@@ -494,32 +494,27 @@ Please write an engaging, age-appropriate story that incorporates all the charac
           } else if (format === 'pdf') {
             const printWindow = window.open('', '_blank', 'width=800,height=600');
             if (printWindow) {
-              printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                  <head>
-                    <meta charset="utf-8">
-                    <title>${storyTitle}</title>
-                    <style>
-                      body { font-family: Arial, sans-serif; padding: 40px; line-height: 1.6; }
-                      h1 { color: #7c3aed; margin-bottom: 20px; }
-                      p { margin-bottom: 10px; white-space: pre-wrap; }
-                    </style>
-                  </head>
-                  <body>
-                    <h1>${storyTitle}</h1>
-                    <p>${generatedStory.replace(/\n/g, '<br>')}</p>
-                    <script>
-                      window.onload = function() {
-                        setTimeout(function() {
-                          window.print();
-                        }, 500);
-                      };
-                    </script>
-                  </body>
-                </html>
-              `);
+              const htmlContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>${storyTitle}</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 40px; line-height: 1.6; }
+      h1 { color: #7c3aed; margin-bottom: 20px; }
+      p { margin-bottom: 10px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>${storyTitle}</h1>
+    <p>${generatedStory.replace(/\n/g, '<br>')}</p>
+  </body>
+</html>`;
+              printWindow.document.write(htmlContent);
               printWindow.document.close();
+              setTimeout(() => {
+                printWindow.print();
+              }, 500);
             } else {
               alert('Popup blocked. Please allow popups.');
             }
