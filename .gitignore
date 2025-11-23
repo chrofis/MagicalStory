@@ -13,3 +13,12 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Test files
+test-simple.html
+
+# Temp files
+nul
+
+# Claude Code
+.claude/
