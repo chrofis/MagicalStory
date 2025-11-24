@@ -429,7 +429,7 @@ Language Level: ${languageInstructions[language][languageLevel]}
 Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.`;
 
         try {
-          const response = await fetch('http://localhost:8000/api/generate', {
+          const response = await fetch('https://magical-story-api.rogerfischer.workers.dev', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
