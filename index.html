@@ -429,19 +429,16 @@ Language Level: ${languageInstructions[language][languageLevel]}
 Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.`;
 
         try {
-          const response = await fetch('https://api.anthropic.com/v1/messages', {
+          const response = await fetch('http://localhost:8000/api/generate', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01'
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({
+              apiKey: apiKey,
+              prompt: prompt,
               model: 'claude-sonnet-4-20250514',
-              max_tokens: 4000,
-              messages: [
-                { role: 'user', content: prompt }
-              ]
+              max_tokens: 4000
             })
           });
 
@@ -598,8 +595,782 @@ Please write an engaging, age-appropriate story that incorporates all the charac
         }
       };
 
-      // Render functions would be too long to include in a single response
-      // Continuing in the next section...
+      const startNewCharacter = () => {
+        setCurrentCharacter({
+          id: Date.now(),
+          name: '',
+          photo: null,
+          photoUrl: null,
+          useDescription: false,
+          descriptionAge: '',
+          hairColor: '',
+          otherFeatures: '',
+          gender: 'other',
+          age: '',
+          strengths: [],
+          weaknesses: [],
+          specialDetails: '',
+          fears: []
+        });
+        setShowCharacterCreated(false);
+      };
+
+      const editCharacter = (char) => {
+        setCurrentCharacter(char);
+        setCharacters(characters.filter(c => c.id !== char.id));
+        setShowCharacterCreated(false);
+      };
+
+      const saveCurrentCharacter = () => {
+        if (currentCharacter.name &&
+            currentCharacter.strengths.length >= 3 &&
+            currentCharacter.weaknesses.length >= 2) {
+          setCharacters([...characters, currentCharacter]);
+          setShowCharacterCreated(true);
+          setCurrentCharacter(null);
+        }
+      };
+
+      const handlePhotoUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setCurrentCharacter({
+              ...currentCharacter,
+              photo: file,
+              photoUrl: reader.result
+            });
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleNameChange = (name) => {
+        const detectedGender = detectGender(name);
+        setCurrentCharacter({
+          ...currentCharacter,
+          name,
+          gender: detectedGender
+        });
+      };
+
+      const toggleArrayItem = (field, item) => {
+        const currentArray = currentCharacter[field];
+        const newArray = currentArray.includes(item)
+          ? currentArray.filter(i => i !== item)
+          : [...currentArray, item];
+        setCurrentCharacter({ ...currentCharacter, [field]: newArray });
+      };
+
+      const addCustomStrength = () => {
+        if (newStrength && !allStrengths.includes(newStrength)) {
+          setCustomStrengths([...customStrengths, newStrength]);
+          setCurrentCharacter({
+            ...currentCharacter,
+            strengths: [...currentCharacter.strengths, newStrength]
+          });
+          setNewStrength('');
+        }
+      };
+
+      const addCustomWeakness = () => {
+        if (newWeakness && !allWeaknesses.includes(newWeakness)) {
+          setCustomWeaknesses([...customWeaknesses, newWeakness]);
+          setCurrentCharacter({
+            ...currentCharacter,
+            weaknesses: [...currentCharacter.weaknesses, newWeakness]
+          });
+          setNewWeakness('');
+        }
+      };
+
+      const addCustomFear = () => {
+        if (newFear && !allFears.includes(newFear)) {
+          setCustomFears([...customFears, newFear]);
+          setCurrentCharacter({
+            ...currentCharacter,
+            fears: [...currentCharacter.fears, newFear]
+          });
+          setNewFear('');
+        }
+      };
+
+      const addCustomRelationship = () => {
+        if (newRelationship && !customRelationships.includes(newRelationship)) {
+          setCustomRelationships([...customRelationships, newRelationship]);
+          setNewRelationship('');
+        }
+      };
+
+      const toggleMainCharacter = (charId) => {
+        if (mainCharacters.includes(charId)) {
+          setMainCharacters(mainCharacters.filter(id => id !== charId));
+        } else if (mainCharacters.length < 2) {
+          setMainCharacters([...mainCharacters, charId]);
+        }
+      };
+
+      const initializeRelationships = () => {
+        const newRelationships = {};
+        characters.forEach(char1 => {
+          characters.forEach(char2 => {
+            if (char1.id !== char2.id) {
+              const key = `${char1.id}-${char2.id}`;
+              if (!relationships[key]) {
+                newRelationships[key] = relationshipTypes[10].value[language];
+              } else {
+                newRelationships[key] = relationships[key];
+              }
+            }
+          });
+        });
+        setRelationships({ ...relationships, ...newRelationships });
+      };
+
+      const updateRelationship = (char1Id, char2Id, type) => {
+        const inverse = getInverseRelationship(type);
+        setRelationships({
+          ...relationships,
+          [`${char1Id}-${char2Id}`]: type,
+          [`${char2Id}-${char1Id}`]: inverse
+        });
+      };
+
+      const areAllRelationshipsDefined = () => {
+        for (let i = 0; i < characters.length; i++) {
+          for (let j = 0; j < characters.length; j++) {
+            if (i !== j) {
+              const key = `${characters[i].id}-${characters[j].id}`;
+              if (!relationships[key]) return false;
+            }
+          }
+        }
+        return true;
+      };
+
+      const renderStep0 = () => (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2 justify-center">
+            <Icon name="book-open" size={24} /> {t.selectLanguage}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+            <button
+              onClick={() => {
+                setLanguage('de');
+                setStep(1);
+              }}
+              className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
+            >
+              <div className="font-bold text-2xl">Deutsch</div>
+            </button>
+
+            <button
+              onClick={() => {
+                setLanguage('en');
+                setStep(1);
+              }}
+              className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
+            >
+              <div className="font-bold text-2xl">English</div>
+            </button>
+
+            <button
+              onClick={() => {
+                setLanguage('fr');
+                setStep(1);
+              }}
+              className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
+            >
+              <div className="font-bold text-2xl">Français</div>
+            </button>
+          </div>
+
+          <div className="text-center pt-6 border-t border-gray-200">
+            <label className="cursor-pointer bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 inline-flex items-center gap-2">
+              <Icon name="folder-open" size={20} /> {t.importConfig}
+              <input
+                type="file"
+                accept=".json"
+                onChange={importConfiguration}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </div>
+      );
+
+      const renderStep1 = () => (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+            <Icon name="book-open" size={24} /> {t.chooseStoryType}
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {storyTypes.map(type => (
+              <button
+                key={type.id}
+                onClick={() => setStoryType(type.id)}
+                className={`p-6 rounded-xl border-2 transition-all ${
+                  storyType === type.id
+                    ? 'border-purple-500 bg-purple-50 shadow-lg scale-105'
+                    : 'border-gray-200 hover:border-purple-300 hover:shadow-md'
+                }`}
+              >
+                <div className="text-4xl mb-2">{type.emoji}</div>
+                <div className="font-semibold text-sm">{type.name[language]}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+
+      const renderStep2 = () => {
+        const canSave = currentCharacter && currentCharacter.name &&
+                        currentCharacter.strengths.length >= 3 &&
+                        currentCharacter.weaknesses.length >= 2;
+
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+              <Icon name="users" size={24} /> {t.createCharacters}
+            </h2>
+
+            {characters.length > 0 && (
+              <div className="bg-white border-2 border-purple-200 rounded-xl p-6 mb-6">
+                <h3 className="text-lg font-bold text-purple-700 mb-4">{t.yourCharacters}</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {characters.map((char) => (
+                    <div key={char.id} className="border border-gray-200 rounded-lg p-4 relative">
+                      <button
+                        onClick={() => editCharacter(char)}
+                        className="absolute top-2 right-2 bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 flex items-center gap-1"
+                      >
+                        {t.editCharacter}
+                      </button>
+                      {char.photoUrl && (
+                        <img src={char.photoUrl} alt={char.name} className="w-20 h-20 rounded-full mx-auto mb-2 object-cover" />
+                      )}
+                      <h4 className="font-bold text-center mb-2">{char.name}</h4>
+                      <p className="text-sm text-gray-600 text-center mb-1">
+                        {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : 'years'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <strong>{t.strengths}:</strong> {char.strengths.slice(0, 3).join(', ')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showCharacterCreated && (
+              <div className="bg-green-50 border-2 border-green-300 rounded-xl p-8 text-center">
+                <Icon name="check" size={64} className="text-green-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-green-700 mb-4">{t.characterCreated}</h2>
+                <p className="text-gray-700 mb-6">
+                  {t.charactersCreated.replace('{count}', characters.length).replace('{s}', characters.length > 1 ? 's' : '')}
+                </p>
+                <div className="flex gap-4 justify-center">
+                  <button
+                    onClick={startNewCharacter}
+                    className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+                  >
+                    <Icon name="plus" size={20} /> {t.createAnother}
+                  </button>
+                  <button
+                    onClick={() => {
+                      initializeRelationships();
+                      setStep(3);
+                    }}
+                    className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+                  >
+                    {t.continueToRelationships} <Icon name="arrow-right" size={20} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!currentCharacter && !showCharacterCreated && (
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-12 text-center">
+                <p className="text-gray-700 mb-6 text-lg">
+                  {characters.length === 0
+                    ? t.charactersCreated.replace('{count}', 0).replace('{s}', 's')
+                    : t.charactersCreated.replace('{count}', characters.length).replace('{s}', characters.length > 1 ? 's' : '')}
+                </p>
+                <button
+                  onClick={startNewCharacter}
+                  className="bg-blue-500 text-white px-8 py-4 rounded-lg hover:bg-blue-600 font-bold text-lg flex items-center gap-2 mx-auto"
+                >
+                  <Icon name="plus" size={24} /> {t.startCreating}
+                </button>
+              </div>
+            )}
+
+            {currentCharacter && (
+              <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
+                <h3 className="text-xl font-bold text-purple-700">{currentCharacter.id ? t.editCharacter : t.startCreating}</h3>
+                <div>
+                  <label className="block text-lg font-semibold mb-2">{t.characterName} *</label>
+                  <input
+                    type="text"
+                    value={currentCharacter.name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+                    placeholder={t.characterName}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-lg font-semibold mb-2">{t.gender}</label>
+                  <select
+                    value={currentCharacter.gender}
+                    onChange={(e) => setCurrentCharacter({ ...currentCharacter, gender: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+                  >
+                    <option value="male">{t.male}</option>
+                    <option value="female">{t.female}</option>
+                    <option value="other">{t.other}</option>
+                  </select>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="border-2 border-purple-300 rounded-lg p-4 bg-purple-50">
+                    <label className="block text-lg font-semibold mb-3 text-center">{t.characterPhoto}</label>
+                    <div className="flex flex-col items-center gap-3">
+                      {currentCharacter.photoUrl && (
+                        <img
+                          src={currentCharacter.photoUrl}
+                          alt="Character"
+                          className="w-32 h-32 rounded-full object-cover border-4 border-purple-400"
+                        />
+                      )}
+                      <label className="cursor-pointer bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 flex items-center gap-2 font-semibold">
+                        <Icon name="upload" size={20} /> {t.uploadPhoto}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="border-2 border-green-300 rounded-lg p-4 bg-green-50">
+                    <label className="block text-lg font-semibold mb-3 text-center">{t.orDescribe}</label>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-semibold mb-1">{t.age}</label>
+                        <input
+                          type="number"
+                          value={currentCharacter.age}
+                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, age: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          placeholder={t.age}
+                          min="1"
+                          max="99"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-1">{t.hairColor}</label>
+                        <input
+                          type="text"
+                          value={currentCharacter.hairColor}
+                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, hairColor: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          placeholder={t.hairColor}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-1">{t.otherFeatures}</label>
+                        <textarea
+                          value={currentCharacter.otherFeatures}
+                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, otherFeatures: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          placeholder={t.descriptionPlaceholder}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-lg font-semibold mb-2">
+                    {t.strengths} * ({t.selectAtLeast} 3) - {t.selected}: {currentCharacter.strengths.length}
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {allStrengths.map(strength => (
+                      <button
+                        key={strength}
+                        onClick={() => toggleArrayItem('strengths', strength)}
+                        className={`px-3 py-1 rounded-full text-sm ${
+                          currentCharacter.strengths.includes(strength)
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {strength}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newStrength}
+                      onChange={(e) => setNewStrength(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addCustomStrength()}
+                      placeholder={t.addCustomStrengths}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                    <button
+                      onClick={addCustomStrength}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                    >
+                      <Icon name="plus" size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-lg font-semibold mb-2">
+                    {t.weaknesses} * ({t.selectAtLeast} 2) - {t.selected}: {currentCharacter.weaknesses.length}
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {allWeaknesses.map(weakness => (
+                      <button
+                        key={weakness}
+                        onClick={() => toggleArrayItem('weaknesses', weakness)}
+                        className={`px-3 py-1 rounded-full text-sm ${
+                          currentCharacter.weaknesses.includes(weakness)
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {weakness}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newWeakness}
+                      onChange={(e) => setNewWeakness(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addCustomWeakness()}
+                      placeholder={t.addCustomWeaknesses}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                    <button
+                      onClick={addCustomWeakness}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                    >
+                      <Icon name="plus" size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-lg font-semibold mb-2">{t.fears}</label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {allFears.map(fear => (
+                      <button
+                        key={fear}
+                        onClick={() => toggleArrayItem('fears', fear)}
+                        className={`px-3 py-1 rounded-full text-sm ${
+                          currentCharacter.fears.includes(fear)
+                            ? 'bg-red-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {fear}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newFear}
+                      onChange={(e) => setNewFear(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addCustomFear()}
+                      placeholder={t.addCustomFears}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                    <button
+                      onClick={addCustomFear}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                    >
+                      <Icon name="plus" size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-lg font-semibold mb-2">{t.specialDetails}</label>
+                  <textarea
+                    value={currentCharacter.specialDetails}
+                    onChange={(e) => setCurrentCharacter({ ...currentCharacter, specialDetails: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+                    placeholder={t.specialDetailsPlaceholder}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      setCurrentCharacter(null);
+                      setShowCharacterCreated(false);
+                    }}
+                    className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 font-semibold"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    onClick={saveCurrentCharacter}
+                    disabled={!canSave}
+                    className={`flex-1 px-6 py-3 rounded-lg font-semibold ${
+                      canSave
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    {t.saveCharacter}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      const renderStep3 = () => (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+            <Icon name="heart" size={24} /> {t.defineRelationships}
+          </h2>
+          <p className="text-gray-600">{t.defineRelationshipsDesc}</p>
+
+          <div className="space-y-4">
+            {characters.map((char1, i) => (
+              <div key={char1.id}>
+                {characters.map((char2, j) => {
+                  if (i >= j) return null;
+                  const key1 = `${char1.id}-${char2.id}`;
+                  const key2 = `${char2.id}-${char1.id}`;
+
+                  return (
+                    <div key={key1} className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-4">
+                      <div className="grid md:grid-cols-3 gap-4 items-center">
+                        <div className="text-center">
+                          {char1.photoUrl && (
+                            <img src={char1.photoUrl} alt={char1.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
+                          )}
+                          <div className="font-bold">{char1.name}</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-center">{t.is}</label>
+                          <select
+                            value={relationships[key1] || relationshipTypes[10].value[language]}
+                            onChange={(e) => updateRelationship(char1.id, char2.id, e.target.value)}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg font-semibold"
+                          >
+                            {allRelationships.map((type, idx) => (
+                              <option key={idx} value={type.value[language]}>{type.value[language]}</option>
+                            ))}
+                          </select>
+                          <div className="flex gap-2 mt-2">
+                            <input
+                              type="text"
+                              value={newRelationship}
+                              onChange={(e) => setNewRelationship(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && addCustomRelationship()}
+                              placeholder={t.addCustomRelationship}
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                            />
+                            <button
+                              onClick={addCustomRelationship}
+                              className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                            >
+                              <Icon name="plus" size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="text-center">
+                          {char2.photoUrl && (
+                            <img src={char2.photoUrl} alt={char2.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
+                          )}
+                          <div className="font-bold">{char2.name}</div>
+                        </div>
+                      </div>
+
+                      {relationships[key1] && relationships[key2] && (
+                        <div className="pt-3 border-t border-gray-200">
+                          <div className="text-xs text-gray-500 text-center mb-1">{t.reverseRelationship}</div>
+                          <div className="text-sm text-center text-gray-600">
+                            <strong>{char2.name}</strong> {t.is} <strong>{relationships[key2]}</strong> <strong>{char1.name}</strong>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      const renderStep4 = () => (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+              <Icon name="wand-2" size={24} /> {t.storySettings}
+            </h2>
+            <button
+              onClick={exportConfiguration}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
+            >
+              <Icon name="save" size={20} /> {t.exportConfig}
+            </button>
+          </div>
+
+          <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
+            <div>
+              <label className="block text-lg font-semibold mb-3">{t.selectMainCharacters}</label>
+              <div className="grid md:grid-cols-2 gap-3">
+                {characters.map(char => (
+                  <button
+                    key={char.id}
+                    onClick={() => toggleMainCharacter(char.id)}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      mainCharacters.includes(char.id)
+                        ? 'border-yellow-500 bg-yellow-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {char.photoUrl && (
+                        <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full object-cover" />
+                      )}
+                      <div className="flex-1">
+                        <div className="font-bold flex items-center gap-2">
+                          {char.name}
+                          {mainCharacters.includes(char.id) && <Icon name="star" size={16} className="text-yellow-500" />}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-lg font-semibold mb-3">{t.numberOfPages}</label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min="3"
+                  max="30"
+                  value={pages}
+                  onChange={(e) => setPages(parseInt(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="text-2xl font-bold text-purple-600 w-12 text-center">{pages}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-lg font-semibold mb-3">{t.readingLevel}</label>
+              <div className="space-y-2">
+                {[
+                  { value: '1st-grade', label: t.firstGrade, desc: t.firstGradeDesc },
+                  { value: 'standard', label: t.standard, desc: t.standardDesc },
+                  { value: 'advanced', label: t.advanced, desc: t.advancedDesc }
+                ].map(level => (
+                  <button
+                    key={level.value}
+                    onClick={() => setLanguageLevel(level.value)}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      languageLevel === level.value
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-purple-300'
+                    }`}
+                  >
+                    <div className="font-semibold">{level.label}</div>
+                    <div className="text-sm text-gray-600">{level.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={generateStory}
+              disabled={isGenerating || characters.length === 0}
+              className={`w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 ${
+                isGenerating || characters.length === 0
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              <Icon name="wand-2" size={24} />
+              {isGenerating ? t.creating : t.generateStory}
+            </button>
+          </div>
+        </div>
+      );
+
+      const renderStep6 = () => (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+            <Icon name="book-open" size={24} /> {t.storyReady}
+          </h2>
+
+          <div className="bg-white border-2 border-purple-200 rounded-xl p-8 prose max-w-none">
+            <div className="whitespace-pre-wrap leading-relaxed text-gray-800">
+              {generatedStory}
+            </div>
+          </div>
+
+          <div className="flex gap-4 flex-wrap">
+            <button
+              onClick={() => downloadStory('txt')}
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+            >
+              <Icon name="download" size={20} /> {t.downloadTXT}
+            </button>
+            <button
+              onClick={() => downloadStory('pdf')}
+              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 font-semibold flex items-center gap-2"
+            >
+              <Icon name="download" size={20} /> {t.downloadPDF}
+            </button>
+            <button
+              onClick={exportConfiguration}
+              className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center gap-2"
+            >
+              <Icon name="save" size={20} /> {t.exportConfig}
+            </button>
+            <button
+              onClick={() => {
+                setStep(1);
+                setGeneratedStory('');
+                setCharacters([]);
+                setRelationships({});
+                setStoryType('');
+                setMainCharacters([]);
+              }}
+              className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold ml-auto"
+            >
+              {t.createAnotherStory}
+            </button>
+          </div>
+        </div>
+      );
 
       return (
         <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 p-4 md:p-8">
@@ -642,13 +1413,60 @@ Please write an engaging, age-appropriate story that incorporates all the charac
               </div>
             )}
 
-            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-              <div className="text-center">
-                <p className="text-lg text-gray-700 mb-4">Welcome to AI Story Creator!</p>
-                <p className="text-sm text-gray-600">This is a demo version. Full implementation with all features coming soon.</p>
-                <p className="text-sm text-gray-600 mt-2">To use this app, you'll need an Anthropic API key. Get one at <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">console.anthropic.com</a></p>
+            {step > 0 && step < 6 && (
+              <div className="flex justify-center mb-8">
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4].map(s => (
+                    <React.Fragment key={s}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                        step >= s ? 'bg-purple-500 text-white' : 'bg-gray-300 text-gray-600'
+                      }`}>
+                        {s}
+                      </div>
+                      {s < 4 && <div className={`w-12 h-1 ${step > s ? 'bg-purple-500' : 'bg-gray-300'}`} />}
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
+            )}
+
+            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6">
+              {step === 0 && renderStep0()}
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
+              {step === 4 && renderStep4()}
+              {step === 6 && renderStep6()}
             </div>
+
+            {step > 0 && step < 6 && step !== 2 && (
+              <div className="flex justify-between">
+                <button
+                  onClick={() => setStep(Math.max(0, step - 1))}
+                  className="bg-white text-purple-600 hover:bg-purple-50 border-2 border-purple-500 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+                >
+                  <Icon name="arrow-left" size={20} /> {t.back}
+                </button>
+
+                <button
+                  onClick={() => setStep(Math.min(4, step + 1))}
+                  disabled={
+                    (step === 1 && !storyType) ||
+                    (step === 2 && characters.length === 0) ||
+                    (step === 3 && !areAllRelationshipsDefined())
+                  }
+                  className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
+                    (step === 1 && !storyType) ||
+                    (step === 2 && characters.length === 0) ||
+                    (step === 3 && !areAllRelationshipsDefined())
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  {t.next} <Icon name="arrow-right" size={20} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       );

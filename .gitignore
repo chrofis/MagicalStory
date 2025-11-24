@@ -20,5 +20,9 @@ test-simple.html
 # Temp files
 nul
 
+# Secrets and API keys
+API key.txt
+*.key
+
 # Claude Code
 .claude/
