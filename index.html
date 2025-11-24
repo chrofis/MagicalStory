@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Story Creator</title>
+  <title>Magical Story</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -90,6 +90,10 @@
         subtitle: 'Create magical stories with AI!',
         selectLanguage: 'Choose your language',
         chooseStoryType: 'Choose Your Story Type',
+        addCustomStoryType: 'Add Custom Story Type',
+        storyTypeName: 'Story Type Name',
+        storyTypeEmoji: 'Emoji',
+        addStoryType: 'Add',
         createCharacters: 'Create Your Characters',
         characterCreated: 'Character Created!',
         createAnother: 'Create Another Character',
@@ -123,6 +127,7 @@
         cancel: 'Cancel',
         saveCharacter: 'Save Character',
         editCharacter: 'Edit',
+        deleteCharacter: 'Delete',
         defineRelationships: 'Define Character Relationships',
         defineRelationshipsDesc: 'Define how each character relates to the others.',
         is: 'is',
@@ -142,6 +147,10 @@
         storyReady: 'Your Story is Ready!',
         downloadTXT: 'Download as TXT',
         downloadPDF: 'Download as PDF',
+        downloadPrompt: 'Download Prompt',
+        viewPrompt: 'View Prompt',
+        hidePrompt: 'Hide Prompt',
+        promptUsed: 'Prompt Used to Generate Story:',
         createAnotherStory: 'Create Another Story',
         back: 'Back',
         next: 'Next',
@@ -156,10 +165,14 @@
         apiKeyNote: 'Your API key is stored locally in your browser and never sent anywhere except to Anthropic.'
       },
       de: {
-        title: 'KI-Geschichten-Creator',
+        title: 'Magical Story',
         subtitle: 'Erstelle magische Geschichten mit KI!',
         selectLanguage: 'Wähle deine Sprache',
         chooseStoryType: 'Wähle deinen Geschichtentyp',
+        addCustomStoryType: 'Eigenen Geschichtentyp hinzufügen',
+        storyTypeName: 'Name des Geschichtentyps',
+        storyTypeEmoji: 'Emoji',
+        addStoryType: 'Hinzufügen',
         createCharacters: 'Erstelle deine Charaktere',
         characterCreated: 'Charakter erstellt!',
         createAnother: 'Weiteren Charakter erstellen',
@@ -193,6 +206,7 @@
         cancel: 'Abbrechen',
         saveCharacter: 'Charakter speichern',
         editCharacter: 'Bearbeiten',
+        deleteCharacter: 'Löschen',
         defineRelationships: 'Charakterbeziehungen definieren',
         defineRelationshipsDesc: 'Definiere, wie die Charaktere zueinander stehen.',
         is: 'ist',
@@ -212,6 +226,10 @@
         storyReady: 'Deine Geschichte ist fertig!',
         downloadTXT: 'Als TXT herunterladen',
         downloadPDF: 'Als PDF herunterladen',
+        downloadPrompt: 'Prompt herunterladen',
+        viewPrompt: 'Prompt anzeigen',
+        hidePrompt: 'Prompt ausblenden',
+        promptUsed: 'Verwendeter Prompt:',
         createAnotherStory: 'Neue Geschichte erstellen',
         back: 'Zurück',
         next: 'Weiter',
@@ -226,10 +244,14 @@
         apiKeyNote: 'Ihr API-Schlüssel wird lokal im Browser gespeichert.'
       },
       fr: {
-        title: 'Créateur d\'Histoires IA',
+        title: 'Magical Story',
         subtitle: 'Créez des histoires magiques avec l\'IA!',
         selectLanguage: 'Choisissez votre langue',
         chooseStoryType: 'Choisissez votre type d\'histoire',
+        addCustomStoryType: 'Ajouter un type d\'histoire personnalisé',
+        storyTypeName: 'Nom du type d\'histoire',
+        storyTypeEmoji: 'Emoji',
+        addStoryType: 'Ajouter',
         createCharacters: 'Créez vos personnages',
         characterCreated: 'Personnage créé!',
         createAnother: 'Créer un autre personnage',
@@ -263,6 +285,7 @@
         cancel: 'Annuler',
         saveCharacter: 'Sauvegarder le personnage',
         editCharacter: 'Modifier',
+        deleteCharacter: 'Supprimer',
         defineRelationships: 'Définir les relations entre personnages',
         defineRelationshipsDesc: 'Définissez comment chaque personnage est lié aux autres.',
         is: 'est',
@@ -282,6 +305,10 @@
         storyReady: 'Votre histoire est prête!',
         downloadTXT: 'Télécharger en TXT',
         downloadPDF: 'Télécharger en PDF',
+        downloadPrompt: 'Télécharger le prompt',
+        viewPrompt: 'Voir le prompt',
+        hidePrompt: 'Masquer le prompt',
+        promptUsed: 'Prompt utilisé pour générer l\'histoire:',
         createAnotherStory: 'Créer une nouvelle histoire',
         back: 'Retour',
         next: 'Suivant',
@@ -321,6 +348,11 @@
       const [apiKey, setApiKey] = useState('');
       const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false);
       const [tempApiKey, setTempApiKey] = useState('');
+      const [generatedPrompt, setGeneratedPrompt] = useState('');
+      const [showPrompt, setShowPrompt] = useState(false);
+      const [customStoryTypes, setCustomStoryTypes] = useState([]);
+      const [newStoryTypeName, setNewStoryTypeName] = useState('');
+      const [newStoryTypeEmoji, setNewStoryTypeEmoji] = useState('🎭');
 
       useEffect(() => {
         const savedApiKey = localStorage.getItem('anthropic_api_key');
@@ -340,6 +372,7 @@
         value: { en: rel, de: rel, fr: rel },
         inverse: { en: rel, de: rel, fr: rel }
       }))];
+      const allStoryTypes = [...storyTypes, ...customStoryTypes];
 
       const detectGender = (name) => {
         const femaleSuffixes = ['a', 'e', 'ie', 'ine', 'elle'];
@@ -428,6 +461,9 @@ Language Level: ${languageInstructions[language][languageLevel]}
 
 Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.`;
 
+        // Save the prompt for display/download
+        setGeneratedPrompt(prompt);
+
         try {
           const response = await fetch('https://magical-story-api.rogerfischer.workers.dev', {
             method: 'POST',
@@ -471,6 +507,24 @@ Please write an engaging, age-appropriate story that incorporates all the charac
           setStep(6);
         } finally {
           setIsGenerating(false);
+        }
+      };
+
+      const downloadPrompt = () => {
+        try {
+          const promptTitle = `Prompt - ${storyTypes.find(t => t.id === storyType)?.name[language] || 'Story'} - ${new Date().toLocaleDateString()}`;
+          const blob = new Blob([generatedPrompt], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${promptTitle}.txt`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error('Download error:', error);
+          alert('Download error: ' + error.message);
         }
       };
 
@@ -544,6 +598,7 @@ Please write an engaging, age-appropriate story that incorporates all the charac
             customWeaknesses,
             customFears,
             customRelationships,
+            customStoryTypes,
             relationships,
             pages,
             languageLevel,
@@ -580,6 +635,7 @@ Please write an engaging, age-appropriate story that incorporates all the charac
               setCustomWeaknesses(config.customWeaknesses || []);
               setCustomFears(config.customFears || []);
               setCustomRelationships(config.customRelationships || []);
+              setCustomStoryTypes(config.customStoryTypes || []);
               setRelationships(config.relationships || {});
               setPages(config.pages || 5);
               setLanguageLevel(config.languageLevel || 'standard');
@@ -619,6 +675,22 @@ Please write an engaging, age-appropriate story that incorporates all the charac
         setCurrentCharacter(char);
         setCharacters(characters.filter(c => c.id !== char.id));
         setShowCharacterCreated(false);
+      };
+
+      const deleteCharacter = (charId) => {
+        if (confirm(t.deleteCharacter + '?')) {
+          setCharacters(characters.filter(c => c.id !== charId));
+          // Remove from main characters if present
+          setMainCharacters(mainCharacters.filter(id => id !== charId));
+          // Remove relationships involving this character
+          const newRelationships = {};
+          Object.keys(relationships).forEach(key => {
+            if (!key.includes(charId.toString())) {
+              newRelationships[key] = relationships[key];
+            }
+          });
+          setRelationships(newRelationships);
+        }
       };
 
       const saveCurrentCharacter = () => {
@@ -700,6 +772,19 @@ Please write an engaging, age-appropriate story that incorporates all the charac
         if (newRelationship && !customRelationships.includes(newRelationship)) {
           setCustomRelationships([...customRelationships, newRelationship]);
           setNewRelationship('');
+        }
+      };
+
+      const addCustomStoryType = () => {
+        if (newStoryTypeName.trim()) {
+          const newType = {
+            id: `custom-${Date.now()}`,
+            name: { en: newStoryTypeName, de: newStoryTypeName, fr: newStoryTypeName },
+            emoji: newStoryTypeEmoji || '🎭'
+          };
+          setCustomStoryTypes([...customStoryTypes, newType]);
+          setNewStoryTypeName('');
+          setNewStoryTypeEmoji('🎭');
         }
       };
 
@@ -806,7 +891,7 @@ Please write an engaging, age-appropriate story that incorporates all the charac
             <Icon name="book-open" size={24} /> {t.chooseStoryType}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {storyTypes.map(type => (
+            {allStoryTypes.map(type => (
               <button
                 key={type.id}
                 onClick={() => setStoryType(type.id)}
@@ -820,6 +905,34 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                 <div className="font-semibold text-sm">{type.name[language]}</div>
               </button>
             ))}
+          </div>
+
+          <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 mt-6">
+            <h3 className="text-lg font-bold text-purple-700 mb-4">{t.addCustomStoryType}</h3>
+            <div className="flex gap-3 flex-wrap">
+              <input
+                type="text"
+                value={newStoryTypeEmoji}
+                onChange={(e) => setNewStoryTypeEmoji(e.target.value)}
+                placeholder={t.storyTypeEmoji}
+                className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center text-2xl"
+                maxLength="2"
+              />
+              <input
+                type="text"
+                value={newStoryTypeName}
+                onChange={(e) => setNewStoryTypeName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addCustomStoryType()}
+                placeholder={t.storyTypeName}
+                className="flex-1 min-w-[200px] px-4 py-2 border-2 border-gray-300 rounded-lg"
+              />
+              <button
+                onClick={addCustomStoryType}
+                className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+              >
+                <Icon name="plus" size={20} /> {t.addStoryType}
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -841,12 +954,20 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                 <div className="grid md:grid-cols-2 gap-4">
                   {characters.map((char) => (
                     <div key={char.id} className="border border-gray-200 rounded-lg p-4 relative">
-                      <button
-                        onClick={() => editCharacter(char)}
-                        className="absolute top-2 right-2 bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 flex items-center gap-1"
-                      >
-                        {t.editCharacter}
-                      </button>
+                      <div className="absolute top-2 right-2 flex gap-2">
+                        <button
+                          onClick={() => editCharacter(char)}
+                          className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 flex items-center gap-1"
+                        >
+                          {t.editCharacter}
+                        </button>
+                        <button
+                          onClick={() => deleteCharacter(char.id)}
+                          className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 flex items-center gap-1"
+                        >
+                          {t.deleteCharacter}
+                        </button>
+                      </div>
                       {char.photoUrl && (
                         <img src={char.photoUrl} alt={char.name} className="w-20 h-20 rounded-full mx-auto mb-2 object-cover" />
                       )}
@@ -897,12 +1018,25 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                     ? t.charactersCreated.replace('{count}', 0).replace('{s}', 's')
                     : t.charactersCreated.replace('{count}', characters.length).replace('{s}', characters.length > 1 ? 's' : '')}
                 </p>
-                <button
-                  onClick={startNewCharacter}
-                  className="bg-blue-500 text-white px-8 py-4 rounded-lg hover:bg-blue-600 font-bold text-lg flex items-center gap-2 mx-auto"
-                >
-                  <Icon name="plus" size={24} /> {t.startCreating}
-                </button>
+                <div className="flex gap-4 justify-center">
+                  <button
+                    onClick={startNewCharacter}
+                    className="bg-blue-500 text-white px-8 py-4 rounded-lg hover:bg-blue-600 font-bold text-lg flex items-center gap-2"
+                  >
+                    <Icon name="plus" size={24} /> {t.startCreating}
+                  </button>
+                  {characters.length > 0 && (
+                    <button
+                      onClick={() => {
+                        initializeRelationships();
+                        setStep(3);
+                      }}
+                      className="bg-blue-500 text-white px-8 py-4 rounded-lg hover:bg-blue-600 font-bold text-lg flex items-center gap-2"
+                    >
+                      {t.continueToRelationships} <Icon name="arrow-right" size={24} />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1336,6 +1470,28 @@ Please write an engaging, age-appropriate story that incorporates all the charac
             </div>
           </div>
 
+          {generatedPrompt && (
+            <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-700">{t.promptUsed}</h3>
+                <button
+                  onClick={() => setShowPrompt(!showPrompt)}
+                  className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
+                >
+                  <Icon name={showPrompt ? "eye-off" : "eye"} size={20} />
+                  {showPrompt ? t.hidePrompt : t.viewPrompt}
+                </button>
+              </div>
+              {showPrompt && (
+                <div className="bg-white border border-gray-300 rounded-lg p-4 mt-4">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">
+                    {generatedPrompt}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-4 flex-wrap">
             <button
               onClick={() => downloadStory('txt')}
@@ -1345,13 +1501,21 @@ Please write an engaging, age-appropriate story that incorporates all the charac
             </button>
             <button
               onClick={() => downloadStory('pdf')}
-              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 font-semibold flex items-center gap-2"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
             >
               <Icon name="download" size={20} /> {t.downloadPDF}
             </button>
+            {generatedPrompt && (
+              <button
+                onClick={downloadPrompt}
+                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+              >
+                <Icon name="download" size={20} /> {t.downloadPrompt}
+              </button>
+            )}
             <button
               onClick={exportConfiguration}
-              className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center gap-2"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
             >
               <Icon name="save" size={20} /> {t.exportConfig}
             </button>
@@ -1359,12 +1523,14 @@ Please write an engaging, age-appropriate story that incorporates all the charac
               onClick={() => {
                 setStep(1);
                 setGeneratedStory('');
+                setGeneratedPrompt('');
+                setShowPrompt(false);
                 setCharacters([]);
                 setRelationships({});
                 setStoryType('');
                 setMainCharacters([]);
               }}
-              className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold ml-auto"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold ml-auto"
             >
               {t.createAnotherStory}
             </button>
@@ -1418,11 +1584,21 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                 <div className="flex items-center gap-2">
                   {[1, 2, 3, 4].map(s => (
                     <React.Fragment key={s}>
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                        step >= s ? 'bg-purple-500 text-white' : 'bg-gray-300 text-gray-600'
-                      }`}>
+                      <button
+                        onClick={() => {
+                          if (s < step || (s === 1 && storyType) || (s === 2 && characters.length > 0) || (s === 3 && areAllRelationshipsDefined())) {
+                            setStep(s);
+                          }
+                        }}
+                        disabled={s > step}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${
+                          step >= s
+                            ? 'bg-purple-500 text-white hover:bg-purple-600 cursor-pointer'
+                            : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                        } ${s < step ? 'hover:scale-110' : ''}`}
+                      >
                         {s}
-                      </div>
+                      </button>
                       {s < 4 && <div className={`w-12 h-1 ${step > s ? 'bg-purple-500' : 'bg-gray-300'}`} />}
                     </React.Fragment>
                   ))}
