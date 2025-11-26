@@ -9,11 +9,22 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Libre+Baskerville:wght@400&display=swap" rel="stylesheet">
   <style>
     body {
       margin: 0;
       padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    }
+    .font-title {
+      font-family: 'Cinzel', serif;
+      font-weight: 700;
+    }
+    .font-body {
+      font-family: 'Libre Baskerville', serif;
+      font-weight: 400;
     }
   </style>
 </head>
@@ -86,8 +97,13 @@
 
     const translations = {
       en: {
-        title: 'AI Story Creator',
-        subtitle: 'Create magical stories with AI!',
+        title: 'Magical Story',
+        subtitle: 'Personalize your story to create magic',
+        heroTitle: 'Become the hero of your story',
+        heroSubtitle: '',
+        heroDescription: 'Turn your wildest ideas into a breathtaking personalized tale.',
+        bookText: 'Get a beautifully printed book and make someone feel like the legend they truly are.',
+        startJourney: 'Start Your Adventure',
         selectLanguage: 'Choose your language',
         chooseStoryType: 'Choose Your Story Type',
         addCustomStoryType: 'Add Custom Story Type',
@@ -166,7 +182,12 @@
       },
       de: {
         title: 'Magical Story',
-        subtitle: 'Erstelle magische Geschichten mit KI!',
+        subtitle: 'Personalisiere deine Geschichte für Magie',
+        heroTitle: 'Werde zum Helden deiner Geschichte',
+        heroSubtitle: '',
+        heroDescription: 'Verwandle deine wildesten Ideen in eine atemberaubende personalisierte Geschichte.',
+        bookText: 'Erhalte ein wunderschön gedrucktes Buch und gib jemandem das Gefühl, die Legende zu sein, die er wirklich ist.',
+        startJourney: 'Starte dein Abenteuer',
         selectLanguage: 'Wähle deine Sprache',
         chooseStoryType: 'Wähle deinen Geschichtentyp',
         addCustomStoryType: 'Eigenen Geschichtentyp hinzufügen',
@@ -245,7 +266,12 @@
       },
       fr: {
         title: 'Magical Story',
-        subtitle: 'Créez des histoires magiques avec l\'IA!',
+        subtitle: 'Personnalisez votre histoire pour créer la magie',
+        heroTitle: 'Devenez le héros de votre histoire',
+        heroSubtitle: '',
+        heroDescription: 'Transformez vos idées les plus folles en un conte personnalisé époustouflant.',
+        bookText: 'Obtenez un livre magnifiquement imprimé et donnez à quelqu\'un le sentiment d\'être la légende qu\'il est vraiment.',
+        startJourney: 'Commencez Votre Aventure',
         selectLanguage: 'Choisissez votre langue',
         chooseStoryType: 'Choisissez votre type d\'histoire',
         addCustomStoryType: 'Ajouter un type d\'histoire personnalisé',
@@ -325,7 +351,15 @@
     };
 
     function StoryCreator() {
-      const [language, setLanguage] = useState('de');
+      // Auto-detect browser language
+      const detectBrowserLanguage = () => {
+        const browserLang = navigator.language || navigator.userLanguage;
+        if (browserLang.startsWith('de')) return 'de';
+        if (browserLang.startsWith('fr')) return 'fr';
+        return 'en'; // default to English
+      };
+
+      const [language, setLanguage] = useState(detectBrowserLanguage());
       const [step, setStep] = useState(0);
       const [storyType, setStoryType] = useState('');
       const [characters, setCharacters] = useState([]);
@@ -353,6 +387,7 @@
       const [customStoryTypes, setCustomStoryTypes] = useState([]);
       const [newStoryTypeName, setNewStoryTypeName] = useState('');
       const [newStoryTypeEmoji, setNewStoryTypeEmoji] = useState('🎭');
+      const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
       useEffect(() => {
         const savedApiKey = localStorage.getItem('anthropic_api_key');
@@ -835,52 +870,92 @@ Please write an engaging, age-appropriate story that incorporates all the charac
       };
 
       const renderStep0 = () => (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2 justify-center">
-            <Icon name="book-open" size={24} /> {t.selectLanguage}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-            <button
-              onClick={() => {
-                setLanguage('de');
-                setStep(1);
-              }}
-              className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
-            >
-              <div className="font-bold text-2xl">Deutsch</div>
-            </button>
+        <div className="flex items-center min-h-[calc(100vh-72px)] px-8 py-8 relative" style={{height: 'calc(100vh - 72px)'}}>
+          {/* Decorative Sparkles - Only 4 total */}
+          <div className="absolute bottom-10 right-20 text-3xl opacity-50 animate-pulse">✨</div>
+          <div className="absolute top-10 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1s'}}>✨</div>
+          <div className="absolute bottom-24 left-1/4 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1.5s'}}>✨</div>
+          <div className="absolute bottom-1/3 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '2s'}}>✨</div>
 
-            <button
-              onClick={() => {
-                setLanguage('en');
-                setStep(1);
-              }}
-              className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
-            >
-              <div className="font-bold text-2xl">English</div>
-            </button>
+          <div className="flex gap-8 w-full items-center relative z-10">
+            {/* Left Side - Text and Button (1/3) */}
+            <div className="space-y-6" style={{width: '30%'}}>
+              <div>
+                <h1 className="text-5xl font-title text-black mb-4 leading-tight">
+                  {t.heroTitle}
+                </h1>
+                <p className="text-xl font-body text-black mb-3">
+                  {t.heroDescription}
+                </p>
+                <p className="text-xl font-body text-black">
+                  {t.bookText}
+                </p>
+              </div>
 
-            <button
-              onClick={() => {
-                setLanguage('fr');
-                setStep(1);
-              }}
-              className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
-            >
-              <div className="font-bold text-2xl">Français</div>
-            </button>
-          </div>
+              <button
+                onClick={() => setStep(1)}
+                className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-8 py-4 rounded-xl text-lg font-bold hover:shadow-2xl transform hover:scale-105 transition-all inline-flex items-center gap-2"
+              >
+                <Icon name="sparkles" size={24} />
+                {t.startJourney}
+                <Icon name="arrow-right" size={24} />
+              </button>
+            </div>
 
-          <div className="text-center pt-6 border-t border-gray-200">
-            <label className="cursor-pointer bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 inline-flex items-center gap-2">
-              <Icon name="folder-open" size={20} /> {t.importConfig}
-              <input
-                type="file"
-                accept=".json"
-                onChange={importConfiguration}
-                className="hidden"
-              />
-            </label>
+            {/* Right Side - Photos and Video (2/3) */}
+            <div className="flex gap-6 items-center" style={{width: '70%'}}>
+              {/* Photos Column - Stacked Vertically */}
+              <div className="flex flex-col gap-3" style={{width: '35%'}}>
+                {/* Real Photo */}
+                <div className="text-center">
+                  <div className="mb-2">
+                    <img src="images/Real person.jpg" alt="Your Picture" className="w-full h-auto object-contain rounded-lg" style={{maxHeight: '160px'}} />
+                  </div>
+                  <p className="text-sm text-black font-semibold">
+                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : 'Your Picture'}
+                  </p>
+                </div>
+
+                {/* Arrow Down - Rotated 90 degrees */}
+                <div className="flex justify-center my-3">
+                  <img src="images/arrow-icon-1162.png" alt="Arrow Down" style={{width: '50px', height: '50px', transform: 'rotate(90deg)'}} />
+                </div>
+
+                {/* Avatar */}
+                <div className="text-center">
+                  <div className="mb-2">
+                    <img src="images/Avatar 2.png" alt="Your Character" className="w-full h-auto object-contain rounded-lg" style={{maxHeight: '160px'}} />
+                  </div>
+                  <p className="text-sm text-black font-semibold">
+                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : 'Your Character'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Arrow Right */}
+              <div className="flex justify-center items-center" style={{width: '10%'}}>
+                <img src="images/arrow-icon-1162.png" alt="Arrow Right" style={{width: '60px', height: '60px'}} />
+              </div>
+
+              {/* Video Column */}
+              <div className="text-center" style={{width: '55%'}}>
+                <div className="rounded-xl overflow-hidden shadow-2xl mb-2" style={{height: '400px'}}>
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  >
+                    <source src="images/Pirat Video2.mp4" type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+                <p className="text-sm text-black font-semibold">
+                  {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre Histoire' : 'Your Story'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -1539,16 +1614,55 @@ Please write an engaging, age-appropriate story that incorporates all the charac
       );
 
       return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 p-4 md:p-8">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl md:text-5xl font-bold text-purple-700 mb-2">
-                ✨ {t.title} ✨
-              </h1>
-              <p className="text-gray-600">{t.subtitle}</p>
+        <div className="min-h-screen" style={{backgroundColor: '#e0f2fe'}}>
+          {/* Black Navigation Bar */}
+          <nav className="bg-black text-white px-8 py-4 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">✨ {t.title}</h1>
             </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                className="bg-gray-800 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-700 flex items-center gap-2"
+              >
+                <Icon name="globe" size={20} />
+                {language.toUpperCase()}
+              </button>
+              {showLanguageDropdown && (
+                <div className="absolute right-0 mt-2 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-50">
+                  <button
+                    onClick={() => {
+                      setLanguage('en');
+                      setShowLanguageDropdown(false);
+                    }}
+                    className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'en' ? 'bg-purple-600 text-white' : 'text-white'}`}
+                  >
+                    EN
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLanguage('de');
+                      setShowLanguageDropdown(false);
+                    }}
+                    className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'de' ? 'bg-purple-600 text-white' : 'text-white'}`}
+                  >
+                    DE
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLanguage('fr');
+                      setShowLanguageDropdown(false);
+                    }}
+                    className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'fr' ? 'bg-purple-600 text-white' : 'text-white'}`}
+                  >
+                    FR
+                  </button>
+                </div>
+              )}
+            </div>
+          </nav>
 
-            {showApiKeyPrompt && (
+          {showApiKeyPrompt && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-xl p-8 max-w-md w-full">
                   <h2 className="text-2xl font-bold text-purple-700 mb-4">{t.apiKeyRequired}</h2>
@@ -1579,9 +1693,13 @@ Please write an engaging, age-appropriate story that incorporates all the charac
               </div>
             )}
 
-            {step > 0 && step < 6 && (
-              <div className="flex justify-center mb-8">
-                <div className="flex items-center gap-2">
+          {step === 0 && renderStep0()}
+
+          {step > 0 && (
+            <div className="max-w-7xl mx-auto px-4 md:px-8">
+              {step < 6 && (
+                <div className="flex justify-center mb-8 mt-8">
+                  <div className="flex items-center gap-2">
                   {[1, 2, 3, 4].map(s => (
                     <React.Fragment key={s}>
                       <button
@@ -1604,19 +1722,18 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                   ))}
                 </div>
               </div>
-            )}
+              )}
 
-            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6">
-              {step === 0 && renderStep0()}
-              {step === 1 && renderStep1()}
-              {step === 2 && renderStep2()}
-              {step === 3 && renderStep3()}
-              {step === 4 && renderStep4()}
-              {step === 6 && renderStep6()}
-            </div>
+              <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6">
+                {step === 1 && renderStep1()}
+                {step === 2 && renderStep2()}
+                {step === 3 && renderStep3()}
+                {step === 4 && renderStep4()}
+                {step === 6 && renderStep6()}
+              </div>
 
-            {step > 0 && step < 6 && step !== 2 && (
-              <div className="flex justify-between">
+              {step < 6 && step !== 2 && (
+                <div className="flex justify-between">
                 <button
                   onClick={() => setStep(Math.max(0, step - 1))}
                   className="bg-white text-purple-600 hover:bg-purple-50 border-2 border-purple-500 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
@@ -1642,8 +1759,9 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                   {t.next} <Icon name="arrow-right" size={20} />
                 </button>
               </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       );
     }
