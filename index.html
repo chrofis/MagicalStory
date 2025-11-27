@@ -409,6 +409,7 @@
       const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
       const [editablePrompt, setEditablePrompt] = useState('');
       const [showPromptPreview, setShowPromptPreview] = useState(false);
+      const characterFormRef = React.useRef(null);
 
       useEffect(() => {
         const savedApiKey = localStorage.getItem('anthropic_api_key');
@@ -419,6 +420,18 @@
           window.lucide.createIcons();
         }
       }, [step, currentCharacter, characters, showCharacterCreated]);
+
+      // Update prompt when returning to step 4 with prompt visible
+      useEffect(() => {
+        if (step === 4 && showPromptPreview && storyType && characters.length > 0) {
+          try {
+            const newPrompt = buildPrompt();
+            setEditablePrompt(newPrompt);
+          } catch (error) {
+            console.error('Error building prompt:', error);
+          }
+        }
+      }, [step, showPromptPreview]);
 
       const t = translations[language];
       const allStrengths = [...defaultStrengths[language], ...customStrengths];
@@ -489,7 +502,7 @@
           }
 
           return desc;
-        }).join('\\n');
+        }).join('\n');
 
         const relationshipDescriptions = Object.entries(relationships)
           .filter(([key, type]) => {
@@ -503,7 +516,7 @@
             const char1 = characters.find(c => c.id === char1Id);
             const char2 = characters.find(c => c.id === char2Id);
             return `${char1?.name} ${t.is} ${type} ${char2?.name}`;
-          }).join('\\n');
+          }).join('\n');
 
         const languageInstructions = {
           'en': {
@@ -529,11 +542,17 @@
 
         prompt += `Characters:\n${characterDescriptions}\n\n`;
 
-        if (relationshipDescriptions) {
+        if (relationshipDescriptions && relationshipDescriptions.length > 0) {
           prompt += `Relationships:\n${relationshipDescriptions}\n\n`;
         }
 
         prompt += `Language Level: ${languageInstructions[language][languageLevel]}\n\n`;
+        prompt += `IMPORTANT INSTRUCTIONS:\n`;
+        prompt += `- Only use the character names provided above. Do NOT invent any new names.\n`;
+        prompt += `- You may create additional characters (like grandfather, shopkeeper, teacher, etc.) but they must remain UNNAMED.\n`;
+        prompt += `- Refer to additional characters only by their role or relationship (e.g., "the grandfather", "the shopkeeper", "her teacher") - NEVER give them names like "Grandfather Steve" or "Shopkeeper Paul".\n`;
+        prompt += `- Use the characters' ages and traits to inform their personality and behavior, but DO NOT explicitly state their age or characteristics in the story.\n`;
+        prompt += `- SHOW the characteristics through actions and dialogue instead of stating them. For example, instead of "Sophie was brave", show Sophie doing something brave. Instead of "Max, who was 8 years old", just use "Max" and let his behavior reflect his age.\n\n`;
         prompt += `Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.`;
 
         return prompt;
@@ -563,7 +582,7 @@
               apiKey: apiKey,
               prompt: prompt,
               model: 'claude-sonnet-4-20250514',
-              max_tokens: 4000
+              max_tokens: 16000
             })
           });
 
@@ -973,6 +992,12 @@
         setCurrentCharacter(char);
         setCharacters(characters.filter(c => c.id !== char.id));
         setShowCharacterCreated(false);
+        // Scroll to character form after state updates
+        setTimeout(() => {
+          if (characterFormRef.current) {
+            characterFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
       };
 
       const deleteCharacter = (charId) => {
@@ -1243,19 +1268,19 @@
               />
             </label>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {allStoryTypes.map(type => (
               <button
                 key={type.id}
                 onClick={() => setStoryType(type.id)}
-                className={`p-6 rounded-xl border-2 transition-all ${
+                className={`p-4 rounded-lg border-2 transition-all ${
                   storyType === type.id
                     ? 'border-purple-500 bg-purple-50 shadow-lg scale-105'
                     : 'border-gray-200 hover:border-purple-300 hover:shadow-md'
                 }`}
               >
-                <div className="text-4xl mb-2">{type.emoji}</div>
-                <div className="font-semibold text-sm">{type.name[language]}</div>
+                <div className="text-3xl mb-1.5">{type.emoji}</div>
+                <div className="font-semibold text-xs">{type.name[language]}</div>
               </button>
             ))}
           </div>
@@ -1394,7 +1419,7 @@
             )}
 
             {currentCharacter && (
-              <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
+              <div ref={characterFormRef} className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
                 <h3 className="text-xl font-bold text-purple-700">{currentCharacter.id ? t.editCharacter : t.startCreating}</h3>
                 <div>
                   <label className="block text-lg font-semibold mb-2">{t.characterName} *</label>
@@ -1715,20 +1740,12 @@
             <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
               <Icon name="wand-2" size={24} /> {t.storySettings}
             </h2>
-            <div className="flex gap-2">
-              <button
-                onClick={exportStoryInfoAsMarkdown}
-                className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center gap-2"
-              >
-                <Icon name="file-text" size={20} /> {t.exportStoryInfo}
-              </button>
-              <button
-                onClick={exportConfiguration}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
-              >
-                <Icon name="save" size={20} /> {t.exportConfig}
-              </button>
-            </div>
+            <button
+              onClick={exportConfiguration}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
+            >
+              <Icon name="save" size={20} /> {t.exportConfig}
+            </button>
           </div>
 
           <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
@@ -1752,7 +1769,9 @@
                       <div className="flex-1">
                         <div className="font-bold flex items-center gap-2">
                           {char.name}
-                          {mainCharacters.includes(char.id) && <Icon name="star" size={16} className="text-yellow-500" />}
+                          <span className={mainCharacters.includes(char.id) ? 'inline-block' : 'hidden'}>
+                            <Icon name="star" size={16} className="text-yellow-500" />
+                          </span>
                         </div>
                         <div className="text-sm text-gray-600">
                           {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
@@ -1918,12 +1937,6 @@
               </button>
             )}
             <button
-              onClick={exportStoryInfoAsMarkdown}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
-            >
-              <Icon name="file-text" size={20} /> {t.exportStoryInfo}
-            </button>
-            <button
               onClick={exportConfiguration}
               className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
             >
@@ -1951,49 +1964,98 @@
       return (
         <div className="min-h-screen" style={{backgroundColor: '#e0f2fe'}}>
           {/* Black Navigation Bar */}
-          <nav className="bg-black text-white px-8 py-4 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">✨ {t.title}</h1>
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                className="bg-gray-800 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-700 flex items-center gap-2"
-              >
-                <Icon name="globe" size={20} />
-                {language.toUpperCase()}
-              </button>
-              {showLanguageDropdown && (
-                <div className="absolute right-0 mt-2 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-50">
-                  <button
-                    onClick={() => {
-                      setLanguage('en');
-                      setShowLanguageDropdown(false);
-                    }}
-                    className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'en' ? 'bg-purple-600 text-white' : 'text-white'}`}
-                  >
-                    EN
-                  </button>
-                  <button
-                    onClick={() => {
-                      setLanguage('de');
-                      setShowLanguageDropdown(false);
-                    }}
-                    className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'de' ? 'bg-purple-600 text-white' : 'text-white'}`}
-                  >
-                    DE
-                  </button>
-                  <button
-                    onClick={() => {
-                      setLanguage('fr');
-                      setShowLanguageDropdown(false);
-                    }}
-                    className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'fr' ? 'bg-purple-600 text-white' : 'text-white'}`}
-                  >
-                    FR
-                  </button>
+          <nav className="bg-black text-white px-6 py-2">
+            <div className="flex justify-between items-center">
+              {/* Left: Title */}
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold">✨ {t.title}</h1>
+              </div>
+
+              {/* Center: Step Navigation */}
+              {step > 0 && (
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map(s => {
+                    // Determine if this step is accessible
+                    let canAccess = false;
+                    if (s === 1) {
+                      canAccess = true; // Can always go to step 1
+                    } else if (s === 2) {
+                      canAccess = storyType !== ''; // Can go to step 2 if story type selected
+                    } else if (s === 3) {
+                      canAccess = storyType !== '' && characters.length > 0; // Need story type AND characters
+                    } else if (s === 4) {
+                      canAccess = storyType !== '' && characters.length > 0 && areAllRelationshipsDefined(); // Need all previous data
+                    } else if (s === 5) {
+                      canAccess = generatedStory !== ''; // Can go to step 5 if story exists
+                    }
+
+                    return (
+                      <React.Fragment key={s}>
+                        <button
+                          onClick={() => {
+                            if (canAccess) {
+                              setStep(s);
+                            }
+                          }}
+                          disabled={!canAccess}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                            canAccess
+                              ? step === s
+                                ? 'bg-purple-600 text-white ring-2 ring-purple-300'
+                                : 'bg-purple-500 text-white hover:bg-purple-600 cursor-pointer'
+                              : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          } ${canAccess && step !== s ? 'hover:scale-110' : ''}`}
+                        >
+                          {s}
+                        </button>
+                        {s < 5 && <div className={`w-8 h-0.5 ${canAccess ? 'bg-purple-500' : 'bg-gray-600'}`} />}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               )}
+
+              {/* Right: Language Selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                  className="bg-gray-800 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-gray-700 flex items-center gap-1.5"
+                >
+                  <Icon name="globe" size={14} />
+                  {language.toUpperCase()}
+                </button>
+                {showLanguageDropdown && (
+                  <div className="absolute right-0 mt-2 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-50">
+                    <button
+                      onClick={() => {
+                        setLanguage('en');
+                        setShowLanguageDropdown(false);
+                      }}
+                      className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'en' ? 'bg-purple-600 text-white' : 'text-white'}`}
+                    >
+                      EN
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLanguage('de');
+                        setShowLanguageDropdown(false);
+                      }}
+                      className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'de' ? 'bg-purple-600 text-white' : 'text-white'}`}
+                    >
+                      DE
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLanguage('fr');
+                        setShowLanguageDropdown(false);
+                      }}
+                      className={`block w-full text-left px-6 py-3 hover:bg-gray-700 font-semibold ${language === 'fr' ? 'bg-purple-600 text-white' : 'text-white'}`}
+                    >
+                      FR
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </nav>
 
@@ -2031,34 +2093,7 @@
           {step === 0 && renderStep0()}
 
           {step > 0 && (
-            <div className="max-w-7xl mx-auto px-4 md:px-8">
-              {step < 5 && (
-                <div className="flex justify-center mb-8 mt-8">
-                  <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4].map(s => (
-                    <React.Fragment key={s}>
-                      <button
-                        onClick={() => {
-                          if (s < step || (s === 1 && storyType) || (s === 2 && characters.length > 0) || (s === 3 && areAllRelationshipsDefined())) {
-                            setStep(s);
-                          }
-                        }}
-                        disabled={s > step}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${
-                          step >= s
-                            ? 'bg-purple-500 text-white hover:bg-purple-600 cursor-pointer'
-                            : 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                        } ${s < step ? 'hover:scale-110' : ''}`}
-                      >
-                        {s}
-                      </button>
-                      {s < 4 && <div className={`w-12 h-1 ${step > s ? 'bg-purple-500' : 'bg-gray-300'}`} />}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-              )}
-
+            <div className="max-w-7xl mx-auto px-4 md:px-8 mt-8">
               <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6">
                 {step === 1 && renderStep1()}
                 {step === 2 && renderStep2()}
