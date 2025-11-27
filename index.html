@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Magical Story</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -171,6 +172,7 @@
         back: 'Back',
         next: 'Next',
         exportConfig: 'Export Configuration',
+        exportStoryInfo: 'Export Story Info (MD)',
         importConfig: 'Import Configuration',
         charactersCreated: "You've created {count} character{s} so far.",
         mainCharacter: 'Main Character',
@@ -255,6 +257,7 @@
         back: 'Zurück',
         next: 'Weiter',
         exportConfig: 'Konfiguration exportieren',
+        exportStoryInfo: 'Story-Info exportieren (MD)',
         importConfig: 'Konfiguration importieren',
         charactersCreated: 'Du hast bisher {count} Charakter{s} erstellt.',
         mainCharacter: 'Hauptfigur',
@@ -339,6 +342,7 @@
         back: 'Retour',
         next: 'Suivant',
         exportConfig: 'Exporter la configuration',
+        exportStoryInfo: 'Exporter infos histoire (MD)',
         importConfig: 'Importer la configuration',
         charactersCreated: 'Vous avez créé {count} personnage{s} jusqu\'à présent.',
         mainCharacter: 'Personnage principal',
@@ -611,6 +615,78 @@ Please write an engaging, age-appropriate story that incorporates all the charac
         }
       };
 
+      const exportStoryInfoAsMarkdown = () => {
+        try {
+          const storyTypeName = allStoryTypes.find(t => t.id === storyType);
+          const storyTypeLabel = storyTypeName ? storyTypeName.name[language] : 'Unknown';
+          const storyEmoji = storyTypeName ? storyTypeName.emoji : '';
+
+          let markdown = `# Story Configuration\n\n`;
+          markdown += `## Story Type\n`;
+          markdown += `- **Type**: ${storyEmoji} ${storyTypeLabel}\n\n`;
+
+          markdown += `## Characters\n\n`;
+          characters.forEach((char, index) => {
+            const isMain = mainCharacters.includes(char.id);
+            markdown += `### ${index + 1}. ${char.name}${isMain ? ' ⭐ (Main Character)' : ''}\n\n`;
+            markdown += `- **Gender**: ${char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}\n`;
+            markdown += `- **Age**: ${char.age} ${language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : 'years'}\n`;
+            if (char.hairColor) {
+              markdown += `- **Hair Color**: ${char.hairColor}\n`;
+            }
+            if (char.otherFeatures) {
+              markdown += `- **Other Features**: ${char.otherFeatures}\n`;
+            }
+            markdown += `- **Strengths**: ${char.strengths.join(', ')}\n`;
+            markdown += `- **Weaknesses**: ${char.weaknesses.join(', ')}\n`;
+            if (char.fears && char.fears.length > 0) {
+              markdown += `- **Fears**: ${char.fears.join(', ')}\n`;
+            }
+            if (char.specialDetails) {
+              markdown += `- **Special Details**: ${char.specialDetails}\n`;
+            }
+            markdown += `\n`;
+          });
+
+          if (Object.keys(relationships).length > 0) {
+            markdown += `## Relationships\n\n`;
+            const processedPairs = new Set();
+            Object.entries(relationships).forEach(([key, type]) => {
+              const [char1Id, char2Id] = key.split('-').map(Number);
+              const pairKey = [char1Id, char2Id].sort().join('-');
+
+              if (!processedPairs.has(pairKey) && type !== 'Not Known to') {
+                const char1 = characters.find(c => c.id === char1Id);
+                const char2 = characters.find(c => c.id === char2Id);
+                if (char1 && char2) {
+                  markdown += `- **${char1.name}** ${t.is} **${type}** **${char2.name}**\n`;
+                  processedPairs.add(pairKey);
+                }
+              }
+            });
+            markdown += `\n`;
+          }
+
+          markdown += `## Story Settings\n\n`;
+          markdown += `- **Number of Pages**: ${pages}\n`;
+          markdown += `- **Reading Level**: ${languageLevel === '1st-grade' ? t.firstGrade : languageLevel === 'standard' ? t.standard : t.advanced}\n`;
+          markdown += `- **Language**: ${language === 'de' ? 'German (Deutsch)' : language === 'fr' ? 'French (Français)' : 'English'}\n`;
+
+          const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `story-info-${storyTypeLabel.replace(/\s+/g, '-')}-${Date.now()}.md`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error('Export markdown error:', error);
+          alert('Export markdown error: ' + error.message);
+        }
+      };
+
       const exportConfiguration = () => {
         try {
           const config = {
@@ -656,14 +732,151 @@ Please write an engaging, age-appropriate story that incorporates all the charac
         }
       };
 
+      const parseMarkdownConfig = (mdContent) => {
+        const config = {
+          language: 'en',
+          storyType: '',
+          characters: [],
+          relationships: {},
+          pages: 5,
+          languageLevel: 'standard',
+          mainCharacters: []
+        };
+
+        // Parse language
+        if (mdContent.includes('German (Deutsch)')) config.language = 'de';
+        else if (mdContent.includes('French (Français)')) config.language = 'fr';
+
+        // Parse story type
+        const storyTypeMatch = mdContent.match(/\*\*Type\*\*:\s*(.+?)\s+(.+)/);
+        if (storyTypeMatch) {
+          const emoji = storyTypeMatch[1].trim();
+          const typeName = storyTypeMatch[2].trim();
+          const foundType = allStoryTypes.find(t => t.emoji === emoji || t.name[config.language] === typeName);
+          if (foundType) config.storyType = foundType.id;
+        }
+
+        // Parse characters
+        const charSections = mdContent.split(/###\s+\d+\.\s+/).slice(1);
+        charSections.forEach((section) => {
+          const lines = section.split('\n').filter(l => l.trim());
+          if (lines.length === 0) return;
+
+          const nameMatch = lines[0].match(/^(.+?)(?:\s+⭐\s+\(Main Character\))?$/);
+          if (!nameMatch) return;
+
+          const char = {
+            id: Date.now() + Math.random(),
+            name: nameMatch[1].trim(),
+            gender: 'other',
+            age: '',
+            hairColor: '',
+            otherFeatures: '',
+            strengths: [],
+            weaknesses: [],
+            fears: [],
+            specialDetails: ''
+          };
+
+          const isMain = lines[0].includes('⭐');
+          if (isMain) config.mainCharacters.push(char.id);
+
+          lines.forEach(line => {
+            if (line.includes('**Gender**:')) {
+              const gender = line.split(':')[1].trim().toLowerCase();
+              if (gender.includes('male') && !gender.includes('female')) char.gender = 'male';
+              else if (gender.includes('female')) char.gender = 'female';
+            }
+            else if (line.includes('**Age**:')) {
+              char.age = line.split(':')[1].trim().split(' ')[0];
+            }
+            else if (line.includes('**Hair Color**:')) {
+              char.hairColor = line.split(':')[1].trim();
+            }
+            else if (line.includes('**Other Features**:')) {
+              char.otherFeatures = line.split(':')[1].trim();
+            }
+            else if (line.includes('**Strengths**:')) {
+              char.strengths = line.split(':')[1].trim().split(',').map(s => s.trim());
+            }
+            else if (line.includes('**Weaknesses**:')) {
+              char.weaknesses = line.split(':')[1].trim().split(',').map(s => s.trim());
+            }
+            else if (line.includes('**Fears**:')) {
+              char.fears = line.split(':')[1].trim().split(',').map(s => s.trim());
+            }
+            else if (line.includes('**Special Details**:')) {
+              char.specialDetails = line.split(':')[1].trim();
+            }
+          });
+
+          config.characters.push(char);
+        });
+
+        // Parse relationships
+        const relSection = mdContent.match(/## Relationships\n\n([\s\S]*?)(?=\n##|$)/);
+        if (relSection) {
+          const relLines = relSection[1].split('\n').filter(l => l.trim().startsWith('-'));
+          relLines.forEach(line => {
+            const match = line.match(/\*\*(.+?)\*\*\s+(.+?)\s+\*\*(.+?)\*\*\s+\*\*(.+?)\*\*/);
+            if (match) {
+              const char1Name = match[1].trim();
+              const relType = match[3].trim();
+              const char2Name = match[4].trim();
+
+              const char1 = config.characters.find(c => c.name === char1Name);
+              const char2 = config.characters.find(c => c.name === char2Name);
+
+              if (char1 && char2) {
+                config.relationships[`${char1.id}-${char2.id}`] = relType;
+                // Also set reverse relationship
+                const relTypeObj = relationshipTypes.find(r => r.value[config.language] === relType);
+                if (relTypeObj) {
+                  config.relationships[`${char2.id}-${char1.id}`] = relTypeObj.inverse[config.language];
+                } else {
+                  config.relationships[`${char2.id}-${char1.id}`] = relType;
+                }
+              }
+            }
+          });
+        }
+
+        // Parse settings
+        const pagesMatch = mdContent.match(/\*\*Number of Pages\*\*:\s*(\d+)/);
+        if (pagesMatch) config.pages = parseInt(pagesMatch[1]);
+
+        const levelMatch = mdContent.match(/\*\*Reading Level\*\*:\s*(.+)/);
+        if (levelMatch) {
+          const level = levelMatch[1].trim();
+          if (level.includes('1st') || level.includes('1ère') || level.includes('1.')) {
+            config.languageLevel = '1st-grade';
+          } else if (level.includes('Advanced') || level.includes('Avancé') || level.includes('Fortgeschritten')) {
+            config.languageLevel = 'advanced';
+          } else {
+            config.languageLevel = 'standard';
+          }
+        }
+
+        return config;
+      };
+
       const importConfiguration = (e) => {
         const file = e.target.files[0];
         if (file) {
           const reader = new FileReader();
           reader.onload = (event) => {
             try {
-              const config = JSON.parse(event.target.result);
-              setLanguage(config.language || 'de');
+              const content = event.target.result;
+              let config;
+
+              // Detect file type
+              if (file.name.endsWith('.md')) {
+                config = parseMarkdownConfig(content);
+              } else {
+                config = JSON.parse(content);
+              }
+
+              setLanguage(config.language || 'en');
               setStoryType(config.storyType || '');
               setCharacters(config.characters || []);
               setCustomStrengths(config.customStrengths || []);
@@ -679,7 +892,7 @@ Please write an engaging, age-appropriate story that incorporates all the charac
               alert('Configuration imported successfully!');
             } catch (error) {
               console.error('Import error:', error);
-              alert('Error loading configuration file');
+              alert('Error loading configuration file: ' + error.message);
             }
           };
           reader.readAsText(file);
@@ -870,90 +1083,94 @@ Please write an engaging, age-appropriate story that incorporates all the charac
       };
 
       const renderStep0 = () => (
-        <div className="flex items-center min-h-[calc(100vh-72px)] px-8 py-8 relative" style={{height: 'calc(100vh - 72px)'}}>
-          {/* Decorative Sparkles - Only 4 total */}
-          <div className="absolute bottom-10 right-20 text-3xl opacity-50 animate-pulse">✨</div>
-          <div className="absolute top-10 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1s'}}>✨</div>
-          <div className="absolute bottom-24 left-1/4 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1.5s'}}>✨</div>
-          <div className="absolute bottom-1/3 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '2s'}}>✨</div>
+        <div className="flex flex-col min-h-[calc(100vh-72px)] px-4 lg:px-8 py-6 lg:py-8 relative">
+          {/* Decorative Sparkles - Only 4 total, hidden on mobile */}
+          <div className="hidden lg:block absolute bottom-10 right-20 text-3xl opacity-50 animate-pulse">✨</div>
+          <div className="hidden lg:block absolute top-10 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1s'}}>✨</div>
+          <div className="hidden lg:block absolute bottom-24 left-1/4 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1.5s'}}>✨</div>
+          <div className="hidden lg:block absolute bottom-1/3 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '2s'}}>✨</div>
 
-          <div className="flex gap-8 w-full items-center relative z-10">
-            {/* Left Side - Text and Button (1/3) */}
-            <div className="space-y-6" style={{width: '30%'}}>
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 w-full relative z-10">
+            {/* Left Side - Text and Button */}
+            <div className="w-full lg:w-[35%] flex flex-col justify-center">
               <div>
-                <h1 className="text-5xl font-title text-black mb-4 leading-tight">
+                <h1 className="text-4xl lg:text-6xl font-title text-black mb-4 lg:mb-6 leading-tight">
                   {t.heroTitle}
                 </h1>
-                <p className="text-xl font-body text-black mb-3">
+                <p className="text-lg lg:text-2xl font-body text-black mb-3 lg:mb-4">
                   {t.heroDescription}
                 </p>
-                <p className="text-xl font-body text-black">
+                <p className="text-lg lg:text-2xl font-body text-black mb-6 lg:mb-8">
                   {t.bookText}
                 </p>
-              </div>
 
-              <button
-                onClick={() => setStep(1)}
-                className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-8 py-4 rounded-xl text-lg font-bold hover:shadow-2xl transform hover:scale-105 transition-all inline-flex items-center gap-2"
-              >
-                <Icon name="sparkles" size={24} />
-                {t.startJourney}
-                <Icon name="arrow-right" size={24} />
-              </button>
+                {/* Button directly below text */}
+                <button
+                  onClick={() => setStep(1)}
+                  className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-8 lg:px-12 py-4 lg:py-6 rounded-2xl text-lg lg:text-2xl font-bold shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all inline-flex items-center gap-3 border-2 border-black"
+                >
+                  <Icon name="sparkles" size={28} />
+                  {t.startJourney}
+                  <Icon name="arrow-right" size={28} />
+                </button>
+              </div>
             </div>
 
-            {/* Right Side - Photos and Video (2/3) */}
-            <div className="flex gap-6 items-center" style={{width: '70%'}}>
-              {/* Photos Column - Stacked Vertically */}
-              <div className="flex flex-col gap-3" style={{width: '35%'}}>
-                {/* Real Photo */}
-                <div className="text-center">
-                  <div className="mb-2">
-                    <img src="images/Real person.jpg" alt="Your Picture" className="w-full h-auto object-contain rounded-lg" style={{maxHeight: '160px'}} />
+            {/* Right Side - Photos and Video (Mobile: stacked, Desktop: side-by-side) */}
+            <div className="w-full lg:w-[65%] flex items-center">
+              {/* Photos Section */}
+              <div className="flex flex-row gap-3 lg:gap-6 items-center justify-center w-full">
+                {/* Photos Column - Stacked Vertically on both mobile and desktop */}
+                <div className="flex flex-col gap-2 lg:gap-4 w-1/4 lg:w-[28%]">
+                  {/* Real Photo */}
+                  <div className="text-center">
+                    <div className="mb-1 lg:mb-2">
+                      <img src="images/Real person.jpg" alt="Your Picture" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
+                    </div>
+                    <p className="text-xs lg:text-base text-black font-semibold">
+                      {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : 'Your Picture'}
+                    </p>
                   </div>
-                  <p className="text-sm text-black font-semibold">
-                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : 'Your Picture'}
+
+                  {/* Arrow Down - Rotated 90 degrees */}
+                  <div className="flex justify-center my-1 lg:my-2">
+                    <img src="images/arrow-icon-1162.png" alt="Arrow Down" className="w-6 h-6 lg:w-12 lg:h-12" style={{transform: 'rotate(90deg)'}} />
+                  </div>
+
+                  {/* Avatar */}
+                  <div className="text-center">
+                    <div className="mb-1 lg:mb-2">
+                      <img src="images/Avatar 2.png" alt="Your Character" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
+                    </div>
+                    <p className="text-xs lg:text-base text-black font-semibold">
+                      {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : 'Your Character'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Arrow Right - Hidden on mobile, shown on desktop */}
+                <div className="hidden lg:flex justify-center items-center lg:w-[8%] self-center">
+                  <img src="images/arrow-icon-1162.png" alt="Arrow Right" className="w-14 h-14 lg:w-16 lg:h-16" />
+                </div>
+
+                {/* Video Column */}
+                <div className="text-center w-3/4 lg:w-[64%]">
+                  <div className="rounded-xl overflow-hidden shadow-2xl mb-1 lg:mb-2 h-[280px] lg:h-[480px]">
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    >
+                      <source src="images/Pirat Video2.mp4" type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                  <p className="text-xs lg:text-base text-black font-semibold">
+                    {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre Histoire' : 'Your Story'}
                   </p>
                 </div>
-
-                {/* Arrow Down - Rotated 90 degrees */}
-                <div className="flex justify-center my-3">
-                  <img src="images/arrow-icon-1162.png" alt="Arrow Down" style={{width: '50px', height: '50px', transform: 'rotate(90deg)'}} />
-                </div>
-
-                {/* Avatar */}
-                <div className="text-center">
-                  <div className="mb-2">
-                    <img src="images/Avatar 2.png" alt="Your Character" className="w-full h-auto object-contain rounded-lg" style={{maxHeight: '160px'}} />
-                  </div>
-                  <p className="text-sm text-black font-semibold">
-                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : 'Your Character'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Arrow Right */}
-              <div className="flex justify-center items-center" style={{width: '10%'}}>
-                <img src="images/arrow-icon-1162.png" alt="Arrow Right" style={{width: '60px', height: '60px'}} />
-              </div>
-
-              {/* Video Column */}
-              <div className="text-center" style={{width: '55%'}}>
-                <div className="rounded-xl overflow-hidden shadow-2xl mb-2" style={{height: '400px'}}>
-                  <video
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  >
-                    <source src="images/Pirat Video2.mp4" type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
-                <p className="text-sm text-black font-semibold">
-                  {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre Histoire' : 'Your Story'}
-                </p>
               </div>
             </div>
           </div>
@@ -962,9 +1179,20 @@ Please write an engaging, age-appropriate story that incorporates all the charac
 
       const renderStep1 = () => (
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
-            <Icon name="book-open" size={24} /> {t.chooseStoryType}
-          </h2>
+          <div className="flex justify-between items-center flex-wrap gap-2 mb-4">
+            <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+              <Icon name="book-open" size={24} /> {t.chooseStoryType}
+            </h2>
+            <label className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 cursor-pointer flex items-center gap-2">
+              <Icon name="upload" size={20} /> {t.importConfig}
+              <input
+                type="file"
+                accept=".json,.md"
+                onChange={importConfiguration}
+                className="hidden"
+              />
+            </label>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {allStoryTypes.map(type => (
               <button
@@ -1433,16 +1661,24 @@ Please write an engaging, age-appropriate story that incorporates all the charac
 
       const renderStep4 = () => (
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
               <Icon name="wand-2" size={24} /> {t.storySettings}
             </h2>
-            <button
-              onClick={exportConfiguration}
-              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
-            >
-              <Icon name="save" size={20} /> {t.exportConfig}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={exportStoryInfoAsMarkdown}
+                className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center gap-2"
+              >
+                <Icon name="file-text" size={20} /> {t.exportStoryInfo}
+              </button>
+              <button
+                onClick={exportConfiguration}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
+              >
+                <Icon name="save" size={20} /> {t.exportConfig}
+              </button>
+            </div>
           </div>
 
           <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
@@ -1588,6 +1824,12 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                 <Icon name="download" size={20} /> {t.downloadPrompt}
               </button>
             )}
+            <button
+              onClick={exportStoryInfoAsMarkdown}
+              className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center gap-2"
+            >
+              <Icon name="file-text" size={20} /> {t.exportStoryInfo}
+            </button>
             <button
               onClick={exportConfiguration}
               className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
