@@ -180,7 +180,12 @@
         apiKeyPrompt: 'Please enter your Anthropic API key to generate stories:',
         apiKeyPlaceholder: 'sk-ant-...',
         saveApiKey: 'Save API Key',
-        apiKeyNote: 'Your API key is stored locally in your browser and never sent anywhere except to Anthropic.'
+        apiKeyNote: 'Your API key is stored locally in your browser and never sent anywhere except to Anthropic.',
+        promptPreview: 'Prompt Preview',
+        showPromptPreview: 'Show Prompt',
+        hidePromptPreview: 'Hide Prompt',
+        editPrompt: 'Edit Prompt',
+        resetPrompt: 'Reset to Default'
       },
       de: {
         title: 'Magical Story',
@@ -265,7 +270,12 @@
         apiKeyPrompt: 'Bitte geben Sie Ihren Anthropic API-Schlüssel ein:',
         apiKeyPlaceholder: 'sk-ant-...',
         saveApiKey: 'API-Schlüssel speichern',
-        apiKeyNote: 'Ihr API-Schlüssel wird lokal im Browser gespeichert.'
+        apiKeyNote: 'Ihr API-Schlüssel wird lokal im Browser gespeichert.',
+        promptPreview: 'Prompt-Vorschau',
+        showPromptPreview: 'Prompt anzeigen',
+        hidePromptPreview: 'Prompt ausblenden',
+        editPrompt: 'Prompt bearbeiten',
+        resetPrompt: 'Auf Standard zurücksetzen'
       },
       fr: {
         title: 'Magical Story',
@@ -350,7 +360,12 @@
         apiKeyPrompt: 'Veuillez entrer votre clé API Anthropic:',
         apiKeyPlaceholder: 'sk-ant-...',
         saveApiKey: 'Sauvegarder la clé API',
-        apiKeyNote: 'Votre clé API est stockée localement dans votre navigateur.'
+        apiKeyNote: 'Votre clé API est stockée localement dans votre navigateur.',
+        promptPreview: 'Aperçu du prompt',
+        showPromptPreview: 'Afficher le prompt',
+        hidePromptPreview: 'Masquer le prompt',
+        editPrompt: 'Modifier le prompt',
+        resetPrompt: 'Réinitialiser'
       }
     };
 
@@ -392,6 +407,8 @@
       const [newStoryTypeName, setNewStoryTypeName] = useState('');
       const [newStoryTypeEmoji, setNewStoryTypeEmoji] = useState('🎭');
       const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+      const [editablePrompt, setEditablePrompt] = useState('');
+      const [showPromptPreview, setShowPromptPreview] = useState(false);
 
       useEffect(() => {
         const savedApiKey = localStorage.getItem('anthropic_api_key');
@@ -441,17 +458,37 @@
         }
       };
 
-      const generateStory = async () => {
-        if (!apiKey) {
-          setShowApiKeyPrompt(true);
-          return;
-        }
-
-        setIsGenerating(true);
-
+      const buildPrompt = () => {
         const characterDescriptions = characters.map(char => {
           const isMain = mainCharacters.includes(char.id) ? ' (MAIN CHARACTER)' : '';
-          return `${char.name}${isMain} (${char.gender}, ${char.age} years old): ${t.strengths}: ${char.strengths.join(', ')}, ${t.weaknesses}: ${char.weaknesses.join(', ')}, ${t.specialDetails}: ${char.specialDetails || 'none'}, ${t.fears}: ${char.fears.join(', ') || 'none'}`;
+          let desc = `${char.name}${isMain} (${char.gender}, ${char.age} years old)`;
+
+          // Only add fields that have values
+          const details = [];
+          if (char.strengths && char.strengths.length > 0) {
+            details.push(`${t.strengths}: ${char.strengths.join(', ')}`);
+          }
+          if (char.weaknesses && char.weaknesses.length > 0) {
+            details.push(`${t.weaknesses}: ${char.weaknesses.join(', ')}`);
+          }
+          if (char.fears && char.fears.length > 0) {
+            details.push(`${t.fears}: ${char.fears.join(', ')}`);
+          }
+          if (char.hairColor) {
+            details.push(`Hair color: ${char.hairColor}`);
+          }
+          if (char.otherFeatures) {
+            details.push(`Features: ${char.otherFeatures}`);
+          }
+          if (char.specialDetails) {
+            details.push(`${t.specialDetails}: ${char.specialDetails}`);
+          }
+
+          if (details.length > 0) {
+            desc += `: ${details.join(', ')}`;
+          }
+
+          return desc;
         }).join('\\n');
 
         const relationshipDescriptions = Object.entries(relationships)
@@ -486,19 +523,32 @@
           }
         };
 
-        const storyTypeName = storyTypes.find(t => t.id === storyType)?.name[language] || 'adventure';
+        const storyTypeName = allStoryTypes.find(t => t.id === storyType)?.name[language] || 'adventure';
 
-        const prompt = `Create a ${pages}-page children's story about a ${storyTypeName} in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.
+        let prompt = `Create a ${pages}-page children's story about a ${storyTypeName} in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.\n\n`;
 
-Characters:
-${characterDescriptions}
+        prompt += `Characters:\n${characterDescriptions}\n\n`;
 
-Relationships:
-${relationshipDescriptions}
+        if (relationshipDescriptions) {
+          prompt += `Relationships:\n${relationshipDescriptions}\n\n`;
+        }
 
-Language Level: ${languageInstructions[language][languageLevel]}
+        prompt += `Language Level: ${languageInstructions[language][languageLevel]}\n\n`;
+        prompt += `Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.`;
 
-Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.`;
+        return prompt;
+      };
+
+      const generateStory = async () => {
+        if (!apiKey) {
+          setShowApiKeyPrompt(true);
+          return;
+        }
+
+        setIsGenerating(true);
+
+        // Use the editable prompt if it exists, otherwise build a new one
+        const prompt = editablePrompt || buildPrompt();
 
         // Save the prompt for display/download
         setGeneratedPrompt(prompt);
@@ -539,11 +589,11 @@ Please write an engaging, age-appropriate story that incorporates all the charac
           }
 
           setGeneratedStory(storyText);
-          setStep(6);
+          setStep(5);
         } catch (error) {
           console.error('Error generating story:', error);
           setGeneratedStory(`Sorry, there was an error generating your story: ${error.message}\\n\\nPlease check your API key and try again!`);
-          setStep(6);
+          setStep(5);
         } finally {
           setIsGenerating(false);
         }
@@ -1753,6 +1803,49 @@ Please write an engaging, age-appropriate story that incorporates all the charac
               </div>
             </div>
 
+            {/* Prompt Preview Section */}
+            <div className="border-t-2 border-gray-200 pt-6">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-semibold text-purple-700">{t.promptPreview}</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (!showPromptPreview) {
+                        setEditablePrompt(buildPrompt());
+                      }
+                      setShowPromptPreview(!showPromptPreview);
+                    }}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2 text-sm"
+                  >
+                    <Icon name={showPromptPreview ? "eye-off" : "eye"} size={16} />
+                    {showPromptPreview ? t.hidePromptPreview : t.showPromptPreview}
+                  </button>
+                  {showPromptPreview && (
+                    <button
+                      onClick={() => setEditablePrompt(buildPrompt())}
+                      className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 flex items-center gap-2 text-sm"
+                    >
+                      <Icon name="refresh-cw" size={16} />
+                      {t.resetPrompt}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {showPromptPreview && (
+                <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4">
+                  <textarea
+                    value={editablePrompt}
+                    onChange={(e) => setEditablePrompt(e.target.value)}
+                    className="w-full h-64 px-4 py-3 border-2 border-gray-300 rounded-lg font-mono text-sm resize-y"
+                    placeholder="Prompt will appear here..."
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    {t.editPrompt}: You can modify the prompt above before generating the story.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={generateStory}
               disabled={isGenerating || characters.length === 0}
@@ -1769,7 +1862,7 @@ Please write an engaging, age-appropriate story that incorporates all the charac
         </div>
       );
 
-      const renderStep6 = () => (
+      const renderStep5 = () => (
         <div className="space-y-6">
           <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
             <Icon name="book-open" size={24} /> {t.storyReady}
@@ -1803,36 +1896,36 @@ Please write an engaging, age-appropriate story that incorporates all the charac
             </div>
           )}
 
-          <div className="flex gap-4 flex-wrap">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <button
               onClick={() => downloadStory('txt')}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
             >
               <Icon name="download" size={20} /> {t.downloadTXT}
             </button>
             <button
               onClick={() => downloadStory('pdf')}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
             >
               <Icon name="download" size={20} /> {t.downloadPDF}
             </button>
             {generatedPrompt && (
               <button
                 onClick={downloadPrompt}
-                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
               >
                 <Icon name="download" size={20} /> {t.downloadPrompt}
               </button>
             )}
             <button
               onClick={exportStoryInfoAsMarkdown}
-              className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center gap-2"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
             >
               <Icon name="file-text" size={20} /> {t.exportStoryInfo}
             </button>
             <button
               onClick={exportConfiguration}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
             >
               <Icon name="save" size={20} /> {t.exportConfig}
             </button>
@@ -1847,7 +1940,7 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                 setStoryType('');
                 setMainCharacters([]);
               }}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold ml-auto"
+              className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold flex items-center justify-center gap-2 sm:col-span-2 lg:col-span-1"
             >
               {t.createAnotherStory}
             </button>
@@ -1939,7 +2032,7 @@ Please write an engaging, age-appropriate story that incorporates all the charac
 
           {step > 0 && (
             <div className="max-w-7xl mx-auto px-4 md:px-8">
-              {step < 6 && (
+              {step < 5 && (
                 <div className="flex justify-center mb-8 mt-8">
                   <div className="flex items-center gap-2">
                   {[1, 2, 3, 4].map(s => (
@@ -1971,10 +2064,10 @@ Please write an engaging, age-appropriate story that incorporates all the charac
                 {step === 2 && renderStep2()}
                 {step === 3 && renderStep3()}
                 {step === 4 && renderStep4()}
-                {step === 6 && renderStep6()}
+                {step === 5 && renderStep5()}
               </div>
 
-              {step < 6 && step !== 2 && (
+              {step < 5 && step !== 2 && (
                 <div className="flex justify-between">
                 <button
                   onClick={() => setStep(Math.max(0, step - 1))}
