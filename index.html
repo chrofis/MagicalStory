@@ -768,14 +768,6 @@
         }
       }, [showAdminPanel, currentUser, authToken]);
 
-      // Protect steps 1-5 - require authentication
-      useEffect(() => {
-        if (step > 0 && !isAuthenticated) {
-          setStep(0); // Redirect to landing page if not authenticated
-          setShowAuthModal(true); // Show login modal
-        }
-      }, [step, isAuthenticated]);
-
       // Save characters whenever they change (with debounce)
       useEffect(() => {
         if (authToken && characters.length > 0) {
