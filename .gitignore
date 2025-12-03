@@ -22,7 +22,23 @@ nul
 
 # Secrets and API keys
 API key.txt
+*API key.txt
 *.key
+.env
 
 # Claude Code
 .claude/
+
+# Server data (sensitive - don't commit to Git)
+data/
+
+# User content and uploads
+Images/
+Magical-Story-images/
+Geschichten, Prompts, Inputs/
+MagicalStory/
+*.zip
+
+# Logs
+*.log
+npm-debug.log*
