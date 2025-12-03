@@ -759,8 +759,14 @@
       useEffect(() => {
         if (showAdminPanel && currentUser && currentUser.role === 'admin') {
           fetchAllUsers();
+          // Reinitialize lucide icons for the modal
+          setTimeout(() => {
+            if (window.lucide) {
+              window.lucide.createIcons();
+            }
+          }, 100);
         }
-      }, [showAdminPanel]);
+      }, [showAdminPanel, currentUser, authToken]);
 
       // Save characters whenever they change (with debounce)
       useEffect(() => {
@@ -1019,7 +1025,10 @@
       };
 
       const fetchAllUsers = async () => {
-        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+        if (!authToken || !currentUser || currentUser.role !== 'admin') {
+          setAdminUsers([]);
+          return;
+        }
 
         try {
           const response = await fetch(`${API_URL}/api/admin/users`, {
@@ -1030,10 +1039,14 @@
 
           if (response.ok) {
             const users = await response.json();
-            setAdminUsers(users);
+            setAdminUsers(users || []);
+          } else {
+            console.error('Failed to fetch users:', response.status);
+            setAdminUsers([]);
           }
         } catch (err) {
           console.error('Error fetching users:', err);
+          setAdminUsers([]);
         }
       };
 
