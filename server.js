@@ -130,24 +130,24 @@ app.post('/api/auth/register', async (req, res) => {
     const { username, password, email } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+      return res.status(400).json({ error: 'Email and password required' });
     }
 
     const users = await readJSON(USERS_FILE);
 
-    // Check if user already exists
+    // Check if user already exists (username is email)
     if (users.find(u => u.username === username)) {
-      return res.status(400).json({ error: 'Username already exists' });
+      return res.status(400).json({ error: 'This email is already registered' });
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
+    // Create new user (username is email)
     const newUser = {
       id: Date.now().toString(),
-      username,
-      email: email || '',
+      username, // This is the email
+      email: username, // Store email in both fields
       password: hashedPassword,
       createdAt: new Date().toISOString(),
       role: users.length === 0 ? 'admin' : 'user', // First user is admin
@@ -189,7 +189,7 @@ app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password required' });
+      return res.status(400).json({ error: 'Email and password required' });
     }
 
     const users = await readJSON(USERS_FILE);
