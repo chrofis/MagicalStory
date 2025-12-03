@@ -1,3 +1,5 @@
+// MagicalStory Backend Server v1.0.1
+// Includes: User quota system, email authentication, admin panel
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
