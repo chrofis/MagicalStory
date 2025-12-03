@@ -251,9 +251,15 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
 // Proxy endpoint for Claude API
 app.post('/api/claude', authenticateToken, async (req, res) => {
   try {
-    const config = await readJSON(CONFIG_FILE);
+    // Prioritize environment variable, fallback to config file
+    let anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 
-    if (!config.anthropicApiKey) {
+    if (!anthropicApiKey) {
+      const config = await readJSON(CONFIG_FILE);
+      anthropicApiKey = config.anthropicApiKey;
+    }
+
+    if (!anthropicApiKey) {
       return res.status(500).json({ error: 'Anthropic API key not configured' });
     }
 
@@ -268,7 +274,7 @@ app.post('/api/claude', authenticateToken, async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': config.anthropicApiKey,
+        'x-api-key': anthropicApiKey,
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
@@ -297,9 +303,15 @@ app.post('/api/claude', authenticateToken, async (req, res) => {
 // Proxy endpoint for Gemini API
 app.post('/api/gemini', authenticateToken, async (req, res) => {
   try {
-    const config = await readJSON(CONFIG_FILE);
+    // Prioritize environment variable, fallback to config file
+    let geminiApiKey = process.env.GEMINI_API_KEY;
 
-    if (!config.geminiApiKey) {
+    if (!geminiApiKey) {
+      const config = await readJSON(CONFIG_FILE);
+      geminiApiKey = config.geminiApiKey;
+    }
+
+    if (!geminiApiKey) {
       return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
@@ -309,7 +321,7 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
       model: model || 'gemini-2.5-flash-image'
     });
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.5-flash-image'}:generateContent?key=${config.geminiApiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.5-flash-image'}:generateContent?key=${geminiApiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
