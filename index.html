@@ -900,10 +900,14 @@
         return prompt;
       };
 
-      // API URL Configuration - automatically uses correct URL for local/production
+      // API URL Configuration
+      // For hybrid deployment: Frontend on IONOS, Backend on Railway
       const API_URL = window.location.hostname === 'localhost'
-        ? 'http://localhost:3000'
-        : window.location.origin;
+        ? 'http://localhost:3000'  // Local development
+        : 'https://YOUR-RAILWAY-APP-URL-HERE.railway.app';  // Production backend on Railway
+
+      // IMPORTANT: After deploying to Railway, replace YOUR-RAILWAY-APP-URL-HERE
+      // with your actual Railway domain (e.g., magicalstory-production.up.railway.app)
 
       // Authentication functions
       const handleLogin = async (e) => {
