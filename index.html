@@ -644,6 +644,7 @@
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
       const [authToken, setAuthToken] = useState(null);
+      const [userQuota, setUserQuota] = useState(null);
       const [showAuthModal, setShowAuthModal] = useState(false);
       const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
       const [authForm, setAuthForm] = useState({ username: '', password: '', email: '' });
@@ -667,6 +668,8 @@
       const [isGenerating, setIsGenerating] = useState(false);
       const [savedStories, setSavedStories] = useState([]);
       const [showSavedStories, setShowSavedStories] = useState(false);
+      const [showAdminPanel, setShowAdminPanel] = useState(false);
+      const [adminUsers, setAdminUsers] = useState([]);
       const [apiKey, setApiKey] = useState('');
       const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false);
       const [tempApiKey, setTempApiKey] = useState('');
@@ -748,8 +751,16 @@
         if (authToken && isAuthenticated) {
           loadCharacters();
           loadStories().then(stories => setSavedStories(stories));
+          fetchUserQuota();
         }
       }, [authToken, isAuthenticated]);
+
+      // Load users when admin panel is opened
+      useEffect(() => {
+        if (showAdminPanel && currentUser && currentUser.role === 'admin') {
+          fetchAllUsers();
+        }
+      }, [showAdminPanel]);
 
       // Save characters whenever they change (with debounce)
       useEffect(() => {
@@ -981,8 +992,72 @@
         localStorage.removeItem('current_user');
         setAuthToken(null);
         setCurrentUser(null);
+        setUserQuota(null);
         setIsAuthenticated(false);
         setShowAuthModal(true);
+      };
+
+      const fetchUserQuota = async () => {
+        if (!authToken) return;
+
+        try {
+          const response = await fetch(`${API_URL}/api/user/quota`, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setUserQuota(data);
+          }
+        } catch (err) {
+          console.error('Error fetching quota:', err);
+        }
+      };
+
+      const fetchAllUsers = async () => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        try {
+          const response = await fetch(`${API_URL}/api/admin/users`, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+
+          if (response.ok) {
+            const users = await response.json();
+            setAdminUsers(users);
+          }
+        } catch (err) {
+          console.error('Error fetching users:', err);
+        }
+      };
+
+      const updateUserQuota = async (userId, newQuota) => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        try {
+          const response = await fetch(`${API_URL}/api/admin/users/${userId}/quota`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ storyQuota: newQuota })
+          });
+
+          if (response.ok) {
+            // Refresh user list
+            await fetchAllUsers();
+            return true;
+          }
+          return false;
+        } catch (err) {
+          console.error('Error updating user quota:', err);
+          return false;
+        }
       };
 
       const makeApiCall = async (prompt, maxTokens = 4096) => {
@@ -1098,14 +1173,23 @@
             body: JSON.stringify({ story: storyData })
           });
 
+          const result = await response.json();
+
           if (!response.ok) {
-            console.error('Failed to save story');
-          } else {
-            const result = await response.json();
-            return result.id;
+            if (response.status === 403 && result.error === 'Story quota exceeded') {
+              // Refresh quota to show updated numbers
+              await fetchUserQuota();
+              throw new Error(`Story quota exceeded! You have used all ${result.quota} of your free stories. Contact admin for more credits.`);
+            }
+            throw new Error(result.error || 'Failed to save story');
           }
+
+          // Refresh quota after successful story save
+          await fetchUserQuota();
+          return result.id;
         } catch (err) {
           console.error('Error saving story:', err);
+          throw err; // Re-throw so caller can handle it
         }
       };
 
@@ -4805,6 +4889,139 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
           )}
 
+          {/* Admin Panel Modal */}
+          {showAdminPanel && currentUser && currentUser.role === 'admin' && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+              <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto p-8 animate-fade-in">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-3xl font-bold text-yellow-700 flex items-center gap-2">
+                    <Icon name="users" size={32} />
+                    User Management
+                  </h2>
+                  <button
+                    onClick={() => setShowAdminPanel(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <Icon name="x" size={24} />
+                  </button>
+                </div>
+
+                <button
+                  onClick={fetchAllUsers}
+                  className="mb-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <Icon name="refresh-cw" size={16} />
+                  Refresh Users
+                </button>
+
+                {adminUsers.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Icon name="users" size={64} className="mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500 text-lg">Click "Refresh Users" to load user list</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Username</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Role</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Quota</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Used</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Remaining</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminUsers.map(user => {
+                          const remaining = user.storyQuota === -1 ? '∞' : Math.max(0, user.storyQuota - user.storiesGenerated);
+                          const isLow = user.storyQuota !== -1 && remaining <= 1;
+                          const isEmpty = user.storyQuota !== -1 && remaining <= 0;
+
+                          return (
+                            <tr key={user.id} className="border-b hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                {user.username}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{user.email || '-'}</td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                  user.role === 'admin' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {user.role} {user.role === 'admin' && '👑'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center font-medium">
+                                {user.storyQuota === -1 ? '∞' : user.storyQuota}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center">{user.storiesGenerated || 0}</td>
+                              <td className="px-4 py-3 text-sm text-center">
+                                <span className={`px-2 py-1 rounded font-semibold ${
+                                  isEmpty ? 'bg-red-100 text-red-800' :
+                                  isLow ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-green-100 text-green-800'
+                                }`}>
+                                  {remaining}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center">
+                                <div className="flex gap-1 justify-center flex-wrap">
+                                  <button
+                                    onClick={() => updateUserQuota(user.id, user.storyQuota + 1)}
+                                    className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
+                                    title="Add 1 story"
+                                  >
+                                    +1
+                                  </button>
+                                  <button
+                                    onClick={() => updateUserQuota(user.id, user.storyQuota + 5)}
+                                    className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
+                                    title="Add 5 stories"
+                                  >
+                                    +5
+                                  </button>
+                                  <button
+                                    onClick={() => updateUserQuota(user.id, user.storyQuota + 10)}
+                                    className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700"
+                                    title="Add 10 stories"
+                                  >
+                                    +10
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Give ${user.username} unlimited stories?`)) {
+                                        updateUserQuota(user.id, -1);
+                                      }
+                                    }}
+                                    className="bg-yellow-600 text-white px-2 py-1 rounded text-xs hover:bg-yellow-700"
+                                    title="Unlimited stories"
+                                  >
+                                    ∞
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h3 className="font-semibold text-blue-900 mb-2">Quick Guide:</h3>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li>• Default quota for new users: 2 stories</li>
+                    <li>• Admin accounts have unlimited stories (∞)</li>
+                    <li>• Click +1, +5, or +10 to add stories to a user's quota</li>
+                    <li>• Click ∞ to give unlimited access</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Saved Stories Modal */}
           {showSavedStories && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -4918,6 +5135,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   <span className="text-sm text-gray-400">
                     | {currentUser.username}
                     {currentUser.role === 'admin' && ' 👑'}
+                    {userQuota && !userQuota.unlimited && (
+                      <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${
+                        userQuota.remaining === 0 ? 'bg-red-600 text-white' :
+                        userQuota.remaining === 1 ? 'bg-yellow-600 text-white' :
+                        'bg-green-600 text-white'
+                      }`}>
+                        {userQuota.remaining} / {userQuota.quota} stories
+                      </span>
+                    )}
                   </span>
                 )}
               </div>
@@ -4970,6 +5196,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <div className="flex items-center gap-3">
                 {isAuthenticated && (
                   <>
+                    {currentUser && currentUser.role === 'admin' && (
+                      <button
+                        onClick={() => setShowAdminPanel(true)}
+                        className="bg-yellow-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-yellow-700 flex items-center gap-1.5"
+                      >
+                        <Icon name="users" size={14} />
+                        Manage Users
+                      </button>
+                    )}
                     <button
                       onClick={() => setShowSavedStories(true)}
                       className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center gap-1.5"

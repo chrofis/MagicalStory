@@ -150,7 +150,9 @@ app.post('/api/auth/register', async (req, res) => {
       email: email || '',
       password: hashedPassword,
       createdAt: new Date().toISOString(),
-      role: users.length === 0 ? 'admin' : 'user' // First user is admin
+      role: users.length === 0 ? 'admin' : 'user', // First user is admin
+      storyQuota: users.length === 0 ? -1 : 2, // Admin: unlimited (-1), Users: 2 free stories
+      storiesGenerated: 0
     };
 
     users.push(newUser);
@@ -171,7 +173,9 @@ app.post('/api/auth/register', async (req, res) => {
         id: newUser.id,
         username: newUser.username,
         email: newUser.email,
-        role: newUser.role
+        role: newUser.role,
+        storyQuota: newUser.storyQuota,
+        storiesGenerated: newUser.storiesGenerated
       }
     });
   } catch (err) {
@@ -216,7 +220,9 @@ app.post('/api/auth/login', async (req, res) => {
         id: user.id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
+        storiesGenerated: user.storiesGenerated || 0
       }
     });
   } catch (err) {
@@ -367,13 +373,88 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
 
     const users = await readJSON(USERS_FILE);
 
-    // Remove password field from response
-    const safeUsers = users.map(({ password, ...user }) => user);
+    // Remove password field from response and add default values for quota fields
+    const safeUsers = users.map(({ password, ...user }) => ({
+      ...user,
+      storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
+      storiesGenerated: user.storiesGenerated || 0
+    }));
 
     res.json(safeUsers);
   } catch (err) {
     console.error('Error fetching users:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Update user quota (admin only)
+app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId } = req.params;
+    const { storyQuota } = req.body;
+
+    if (storyQuota === undefined || (storyQuota !== -1 && storyQuota < 0)) {
+      return res.status(400).json({ error: 'Invalid quota value. Use -1 for unlimited or a positive number.' });
+    }
+
+    const users = await readJSON(USERS_FILE);
+    const user = users.find(u => u.id === userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    user.storyQuota = storyQuota;
+    await writeJSON(USERS_FILE, users);
+
+    await logActivity(req.user.id, req.user.username, 'USER_QUOTA_UPDATED', {
+      targetUserId: userId,
+      targetUsername: user.username,
+      newQuota: storyQuota
+    });
+
+    res.json({
+      message: 'User quota updated successfully',
+      user: {
+        id: user.id,
+        username: user.username,
+        storyQuota: user.storyQuota,
+        storiesGenerated: user.storiesGenerated || 0
+      }
+    });
+  } catch (err) {
+    console.error('Error updating user quota:', err);
+    res.status(500).json({ error: 'Failed to update user quota' });
+  }
+});
+
+// Get current user's quota status
+app.get('/api/user/quota', authenticateToken, async (req, res) => {
+  try {
+    const users = await readJSON(USERS_FILE);
+    const user = users.find(u => u.id === req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const quota = user.storyQuota !== undefined ? user.storyQuota : 2;
+    const generated = user.storiesGenerated || 0;
+    const remaining = quota === -1 ? -1 : Math.max(0, quota - generated);
+
+    res.json({
+      quota: quota,
+      used: generated,
+      remaining: remaining,
+      unlimited: quota === -1
+    });
+  } catch (err) {
+    console.error('Error fetching user quota:', err);
+    res.status(500).json({ error: 'Failed to fetch user quota' });
   }
 });
 
@@ -425,6 +506,7 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
   try {
     const { story } = req.body;
     const allStories = await readJSON(STORIES_FILE);
+    const users = await readJSON(USERS_FILE);
 
     if (!allStories[req.user.id]) {
       allStories[req.user.id] = [];
@@ -439,6 +521,31 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
 
     // Check if story exists (update) or new (create)
     const existingIndex = allStories[req.user.id].findIndex(s => s.id === story.id);
+    const isNewStory = existingIndex < 0;
+
+    // Check quota only for new stories
+    if (isNewStory) {
+      const user = users.find(u => u.id === req.user.id);
+      if (user) {
+        const quota = user.storyQuota !== undefined ? user.storyQuota : 2;
+        const generated = user.storiesGenerated || 0;
+
+        // -1 means unlimited (admin), otherwise check quota
+        if (quota !== -1 && generated >= quota) {
+          return res.status(403).json({
+            error: 'Story quota exceeded',
+            quota: quota,
+            used: generated,
+            remaining: 0
+          });
+        }
+
+        // Increment story counter for new stories
+        user.storiesGenerated = generated + 1;
+        await writeJSON(USERS_FILE, users);
+      }
+    }
+
     if (existingIndex >= 0) {
       allStories[req.user.id][existingIndex] = story;
     } else {
@@ -447,7 +554,11 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
 
     await writeJSON(STORIES_FILE, allStories);
 
-    await logActivity(req.user.id, req.user.username, 'STORY_SAVED', { storyId: story.id });
+    await logActivity(req.user.id, req.user.username, 'STORY_SAVED', {
+      storyId: story.id,
+      isNew: isNewStory
+    });
+
     res.json({ message: 'Story saved successfully', id: story.id });
   } catch (err) {
     console.error('Error saving story:', err);
