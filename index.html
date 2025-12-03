@@ -768,6 +768,14 @@
         }
       }, [showAdminPanel, currentUser, authToken]);
 
+      // Protect steps 1-5 - require authentication
+      useEffect(() => {
+        if (step > 0 && !isAuthenticated) {
+          setStep(0); // Redirect to landing page if not authenticated
+          setShowAuthModal(true); // Show login modal
+        }
+      }, [step, isAuthenticated]);
+
       // Save characters whenever they change (with debounce)
       useEffect(() => {
         if (authToken && characters.length > 0) {
@@ -5334,7 +5342,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           {step === 0 && renderStep0()}
 
-          {step > 0 && (
+          {step > 0 && isAuthenticated && (
             <div className="max-w-7xl mx-auto px-4 md:px-8 mt-8">
               <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6">
                 {step === 1 && renderStep1()}
