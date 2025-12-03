@@ -759,14 +759,25 @@
       useEffect(() => {
         if (showAdminPanel && currentUser && currentUser.role === 'admin') {
           fetchAllUsers();
-          // Reinitialize lucide icons for the modal
-          setTimeout(() => {
-            if (window.lucide) {
-              window.lucide.createIcons();
-            }
-          }, 100);
         }
-      }, [showAdminPanel, currentUser, authToken]);
+      }, [showAdminPanel]);
+
+      // Initialize icons after admin users are loaded (safe timing)
+      useEffect(() => {
+        if (showAdminPanel && adminUsers.length > 0) {
+          // Wait for React to finish rendering before creating icons
+          const timeoutId = setTimeout(() => {
+            if (window.lucide) {
+              try {
+                window.lucide.createIcons();
+              } catch (e) {
+                console.log('Icon initialization skipped');
+              }
+            }
+          }, 300);
+          return () => clearTimeout(timeoutId);
+        }
+      }, [adminUsers, showAdminPanel]);
 
       // Save characters whenever they change (with debounce)
       useEffect(() => {
