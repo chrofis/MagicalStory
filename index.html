@@ -1247,10 +1247,11 @@
       };
 
       const generateOutline = async () => {
-        if (!apiKey) {
-          setShowApiKeyPrompt(true);
-          return;
-        }
+        // Backend now handles API key - no need to check locally
+        // if (!apiKey) {
+        //   setShowApiKeyPrompt(true);
+        //   return;
+        // }
 
         setIsGeneratingOutline(true);
         const basePrompt = editablePrompt || buildPrompt();
@@ -1783,10 +1784,11 @@ Be concise and focus on essential visual details only.`;
 
       // Auto-Run Mode: Execute all steps automatically
       const runAutoMode = async () => {
-        if (!apiKey) {
-          setShowApiKeyPrompt(true);
-          return;
-        }
+        // Backend now handles API key - no need to check locally
+        // if (!apiKey) {
+        //   setShowApiKeyPrompt(true);
+        //   return;
+        // }
 
         try {
           // Step 1: Generate Outline
