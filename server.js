@@ -833,8 +833,22 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
 // Character management endpoints
 app.get('/api/characters', authenticateToken, async (req, res) => {
   try {
-    const allCharacters = await readJSON(CHARACTERS_FILE);
-    const userCharacters = allCharacters[req.user.id] || [];
+    let userCharacters = [];
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT data FROM characters WHERE user_id = $1'
+        : 'SELECT data FROM characters WHERE user_id = ?';
+      const rows = await dbQuery(selectQuery, [req.user.id]);
+
+      // Parse the JSON data from each row
+      userCharacters = rows.map(row => JSON.parse(row.data));
+    } else {
+      // File mode
+      const allCharacters = await readJSON(CHARACTERS_FILE);
+      userCharacters = allCharacters[req.user.id] || [];
+    }
 
     await logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: userCharacters.length });
     res.json(userCharacters);
@@ -847,10 +861,28 @@ app.get('/api/characters', authenticateToken, async (req, res) => {
 app.post('/api/characters', authenticateToken, async (req, res) => {
   try {
     const { characters } = req.body;
-    const allCharacters = await readJSON(CHARACTERS_FILE);
 
-    allCharacters[req.user.id] = characters;
-    await writeJSON(CHARACTERS_FILE, allCharacters);
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode - delete old characters and insert new ones
+      const deleteQuery = DB_TYPE === 'postgresql'
+        ? 'DELETE FROM characters WHERE user_id = $1'
+        : 'DELETE FROM characters WHERE user_id = ?';
+      await dbQuery(deleteQuery, [req.user.id]);
+
+      // Insert each character
+      for (const character of characters) {
+        const characterId = character.id || Date.now().toString() + Math.random();
+        const insertQuery = DB_TYPE === 'postgresql'
+          ? 'INSERT INTO characters (id, user_id, data) VALUES ($1, $2, $3)'
+          : 'INSERT INTO characters (id, user_id, data) VALUES (?, ?, ?)';
+        await dbQuery(insertQuery, [characterId, req.user.id, JSON.stringify(character)]);
+      }
+    } else {
+      // File mode
+      const allCharacters = await readJSON(CHARACTERS_FILE);
+      allCharacters[req.user.id] = characters;
+      await writeJSON(CHARACTERS_FILE, allCharacters);
+    }
 
     await logActivity(req.user.id, req.user.username, 'CHARACTERS_SAVED', { count: characters.length });
     res.json({ message: 'Characters saved successfully', count: characters.length });
@@ -863,8 +895,22 @@ app.post('/api/characters', authenticateToken, async (req, res) => {
 // Story management endpoints
 app.get('/api/stories', authenticateToken, async (req, res) => {
   try {
-    const allStories = await readJSON(STORIES_FILE);
-    const userStories = allStories[req.user.id] || [];
+    let userStories = [];
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC'
+        : 'SELECT data FROM stories WHERE user_id = ? ORDER BY created_at DESC';
+      const rows = await dbQuery(selectQuery, [req.user.id]);
+
+      // Parse the JSON data from each row
+      userStories = rows.map(row => JSON.parse(row.data));
+    } else {
+      // File mode
+      const allStories = await readJSON(STORIES_FILE);
+      userStories = allStories[req.user.id] || [];
+    }
 
     await logActivity(req.user.id, req.user.username, 'STORIES_LOADED', { count: userStories.length });
     res.json(userStories);
