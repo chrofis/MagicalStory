@@ -1,15 +1,34 @@
-// MagicalStory Backend Server v1.0.1
-// Includes: User quota system, email authentication, admin panel
+// MagicalStory Backend Server v1.0.2
+// Includes: User quota system, email authentication, admin panel, MySQL database support
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');
+const mysql = require('mysql2/promise');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+const STORAGE_MODE = process.env.STORAGE_MODE || 'file'; // 'file' or 'database'
+
+// Database connection pool (only used if STORAGE_MODE=database)
+let dbPool = null;
+if (STORAGE_MODE === 'database') {
+  dbPool = mysql.createPool({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+  });
+
+  console.log(`✓ Database mode enabled: ${process.env.DB_HOST}`);
+}
 
 // Middleware
 app.use(cors());
@@ -80,6 +99,74 @@ async function initializeDataFiles() {
   }
 }
 
+// Initialize database tables
+async function initializeDatabase() {
+  if (!dbPool) return;
+
+  try {
+    // Create users table
+    await dbPool.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'user',
+        story_quota INT DEFAULT 2,
+        stories_generated INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create config table
+    await dbPool.execute(`
+      CREATE TABLE IF NOT EXISTS config (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        config_key VARCHAR(255) UNIQUE NOT NULL,
+        config_value TEXT
+      )
+    `);
+
+    // Create logs table
+    await dbPool.execute(`
+      CREATE TABLE IF NOT EXISTS logs (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        user_id VARCHAR(255),
+        username VARCHAR(255),
+        action VARCHAR(255),
+        details TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create characters table
+    await dbPool.execute(`
+      CREATE TABLE IF NOT EXISTS characters (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        data TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(user_id)
+      )
+    `);
+
+    // Create stories table
+    await dbPool.execute(`
+      CREATE TABLE IF NOT EXISTS stories (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        data TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX(user_id)
+      )
+    `);
+
+    console.log('✓ Database tables initialized');
+  } catch (err) {
+    console.error('Database initialization error:', err);
+  }
+}
+
 // Helper functions for file operations
 async function readJSON(filePath) {
   try {
@@ -97,15 +184,26 @@ async function writeJSON(filePath, data) {
 
 // Logging function
 async function logActivity(userId, username, action, details) {
-  const logs = await readJSON(LOGS_FILE);
-  logs.push({
-    timestamp: new Date().toISOString(),
-    userId,
-    username,
-    action,
-    details
-  });
-  await writeJSON(LOGS_FILE, logs);
+  if (STORAGE_MODE === 'database' && dbPool) {
+    try {
+      await dbPool.execute(
+        'INSERT INTO logs (user_id, username, action, details) VALUES (?, ?, ?, ?)',
+        [userId, username, action, JSON.stringify(details)]
+      );
+    } catch (err) {
+      console.error('Log error:', err);
+    }
+  } else {
+    const logs = await readJSON(LOGS_FILE);
+    logs.push({
+      timestamp: new Date().toISOString(),
+      userId,
+      username,
+      action,
+      details
+    });
+    await writeJSON(LOGS_FILE, logs);
+  }
 }
 
 // Middleware to verify JWT token
@@ -135,30 +233,67 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const users = await readJSON(USERS_FILE);
-
-    // Check if user already exists (username is email)
-    if (users.find(u => u.username === username)) {
-      return res.status(400).json({ error: 'This email is already registered' });
-    }
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user (username is email)
-    const newUser = {
-      id: Date.now().toString(),
-      username, // This is the email
-      email: username, // Store email in both fields
-      password: hashedPassword,
-      createdAt: new Date().toISOString(),
-      role: users.length === 0 ? 'admin' : 'user', // First user is admin
-      storyQuota: users.length === 0 ? -1 : 2, // Admin: unlimited (-1), Users: 2 free stories
-      storiesGenerated: 0
-    };
+    let newUser;
 
-    users.push(newUser);
-    await writeJSON(USERS_FILE, users);
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      // Check if user already exists
+      const [existing] = await dbPool.execute(
+        'SELECT id FROM users WHERE username = ?',
+        [username]
+      );
+
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'This email is already registered' });
+      }
+
+      // Check if this is the first user (will be admin)
+      const [userCount] = await dbPool.execute('SELECT COUNT(*) as count FROM users');
+      const isFirstUser = userCount[0].count === 0;
+
+      const userId = Date.now().toString();
+      const role = isFirstUser ? 'admin' : 'user';
+      const storyQuota = isFirstUser ? -1 : 2;
+
+      await dbPool.execute(
+        'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [userId, username, username, hashedPassword, role, storyQuota, 0]
+      );
+
+      newUser = {
+        id: userId,
+        username,
+        email: username,
+        role,
+        storyQuota,
+        storiesGenerated: 0
+      };
+    } else {
+      // File mode
+      const users = await readJSON(USERS_FILE);
+
+      // Check if user already exists
+      if (users.find(u => u.username === username)) {
+        return res.status(400).json({ error: 'This email is already registered' });
+      }
+
+      newUser = {
+        id: Date.now().toString(),
+        username,
+        email: username,
+        password: hashedPassword,
+        createdAt: new Date().toISOString(),
+        role: users.length === 0 ? 'admin' : 'user',
+        storyQuota: users.length === 0 ? -1 : 2,
+        storiesGenerated: 0
+      };
+
+      users.push(newUser);
+      await writeJSON(USERS_FILE, users);
+    }
 
     await logActivity(newUser.id, username, 'USER_REGISTERED', { email });
 
@@ -194,11 +329,37 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const users = await readJSON(USERS_FILE);
-    const user = users.find(u => u.username === username);
+    let user;
 
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const [rows] = await dbPool.execute(
+        'SELECT * FROM users WHERE username = ?',
+        [username]
+      );
+
+      if (rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      const dbUser = rows[0];
+      user = {
+        id: dbUser.id,
+        username: dbUser.username,
+        email: dbUser.email,
+        password: dbUser.password,
+        role: dbUser.role,
+        storyQuota: dbUser.story_quota,
+        storiesGenerated: dbUser.stories_generated
+      };
+    } else {
+      // File mode
+      const users = await readJSON(USERS_FILE);
+      user = users.find(u => u.username === username);
+
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
     }
 
     // Verify password
@@ -378,14 +539,29 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const users = await readJSON(USERS_FILE);
+    let safeUsers;
 
-    // Remove password field from response and add default values for quota fields
-    const safeUsers = users.map(({ password, ...user }) => ({
-      ...user,
-      storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
-      storiesGenerated: user.storiesGenerated || 0
-    }));
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const [rows] = await dbPool.execute('SELECT id, username, email, role, story_quota, stories_generated, created_at FROM users');
+      safeUsers = rows.map(user => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        storyQuota: user.story_quota,
+        storiesGenerated: user.stories_generated,
+        createdAt: user.created_at
+      }));
+    } else {
+      // File mode
+      const users = await readJSON(USERS_FILE);
+      safeUsers = users.map(({ password, ...user }) => ({
+        ...user,
+        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
+        storiesGenerated: user.storiesGenerated || 0
+      }));
+    }
 
     res.json(safeUsers);
   } catch (err) {
@@ -408,15 +584,36 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
       return res.status(400).json({ error: 'Invalid quota value. Use -1 for unlimited or a positive number.' });
     }
 
-    const users = await readJSON(USERS_FILE);
-    const user = users.find(u => u.id === userId);
+    let user;
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const [rows] = await dbPool.execute('SELECT * FROM users WHERE id = ?', [userId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      await dbPool.execute('UPDATE users SET story_quota = ? WHERE id = ?', [storyQuota, userId]);
+
+      user = {
+        id: rows[0].id,
+        username: rows[0].username,
+        storyQuota: storyQuota,
+        storiesGenerated: rows[0].stories_generated
+      };
+    } else {
+      // File mode
+      const users = await readJSON(USERS_FILE);
+      user = users.find(u => u.id === userId);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      user.storyQuota = storyQuota;
+      await writeJSON(USERS_FILE, users);
     }
-
-    user.storyQuota = storyQuota;
-    await writeJSON(USERS_FILE, users);
 
     await logActivity(req.user.id, req.user.username, 'USER_QUOTA_UPDATED', {
       targetUserId: userId,
@@ -442,15 +639,31 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
 // Get current user's quota status
 app.get('/api/user/quota', authenticateToken, async (req, res) => {
   try {
-    const users = await readJSON(USERS_FILE);
-    const user = users.find(u => u.id === req.user.id);
+    let quota, generated;
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const [rows] = await dbPool.execute('SELECT story_quota, stories_generated FROM users WHERE id = ?', [req.user.id]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      quota = rows[0].story_quota !== undefined ? rows[0].story_quota : 2;
+      generated = rows[0].stories_generated || 0;
+    } else {
+      // File mode
+      const users = await readJSON(USERS_FILE);
+      const user = users.find(u => u.id === req.user.id);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      quota = user.storyQuota !== undefined ? user.storyQuota : 2;
+      generated = user.storiesGenerated || 0;
     }
 
-    const quota = user.storyQuota !== undefined ? user.storyQuota : 2;
-    const generated = user.storiesGenerated || 0;
     const remaining = quota === -1 ? -1 : Math.max(0, quota - generated);
 
     res.json({
@@ -512,12 +725,6 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
 app.post('/api/stories', authenticateToken, async (req, res) => {
   try {
     const { story } = req.body;
-    const allStories = await readJSON(STORIES_FILE);
-    const users = await readJSON(USERS_FILE);
-
-    if (!allStories[req.user.id]) {
-      allStories[req.user.id] = [];
-    }
 
     // Add timestamp and ID if not present
     if (!story.id) {
@@ -526,40 +733,88 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
     story.createdAt = story.createdAt || new Date().toISOString();
     story.updatedAt = new Date().toISOString();
 
-    // Check if story exists (update) or new (create)
-    const existingIndex = allStories[req.user.id].findIndex(s => s.id === story.id);
-    const isNewStory = existingIndex < 0;
+    let isNewStory;
 
-    // Check quota only for new stories
-    if (isNewStory) {
-      const user = users.find(u => u.id === req.user.id);
-      if (user) {
-        const quota = user.storyQuota !== undefined ? user.storyQuota : 2;
-        const generated = user.storiesGenerated || 0;
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      // Check if story exists
+      const [existing] = await dbPool.execute('SELECT id FROM stories WHERE id = ? AND user_id = ?', [story.id, req.user.id]);
+      isNewStory = existing.length === 0;
 
-        // -1 means unlimited (admin), otherwise check quota
-        if (quota !== -1 && generated >= quota) {
-          return res.status(403).json({
-            error: 'Story quota exceeded',
-            quota: quota,
-            used: generated,
-            remaining: 0
-          });
+      // Check quota only for new stories
+      if (isNewStory) {
+        const [userRows] = await dbPool.execute('SELECT story_quota, stories_generated FROM users WHERE id = ?', [req.user.id]);
+        if (userRows.length > 0) {
+          const quota = userRows[0].story_quota !== undefined ? userRows[0].story_quota : 2;
+          const generated = userRows[0].stories_generated || 0;
+
+          if (quota !== -1 && generated >= quota) {
+            return res.status(403).json({
+              error: 'Story quota exceeded',
+              quota: quota,
+              used: generated,
+              remaining: 0
+            });
+          }
+
+          // Increment story counter
+          await dbPool.execute('UPDATE users SET stories_generated = stories_generated + 1 WHERE id = ?', [req.user.id]);
         }
-
-        // Increment story counter for new stories
-        user.storiesGenerated = generated + 1;
-        await writeJSON(USERS_FILE, users);
       }
-    }
 
-    if (existingIndex >= 0) {
-      allStories[req.user.id][existingIndex] = story;
+      // Save or update story
+      if (isNewStory) {
+        await dbPool.execute(
+          'INSERT INTO stories (id, user_id, data) VALUES (?, ?, ?)',
+          [story.id, req.user.id, JSON.stringify(story)]
+        );
+      } else {
+        await dbPool.execute(
+          'UPDATE stories SET data = ? WHERE id = ? AND user_id = ?',
+          [JSON.stringify(story), story.id, req.user.id]
+        );
+      }
     } else {
-      allStories[req.user.id].push(story);
-    }
+      // File mode
+      const allStories = await readJSON(STORIES_FILE);
+      const users = await readJSON(USERS_FILE);
 
-    await writeJSON(STORIES_FILE, allStories);
+      if (!allStories[req.user.id]) {
+        allStories[req.user.id] = [];
+      }
+
+      const existingIndex = allStories[req.user.id].findIndex(s => s.id === story.id);
+      isNewStory = existingIndex < 0;
+
+      // Check quota only for new stories
+      if (isNewStory) {
+        const user = users.find(u => u.id === req.user.id);
+        if (user) {
+          const quota = user.storyQuota !== undefined ? user.storyQuota : 2;
+          const generated = user.storiesGenerated || 0;
+
+          if (quota !== -1 && generated >= quota) {
+            return res.status(403).json({
+              error: 'Story quota exceeded',
+              quota: quota,
+              used: generated,
+              remaining: 0
+            });
+          }
+
+          user.storiesGenerated = generated + 1;
+          await writeJSON(USERS_FILE, users);
+        }
+      }
+
+      if (existingIndex >= 0) {
+        allStories[req.user.id][existingIndex] = story;
+      } else {
+        allStories[req.user.id].push(story);
+      }
+
+      await writeJSON(STORIES_FILE, allStories);
+    }
 
     await logActivity(req.user.id, req.user.username, 'STORY_SAVED', {
       storyId: story.id,
@@ -605,14 +860,28 @@ app.get('/api/health', (req, res) => {
 });
 
 // Initialize and start server
-initializeDataFiles().then(() => {
+// Initialize database or files based on mode
+async function initialize() {
+  if (STORAGE_MODE === 'database') {
+    await initializeDatabase();
+  } else {
+    await initializeDataFiles();
+  }
+}
+
+initialize().then(() => {
   app.listen(PORT, () => {
     console.log(`\n=================================`);
     console.log(`🚀 MagicalStory Server Running`);
     console.log(`=================================`);
     console.log(`📍 URL: http://localhost:${PORT}`);
-    console.log(`📝 Logs: data/logs.json`);
-    console.log(`👥 Users: data/users.json`);
+    console.log(`💾 Storage: ${STORAGE_MODE.toUpperCase()}`);
+    if (STORAGE_MODE === 'database') {
+      console.log(`🗄️  Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
+    } else {
+      console.log(`📝 Logs: data/logs.json`);
+      console.log(`👥 Users: data/users.json`);
+    }
     console.log(`=================================\n`);
   });
 }).catch(err => {
