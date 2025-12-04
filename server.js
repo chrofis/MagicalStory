@@ -630,8 +630,11 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Gemini API error:', JSON.stringify(data, null, 2));
-      console.error('Status:', response.status);
+      console.error('❌ Gemini API error response:');
+      console.error('  Status:', response.status);
+      console.error('  Response:', JSON.stringify(data, null, 2));
+      console.error('  Request URL:', url.substring(0, 100) + '...');
+      console.error('  Model:', model || 'gemini-2.5-flash-image');
       throw new Error(data.error?.message || `Gemini API request failed: ${response.status}`);
     }
 
