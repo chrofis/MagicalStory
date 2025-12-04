@@ -16,18 +16,31 @@ const STORAGE_MODE = process.env.STORAGE_MODE || 'file'; // 'file' or 'database'
 // Database connection pool (only used if STORAGE_MODE=database)
 let dbPool = null;
 if (STORAGE_MODE === 'database') {
-  dbPool = mysql.createPool({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
+  try {
+    if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+      console.error('❌ Database credentials missing in environment variables');
+      console.log('Falling back to file storage mode...');
+      // Don't create pool, will use file mode
+    } else {
+      dbPool = mysql.createPool({
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT || 3306,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        connectTimeout: 10000
+      });
 
-  console.log(`✓ Database mode enabled: ${process.env.DB_HOST}`);
+      console.log(`✓ Database mode enabled: ${process.env.DB_HOST}`);
+    }
+  } catch (err) {
+    console.error('❌ Database connection error:', err.message);
+    console.log('Falling back to file storage mode...');
+    dbPool = null;
+  }
 }
 
 // Middleware
@@ -101,9 +114,16 @@ async function initializeDataFiles() {
 
 // Initialize database tables
 async function initializeDatabase() {
-  if (!dbPool) return;
+  if (!dbPool) {
+    console.log('⚠️  No database pool - skipping database initialization');
+    return;
+  }
 
   try {
+    // Test connection first
+    await dbPool.execute('SELECT 1');
+    console.log('✓ Database connection successful');
+
     // Create users table
     await dbPool.execute(`
       CREATE TABLE IF NOT EXISTS users (
@@ -163,7 +183,10 @@ async function initializeDatabase() {
 
     console.log('✓ Database tables initialized');
   } catch (err) {
-    console.error('Database initialization error:', err);
+    console.error('❌ Database initialization error:', err.message);
+    console.error('Error code:', err.code);
+    console.error('SQL:', err.sql);
+    throw err; // Re-throw to be caught by initialization
   }
 }
 
