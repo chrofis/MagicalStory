@@ -11,36 +11,34 @@ const mysql = require('mysql2/promise');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
-const STORAGE_MODE = process.env.STORAGE_MODE || 'file'; // 'file' or 'database'
+
+// Default to file mode for safety - only use database if explicitly configured AND credentials exist
+const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' &&
+                     process.env.DB_HOST &&
+                     process.env.DB_USER &&
+                     process.env.DB_PASSWORD &&
+                     process.env.DB_NAME)
+                     ? 'database'
+                     : 'file';
+
+console.log(`📦 Storage mode: ${STORAGE_MODE}`);
 
 // Database connection pool (only used if STORAGE_MODE=database)
 let dbPool = null;
 if (STORAGE_MODE === 'database') {
-  try {
-    if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
-      console.error('❌ Database credentials missing in environment variables');
-      console.log('Falling back to file storage mode...');
-      // Don't create pool, will use file mode
-    } else {
-      dbPool = mysql.createPool({
-        host: process.env.DB_HOST,
-        port: process.env.DB_PORT || 3306,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        connectTimeout: 10000
-      });
+  dbPool = mysql.createPool({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    connectTimeout: 10000
+  });
 
-      console.log(`✓ Database mode enabled: ${process.env.DB_HOST}`);
-    }
-  } catch (err) {
-    console.error('❌ Database connection error:', err.message);
-    console.log('Falling back to file storage mode...');
-    dbPool = null;
-  }
+  console.log(`✓ Database pool created: ${process.env.DB_HOST}`);
 }
 
 // Middleware
