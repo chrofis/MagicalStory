@@ -753,7 +753,7 @@
         if (window.lucide) {
           window.lucide.createIcons();
         }
-      }, [step, currentCharacter, characters, showCharacterCreated]);
+      }, []); // Run only once on mount - don't re-run when step changes!
 
       // Load characters and stories when user logs in
       useEffect(() => {
