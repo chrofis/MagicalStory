@@ -301,10 +301,10 @@ async function writeJSON(filePath, data) {
 async function logActivity(userId, username, action, details) {
   if (STORAGE_MODE === 'database' && dbPool) {
     try {
-      await dbPool.execute(
-        'INSERT INTO logs (user_id, username, action, details) VALUES (?, ?, ?, ?)',
-        [userId, username, action, JSON.stringify(details)]
-      );
+      const insertQuery = DB_TYPE === 'postgresql'
+        ? 'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)'
+        : 'INSERT INTO logs (user_id, username, action, details) VALUES (?, ?, ?, ?)';
+      await dbQuery(insertQuery, [userId, username, action, JSON.stringify(details)]);
     } catch (err) {
       console.error('Log error:', err);
     }
@@ -664,7 +664,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const [rows] = await dbPool.execute('SELECT id, username, email, role, story_quota, stories_generated, created_at FROM users');
+      const rows = await dbQuery('SELECT id, username, email, role, story_quota, stories_generated, created_at FROM users', []);
       safeUsers = rows.map(user => ({
         id: user.id,
         username: user.username,
@@ -709,13 +709,19 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const [rows] = await dbPool.execute('SELECT * FROM users WHERE id = ?', [userId]);
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT * FROM users WHERE id = $1'
+        : 'SELECT * FROM users WHERE id = ?';
+      const rows = await dbQuery(selectQuery, [userId]);
 
       if (rows.length === 0) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      await dbPool.execute('UPDATE users SET story_quota = ? WHERE id = ?', [storyQuota, userId]);
+      const updateQuery = DB_TYPE === 'postgresql'
+        ? 'UPDATE users SET story_quota = $1 WHERE id = $2'
+        : 'UPDATE users SET story_quota = ? WHERE id = ?';
+      await dbQuery(updateQuery, [storyQuota, userId]);
 
       user = {
         id: rows[0].id,
@@ -764,7 +770,10 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const [rows] = await dbPool.execute('SELECT story_quota, stories_generated FROM users WHERE id = ?', [req.user.id]);
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT story_quota, stories_generated FROM users WHERE id = $1'
+        : 'SELECT story_quota, stories_generated FROM users WHERE id = ?';
+      const rows = await dbQuery(selectQuery, [req.user.id]);
 
       if (rows.length === 0) {
         return res.status(404).json({ error: 'User not found' });
@@ -859,12 +868,18 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
       // Check if story exists
-      const [existing] = await dbPool.execute('SELECT id FROM stories WHERE id = ? AND user_id = ?', [story.id, req.user.id]);
+      const checkQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT id FROM stories WHERE id = $1 AND user_id = $2'
+        : 'SELECT id FROM stories WHERE id = ? AND user_id = ?';
+      const existing = await dbQuery(checkQuery, [story.id, req.user.id]);
       isNewStory = existing.length === 0;
 
       // Check quota only for new stories
       if (isNewStory) {
-        const [userRows] = await dbPool.execute('SELECT story_quota, stories_generated FROM users WHERE id = ?', [req.user.id]);
+        const userQuery = DB_TYPE === 'postgresql'
+          ? 'SELECT story_quota, stories_generated FROM users WHERE id = $1'
+          : 'SELECT story_quota, stories_generated FROM users WHERE id = ?';
+        const userRows = await dbQuery(userQuery, [req.user.id]);
         if (userRows.length > 0) {
           const quota = userRows[0].story_quota !== undefined ? userRows[0].story_quota : 2;
           const generated = userRows[0].stories_generated || 0;
@@ -879,21 +894,24 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
           }
 
           // Increment story counter
-          await dbPool.execute('UPDATE users SET stories_generated = stories_generated + 1 WHERE id = ?', [req.user.id]);
+          const updateQuery = DB_TYPE === 'postgresql'
+            ? 'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = $1'
+            : 'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = ?';
+          await dbQuery(updateQuery, [req.user.id]);
         }
       }
 
       // Save or update story
       if (isNewStory) {
-        await dbPool.execute(
-          'INSERT INTO stories (id, user_id, data) VALUES (?, ?, ?)',
-          [story.id, req.user.id, JSON.stringify(story)]
-        );
+        const insertQuery = DB_TYPE === 'postgresql'
+          ? 'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3)'
+          : 'INSERT INTO stories (id, user_id, data) VALUES (?, ?, ?)';
+        await dbQuery(insertQuery, [story.id, req.user.id, JSON.stringify(story)]);
       } else {
-        await dbPool.execute(
-          'UPDATE stories SET data = ? WHERE id = ? AND user_id = ?',
-          [JSON.stringify(story), story.id, req.user.id]
-        );
+        const updateQuery = DB_TYPE === 'postgresql'
+          ? 'UPDATE stories SET data = $1 WHERE id = $2 AND user_id = $3'
+          : 'UPDATE stories SET data = ? WHERE id = ? AND user_id = ?';
+        await dbQuery(updateQuery, [JSON.stringify(story), story.id, req.user.id]);
       }
     } else {
       // File mode
