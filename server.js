@@ -23,6 +23,8 @@ console.log(`  DATABASE_URL: ${DATABASE_URL ? 'SET (length: ' + DATABASE_URL.len
 console.log(`  STORAGE_MODE: ${process.env.STORAGE_MODE}`);
 console.log(`  DB_HOST: ${process.env.DB_HOST || 'NOT SET'}`);
 console.log(`  DB_USER: ${process.env.DB_USER || 'NOT SET'}`);
+console.log(`  GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'SET (length: ' + process.env.GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
+console.log(`  ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'SET (length: ' + process.env.ANTHROPIC_API_KEY.length + ')' : 'NOT SET'}`);
 
 // Default to file mode for safety - only use database if explicitly configured AND credentials exist
 const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' &&
@@ -417,6 +419,8 @@ app.post('/api/auth/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    console.log(`✅ User registered: ${newUser.username} (role: ${newUser.role})`);
+
     res.json({
       token,
       user: {
@@ -489,6 +493,8 @@ app.post('/api/auth/login', async (req, res) => {
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    console.log(`✅ User logged in: ${user.username} (role: ${user.role})`);
 
     res.json({
       token,
@@ -619,7 +625,9 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Gemini API request failed');
+      console.error('Gemini API error:', JSON.stringify(data, null, 2));
+      console.error('Status:', response.status);
+      throw new Error(data.error?.message || `Gemini API request failed: ${response.status}`);
     }
 
     res.json(data);
