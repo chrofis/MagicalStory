@@ -724,11 +724,20 @@
         const savedToken = localStorage.getItem('auth_token');
         const savedUser = localStorage.getItem('current_user');
 
+        console.log('🔐 Checking saved auth:', {
+          hasToken: !!savedToken,
+          hasUser: !!savedUser,
+          token: savedToken ? savedToken.substring(0, 20) + '...' : 'none'
+        });
+
         if (savedToken && savedUser) {
           setAuthToken(savedToken);
           setCurrentUser(JSON.parse(savedUser));
           setIsAuthenticated(true);
           setStep(1); // Go to step 1 if already logged in
+          console.log('✅ Auto-login successful');
+        } else {
+          console.log('❌ No saved auth found');
         }
         // Don't show auth modal automatically - user needs to click "Start Your Adventure"
 
@@ -778,6 +787,14 @@
           return () => clearTimeout(timeoutId);
         }
       }, [adminUsers, showAdminPanel]);
+
+      // Initialize character when entering step 2
+      useEffect(() => {
+        if (step === 2 && !currentCharacter && !showCharacterCreated) {
+          console.log('🎭 Initializing new character for step 2');
+          startNewCharacter();
+        }
+      }, [step, currentCharacter, showCharacterCreated]);
 
       // Save characters whenever they change (with debounce)
       useEffect(() => {
@@ -3430,10 +3447,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       );
 
       const renderStep2 = () => {
-        // If no current character, initialize a new one (but don't return null yet)
-        if (!currentCharacter && !showCharacterCreated) {
-          startNewCharacter();
-        }
+        // Character is initialized by useEffect when step changes to 2
+        // This prevents state updates during render
 
         // Ensure arrays are initialized (only if currentCharacter exists)
         if (currentCharacter) {
