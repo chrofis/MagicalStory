@@ -7,38 +7,54 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');
 const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
 
+// Detect database type: PostgreSQL (Railway) or MySQL (IONOS)
+const DATABASE_URL = process.env.DATABASE_URL; // Railway PostgreSQL
+const DB_TYPE = DATABASE_URL ? 'postgresql' : 'mysql';
+
 // Default to file mode for safety - only use database if explicitly configured AND credentials exist
 const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' &&
-                     process.env.DB_HOST &&
-                     process.env.DB_USER &&
-                     process.env.DB_PASSWORD &&
-                     process.env.DB_NAME)
+                     (DATABASE_URL || (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME)))
                      ? 'database'
                      : 'file';
 
 console.log(`📦 Storage mode: ${STORAGE_MODE}`);
+if (STORAGE_MODE === 'database') {
+  console.log(`🗄️  Database type: ${DB_TYPE}`);
+}
 
 // Database connection pool (only used if STORAGE_MODE=database)
 let dbPool = null;
 if (STORAGE_MODE === 'database') {
-  dbPool = mysql.createPool({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    connectTimeout: 10000
-  });
-
-  console.log(`✓ Database pool created: ${process.env.DB_HOST}`);
+  if (DB_TYPE === 'postgresql') {
+    // Railway PostgreSQL
+    dbPool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
+    console.log(`✓ PostgreSQL pool created (Railway)`);
+  } else {
+    // MySQL (IONOS)
+    dbPool = mysql.createPool({
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT || 3306,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      connectTimeout: 10000
+    });
+    console.log(`✓ MySQL pool created: ${process.env.DB_HOST}`);
+  }
 }
 
 // Middleware
@@ -110,6 +126,19 @@ async function initializeDataFiles() {
   }
 }
 
+// Database query wrapper - works with both PostgreSQL and MySQL
+async function dbQuery(sql, params = []) {
+  if (DB_TYPE === 'postgresql') {
+    // PostgreSQL uses $1, $2, etc for parameters
+    const result = await dbPool.query(sql, params);
+    return result.rows;
+  } else {
+    // MySQL uses ? for parameters
+    const [rows] = await dbPool.execute(sql, params);
+    return rows;
+  }
+}
+
 // Initialize database tables
 async function initializeDatabase() {
   if (!dbPool) {
@@ -119,65 +148,121 @@ async function initializeDatabase() {
 
   try {
     // Test connection first
-    await dbPool.execute('SELECT 1');
+    if (DB_TYPE === 'postgresql') {
+      await dbPool.query('SELECT 1');
+    } else {
+      await dbPool.execute('SELECT 1');
+    }
     console.log('✓ Database connection successful');
 
-    // Create users table
-    await dbPool.execute(`
-      CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR(255) PRIMARY KEY,
-        username VARCHAR(255) UNIQUE NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        role VARCHAR(50) DEFAULT 'user',
-        story_quota INT DEFAULT 2,
-        stories_generated INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    if (DB_TYPE === 'postgresql') {
+      // PostgreSQL table creation
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id VARCHAR(255) PRIMARY KEY,
+          username VARCHAR(255) UNIQUE NOT NULL,
+          email VARCHAR(255) NOT NULL,
+          password VARCHAR(255) NOT NULL,
+          role VARCHAR(50) DEFAULT 'user',
+          story_quota INT DEFAULT 2,
+          stories_generated INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    // Create config table
-    await dbPool.execute(`
-      CREATE TABLE IF NOT EXISTS config (
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        config_key VARCHAR(255) UNIQUE NOT NULL,
-        config_value TEXT
-      )
-    `);
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS config (
+          id SERIAL PRIMARY KEY,
+          config_key VARCHAR(255) UNIQUE NOT NULL,
+          config_value TEXT
+        )
+      `);
 
-    // Create logs table
-    await dbPool.execute(`
-      CREATE TABLE IF NOT EXISTS logs (
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        user_id VARCHAR(255),
-        username VARCHAR(255),
-        action VARCHAR(255),
-        details TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS logs (
+          id SERIAL PRIMARY KEY,
+          user_id VARCHAR(255),
+          username VARCHAR(255),
+          action VARCHAR(255),
+          details TEXT,
+          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    // Create characters table
-    await dbPool.execute(`
-      CREATE TABLE IF NOT EXISTS characters (
-        id VARCHAR(255) PRIMARY KEY,
-        user_id VARCHAR(255) NOT NULL,
-        data TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX(user_id)
-      )
-    `);
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS characters (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL,
+          data TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id)`);
 
-    // Create stories table
-    await dbPool.execute(`
-      CREATE TABLE IF NOT EXISTS stories (
-        id VARCHAR(255) PRIMARY KEY,
-        user_id VARCHAR(255) NOT NULL,
-        data TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX(user_id)
-      )
-    `);
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS stories (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL,
+          data TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
+
+    } else {
+      // MySQL table creation
+      await dbPool.execute(`
+        CREATE TABLE IF NOT EXISTS users (
+          id VARCHAR(255) PRIMARY KEY,
+          username VARCHAR(255) UNIQUE NOT NULL,
+          email VARCHAR(255) NOT NULL,
+          password VARCHAR(255) NOT NULL,
+          role VARCHAR(50) DEFAULT 'user',
+          story_quota INT DEFAULT 2,
+          stories_generated INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      await dbPool.execute(`
+        CREATE TABLE IF NOT EXISTS config (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          config_key VARCHAR(255) UNIQUE NOT NULL,
+          config_value TEXT
+        )
+      `);
+
+      await dbPool.execute(`
+        CREATE TABLE IF NOT EXISTS logs (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          user_id VARCHAR(255),
+          username VARCHAR(255),
+          action VARCHAR(255),
+          details TEXT,
+          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      await dbPool.execute(`
+        CREATE TABLE IF NOT EXISTS characters (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL,
+          data TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX(user_id)
+        )
+      `);
+
+      await dbPool.execute(`
+        CREATE TABLE IF NOT EXISTS stories (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL,
+          data TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX(user_id)
+        )
+      `);
+    }
 
     console.log('✓ Database tables initialized');
   } catch (err) {
