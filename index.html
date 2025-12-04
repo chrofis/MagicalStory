@@ -790,11 +790,18 @@
 
       // Initialize character when entering step 2
       useEffect(() => {
+        console.log('📍 Step/Auth state:', {
+          step,
+          isAuthenticated,
+          hasCurrentCharacter: !!currentCharacter,
+          showCharacterCreated
+        });
+
         if (step === 2 && !currentCharacter && !showCharacterCreated) {
           console.log('🎭 Initializing new character for step 2');
           startNewCharacter();
         }
-      }, [step, currentCharacter, showCharacterCreated]);
+      }, [step, currentCharacter, showCharacterCreated, isAuthenticated]);
 
       // Save characters whenever they change (with debounce)
       useEffect(() => {
