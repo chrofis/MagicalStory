@@ -1527,10 +1527,11 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
       };
 
       const generateStoryMultiPart = async () => {
-        if (!apiKey) {
-          setShowApiKeyPrompt(true);
-          return;
-        }
+        // Backend now handles API key - no need to check locally
+        // if (!apiKey) {
+        //   setShowApiKeyPrompt(true);
+        //   return;
+        // }
 
         setIsGenerating(true);
         const basePrompt = editablePrompt || buildPrompt();
@@ -1581,10 +1582,11 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
       };
 
       const generateStory = async () => {
-        if (!apiKey) {
-          setShowApiKeyPrompt(true);
-          return;
-        }
+        // Backend now handles API key - no need to check locally
+        // if (!apiKey) {
+        //   setShowApiKeyPrompt(true);
+        //   return;
+        // }
 
         // Use multi-part generation for stories with more than 5 pages
         if (pages > 5) {
@@ -1619,10 +1621,11 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
       };
 
       const generateScenes = async () => {
-        if (!apiKey) {
-          setShowApiKeyPrompt(true);
-          return;
-        }
+        // Backend now handles API key - no need to check locally
+        // if (!apiKey) {
+        //   setShowApiKeyPrompt(true);
+        //   return;
+        // }
 
         if (!generatedStory) {
           alert('Please generate a story first!');
