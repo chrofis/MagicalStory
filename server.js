@@ -17,6 +17,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-pro
 const DATABASE_URL = process.env.DATABASE_URL; // Railway PostgreSQL
 const DB_TYPE = DATABASE_URL ? 'postgresql' : 'mysql';
 
+// Debug logging
+console.log('🔍 Environment Check:');
+console.log(`  DATABASE_URL: ${DATABASE_URL ? 'SET (length: ' + DATABASE_URL.length + ')' : 'NOT SET'}`);
+console.log(`  STORAGE_MODE: ${process.env.STORAGE_MODE}`);
+console.log(`  DB_HOST: ${process.env.DB_HOST || 'NOT SET'}`);
+console.log(`  DB_USER: ${process.env.DB_USER || 'NOT SET'}`);
+
 // Default to file mode for safety - only use database if explicitly configured AND credentials exist
 const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' &&
                      (DATABASE_URL || (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME)))
