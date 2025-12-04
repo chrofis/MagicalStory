@@ -594,12 +594,17 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
     // Prioritize environment variable, fallback to config file
     let geminiApiKey = process.env.GEMINI_API_KEY;
 
+    console.log('🔑 Gemini API key check:');
+    console.log(`  From env: ${geminiApiKey ? 'SET (length: ' + geminiApiKey.length + ', starts with: ' + geminiApiKey.substring(0, 6) + ')' : 'NOT SET'}`);
+
     if (!geminiApiKey) {
       const config = await readJSON(CONFIG_FILE);
       geminiApiKey = config.geminiApiKey;
+      console.log(`  From config file: ${geminiApiKey ? 'SET' : 'NOT SET'}`);
     }
 
     if (!geminiApiKey) {
+      console.log('  ❌ No API key found!');
       return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
