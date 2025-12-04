@@ -5000,6 +5000,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               <td className="px-4 py-3 text-sm text-center">
                                 <div className="flex gap-1 justify-center flex-wrap">
                                   <button
+                                    onClick={() => {
+                                      if (confirm(`Set ${user.username}'s quota to 0?`)) {
+                                        updateUserQuota(user.id, 0);
+                                      }
+                                    }}
+                                    className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700"
+                                    title="Set quota to 0"
+                                  >
+                                    0
+                                  </button>
+                                  <button
                                     onClick={() => updateUserQuota(user.id, user.storyQuota + 1)}
                                     className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
                                     title="Add 1 story"

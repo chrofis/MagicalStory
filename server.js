@@ -685,8 +685,9 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     let safeUsers;
 
     if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const rows = await dbQuery('SELECT id, username, email, role, story_quota, stories_generated, created_at FROM users', []);
+      // Database mode - order by created_at to maintain consistent order
+      const selectQuery = 'SELECT id, username, email, role, story_quota, stories_generated, created_at FROM users ORDER BY created_at ASC';
+      const rows = await dbQuery(selectQuery, []);
       safeUsers = rows.map(user => ({
         id: user.id,
         username: user.username,
@@ -1038,20 +1039,35 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
 app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const allStories = await readJSON(STORIES_FILE);
 
-    if (!allStories[req.user.id]) {
-      return res.status(404).json({ error: 'Story not found' });
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const deleteQuery = DB_TYPE === 'postgresql'
+        ? 'DELETE FROM stories WHERE id = $1 AND user_id = $2'
+        : 'DELETE FROM stories WHERE id = ? AND user_id = ?';
+      const result = await dbQuery(deleteQuery, [id, req.user.id]);
+
+      // Check if any rows were deleted (PostgreSQL returns rows, MySQL returns affectedRows info)
+      if (DB_TYPE === 'postgresql' && result.length === 0) {
+        return res.status(404).json({ error: 'Story not found' });
+      }
+    } else {
+      // File mode
+      const allStories = await readJSON(STORIES_FILE);
+
+      if (!allStories[req.user.id]) {
+        return res.status(404).json({ error: 'Story not found' });
+      }
+
+      const initialLength = allStories[req.user.id].length;
+      allStories[req.user.id] = allStories[req.user.id].filter(s => s.id !== id);
+
+      if (allStories[req.user.id].length === initialLength) {
+        return res.status(404).json({ error: 'Story not found' });
+      }
+
+      await writeJSON(STORIES_FILE, allStories);
     }
-
-    const initialLength = allStories[req.user.id].length;
-    allStories[req.user.id] = allStories[req.user.id].filter(s => s.id !== id);
-
-    if (allStories[req.user.id].length === initialLength) {
-      return res.status(404).json({ error: 'Story not found' });
-    }
-
-    await writeJSON(STORIES_FILE, allStories);
 
     await logActivity(req.user.id, req.user.username, 'STORY_DELETED', { storyId: id });
     res.json({ message: 'Story deleted successfully' });
