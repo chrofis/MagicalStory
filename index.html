@@ -4160,9 +4160,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               </p>
               <button
                 onClick={runAutoMode}
-                disabled={characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages}
+                disabled={characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)}
                 className={`w-full py-3 rounded-lg font-bold text-lg flex items-center justify-center gap-2 ${
-                  characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages
+                  characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-white text-purple-600 hover:bg-gray-100'
                 }`}
@@ -4170,6 +4170,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <Icon name="play" size={24} />
                 {language === 'de' ? 'Alles Automatisch Generieren' : language === 'fr' ? 'Tout Générer Automatiquement' : 'Generate Everything Automatically'}
               </button>
+              {userQuota && !userQuota.unlimited && userQuota.remaining <= 0 && (
+                <p className="text-sm text-red-600 font-semibold mt-2 text-center">
+                  {language === 'de' ? 'Keine Credits mehr verfügbar. Kontaktieren Sie den Administrator für mehr Credits.' :
+                   language === 'fr' ? 'Plus de crédits disponibles. Contactez l\'administrateur pour plus de crédits.' :
+                   'No credits remaining. Contact administrator for more credits.'}
+                </p>
+              )}
             </div>
           )}
 
@@ -4295,18 +4302,27 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <>
                 {!editableOutline ? (
                   // Stage 1: Generate Outline
-                  <button
-                    onClick={generateOutline}
-                    disabled={isGeneratingOutline || characters.length === 0}
-                    className={`w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 ${
-                      isGeneratingOutline || characters.length === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-purple-500 text-white hover:bg-purple-600'
-                    }`}
-                  >
-                    <Icon name="list" size={24} />
-                    {isGeneratingOutline ? t.generatingOutline : t.generateOutline}
-                  </button>
+                  <>
+                    <button
+                      onClick={generateOutline}
+                      disabled={isGeneratingOutline || characters.length === 0 || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)}
+                      className={`w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 ${
+                        isGeneratingOutline || characters.length === 0 || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-purple-500 text-white hover:bg-purple-600'
+                      }`}
+                    >
+                      <Icon name="list" size={24} />
+                      {isGeneratingOutline ? t.generatingOutline : t.generateOutline}
+                    </button>
+                    {userQuota && !userQuota.unlimited && userQuota.remaining <= 0 && (
+                      <p className="text-sm text-red-600 font-semibold mt-2 text-center">
+                        {language === 'de' ? 'Keine Credits mehr verfügbar. Kontaktieren Sie den Administrator für mehr Credits.' :
+                         language === 'fr' ? 'Plus de crédits disponibles. Contactez l\'administrateur pour plus de crédits.' :
+                         'No credits remaining. Contact administrator for more credits.'}
+                      </p>
+                    )}
+                  </>
                 ) : (
                   // Stage 2: Show outline and Generate Story button
                   <div className="space-y-4">
@@ -4335,9 +4351,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                     <button
                       onClick={generateStory}
-                      disabled={isGenerating || !editableOutline}
+                      disabled={isGenerating || !editableOutline || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)}
                       className={`w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 ${
-                        isGenerating || !editableOutline
+                        isGenerating || !editableOutline || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-blue-500 text-white hover:bg-blue-600'
                       }`}
@@ -4345,6 +4361,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       <Icon name="wand-2" size={24} />
                       {isGenerating ? t.creating : t.generateStory}
                     </button>
+                    {userQuota && !userQuota.unlimited && userQuota.remaining <= 0 && (
+                      <p className="text-sm text-red-600 font-semibold mt-2 text-center">
+                        {language === 'de' ? 'Keine Credits mehr verfügbar. Kontaktieren Sie den Administrator für mehr Credits.' :
+                         language === 'fr' ? 'Plus de crédits disponibles. Contactez l\'administrateur pour plus de crédits.' :
+                         'No credits remaining. Contact administrator for more credits.'}
+                      </p>
+                    )}
                   </div>
                 )}
               </>
