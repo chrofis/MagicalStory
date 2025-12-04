@@ -323,7 +323,7 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
-    const { model, contents } = req.body;
+    const { model, contents, safetySettings } = req.body;
 
     await logActivity(req.user.id, req.user.username, 'GEMINI_API_CALL', {
       model: model || 'gemini-2.5-flash-image'
@@ -331,10 +331,15 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.5-flash-image'}:generateContent?key=${geminiApiKey}`;
 
+    const requestBody = { contents };
+    if (safetySettings) {
+      requestBody.safetySettings = safetySettings;
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents })
+      body: JSON.stringify(requestBody)
     });
 
     const data = await response.json();

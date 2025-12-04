@@ -1396,12 +1396,9 @@ Provide the outline first, then the character manifest (if applicable). Be speci
        * Generate cartoon illustration from character photo (for display only)
        * Returns base64 image data
        * NOTE: This cartoon is for DISPLAY purposes only, NOT used as API reference
+       * Uses backend /api/gemini endpoint with Railway-stored API keys
        */
       const generateCharacterCartoon = async (character) => {
-        if (!geminiApiKey) {
-          throw new Error('Gemini API key required for cartoon generation');
-        }
-
         if (!character.photoUrl) {
           throw new Error(`Character ${character.name} has no photo to convert`);
         }
@@ -1417,12 +1414,15 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
         const mimeType = character.photoUrl.match(/^data:(image\/\w+);base64,/) ?
           character.photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`;
-
-        const response = await fetch(url, {
+        // Call backend API endpoint which has the Gemini API key
+        const response = await fetch(`${API_URL}/api/gemini`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
           body: JSON.stringify({
+            model: 'gemini-2.5-flash-image',
             contents: [{
               parts: [
                 { text: cartoonPrompt },
@@ -1444,7 +1444,8 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
         });
 
         if (!response.ok) {
-          throw new Error(`Gemini API Error: ${response.status}`);
+          const errorData = await response.json();
+          throw new Error(errorData.error || `API Error: ${response.status}`);
         }
 
         const data = await response.json();
@@ -1783,10 +1784,6 @@ Be concise and focus on essential visual details only.`;
           setShowApiKeyPrompt(true);
           return;
         }
-        if (!geminiApiKey) {
-          setShowGeminiApiKeyPrompt(true);
-          return;
-        }
 
         try {
           // Step 1: Generate Outline
@@ -1987,7 +1984,7 @@ Be concise and focus on essential visual details only.`;
             try {
               let imageData;
               if (characterImages.length > 0) {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`;
+                // Call backend API endpoint which has the Gemini API key
                 const parts = [{ text: imagePrompt }];
 
                 characterImages.forEach(charImage => {
@@ -2003,10 +2000,16 @@ Be concise and focus on essential visual details only.`;
                   });
                 });
 
-                const response = await fetch(url, {
+                const response = await fetch(`${API_URL}/api/gemini`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ contents: [{ parts }] })
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify({
+                    model: 'gemini-2.5-flash-image',
+                    contents: [{ parts }]
+                  })
                 });
 
                 if (!response.ok) throw new Error(`API Error: ${response.status}`);
@@ -2159,11 +2162,6 @@ Be concise and focus on essential visual details only.`;
       };
 
       const generateSceneImages = async () => {
-        if (!geminiApiKey) {
-          setShowGeminiApiKeyPrompt(true);
-          return;
-        }
-
         if (sceneDescriptions.length === 0) {
           alert('Please create scene descriptions first!');
           return;
@@ -2336,17 +2334,19 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
       // Helper function to generate a single avatar variant
       const generateSingleAvatar = async (referenceImage, prompt) => {
-        const model = "gemini-2.5-flash-image";
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
-
         const base64Data = referenceImage.replace(/^data:image\/\w+;base64,/, '');
         const mimeType = referenceImage.match(/^data:(image\/\w+);base64,/) ?
           referenceImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
-        const response = await fetch(url, {
+        // Call backend API endpoint which has the Gemini API key
+        const response = await fetch(`${API_URL}/api/gemini`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
           body: JSON.stringify({
+            model: 'gemini-2.5-flash-image',
             contents: [{
               parts: [
                 { text: prompt },
@@ -2390,11 +2390,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       };
 
       const generateAvatar = async (referenceImage) => {
-        if (!geminiApiKey) {
-          setShowGeminiApiKeyPrompt(true);
-          return;
-        }
-
         setIsGeneratingAvatar(true);
         setGeneratedAvatar(null);
         setGeneratedAvatars([]);
@@ -2445,28 +2440,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       };
 
       const editImage = async (currentImage, editInstruction) => {
-        if (!geminiApiKey) {
-          setShowGeminiApiKeyPrompt(true);
-          return null;
-        }
-
         try {
-          // Use gemini-2.5-flash-image for image editing (same as original editAvatar)
-          const model = "gemini-2.5-flash-image";
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
-
           const base64Data = currentImage.replace(/^data:image\/\w+;base64,/, '');
           const mimeType = currentImage.match(/^data:(image\/\w+);base64,/) ?
             currentImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
           const finalPrompt = `Edit this scene: ${editInstruction}. Maintain the same 3D Pixar/Disney animation style, character appearances, and overall art style.`;
 
-          const response = await fetch(url, {
+          // Call backend API endpoint which has the Gemini API key
+          const response = await fetch(`${API_URL}/api/gemini`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
             body: JSON.stringify({
+              model: 'gemini-2.5-flash-image',
               contents: [{
                 parts: [
                   {
@@ -2522,23 +2511,20 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       };
 
       const analyzeImageForTraits = async (imageData) => {
-        if (!geminiApiKey) {
-          return null;
-        }
-
         try {
-          // Use gemini-2.5-flash for vision/text analysis (same as original)
-          const model = "gemini-2.5-flash";
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
-
           const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
           const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
             imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
-          const response = await fetch(url, {
+          // Call backend API endpoint which has the Gemini API key
+          const response = await fetch(`${API_URL}/api/gemini`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
             body: JSON.stringify({
+              model: 'gemini-2.5-flash',
               contents: [{
                 parts: [
                   {
@@ -5330,39 +5316,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <button
                       onClick={saveApiKeyToStorage}
                       className="flex-1 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600"
-                    >
-                      {t.saveApiKey}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          {showGeminiApiKeyPrompt && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl p-8 max-w-md w-full">
-                  <h2 className="text-2xl font-bold text-indigo-700 mb-4">{t.geminiApiKey}</h2>
-                  <p className="text-gray-600 mb-4">{t.geminiApiKeyPrompt}</p>
-                  <input
-                    type="password"
-                    value={tempGeminiApiKey}
-                    onChange={(e) => setTempGeminiApiKey(e.target.value)}
-                    placeholder="AIza..."
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg mb-4"
-                  />
-                  <p className="text-xs text-gray-500 mb-4">
-                    {t.geminiApiKeyNote}: <a href="https://aistudio.google.com/apikey" target="_blank" className="text-indigo-600 underline">Google AI Studio</a>
-                  </p>
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => setShowGeminiApiKeyPrompt(false)}
-                      className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400"
-                    >
-                      {t.cancel}
-                    </button>
-                    <button
-                      onClick={saveGeminiApiKey}
-                      className="flex-1 bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600"
                     >
                       {t.saveApiKey}
                     </button>
