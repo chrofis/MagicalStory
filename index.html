@@ -5387,7 +5387,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 </button>
 
                 <button
-                  onClick={() => setStep(Math.min(4, step + 1))}
+                  onClick={() => {
+                    const nextStep = Math.min(4, step + 1);
+                    console.log('🔵 Next button clicked:', {
+                      currentStep: step,
+                      nextStep,
+                      storyType,
+                      isDisabled: (step === 1 && !storyType) || (step === 2 && characters.length === 0) || (step === 3 && !areAllRelationshipsDefined())
+                    });
+                    setStep(nextStep);
+                  }}
                   disabled={
                     (step === 1 && !storyType) ||
                     (step === 2 && characters.length === 0) ||
