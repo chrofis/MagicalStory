@@ -185,7 +185,7 @@ async function initializeDatabase() {
   } catch (err) {
     console.error('❌ Database initialization error:', err.message);
     console.error('Error code:', err.code);
-    console.error('SQL:', err.sql);
+    if (err.sql) console.error('SQL:', err.sql);
     throw err; // Re-throw to be caught by initialization
   }
 }
@@ -885,8 +885,13 @@ app.get('/api/health', (req, res) => {
 // Initialize and start server
 // Initialize database or files based on mode
 async function initialize() {
-  if (STORAGE_MODE === 'database') {
-    await initializeDatabase();
+  if (STORAGE_MODE === 'database' && dbPool) {
+    try {
+      await initializeDatabase();
+    } catch (err) {
+      console.error('⚠️  Database initialization failed, falling back to file storage');
+      await initializeDataFiles();
+    }
   } else {
     await initializeDataFiles();
   }
