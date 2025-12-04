@@ -33,7 +33,7 @@ API key.txt
 data/
 
 # User content and uploads
-Images/
+# Images/ - now included in git for Railway deployment
 Magical-Story-images/
 Geschichten, Prompts, Inputs/
 MagicalStory/
