@@ -1419,7 +1419,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
           },
           body: JSON.stringify({
             model: 'gemini-2.5-flash-image',
@@ -2004,7 +2004,7 @@ Be concise and focus on essential visual details only.`;
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
                   },
                   body: JSON.stringify({
                     model: 'gemini-2.5-flash-image',
@@ -2343,7 +2343,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
           },
           body: JSON.stringify({
             model: 'gemini-2.5-flash-image',
@@ -2452,7 +2452,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             },
             body: JSON.stringify({
               model: 'gemini-2.5-flash-image',
@@ -2521,7 +2521,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             },
             body: JSON.stringify({
               model: 'gemini-2.5-flash',
