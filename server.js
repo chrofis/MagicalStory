@@ -591,6 +591,10 @@ app.post('/api/claude', authenticateToken, async (req, res) => {
 
 // Proxy endpoint for Gemini API
 app.post('/api/gemini', authenticateToken, async (req, res) => {
+  console.log('🎨 === GEMINI ENDPOINT CALLED ===');
+  console.log(`  User: ${req.user?.username || 'unknown'}`);
+  console.log(`  Time: ${new Date().toISOString()}`);
+
   try {
     // Prioritize environment variable, fallback to config file
     let geminiApiKey = process.env.GEMINI_API_KEY;
