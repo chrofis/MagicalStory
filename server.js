@@ -539,16 +539,25 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
 
 // Proxy endpoint for Claude API
 app.post('/api/claude', authenticateToken, async (req, res) => {
+  console.log('📖 === CLAUDE/ANTHROPIC ENDPOINT CALLED ===');
+  console.log(`  User: ${req.user?.username || 'unknown'}`);
+  console.log(`  Time: ${new Date().toISOString()}`);
+
   try {
     // Prioritize environment variable, fallback to config file
     let anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 
+    console.log('🔑 Anthropic API key check:');
+    console.log(`  From env: ${anthropicApiKey ? 'SET (length: ' + anthropicApiKey.length + ', starts with: ' + anthropicApiKey.substring(0, 6) + ')' : 'NOT SET'}`);
+
     if (!anthropicApiKey) {
       const config = await readJSON(CONFIG_FILE);
       anthropicApiKey = config.anthropicApiKey;
+      console.log(`  From config file: ${anthropicApiKey ? 'SET' : 'NOT SET'}`);
     }
 
     if (!anthropicApiKey) {
+      console.log('  ❌ No API key found!');
       return res.status(500).json({ error: 'Anthropic API key not configured' });
     }
 
