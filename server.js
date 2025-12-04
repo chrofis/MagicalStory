@@ -495,6 +495,7 @@ app.post('/api/auth/login', async (req, res) => {
     );
 
     console.log(`✅ User logged in: ${user.username} (role: ${user.role})`);
+    console.log(`⚠️  TEST LOG - If you see this, logs are working!`);
 
     res.json({
       token,
