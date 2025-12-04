@@ -880,6 +880,22 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// IP check endpoint - shows Railway's outgoing IP for database whitelisting
+app.get('/api/check-ip', async (req, res) => {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    res.json({
+      railwayOutgoingIp: data.ip,
+      requestIp: req.ip,
+      forwardedFor: req.headers['x-forwarded-for'],
+      message: 'Add the railwayOutgoingIp to your IONOS database whitelist'
+    });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
+
 // Initialize and start server
 // Initialize database or files based on mode
 async function initialize() {
