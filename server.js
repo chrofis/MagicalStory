@@ -354,27 +354,27 @@ app.post('/api/auth/register', async (req, res) => {
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
       // Check if user already exists
-      const [existing] = await dbPool.execute(
-        'SELECT id FROM users WHERE username = ?',
-        [username]
-      );
+      const existingQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT id FROM users WHERE username = $1'
+        : 'SELECT id FROM users WHERE username = ?';
+      const existing = await dbQuery(existingQuery, [username]);
 
       if (existing.length > 0) {
         return res.status(400).json({ error: 'This email is already registered' });
       }
 
       // Check if this is the first user (will be admin)
-      const [userCount] = await dbPool.execute('SELECT COUNT(*) as count FROM users');
+      const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
       const isFirstUser = userCount[0].count === 0;
 
       const userId = Date.now().toString();
       const role = isFirstUser ? 'admin' : 'user';
       const storyQuota = isFirstUser ? -1 : 2;
 
-      await dbPool.execute(
-        'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [userId, username, username, hashedPassword, role, storyQuota, 0]
-      );
+      const insertQuery = DB_TYPE === 'postgresql'
+        ? 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated) VALUES ($1, $2, $3, $4, $5, $6, $7)'
+        : 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated) VALUES (?, ?, ?, ?, ?, ?, ?)';
+      await dbQuery(insertQuery, [userId, username, username, hashedPassword, role, storyQuota, 0]);
 
       newUser = {
         id: userId,
@@ -446,10 +446,10 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const [rows] = await dbPool.execute(
-        'SELECT * FROM users WHERE username = ?',
-        [username]
-      );
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT * FROM users WHERE username = $1'
+        : 'SELECT * FROM users WHERE username = ?';
+      const rows = await dbQuery(selectQuery, [username]);
 
       if (rows.length === 0) {
         return res.status(401).json({ error: 'Invalid credentials' });
