@@ -3596,7 +3596,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             {allStoryTypes.map(type => (
               <button
                 key={type.id}
-                onClick={() => setStoryType(type.id)}
+                onClick={() => {
+                  setStoryType(type.id);
+                  // Auto-scroll to art style selection after a short delay
+                  setTimeout(() => {
+                    const artStyleSection = document.getElementById('art-style-section');
+                    if (artStyleSection) {
+                      artStyleSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }, 100);
+                }}
                 className={`p-2 rounded-lg border-2 transition-all ${
                   storyType === type.id
                     ? 'border-purple-500 bg-purple-50 shadow-lg'
@@ -3619,6 +3628,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   };
                   setCustomStoryTypes([...customStoryTypes, newType]);
                   setStoryType(newType.id); // Auto-select the new custom type
+                  // Auto-scroll to art style selection
+                  setTimeout(() => {
+                    const artStyleSection = document.getElementById('art-style-section');
+                    if (artStyleSection) {
+                      artStyleSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }, 100);
                 }
               }}
               className="p-2 rounded-lg border-2 border-dashed border-purple-300 hover:border-purple-500 transition-all hover:bg-purple-50"
@@ -3630,7 +3646,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           {/* Art Style Selection - Show only after story type is selected */}
           {storyType && (
-            <div className="md:bg-gradient-to-br md:from-pink-50 md:to-purple-50 md:border-2 md:border-pink-300 md:rounded-lg md:p-4 mt-4">
+            <div id="art-style-section" className="md:bg-gradient-to-br md:from-pink-50 md:to-purple-50 md:border-2 md:border-pink-300 md:rounded-lg md:p-4 mt-4">
               <div className="flex items-center gap-2 mb-2">
                 <Icon name="palette" size={18} className="text-pink-600" />
                 <h2 className="text-base md:text-lg font-bold text-gray-800 md:text-pink-700">{t.chooseArtStyle}</h2>
@@ -4280,12 +4296,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   const key2 = `${char2.id}-${char1.id}`;
 
                   return (
-                    <div key={key1} className="bg-white border-2 border-purple-200 rounded-xl p-6">
+                    <div key={key1} className="bg-white md:border-2 md:border-purple-200 md:rounded-xl p-4 md:p-6 mb-4">
                       {/* Main relationship selector and description - side by side on wide screens */}
-                      <div className="grid lg:grid-cols-[1fr,300px] gap-4">
+                      <div className="grid lg:grid-cols-[1fr,350px] gap-4">
                         {/* Left: Relationship Selector */}
                         <div className="space-y-4">
-                          <div className="grid md:grid-cols-3 gap-4 items-center">
+                          <div className="grid md:grid-cols-3 gap-2 md:gap-3 items-center">
                             <div className="text-center">
                               {char1.photoUrl && (
                                 <img src={char1.photoUrl} alt={char1.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
@@ -4297,41 +4313,27 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               <label className="block text-sm font-semibold text-center">{t.is}</label>
                               <select
                                 value={relationships[key1] || relationshipTypes[10].value[language]}
-                                onChange={(e) => updateRelationship(char1.id, char2.id, e.target.value)}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (value === '__CREATE_CUSTOM__') {
+                                    const customRel = prompt(language === 'de' ? 'Beziehung eingeben:' : language === 'fr' ? 'Entrer la relation:' : 'Enter relationship:');
+                                    if (customRel && customRel.trim()) {
+                                      setCustomRelationships([...customRelationships, customRel.trim()]);
+                                      updateRelationship(char1.id, char2.id, customRel.trim());
+                                    }
+                                  } else {
+                                    updateRelationship(char1.id, char2.id, value);
+                                  }
+                                }}
                                 className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg font-semibold"
                               >
+                                <option value="__CREATE_CUSTOM__">
+                                  {language === 'de' ? '+ Eigene Beziehung erstellen' : language === 'fr' ? '+ Créer relation personnalisée' : '+ Create custom relationship'}
+                                </option>
                                 {allRelationships.map((type, idx) => (
                                   <option key={idx} value={type.value[language]}>{type.value[language]}</option>
                                 ))}
                               </select>
-                              <div className="flex gap-2 mt-2">
-                                <input
-                                  type="text"
-                                  value={newRelationship}
-                                  onChange={(e) => setNewRelationship(e.target.value)}
-                                  onKeyPress={(e) => {
-                                    if (e.key === 'Enter' && newRelationship && !customRelationships.includes(newRelationship)) {
-                                      setCustomRelationships([...customRelationships, newRelationship]);
-                                      updateRelationship(char1.id, char2.id, newRelationship);
-                                      setNewRelationship('');
-                                    }
-                                  }}
-                                  placeholder={t.addCustomRelationship}
-                                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                />
-                                <button
-                                  onClick={() => {
-                                    if (newRelationship && !customRelationships.includes(newRelationship)) {
-                                      setCustomRelationships([...customRelationships, newRelationship]);
-                                      updateRelationship(char1.id, char2.id, newRelationship);
-                                      setNewRelationship('');
-                                    }
-                                  }}
-                                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                                >
-                                  <Icon name="plus" size={16} />
-                                </button>
-                              </div>
                             </div>
 
                             <div className="text-center">
@@ -4341,21 +4343,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               <div className="font-bold">{char2.name}</div>
                             </div>
                           </div>
-
-                          {/* Inverse Relationship Display - Admin only */}
-                          {currentUser && currentUser.role === 'admin' && relationships[key1] && relationships[key2] && (
-                            <div className="pt-3 border-t border-gray-200">
-                              <div className="text-xs text-gray-500 text-center mb-1">{t.reverseRelationship}</div>
-                              <div className="text-sm text-center text-gray-600">
-                                <strong>{char2.name}</strong> {t.is} <strong>{relationships[key2]}</strong> <strong>{char1.name}</strong>
-                              </div>
-                            </div>
-                          )}
                         </div>
 
                         {/* Right (wide screens) / Bottom (narrow screens): Relationship Description */}
                         {relationships[key1] && relationships[key2] && (
-                          <div className={currentUser && currentUser.role === 'admin' ? "lg:border-l lg:pl-4 lg:border-gray-200 pt-4 lg:pt-0" : "lg:border-l lg:pl-4 lg:border-gray-200"}>
+                          <div className="lg:border-l lg:pl-4 lg:border-gray-200">
                             <label className="block text-xs font-semibold text-gray-600 mb-1">
                               {language === 'de' ? 'Beziehung beschreiben' : language === 'fr' ? 'Décrire la relation' : 'Describe Relationship'}
                             </label>
@@ -5474,9 +5466,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {/* Black Navigation Bar - Simplified */}
           <nav className="bg-black text-white px-3 py-2">
             <div className="flex justify-between items-center">
-              {/* Left: Step Navigation - Always visible */}
+              {/* Left: Title - Hidden on very narrow screens when steps would overlap */}
+              <div className={`${step > 0 ? 'hidden lg:block' : 'block'}`}>
+                <h1 className="text-base md:text-lg font-bold">✨ {t.title}</h1>
+              </div>
+
+              {/* Center: Step Navigation - Always visible */}
               {step > 0 && (
-                <div className="flex items-center gap-1 md:gap-2">
+                <div className="flex items-center gap-1 md:gap-2 mx-auto lg:mx-0">
                   {[1, 2, 3, 4, 5].map(s => {
                     // Determine if this step is accessible
                     let canAccess = false;
