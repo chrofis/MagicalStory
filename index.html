@@ -788,7 +788,7 @@
         }
       }, [step, currentCharacter, showCharacterCreated, isAuthenticated]);
 
-      // Save characters whenever they change (with debounce)
+      // Save characters and relationships whenever they change (with debounce)
       useEffect(() => {
         if (authToken && characters.length > 0) {
           const timeoutId = setTimeout(() => {
@@ -797,7 +797,7 @@
 
           return () => clearTimeout(timeoutId);
         }
-      }, [characters, authToken]);
+      }, [characters, relationships, authToken]);
 
       // Update prompt when returning to step 4 with prompt visible
       useEffect(() => {
@@ -1164,7 +1164,10 @@
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({ characters: charactersToSave })
+            body: JSON.stringify({
+              characters: charactersToSave,
+              relationships: relationships
+            })
           });
 
           if (!response.ok) {
@@ -1186,8 +1189,16 @@
           });
 
           if (response.ok) {
-            const savedCharacters = await response.json();
-            setCharacters(savedCharacters);
+            const data = await response.json();
+            // Handle both old format (array) and new format (object with characters and relationships)
+            if (Array.isArray(data)) {
+              setCharacters(data);
+            } else {
+              setCharacters(data.characters || []);
+              if (data.relationships) {
+                setRelationships(data.relationships);
+              }
+            }
           }
         } catch (err) {
           console.error('Error loading characters:', err);
@@ -3378,47 +3389,37 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <div className="font-semibold text-[10px]">{type.name[language]}</div>
               </button>
             ))}
+            {/* Add Custom Type Button */}
+            <button
+              onClick={() => {
+                const emoji = prompt('Enter emoji (e.g. 🎭):');
+                if (emoji) {
+                  const name = prompt('Enter story type name:');
+                  if (name) {
+                    const newType = {
+                      id: `custom_${Date.now()}`,
+                      name: { en: name, de: name, fr: name },
+                      emoji: emoji
+                    };
+                    setCustomStoryTypes([...customStoryTypes, newType]);
+                  }
+                }
+              }}
+              className="p-2 rounded-lg border-2 border-dashed border-purple-300 hover:border-purple-500 transition-all hover:bg-purple-50"
+            >
+              <div className="text-2xl mb-1">➕</div>
+              <div className="font-semibold text-[10px] text-purple-600">{t.addCustomStoryType}</div>
+            </button>
           </div>
-
-          {/* Custom Story Type - Show after story type is selected */}
-          {storyType && (
-            <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-3 mt-4">
-              <h3 className="text-sm font-bold text-purple-700 mb-2">{t.addCustomStoryType}</h3>
-              <div className="flex gap-2 flex-wrap">
-                <input
-                  type="text"
-                  value={newStoryTypeEmoji}
-                  onChange={(e) => setNewStoryTypeEmoji(e.target.value)}
-                  placeholder={t.storyTypeEmoji}
-                  className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-lg"
-                  maxLength="2"
-                />
-                <input
-                  type="text"
-                  value={newStoryTypeName}
-                  onChange={(e) => setNewStoryTypeName(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && addCustomStoryType()}
-                  placeholder={t.storyTypeName}
-                  className="flex-1 min-w-[150px] px-3 py-1 border border-gray-300 rounded text-sm"
-                />
-                <button
-                  onClick={addCustomStoryType}
-                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 font-semibold text-sm flex items-center gap-1"
-                >
-                  <Icon name="plus" size={14} /> {t.addStoryType}
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Art Style Selection - Show only after story type is selected */}
           {storyType && (
-            <div className="bg-gradient-to-br from-pink-50 to-purple-50 border-2 border-pink-300 rounded-lg p-4 mt-4">
+            <div className="bg-gradient-to-br from-pink-50 to-purple-50 md:border-2 border-pink-300 rounded-lg p-2 md:p-4 mt-4">
               <div className="flex items-center gap-2 mb-2">
                 <Icon name="palette" size={18} className="text-pink-600" />
-                <h2 className="text-lg font-bold text-pink-700">{t.chooseArtStyle}</h2>
+                <h2 className="text-base md:text-lg font-bold text-pink-700">{t.chooseArtStyle}</h2>
               </div>
-              <p className="text-xs text-gray-600 mb-3">{t.artStyleDescription}</p>
+              <p className="text-xs text-gray-600 mb-2 md:mb-3">{t.artStyleDescription}</p>
               <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
                 {artStyles.map(style => (
                   <button
@@ -5385,8 +5386,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {step === 0 && renderStep0()}
 
           {step > 0 && isAuthenticated && (
-            <div className="max-w-7xl mx-auto px-4 md:px-8 mt-8">
-              <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6">
+            <div className="max-w-7xl mx-auto px-2 md:px-8 mt-4 md:mt-8">
+              <div className="bg-white md:rounded-2xl md:shadow-xl p-3 md:p-8 mb-4 md:mb-6">
                 {step === 1 && renderStep1()}
                 {step === 2 && renderStep2()}
                 {step === 3 && renderStep3()}
