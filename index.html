@@ -52,6 +52,8 @@
     };
 
     const storyTypes = [
+      { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachtsgeschichte', fr: 'Histoire de Noël' }, emoji: '🎄' },
+      { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrsgeschichte', fr: 'Histoire du Nouvel An' }, emoji: '🎆' },
       { id: 'pirate', name: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de Pirates' }, emoji: '🏴‍☠️' },
       { id: 'cowboy', name: { en: 'Wild West', de: 'Wilder Westen', fr: 'Far West' }, emoji: '🤠' },
       { id: 'fireman', name: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier Courageux' }, emoji: '🚒' },
@@ -5207,14 +5209,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
           )}
 
-          {/* Black Navigation Bar */}
-          <nav className="bg-black text-white px-6 py-2">
+          {/* Black Navigation Bar - Mobile Responsive */}
+          <nav className="bg-black text-white px-3 py-2">
             <div className="flex justify-between items-center">
               {/* Left: Title */}
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold">✨ {t.title}</h1>
+                <h1 className="text-base md:text-lg font-bold">✨ {t.title}</h1>
                 {isAuthenticated && currentUser && (
-                  <span className="text-sm text-gray-400">
+                  <span className="hidden md:inline text-sm text-gray-400">
                     | {currentUser.username}
                     {currentUser.role === 'admin' && ' 👑'}
                     {userQuota && !userQuota.unlimited && (
@@ -5230,9 +5232,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 )}
               </div>
 
-              {/* Center: Step Navigation */}
+              {/* Center: Step Navigation - Hidden on mobile */}
               {step > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-2">
                   {[1, 2, 3, 4, 5].map(s => {
                     // Determine if this step is accessible
                     let canAccess = false;
@@ -5274,32 +5276,33 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 </div>
               )}
 
-              {/* Right: Language Selector and Logout */}
-              <div className="flex items-center gap-3">
+              {/* Right: Language Selector and Logout - Responsive */}
+              <div className="flex items-center gap-1 md:gap-3">
                 {isAuthenticated && (
                   <>
                     {currentUser && currentUser.role === 'admin' && (
                       <button
                         onClick={() => setShowAdminPanel(true)}
-                        className="bg-yellow-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-yellow-700 flex items-center gap-1.5"
+                        className="bg-yellow-600 text-white px-2 md:px-3 py-1 rounded text-xs font-semibold hover:bg-yellow-700 flex items-center gap-1"
                       >
                         <Icon name="users" size={14} />
-                        Manage Users
+                        <span className="hidden md:inline">Manage Users</span>
                       </button>
                     )}
                     <button
                       onClick={() => setShowSavedStories(true)}
-                      className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center gap-1.5"
+                      className="bg-blue-600 text-white px-2 md:px-3 py-1 rounded text-xs font-semibold hover:bg-blue-700 flex items-center gap-1"
                     >
                       <Icon name="book-open" size={14} />
-                      My Stories ({savedStories.length})
+                      <span className="hidden md:inline">My Stories ({savedStories.length})</span>
+                      <span className="md:hidden">{savedStories.length}</span>
                     </button>
                     <button
                       onClick={handleLogout}
-                      className="bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-red-700 flex items-center gap-1.5"
+                      className="bg-red-600 text-white px-2 md:px-3 py-1 rounded text-xs font-semibold hover:bg-red-700 flex items-center gap-1"
                     >
                       <Icon name="log-out" size={14} />
-                      {t.logout}
+                      <span className="hidden md:inline">{t.logout}</span>
                     </button>
                   </>
                 )}
@@ -5307,10 +5310,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <div className="relative">
                   <button
                     onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                    className="bg-gray-800 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-gray-700 flex items-center gap-1.5"
+                    className="bg-gray-800 text-white px-2 md:px-3 py-1 rounded text-xs font-semibold hover:bg-gray-700 flex items-center gap-1"
                   >
                     <Icon name="globe" size={14} />
-                    {language.toUpperCase()}
+                    <span className="hidden md:inline">{language.toUpperCase()}</span>
                   </button>
                 {showLanguageDropdown && (
                   <div className="absolute right-0 mt-2 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-50">
