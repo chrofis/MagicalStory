@@ -1221,6 +1221,19 @@
             body: JSON.stringify({ story: storyData })
           });
 
+          // Handle 413 Payload Too Large error
+          if (response.status === 413) {
+            throw new Error('Story is too large to save. Try reducing the number of pages or image quality.');
+          }
+
+          // Check if response is JSON or HTML error page
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text.substring(0, 200));
+            throw new Error(`Server error (${response.status}): The story may be too large. Try reducing pages.`);
+          }
+
           const result = await response.json();
 
           if (!response.ok) {
