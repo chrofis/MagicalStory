@@ -637,7 +637,12 @@
 
       const [language, setLanguage] = useState(detectBrowserLanguage());
       const [developerMode, setDeveloperMode] = useState(false); // false = Auto Mode, true = Developer Mode
-      const [step, setStep] = useState(0);
+      // Skip landing page if already logged in
+      const [step, setStep] = useState(() => {
+        const savedToken = localStorage.getItem('auth_token');
+        const savedUser = localStorage.getItem('current_user');
+        return (savedToken && savedUser) ? 1 : 0;
+      });
       const [storyType, setStoryType] = useState('');
       const [artStyle, setArtStyle] = useState('pixar'); // Art style for images
       const [storyDetails, setStoryDetails] = useState('');
@@ -770,64 +775,7 @@
           setAuthToken(savedToken);
           setCurrentUser(user);
           setIsAuthenticated(true);
-          setStep(1); // Go to step 1 if already logged in
-          console.log('✅ Auto-login successful');
-
-          // Load stories immediately after authentication
-          console.log('🔄 Loading stories on auto-login...', {
-            apiUrl: API_URL,
-            hasToken: !!savedToken
-          });
-          fetch(`${API_URL}/api/stories`, {
-            headers: { 'Authorization': `Bearer ${savedToken}` }
-          })
-          .then(res => {
-            console.log('📡 Stories API response:', {
-              ok: res.ok,
-              status: res.status,
-              statusText: res.statusText
-            });
-            if (!res.ok) {
-              throw new Error(`Stories API failed: ${res.status} ${res.statusText}`);
-            }
-            return res.json();
-          })
-          .then(stories => {
-            console.log('📚 Auto-login stories loaded:', stories.length, stories);
-            setSavedStories(Array.isArray(stories) ? stories : []);
-          })
-          .catch(err => {
-            console.error('❌ Error loading stories on auto-login:', err);
-            console.error('Error details:', {
-              message: err.message,
-              stack: err.stack
-            });
-          });
-
-          // Load characters
-          fetch(`${API_URL}/api/characters`, {
-            headers: { 'Authorization': `Bearer ${savedToken}` }
-          })
-          .then(res => res.ok ? res.json() : [])
-          .then(chars => {
-            const charArray = Array.isArray(chars) ? chars : [];
-            console.log('👥 Auto-login characters loaded:', charArray.length, charArray);
-            setCharacters(charArray);
-          })
-          .catch(err => console.error('Error loading characters:', err));
-
-          // Load quota
-          fetch(`${API_URL}/api/user/quota`, {
-            headers: { 'Authorization': `Bearer ${savedToken}` }
-          })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data) {
-              setStoryQuota(data.quota);
-              setStoriesGenerated(data.generated);
-            }
-          })
-          .catch(err => console.error('Error loading quota:', err));
+          console.log('✅ Auto-login successful - data will be loaded by useEffect');
         } else {
           console.log('❌ No saved auth found');
         }
