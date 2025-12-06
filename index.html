@@ -1099,10 +1099,12 @@
       };
 
       // API URL Configuration
-      // For hybrid deployment: Frontend on IONOS, Backend on Railway
+      // Smart detection: use relative URLs when on same domain (faster, no CORS preflight)
       const API_URL = window.location.hostname === 'localhost'
         ? 'http://localhost:3000'  // Local development
-        : 'https://magicalstory-production.up.railway.app';  // Production backend on Railway
+        : window.location.hostname.includes('railway.app')
+          ? ''  // Same domain (Railway) - use relative URLs (no CORS preflight)
+          : 'https://magicalstory-production.up.railway.app';  // Cross-origin (IONOS frontend)
 
       // Authentication functions
       const handleLogin = async (e) => {

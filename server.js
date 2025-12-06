@@ -1476,10 +1476,10 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const rows = await dbQuery(selectQuery, [req.user.id]);
       console.log(`📚 Query returned ${rows.length} rows`);
 
-      // Parse the JSON data from each row and include ONLY first image as thumbnail
+      // Parse the JSON data from each row - return ONLY metadata (NO images)
       userStories = rows.map(row => {
         const story = JSON.parse(row.data);
-        // Return metadata + first image only (for thumbnail)
+        // Return metadata only - no images at all to minimize response size
         return {
           id: story.id,
           title: story.title,
@@ -1488,14 +1488,10 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           pages: story.pages,
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: story.sceneImages?.length || 0,
-          // Include ONLY first image as thumbnail
-          thumbnail: story.sceneImages && story.sceneImages.length > 0
-            ? story.sceneImages[0].imageData
-            : null
+          pageCount: story.sceneImages?.length || 0
         };
       });
-      console.log(`📚 Parsed ${userStories.length} stories (metadata only, images excluded)`);
+      console.log(`📚 Parsed ${userStories.length} stories (metadata only, NO images)`);
 
       if (userStories.length > 0) {
         console.log(`📚 First story: ${userStories[0].title} (ID: ${userStories[0].id})`);
@@ -1504,7 +1500,7 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       // File mode
       const allStories = await readJSON(STORIES_FILE);
       const fullStories = allStories[req.user.id] || [];
-      // Include ONLY first image as thumbnail
+      // Return ONLY metadata (NO images) to minimize response size
       userStories = fullStories.map(story => ({
         id: story.id,
         title: story.title,
@@ -1513,12 +1509,9 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
         pages: story.pages,
         language: story.language,
         characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: story.sceneImages?.length || 0,
-        thumbnail: story.sceneImages && story.sceneImages.length > 0
-          ? story.sceneImages[0].imageData
-          : null
+        pageCount: story.sceneImages?.length || 0
       }));
-      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (with thumbnails)`);
+      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (metadata only, NO images)`);
     }
 
     console.log(`📚 Returning ${userStories.length} stories (total size: ${JSON.stringify(userStories).length} bytes)`);
