@@ -1717,12 +1717,14 @@ ${characters.map(c => `${c.name}: ${c.gender === 'male' ? 'Male' : c.gender === 
 
 IMPORTANT: Only include characters that are actually mentioned or needed in THIS specific scene. Avoid crowding - use 1-2 characters maximum unless the story specifically requires more.
 
-Describe in 2-3 sentences:
-1. Which characters are present (minimal - only those needed)
-2. What they're doing and their expressions
-3. The setting and key visual elements
+CRITICAL: Do not describe everything mentioned in the text. Instead, focus on ONE key visual moment that captures the essence of the scene. Choose the most impactful visual element.
 
-Be concise and focus on essential visual details only.`;
+Output must contain the following structure:
+1) The location of the scene and key visual elements (3-4 sentences describing the setting, atmosphere, lighting, and important objects)
+2) The characters present (list only those characters actually needed in this scene)
+3) What the characters are doing and their expressions (3-4 sentences describing their actions, body language, facial expressions, and interactions)
+
+Focus on creating a vivid, focused visual description that an illustrator can work from.`;
 
             // Store the prompt for this specific scene
             prompts[pageNumber] = scenePrompt;
@@ -1927,12 +1929,14 @@ ${characters.map(c => `${c.name}: ${c.gender === 'male' ? 'Male' : c.gender === 
 
 IMPORTANT: Only include characters that are actually mentioned or needed in THIS specific scene. Avoid crowding - use 1-2 characters maximum unless the story specifically requires more.
 
-Describe in 2-3 sentences:
-1. Which characters are present (minimal - only those needed)
-2. What they're doing and their expressions
-3. The setting and key visual elements
+CRITICAL: Do not describe everything mentioned in the text. Instead, focus on ONE key visual moment that captures the essence of the scene. Choose the most impactful visual element.
 
-Be concise and focus on essential visual details only.`;
+Output must contain the following structure:
+1) The location of the scene and key visual elements (3-4 sentences describing the setting, atmosphere, lighting, and important objects)
+2) The characters present (list only those characters actually needed in this scene)
+3) What the characters are doing and their expressions (3-4 sentences describing their actions, body language, facial expressions, and interactions)
+
+Focus on creating a vivid, focused visual description that an illustrator can work from.`;
 
             // Store the prompt for this specific scene
             scenePrompts[pageNumber] = scenePrompt;
@@ -1994,17 +1998,26 @@ Be concise and focus on essential visual details only.`;
               charactersInScene.forEach((char, idx) => {
                 const age = parseInt(char.age) || 10;
 
+                // Use clothing from avatar analysis if available, otherwise use default
                 if (!characterClothing[char.name]) {
-                  if (isOutdoor) {
-                    characterClothing[char.name] = age < 13 ? 'blue jacket, jeans, red sneakers' : 'gray jacket, dark pants, brown shoes';
+                  if (char.clothing) {
+                    // Use clothing extracted from avatar
+                    characterClothing[char.name] = char.clothing;
+                    characterClothing[char.name + '_base'] = char.clothing;
                   } else {
-                    characterClothing[char.name] = age < 13 ? 'green t-shirt, khaki shorts, white sneakers' : 'blue shirt, beige pants, casual shoes';
+                    // Fallback to default clothing
+                    if (isOutdoor) {
+                      characterClothing[char.name] = age < 13 ? 'blue jacket, jeans, red sneakers' : 'gray jacket, dark pants, brown shoes';
+                    } else {
+                      characterClothing[char.name] = age < 13 ? 'casual outdoor clothes' : 'casual indoor clothes';
+                    }
+                    characterClothing[char.name + '_base'] = characterClothing[char.name];
                   }
-                  characterClothing[char.name + '_base'] = characterClothing[char.name];
                 } else {
+                  // Adjust clothing for indoor/outdoor if needed
                   const baseClothing = characterClothing[char.name + '_base'] || characterClothing[char.name];
-                  if (isOutdoor && !characterClothing[char.name].includes('jacket')) {
-                    characterClothing[char.name] = `blue jacket over ${baseClothing}`;
+                  if (isOutdoor && baseClothing && !characterClothing[char.name].includes('jacket')) {
+                    characterClothing[char.name] = `jacket over ${baseClothing}`;
                   } else if (isIndoor && characterClothing[char.name].includes('jacket')) {
                     characterClothing[char.name] = baseClothing;
                   }
@@ -2028,7 +2041,7 @@ Be concise and focus on essential visual details only.`;
             const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
             const styleDescription = selectedStyle.prompt;
 
-            const imagePrompt = `Create a cinematic scene in ${styleDescription}.\n\n${shortSceneDesc ? `Short Scene Summary: ${shortSceneDesc}\n\n` : ''}Full Scene Description: ${scene.description}\n${characterPrompts}\n\nImportant:\n- Show only the emotions visible on faces (happy, sad, surprised, worried, excited)\n- Keep clothing exactly as described\n- Maintain consistent character appearance\n- Clean, clear composition`;
+            const imagePrompt = `Create a cinematic scene in ${styleDescription}.\n\nScene Description: ${scene.description}\n${characterPrompts}\n\nImportant:\n- Show only the emotions visible on faces (happy, sad, surprised, worried, excited)\n- Keep clothing exactly as described\n- Maintain consistent character appearance\n- Clean, clear composition`;
 
             prompts[scene.pageNumber] = imagePrompt;
 
@@ -2489,17 +2502,23 @@ Be concise and focus on essential visual details only.`;
 
                 // Initialize or update clothing based on scene setting
                 if (!characterClothing[char.name]) {
-                  // First appearance - set base clothing
-                  if (isOutdoor) {
-                    characterClothing[char.name] = age < 13
-                      ? 'blue jacket, jeans, red sneakers'
-                      : 'gray jacket, dark pants, brown shoes';
+                  // First appearance - use clothing from avatar if available
+                  if (char.clothing) {
+                    characterClothing[char.name] = char.clothing;
+                    characterClothing[char.name + '_base'] = char.clothing;
                   } else {
-                    characterClothing[char.name] = age < 13
-                      ? 'green t-shirt, khaki shorts, white sneakers'
-                      : 'blue shirt, beige pants, casual shoes';
+                    // Fallback to default clothing
+                    if (isOutdoor) {
+                      characterClothing[char.name] = age < 13
+                        ? 'blue jacket, jeans, red sneakers'
+                        : 'gray jacket, dark pants, brown shoes';
+                    } else {
+                      characterClothing[char.name] = age < 13
+                        ? 'casual outdoor clothes'
+                        : 'casual indoor clothes';
+                    }
+                    characterClothing[char.name + '_base'] = characterClothing[char.name];
                   }
-                  characterClothing[char.name + '_base'] = characterClothing[char.name];
                 } else {
                   // Character appeared before - check if clothing needs to change
                   const baseClothing = characterClothing[char.name + '_base'] || characterClothing[char.name];
@@ -2507,7 +2526,7 @@ Be concise and focus on essential visual details only.`;
                   if (isOutdoor && !characterClothing[char.name].includes('jacket') && !characterClothing[char.name].includes('coat')) {
                     // Going outside - add jacket/coat
                     characterClothing[char.name] = age < 13
-                      ? `blue jacket over ${baseClothing}`
+                      ? `jacket over ${baseClothing}`
                       : `warm coat over ${baseClothing}`;
                   } else if (isIndoor && (characterClothing[char.name].includes('jacket') || characterClothing[char.name].includes('coat'))) {
                     // Going inside - remove jacket/coat (back to base)
@@ -2535,10 +2554,10 @@ Be concise and focus on essential visual details only.`;
             const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
             const styleDescription = selectedStyle.prompt;
 
-            // Build image prompt with character consistency guide
+            // Build image prompt with character consistency guide - ONLY use the detailed scene description
             let imagePrompt = `Create a cinematic scene in ${styleDescription}.
 
-${shortSceneDesc ? `Short Scene Summary: ${shortSceneDesc}\n\n` : ''}Full Scene Description: ${scene.description}
+Scene Description: ${scene.description}
 ${characterPrompts}`;
 
             // Add character consistency guide if available
@@ -2824,12 +2843,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     2. Estimated Height in centimeters
                     3. Build (slim/average/athletic/chubby/overweight/heavily overweight)
                     4. Hair style/color
-                    5. Other distinctive features (eye color, glasses, facial features, etc.)
+                    5. Clothing style (describe what they're wearing: type of garment, colors, style)
+                    6. Other distinctive features (eye color, glasses, facial features, etc.)
                     Return the response in this exact format:
                     Age: [number]
                     Height: [number] cm
                     Build: [description]
                     Hair: [description]
+                    Clothing: [description]
                     Features: [description]`
                   },
                   {
@@ -2854,12 +2875,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             const analysisText = data.candidates[0].content.parts[0].text;
             console.log('Image analysis:', analysisText);
 
-            // Parse the analysis to extract age, height, build, hair, and features
+            // Parse the analysis to extract age, height, build, hair, clothing, and features
             const traits = {
               age: '',
               height: '',
               build: '',
               hairColor: '',
+              clothing: '',
               otherFeatures: '',
               fullText: analysisText
             };
@@ -2875,6 +2897,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
             const hairMatch = analysisText.match(/Hair:\s*([^\n]+)/i);
             if (hairMatch) traits.hairColor = hairMatch[1].trim();
+
+            const clothingMatch = analysisText.match(/Clothing:\s*([^\n]+)/i);
+            if (clothingMatch) traits.clothing = clothingMatch[1].trim();
 
             const featuresMatch = analysisText.match(/Features:\s*([^\n]+)/i);
             if (featuresMatch) traits.otherFeatures = featuresMatch[1].trim();
@@ -3345,6 +3370,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           useDescription: false,
           descriptionAge: '',
           hairColor: '',
+          clothing: '',
           otherFeatures: '',
           gender: 'other',
           age: '',
@@ -3437,6 +3463,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   height: traits.height || prev.height,
                   build: traits.build || prev.build,
                   hairColor: traits.hairColor || prev.hairColor,
+                  clothing: traits.clothing || prev.clothing,
                   otherFeatures: traits.otherFeatures || prev.otherFeatures
                 }));
                 // Store the full analyzed text for display
