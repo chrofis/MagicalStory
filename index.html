@@ -1707,31 +1707,41 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
             // Get short scene description from outline if available
             const shortSceneDesc = shortSceneDescriptions[pageNumber];
 
-            const scenePrompt = `Create a concise visual scene description for illustration.
+            const scenePrompt = `**ROLE:**
+You are an expert Art Director creating an illustration brief for a children's book.
 
-${shortSceneDesc ? `SCENE SUMMARY: ${shortSceneDesc}\n\n` : ''}STORY PAGE ${pageNumber}:
+**SCENE CONTEXT:**
+${shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : ''}Story Text (Page ${pageNumber}):
 ${pageContent}
 
-AVAILABLE CHARACTERS:
-${characters.map(c => `${c.name}: ${c.gender === 'male' ? 'Male' : c.gender === 'female' ? 'Female' : 'Non-binary'}, age ${c.age}`).join(', ')}
+**AVAILABLE CHARACTERS & VISUAL REFERENCES:**
+${characters.map(c => {
+  const details = [];
+  if (c.age) details.push(`Age ${c.age}`);
+  if (c.gender) details.push(c.gender === 'male' ? 'Male' : c.gender === 'female' ? 'Female' : 'Non-binary');
+  if (c.hairColor) details.push(c.hairColor);
+  if (c.clothing) details.push(c.clothing);
+  if (c.otherFeatures) details.push(c.otherFeatures);
+  return `* **${c.name}:** ${details.join(', ')}`;
+}).join('\n')}
 
-IMPORTANT: Only include characters that are actually mentioned or needed in THIS specific scene. Avoid crowding - use 1-2 characters maximum unless the story specifically requires more.
+**TASK:**
+Create a detailed visual description of ONE key moment from the scene context provided.
 
-CRITICAL: Do not describe everything mentioned in the text. Instead, focus on ONE key visual moment that captures the essence of the scene. Choose the most impactful visual element.
+Focus on essential characters only (1-2 maximum unless the story specifically requires more). Choose the most impactful visual moment that captures the essence of the scene.
 
-LANGUAGE REQUIREMENTS:
-- Use simple, clear language and wording
-- Exclude any unnecessary dialogues or speech
-- Exclude any unnecessary people - only include characters essential to this scene
+**OUTPUT FORMAT:**
+1. **Setting & Atmosphere:** Describe the background, time of day, lighting, and mood.
+2. **Composition:** Describe the camera angle (e.g., low angle, wide shot) and framing.
+3. **Characters:**
+   * **[Character Name]:** Exact action, body language, facial expression, and location in the frame.
+   (Repeat for each character present in this specific scene)
 
-Output must contain the following structure:
-1) The location where the scene takes place. (1-2 sentences describing the setting and important objects, do not include any people)
-2) For each character present (only those actually needed in this scene):
-   - Character name
-   - Where the character is positioned in the scene
-   - What the character is doing and their expression (body language, facial expression, actions)
-
-Focus on creating a vivid, focused visual description that an illustrator can work from.`;
+**CONSTRAINTS:**
+- Do not include dialogue or speech
+- Focus purely on visual elements
+- Use simple, clear language
+- Only include characters essential to this scene`;
 
             // Store the prompt for this specific scene
             prompts[pageNumber] = scenePrompt;
@@ -1926,31 +1936,41 @@ Focus on creating a vivid, focused visual description that an illustrator can wo
             // Get short scene description from outline if available
             const shortSceneDesc = sceneDescMap[pageNumber];
 
-            const scenePrompt = `Create a concise visual scene description for illustration.
+            const scenePrompt = `**ROLE:**
+You are an expert Art Director creating an illustration brief for a children's book.
 
-${shortSceneDesc ? `SCENE SUMMARY: ${shortSceneDesc}\n\n` : ''}STORY PAGE ${pageNumber}:
+**SCENE CONTEXT:**
+${shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : ''}Story Text (Page ${pageNumber}):
 ${pageContent}
 
-AVAILABLE CHARACTERS:
-${characters.map(c => `${c.name}: ${c.gender === 'male' ? 'Male' : c.gender === 'female' ? 'Female' : 'Non-binary'}, age ${c.age}`).join(', ')}
+**AVAILABLE CHARACTERS & VISUAL REFERENCES:**
+${characters.map(c => {
+  const details = [];
+  if (c.age) details.push(`Age ${c.age}`);
+  if (c.gender) details.push(c.gender === 'male' ? 'Male' : c.gender === 'female' ? 'Female' : 'Non-binary');
+  if (c.hairColor) details.push(c.hairColor);
+  if (c.clothing) details.push(c.clothing);
+  if (c.otherFeatures) details.push(c.otherFeatures);
+  return `* **${c.name}:** ${details.join(', ')}`;
+}).join('\n')}
 
-IMPORTANT: Only include characters that are actually mentioned or needed in THIS specific scene. Avoid crowding - use 1-2 characters maximum unless the story specifically requires more.
+**TASK:**
+Create a detailed visual description of ONE key moment from the scene context provided.
 
-CRITICAL: Do not describe everything mentioned in the text. Instead, focus on ONE key visual moment that captures the essence of the scene. Choose the most impactful visual element.
+Focus on essential characters only (1-2 maximum unless the story specifically requires more). Choose the most impactful visual moment that captures the essence of the scene.
 
-LANGUAGE REQUIREMENTS:
-- Use simple, clear language and wording
-- Exclude any unnecessary dialogues or speech
-- Exclude any unnecessary people - only include characters essential to this scene
+**OUTPUT FORMAT:**
+1. **Setting & Atmosphere:** Describe the background, time of day, lighting, and mood.
+2. **Composition:** Describe the camera angle (e.g., low angle, wide shot) and framing.
+3. **Characters:**
+   * **[Character Name]:** Exact action, body language, facial expression, and location in the frame.
+   (Repeat for each character present in this specific scene)
 
-Output must contain the following structure:
-1) The location where the scene takes place. (1-2 sentences describing the setting and important objects, do not include any people)
-2) For each character present (only those actually needed in this scene):
-   - Character name
-   - Where the character is positioned in the scene
-   - What the character is doing and their expression (body language, facial expression, actions)
-
-Focus on creating a vivid, focused visual description that an illustrator can work from.`;
+**CONSTRAINTS:**
+- Do not include dialogue or speech
+- Focus purely on visual elements
+- Use simple, clear language
+- Only include characters essential to this scene`;
 
             // Store the prompt for this specific scene
             scenePrompts[pageNumber] = scenePrompt;
