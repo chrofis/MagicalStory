@@ -772,17 +772,34 @@
           console.log('✅ Auto-login successful');
 
           // Load stories immediately after authentication
-          console.log('🔄 Loading stories on auto-login...');
+          console.log('🔄 Loading stories on auto-login...', {
+            apiUrl: API_URL,
+            hasToken: !!savedToken
+          });
           fetch(`${API_URL}/api/stories`, {
             headers: { 'Authorization': `Bearer ${savedToken}` }
           })
-          .then(res => res.ok ? res.json() : [])
+          .then(res => {
+            console.log('📡 Stories API response:', {
+              ok: res.ok,
+              status: res.status,
+              statusText: res.statusText
+            });
+            if (!res.ok) {
+              throw new Error(`Stories API failed: ${res.status} ${res.statusText}`);
+            }
+            return res.json();
+          })
           .then(stories => {
-            console.log('📚 Auto-login stories loaded:', stories.length);
-            setSavedStories(stories);
+            console.log('📚 Auto-login stories loaded:', stories.length, stories);
+            setSavedStories(Array.isArray(stories) ? stories : []);
           })
           .catch(err => {
             console.error('❌ Error loading stories on auto-login:', err);
+            console.error('Error details:', {
+              message: err.message,
+              stack: err.stack
+            });
           });
 
           // Load characters
