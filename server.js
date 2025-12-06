@@ -67,7 +67,21 @@ if (STORAGE_MODE === 'database') {
 }
 
 // Middleware
-app.use(cors());
+// Configure CORS to allow requests from your domains
+const corsOptions = {
+  origin: [
+    'http://localhost:8000',
+    'http://localhost:3000',
+    'http://127.0.0.1:8000',
+    'https://www.magicalstory.ch',
+    'https://magicalstory.ch',
+    'https://magicalstory-production.up.railway.app'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
