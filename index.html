@@ -790,11 +790,28 @@
       // Load characters and stories when user logs in
       useEffect(() => {
         if (authToken && isAuthenticated) {
+          console.log('🔄 Loading user data (characters, stories, quota)...');
           loadCharacters();
-          loadStories().then(stories => setSavedStories(stories));
+          loadStories().then(stories => {
+            console.log('📚 Loaded stories:', stories.length);
+            setSavedStories(stories);
+          }).catch(err => {
+            console.error('❌ Error loading stories:', err);
+          });
           fetchUserQuota();
         }
       }, [authToken, isAuthenticated]);
+
+      // Also load stories when user opens the stories modal (as a fallback)
+      useEffect(() => {
+        if (showSavedStories && authToken && savedStories.length === 0) {
+          console.log('📖 Reloading stories when opening modal...');
+          loadStories().then(stories => {
+            console.log('📚 Reloaded stories:', stories.length);
+            setSavedStories(stories);
+          });
+        }
+      }, [showSavedStories]);
 
       // Load users when admin panel is opened
       useEffect(() => {
