@@ -777,27 +777,26 @@
 
       // Initialize character when entering step 2
       useEffect(() => {
-        console.log('📍 Step/Auth state:', {
+        console.log('📍 Step changed:', {
           step,
           isAuthenticated,
           hasCurrentCharacter: !!currentCharacter,
-          showCharacterCreated,
           existingCharactersCount: characters.length
         });
 
         if (step === 2) {
-          // If there are existing characters, clear currentCharacter to show the list
-          if (characters.length > 0 && currentCharacter && !showCharacterCreated) {
+          // If there are existing characters and we're navigating TO step 2, clear currentCharacter to show the list
+          if (characters.length > 0 && currentCharacter) {
             console.log('🎭 Clearing current character to show character list');
             setCurrentCharacter(null);
           }
           // Only auto-create new character if there are NO characters at all
-          else if (characters.length === 0 && !currentCharacter && !showCharacterCreated) {
+          else if (characters.length === 0 && !currentCharacter) {
             console.log('🎭 No characters exist - initializing new character for step 2');
             startNewCharacter();
           }
         }
-      }, [step, showCharacterCreated]);
+      }, [step]);
 
       // Save characters and relationships whenever they change (with debounce)
       useEffect(() => {
