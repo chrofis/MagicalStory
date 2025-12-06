@@ -663,7 +663,7 @@
       const [newFear, setNewFear] = useState('');
       const [newRelationship, setNewRelationship] = useState('');
       const [relationships, setRelationships] = useState({});
-      const [pages, setPages] = useState(5);
+      const [pages, setPages] = useState(24); // Default to 24 pages (minimum for Gelato printing)
       const [languageLevel, setLanguageLevel] = useState('standard');
       const [mainCharacters, setMainCharacters] = useState([]);
       const [generatedStory, setGeneratedStory] = useState('');
@@ -3225,6 +3225,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             return;
           }
 
+          // Check minimum page count for Gelato printing
+          if (pages < 24) {
+            alert(language === 'de'
+              ? `Gedruckte Bücher benötigen mindestens 24 Seiten. Ihre Geschichte hat ${pages} Seiten.\n\nBitte erstellen Sie eine neue Geschichte mit mindestens 24 Seiten oder laden Sie die Geschichte als PDF herunter.`
+              : language === 'fr'
+              ? `Les livres imprimés nécessitent au moins 24 pages. Votre histoire a ${pages} pages.\n\nVeuillez créer une nouvelle histoire avec au moins 24 pages ou télécharger l'histoire en PDF.`
+              : `Printed books require at least 24 pages. Your story has ${pages} pages.\n\nPlease create a new story with at least 24 pages or download the story as PDF.`);
+            return;
+          }
+
           // Load saved shipping info from database
           try {
             const response = await fetch(`${API_URL}/api/user/shipping-address`, {
@@ -4978,18 +4988,33 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
 
             <div>
-              <label className="block text-lg font-semibold mb-3">{t.numberOfPages}</label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="3"
-                  max="30"
-                  value={pages}
-                  onChange={(e) => setPages(parseInt(e.target.value))}
-                  className="flex-1"
-                />
-                <span className="text-2xl font-bold text-purple-600 w-12 text-center">{pages}</span>
-              </div>
+              <label className="block text-lg font-semibold mb-3">
+                {t.numberOfPages}
+                <span className="text-sm font-normal text-gray-600 ml-2">
+                  ({language === 'de' ? 'Für Druck: mind. 24 Seiten' : language === 'fr' ? 'Pour impression: min. 24 pages' : 'For printing: min. 24 pages'})
+                </span>
+              </label>
+              <select
+                value={pages}
+                onChange={(e) => setPages(parseInt(e.target.value))}
+                className="w-full px-4 py-3 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none text-lg font-semibold"
+              >
+                <option value="5">5 {language === 'de' ? 'Seiten (nur online)' : language === 'fr' ? 'pages (en ligne uniquement)' : 'pages (online only)'}</option>
+                <option value="10">10 {language === 'de' ? 'Seiten (nur online)' : language === 'fr' ? 'pages (en ligne uniquement)' : 'pages (online only)'}</option>
+                <option value="15">15 {language === 'de' ? 'Seiten (nur online)' : language === 'fr' ? 'pages (en ligne uniquement)' : 'pages (online only)'}</option>
+                <option value="24">24 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
+                <option value="28">28 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
+                <option value="32">32 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
+                <option value="36">36 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
+                <option value="40">40 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
+              </select>
+              <p className="text-sm text-gray-600 mt-2">
+                {language === 'de'
+                  ? 'Wählen Sie mindestens 24 Seiten für gedruckte Bücher. Kleinere Geschichten können online gelesen werden.'
+                  : language === 'fr'
+                  ? 'Choisissez au moins 24 pages pour les livres imprimés. Les histoires plus courtes peuvent être lues en ligne.'
+                  : 'Choose at least 24 pages for printed books. Shorter stories can be read online.'}
+              </p>
             </div>
 
             <div>
