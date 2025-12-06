@@ -1742,8 +1742,8 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
       return res.status(500).json({ error: 'Gelato API not configured' });
     }
 
-    // Fetch products from Gelato API
-    const response = await fetch('https://product.gelatoapis.com/v3/products?limit=100', {
+    // Fetch products from Gelato API - increase limit to get more products
+    const response = await fetch('https://product.gelatoapis.com/v3/products?limit=500', {
       headers: {
         'X-API-KEY': gelatoApiKey
       }
@@ -1758,7 +1758,8 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
 
     console.log('📦 Gelato API response:', {
       totalProducts: data.products?.length || 0,
-      sampleProduct: data.products?.[0] || null
+      sampleProduct: data.products?.[0] || null,
+      productTypes: [...new Set(data.products?.slice(0, 20).map(p => p.productTypeUid || p.productNameUid))]
     });
 
     // Filter for photobooks only - check multiple possible fields and patterns
@@ -1766,14 +1767,20 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
       const uid = product.productUid || product.uid || product.id || '';
       const name = product.name || product.productName || '';
       const category = product.category || product.productCategory || '';
+      const productType = product.productTypeUid || product.productType || '';
+      const productName = product.productNameUid || '';
 
       // Check if it's a photobook in any of these fields
-      return (
+      const isPhotobook = (
         uid.toLowerCase().includes('photobook') ||
         name.toLowerCase().includes('photobook') ||
         name.toLowerCase().includes('photo book') ||
-        category.toLowerCase().includes('photobook')
+        category.toLowerCase().includes('photobook') ||
+        productType.toLowerCase().includes('photobook') ||
+        productName.toLowerCase().includes('photobook')
       );
+
+      return isPhotobook;
     });
 
     console.log('📚 Filtered photobooks:', photobooks.length);
