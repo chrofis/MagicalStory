@@ -219,6 +219,40 @@ async function initializeDatabase() {
       `);
       await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
 
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS files (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL,
+          file_type VARCHAR(50) NOT NULL,
+          story_id VARCHAR(255),
+          mime_type VARCHAR(100) NOT NULL,
+          file_data BYTEA NOT NULL,
+          file_size INT,
+          filename VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id)`);
+      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_files_story_id ON files(story_id)`);
+
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS gelato_products (
+          id SERIAL PRIMARY KEY,
+          product_uid VARCHAR(500) UNIQUE NOT NULL,
+          product_name VARCHAR(255) NOT NULL,
+          description TEXT,
+          size VARCHAR(100),
+          cover_type VARCHAR(100),
+          min_pages INT,
+          max_pages INT,
+          available_page_counts TEXT,
+          is_active BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_gelato_products_active ON gelato_products(is_active)`);
+
     } else {
       // MySQL table creation
       await dbPool.execute(`
@@ -270,6 +304,40 @@ async function initializeDatabase() {
           data TEXT NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           INDEX(user_id)
+        )
+      `);
+
+      await dbPool.execute(`
+        CREATE TABLE IF NOT EXISTS files (
+          id VARCHAR(255) PRIMARY KEY,
+          user_id VARCHAR(255) NOT NULL,
+          file_type VARCHAR(50) NOT NULL,
+          story_id VARCHAR(255),
+          mime_type VARCHAR(100) NOT NULL,
+          file_data LONGBLOB NOT NULL,
+          file_size INT,
+          filename VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX(user_id),
+          INDEX(story_id)
+        )
+      `);
+
+      await dbPool.execute(`
+        CREATE TABLE IF NOT EXISTS gelato_products (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          product_uid VARCHAR(500) UNIQUE NOT NULL,
+          product_name VARCHAR(255) NOT NULL,
+          description TEXT,
+          size VARCHAR(100),
+          cover_type VARCHAR(100),
+          min_pages INT,
+          max_pages INT,
+          available_page_counts TEXT,
+          is_active BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX(is_active)
         )
       `);
     }
@@ -1102,6 +1170,756 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error deleting story:', err);
     res.status(500).json({ error: 'Failed to delete story' });
+  }
+});
+
+// Gelato Print API - Create photobook order
+app.post('/api/gelato/order', authenticateToken, async (req, res) => {
+  try {
+    const { pdfUrl, shippingAddress, orderReference, productUid, pageCount } = req.body;
+
+    if (!pdfUrl || !shippingAddress || !productUid || !pageCount) {
+      return res.status(400).json({ error: 'Missing required fields: pdfUrl, shippingAddress, productUid, pageCount' });
+    }
+
+    const gelatoApiKey = process.env.GELATO_API_KEY;
+    const orderType = process.env.GELATO_ORDER_TYPE || 'draft'; // 'draft' or 'order'
+
+    if (!gelatoApiKey || gelatoApiKey === 'your_gelato_api_key_here') {
+      return res.status(500).json({
+        error: 'Gelato API not configured. Please add GELATO_API_KEY to .env file',
+        setupUrl: 'https://dashboard.gelato.com/'
+      });
+    }
+
+    // Prepare Gelato order payload
+    const orderPayload = {
+      orderType: orderType, // 'draft' for preview only, 'order' for actual printing
+      orderReferenceId: orderReference || `magical-story-${Date.now()}`,
+      customerReferenceId: req.user.id,
+      currency: 'USD',
+      items: [
+        {
+          itemReferenceId: `item-${Date.now()}`,
+          productUid: productUid,
+          pageCount: parseInt(pageCount), // Add page count as item attribute
+          files: [
+            {
+              type: 'default',
+              url: pdfUrl
+            }
+          ],
+          quantity: 1
+        }
+      ],
+      shipmentMethodUid: 'standard',
+      shippingAddress: {
+        firstName: shippingAddress.firstName,
+        lastName: shippingAddress.lastName,
+        addressLine1: shippingAddress.addressLine1,
+        addressLine2: shippingAddress.addressLine2 || '',
+        city: shippingAddress.city,
+        state: shippingAddress.state || '',
+        postCode: shippingAddress.postCode,
+        country: shippingAddress.country,
+        email: shippingAddress.email,
+        phone: shippingAddress.phone || ''
+      }
+    };
+
+    // Call Gelato API
+    const gelatoResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': gelatoApiKey
+      },
+      body: JSON.stringify(orderPayload)
+    });
+
+    const gelatoData = await gelatoResponse.json();
+
+    if (!gelatoResponse.ok) {
+      console.error('Gelato API error:', gelatoData);
+      return res.status(gelatoResponse.status).json({
+        error: 'Gelato order failed',
+        details: gelatoData
+      });
+    }
+
+    await logActivity(req.user.id, req.user.username, 'GELATO_ORDER_CREATED', {
+      orderId: gelatoData.orderId || gelatoData.id,
+      orderReference: orderPayload.orderReferenceId,
+      orderType: orderType
+    });
+
+    // Extract preview URLs if available
+    const previewUrls = [];
+    if (gelatoData.items && Array.isArray(gelatoData.items)) {
+      gelatoData.items.forEach(item => {
+        if (item.previews && Array.isArray(item.previews)) {
+          item.previews.forEach(preview => {
+            if (preview.url) {
+              previewUrls.push({
+                type: preview.type || 'preview',
+                url: preview.url
+              });
+            }
+          });
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      orderId: gelatoData.orderId || gelatoData.id,
+      orderReference: orderPayload.orderReferenceId,
+      orderType: orderType,
+      isDraft: orderType === 'draft',
+      previewUrls: previewUrls,
+      dashboardUrl: `https://dashboard.gelato.com/orders/${gelatoData.orderId || gelatoData.id}`,
+      data: gelatoData
+    });
+
+  } catch (err) {
+    console.error('Error creating Gelato order:', err);
+    res.status(500).json({ error: 'Failed to create print order', details: err.message });
+  }
+});
+
+// Gelato Product Management (Admin Only)
+
+// Fetch products from Gelato API
+app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const gelatoApiKey = process.env.GELATO_API_KEY;
+    if (!gelatoApiKey || gelatoApiKey === 'your_gelato_api_key_here') {
+      return res.status(500).json({ error: 'Gelato API not configured' });
+    }
+
+    // Fetch products from Gelato API
+    const response = await fetch('https://product.gelatoapis.com/v3/products?limit=100', {
+      headers: {
+        'X-API-KEY': gelatoApiKey
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return res.status(response.status).json({ error: 'Failed to fetch from Gelato', details: errorData });
+    }
+
+    const data = await response.json();
+
+    // Filter for photobooks only
+    const photobooks = (data.products || []).filter(product =>
+      product.productUid && product.productUid.includes('photobook')
+    );
+
+    res.json({
+      success: true,
+      count: photobooks.length,
+      products: photobooks
+    });
+
+  } catch (err) {
+    console.error('Error fetching Gelato products:', err);
+    res.status(500).json({ error: 'Failed to fetch products', details: err.message });
+  }
+});
+
+// Get all saved Gelato products from database
+app.get('/api/admin/gelato/products', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT * FROM gelato_products ORDER BY is_active DESC, created_at DESC'
+        : 'SELECT * FROM gelato_products ORDER BY is_active DESC, created_at DESC';
+
+      const rows = await dbQuery(selectQuery, []);
+      res.json({ success: true, products: rows });
+    } else {
+      // File mode fallback
+      const fs = require('fs').promises;
+      const path = require('path');
+      const productsFile = path.join(__dirname, 'data', 'gelato_products.json');
+
+      try {
+        const data = await fs.readFile(productsFile, 'utf-8');
+        const products = JSON.parse(data);
+        res.json({ success: true, products: Object.values(products) });
+      } catch (err) {
+        res.json({ success: true, products: [] });
+      }
+    }
+
+  } catch (err) {
+    console.error('Error getting products:', err);
+    res.status(500).json({ error: 'Failed to get products', details: err.message });
+  }
+});
+
+// Save/Update Gelato product
+app.post('/api/admin/gelato/products', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const {
+      product_uid,
+      product_name,
+      description,
+      size,
+      cover_type,
+      min_pages,
+      max_pages,
+      available_page_counts,
+      is_active
+    } = req.body;
+
+    if (!product_uid || !product_name) {
+      return res.status(400).json({ error: 'Missing required fields: product_uid, product_name' });
+    }
+
+    // Convert available_page_counts array to JSON string if needed
+    const pageCountsStr = Array.isArray(available_page_counts)
+      ? JSON.stringify(available_page_counts)
+      : available_page_counts;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Try to insert, if exists, update
+      const upsertQuery = DB_TYPE === 'postgresql'
+        ? `INSERT INTO gelato_products
+           (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+           ON CONFLICT (product_uid)
+           DO UPDATE SET
+             product_name = $2,
+             description = $3,
+             size = $4,
+             cover_type = $5,
+             min_pages = $6,
+             max_pages = $7,
+             available_page_counts = $8,
+             is_active = $9,
+             updated_at = CURRENT_TIMESTAMP`
+        : `INSERT INTO gelato_products
+           (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             product_name = VALUES(product_name),
+             description = VALUES(description),
+             size = VALUES(size),
+             cover_type = VALUES(cover_type),
+             min_pages = VALUES(min_pages),
+             max_pages = VALUES(max_pages),
+             available_page_counts = VALUES(available_page_counts),
+             is_active = VALUES(is_active),
+             updated_at = CURRENT_TIMESTAMP`;
+
+      await dbQuery(upsertQuery, [
+        product_uid,
+        product_name,
+        description || null,
+        size || null,
+        cover_type || null,
+        min_pages || null,
+        max_pages || null,
+        pageCountsStr || null,
+        is_active !== false
+      ]);
+    } else {
+      // File mode
+      const fs = require('fs').promises;
+      const path = require('path');
+      const productsFile = path.join(__dirname, 'data', 'gelato_products.json');
+
+      let products = {};
+      try {
+        const data = await fs.readFile(productsFile, 'utf-8');
+        products = JSON.parse(data);
+      } catch (err) {
+        // File doesn't exist yet
+      }
+
+      products[product_uid] = {
+        product_uid,
+        product_name,
+        description: description || null,
+        size: size || null,
+        cover_type: cover_type || null,
+        min_pages: min_pages || null,
+        max_pages: max_pages || null,
+        available_page_counts: pageCountsStr || null,
+        is_active: is_active !== false,
+        updated_at: new Date().toISOString()
+      };
+
+      await fs.writeFile(productsFile, JSON.stringify(products, null, 2));
+    }
+
+    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_SAVED', { product_uid });
+
+    res.json({ success: true, message: 'Product saved successfully' });
+
+  } catch (err) {
+    console.error('Error saving product:', err);
+    res.status(500).json({ error: 'Failed to save product', details: err.message });
+  }
+});
+
+// Seed default products (Admin only)
+app.post('/api/admin/gelato/seed-products', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    // Default 14x14cm photobook product from your URL
+    const defaultProduct = {
+      product_uid: 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver',
+      product_name: '14x14cm Softcover Photobook',
+      description: 'Square softcover photobook with matt lamination, 170gsm coated silk paper',
+      size: '14x14cm (5.5x5.5 inch)',
+      cover_type: 'Softcover',
+      min_pages: 24,
+      max_pages: 200,
+      available_page_counts: JSON.stringify([24, 30, 40, 50, 60, 80, 100, 120, 150, 200]),
+      is_active: true
+    };
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const upsertQuery = DB_TYPE === 'postgresql'
+        ? `INSERT INTO gelato_products
+           (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (product_uid)
+           DO UPDATE SET
+             product_name = $2,
+             description = $3,
+             size = $4,
+             cover_type = $5,
+             min_pages = $6,
+             max_pages = $7,
+             available_page_counts = $8,
+             is_active = $9,
+             updated_at = CURRENT_TIMESTAMP`
+        : `INSERT INTO gelato_products
+           (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             product_name = VALUES(product_name),
+             description = VALUES(description),
+             size = VALUES(size),
+             cover_type = VALUES(cover_type),
+             min_pages = VALUES(min_pages),
+             max_pages = VALUES(max_pages),
+             available_page_counts = VALUES(available_page_counts),
+             is_active = VALUES(is_active),
+             updated_at = CURRENT_TIMESTAMP`;
+
+      await dbQuery(upsertQuery, [
+        defaultProduct.product_uid,
+        defaultProduct.product_name,
+        defaultProduct.description,
+        defaultProduct.size,
+        defaultProduct.cover_type,
+        defaultProduct.min_pages,
+        defaultProduct.max_pages,
+        defaultProduct.available_page_counts,
+        defaultProduct.is_active
+      ]);
+
+      res.json({ success: true, message: 'Default product seeded successfully' });
+    } else {
+      res.status(500).json({ error: 'Database mode required for seeding' });
+    }
+
+  } catch (err) {
+    console.error('Error seeding products:', err);
+    res.status(500).json({ error: 'Failed to seed products', details: err.message });
+  }
+});
+
+// Get active products for users
+app.get('/api/gelato/products', async (req, res) => {
+  try {
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true ORDER BY product_name'
+        : 'SELECT product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = 1 ORDER BY product_name';
+
+      const rows = await dbQuery(selectQuery, []);
+      res.json({ success: true, products: rows });
+    } else {
+      // File mode
+      const fs = require('fs').promises;
+      const path = require('path');
+      const productsFile = path.join(__dirname, 'data', 'gelato_products.json');
+
+      try {
+        const data = await fs.readFile(productsFile, 'utf-8');
+        const allProducts = JSON.parse(data);
+        const activeProducts = Object.values(allProducts).filter(p => p.is_active);
+        res.json({ success: true, products: activeProducts });
+      } catch (err) {
+        res.json({ success: true, products: [] });
+      }
+    }
+
+  } catch (err) {
+    console.error('Error getting active products:', err);
+    res.status(500).json({ error: 'Failed to get products', details: err.message });
+  }
+});
+
+// File Management Endpoints
+
+// Upload file (image or PDF)
+app.post('/api/files', authenticateToken, async (req, res) => {
+  try {
+    const { fileData, fileType, storyId, mimeType, filename } = req.body;
+
+    if (!fileData || !fileType || !mimeType) {
+      return res.status(400).json({ error: 'Missing required fields: fileData, fileType, mimeType' });
+    }
+
+    // Extract base64 data (remove data URL prefix if present)
+    const base64Data = fileData.replace(/^data:[^;]+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fileSize = buffer.length;
+
+    const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const insertQuery = DB_TYPE === 'postgresql'
+        ? 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)'
+        : 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+
+      await dbQuery(insertQuery, [
+        fileId,
+        req.user.id,
+        fileType,
+        storyId || null,
+        mimeType,
+        buffer,
+        fileSize,
+        filename || null
+      ]);
+    } else {
+      // File mode - save to disk
+      const fs = require('fs').promises;
+      const path = require('path');
+      const uploadsDir = path.join(__dirname, 'data', 'uploads');
+
+      // Create uploads directory if it doesn't exist
+      await fs.mkdir(uploadsDir, { recursive: true });
+
+      const filePath = path.join(uploadsDir, fileId);
+      await fs.writeFile(filePath, buffer);
+
+      // Save metadata to JSON
+      const metadataFile = path.join(__dirname, 'data', 'files.json');
+      let metadata = {};
+      try {
+        const data = await fs.readFile(metadataFile, 'utf-8');
+        metadata = JSON.parse(data);
+      } catch (err) {
+        // File doesn't exist yet
+      }
+
+      metadata[fileId] = {
+        id: fileId,
+        userId: req.user.id,
+        fileType,
+        storyId: storyId || null,
+        mimeType,
+        fileSize,
+        filename: filename || null,
+        createdAt: new Date().toISOString()
+      };
+
+      await fs.writeFile(metadataFile, JSON.stringify(metadata, null, 2));
+    }
+
+    await logActivity(req.user.id, req.user.username, 'FILE_UPLOADED', {
+      fileId,
+      fileType,
+      fileSize
+    });
+
+    res.json({
+      success: true,
+      fileId,
+      fileUrl: `${req.protocol}://${req.get('host')}/api/files/${fileId}`,
+      fileSize
+    });
+
+  } catch (err) {
+    console.error('Error uploading file:', err);
+    res.status(500).json({ error: 'Failed to upload file', details: err.message });
+  }
+});
+
+// Get/serve file by ID
+app.get('/api/files/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT mime_type, file_data, filename FROM files WHERE id = $1'
+        : 'SELECT mime_type, file_data, filename FROM files WHERE id = ?';
+
+      const rows = await dbQuery(selectQuery, [fileId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      const file = rows[0];
+
+      res.set('Content-Type', file.mime_type);
+      if (file.filename) {
+        res.set('Content-Disposition', `inline; filename="${file.filename}"`);
+      }
+      res.send(file.file_data);
+
+    } else {
+      // File mode - read from disk
+      const fs = require('fs').promises;
+      const path = require('path');
+
+      const metadataFile = path.join(__dirname, 'data', 'files.json');
+      const data = await fs.readFile(metadataFile, 'utf-8');
+      const metadata = JSON.parse(data);
+
+      if (!metadata[fileId]) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      const fileMetadata = metadata[fileId];
+      const filePath = path.join(__dirname, 'data', 'uploads', fileId);
+      const fileBuffer = await fs.readFile(filePath);
+
+      res.set('Content-Type', fileMetadata.mimeType);
+      if (fileMetadata.filename) {
+        res.set('Content-Disposition', `inline; filename="${fileMetadata.filename}"`);
+      }
+      res.send(fileBuffer);
+    }
+
+  } catch (err) {
+    console.error('Error serving file:', err);
+    res.status(500).json({ error: 'Failed to serve file', details: err.message });
+  }
+});
+
+// Delete file by ID
+app.delete('/api/files/:fileId', authenticateToken, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode - verify ownership before deleting
+      const deleteQuery = DB_TYPE === 'postgresql'
+        ? 'DELETE FROM files WHERE id = $1 AND user_id = $2'
+        : 'DELETE FROM files WHERE id = ? AND user_id = ?';
+
+      const result = await dbQuery(deleteQuery, [fileId, req.user.id]);
+
+      if (DB_TYPE === 'postgresql' && result.length === 0) {
+        return res.status(404).json({ error: 'File not found or unauthorized' });
+      }
+    } else {
+      // File mode
+      const fs = require('fs').promises;
+      const path = require('path');
+
+      const metadataFile = path.join(__dirname, 'data', 'files.json');
+      const data = await fs.readFile(metadataFile, 'utf-8');
+      const metadata = JSON.parse(data);
+
+      if (!metadata[fileId] || metadata[fileId].userId !== req.user.id) {
+        return res.status(404).json({ error: 'File not found or unauthorized' });
+      }
+
+      // Delete file from disk
+      const filePath = path.join(__dirname, 'data', 'uploads', fileId);
+      await fs.unlink(filePath);
+
+      // Remove from metadata
+      delete metadata[fileId];
+      await fs.writeFile(metadataFile, JSON.stringify(metadata, null, 2));
+    }
+
+    await logActivity(req.user.id, req.user.username, 'FILE_DELETED', { fileId });
+    res.json({ success: true, message: 'File deleted successfully' });
+
+  } catch (err) {
+    console.error('Error deleting file:', err);
+    res.status(500).json({ error: 'Failed to delete file', details: err.message });
+  }
+});
+
+// Generate PDF from story
+app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
+  try {
+    const { storyId, storyTitle, storyPages, sceneImages } = req.body;
+
+    if (!storyPages || !Array.isArray(storyPages) || storyPages.length === 0) {
+      return res.status(400).json({ error: 'Missing or invalid storyPages' });
+    }
+
+    const PDFDocument = require('pdfkit');
+    const stream = require('stream');
+
+    // Create PDF document
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 72, bottom: 72, left: 72, right: 72 }
+    });
+
+    // Collect PDF data in a buffer
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+
+    // Wait for PDF to finish
+    const pdfPromise = new Promise((resolve, reject) => {
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(buffers);
+        resolve(pdfBuffer);
+      });
+      doc.on('error', reject);
+    });
+
+    // Add content to PDF
+    storyPages.forEach((page, index) => {
+      const pageNumber = index + 1;
+
+      // Add text page
+      if (index > 0) doc.addPage();
+
+      doc.fontSize(16)
+         .font('Helvetica')
+         .text(page.text, {
+           align: 'center',
+           valign: 'center'
+         });
+
+      // Add image page if available
+      const sceneImage = sceneImages.find(img => img.pageNumber === pageNumber);
+      if (sceneImage && sceneImage.imageData) {
+        doc.addPage();
+
+        // Extract base64 data
+        const base64Data = sceneImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+
+        // Add image centered on page
+        try {
+          doc.image(imageBuffer, {
+            fit: [doc.page.width - 144, doc.page.height - 144],
+            align: 'center',
+            valign: 'center'
+          });
+        } catch (imgErr) {
+          console.error('Error adding image to PDF:', imgErr);
+          // Continue without image if there's an error
+        }
+      }
+    });
+
+    // Finalize PDF
+    doc.end();
+
+    // Wait for PDF generation to complete
+    const pdfBuffer = await pdfPromise;
+    const fileSize = pdfBuffer.length;
+    const fileId = `file-pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const filename = `${storyTitle || 'story'}.pdf`;
+
+    // Store PDF in database
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const insertQuery = DB_TYPE === 'postgresql'
+        ? 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)'
+        : 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+
+      await dbQuery(insertQuery, [
+        fileId,
+        req.user.id,
+        'story_pdf',
+        storyId || null,
+        'application/pdf',
+        pdfBuffer,
+        fileSize,
+        filename
+      ]);
+    } else {
+      // File mode
+      const fs = require('fs').promises;
+      const path = require('path');
+      const uploadsDir = path.join(__dirname, 'data', 'uploads');
+
+      await fs.mkdir(uploadsDir, { recursive: true });
+      const filePath = path.join(uploadsDir, fileId);
+      await fs.writeFile(filePath, pdfBuffer);
+
+      // Save metadata
+      const metadataFile = path.join(__dirname, 'data', 'files.json');
+      let metadata = {};
+      try {
+        const data = await fs.readFile(metadataFile, 'utf-8');
+        metadata = JSON.parse(data);
+      } catch (err) {
+        // File doesn't exist yet
+      }
+
+      metadata[fileId] = {
+        id: fileId,
+        userId: req.user.id,
+        fileType: 'story_pdf',
+        storyId: storyId || null,
+        mimeType: 'application/pdf',
+        fileSize,
+        filename,
+        createdAt: new Date().toISOString()
+      };
+
+      await fs.writeFile(metadataFile, JSON.stringify(metadata, null, 2));
+    }
+
+    await logActivity(req.user.id, req.user.username, 'PDF_GENERATED', {
+      fileId,
+      storyId,
+      fileSize
+    });
+
+    const fileUrl = `${req.protocol}://${req.get('host')}/api/files/${fileId}`;
+
+    res.json({
+      success: true,
+      fileId,
+      fileUrl,
+      fileSize,
+      filename
+    });
+
+  } catch (err) {
+    console.error('Error generating PDF:', err);
+    res.status(500).json({ error: 'Failed to generate PDF', details: err.message });
   }
 });
 

@@ -241,8 +241,8 @@
         addCustomStrengths: 'Add custom strengths',
         addCustomWeaknesses: 'Add custom weaknesses',
         addCustomFears: 'Add custom fears',
-        specialDetails: 'Favorite Animal, Hopes and Other Details (Optional)',
-        specialDetailsPlaceholder: 'e.g., Loves dogs, dreams of flying, always wears a red hat',
+        specialDetails: 'Hobbies, Hopes & Fears, Favourite Animals and Other Details',
+        specialDetailsPlaceholder: 'e.g., Enjoys painting, dreams of becoming an astronaut, scared of spiders, loves horses',
         fears: 'Fears',
         addCustomRelationship: 'Add custom relationship',
         cancel: 'Cancel',
@@ -387,8 +387,8 @@
         addCustomStrengths: 'Eigene Stärken hinzufügen',
         addCustomWeaknesses: 'Eigene Schwächen hinzufügen',
         addCustomFears: 'Eigene Ängste hinzufügen',
-        specialDetails: 'Lieblingstier, Hoffnungen und andere Besonderheiten (Optional)',
-        specialDetailsPlaceholder: 'z.B. Liebt Hunde, träumt vom Fliegen, trägt immer einen roten Hut',
+        specialDetails: 'Hobbys, Hoffnungen & Ängste, Lieblingstiere und andere Besonderheiten',
+        specialDetailsPlaceholder: 'z.B. Malt gerne, träumt davon Astronaut zu werden, hat Angst vor Spinnen, liebt Pferde',
         fears: 'Ängste',
         addCustomRelationship: 'Eigene Beziehung hinzufügen',
         cancel: 'Abbrechen',
@@ -533,8 +533,8 @@
         addCustomStrengths: 'Ajouter des forces personnalisées',
         addCustomWeaknesses: 'Ajouter des faiblesses personnalisées',
         addCustomFears: 'Ajouter des peurs personnalisées',
-        specialDetails: 'Animal préféré, espoirs et autres détails (Optionnel)',
-        specialDetailsPlaceholder: 'par ex. Aime les chiens, rêve de voler, porte toujours un chapeau rouge',
+        specialDetails: 'Hobbies, Espoirs & Peurs, Animaux Préférés et Autres Détails',
+        specialDetailsPlaceholder: 'par ex. Aime peindre, rêve de devenir astronaute, peur des araignées, aime les chevaux',
         fears: 'Peurs',
         addCustomRelationship: 'Ajouter une relation personnalisée',
         cancel: 'Annuler',
@@ -3129,6 +3129,190 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         }
       };
 
+      const orderPrintedBook = async () => {
+        try {
+          // Check if story has all required content
+          if (!generatedStory || sceneImages.length === 0) {
+            alert(language === 'de'
+              ? 'Bitte generieren Sie zuerst die Geschichte und Bilder'
+              : language === 'fr'
+              ? 'Veuillez d\'abord générer l\'histoire et les images'
+              : 'Please generate the story and images first');
+            return;
+          }
+
+          // Show shipping address modal
+          const firstName = prompt(language === 'de' ? 'Vorname:' : language === 'fr' ? 'Prénom:' : 'First Name:');
+          if (!firstName) return;
+
+          const lastName = prompt(language === 'de' ? 'Nachname:' : language === 'fr' ? 'Nom:' : 'Last Name:');
+          if (!lastName) return;
+
+          const addressLine1 = prompt(language === 'de' ? 'Straße und Hausnummer:' : language === 'fr' ? 'Adresse:' : 'Address Line 1:');
+          if (!addressLine1) return;
+
+          const city = prompt(language === 'de' ? 'Stadt:' : language === 'fr' ? 'Ville:' : 'City:');
+          if (!city) return;
+
+          const postCode = prompt(language === 'de' ? 'Postleitzahl:' : language === 'fr' ? 'Code postal:' : 'Postal Code:');
+          if (!postCode) return;
+
+          const country = prompt(language === 'de' ? 'Land (2-Buchstaben-Code, z.B. DE):' : language === 'fr' ? 'Pays (code à 2 lettres, ex: FR):' : 'Country (2-letter code, e.g., US):');
+          if (!country) return;
+
+          const email = prompt(language === 'de' ? 'E-Mail:' : language === 'fr' ? 'E-mail:' : 'Email:');
+          if (!email) return;
+
+          const shippingAddress = {
+            firstName,
+            lastName,
+            addressLine1,
+            city,
+            postCode,
+            country: country.toUpperCase(),
+            email
+          };
+
+          // Step 1: Generate PDF on server
+          alert(language === 'de'
+            ? 'PDF wird generiert, bitte warten...'
+            : language === 'fr'
+            ? 'Génération du PDF, veuillez patienter...'
+            : 'Generating PDF, please wait...'
+          );
+
+          // Parse story pages from generatedStory
+          const pageMatches = generatedStory.split(/---\s*Page\s+\d+\s*---/i);
+          const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0).map((text, index) => ({
+            pageNumber: index + 1,
+            text: text.trim()
+          }));
+
+          const storyTitle = storyTypes.find(t => t.id === storyType)?.name[language] || 'Story';
+
+          const pdfResponse = await fetch('/api/generate-pdf', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+              storyId: currentStoryId || `story-${Date.now()}`,
+              storyTitle: storyTitle,
+              storyPages: storyPages,
+              sceneImages: sceneImages
+            })
+          });
+
+          const pdfData = await pdfResponse.json();
+
+          if (!pdfResponse.ok) {
+            throw new Error(pdfData.error || 'Failed to generate PDF');
+          }
+
+          console.log('PDF generated:', pdfData);
+
+          // Step 2: Create Gelato order with PDF URL
+          const gelatoResponse = await fetch('/api/gelato/order', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+              pdfUrl: pdfData.fileUrl,
+              shippingAddress: shippingAddress,
+              orderReference: `story-${Date.now()}`
+            })
+          });
+
+          const gelatoData = await gelatoResponse.json();
+
+          if (gelatoResponse.ok) {
+            // Build message based on draft vs actual order
+            let message = '';
+
+            if (gelatoData.isDraft) {
+              // Draft order - show preview information
+              message = language === 'de'
+                ? `📋 Vorschau-Bestellung erstellt!\n\n` +
+                  `Bestellnummer: ${gelatoData.orderId}\n` +
+                  `Status: ENTWURF (wird nicht gedruckt)\n\n` +
+                  `PDF: ${pdfData.filename}\n\n` +
+                  `✨ Sie können Ihre Bestellung in Ihrem Gelato Dashboard ansehen:\n${gelatoData.dashboardUrl}\n\n` +
+                  (gelatoData.previewUrls && gelatoData.previewUrls.length > 0
+                    ? `Vorschau-Links:\n${gelatoData.previewUrls.map(p => p.url).join('\n')}\n\n`
+                    : '') +
+                  `⚠️ Um tatsächlich zu drucken, ändern Sie GELATO_ORDER_TYPE in .env von 'draft' auf 'order'`
+                : language === 'fr'
+                ? `📋 Commande d'aperçu créée!\n\n` +
+                  `Numéro de commande: ${gelatoData.orderId}\n` +
+                  `Statut: BROUILLON (ne sera pas imprimé)\n\n` +
+                  `PDF: ${pdfData.filename}\n\n` +
+                  `✨ Vous pouvez voir votre commande sur votre tableau de bord Gelato:\n${gelatoData.dashboardUrl}\n\n` +
+                  (gelatoData.previewUrls && gelatoData.previewUrls.length > 0
+                    ? `Liens d'aperçu:\n${gelatoData.previewUrls.map(p => p.url).join('\n')}\n\n`
+                    : '') +
+                  `⚠️ Pour imprimer réellement, changez GELATO_ORDER_TYPE dans .env de 'draft' à 'order'`
+                : `📋 Preview Order Created!\n\n` +
+                  `Order ID: ${gelatoData.orderId}\n` +
+                  `Status: DRAFT (will not be printed)\n\n` +
+                  `PDF: ${pdfData.filename}\n\n` +
+                  `✨ View your order in Gelato Dashboard:\n${gelatoData.dashboardUrl}\n\n` +
+                  (gelatoData.previewUrls && gelatoData.previewUrls.length > 0
+                    ? `Preview Links:\n${gelatoData.previewUrls.map(p => p.url).join('\n')}\n\n`
+                    : '') +
+                  `⚠️ To actually print, change GELATO_ORDER_TYPE in .env from 'draft' to 'order'`;
+            } else {
+              // Actual order - will be printed
+              message = language === 'de'
+                ? `✅ Bestellung erfolgreich erstellt!\n\n` +
+                  `Bestellnummer: ${gelatoData.orderId}\n` +
+                  `Status: WIRD GEDRUCKT\n\n` +
+                  `PDF: ${pdfData.filename}\n\n` +
+                  `Sie erhalten eine Bestätigungs-E-Mail an ${email}\n\n` +
+                  `Dashboard: ${gelatoData.dashboardUrl}`
+                : language === 'fr'
+                ? `✅ Commande créée avec succès!\n\n` +
+                  `Numéro de commande: ${gelatoData.orderId}\n` +
+                  `Statut: EN IMPRESSION\n\n` +
+                  `PDF: ${pdfData.filename}\n\n` +
+                  `Vous recevrez un e-mail de confirmation à ${email}\n\n` +
+                  `Tableau de bord: ${gelatoData.dashboardUrl}`
+                : `✅ Order Created Successfully!\n\n` +
+                  `Order ID: ${gelatoData.orderId}\n` +
+                  `Status: PRINTING\n\n` +
+                  `PDF: ${pdfData.filename}\n\n` +
+                  `You will receive a confirmation email at ${email}\n\n` +
+                  `Dashboard: ${gelatoData.dashboardUrl}`;
+            }
+
+            alert(message);
+          } else {
+            // PDF was generated but Gelato order failed
+            if (gelatoData.setupUrl) {
+              alert(language === 'de'
+                ? `PDF wurde erstellt, aber Gelato ist nicht konfiguriert.\n\nPDF-Link: ${pdfData.fileUrl}\n\nBitte konfigurieren Sie Gelato unter: ${gelatoData.setupUrl}`
+                : language === 'fr'
+                ? `PDF créé, mais Gelato n'est pas configuré.\n\nLien PDF: ${pdfData.fileUrl}\n\nVeuillez configurer Gelato sur: ${gelatoData.setupUrl}`
+                : `PDF generated, but Gelato is not configured.\n\nPDF URL: ${pdfData.fileUrl}\n\nPlease configure Gelato at: ${gelatoData.setupUrl}`
+              );
+            } else {
+              throw new Error(gelatoData.error || 'Failed to create Gelato order');
+            }
+          }
+
+        } catch (error) {
+          console.error('Print book error:', error);
+          alert(language === 'de'
+            ? 'Fehler beim Erstellen der Druckbestellung: ' + error.message
+            : language === 'fr'
+            ? 'Erreur lors de la création de la commande d\'impression: ' + error.message
+            : 'Error creating print order: ' + error.message
+          );
+        }
+      };
+
       const exportStoryInfoAsMarkdown = () => {
         try {
           const storyTypeName = allStoryTypes.find(t => t.id === storyType);
@@ -3989,31 +4173,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <div ref={characterFormRef} className="bg-white border-2 border-purple-200 rounded-lg p-3 space-y-3">
                 <h3 className="text-base font-bold text-purple-700">{currentCharacter.id ? t.editCharacter : t.startCreating}</h3>
 
-                {/* Compact Name and Gender on same line for mobile */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">{t.characterName} *</label>
-                    <input
-                      type="text"
-                      value={currentCharacter.name}
-                      onChange={(e) => handleNameChange(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                      placeholder={t.characterName}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">{t.gender}</label>
-                    <select
-                      value={currentCharacter.gender}
-                      onChange={(e) => setCurrentCharacter({ ...currentCharacter, gender: e.target.value })}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                    >
-                      <option value="male">{t.male}</option>
-                      <option value="female">{t.female}</option>
-                      <option value="other">{t.other}</option>
-                    </select>
-                  </div>
+                {/* Character Name */}
+                <div>
+                  <label className="block text-xs font-semibold mb-1">{t.characterName} *</label>
+                  <input
+                    type="text"
+                    value={currentCharacter.name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                    placeholder={t.characterName}
+                  />
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-3">
@@ -4069,7 +4238,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         />
                       </label>
 
-                      {currentCharacter.photoUrl && !generatedAvatar && generatedAvatars.length === 0 && (uploadType === 'photo' || !currentUser || currentUser.role !== 'admin') && (
+                      {/* Generate Avatar Button - Admin only */}
+                      {currentUser && currentUser.role === 'admin' && currentCharacter.photoUrl && !generatedAvatar && generatedAvatars.length === 0 && (uploadType === 'photo' || !currentUser || currentUser.role !== 'admin') && (
                         <button
                           onClick={() => generateAvatar(currentCharacter.photoUrl)}
                           disabled={isGeneratingAvatar}
@@ -4236,6 +4406,20 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   <div className="md:border-2 md:border-green-300 md:rounded-lg p-4 md:bg-green-50">
                     <label className="block text-lg font-semibold mb-3 text-center md:block hidden">{t.orDescribe}</label>
                     <div className="space-y-2">
+                      {/* Gender */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">{t.gender}:</label>
+                        <select
+                          value={currentCharacter.gender}
+                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, gender: e.target.value })}
+                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                        >
+                          <option value="male">{t.male}</option>
+                          <option value="female">{t.female}</option>
+                          <option value="other">{t.other}</option>
+                        </select>
+                      </div>
+
                       {/* Age and Height on same row */}
                       <div className="grid grid-cols-2 gap-2">
                         <div className="flex items-center gap-2">
@@ -4286,28 +4470,31 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         </select>
                       </div>
 
-                      {/* Hair Color */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">{t.hairColor}:</label>
-                        <input
-                          type="text"
-                          value={currentCharacter.hairColor}
-                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, hairColor: e.target.value })}
-                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
-                          placeholder={t.hairColor}
-                        />
-                      </div>
-                      {/* Other Features - inline label */}
-                      <div className="flex items-start gap-2">
-                        <label className="text-xs font-semibold whitespace-nowrap min-w-[60px] pt-1.5">{t.otherFeatures}:</label>
-                        <textarea
-                          value={currentCharacter.otherFeatures}
-                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, otherFeatures: e.target.value })}
-                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
-                          placeholder={t.descriptionPlaceholder}
-                          rows={2}
-                        />
-                      </div>
+                      {/* Hair Color and Other Features - Admin only */}
+                      {currentUser && currentUser.role === 'admin' && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">{t.hairColor}:</label>
+                            <input
+                              type="text"
+                              value={currentCharacter.hairColor}
+                              onChange={(e) => setCurrentCharacter({ ...currentCharacter, hairColor: e.target.value })}
+                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                              placeholder={t.hairColor}
+                            />
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <label className="text-xs font-semibold whitespace-nowrap min-w-[60px] pt-1.5">{t.otherFeatures}:</label>
+                            <textarea
+                              value={currentCharacter.otherFeatures}
+                              onChange={(e) => setCurrentCharacter({ ...currentCharacter, otherFeatures: e.target.value })}
+                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                              placeholder={t.descriptionPlaceholder}
+                              rows={2}
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -4379,41 +4566,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     />
                     <button
                       onClick={addCustomWeakness}
-                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-                    >
-                      <Icon name="plus" size={20} />
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-lg font-semibold mb-2">{t.fears}</label>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {allFears.map(fear => (
-                      <button
-                        key={fear}
-                        onClick={() => toggleArrayItem('fears', fear)}
-                        className={`px-3 py-1 rounded-full text-sm ${
-                          currentCharacter.fears.includes(fear)
-                            ? 'bg-red-500 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {fear}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newFear}
-                      onChange={(e) => setNewFear(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && addCustomFear()}
-                      placeholder={t.addCustomFears}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-                    />
-                    <button
-                      onClick={addCustomFear}
                       className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
                     >
                       <Icon name="plus" size={20} />
@@ -4982,6 +5134,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center justify-center gap-2"
               >
                 <Icon name="file-text" size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
+              </button>
+            )}
+            {/* All users: Print Book via Gelato */}
+            {sceneImages.length > 0 && (
+              <button
+                onClick={orderPrintedBook}
+                className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold flex items-center justify-center gap-2"
+              >
+                <Icon name="printer" size={20} /> {language === 'de' ? 'Buch drucken' : language === 'fr' ? 'Imprimer le livre' : 'Print Book'}
               </button>
             )}
             {currentUser && currentUser.role === 'admin' && generatedPrompt && (
