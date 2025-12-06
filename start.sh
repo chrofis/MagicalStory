@@ -1,11 +1,8 @@
 #!/bin/bash
 set -e
 
-echo "Installing Python dependencies..."
-python3 -m pip install -r requirements.txt
-
 echo "Starting Python photo analyzer service..."
-python3 photo_analyzer.py &
+python photo_analyzer.py &
 PYTHON_PID=$!
 
 echo "Waiting for Python service to start..."
