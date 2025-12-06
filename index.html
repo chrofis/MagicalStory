@@ -732,6 +732,21 @@
         email: ''
       });
       const [emailChanged, setEmailChanged] = useState(false);
+      const [adminTab, setAdminTab] = useState('users'); // 'users' or 'products'
+      const [gelatoProducts, setGelatoProducts] = useState([]);
+      const [showProductForm, setShowProductForm] = useState(false);
+      const [editingProduct, setEditingProduct] = useState(null);
+      const [productForm, setProductForm] = useState({
+        product_uid: '',
+        product_name: '',
+        description: '',
+        size: '',
+        cover_type: '',
+        min_pages: 24,
+        max_pages: 24,
+        available_page_counts: '[24]',
+        is_active: true
+      });
 
       const characterFormRef = React.useRef(null);
 
@@ -1114,6 +1129,110 @@
         } catch (err) {
           console.error('Error updating user quota:', err);
           return false;
+        }
+      };
+
+      // Gelato Products Management Functions
+      const fetchGelatoProducts = async () => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        try {
+          const response = await fetch(`${API_URL}/api/admin/gelato-products`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setGelatoProducts(data.products || []);
+          }
+        } catch (err) {
+          console.error('Error fetching Gelato products:', err);
+        }
+      };
+
+      const saveGelatoProduct = async () => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        try {
+          const url = editingProduct
+            ? `${API_URL}/api/admin/gelato-products/${editingProduct.id}`
+            : `${API_URL}/api/admin/gelato-products`;
+
+          const response = await fetch(url, {
+            method: editingProduct ? 'PUT' : 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(productForm)
+          });
+
+          if (response.ok) {
+            await fetchGelatoProducts();
+            setShowProductForm(false);
+            setEditingProduct(null);
+            setProductForm({
+              product_uid: '',
+              product_name: '',
+              description: '',
+              size: '',
+              cover_type: '',
+              min_pages: 24,
+              max_pages: 24,
+              available_page_counts: '[24]',
+              is_active: true
+            });
+            alert('Product saved successfully!');
+          } else {
+            const error = await response.json();
+            alert(`Failed to save product: ${error.error || 'Unknown error'}`);
+          }
+        } catch (err) {
+          console.error('Error saving product:', err);
+          alert('Error saving product');
+        }
+      };
+
+      const deleteGelatoProduct = async (productId) => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+        if (!confirm('Delete this product?')) return;
+
+        try {
+          const response = await fetch(`${API_URL}/api/admin/gelato-products/${productId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+
+          if (response.ok) {
+            await fetchGelatoProducts();
+            alert('Product deleted successfully!');
+          } else {
+            alert('Failed to delete product');
+          }
+        } catch (err) {
+          console.error('Error deleting product:', err);
+          alert('Error deleting product');
+        }
+      };
+
+      const toggleProductActive = async (productId, currentStatus) => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        try {
+          const response = await fetch(`${API_URL}/api/admin/gelato-products/${productId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ is_active: !currentStatus })
+          });
+
+          if (response.ok) {
+            await fetchGelatoProducts();
+          }
+        } catch (err) {
+          console.error('Error toggling product status:', err);
         }
       };
 
@@ -5895,8 +6014,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto p-8 animate-fade-in">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-3xl font-bold text-yellow-700 flex items-center gap-2">
-                    <span className="text-4xl">👥</span>
-                    User Management
+                    <span className="text-4xl">⚙️</span>
+                    Admin Panel
                   </h2>
                   <button
                     onClick={() => setShowAdminPanel(false)}
@@ -5906,13 +6025,43 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </button>
                 </div>
 
-                <button
-                  onClick={fetchAllUsers}
-                  className="mb-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <span>🔄</span>
-                  Refresh Users
-                </button>
+                {/* Tabs */}
+                <div className="flex gap-2 mb-6 border-b-2">
+                  <button
+                    onClick={() => setAdminTab('users')}
+                    className={`px-6 py-3 font-semibold transition-colors ${
+                      adminTab === 'users'
+                        ? 'text-yellow-700 border-b-4 border-yellow-700 -mb-0.5'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    👥 Users
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAdminTab('products');
+                      fetchGelatoProducts();
+                    }}
+                    className={`px-6 py-3 font-semibold transition-colors ${
+                      adminTab === 'products'
+                        ? 'text-yellow-700 border-b-4 border-yellow-700 -mb-0.5'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    📦 Gelato Products
+                  </button>
+                </div>
+
+                {/* Users Tab */}
+                {adminTab === 'users' && (
+                  <>
+                    <button
+                      onClick={fetchAllUsers}
+                      className="mb-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    >
+                      <span>🔄</span>
+                      Refresh Users
+                    </button>
 
                 {adminUsers.length === 0 ? (
                   <div className="text-center py-12">
@@ -6026,6 +6175,293 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <li>• Click +1, +5, or +10 to add stories to a user's quota</li>
                     <li>• Click ∞ to give unlimited access</li>
                   </ul>
+                </div>
+                  </>
+                )}
+
+                {/* Products Tab */}
+                {adminTab === 'products' && (
+                  <>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-bold text-yellow-700">Gelato Product Configuration</h3>
+                      <button
+                        onClick={() => {
+                          setShowProductForm(true);
+                          setEditingProduct(null);
+                          setProductForm({
+                            product_uid: '',
+                            product_name: '',
+                            description: '',
+                            size: '',
+                            cover_type: '',
+                            min_pages: 24,
+                            max_pages: 24,
+                            available_page_counts: '[24]',
+                            is_active: true
+                          });
+                        }}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+                      >
+                        <span>➕</span>
+                        Add Product
+                      </button>
+                    </div>
+
+                    {gelatoProducts.length === 0 ? (
+                      <div className="text-center py-12 bg-gray-50 rounded-lg">
+                        <div className="text-gray-300 mb-4 text-6xl">📦</div>
+                        <p className="text-gray-500 text-lg mb-2">No Gelato products configured</p>
+                        <p className="text-gray-400 text-sm">Add products to enable print ordering</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Product Name</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Size</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cover</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Pages</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {gelatoProducts.map(product => (
+                              <tr key={product.id} className="border-b hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm text-center">
+                                  <button
+                                    onClick={() => toggleProductActive(product.id, product.is_active)}
+                                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                      product.is_active
+                                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                        : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                    }`}
+                                  >
+                                    {product.is_active ? '✓ Active' : '✕ Inactive'}
+                                  </button>
+                                </td>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                  {product.product_name}
+                                  <div className="text-xs text-gray-500 mt-1">{product.description}</div>
+                                </td>
+                                <td className="px-4 py-3 text-sm">{product.size}</td>
+                                <td className="px-4 py-3 text-sm">{product.cover_type}</td>
+                                <td className="px-4 py-3 text-sm text-center">
+                                  {product.min_pages === product.max_pages
+                                    ? product.min_pages
+                                    : `${product.min_pages}-${product.max_pages}`}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center">
+                                  <div className="flex gap-2 justify-center">
+                                    <button
+                                      onClick={() => {
+                                        setEditingProduct(product);
+                                        setProductForm({
+                                          product_uid: product.product_uid,
+                                          product_name: product.product_name,
+                                          description: product.description,
+                                          size: product.size,
+                                          cover_type: product.cover_type,
+                                          min_pages: product.min_pages,
+                                          max_pages: product.max_pages,
+                                          available_page_counts: product.available_page_counts,
+                                          is_active: product.is_active
+                                        });
+                                        setShowProductForm(true);
+                                      }}
+                                      className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                                      title="Edit product"
+                                    >
+                                      ✏️
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm(`Delete product "${product.product_name}"?`)) {
+                                          deleteGelatoProduct(product.id);
+                                        }
+                                      }}
+                                      className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                                      title="Delete product"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="font-semibold text-yellow-900 mb-2">About Gelato Products:</h3>
+                      <ul className="text-sm text-yellow-800 space-y-1">
+                        <li>• Active products are available for print ordering</li>
+                        <li>• Product UID comes from Gelato's API catalog</li>
+                        <li>• Page counts must match Gelato's supported values (typically 24, 28, 32, 36, 40)</li>
+                        <li>• Use available_page_counts as JSON array, e.g. [24,28,32]</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Product Form Modal */}
+          {showProductForm && currentUser && currentUser.role === 'admin' && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 animate-fade-in">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-yellow-700">
+                    {editingProduct ? 'Edit Gelato Product' : 'Add Gelato Product'}
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setShowProductForm(false);
+                      setEditingProduct(null);
+                    }}
+                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Product UID <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={productForm.product_uid}
+                      onChange={(e) => setProductForm({ ...productForm, product_uid: e.target.value })}
+                      placeholder="photobooks-softcover_pf_140x140-mm..."
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">From Gelato's product catalog API</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Product Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={productForm.product_name}
+                      onChange={(e) => setProductForm({ ...productForm, product_name: e.target.value })}
+                      placeholder="14x14cm Softcover Photobook - 24 pages"
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                    <input
+                      type="text"
+                      value={productForm.description}
+                      onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                      placeholder="Square softcover photobook with 24 pages"
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Size</label>
+                      <input
+                        type="text"
+                        value={productForm.size}
+                        onChange={(e) => setProductForm({ ...productForm, size: e.target.value })}
+                        placeholder="14x14cm"
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Cover Type</label>
+                      <input
+                        type="text"
+                        value={productForm.cover_type}
+                        onChange={(e) => setProductForm({ ...productForm, cover_type: e.target.value })}
+                        placeholder="Softcover"
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Min Pages <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={productForm.min_pages}
+                        onChange={(e) => setProductForm({ ...productForm, min_pages: parseInt(e.target.value) })}
+                        min="1"
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Max Pages <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={productForm.max_pages}
+                        onChange={(e) => setProductForm({ ...productForm, max_pages: parseInt(e.target.value) })}
+                        min="1"
+                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Available Page Counts (JSON Array) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={productForm.available_page_counts}
+                      onChange={(e) => setProductForm({ ...productForm, available_page_counts: e.target.value })}
+                      placeholder="[24,28,32,36,40]"
+                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Format: [24,28,32] - must be valid JSON array</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      checked={productForm.is_active}
+                      onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })}
+                      className="w-5 h-5 text-yellow-600"
+                    />
+                    <label htmlFor="is_active" className="text-sm font-semibold text-gray-700">
+                      Active (available for print ordering)
+                    </label>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={saveGelatoProduct}
+                      className="flex-1 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 font-semibold"
+                    >
+                      {editingProduct ? 'Update Product' : 'Add Product'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowProductForm(false);
+                        setEditingProduct(null);
+                      }}
+                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

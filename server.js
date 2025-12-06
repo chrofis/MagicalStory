@@ -865,6 +865,303 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
   }
 });
 
+// =======================
+// Gelato Products Admin Endpoints
+// =======================
+
+// Get all Gelato products (admin only)
+app.get('/api/admin/gelato-products', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database' || !dbPool) {
+      return res.status(503).json({ error: 'Database required for Gelato products management' });
+    }
+
+    const selectQuery = 'SELECT * FROM gelato_products ORDER BY created_at DESC';
+    const products = await dbQuery(selectQuery, []);
+
+    res.json({ products });
+  } catch (err) {
+    console.error('Error fetching Gelato products:', err);
+    res.status(500).json({ error: 'Failed to fetch Gelato products' });
+  }
+});
+
+// Create new Gelato product (admin only)
+app.post('/api/admin/gelato-products', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database' || !dbPool) {
+      return res.status(503).json({ error: 'Database required for Gelato products management' });
+    }
+
+    const {
+      product_uid,
+      product_name,
+      description,
+      size,
+      cover_type,
+      min_pages,
+      max_pages,
+      available_page_counts,
+      is_active
+    } = req.body;
+
+    // Validate required fields
+    if (!product_uid || !product_name || min_pages === undefined || max_pages === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: product_uid, product_name, min_pages, max_pages' });
+    }
+
+    // Validate JSON format for available_page_counts
+    let pageCounts;
+    try {
+      pageCounts = typeof available_page_counts === 'string'
+        ? JSON.parse(available_page_counts)
+        : available_page_counts;
+      if (!Array.isArray(pageCounts)) {
+        throw new Error('Must be an array');
+      }
+    } catch (err) {
+      return res.status(400).json({ error: 'available_page_counts must be a valid JSON array' });
+    }
+
+    const insertQuery = DB_TYPE === 'postgresql'
+      ? `INSERT INTO gelato_products
+         (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING *`
+      : `INSERT INTO gelato_products
+         (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    const pageCountsJson = JSON.stringify(pageCounts);
+    const params = [
+      product_uid,
+      product_name,
+      description || null,
+      size || null,
+      cover_type || null,
+      min_pages,
+      max_pages,
+      pageCountsJson,
+      is_active !== false
+    ];
+
+    const result = await dbQuery(insertQuery, params);
+
+    // For MySQL, fetch the inserted record
+    let newProduct;
+    if (DB_TYPE === 'postgresql') {
+      newProduct = result[0];
+    } else {
+      const selectQuery = 'SELECT * FROM gelato_products WHERE id = ?';
+      const rows = await dbQuery(selectQuery, [result.insertId]);
+      newProduct = rows[0];
+    }
+
+    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_CREATED', {
+      productId: newProduct.id,
+      productName: product_name
+    });
+
+    res.json({ product: newProduct, message: 'Product created successfully' });
+  } catch (err) {
+    console.error('Error creating Gelato product:', err);
+    res.status(500).json({ error: 'Failed to create Gelato product' });
+  }
+});
+
+// Update Gelato product (admin only)
+app.put('/api/admin/gelato-products/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database' || !dbPool) {
+      return res.status(503).json({ error: 'Database required for Gelato products management' });
+    }
+
+    const { id } = req.params;
+    const {
+      product_uid,
+      product_name,
+      description,
+      size,
+      cover_type,
+      min_pages,
+      max_pages,
+      available_page_counts,
+      is_active
+    } = req.body;
+
+    // Validate JSON format for available_page_counts
+    let pageCounts;
+    try {
+      pageCounts = typeof available_page_counts === 'string'
+        ? JSON.parse(available_page_counts)
+        : available_page_counts;
+      if (!Array.isArray(pageCounts)) {
+        throw new Error('Must be an array');
+      }
+    } catch (err) {
+      return res.status(400).json({ error: 'available_page_counts must be a valid JSON array' });
+    }
+
+    const updateQuery = DB_TYPE === 'postgresql'
+      ? `UPDATE gelato_products
+         SET product_uid = $1, product_name = $2, description = $3, size = $4,
+             cover_type = $5, min_pages = $6, max_pages = $7,
+             available_page_counts = $8, is_active = $9
+         WHERE id = $10
+         RETURNING *`
+      : `UPDATE gelato_products
+         SET product_uid = ?, product_name = ?, description = ?, size = ?,
+             cover_type = ?, min_pages = ?, max_pages = ?,
+             available_page_counts = ?, is_active = ?
+         WHERE id = ?`;
+
+    const pageCountsJson = JSON.stringify(pageCounts);
+    const params = [
+      product_uid,
+      product_name,
+      description || null,
+      size || null,
+      cover_type || null,
+      min_pages,
+      max_pages,
+      pageCountsJson,
+      is_active !== false,
+      id
+    ];
+
+    const result = await dbQuery(updateQuery, params);
+
+    // For MySQL, fetch the updated record
+    let updatedProduct;
+    if (DB_TYPE === 'postgresql') {
+      if (result.length === 0) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      updatedProduct = result[0];
+    } else {
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      const selectQuery = 'SELECT * FROM gelato_products WHERE id = ?';
+      const rows = await dbQuery(selectQuery, [id]);
+      updatedProduct = rows[0];
+    }
+
+    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_UPDATED', {
+      productId: id,
+      productName: product_name
+    });
+
+    res.json({ product: updatedProduct, message: 'Product updated successfully' });
+  } catch (err) {
+    console.error('Error updating Gelato product:', err);
+    res.status(500).json({ error: 'Failed to update Gelato product' });
+  }
+});
+
+// Toggle product active status (admin only)
+app.put('/api/admin/gelato-products/:id/toggle', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database' || !dbPool) {
+      return res.status(503).json({ error: 'Database required for Gelato products management' });
+    }
+
+    const { id } = req.params;
+    const { is_active } = req.body;
+
+    const updateQuery = DB_TYPE === 'postgresql'
+      ? 'UPDATE gelato_products SET is_active = $1 WHERE id = $2 RETURNING *'
+      : 'UPDATE gelato_products SET is_active = ? WHERE id = ?';
+
+    const result = await dbQuery(updateQuery, [!is_active, id]);
+
+    // For MySQL, fetch the updated record
+    let updatedProduct;
+    if (DB_TYPE === 'postgresql') {
+      if (result.length === 0) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      updatedProduct = result[0];
+    } else {
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      const selectQuery = 'SELECT * FROM gelato_products WHERE id = ?';
+      const rows = await dbQuery(selectQuery, [id]);
+      updatedProduct = rows[0];
+    }
+
+    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_TOGGLED', {
+      productId: id,
+      isActive: !is_active
+    });
+
+    res.json({ product: updatedProduct, message: 'Product status updated successfully' });
+  } catch (err) {
+    console.error('Error toggling Gelato product status:', err);
+    res.status(500).json({ error: 'Failed to toggle product status' });
+  }
+});
+
+// Delete Gelato product (admin only)
+app.delete('/api/admin/gelato-products/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database' || !dbPool) {
+      return res.status(503).json({ error: 'Database required for Gelato products management' });
+    }
+
+    const { id } = req.params;
+
+    // Get product name before deleting for logging
+    const selectQuery = DB_TYPE === 'postgresql'
+      ? 'SELECT product_name FROM gelato_products WHERE id = $1'
+      : 'SELECT product_name FROM gelato_products WHERE id = ?';
+    const rows = await dbQuery(selectQuery, [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const productName = rows[0].product_name;
+
+    const deleteQuery = DB_TYPE === 'postgresql'
+      ? 'DELETE FROM gelato_products WHERE id = $1'
+      : 'DELETE FROM gelato_products WHERE id = ?';
+
+    await dbQuery(deleteQuery, [id]);
+
+    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_DELETED', {
+      productId: id,
+      productName: productName
+    });
+
+    res.json({ message: 'Product deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting Gelato product:', err);
+    res.status(500).json({ error: 'Failed to delete Gelato product' });
+  }
+});
+
 // Get current user's quota status
 app.get('/api/user/quota', authenticateToken, async (req, res) => {
   try {

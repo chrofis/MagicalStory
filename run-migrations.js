@@ -38,58 +38,72 @@ async function runMigrations(dbPool, dbType) {
     await executeQuery(createMigrationsTable);
     console.log('✓ Migrations table ready');
 
-    // Read migration files
+    // Read all migration files
     const migrationsDir = path.join(__dirname, 'database', 'migrations');
-    const migrationFile = dbType === 'postgresql'
-      ? 'add_shipping_and_quota_columns_postgresql.sql'
-      : 'add_shipping_and_quota_columns.sql';
+    const allFiles = await fs.readdir(migrationsDir);
 
-    const migrationPath = path.join(migrationsDir, migrationFile);
+    // Filter migration files based on database type
+    const migrationFiles = allFiles.filter(file => {
+      if (dbType === 'postgresql') {
+        return file.endsWith('_postgresql.sql') || (!file.includes('_postgresql') && !file.includes('add_default') && file.endsWith('.sql'));
+      } else {
+        return !file.endsWith('_postgresql.sql') && file.endsWith('.sql');
+      }
+    }).sort(); // Sort to ensure consistent order
 
-    // Check if migration already executed
-    const checkQuery = dbType === 'postgresql'
-      ? 'SELECT migration_name FROM schema_migrations WHERE migration_name = $1'
-      : 'SELECT migration_name FROM schema_migrations WHERE migration_name = ?';
+    console.log(`Found ${migrationFiles.length} migration files to process`);
 
-    const rows = await executeQuery(checkQuery, [migrationFile]);
+    // Execute each migration
+    for (const migrationFile of migrationFiles) {
+      const migrationPath = path.join(migrationsDir, migrationFile);
 
-    if (rows.length > 0) {
-      console.log(`✓ Migration ${migrationFile} already executed`);
-      return;
-    }
+      // Check if migration already executed
+      const checkQuery = dbType === 'postgresql'
+        ? 'SELECT migration_name FROM schema_migrations WHERE migration_name = $1'
+        : 'SELECT migration_name FROM schema_migrations WHERE migration_name = ?';
 
-    // Read and execute migration
-    console.log(`📝 Running migration: ${migrationFile}...`);
-    const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
+      const rows = await executeQuery(checkQuery, [migrationFile]);
 
-    // Split by semicolon and execute each statement
-    const statements = migrationSQL
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
+      if (rows.length > 0) {
+        console.log(`✓ Migration ${migrationFile} already executed`);
+        continue;
+      }
 
-    for (const statement of statements) {
-      try {
-        await executeQuery(statement);
-      } catch (err) {
-        // Ignore "already exists" errors
-        if (!err.message.includes('already exists') &&
-            !err.message.includes('duplicate column') &&
-            !err.message.includes('Duplicate column')) {
-          console.error('Statement error:', err.message);
-          console.error('Statement:', statement.substring(0, 100));
+      // Read and execute migration
+      console.log(`📝 Running migration: ${migrationFile}...`);
+      const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
+
+      // Split by semicolon and execute each statement
+      const statements = migrationSQL
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && !s.startsWith('--'));
+
+      for (const statement of statements) {
+        try {
+          await executeQuery(statement);
+        } catch (err) {
+          // Ignore "already exists" errors
+          if (!err.message.includes('already exists') &&
+              !err.message.includes('duplicate column') &&
+              !err.message.includes('Duplicate column')) {
+            console.error('Statement error:', err.message);
+            console.error('Statement:', statement.substring(0, 100));
+          }
         }
       }
+
+      // Record migration as executed
+      const insertQuery = dbType === 'postgresql'
+        ? 'INSERT INTO schema_migrations (migration_name) VALUES ($1)'
+        : 'INSERT INTO schema_migrations (migration_name) VALUES (?)';
+
+      await executeQuery(insertQuery, [migrationFile]);
+
+      console.log(`✅ Migration ${migrationFile} completed successfully`);
     }
 
-    // Record migration as executed
-    const insertQuery = dbType === 'postgresql'
-      ? 'INSERT INTO schema_migrations (migration_name) VALUES ($1)'
-      : 'INSERT INTO schema_migrations (migration_name) VALUES (?)';
-
-    await executeQuery(insertQuery, [migrationFile]);
-
-    console.log(`✅ Migration ${migrationFile} completed successfully`);
+    console.log('✅ All migrations completed');
   } catch (err) {
     console.error('❌ Migration failed:', err.message);
     throw err;
