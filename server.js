@@ -1476,10 +1476,10 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const rows = await dbQuery(selectQuery, [req.user.id]);
       console.log(`📚 Query returned ${rows.length} rows`);
 
-      // Parse the JSON data from each row and STRIP OUT IMAGES
+      // Parse the JSON data from each row and include ONLY first image as thumbnail
       userStories = rows.map(row => {
         const story = JSON.parse(row.data);
-        // Return only metadata, exclude images to reduce size
+        // Return metadata + first image only (for thumbnail)
         return {
           id: story.id,
           title: story.title,
@@ -1488,8 +1488,11 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           pages: story.pages,
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          // Don't send sceneImages or any base64 data
-          pageCount: story.sceneImages?.length || 0
+          pageCount: story.sceneImages?.length || 0,
+          // Include ONLY first image as thumbnail
+          thumbnail: story.sceneImages && story.sceneImages.length > 0
+            ? story.sceneImages[0].imageData
+            : null
         };
       });
       console.log(`📚 Parsed ${userStories.length} stories (metadata only, images excluded)`);
@@ -1501,7 +1504,7 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       // File mode
       const allStories = await readJSON(STORIES_FILE);
       const fullStories = allStories[req.user.id] || [];
-      // Strip images from file mode too
+      // Include ONLY first image as thumbnail
       userStories = fullStories.map(story => ({
         id: story.id,
         title: story.title,
@@ -1510,9 +1513,12 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
         pages: story.pages,
         language: story.language,
         characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: story.sceneImages?.length || 0
+        pageCount: story.sceneImages?.length || 0,
+        thumbnail: story.sceneImages && story.sceneImages.length > 0
+          ? story.sceneImages[0].imageData
+          : null
       }));
-      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (metadata only)`);
+      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (with thumbnails)`);
     }
 
     console.log(`📚 Returning ${userStories.length} stories (total size: ${JSON.stringify(userStories).length} bytes)`);
@@ -1522,6 +1528,41 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
     console.error('❌ Error fetching stories:', err);
     console.error('Error stack:', err.stack);
     res.status(500).json({ error: 'Failed to fetch stories', details: err.message });
+  }
+});
+
+// Get single story with ALL data (images included)
+app.get('/api/stories/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`📖 GET /api/stories/${id} - User: ${req.user.username}`);
+
+    let story = null;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT data FROM stories WHERE id = $1 AND user_id = $2'
+        : 'SELECT data FROM stories WHERE id = ? AND user_id = ?';
+      const rows = await dbQuery(selectQuery, [id, req.user.id]);
+
+      if (rows.length > 0) {
+        story = JSON.parse(rows[0].data);
+      }
+    } else {
+      const allStories = await readJSON(STORIES_FILE);
+      const userStories = allStories[req.user.id] || [];
+      story = userStories.find(s => s.id === id);
+    }
+
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    console.log(`📖 Returning full story: ${story.title} with ${story.sceneImages?.length || 0} images`);
+    res.json(story);
+  } catch (err) {
+    console.error('❌ Error fetching story:', err);
+    res.status(500).json({ error: 'Failed to fetch story', details: err.message });
   }
 });
 
