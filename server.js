@@ -900,6 +900,139 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
   }
 });
 
+// Get user's saved shipping address
+app.get('/api/user/shipping-address', authenticateToken, async (req, res) => {
+  try {
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const selectQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT shipping_first_name, shipping_last_name, shipping_address_line1, shipping_city, shipping_post_code, shipping_country, shipping_email FROM users WHERE id = $1'
+        : 'SELECT shipping_first_name, shipping_last_name, shipping_address_line1, shipping_city, shipping_post_code, shipping_country, shipping_email FROM users WHERE id = ?';
+      const rows = await dbQuery(selectQuery, [req.user.id]);
+
+      if (rows.length === 0) {
+        return res.json(null);
+      }
+
+      const user = rows[0];
+      if (!user.shipping_first_name) {
+        return res.json(null);
+      }
+
+      res.json({
+        firstName: user.shipping_first_name,
+        lastName: user.shipping_last_name,
+        addressLine1: user.shipping_address_line1,
+        city: user.shipping_city,
+        postCode: user.shipping_post_code,
+        country: user.shipping_country,
+        email: user.shipping_email
+      });
+    } else {
+      // File mode
+      const users = await readJSON(USERS_FILE);
+      const user = users.find(u => u.id === req.user.id);
+
+      if (!user || !user.shippingAddress) {
+        return res.json(null);
+      }
+
+      res.json(user.shippingAddress);
+    }
+  } catch (err) {
+    console.error('Error fetching shipping address:', err);
+    res.status(500).json({ error: 'Failed to fetch shipping address' });
+  }
+});
+
+// Save user's shipping address
+app.put('/api/user/shipping-address', authenticateToken, async (req, res) => {
+  try {
+    const { firstName, lastName, addressLine1, city, postCode, country, email } = req.body;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode
+      const updateQuery = DB_TYPE === 'postgresql'
+        ? 'UPDATE users SET shipping_first_name = $1, shipping_last_name = $2, shipping_address_line1 = $3, shipping_city = $4, shipping_post_code = $5, shipping_country = $6, shipping_email = $7 WHERE id = $8'
+        : 'UPDATE users SET shipping_first_name = ?, shipping_last_name = ?, shipping_address_line1 = ?, shipping_city = ?, shipping_post_code = ?, shipping_country = ?, shipping_email = ? WHERE id = ?';
+      await dbQuery(updateQuery, [firstName, lastName, addressLine1, city, postCode, country, email, req.user.id]);
+
+      await logActivity(req.user.id, req.user.username, 'SHIPPING_ADDRESS_SAVED', { country });
+      res.json({ success: true });
+    } else {
+      // File mode
+      const users = await readJSON(USERS_FILE);
+      const user = users.find(u => u.id === req.user.id);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      user.shippingAddress = { firstName, lastName, addressLine1, city, postCode, country, email };
+      await writeJSON(USERS_FILE, users);
+
+      await logActivity(req.user.id, req.user.username, 'SHIPPING_ADDRESS_SAVED', { country });
+      res.json({ success: true });
+    }
+  } catch (err) {
+    console.error('Error saving shipping address:', err);
+    res.status(500).json({ error: 'Failed to save shipping address' });
+  }
+});
+
+// Update user's email address
+app.put('/api/user/update-email', authenticateToken, async (req, res) => {
+  try {
+    const { newEmail } = req.body;
+
+    if (!newEmail || !newEmail.includes('@')) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Database mode - check if email already exists
+      const checkQuery = DB_TYPE === 'postgresql'
+        ? 'SELECT id FROM users WHERE username = $1 AND id != $2'
+        : 'SELECT id FROM users WHERE username = ? AND id != ?';
+      const existing = await dbQuery(checkQuery, [newEmail, req.user.id]);
+
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Email already in use' });
+      }
+
+      const updateQuery = DB_TYPE === 'postgresql'
+        ? 'UPDATE users SET username = $1 WHERE id = $2'
+        : 'UPDATE users SET username = ? WHERE id = ?';
+      await dbQuery(updateQuery, [newEmail, req.user.id]);
+
+      await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
+      res.json({ success: true, username: newEmail });
+    } else {
+      // File mode
+      const users = await readJSON(USERS_FILE);
+      const existing = users.find(u => u.username === newEmail && u.id !== req.user.id);
+
+      if (existing) {
+        return res.status(400).json({ error: 'Email already in use' });
+      }
+
+      const user = users.find(u => u.id === req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      user.username = newEmail;
+      await writeJSON(USERS_FILE, users);
+
+      await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
+      res.json({ success: true, username: newEmail });
+    }
+  } catch (err) {
+    console.error('Error updating email:', err);
+    res.status(500).json({ error: 'Failed to update email' });
+  }
+});
+
 // Character management endpoints
 app.get('/api/characters', authenticateToken, async (req, res) => {
   try {
