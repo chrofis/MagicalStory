@@ -647,6 +647,8 @@
       const [currentUser, setCurrentUser] = useState(null);
       const [authToken, setAuthToken] = useState(null);
       const [userQuota, setUserQuota] = useState(null);
+      const [storyQuota, setStoryQuota] = useState(2);
+      const [storiesGenerated, setStoriesGenerated] = useState(0);
       const [showAuthModal, setShowAuthModal] = useState(false);
       const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
       const [authForm, setAuthForm] = useState({ username: '', password: '', email: '' });
@@ -808,8 +810,9 @@
           })
           .then(res => res.ok ? res.json() : [])
           .then(chars => {
-            console.log('👥 Auto-login characters loaded:', chars.length);
-            setCharacters(chars);
+            const charArray = Array.isArray(chars) ? chars : [];
+            console.log('👥 Auto-login characters loaded:', charArray.length, charArray);
+            setCharacters(charArray);
           })
           .catch(err => console.error('Error loading characters:', err));
 
