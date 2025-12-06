@@ -835,25 +835,46 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
 // Character management endpoints
 app.get('/api/characters', authenticateToken, async (req, res) => {
   try {
-    let userCharacters = [];
+    let characterData = {
+      characters: [],
+      relationships: {},
+      relationshipTexts: {},
+      customRelationships: []
+    };
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
       const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT data FROM characters WHERE user_id = $1'
-        : 'SELECT data FROM characters WHERE user_id = ?';
+        ? 'SELECT data FROM characters WHERE user_id = $1 ORDER BY id DESC LIMIT 1'
+        : 'SELECT data FROM characters WHERE user_id = ? ORDER BY id DESC LIMIT 1';
       const rows = await dbQuery(selectQuery, [req.user.id]);
 
-      // Parse the JSON data from each row
-      userCharacters = rows.map(row => JSON.parse(row.data));
+      if (rows.length > 0) {
+        const data = JSON.parse(rows[0].data);
+        // Handle both old format (array) and new format (object)
+        if (Array.isArray(data)) {
+          characterData.characters = data;
+        } else {
+          characterData = data;
+        }
+      }
     } else {
       // File mode
       const allCharacters = await readJSON(CHARACTERS_FILE);
-      userCharacters = allCharacters[req.user.id] || [];
+      const data = allCharacters[req.user.id];
+
+      if (data) {
+        // Handle both old format (array) and new format (object)
+        if (Array.isArray(data)) {
+          characterData.characters = data;
+        } else {
+          characterData = data;
+        }
+      }
     }
 
-    await logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: userCharacters.length });
-    res.json(userCharacters);
+    await logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: characterData.characters.length });
+    res.json(characterData);
   } catch (err) {
     console.error('Error fetching characters:', err);
     res.status(500).json({ error: 'Failed to fetch characters' });
@@ -862,7 +883,15 @@ app.get('/api/characters', authenticateToken, async (req, res) => {
 
 app.post('/api/characters', authenticateToken, async (req, res) => {
   try {
-    const { characters } = req.body;
+    const { characters, relationships, relationshipTexts, customRelationships } = req.body;
+
+    // Store character data as an object with all related information
+    const characterData = {
+      characters: characters || [],
+      relationships: relationships || {},
+      relationshipTexts: relationshipTexts || {},
+      customRelationships: customRelationships || []
+    };
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode - delete old characters and insert new ones
@@ -871,18 +900,16 @@ app.post('/api/characters', authenticateToken, async (req, res) => {
         : 'DELETE FROM characters WHERE user_id = ?';
       await dbQuery(deleteQuery, [req.user.id]);
 
-      // Insert each character
-      for (const character of characters) {
-        const characterId = character.id || Date.now().toString() + Math.random();
-        const insertQuery = DB_TYPE === 'postgresql'
-          ? 'INSERT INTO characters (id, user_id, data) VALUES ($1, $2, $3)'
-          : 'INSERT INTO characters (id, user_id, data) VALUES (?, ?, ?)';
-        await dbQuery(insertQuery, [characterId, req.user.id, JSON.stringify(character)]);
-      }
+      // Insert character data as a single record with all information
+      const characterId = `characters_${req.user.id}_${Date.now()}`;
+      const insertQuery = DB_TYPE === 'postgresql'
+        ? 'INSERT INTO characters (id, user_id, data) VALUES ($1, $2, $3)'
+        : 'INSERT INTO characters (id, user_id, data) VALUES (?, ?, ?)';
+      await dbQuery(insertQuery, [characterId, req.user.id, JSON.stringify(characterData)]);
     } else {
-      // File mode
+      // File mode - save all character data as an object
       const allCharacters = await readJSON(CHARACTERS_FILE);
-      allCharacters[req.user.id] = characters;
+      allCharacters[req.user.id] = characterData;
       await writeJSON(CHARACTERS_FILE, allCharacters);
     }
 
