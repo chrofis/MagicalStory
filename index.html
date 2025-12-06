@@ -764,11 +764,50 @@
         });
 
         if (savedToken && savedUser) {
+          const user = JSON.parse(savedUser);
           setAuthToken(savedToken);
-          setCurrentUser(JSON.parse(savedUser));
+          setCurrentUser(user);
           setIsAuthenticated(true);
           setStep(1); // Go to step 1 if already logged in
           console.log('✅ Auto-login successful');
+
+          // Load stories immediately after authentication
+          console.log('🔄 Loading stories on auto-login...');
+          fetch(`${API_URL}/api/stories`, {
+            headers: { 'Authorization': `Bearer ${savedToken}` }
+          })
+          .then(res => res.ok ? res.json() : [])
+          .then(stories => {
+            console.log('📚 Auto-login stories loaded:', stories.length);
+            setSavedStories(stories);
+          })
+          .catch(err => {
+            console.error('❌ Error loading stories on auto-login:', err);
+          });
+
+          // Load characters
+          fetch(`${API_URL}/api/characters`, {
+            headers: { 'Authorization': `Bearer ${savedToken}` }
+          })
+          .then(res => res.ok ? res.json() : [])
+          .then(chars => {
+            console.log('👥 Auto-login characters loaded:', chars.length);
+            setCharacters(chars);
+          })
+          .catch(err => console.error('Error loading characters:', err));
+
+          // Load quota
+          fetch(`${API_URL}/api/user/quota`, {
+            headers: { 'Authorization': `Bearer ${savedToken}` }
+          })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data) {
+              setStoryQuota(data.quota);
+              setStoriesGenerated(data.generated);
+            }
+          })
+          .catch(err => console.error('Error loading quota:', err));
         } else {
           console.log('❌ No saved auth found');
         }
