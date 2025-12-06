@@ -2883,9 +2883,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           });
 
           if (!response.ok) {
-            console.error('Photo analysis failed');
             const errorData = await response.json();
-            console.error('Error details:', errorData);
+
+            // If Python service is unavailable, fall back to Gemini analysis
+            if (errorData.fallback || response.status === 503) {
+              console.warn('⚠️  DeepFace unavailable, falling back to Gemini analysis');
+              return await analyzeImageForTraitsGemini(imageData);
+            }
+
+            console.error('Photo analysis failed:', errorData);
             return null;
           }
 
@@ -2918,7 +2924,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           return null;
         } catch (error) {
           console.error('Error analyzing image:', error);
-          return null;
+          // Fall back to Gemini on any error
+          console.warn('⚠️  DeepFace error, falling back to Gemini analysis');
+          try {
+            return await analyzeImageForTraitsGemini(imageData);
+          } catch (fallbackError) {
+            console.error('Gemini fallback also failed:', fallbackError);
+            return null;
+          }
         }
       };
 
