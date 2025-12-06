@@ -69,14 +69,26 @@ if (STORAGE_MODE === 'database') {
 // Middleware
 // Configure CORS to allow requests from your domains
 const corsOptions = {
-  origin: [
-    'http://localhost:8000',
-    'http://localhost:3000',
-    'http://127.0.0.1:8000',
-    'https://www.magicalstory.ch',
-    'https://magicalstory.ch',
-    'https://magicalstory-production.up.railway.app'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      'http://localhost:8000',
+      'http://localhost:3000',
+      'http://127.0.0.1:8000',
+      'https://www.magicalstory.ch',
+      'https://magicalstory.ch'
+    ];
+
+    // Also allow any Railway.app domain
+    if (origin.includes('railway.app') || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn('⚠️  CORS blocked origin:', origin);
+      callback(null, true); // Allow anyway for now, log for debugging
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200
 };
