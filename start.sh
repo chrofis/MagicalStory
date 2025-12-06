@@ -2,7 +2,7 @@
 set -e
 
 echo "Starting Python photo analyzer service..."
-python photo_analyzer.py &
+python3 photo_analyzer.py &
 PYTHON_PID=$!
 
 echo "Waiting for Python service to start..."
