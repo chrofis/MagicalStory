@@ -1736,35 +1736,57 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
     }
 
     // Call Python photo analyzer service
-    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://localhost:5000';
+    // Use 127.0.0.1 instead of localhost to avoid IPv6 issues
+    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 
-    const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ image: imageData })
-    });
-
-    const analyzerData = await analyzerResponse.json();
-
-    if (!analyzerResponse.ok || !analyzerData.success) {
-      return res.status(500).json({
-        error: 'Photo analysis failed',
-        details: analyzerData.error || 'Unknown error'
+    try {
+      const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ image: imageData }),
+        signal: AbortSignal.timeout(30000) // 30 second timeout
       });
+
+      const analyzerData = await analyzerResponse.json();
+
+      if (!analyzerResponse.ok || !analyzerData.success) {
+        return res.status(500).json({
+          error: 'Photo analysis failed',
+          details: analyzerData.error || 'Unknown error'
+        });
+      }
+
+      await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
+        age: analyzerData.attributes?.age,
+        gender: analyzerData.attributes?.gender
+      });
+
+      res.json(analyzerData);
+
+    } catch (fetchErr) {
+      console.error('Python photo analyzer service unavailable:', fetchErr.message);
+
+      // Return a helpful error when Python service is down
+      if (fetchErr.cause?.code === 'ECONNREFUSED') {
+        return res.status(503).json({
+          error: 'Photo analysis service unavailable',
+          details: 'The photo analysis service is not running. Please contact support.',
+          fallback: true
+        });
+      }
+
+      throw fetchErr; // Re-throw other errors to outer catch
     }
-
-    await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
-      age: analyzerData.attributes?.age,
-      gender: analyzerData.attributes?.gender
-    });
-
-    res.json(analyzerData);
 
   } catch (err) {
     console.error('Error analyzing photo:', err);
-    res.status(500).json({ error: 'Failed to analyze photo', details: err.message });
+    res.status(500).json({
+      error: 'Failed to analyze photo',
+      details: err.message,
+      fallback: true
+    });
   }
 });
 
