@@ -1,7 +1,7 @@
--- Migration: Add shipping address and quota columns to users table
+-- Migration: Add shipping address and quota columns to users table (MySQL)
 -- Date: 2025-12-06
 
--- Add shipping address columns
+-- Add shipping address columns to users table
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS shipping_first_name VARCHAR(255),
 ADD COLUMN IF NOT EXISTS shipping_last_name VARCHAR(255),
@@ -19,3 +19,8 @@ ADD COLUMN IF NOT EXISTS stories_generated INT DEFAULT 0;
 -- Add role column for admin users (if it doesn't exist)
 ALTER TABLE users
 ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user';
+
+-- Fix stories table: Add data column for JSON storage
+-- The code expects a 'data' JSON column, but schema has individual columns
+ALTER TABLE stories
+ADD COLUMN IF NOT EXISTS data JSON;
