@@ -4738,15 +4738,27 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           </button>
                         </div>
                         {char.photoUrl && (
-                          <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full mx-auto mb-1 object-cover" />
+                          <img src={char.photoUrl} alt={char.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover border-2 border-purple-200" />
                         )}
-                        <h4 className="font-bold text-center mb-1 text-xs">{char.name}</h4>
-                        <p className="text-[10px] text-gray-600 text-center mb-0.5">
+                        <h4 className="font-bold text-center mb-1 text-sm">{char.name}</h4>
+                        <p className="text-xs text-gray-600 text-center mb-2">
                           {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
                         </p>
-                        <p className="text-[10px] text-gray-600">
-                          <strong>{t.strengths}:</strong> {char.strengths ? char.strengths.slice(0, 2).join(', ') : 'None'}
-                        </p>
+                        {char.strengths && char.strengths.length > 0 && (
+                          <p className="text-[10px] text-gray-700 mb-1">
+                            <strong className="text-green-600">{t.strengths}:</strong> {char.strengths.join(', ')}
+                          </p>
+                        )}
+                        {char.weaknesses && char.weaknesses.length > 0 && (
+                          <p className="text-[10px] text-gray-700 mb-1">
+                            <strong className="text-orange-600">{t.weaknesses}:</strong> {char.weaknesses.join(', ')}
+                          </p>
+                        )}
+                        {char.fears && char.fears.length > 0 && (
+                          <p className="text-[10px] text-gray-700 mb-1">
+                            <strong className="text-red-600">{t.fears}:</strong> {char.fears.join(', ')}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
