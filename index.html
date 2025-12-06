@@ -859,13 +859,15 @@
         }
       }, [authToken, isAuthenticated]);
 
-      // Also load stories when user opens the stories modal (as a fallback)
+      // Always load stories when user opens the stories modal
       useEffect(() => {
-        if (showSavedStories && authToken && savedStories.length === 0) {
-          console.log('📖 Reloading stories when opening modal...');
+        if (showSavedStories && authToken) {
+          console.log('📖 Refreshing stories when opening modal...');
           loadStories().then(stories => {
-            console.log('📚 Reloaded stories:', stories.length);
+            console.log('📚 Stories refreshed:', stories.length, stories);
             setSavedStories(stories);
+          }).catch(err => {
+            console.error('❌ Error refreshing stories:', err);
           });
         }
       }, [showSavedStories]);
@@ -6649,12 +6651,27 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <Icon name="book-open" size={32} />
                     My Saved Stories
                   </h2>
-                  <button
-                    onClick={() => setShowSavedStories(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <Icon name="x" size={24} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        console.log('🔄 Manual refresh of stories...');
+                        const stories = await loadStories();
+                        console.log('✅ Refreshed stories:', stories.length);
+                        setSavedStories(stories);
+                      }}
+                      className="text-blue-500 hover:text-blue-700 flex items-center gap-1 px-3 py-1 rounded hover:bg-blue-50"
+                      title="Refresh stories"
+                    >
+                      <Icon name="refresh-cw" size={20} />
+                      <span className="text-sm">Refresh</span>
+                    </button>
+                    <button
+                      onClick={() => setShowSavedStories(false)}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <Icon name="x" size={24} />
+                    </button>
+                  </div>
                 </div>
 
                 {savedStories.length === 0 ? (
