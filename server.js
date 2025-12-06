@@ -1781,18 +1781,32 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
     }
 
     const catalogsData = await catalogsResponse.json();
+    console.log('📁 Gelato catalogs RAW response:', JSON.stringify(catalogsData).substring(0, 500));
+
+    // Try different possible response structures
+    const catalogs = catalogsData.catalogs || catalogsData.data || catalogsData.results || catalogsData || [];
+    const catalogArray = Array.isArray(catalogs) ? catalogs : (catalogs.items || []);
+
     console.log('📁 Gelato catalogs:', {
-      count: catalogsData.catalogs?.length || 0,
-      catalogUids: catalogsData.catalogs?.map(c => c.uid) || []
+      count: catalogArray.length,
+      catalogUids: catalogArray.slice(0, 5).map(c => c?.uid || c?.id || c?.catalogUid || 'unknown'),
+      firstCatalog: catalogArray[0] || null
     });
 
     // Step 2: Search for photobooks in each catalog
     let allPhotobooks = [];
 
-    for (const catalog of catalogsData.catalogs || []) {
+    for (const catalog of catalogArray) {
+      const catalogUid = catalog.uid || catalog.id || catalog.catalogUid;
+      if (!catalogUid) {
+        console.log('⚠️  Skipping catalog with no UID:', catalog);
+        continue;
+      }
+
       try {
+        console.log(`🔍 Searching catalog: ${catalogUid}`);
         // Search for products in this catalog
-        const searchResponse = await fetch(`https://product.gelatoapis.com/v3/catalogs/${catalog.uid}/products:search`, {
+        const searchResponse = await fetch(`https://product.gelatoapis.com/v3/catalogs/${catalogUid}/products:search`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1844,7 +1858,7 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
       success: true,
       count: uniquePhotobooks.length,
       products: uniquePhotobooks,
-      catalogsSearched: catalogsData.catalogs?.length || 0
+      catalogsSearched: catalogArray.length
     });
 
   } catch (err) {
@@ -2565,7 +2579,18 @@ initialize().then(() => {
     console.log(`📍 URL: http://localhost:${PORT}`);
     console.log(`💾 Storage: ${STORAGE_MODE.toUpperCase()}`);
     if (STORAGE_MODE === 'database') {
-      console.log(`🗄️  Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
+      if (DB_TYPE === 'postgresql') {
+        // Parse DATABASE_URL to show host and database name
+        try {
+          const url = new URL(DATABASE_URL);
+          const dbName = url.pathname.slice(1); // Remove leading /
+          console.log(`🗄️  Database: ${url.hostname}/${dbName} (PostgreSQL)`);
+        } catch (err) {
+          console.log(`🗄️  Database: PostgreSQL (Railway)`);
+        }
+      } else {
+        console.log(`🗄️  Database: ${process.env.DB_HOST}/${process.env.DB_NAME} (MySQL)`);
+      }
     } else {
       console.log(`📝 Logs: data/logs.json`);
       console.log(`👥 Users: data/users.json`);
