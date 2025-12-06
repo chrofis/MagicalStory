@@ -1476,9 +1476,23 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const rows = await dbQuery(selectQuery, [req.user.id]);
       console.log(`📚 Query returned ${rows.length} rows`);
 
-      // Parse the JSON data from each row
-      userStories = rows.map(row => JSON.parse(row.data));
-      console.log(`📚 Parsed ${userStories.length} stories`);
+      // Parse the JSON data from each row and STRIP OUT IMAGES
+      userStories = rows.map(row => {
+        const story = JSON.parse(row.data);
+        // Return only metadata, exclude images to reduce size
+        return {
+          id: story.id,
+          title: story.title,
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          pages: story.pages,
+          language: story.language,
+          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+          // Don't send sceneImages or any base64 data
+          pageCount: story.sceneImages?.length || 0
+        };
+      });
+      console.log(`📚 Parsed ${userStories.length} stories (metadata only, images excluded)`);
 
       if (userStories.length > 0) {
         console.log(`📚 First story: ${userStories[0].title} (ID: ${userStories[0].id})`);
@@ -1486,11 +1500,22 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
     } else {
       // File mode
       const allStories = await readJSON(STORIES_FILE);
-      userStories = allStories[req.user.id] || [];
-      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id}`);
+      const fullStories = allStories[req.user.id] || [];
+      // Strip images from file mode too
+      userStories = fullStories.map(story => ({
+        id: story.id,
+        title: story.title,
+        createdAt: story.createdAt,
+        updatedAt: story.updatedAt,
+        pages: story.pages,
+        language: story.language,
+        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+        pageCount: story.sceneImages?.length || 0
+      }));
+      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (metadata only)`);
     }
 
-    console.log(`📚 Returning ${userStories.length} stories to client`);
+    console.log(`📚 Returning ${userStories.length} stories (total size: ${JSON.stringify(userStories).length} bytes)`);
     await logActivity(req.user.id, req.user.username, 'STORIES_LOADED', { count: userStories.length });
     res.json(userStories);
   } catch (err) {
