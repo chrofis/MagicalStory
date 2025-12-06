@@ -6811,15 +6811,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           </p>
                         </div>
 
-                        {story.sceneImages && story.sceneImages[0]?.imageData && (
-                          <div className="mb-4 rounded-lg overflow-hidden">
-                            <img
-                              src={story.sceneImages[0].imageData}
-                              alt="Story preview"
-                              className="w-full h-32 object-cover"
-                            />
+                        {/* Thumbnail placeholder based on story title */}
+                        <div className="mb-4 rounded-lg overflow-hidden bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 flex items-center justify-center h-32">
+                          <div className="text-white text-6xl font-bold opacity-90">
+                            {story.title ? story.title.charAt(0).toUpperCase() : '📖'}
                           </div>
-                        )}
+                        </div>
 
                         <button
                           onClick={async () => {
