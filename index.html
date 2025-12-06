@@ -653,6 +653,7 @@
       const [authError, setAuthError] = useState('');
       const [characters, setCharacters] = useState([]);
       const [currentCharacter, setCurrentCharacter] = useState(null);
+      const [characterBackup, setCharacterBackup] = useState(null); // Backup for cancel/language change
       const [showCharacterCreated, setShowCharacterCreated] = useState(false);
       const [customStrengths, setCustomStrengths] = useState([]);
       const [customWeaknesses, setCustomWeaknesses] = useState([]);
@@ -4097,6 +4098,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       };
 
       const editCharacter = (char) => {
+        // Store backup before editing
+        setCharacterBackup(JSON.parse(JSON.stringify(char))); // Deep copy
         setCurrentCharacter(char);
         setCharacters(characters.filter(c => c.id !== char.id));
         setShowCharacterCreated(false);
@@ -4108,6 +4111,18 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             characterFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         }, 100);
+      };
+
+      const cancelEditCharacter = () => {
+        if (characterBackup) {
+          // Restore the backup
+          setCharacters([...characters, characterBackup]);
+          setCharacterBackup(null);
+        }
+        setCurrentCharacter(null);
+        setShowCharacterCreated(false);
+        setGeneratedAvatar(null);
+        setGeneratedAvatars([]);
       };
 
       const deleteCharacter = (charId) => {
@@ -4139,6 +4154,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           setShowCharacterCreated(true);
           setCurrentCharacter(null);
+          setCharacterBackup(null); // Clear backup after successful save
 
           // Scroll to top of page
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -5043,10 +5059,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 <div className="flex gap-4">
                   <button
-                    onClick={() => {
-                      setCurrentCharacter(null);
-                      setShowCharacterCreated(false);
-                    }}
+                    onClick={cancelEditCharacter}
                     className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 font-semibold"
                   >
                     {t.cancel}

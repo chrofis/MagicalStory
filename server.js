@@ -1756,15 +1756,33 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
 
     const data = await response.json();
 
-    // Filter for photobooks only
-    const photobooks = (data.products || []).filter(product =>
-      product.productUid && product.productUid.includes('photobook')
-    );
+    console.log('📦 Gelato API response:', {
+      totalProducts: data.products?.length || 0,
+      sampleProduct: data.products?.[0] || null
+    });
+
+    // Filter for photobooks only - check multiple possible fields and patterns
+    const photobooks = (data.products || []).filter(product => {
+      const uid = product.productUid || product.uid || product.id || '';
+      const name = product.name || product.productName || '';
+      const category = product.category || product.productCategory || '';
+
+      // Check if it's a photobook in any of these fields
+      return (
+        uid.toLowerCase().includes('photobook') ||
+        name.toLowerCase().includes('photobook') ||
+        name.toLowerCase().includes('photo book') ||
+        category.toLowerCase().includes('photobook')
+      );
+    });
+
+    console.log('📚 Filtered photobooks:', photobooks.length);
 
     res.json({
       success: true,
       count: photobooks.length,
-      products: photobooks
+      products: photobooks,
+      totalFetched: data.products?.length || 0
     });
 
   } catch (err) {
