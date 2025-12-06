@@ -3531,9 +3531,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
     <meta charset="UTF-8">
     <title>${storyTitle}</title>
     <style>
-      /* PDF/X compatible settings */
+      /* PDF/X compatible settings - optimized for photobook printing */
       @page {
-        size: A4;
+        size: 210mm 210mm; /* Square format 21x21cm for photobook */
         margin: 0;
       }
       @media print {
@@ -3542,40 +3542,56 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
-        font-family: Georgia, serif;
-        font-size: 16pt;
-        line-height: 1.8;
+        font-family: 'Georgia', 'Times New Roman', serif;
+        font-size: 14pt;
+        line-height: 1.6;
+        background: white;
       }
-      /* Text page - centered vertically and horizontally */
+      /* Text page - LEFT PAGE in book spread */
       .text-page {
-        width: 100vw;
-        height: 100vh;
+        width: 210mm;
+        height: 210mm;
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 3cm;
+        padding: 20mm;
         page-break-after: always;
+        background: #fffef8; /* Slight cream color for text pages */
       }
       .story-text {
         text-align: center;
         white-space: pre-wrap;
-        max-width: 80%;
+        max-width: 100%;
+        font-size: 14pt;
+        line-height: 1.8;
+        color: #333;
       }
-      /* Image page - full page, centered */
+      /* Image page - RIGHT PAGE in book spread */
       .image-page {
-        width: 100vw;
-        height: 100vh;
+        width: 210mm;
+        height: 210mm;
         display: flex;
         justify-content: center;
         align-items: center;
         background: white;
         page-break-after: always;
+        padding: 10mm;
       }
       .image-page img {
         width: 100%;
         height: 100%;
         object-fit: contain;
+        border-radius: 8px;
       }
+      /* Page numbers */
+      .page-number {
+        position: absolute;
+        bottom: 10mm;
+        font-size: 10pt;
+        color: #999;
+      }
+      .text-page .page-number { left: 10mm; }
+      .image-page .page-number { right: 10mm; }
     </style>
   </head>
   <body>`;
