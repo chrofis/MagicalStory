@@ -879,6 +879,77 @@
         }
       }, [showAdminPanel]);
 
+      // Track previous language for translation
+      const prevLanguageRef = React.useRef(language);
+
+      // Translate character data when language changes
+      useEffect(() => {
+        const prevLang = prevLanguageRef.current;
+
+        if (prevLang && prevLang !== language) {
+          console.log(`🌐 Language changed from ${prevLang} to ${language}, translating character data...`);
+
+          // Helper to translate relationship value
+          const translateRelationship = (relValue) => {
+            if (!relValue) return relValue;
+
+            // Find matching relationship type
+            for (const relType of relationshipTypes) {
+              if (relType.value[prevLang] === relValue) {
+                return relType.value[language];
+              }
+              if (relType.inverse[prevLang] === relValue) {
+                return relType.inverse[language];
+              }
+            }
+            // Custom relationship - keep as is
+            return relValue;
+          };
+
+          // Translate current character being edited
+          if (currentCharacter) {
+            setCurrentCharacter(prev => ({
+              ...prev,
+              strengths: translateArray(prev.strengths || [], prevLang, language, defaultStrengths),
+              weaknesses: translateArray(prev.weaknesses || [], prevLang, language, defaultWeaknesses),
+              fears: translateArray(prev.fears || [], prevLang, language, fearOptions)
+            }));
+          }
+
+          // Translate character backup if exists
+          if (characterBackup) {
+            setCharacterBackup(prev => ({
+              ...prev,
+              strengths: translateArray(prev.strengths || [], prevLang, language, defaultStrengths),
+              weaknesses: translateArray(prev.weaknesses || [], prevLang, language, defaultWeaknesses),
+              fears: translateArray(prev.fears || [], prevLang, language, fearOptions)
+            }));
+          }
+
+          // Translate all existing characters
+          if (characters.length > 0) {
+            setCharacters(prevChars => prevChars.map(char => ({
+              ...char,
+              strengths: translateArray(char.strengths || [], prevLang, language, defaultStrengths),
+              weaknesses: translateArray(char.weaknesses || [], prevLang, language, defaultWeaknesses),
+              fears: translateArray(char.fears || [], prevLang, language, fearOptions)
+            })));
+          }
+
+          // Translate relationships
+          if (Object.keys(relationships).length > 0) {
+            const translatedRelationships = {};
+            for (const [key, value] of Object.entries(relationships)) {
+              translatedRelationships[key] = translateRelationship(value);
+            }
+            setRelationships(translatedRelationships);
+          }
+        }
+
+        // Update previous language ref
+        prevLanguageRef.current = language;
+      }, [language]);
+
       // Initialize character when entering step 2
       useEffect(() => {
         console.log('📍 Step changed:', {
@@ -933,6 +1004,31 @@
         value: { en: rel, de: rel, fr: rel },
         inverse: { en: rel, de: rel, fr: rel }
       }))];
+
+      // Helper function to translate values between languages
+      const translateValue = (value, fromLang, toLang, options) => {
+        if (!value || !fromLang || !toLang || fromLang === toLang) return value;
+
+        // Try to find the value in the source language array
+        const sourceArray = options[fromLang];
+        const targetArray = options[toLang];
+
+        if (!sourceArray || !targetArray) return value;
+
+        const index = sourceArray.indexOf(value);
+        if (index !== -1 && index < targetArray.length) {
+          return targetArray[index];
+        }
+
+        // If not found in predefined options, keep original (custom value)
+        return value;
+      };
+
+      // Helper to translate array of values
+      const translateArray = (values, fromLang, toLang, options) => {
+        if (!values || !Array.isArray(values)) return [];
+        return values.map(val => translateValue(val, fromLang, toLang, options));
+      };
       const allStoryTypes = [...storyTypes, ...customStoryTypes];
 
       const detectGender = (name) => {
