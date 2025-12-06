@@ -1548,14 +1548,25 @@
           if (response.ok) {
             const data = await response.json();
             console.log('👥 Characters API response:', data);
+
+            // Normalize characters - ensure all fields exist with defaults
+            const normalizeCharacter = (char) => ({
+              ...char,
+              specialDetails: char.specialDetails || '',
+              strengths: char.strengths || [],
+              weaknesses: char.weaknesses || [],
+              fears: char.fears || [],
+              photoUrl: char.photoUrl || null
+            });
+
             // Handle both old format (array) and new format (object with characters and relationships)
             if (Array.isArray(data)) {
               console.log('👥 Setting characters (array format):', data.length, data);
-              setCharacters(data);
+              setCharacters(data.map(normalizeCharacter));
             } else {
               console.log('👥 Setting characters (object format):', data.characters?.length, data.characters);
               console.log('👥 First character details:', data.characters?.[0]);
-              setCharacters(data.characters || []);
+              setCharacters((data.characters || []).map(normalizeCharacter));
               if (data.relationships) {
                 setRelationships(data.relationships);
               }
