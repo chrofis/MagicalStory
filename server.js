@@ -343,6 +343,16 @@ async function initializeDatabase() {
     }
 
     console.log('✓ Database tables initialized');
+
+    // Run database migrations
+    try {
+      const { runMigrations } = require('./run-migrations');
+      await runMigrations(dbPool, DB_TYPE);
+    } catch (err) {
+      console.error('⚠️  Migration warning:', err.message);
+      // Don't fail initialization if migrations fail
+    }
+
   } catch (err) {
     console.error('❌ Database initialization error:', err.message);
     console.error('Error code:', err.code);
