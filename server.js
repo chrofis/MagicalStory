@@ -1583,6 +1583,48 @@ app.get('/api/gelato/products', async (req, res) => {
   }
 });
 
+// Photo Analysis Endpoint (calls Python DeepFace service)
+app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
+  try {
+    const { imageData } = req.body;
+
+    if (!imageData) {
+      return res.status(400).json({ error: 'Missing imageData' });
+    }
+
+    // Call Python photo analyzer service
+    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://localhost:5000';
+
+    const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ image: imageData })
+    });
+
+    const analyzerData = await analyzerResponse.json();
+
+    if (!analyzerResponse.ok || !analyzerData.success) {
+      return res.status(500).json({
+        error: 'Photo analysis failed',
+        details: analyzerData.error || 'Unknown error'
+      });
+    }
+
+    await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
+      age: analyzerData.attributes?.age,
+      gender: analyzerData.attributes?.gender
+    });
+
+    res.json(analyzerData);
+
+  } catch (err) {
+    console.error('Error analyzing photo:', err);
+    res.status(500).json({ error: 'Failed to analyze photo', details: err.message });
+  }
+});
+
 // File Management Endpoints
 
 // Upload file (image or PDF)

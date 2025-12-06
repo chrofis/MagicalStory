@@ -720,6 +720,7 @@
       const [characterConsistencyGuide, setCharacterConsistencyGuide] = useState(''); // Text guide for image prompts
       const [baseCharacterImages, setBaseCharacterImages] = useState({}); // Map of character ID -> cartoon base64
       const [isGeneratingCartoons, setIsGeneratingCartoons] = useState(false);
+      const [currentStoryId, setCurrentStoryId] = useState(null); // Track current story ID for print orders
 
       const characterFormRef = React.useRef(null);
 
@@ -2198,6 +2199,8 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
           const savedId = await saveStory(storyToSave);
           if (savedId) {
+            // Store the current story ID for print orders
+            setCurrentStoryId(savedId);
             // Reload saved stories
             const updatedStories = await loadStories();
             setSavedStories(updatedStories);
@@ -2853,6 +2856,63 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       };
 
       const analyzeImageForTraits = async (imageData) => {
+        try {
+          console.log('🔍 Analyzing photo with DeepFace...');
+
+          // Call Python photo analyzer service via Node.js backend
+          const response = await fetch(`${API_URL}/api/analyze-photo`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+              imageData: imageData
+            })
+          });
+
+          if (!response.ok) {
+            console.error('Photo analysis failed');
+            const errorData = await response.json();
+            console.error('Error details:', errorData);
+            return null;
+          }
+
+          const data = await response.json();
+
+          if (data.success && data.attributes) {
+            console.log('✓ Photo analyzed:', data.attributes);
+
+            // Update character photo with cropped version
+            if (data.cropped_image) {
+              setCurrentCharacter(prev => ({
+                ...prev,
+                photoUrl: data.cropped_image
+              }));
+            }
+
+            // Return extracted traits
+            return {
+              age: data.attributes.age,
+              height: data.attributes.height,
+              build: data.attributes.build,
+              gender: data.attributes.gender,
+              hairColor: '',  // DeepFace doesn't extract this
+              clothing: '',   // DeepFace doesn't extract this
+              otherFeatures: `Face detected at (${data.face_region.x}, ${data.face_region.y})`,
+              fullText: `Age: ${data.attributes.age}, Gender: ${data.attributes.gender}, Height: ${data.attributes.height}cm, Build: ${data.attributes.build}`
+            };
+          }
+
+          return null;
+        } catch (error) {
+          console.error('Error analyzing image:', error);
+          return null;
+        }
+      };
+
+      // Fallback: Old Gemini-based analysis (if DeepFace unavailable)
+      const analyzeImageForTraitsGemini = async (imageData) => {
         try {
           const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
           const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
@@ -3710,6 +3770,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               if (traits) {
                 setCurrentCharacter(prev => ({
                   ...prev,
+                  gender: traits.gender || prev.gender,  // DeepFace extracts gender
                   age: traits.age || prev.age,
                   height: traits.height || prev.height,
                   build: traits.build || prev.build,
@@ -5863,6 +5924,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         <button
                           onClick={() => {
                             // Load the story
+                            setCurrentStoryId(story.id); // Set story ID for print orders
                             setStoryType(story.storyType);
                             setArtStyle(story.artStyle);
                             setPages(story.pages);
