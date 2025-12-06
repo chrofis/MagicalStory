@@ -721,6 +721,17 @@
       const [baseCharacterImages, setBaseCharacterImages] = useState({}); // Map of character ID -> cartoon base64
       const [isGeneratingCartoons, setIsGeneratingCartoons] = useState(false);
       const [currentStoryId, setCurrentStoryId] = useState(null); // Track current story ID for print orders
+      const [showShippingModal, setShowShippingModal] = useState(false);
+      const [shippingForm, setShippingForm] = useState({
+        firstName: '',
+        lastName: '',
+        addressLine1: '',
+        city: '',
+        postCode: '',
+        country: '',
+        email: ''
+      });
+      const [emailChanged, setEmailChanged] = useState(false);
 
       const characterFormRef = React.useRef(null);
 
@@ -3201,37 +3212,113 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             return;
           }
 
-          // Show shipping address modal
-          const firstName = prompt(language === 'de' ? 'Vorname:' : language === 'fr' ? 'Prénom:' : 'First Name:');
-          if (!firstName) return;
+          // Load saved shipping info from database
+          try {
+            const response = await fetch(`${API_URL}/api/user/shipping-address`, {
+              headers: { 'Authorization': `Bearer ${authToken}` }
+            });
 
-          const lastName = prompt(language === 'de' ? 'Nachname:' : language === 'fr' ? 'Nom:' : 'Last Name:');
-          if (!lastName) return;
+            if (response.ok) {
+              const savedShipping = await response.json();
+              if (savedShipping) {
+                setShippingForm({
+                  firstName: savedShipping.firstName || '',
+                  lastName: savedShipping.lastName || '',
+                  addressLine1: savedShipping.addressLine1 || '',
+                  city: savedShipping.city || '',
+                  postCode: savedShipping.postCode || '',
+                  country: savedShipping.country || '',
+                  email: savedShipping.email || currentUser?.username || ''
+                });
+              } else {
+                // No saved shipping info, just pre-fill email
+                setShippingForm(prev => ({
+                  ...prev,
+                  email: currentUser?.username || currentUser?.email || ''
+                }));
+              }
+            } else {
+              // Error loading, just pre-fill email
+              setShippingForm(prev => ({
+                ...prev,
+                email: currentUser?.username || currentUser?.email || ''
+              }));
+            }
+          } catch (err) {
+            console.error('Error loading shipping address:', err);
+            // Just pre-fill email on error
+            setShippingForm(prev => ({
+              ...prev,
+              email: currentUser?.username || currentUser?.email || ''
+            }));
+          }
 
-          const addressLine1 = prompt(language === 'de' ? 'Straße und Hausnummer:' : language === 'fr' ? 'Adresse:' : 'Address Line 1:');
-          if (!addressLine1) return;
+          setEmailChanged(false);
+          setShowShippingModal(true);
+        } catch (error) {
+          console.error('Print book error:', error);
+          alert(language === 'de'
+            ? 'Fehler beim Erstellen der Druckbestellung'
+            : language === 'fr'
+            ? 'Erreur lors de la création de la commande d\'impression'
+            : 'Error creating print order');
+        }
+      };
 
-          const city = prompt(language === 'de' ? 'Stadt:' : language === 'fr' ? 'Ville:' : 'City:');
-          if (!city) return;
-
-          const postCode = prompt(language === 'de' ? 'Postleitzahl:' : language === 'fr' ? 'Code postal:' : 'Postal Code:');
-          if (!postCode) return;
-
-          const country = prompt(language === 'de' ? 'Land (2-Buchstaben-Code, z.B. DE):' : language === 'fr' ? 'Pays (code à 2 lettres, ex: FR):' : 'Country (2-letter code, e.g., US):');
-          if (!country) return;
-
-          const email = prompt(language === 'de' ? 'E-Mail:' : language === 'fr' ? 'E-mail:' : 'Email:');
-          if (!email) return;
-
+      const submitPrintOrder = async () => {
+        try {
           const shippingAddress = {
-            firstName,
-            lastName,
-            addressLine1,
-            city,
-            postCode,
-            country: country.toUpperCase(),
-            email
+            firstName: shippingForm.firstName,
+            lastName: shippingForm.lastName,
+            addressLine1: shippingForm.addressLine1,
+            city: shippingForm.city,
+            postCode: shippingForm.postCode,
+            country: shippingForm.country.toUpperCase(),
+            email: shippingForm.email
           };
+
+          // Save shipping address to database for future orders
+          try {
+            await fetch(`${API_URL}/api/user/shipping-address`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+              },
+              body: JSON.stringify(shippingAddress)
+            });
+          } catch (err) {
+            console.error('Error saving shipping address:', err);
+            // Continue even if save fails
+          }
+
+          // If email changed, update user account
+          if (emailChanged && shippingForm.email !== currentUser?.username) {
+            const updateResponse = await fetch(`${API_URL}/api/user/update-email`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+              },
+              body: JSON.stringify({ newEmail: shippingForm.email })
+            });
+
+            if (updateResponse.ok) {
+              const updatedUser = await updateResponse.json();
+              setCurrentUser(prev => ({ ...prev, username: updatedUser.username }));
+              alert(language === 'de'
+                ? `E-Mail-Adresse auf ${shippingForm.email} aktualisiert`
+                : language === 'fr'
+                ? `Adresse e-mail mise à jour en ${shippingForm.email}`
+                : `Email address updated to ${shippingForm.email}`);
+            } else {
+              const errorData = await updateResponse.json();
+              console.error('Failed to update email:', errorData);
+              // Continue with order even if email update fails
+            }
+          }
+
+          setShowShippingModal(false);
 
           // Step 1: Generate PDF on server
           alert(language === 'de'
@@ -5945,6 +6032,152 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Shipping Address Modal */}
+          {showShippingModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 animate-fade-in">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
+                    <Icon name="truck" size={32} />
+                    {language === 'de' ? 'Lieferadresse' : language === 'fr' ? 'Adresse de livraison' : 'Shipping Address'}
+                  </h2>
+                  <button
+                    onClick={() => setShowShippingModal(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <Icon name="x" size={24} />
+                  </button>
+                </div>
+
+                <form onSubmit={(e) => { e.preventDefault(); submitPrintOrder(); }} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        {language === 'de' ? 'Vorname' : language === 'fr' ? 'Prénom' : 'First Name'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={shippingForm.firstName}
+                        onChange={(e) => setShippingForm(prev => ({ ...prev, firstName: e.target.value }))}
+                        className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        {language === 'de' ? 'Nachname' : language === 'fr' ? 'Nom' : 'Last Name'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={shippingForm.lastName}
+                        onChange={(e) => setShippingForm(prev => ({ ...prev, lastName: e.target.value }))}
+                        className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      {language === 'de' ? 'Straße und Hausnummer' : language === 'fr' ? 'Adresse' : 'Address Line 1'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={shippingForm.addressLine1}
+                      onChange={(e) => setShippingForm(prev => ({ ...prev, addressLine1: e.target.value }))}
+                      className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        {language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : 'City'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={shippingForm.city}
+                        onChange={(e) => setShippingForm(prev => ({ ...prev, city: e.target.value }))}
+                        className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        {language === 'de' ? 'Postleitzahl' : language === 'fr' ? 'Code postal' : 'Postal Code'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={shippingForm.postCode}
+                        onChange={(e) => setShippingForm(prev => ({ ...prev, postCode: e.target.value }))}
+                        className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      {language === 'de' ? 'Land (2-Buchstaben-Code)' : language === 'fr' ? 'Pays (code à 2 lettres)' : 'Country (2-letter code)'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength="2"
+                      value={shippingForm.country}
+                      onChange={(e) => setShippingForm(prev => ({ ...prev, country: e.target.value.toUpperCase() }))}
+                      placeholder="US, DE, FR, etc."
+                      className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      {language === 'de' ? 'E-Mail' : language === 'fr' ? 'E-mail' : 'Email'}
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={shippingForm.email}
+                      onChange={(e) => {
+                        setShippingForm(prev => ({ ...prev, email: e.target.value }));
+                        setEmailChanged(true);
+                      }}
+                      className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                    />
+                    {emailChanged && shippingForm.email !== currentUser?.username && (
+                      <p className="text-sm text-orange-600 mt-1">
+                        {language === 'de'
+                          ? 'Ihre E-Mail-Adresse wird beim Speichern aktualisiert'
+                          : language === 'fr'
+                          ? 'Votre adresse e-mail sera mise à jour lors de l\'enregistrement'
+                          : 'Your email address will be updated when you submit'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowShippingModal(false)}
+                      className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 font-semibold"
+                    >
+                      {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-semibold flex items-center justify-center gap-2"
+                    >
+                      <Icon name="printer" size={20} />
+                      {language === 'de' ? 'Druckauftrag erstellen' : language === 'fr' ? 'Créer la commande' : 'Create Print Order'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
