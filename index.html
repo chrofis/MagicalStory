@@ -1719,6 +1719,11 @@ IMPORTANT: Only include characters that are actually mentioned or needed in THIS
 
 CRITICAL: Do not describe everything mentioned in the text. Instead, focus on ONE key visual moment that captures the essence of the scene. Choose the most impactful visual element.
 
+LANGUAGE REQUIREMENTS:
+- Use simple, clear language and wording
+- Exclude any unnecessary dialogues or speech
+- Exclude any unnecessary people - only include characters essential to this scene
+
 Output must contain the following structure:
 1) The location where the scene takes place. (1-2 sentences describing the setting and important objects, do not include any people)
 2) For each character present (only those actually needed in this scene):
@@ -1932,6 +1937,11 @@ ${characters.map(c => `${c.name}: ${c.gender === 'male' ? 'Male' : c.gender === 
 IMPORTANT: Only include characters that are actually mentioned or needed in THIS specific scene. Avoid crowding - use 1-2 characters maximum unless the story specifically requires more.
 
 CRITICAL: Do not describe everything mentioned in the text. Instead, focus on ONE key visual moment that captures the essence of the scene. Choose the most impactful visual element.
+
+LANGUAGE REQUIREMENTS:
+- Use simple, clear language and wording
+- Exclude any unnecessary dialogues or speech
+- Exclude any unnecessary people - only include characters essential to this scene
 
 Output must contain the following structure:
 1) The location where the scene takes place. (1-2 sentences describing the setting and important objects, do not include any people)
