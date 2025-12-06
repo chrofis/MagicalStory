@@ -1547,10 +1547,14 @@
 
           if (response.ok) {
             const data = await response.json();
+            console.log('👥 Characters API response:', data);
             // Handle both old format (array) and new format (object with characters and relationships)
             if (Array.isArray(data)) {
+              console.log('👥 Setting characters (array format):', data.length, data);
               setCharacters(data);
             } else {
+              console.log('👥 Setting characters (object format):', data.characters?.length, data.characters);
+              console.log('👥 First character details:', data.characters?.[0]);
               setCharacters(data.characters || []);
               if (data.relationships) {
                 setRelationships(data.relationships);
@@ -4244,6 +4248,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       };
 
       const editCharacter = (char) => {
+        console.log('✏️ Editing character:', char);
+        console.log('✏️ Character has photoUrl:', !!char.photoUrl);
+        console.log('✏️ Character strengths:', char.strengths);
+        console.log('✏️ Character weaknesses:', char.weaknesses);
+        console.log('✏️ Character fears:', char.fears);
         // Store backup before editing
         setCharacterBackup(JSON.parse(JSON.stringify(char))); // Deep copy
         setCurrentCharacter(char);
