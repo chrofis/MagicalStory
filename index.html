@@ -3010,7 +3010,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
       const downloadPrintablePDF = () => {
         try {
-          const storyTitle = `${storyTypes.find(t => t.id === storyType)?.name[language] || 'Story'} - ${new Date().toLocaleDateString()}`;
+          const storyTitle = `${storyTypes.find(t => t.id === storyType)?.name[language] || 'Story'}`;
           const pageMatches = generatedStory ? generatedStory.split(/---\s*Page\s+\d+\s*---/i) : [];
           const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
 
@@ -3022,38 +3022,71 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
     <meta charset="UTF-8">
     <title>${storyTitle}</title>
     <style>
-      @page { size: A4; margin: 2cm; }
+      /* PDF/X compatible settings */
+      @page {
+        size: A4;
+        margin: 0;
+      }
       @media print {
         .page-break { page-break-after: always; }
+        header, footer { display: none; }
       }
-      body { font-family: Georgia, serif; font-size: 14pt; line-height: 1.6; }
-      h1 { text-align: center; color: #7c3aed; margin-bottom: 1em; }
-      .page-number { text-align: center; font-weight: bold; margin: 2em 0 1em 0; color: #7c3aed; font-size: 18pt; }
-      .story-text { margin-bottom: 2em; white-space: pre-wrap; }
-      .image-page { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
-      .image-page img { max-width: 100%; max-height: 80vh; object-fit: contain; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: Georgia, serif;
+        font-size: 16pt;
+        line-height: 1.8;
+      }
+      /* Text page - centered vertically and horizontally */
+      .text-page {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 3cm;
+        page-break-after: always;
+      }
+      .story-text {
+        text-align: center;
+        white-space: pre-wrap;
+        max-width: 80%;
+      }
+      /* Image page - full page, centered */
+      .image-page {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: white;
+        page-break-after: always;
+      }
+      .image-page img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
     </style>
   </head>
-  <body>
-    <h1>${storyTitle}</h1>`;
+  <body>`;
 
             // Alternate between text and images
             storyPages.forEach((pageText, index) => {
               const pageNumber = index + 1;
               const image = sceneImages.find(img => img.pageNumber === pageNumber);
 
-              // Text page
+              // Text page - centered
               htmlContent += `
-    <div class="page-break">
-      <div class="page-number">Page ${pageNumber}</div>
+    <div class="text-page">
       <div class="story-text">${pageText.trim()}</div>
     </div>`;
 
-              // Image page
+              // Image page - full page
               if (image && image.imageData) {
                 htmlContent += `
-    <div class="page-break image-page">
-      <img src="${image.imageData}" alt="Scene ${pageNumber}" />
+    <div class="image-page">
+      <img src="${image.imageData}" alt="" />
     </div>`;
               }
             });
@@ -3066,6 +3099,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             printWindow.document.write(htmlContent);
             printWindow.document.close();
 
+            // Trigger print dialog (users can save as PDF)
             setTimeout(() => {
               printWindow.print();
             }, 500);
@@ -4905,24 +4939,30 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <button
-              onClick={() => downloadStory('txt')}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
-            >
-              <Icon name="download" size={20} /> {t.downloadTXT}
-            </button>
-            <button
-              onClick={() => downloadStory('pdf')}
-              className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
-            >
-              <Icon name="download" size={20} /> {t.downloadPDF}
-            </button>
+            {/* Admin only: TXT and PDF downloads */}
+            {currentUser && currentUser.role === 'admin' && (
+              <>
+                <button
+                  onClick={() => downloadStory('txt')}
+                  className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
+                >
+                  <Icon name="download" size={20} /> {t.downloadTXT}
+                </button>
+                <button
+                  onClick={() => downloadStory('pdf')}
+                  className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
+                >
+                  <Icon name="download" size={20} /> {t.downloadPDF}
+                </button>
+              </>
+            )}
+            {/* All users: Printable PDF */}
             {sceneImages.length > 0 && (
               <button
                 onClick={downloadPrintablePDF}
                 className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center justify-center gap-2"
               >
-                <Icon name="printer" size={20} /> {language === 'de' ? 'Druckbare PDF' : language === 'fr' ? 'PDF imprimable' : 'Printable PDF'}
+                <Icon name="file-text" size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
               </button>
             )}
             {currentUser && currentUser.role === 'admin' && generatedPrompt && (
