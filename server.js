@@ -167,10 +167,15 @@ async function dbQuery(sql, params = []) {
   if (DB_TYPE === 'postgresql') {
     // PostgreSQL uses $1, $2, etc for parameters
     const result = await dbPool.query(sql, params);
+    // Return rows with metadata for DELETE/UPDATE operations
+    result.rows.rowCount = result.rowCount;
+    result.rows.command = result.command;
     return result.rows;
   } else {
     // MySQL uses ? for parameters
-    const [rows] = await dbPool.execute(sql, params);
+    const [rows, fields] = await dbPool.execute(sql, params);
+    // Add affectedRows for consistency
+    rows.rowCount = rows.affectedRows || 0;
     return rows;
   }
 }
@@ -1613,6 +1618,7 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
 app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`🗑️  DELETE /api/stories/${id} - User: ${req.user.username} (ID: ${req.user.id})`);
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
@@ -1621,10 +1627,15 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
         : 'DELETE FROM stories WHERE id = ? AND user_id = ?';
       const result = await dbQuery(deleteQuery, [id, req.user.id]);
 
-      // Check if any rows were deleted (PostgreSQL returns rows, MySQL returns affectedRows info)
-      if (DB_TYPE === 'postgresql' && result.length === 0) {
-        return res.status(404).json({ error: 'Story not found' });
+      console.log(`🗑️  Delete result:`, { rowCount: result.rowCount, command: result.command });
+
+      // Check if any rows were deleted using rowCount
+      if (!result.rowCount || result.rowCount === 0) {
+        console.log(`⚠️  Story ${id} not found for user ${req.user.id}`);
+        return res.status(404).json({ error: 'Story not found or you do not have permission to delete it' });
       }
+
+      console.log(`✅ Successfully deleted story ${id}`);
     } else {
       // File mode
       const allStories = await readJSON(STORIES_FILE);
@@ -1822,7 +1833,7 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
             'X-API-KEY': gelatoApiKey
           },
           body: JSON.stringify({
-            limit: 500,
+            limit: 100,
             offset: 0
           })
         });
