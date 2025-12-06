@@ -1693,8 +1693,7 @@
               return stories;
             } catch (jsonErr) {
               console.error('❌ Failed to parse JSON:', jsonErr);
-              const text = await response.text();
-              console.error('Response body:', text.substring(0, 500));
+              console.error('This usually means the server returned invalid JSON or the connection failed');
               return [];
             }
           } else {
