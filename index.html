@@ -3359,7 +3359,41 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           console.log('PDF generated:', pdfData);
 
-          // Step 2: Create Gelato order with PDF URL
+          // Step 2: Get product UID from backend
+          const productsResponse = await fetch(`${API_URL}/api/gelato/products`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+
+          let productUid;
+          if (productsResponse.ok) {
+            const productsData = await productsResponse.json();
+            const products = productsData.products || [];
+
+            // Find product matching the page count
+            const matchingProduct = products.find(p => {
+              // Check if available_page_counts array includes our page count
+              if (p.available_page_counts) {
+                const availableCounts = JSON.parse(p.available_page_counts || '[]');
+                return availableCounts.includes(pages);
+              }
+              // Fallback: check min/max range
+              return pages >= (p.min_pages || 0) && pages <= (p.max_pages || 999);
+            });
+
+            productUid = matchingProduct?.product_uid;
+            console.log('Selected product:', matchingProduct?.product_name, 'UID:', productUid);
+          }
+
+          // Error if no matching product found
+          if (!productUid) {
+            throw new Error(language === 'de'
+              ? `Kein passendes Produkt für ${pages} Seiten gefunden`
+              : language === 'fr'
+              ? `Aucun produit correspondant trouvé pour ${pages} pages`
+              : `No matching product found for ${pages} pages`);
+          }
+
+          // Step 3: Create Gelato order with PDF URL
           const gelatoResponse = await fetch('/api/gelato/order', {
             method: 'POST',
             headers: {
@@ -3369,7 +3403,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             body: JSON.stringify({
               pdfUrl: pdfData.fileUrl,
               shippingAddress: shippingAddress,
-              orderReference: `story-${Date.now()}`
+              orderReference: `story-${Date.now()}`,
+              productUid: productUid,
+              pageCount: pages
             })
           });
 
