@@ -5676,14 +5676,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {/* Black Navigation Bar - Simplified */}
           <nav className="bg-black text-white px-3 py-2">
             <div className="flex justify-between items-center">
-              {/* Left: Title - Hidden on very narrow screens when steps would overlap */}
-              <div className={`${step > 0 ? 'hidden lg:block' : 'block'} flex-shrink-0`}>
+              {/* Left: Title - Always visible */}
+              <div className="flex-shrink-0">
                 <h1 className="text-sm md:text-base font-bold whitespace-nowrap">✨ {t.title}</h1>
               </div>
 
               {/* Center: Step Navigation - Always visible */}
               {step > 0 && (
-                <div className="flex items-center gap-0.5 md:gap-1 mx-auto lg:mx-0">
+                <div className="flex items-center gap-0.5 md:gap-1 flex-1 justify-center">
                   {[1, 2, 3, 4, 5].map(s => {
                     // Determine if this step is accessible
                     let canAccess = false;
