@@ -1695,6 +1695,20 @@ app.post('/api/admin/gelato/seed-products', authenticateToken, async (req, res) 
 });
 
 // Get active products for users
+// Get default Gelato product UID from environment
+app.get('/api/config/gelato-product-uid', authenticateToken, (req, res) => {
+  const productUid = process.env.GELATO_PHOTOBOOK_UID;
+
+  if (!productUid) {
+    return res.status(500).json({
+      error: 'Gelato product UID not configured',
+      message: 'Please set GELATO_PHOTOBOOK_UID in environment variables'
+    });
+  }
+
+  res.json({ productUid });
+});
+
 app.get('/api/gelato/products', async (req, res) => {
   try {
     if (STORAGE_MODE === 'database' && dbPool) {

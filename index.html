@@ -3382,38 +3382,63 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           console.log('PDF generated:', pdfData);
 
-          // Step 2: Get product UID from backend
-          const productsResponse = await fetch(`${API_URL}/api/gelato/products`, {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          });
-
+          // Step 2: Get product UID from backend (with fallback to default)
           let productUid;
-          if (productsResponse.ok) {
-            const productsData = await productsResponse.json();
-            const products = productsData.products || [];
 
-            // Find product matching the page count
-            const matchingProduct = products.find(p => {
-              // Check if available_page_counts array includes our page count
-              if (p.available_page_counts) {
-                const availableCounts = JSON.parse(p.available_page_counts || '[]');
-                return availableCounts.includes(pages);
-              }
-              // Fallback: check min/max range
-              return pages >= (p.min_pages || 0) && pages <= (p.max_pages || 999);
+          try {
+            const productsResponse = await fetch(`${API_URL}/api/gelato/products`, {
+              headers: { 'Authorization': `Bearer ${authToken}` }
             });
 
-            productUid = matchingProduct?.product_uid;
-            console.log('Selected product:', matchingProduct?.product_name, 'UID:', productUid);
+            if (productsResponse.ok) {
+              const productsData = await productsResponse.json();
+              const products = productsData.products || [];
+
+              if (products.length > 0) {
+                // Find product matching the page count
+                const matchingProduct = products.find(p => {
+                  // Check if available_page_counts array includes our page count
+                  if (p.available_page_counts) {
+                    const availableCounts = JSON.parse(p.available_page_counts || '[]');
+                    return availableCounts.includes(pages);
+                  }
+                  // Fallback: check min/max range
+                  return pages >= (p.min_pages || 0) && pages <= (p.max_pages || 999);
+                });
+
+                productUid = matchingProduct?.product_uid;
+                console.log('Selected product from database:', matchingProduct?.product_name, 'UID:', productUid);
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to fetch products, will use default:', err.message);
           }
 
-          // Error if no matching product found
+          // Fallback to default Gelato product UID from environment
+          if (!productUid) {
+            // Get default product UID from backend
+            try {
+              const configResponse = await fetch(`${API_URL}/api/config/gelato-product-uid`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+              });
+
+              if (configResponse.ok) {
+                const configData = await configResponse.json();
+                productUid = configData.productUid;
+                console.log('Using default product UID from config:', productUid);
+              }
+            } catch (err) {
+              console.error('Failed to get default product UID:', err);
+            }
+          }
+
+          // Final check - error if still no product UID
           if (!productUid) {
             throw new Error(language === 'de'
-              ? `Kein passendes Produkt für ${pages} Seiten gefunden`
+              ? `Kein Gelato-Produkt konfiguriert. Bitte kontaktieren Sie den Support.`
               : language === 'fr'
-              ? `Aucun produit correspondant trouvé pour ${pages} pages`
-              : `No matching product found for ${pages} pages`);
+              ? `Aucun produit Gelato configuré. Veuillez contacter le support.`
+              : `No Gelato product configured. Please contact support.`);
           }
 
           // Step 3: Create Gelato order with PDF URL
