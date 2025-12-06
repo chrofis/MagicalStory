@@ -781,14 +781,23 @@
           step,
           isAuthenticated,
           hasCurrentCharacter: !!currentCharacter,
-          showCharacterCreated
+          showCharacterCreated,
+          existingCharactersCount: characters.length
         });
 
-        if (step === 2 && !currentCharacter && !showCharacterCreated) {
-          console.log('🎭 Initializing new character for step 2');
-          startNewCharacter();
+        if (step === 2) {
+          // If there are existing characters, clear currentCharacter to show the list
+          if (characters.length > 0 && currentCharacter && !showCharacterCreated) {
+            console.log('🎭 Clearing current character to show character list');
+            setCurrentCharacter(null);
+          }
+          // Only auto-create new character if there are NO characters at all
+          else if (characters.length === 0 && !currentCharacter && !showCharacterCreated) {
+            console.log('🎭 No characters exist - initializing new character for step 2');
+            startNewCharacter();
+          }
         }
-      }, [step, currentCharacter, showCharacterCreated, isAuthenticated]);
+      }, [step, showCharacterCreated]);
 
       // Save characters and relationships whenever they change (with debounce)
       useEffect(() => {
@@ -1168,7 +1177,9 @@
             },
             body: JSON.stringify({
               characters: charactersToSave,
-              relationships: relationships
+              relationships: relationships,
+              relationshipTexts: relationshipTexts,
+              customRelationships: customRelationships
             })
           });
 
@@ -1199,6 +1210,12 @@
               setCharacters(data.characters || []);
               if (data.relationships) {
                 setRelationships(data.relationships);
+              }
+              if (data.relationshipTexts) {
+                setRelationshipTexts(data.relationshipTexts);
+              }
+              if (data.customRelationships) {
+                setCustomRelationships(data.customRelationships);
               }
             }
           }
@@ -4144,41 +4161,46 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                   <div className="md:border-2 md:border-green-300 md:rounded-lg p-4 md:bg-green-50">
                     <label className="block text-lg font-semibold mb-3 text-center md:block hidden">{t.orDescribe}</label>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-semibold mb-1">{t.age}</label>
-                        <input
-                          type="number"
-                          value={currentCharacter.age}
-                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, age: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          placeholder={t.age}
-                          min="1"
-                          max="99"
-                        />
+                    <div className="space-y-2">
+                      {/* Age and Height on same row */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-semibold whitespace-nowrap">{t.age}:</label>
+                          <input
+                            type="number"
+                            value={currentCharacter.age}
+                            onChange={(e) => setCurrentCharacter({ ...currentCharacter, age: e.target.value })}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                            placeholder={t.age}
+                            min="1"
+                            max="99"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-semibold whitespace-nowrap">
+                            {language === 'de' ? 'Größe:' : language === 'fr' ? 'Taille:' : 'Height:'}
+                          </label>
+                          <input
+                            type="number"
+                            value={currentCharacter.height}
+                            onChange={(e) => setCurrentCharacter({ ...currentCharacter, height: e.target.value })}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                            placeholder="cm"
+                            min="50"
+                            max="250"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-semibold mb-1">
-                          {language === 'de' ? 'Größe (cm)' : language === 'fr' ? 'Taille (cm)' : 'Height (cm)'}
-                        </label>
-                        <input
-                          type="number"
-                          value={currentCharacter.height}
-                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, height: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          placeholder={language === 'de' ? 'z.B. 170' : language === 'fr' ? 'par ex. 170' : 'e.g. 170'}
-                          min="50"
-                          max="250"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold mb-1">
-                          {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
+
+                      {/* Build */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">
+                          {language === 'de' ? 'Körperbau:' : language === 'fr' ? 'Corpulence:' : 'Build:'}
                         </label>
                         <select
                           value={currentCharacter.build}
                           onChange={(e) => setCurrentCharacter({ ...currentCharacter, build: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
                         >
                           <option value="">{language === 'de' ? 'Wählen...' : language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
                           <option value="slim">{language === 'de' ? 'Schlank' : language === 'fr' ? 'Mince' : 'Slim'}</option>
@@ -4189,22 +4211,25 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           <option value="heavily overweight">{language === 'de' ? 'Stark übergewichtig' : language === 'fr' ? 'Très en surpoids' : 'Heavily Overweight'}</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-sm font-semibold mb-1">{t.hairColor}</label>
+
+                      {/* Hair Color */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">{t.hairColor}:</label>
                         <input
                           type="text"
                           value={currentCharacter.hairColor}
                           onChange={(e) => setCurrentCharacter({ ...currentCharacter, hairColor: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
                           placeholder={t.hairColor}
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-semibold mb-1">{t.otherFeatures}</label>
+                      {/* Other Features - inline label */}
+                      <div className="flex items-start gap-2">
+                        <label className="text-xs font-semibold whitespace-nowrap min-w-[60px] pt-1.5">{t.otherFeatures}:</label>
                         <textarea
                           value={currentCharacter.otherFeatures}
                           onChange={(e) => setCurrentCharacter({ ...currentCharacter, otherFeatures: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
                           placeholder={t.descriptionPlaceholder}
                           rows={2}
                         />
@@ -4376,8 +4401,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   const key1 = `${char1.id}-${char2.id}`;
                   const key2 = `${char2.id}-${char1.id}`;
 
+                  // Check if this is the last relationship pair
+                  const isLastRelationship = i === characters.length - 2 && j === characters.length - 1;
+
                   return (
-                    <div key={key1} className="bg-white md:border-2 md:border-purple-200 md:rounded-xl p-4 md:p-6 mb-4">
+                    <>
+                      <div key={key1} className="bg-white md:border-2 md:border-purple-200 md:rounded-xl p-4 md:p-6 mb-4">
                       {/* Main relationship selector and description - side by side on wide screens */}
                       <div className="grid lg:grid-cols-[1fr,350px] gap-4">
                         {/* Left: Relationship Selector */}
@@ -4443,6 +4472,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         )}
                       </div>
                     </div>
+
+                    {/* Separator line between relationships */}
+                    {!isLastRelationship && (
+                      <hr className="border-t-2 border-gray-300 my-6" />
+                    )}
+                  </>
                   );
                 })}
               </div>
