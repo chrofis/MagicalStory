@@ -1684,9 +1684,19 @@
           console.log('📚 Stories response:', { ok: response.ok, status: response.status, statusText: response.statusText });
 
           if (response.ok) {
-            const stories = await response.json();
-            console.log('📚 Stories loaded successfully:', { count: stories.length, stories: stories });
-            return stories;
+            console.log('📚 About to parse JSON...');
+            try {
+              const stories = await response.json();
+              console.log('📚 JSON parsed successfully');
+              console.log('📚 Stories loaded successfully:', { count: stories.length, stories: stories });
+              console.log('📚 Returning stories:', stories);
+              return stories;
+            } catch (jsonErr) {
+              console.error('❌ Failed to parse JSON:', jsonErr);
+              const text = await response.text();
+              console.error('Response body:', text.substring(0, 500));
+              return [];
+            }
           } else {
             const errorText = await response.text();
             console.error('❌ Stories API error:', { status: response.status, error: errorText });
