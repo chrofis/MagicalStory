@@ -1768,54 +1768,83 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
       return res.status(500).json({ error: 'Gelato API not configured' });
     }
 
-    // Fetch products from Gelato API - increase limit to get more products
-    const response = await fetch('https://product.gelatoapis.com/v3/products?limit=500', {
+    // Step 1: Fetch all available catalogs from Gelato
+    const catalogsResponse = await fetch('https://product.gelatoapis.com/v3/catalogs', {
       headers: {
         'X-API-KEY': gelatoApiKey
       }
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(response.status).json({ error: 'Failed to fetch from Gelato', details: errorData });
+    if (!catalogsResponse.ok) {
+      const errorData = await catalogsResponse.json();
+      return res.status(catalogsResponse.status).json({ error: 'Failed to fetch catalogs from Gelato', details: errorData });
     }
 
-    const data = await response.json();
-
-    console.log('📦 Gelato API response:', {
-      totalProducts: data.products?.length || 0,
-      sampleProduct: data.products?.[0] || null,
-      productTypes: [...new Set(data.products?.slice(0, 20).map(p => p.productTypeUid || p.productNameUid))]
+    const catalogsData = await catalogsResponse.json();
+    console.log('📁 Gelato catalogs:', {
+      count: catalogsData.catalogs?.length || 0,
+      catalogUids: catalogsData.catalogs?.map(c => c.uid) || []
     });
 
-    // Filter for photobooks only - check multiple possible fields and patterns
-    const photobooks = (data.products || []).filter(product => {
-      const uid = product.productUid || product.uid || product.id || '';
-      const name = product.name || product.productName || '';
-      const category = product.category || product.productCategory || '';
-      const productType = product.productTypeUid || product.productType || '';
-      const productName = product.productNameUid || '';
+    // Step 2: Search for photobooks in each catalog
+    let allPhotobooks = [];
 
-      // Check if it's a photobook in any of these fields
-      const isPhotobook = (
-        uid.toLowerCase().includes('photobook') ||
-        name.toLowerCase().includes('photobook') ||
-        name.toLowerCase().includes('photo book') ||
-        category.toLowerCase().includes('photobook') ||
-        productType.toLowerCase().includes('photobook') ||
-        productName.toLowerCase().includes('photobook')
-      );
+    for (const catalog of catalogsData.catalogs || []) {
+      try {
+        // Search for products in this catalog
+        const searchResponse = await fetch(`https://product.gelatoapis.com/v3/catalogs/${catalog.uid}/products:search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': gelatoApiKey
+          },
+          body: JSON.stringify({
+            limit: 500,
+            offset: 0
+          })
+        });
 
-      return isPhotobook;
-    });
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
 
-    console.log('📚 Filtered photobooks:', photobooks.length);
+          // Filter for photobooks
+          const photobooks = (searchData.products || []).filter(product => {
+            const uid = product.productUid || product.uid || '';
+            const name = product.name || product.productName || '';
+            const productType = product.productTypeUid || '';
+            const productName = product.productNameUid || '';
+
+            const isPhotobook = (
+              uid.toLowerCase().includes('photobook') ||
+              name.toLowerCase().includes('photobook') ||
+              name.toLowerCase().includes('photo book') ||
+              productType.toLowerCase().includes('photobook') ||
+              productName.toLowerCase().includes('photobook')
+            );
+
+            return isPhotobook;
+          });
+
+          console.log(`📚 Catalog ${catalog.uid}: Found ${photobooks.length} photobooks out of ${searchData.products?.length || 0} products`);
+          allPhotobooks = allPhotobooks.concat(photobooks);
+        }
+      } catch (err) {
+        console.error(`Error searching catalog ${catalog.uid}:`, err.message);
+      }
+    }
+
+    // Remove duplicates based on productUid
+    const uniquePhotobooks = Array.from(
+      new Map(allPhotobooks.map(p => [p.productUid || p.uid, p])).values()
+    );
+
+    console.log('📚 Total unique photobooks found:', uniquePhotobooks.length);
 
     res.json({
       success: true,
-      count: photobooks.length,
-      products: photobooks,
-      totalFetched: data.products?.length || 0
+      count: uniquePhotobooks.length,
+      products: uniquePhotobooks,
+      catalogsSearched: catalogsData.catalogs?.length || 0
     });
 
   } catch (err) {
