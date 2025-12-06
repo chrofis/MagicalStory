@@ -3769,21 +3769,32 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             if (productsResponse.ok) {
               const productsData = await productsResponse.json();
               const products = productsData.products || [];
+              console.log('📦 Fetched Gelato products:', products.length, products);
+              console.log('📄 Story pages:', pages);
 
               if (products.length > 0) {
                 // Find product matching the page count
                 const matchingProduct = products.find(p => {
+                  console.log(`🔍 Checking product: ${p.product_name}, min: ${p.min_pages}, max: ${p.max_pages}, available: ${p.available_page_counts}`);
                   // Check if available_page_counts array includes our page count
                   if (p.available_page_counts) {
                     const availableCounts = JSON.parse(p.available_page_counts || '[]');
+                    console.log(`  Available counts:`, availableCounts, `Looking for: ${pages}`, `Match: ${availableCounts.includes(pages)}`);
                     return availableCounts.includes(pages);
                   }
                   // Fallback: check min/max range
-                  return pages >= (p.min_pages || 0) && pages <= (p.max_pages || 999);
+                  const inRange = pages >= (p.min_pages || 0) && pages <= (p.max_pages || 999);
+                  console.log(`  Range check: ${inRange}`);
+                  return inRange;
                 });
 
                 productUid = matchingProduct?.product_uid;
-                console.log('Selected product from database:', matchingProduct?.product_name, 'UID:', productUid);
+                console.log('✅ Selected product:', matchingProduct?.product_name, 'UID:', productUid);
+                if (!matchingProduct) {
+                  console.error('❌ No product matches page count:', pages);
+                }
+              } else {
+                console.error('❌ No products in database!');
               }
             }
           } catch (err) {
