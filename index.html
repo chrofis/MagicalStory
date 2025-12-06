@@ -2952,6 +2952,74 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         }
       };
 
+      const downloadPrintablePDF = () => {
+        try {
+          const storyTitle = `${storyTypes.find(t => t.id === storyType)?.name[language] || 'Story'} - ${new Date().toLocaleDateString()}`;
+          const pageMatches = generatedStory ? generatedStory.split(/---\s*Page\s+\d+\s*---/i) : [];
+          const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
+
+          const printWindow = window.open('', '_blank', 'width=800,height=600');
+          if (printWindow) {
+            let htmlContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>${storyTitle}</title>
+    <style>
+      @page { size: A4; margin: 2cm; }
+      @media print {
+        .page-break { page-break-after: always; }
+      }
+      body { font-family: Georgia, serif; font-size: 14pt; line-height: 1.6; }
+      h1 { text-align: center; color: #7c3aed; margin-bottom: 1em; }
+      .page-number { text-align: center; font-weight: bold; margin: 2em 0 1em 0; color: #7c3aed; font-size: 18pt; }
+      .story-text { margin-bottom: 2em; white-space: pre-wrap; }
+      .image-page { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+      .image-page img { max-width: 100%; max-height: 80vh; object-fit: contain; }
+    </style>
+  </head>
+  <body>
+    <h1>${storyTitle}</h1>`;
+
+            // Alternate between text and images
+            storyPages.forEach((pageText, index) => {
+              const pageNumber = index + 1;
+              const image = sceneImages.find(img => img.pageNumber === pageNumber);
+
+              // Text page
+              htmlContent += `
+    <div class="page-break">
+      <div class="page-number">Page ${pageNumber}</div>
+      <div class="story-text">${pageText.trim()}</div>
+    </div>`;
+
+              // Image page
+              if (image && image.imageData) {
+                htmlContent += `
+    <div class="page-break image-page">
+      <img src="${image.imageData}" alt="Scene ${pageNumber}" />
+    </div>`;
+              }
+            });
+
+            htmlContent += `
+  </body>
+</html>`;
+
+            printWindow.document.open();
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+
+            setTimeout(() => {
+              printWindow.print();
+            }, 500);
+          }
+        } catch (error) {
+          console.error('PDF export error:', error);
+          alert('PDF export error: ' + error.message);
+        }
+      };
+
       const exportStoryInfoAsMarkdown = () => {
         try {
           const storyTypeName = allStoryTypes.find(t => t.id === storyType);
@@ -4708,9 +4776,32 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             )}
           </div>
 
-          {/* Story Outline - Developer Mode Only */}
+          {/* 1. Prompt Used - Developer Mode Only */}
+          {developerMode && generatedPrompt && (
+            <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-700">{t.promptUsed}</h3>
+                <button
+                  onClick={() => setShowPrompt(!showPrompt)}
+                  className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
+                >
+                  <Icon name={showPrompt ? "eye-off" : "eye"} size={20} />
+                  {showPrompt ? t.hidePrompt : t.viewPrompt}
+                </button>
+              </div>
+              {showPrompt && (
+                <div className="bg-white border border-gray-300 rounded-lg p-4 mt-4">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">
+                    {generatedPrompt}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 2. Story Outline - Developer Mode Only */}
           {developerMode && storyOutline && (
-            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6">
+            <div className="md:bg-yellow-50 md:border-2 md:border-yellow-300 md:rounded-xl p-4 md:p-6">
               <h3 className="text-lg font-bold text-yellow-700 mb-3 flex items-center gap-2">
                 <Icon name="list" size={20} /> Story Outline
               </h3>
@@ -4722,9 +4813,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
           )}
 
-          {/* Full Story Text - Developer Mode Only */}
+          {/* 3. Full Story Text - Developer Mode Only */}
           {developerMode && (
-            <div className="bg-white border-2 border-purple-200 rounded-xl p-8">
+            <div className="md:bg-white md:border-2 md:border-purple-200 md:rounded-xl p-4 md:p-8">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-purple-700">Full Story Text</h3>
                 <button
@@ -4757,28 +4848,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
           )}
 
-          {developerMode && generatedPrompt && (
-            <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-700">{t.promptUsed}</h3>
-                <button
-                  onClick={() => setShowPrompt(!showPrompt)}
-                  className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
-                >
-                  <Icon name={showPrompt ? "eye-off" : "eye"} size={20} />
-                  {showPrompt ? t.hidePrompt : t.viewPrompt}
-                </button>
-              </div>
-              {showPrompt && (
-                <div className="bg-white border border-gray-300 rounded-lg p-4 mt-4">
-                  <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">
-                    {generatedPrompt}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <button
               onClick={() => downloadStory('txt')}
@@ -4792,6 +4861,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             >
               <Icon name="download" size={20} /> {t.downloadPDF}
             </button>
+            {sceneImages.length > 0 && (
+              <button
+                onClick={downloadPrintablePDF}
+                className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center justify-center gap-2"
+              >
+                <Icon name="printer" size={20} /> {language === 'de' ? 'Druckbare PDF' : language === 'fr' ? 'PDF imprimable' : 'Printable PDF'}
+              </button>
+            )}
             {currentUser && currentUser.role === 'admin' && generatedPrompt && (
               <button
                 onClick={downloadPrompt}
