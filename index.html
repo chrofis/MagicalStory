@@ -3844,110 +3844,90 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <Icon name="users" size={24} /> {t.createCharacters}
             </h2>
 
-            {/* Navigation after saving character */}
-            {showCharacterCreated && (
-              <div className="md:bg-green-50 md:border-2 md:border-green-400 md:rounded-xl p-4 md:p-6 animate-fade-in">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-green-500 text-white rounded-full w-10 h-10 flex items-center justify-center">
-                    <Icon name="check" size={24} />
-                  </div>
-                  <h3 className="text-xl font-bold text-green-700">
-                    {language === 'de' ? 'Charakter erfolgreich erstellt!' : language === 'fr' ? 'Personnage créé avec succès !' : 'Character Created Successfully!'}
-                  </h3>
-                </div>
-                <p className="text-gray-700 mb-6">
-                  {language === 'de'
-                    ? 'Was möchten Sie als Nächstes tun?'
-                    : language === 'fr'
-                    ? 'Que voulez-vous faire ensuite ?'
-                    : 'What would you like to do next?'}
-                </p>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <button
-                    onClick={() => {
-                      setShowCharacterCreated(false);
-                      startNewCharacter();
-                    }}
-                    className="bg-purple-500 text-white px-6 py-4 rounded-lg hover:bg-purple-600 font-semibold flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Icon name="user-plus" size={20} />
-                    {language === 'de' ? 'Weiteren Charakter erstellen' : language === 'fr' ? 'Créer un autre personnage' : 'Create Another Character'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowCharacterCreated(false);
-                      setStep(3);
-                    }}
-                    className="bg-blue-500 text-white px-6 py-4 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <Icon name="arrow-right" size={20} />
-                    {language === 'de' ? 'Weiter zu Beziehungen' : language === 'fr' ? 'Continuer vers les relations' : 'Continue to Relationships'}
-                  </button>
-                </div>
-              </div>
-            )}
-
+            {/* Character list with action buttons - shown when there are existing characters */}
             {characters.length > 0 && !currentCharacter && (
-              <div className="bg-white border-2 border-purple-200 rounded-lg p-3 mb-3">
-                <h3 className="text-sm font-bold text-purple-700 mb-2">{t.yourCharacters}</h3>
-                <div className="grid md:grid-cols-2 gap-2">
-                  {characters.map((char) => (
-                    <div key={char.id} className="border border-gray-200 rounded p-2 relative">
-                      <div className="absolute top-1 right-1 flex gap-1">
-                        <button
-                          onClick={() => editCharacter(char)}
-                          className="bg-blue-500 text-white px-2 py-0.5 rounded text-[10px] hover:bg-blue-600"
-                        >
-                          {t.editCharacter}
-                        </button>
-                        <button
-                          onClick={() => deleteCharacter(char.id)}
-                          className="bg-red-500 text-white px-2 py-0.5 rounded text-[10px] hover:bg-red-600"
-                        >
-                          {t.deleteCharacter}
-                        </button>
+              <div className="space-y-4">
+                {/* Success message if just created */}
+                {showCharacterCreated && (
+                  <div className="md:bg-green-50 md:border-2 md:border-green-400 md:rounded-xl p-4 animate-fade-in">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-green-500 text-white rounded-full w-8 h-8 flex items-center justify-center">
+                        <Icon name="check" size={20} />
                       </div>
-                      {char.photoUrl && (
-                        <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full mx-auto mb-1 object-cover" />
-                      )}
-                      <h4 className="font-bold text-center mb-1 text-xs">{char.name}</h4>
-                      <p className="text-[10px] text-gray-600 text-center mb-0.5">
-                        {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
-                      </p>
-                      <p className="text-[10px] text-gray-600">
-                        <strong>{t.strengths}:</strong> {char.strengths ? char.strengths.slice(0, 2).join(', ') : 'None'}
-                      </p>
+                      <h3 className="text-lg font-bold text-green-700">
+                        {language === 'de' ? 'Charakter erfolgreich erstellt!' : language === 'fr' ? 'Personnage créé avec succès !' : 'Character Created Successfully!'}
+                      </h3>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
-            {!currentCharacter && !showCharacterCreated && (
-              <div className="md:bg-purple-50 md:border-2 md:border-purple-200 md:rounded-lg p-4 text-center">
-                <p className="text-gray-700 mb-3 text-sm">
-                  {characters.length === 0
-                    ? t.charactersCreated.replace('{count}', 0).replace('{s}', 's')
-                    : t.charactersCreated.replace('{count}', characters.length).replace('{s}', characters.length > 1 ? 's' : '')}
-                </p>
-                <div className="flex gap-2 justify-center flex-wrap">
-                  <button
-                    onClick={startNewCharacter}
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 font-semibold text-sm flex items-center gap-1"
-                  >
-                    <Icon name="plus" size={16} /> {t.startCreating}
-                  </button>
-                  {characters.length > 0 && (
+                {/* Existing characters */}
+                <div className="bg-white border-2 border-purple-200 rounded-lg p-3">
+                  <h3 className="text-sm font-bold text-purple-700 mb-2">{t.yourCharacters}</h3>
+                  <div className="grid md:grid-cols-2 gap-2">
+                    {characters.map((char) => (
+                      <div key={char.id} className="border border-gray-200 rounded p-2 relative">
+                        <div className="absolute top-1 right-1 flex gap-1">
+                          <button
+                            onClick={() => editCharacter(char)}
+                            className="bg-blue-500 text-white px-2 py-0.5 rounded text-[10px] hover:bg-blue-600"
+                          >
+                            {t.editCharacter}
+                          </button>
+                          <button
+                            onClick={() => deleteCharacter(char.id)}
+                            className="bg-red-500 text-white px-2 py-0.5 rounded text-[10px] hover:bg-red-600"
+                          >
+                            {t.deleteCharacter}
+                          </button>
+                        </div>
+                        {char.photoUrl && (
+                          <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full mx-auto mb-1 object-cover" />
+                        )}
+                        <h4 className="font-bold text-center mb-1 text-xs">{char.name}</h4>
+                        <p className="text-[10px] text-gray-600 text-center mb-0.5">
+                          {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
+                        </p>
+                        <p className="text-[10px] text-gray-600">
+                          <strong>{t.strengths}:</strong> {char.strengths ? char.strengths.slice(0, 2).join(', ') : 'None'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* What would you like to do next? */}
+                <div className="md:bg-purple-50 md:border-2 md:border-purple-200 md:rounded-lg p-4">
+                  <p className="text-gray-700 mb-4 text-center font-semibold">
+                    {language === 'de'
+                      ? 'Was möchten Sie als Nächstes tun?'
+                      : language === 'fr'
+                      ? 'Que voulez-vous faire ensuite ?'
+                      : 'What would you like to do next?'}
+                  </p>
+                  <div className="grid md:grid-cols-2 gap-3">
                     <button
                       onClick={() => {
+                        setShowCharacterCreated(false);
+                        startNewCharacter();
+                      }}
+                      className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Icon name="user-plus" size={20} />
+                      {language === 'de' ? 'Weiteren Charakter erstellen' : language === 'fr' ? 'Créer un autre personnage' : 'Create Another Character'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCharacterCreated(false);
                         initializeRelationships();
                         setStep(3);
                       }}
-                      className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 font-semibold text-sm flex items-center gap-1"
+                      className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2 transition-colors"
                     >
-                      {t.continueToRelationships} <Icon name="arrow-right" size={16} />
+                      <Icon name="arrow-right" size={20} />
+                      {language === 'de' ? 'Weiter zu Beziehungen' : language === 'fr' ? 'Continuer vers les relations' : 'Continue to Relationships'}
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
