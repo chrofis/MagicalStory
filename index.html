@@ -3866,7 +3866,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             )}
 
             {!currentCharacter && !showCharacterCreated && (
-              <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 text-center">
+              <div className="md:bg-purple-50 md:border-2 md:border-purple-200 md:rounded-lg p-4 text-center">
                 <p className="text-gray-700 mb-3 text-sm">
                   {characters.length === 0
                     ? t.charactersCreated.replace('{count}', 0).replace('{s}', 's')
@@ -3926,7 +3926,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-3">
-                  <div className="border border-purple-300 rounded-lg p-2 bg-purple-50">
+                  <div className="md:border md:border-purple-300 md:rounded-lg p-2 md:bg-purple-50">
                     <label className="block text-xs font-semibold mb-2 text-center">{t.characterPhoto}</label>
                     <div className="flex flex-col items-center gap-2">
                       {currentCharacter.photoUrl && (
@@ -4142,8 +4142,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </div>
                   </div>
 
-                  <div className="border-2 border-green-300 rounded-lg p-4 bg-green-50">
-                    <label className="block text-lg font-semibold mb-3 text-center">{t.orDescribe}</label>
+                  <div className="md:border-2 md:border-green-300 md:rounded-lg p-4 md:bg-green-50">
+                    <label className="block text-lg font-semibold mb-3 text-center md:block hidden">{t.orDescribe}</label>
                     <div className="space-y-3">
                       <div>
                         <label className="block text-sm font-semibold mb-1">{t.age}</label>
@@ -5558,12 +5558,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             <div className="flex justify-between items-center">
               {/* Left: Title - Hidden on very narrow screens when steps would overlap */}
               <div className={`${step > 0 ? 'hidden lg:block' : 'block'} flex-shrink-0`}>
-                <h1 className="text-base md:text-lg font-bold whitespace-nowrap">✨ {t.title}</h1>
+                <h1 className="text-sm md:text-base font-bold whitespace-nowrap">✨ {t.title}</h1>
               </div>
 
               {/* Center: Step Navigation - Always visible */}
               {step > 0 && (
-                <div className="flex items-center gap-1 md:gap-2 mx-auto lg:mx-0">
+                <div className="flex items-center gap-0.5 md:gap-1 mx-auto lg:mx-0">
                   {[1, 2, 3, 4, 5].map(s => {
                     // Determine if this step is accessible
                     let canAccess = false;
@@ -5588,17 +5588,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                             }
                           }}
                           disabled={!canAccess}
-                          className={`w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                          className={`w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold transition-all ${
                             canAccess
                               ? step === s
-                                ? 'bg-purple-600 text-white ring-2 ring-purple-300'
+                                ? 'bg-purple-600 text-white ring-1 ring-purple-300'
                                 : 'bg-purple-500 text-white hover:bg-purple-600 cursor-pointer'
                               : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                           } ${canAccess && step !== s ? 'hover:scale-110' : ''}`}
                         >
                           {s}
                         </button>
-                        {s < 5 && <div className={`w-4 md:w-8 h-0.5 ${canAccess ? 'bg-purple-500' : 'bg-gray-600'}`} />}
+                        {s < 5 && <div className={`w-3 md:w-6 h-0.5 ${canAccess ? 'bg-purple-500' : 'bg-gray-600'}`} />}
                       </React.Fragment>
                     );
                   })}
