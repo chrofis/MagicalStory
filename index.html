@@ -1663,21 +1663,35 @@
       };
 
       const loadStories = async () => {
-        if (!authToken) return [];
+        console.log('📚 loadStories() called', { hasAuthToken: !!authToken, apiUrl: API_URL });
+
+        if (!authToken) {
+          console.warn('⚠️  No auth token - cannot load stories');
+          return [];
+        }
 
         try {
+          console.log('📚 Fetching stories from:', `${API_URL}/api/stories`);
           const response = await fetch(`${API_URL}/api/stories`, {
             headers: {
               'Authorization': `Bearer ${authToken}`
             }
           });
 
+          console.log('📚 Stories response:', { ok: response.ok, status: response.status, statusText: response.statusText });
+
           if (response.ok) {
-            return await response.json();
+            const stories = await response.json();
+            console.log('📚 Stories loaded successfully:', { count: stories.length, stories: stories });
+            return stories;
+          } else {
+            const errorText = await response.text();
+            console.error('❌ Stories API error:', { status: response.status, error: errorText });
+            return [];
           }
-          return [];
         } catch (err) {
-          console.error('Error loading stories:', err);
+          console.error('❌ Error loading stories:', err);
+          console.error('Error details:', { message: err.message, stack: err.stack });
           return [];
         }
       };

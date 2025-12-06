@@ -1458,6 +1458,7 @@ app.post('/api/characters', authenticateToken, async (req, res) => {
 // Story management endpoints
 app.get('/api/stories', authenticateToken, async (req, res) => {
   try {
+    console.log(`📚 GET /api/stories - User: ${req.user.username} (ID: ${req.user.id}), Mode: ${STORAGE_MODE}`);
     let userStories = [];
 
     if (STORAGE_MODE === 'database' && dbPool) {
@@ -1465,21 +1466,32 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const selectQuery = DB_TYPE === 'postgresql'
         ? 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC'
         : 'SELECT data FROM stories WHERE user_id = ? ORDER BY created_at DESC';
+
+      console.log(`📚 Executing query: ${selectQuery} with user_id: ${req.user.id}`);
       const rows = await dbQuery(selectQuery, [req.user.id]);
+      console.log(`📚 Query returned ${rows.length} rows`);
 
       // Parse the JSON data from each row
       userStories = rows.map(row => JSON.parse(row.data));
+      console.log(`📚 Parsed ${userStories.length} stories`);
+
+      if (userStories.length > 0) {
+        console.log(`📚 First story: ${userStories[0].title} (ID: ${userStories[0].id})`);
+      }
     } else {
       // File mode
       const allStories = await readJSON(STORIES_FILE);
       userStories = allStories[req.user.id] || [];
+      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id}`);
     }
 
+    console.log(`📚 Returning ${userStories.length} stories to client`);
     await logActivity(req.user.id, req.user.username, 'STORIES_LOADED', { count: userStories.length });
     res.json(userStories);
   } catch (err) {
-    console.error('Error fetching stories:', err);
-    res.status(500).json({ error: 'Failed to fetch stories' });
+    console.error('❌ Error fetching stories:', err);
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ error: 'Failed to fetch stories', details: err.message });
   }
 });
 
@@ -1821,25 +1833,42 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
 
-          // Filter for photobooks
-          const photobooks = (searchData.products || []).filter(product => {
-            const uid = product.productUid || product.uid || '';
-            const name = product.name || product.productName || '';
-            const productType = product.productTypeUid || '';
-            const productName = product.productNameUid || '';
+          // If catalog name includes "photobook", accept ALL products from it
+          const isPhotobookCatalog = catalogUid.toLowerCase().includes('photobook');
 
-            const isPhotobook = (
-              uid.toLowerCase().includes('photobook') ||
-              name.toLowerCase().includes('photobook') ||
-              name.toLowerCase().includes('photo book') ||
-              productType.toLowerCase().includes('photobook') ||
-              productName.toLowerCase().includes('photobook')
-            );
+          let photobooks;
+          if (isPhotobookCatalog) {
+            // Accept all products from photobook catalogs
+            photobooks = searchData.products || [];
+            console.log(`📚 Catalog ${catalogUid} is a photobook catalog - accepting all ${photobooks.length} products`);
+          } else {
+            // Filter for photobooks in other catalogs
+            photobooks = (searchData.products || []).filter(product => {
+              const uid = product.productUid || product.uid || '';
+              const name = product.name || product.productName || '';
+              const productType = product.productTypeUid || '';
+              const productName = product.productNameUid || '';
 
-            return isPhotobook;
-          });
+              const isPhotobook = (
+                uid.toLowerCase().includes('photobook') ||
+                name.toLowerCase().includes('photobook') ||
+                name.toLowerCase().includes('photo book') ||
+                productType.toLowerCase().includes('photobook') ||
+                productName.toLowerCase().includes('photobook')
+              );
 
-          console.log(`📚 Catalog ${catalog.uid}: Found ${photobooks.length} photobooks out of ${searchData.products?.length || 0} products`);
+              return isPhotobook;
+            });
+            console.log(`📚 Catalog ${catalogUid}: Found ${photobooks.length} photobooks out of ${searchData.products?.length || 0} products`);
+          }
+
+          if (photobooks.length > 0 && photobooks[0]) {
+            console.log(`📚 Sample product from ${catalogUid}:`, {
+              uid: photobooks[0].productUid,
+              name: photobooks[0].name || photobooks[0].productName
+            });
+          }
+
           allPhotobooks = allPhotobooks.concat(photobooks);
         }
       } catch (err) {
