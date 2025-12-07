@@ -2381,8 +2381,8 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       const availableWidth = pageSize - (margin * 2);
       const availableHeight = pageSize - (margin * 2);
 
-      // Start with default font size, reduce if text doesn't fit
-      let fontSize = 11;  // Reduced from 14 to 11
+      // Start with smaller font size to ensure text fits
+      let fontSize = 9;  // Reduced from 11 to 9
       let textHeight;
       let fontReduced = false;
 
@@ -2393,8 +2393,8 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         align: 'left'
       });
 
-      // If text doesn't fit, reduce font size
-      while (textHeight > availableHeight && fontSize > 7) {
+      // If text doesn't fit, reduce font size to minimum 5pt
+      while (textHeight > availableHeight && fontSize > 5) {
         fontSize -= 0.5;
         doc.fontSize(fontSize);
         textHeight = doc.heightOfString(page.text, {
@@ -2404,17 +2404,43 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         fontReduced = true;
       }
 
+      // If text still doesn't fit even at 5pt, truncate it
+      let textToRender = page.text;
+      if (textHeight > availableHeight) {
+        console.error(`⚠️  Page ${pageNumber}: Text too long even at ${fontSize}pt, truncating...`);
+        // Truncate text to fit
+        const words = page.text.split(' ');
+        textToRender = '';
+        for (let i = 0; i < words.length; i++) {
+          const testText = textToRender + (textToRender ? ' ' : '') + words[i];
+          const testHeight = doc.heightOfString(testText, {
+            width: availableWidth,
+            align: 'left'
+          });
+          if (testHeight <= availableHeight) {
+            textToRender = testText;
+          } else {
+            break;
+          }
+        }
+        textToRender += '...';
+      }
+
       // Log warning if font was reduced
       if (fontReduced) {
         console.warn(`⚠️  Page ${pageNumber}: Text too long, reduced font to ${fontSize}pt`);
       }
 
       // Calculate vertical position to center text
+      textHeight = doc.heightOfString(textToRender, {
+        width: availableWidth,
+        align: 'left'
+      });
       const yPosition = margin + (availableHeight - textHeight) / 2;
 
       // Render text (left-aligned, vertically centered)
       doc.fillColor('#333333')  // Dark gray instead of pure black to reduce ink
-         .text(page.text, margin, yPosition, {
+         .text(textToRender, margin, yPosition, {
            width: availableWidth,
            align: 'left'
          });

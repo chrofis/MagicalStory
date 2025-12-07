@@ -1036,7 +1036,7 @@
       useEffect(() => {
         if (step === 4 && showPromptPreview && storyType && characters.length > 0) {
           try {
-            const newPrompt = buildPrompt();
+            const newPrompt = buildOutlinePrompt();
             setEditablePrompt(newPrompt);
           } catch (error) {
             console.error('Error building prompt:', error);
@@ -1193,6 +1193,80 @@
         prompt += `Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.`;
 
         return prompt;
+      };
+
+      // Build the full outline prompt with Role/Context and structured sections
+      const buildOutlinePrompt = () => {
+        const basePrompt = buildPrompt();
+
+        return `# Role and Context
+
+You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure, and visual storytelling for illustrated books. Your expertise includes:
+
+- Creating engaging, age-appropriate narratives that captivate young readers
+- Crafting clear story arcs with proper setup, conflict, and resolution
+- Writing vivid scene descriptions that translate beautifully to illustrations
+- Balancing text and visual elements for maximum impact
+- Understanding pacing and page turns in illustrated books
+- Creating memorable characters and meaningful moments
+
+Your task is to create a compelling, well-structured story outline that will guide both the narrative text and visual illustrations.
+
+${basePrompt}
+
+# Part 1: Story Title
+
+Create an engaging, age-appropriate title for this story. The title should:
+- Capture the essence of the story
+- Be appealing to the target age group
+- Be memorable and creative
+- Reflect the main theme or adventure
+
+Format:
+Title: [Your creative title here]
+
+# Part 2: Story Outline
+
+Create a detailed outline for this ${pages}-page story. Include:
+- Brief summary of each page (what happens on that page)
+- Key events and character moments
+- Story arc and progression (clear beginning, middle, and end)
+- How the story builds tension and resolves satisfyingly
+
+For EACH of the ${pages} story pages, provide a SHORT SCENE DESCRIPTION (1-2 sentences) that describes the visual scene - what the characters are doing, where they are, and the setting. This will be used for illustration purposes.
+
+# Part 3: Cover Scene Descriptions
+
+In addition to the ${pages} story pages, provide scene descriptions for these 3 cover elements:
+
+**Title Page Scene**: A captivating cover illustration that features the main characters and sets the tone for the story. This should be visually striking and focus on the protagonist(s) in a way that draws readers in.
+
+**Page 0 Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
+
+**Back Cover Scene**: A satisfying concluding illustration that provides closure and leaves readers with a positive feeling. This should feel like a natural ending to the visual journey.
+
+# Format Your Response
+
+Title: [Story title]
+
+Page 1: [Summary]
+Scene: [Short visual description]
+
+Page 2: [Summary]
+Scene: [Short visual description]
+
+...and so on for all ${pages} pages.
+
+Title Page: [Summary of title page concept]
+Scene: [Visual description focusing on main characters]
+
+Page 0: [Summary of dedication/intro concept]
+Scene: [Visual description for welcoming scene]
+
+Back Cover: [Summary of back cover concept]
+Scene: [Visual description for concluding scene]
+
+Be specific and creative. Each scene description should paint a clear picture for the illustrator.`;
       };
 
       // API URL Configuration
@@ -1833,8 +1907,6 @@
         // }
 
         setIsGeneratingOutline(true);
-        const basePrompt = editablePrompt || buildPrompt();
-        setGeneratedPrompt(basePrompt);
 
         try {
           // Get list of non-main characters (secondary characters)
@@ -1842,7 +1914,16 @@
 
           // Character manifest removed - will be generated during scene generation phase
 
-          const outlinePrompt = `# Role and Context
+          // If user edited the prompt in preview, use it directly
+          // Otherwise, build the full outline prompt with structure
+          let outlinePrompt;
+          if (editablePrompt) {
+            // User edited the preview - use their edited version directly
+            outlinePrompt = editablePrompt;
+          } else {
+            // No edits - build the full structured prompt
+            const basePrompt = buildPrompt();
+            outlinePrompt = `# Role and Context
 
 You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure, and visual storytelling for illustrated books. Your expertise includes:
 
@@ -1910,6 +1991,10 @@ Back Cover: [Summary of back cover concept]
 Scene: [Visual description for concluding scene]
 
 Be specific and creative. Each scene description should paint a clear picture for the illustrator.`;
+          }
+
+          // Store the prompt for debugging/display
+          setGeneratedPrompt(outlinePrompt);
 
           const response = await makeApiCall(outlinePrompt, 8192);  // Max for Sonnet 4.5
 
@@ -2506,10 +2591,16 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           setGenerationProgress({ current: 1, total: 4, message: 'Step 1/4: Generating story outline...' });
           setIsGeneratingOutline(true);
 
-          const basePrompt = editablePrompt || buildPrompt();
-          setGeneratedPrompt(basePrompt);
-
-          const outlinePrompt = `# Role and Context
+          // If user edited the prompt in preview, use it directly
+          // Otherwise, build the full outline prompt with structure
+          let outlinePrompt;
+          if (editablePrompt) {
+            // User edited the preview - use their edited version directly
+            outlinePrompt = editablePrompt;
+          } else {
+            // No edits - build the full structured prompt
+            const basePrompt = buildPrompt();
+            outlinePrompt = `# Role and Context
 
 You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure, and visual storytelling for illustrated books. Your expertise includes:
 
@@ -2577,6 +2668,10 @@ Back Cover: [Summary of back cover concept]
 Scene: [Visual description for concluding scene]
 
 Be specific and creative. Each scene description should paint a clear picture for the illustrator.`;
+          }
+
+          // Store the prompt for debugging/display
+          setGeneratedPrompt(outlinePrompt);
 
           const outline = await makeApiCall(outlinePrompt, 8192);  // Max for Sonnet 4.5
 
@@ -3006,15 +3101,43 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
           const styleDescription = selectedStyle.prompt;
 
+          // Build character information for cover images
+          const coverCharacterImages = [];
+          const coverCharacterImageMap = [];
+          let characterInfo = '';
+
+          if (characters.length > 0) {
+            characterInfo = '\n\nThe cover MUST feature the following characters:\n';
+
+            characters.forEach((char, idx) => {
+              const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
+              characterInfo += `Character ${idx + 1} (${char.name})${imageRef}: ${char.age} years old, ${char.height}, ${char.build}. ${char.traits}.\n`;
+
+              // Collect character images
+              if (char.photoUrl) {
+                coverCharacterImages.push(char.photoUrl);
+                coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length });
+              }
+            });
+
+            // Add image reference explanation if we have character images
+            if (coverCharacterImageMap.length > 0) {
+              characterInfo += '\n**CHARACTER REFERENCE IMAGES:**\n';
+              coverCharacterImageMap.forEach((mapping) => {
+                characterInfo += `- Image ${mapping.imageIndex}: ${mapping.name}'s portrait (use for facial features, appearance consistency)\n`;
+              });
+            }
+          }
+
           // Use scene descriptions from outline if available, otherwise use defaults
           const titlePageScene = coverSceneDescriptions.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
           const page0Scene = coverSceneDescriptions.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
           const backCoverScene = coverSceneDescriptions.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
           // Define cover image prompts with scene descriptions from outline
-          const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as a beautiful title page for the children's book "${storyTitle}". Magical and inviting.`;
-          const page0Prompt = `${page0Scene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as the dedication/introduction page for "${storyTitle}".`;
-          const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as the back cover illustration for "${storyTitle}".`;
+          const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page for the children's book "${storyTitle}". Magical and inviting.`;
+          const page0Prompt = `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as the dedication/introduction page for "${storyTitle}".`;
+          const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as the back cover illustration for "${storyTitle}".`;
 
           // Define detailed cover scene descriptions for display
           const coverDescriptions = {
@@ -3023,9 +3146,77 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             backCover: `**Back Cover**\n\n${backCoverScene}`
           };
 
-          const generateCoverImage = async (coverType, prompt) => {
+          const generateCoverImage = async (coverType, prompt, charImages = []) => {
             try {
-              const imageData = await callGeminiAPI(prompt);
+              let imageData = null;
+
+              // If we have character images, use multi-part API call
+              if (charImages.length > 0) {
+                const parts = [{ text: prompt }];
+
+                charImages.forEach(charImage => {
+                  const base64Data = charImage.replace(/^data:image\/\w+;base64,/, '');
+                  const mimeType = charImage.match(/^data:(image\/\w+);base64,/) ?
+                    charImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+                  parts.push({
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64Data
+                    }
+                  });
+                });
+
+                const apiPayload = {
+                  model: 'gemini-2.5-flash-image',
+                  contents: [{ parts }],
+                  safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+                  ]
+                };
+
+                const response = await fetch(`${API_URL}/api/gemini`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                  },
+                  body: JSON.stringify(apiPayload)
+                });
+
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+                const data = await response.json();
+                if (!data.candidates || data.candidates.length === 0) {
+                  throw new Error("No response from Gemini.");
+                }
+
+                const candidate = data.candidates[0];
+                if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+                  throw new Error(`Content blocked: ${candidate.finishReason}.`);
+                }
+
+                if (!candidate.content || !candidate.content.parts) {
+                  throw new Error("Invalid response from Gemini.");
+                }
+
+                const responseParts = candidate.content.parts;
+                for (const part of responseParts) {
+                  if (part.inlineData && part.inlineData.data) {
+                    imageData = `data:image/png;base64,${part.inlineData.data}`;
+                    break;
+                  }
+                }
+
+                if (!imageData) throw new Error("No image data found in response.");
+              } else {
+                // No character images, use simple text-only API call
+                imageData = await callGeminiAPI(prompt);
+              }
+
               return imageData;
             } catch (error) {
               console.error(`Error generating ${coverType} cover:`, error);
@@ -3034,9 +3225,9 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           };
 
           const coverPromises = [
-            generateCoverImage('frontCover', frontCoverPrompt),
-            generateCoverImage('page0', page0Prompt),
-            generateCoverImage('backCover', backCoverPrompt)
+            generateCoverImage('frontCover', frontCoverPrompt, coverCharacterImages),
+            generateCoverImage('page0', page0Prompt, coverCharacterImages),
+            generateCoverImage('backCover', backCoverPrompt, coverCharacterImages)
           ];
 
           const [frontCover, page0, backCover] = await Promise.all(coverPromises);
@@ -3545,15 +3736,43 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
           const styleDescription = selectedStyle.prompt;
 
+          // Build character information for cover images
+          const coverCharacterImages = [];
+          const coverCharacterImageMap = [];
+          let characterInfo = '';
+
+          if (characters.length > 0) {
+            characterInfo = '\n\nThe cover MUST feature the following characters:\n';
+
+            characters.forEach((char, idx) => {
+              const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
+              characterInfo += `Character ${idx + 1} (${char.name})${imageRef}: ${char.age} years old, ${char.height}, ${char.build}. ${char.traits}.\n`;
+
+              // Collect character images
+              if (char.photoUrl) {
+                coverCharacterImages.push(char.photoUrl);
+                coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length });
+              }
+            });
+
+            // Add image reference explanation if we have character images
+            if (coverCharacterImageMap.length > 0) {
+              characterInfo += '\n**CHARACTER REFERENCE IMAGES:**\n';
+              coverCharacterImageMap.forEach((mapping) => {
+                characterInfo += `- Image ${mapping.imageIndex}: ${mapping.name}'s portrait (use for facial features, appearance consistency)\n`;
+              });
+            }
+          }
+
           // Use scene descriptions from outline if available, otherwise use defaults
           const titlePageScene = coverSceneDescriptions.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
           const page0Scene = coverSceneDescriptions.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
           const backCoverScene = coverSceneDescriptions.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
           // Define cover image prompts with scene descriptions from outline
-          const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as a beautiful title page for the children's book "${storyTitle}". Magical and inviting.`;
-          const page0Prompt = `${page0Scene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as the dedication/introduction page for "${storyTitle}".`;
-          const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as the back cover illustration for "${storyTitle}".`;
+          const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page for the children's book "${storyTitle}". Magical and inviting.`;
+          const page0Prompt = `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as the dedication/introduction page for "${storyTitle}".`;
+          const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as the back cover illustration for "${storyTitle}".`;
 
           // Define detailed cover scene descriptions for display
           const coverDescriptions = {
@@ -3562,9 +3781,77 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             backCover: `**Back Cover**\n\n${backCoverScene}`
           };
 
-          const generateCoverImage = async (coverType, prompt) => {
+          const generateCoverImage = async (coverType, prompt, charImages = []) => {
             try {
-              const imageData = await callGeminiAPI(prompt);
+              let imageData = null;
+
+              // If we have character images, use multi-part API call
+              if (charImages.length > 0) {
+                const parts = [{ text: prompt }];
+
+                charImages.forEach(charImage => {
+                  const base64Data = charImage.replace(/^data:image\/\w+;base64,/, '');
+                  const mimeType = charImage.match(/^data:(image\/\w+);base64,/) ?
+                    charImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+                  parts.push({
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64Data
+                    }
+                  });
+                });
+
+                const apiPayload = {
+                  model: 'gemini-2.5-flash-image',
+                  contents: [{ parts }],
+                  safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+                  ]
+                };
+
+                const response = await fetch(`${API_URL}/api/gemini`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                  },
+                  body: JSON.stringify(apiPayload)
+                });
+
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+                const data = await response.json();
+                if (!data.candidates || data.candidates.length === 0) {
+                  throw new Error("No response from Gemini.");
+                }
+
+                const candidate = data.candidates[0];
+                if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+                  throw new Error(`Content blocked: ${candidate.finishReason}.`);
+                }
+
+                if (!candidate.content || !candidate.content.parts) {
+                  throw new Error("Invalid response from Gemini.");
+                }
+
+                const responseParts = candidate.content.parts;
+                for (const part of responseParts) {
+                  if (part.inlineData && part.inlineData.data) {
+                    imageData = `data:image/png;base64,${part.inlineData.data}`;
+                    break;
+                  }
+                }
+
+                if (!imageData) throw new Error("No image data found in response.");
+              } else {
+                // No character images, use simple text-only API call
+                imageData = await callGeminiAPI(prompt);
+              }
+
               return imageData;
             } catch (error) {
               console.error(`Error generating ${coverType} cover:`, error);
@@ -3573,9 +3860,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           };
 
           const coverPromises = [
-            generateCoverImage('frontCover', frontCoverPrompt),
-            generateCoverImage('page0', page0Prompt),
-            generateCoverImage('backCover', backCoverPrompt)
+            generateCoverImage('frontCover', frontCoverPrompt, coverCharacterImages),
+            generateCoverImage('page0', page0Prompt, coverCharacterImages),
+            generateCoverImage('backCover', backCoverPrompt, coverCharacterImages)
           ];
 
           const [frontCover, page0, backCover] = await Promise.all(coverPromises);
@@ -6017,7 +6304,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <button
                       onClick={() => {
                         if (!showPromptPreview) {
-                          setEditablePrompt(buildPrompt());
+                          setEditablePrompt(buildOutlinePrompt());
                         }
                         setShowPromptPreview(!showPromptPreview);
                       }}
@@ -6028,7 +6315,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </button>
                     {showPromptPreview && (
                       <button
-                        onClick={() => setEditablePrompt(buildPrompt())}
+                        onClick={() => setEditablePrompt(buildOutlinePrompt())}
                         className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 flex items-center gap-2 text-sm"
                       >
                         <Icon name="refresh-cw" size={16} />
