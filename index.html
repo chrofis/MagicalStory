@@ -3551,10 +3551,9 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           }
 
           // Use scene descriptions from outline if available, otherwise use defaults
-          // NOTE: Use local 'coverScenes' variable instead of state to avoid async timing issues
-          const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-          const page0Scene = coverScenes.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
-          const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
+          const titlePageScene = coverSceneDescriptions.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+          const page0Scene = coverSceneDescriptions.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+          const backCoverScene = coverSceneDescriptions.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
           // Define cover image prompts with scene descriptions from outline
           const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page for the children's book "${storyTitle}".\n\nIMPORTANT: The image should ONLY contain the story title "${storyTitle}" - no other text, no subtitles, no author names. Just the title and the illustration.`;
@@ -4344,10 +4343,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           }
 
           // Use scene descriptions from outline if available, otherwise use defaults
-          // NOTE: Use local 'coverScenes' variable instead of state to avoid async timing issues
-          const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-          const page0Scene = coverScenes.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
-          const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
+          const titlePageScene = coverSceneDescriptions.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+          const page0Scene = coverSceneDescriptions.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+          const backCoverScene = coverSceneDescriptions.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
           // Define cover image prompts with scene descriptions from outline
           const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page for the children's book "${storyTitle}".\n\nIMPORTANT: The image should ONLY contain the story title "${storyTitle}" - no other text, no subtitles, no author names. Just the title and the illustration.`;

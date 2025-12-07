@@ -2901,17 +2901,26 @@ async function processStoryJob(jobId) {
     const sceneArray = parseSceneDescriptions(sceneDescriptions);
     const images = [];
 
-    for (let i = 0; i < sceneArray.length; i++) {
-      const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
-      const imageData = await callGeminiAPIForImage(imagePrompt);
-      images.push(imageData);
+    console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images for job ${jobId}`);
 
-      // Update progress
-      const imageProgress = 70 + Math.floor((i + 1) / sceneArray.length * 25);
-      await dbPool.query(
-        'UPDATE story_jobs SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [imageProgress, jobId]
-      );
+    for (let i = 0; i < sceneArray.length; i++) {
+      try {
+        console.log(`📸 [PIPELINE] Generating image ${i + 1}/${sceneArray.length} for job ${jobId}`);
+        const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
+        const imageData = await callGeminiAPIForImage(imagePrompt);
+        images.push(imageData);
+        console.log(`✅ [PIPELINE] Image ${i + 1}/${sceneArray.length} generated successfully`);
+
+        // Update progress
+        const imageProgress = 70 + Math.floor((i + 1) / sceneArray.length * 25);
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [imageProgress, jobId]
+        );
+      } catch (error) {
+        console.error(`❌ [PIPELINE] Failed to generate image ${i + 1}/${sceneArray.length} for job ${jobId}:`, error);
+        throw new Error(`Image generation failed for scene ${i + 1}: ${error.message}`);
+      }
     }
 
     // Step 5: Generate cover images
@@ -2920,23 +2929,48 @@ async function processStoryJob(jobId) {
       [95, 'Generating cover images...', jobId]
     );
 
+    console.log(`📕 [PIPELINE] Generating cover images for job ${jobId}`);
+
     const artStyle = inputData.artStyle || 'pixar';
     const storyTitle = inputData.title || 'My Story';
     const characterInfo = inputData.characters && inputData.characters.length > 0
       ? `\n\nMain characters: ${inputData.characters.map(c => `${c.name} (${c.gender}, age ${c.age})`).join(', ')}`
       : '';
 
+    let frontCover, page0, backCover;
+
     // Generate front cover
-    const frontCoverPrompt = `Children's book front cover illustration for "${storyTitle}". Style: ${artStyle}. ${characterInfo}\n\nCreate a beautiful, eye-catching cover that captures the essence of the story.`;
-    const frontCover = await callGeminiAPIForImage(frontCoverPrompt);
+    try {
+      console.log(`📕 [PIPELINE] Generating front cover for job ${jobId}`);
+      const frontCoverPrompt = `Children's book front cover illustration for "${storyTitle}". Style: ${artStyle}. ${characterInfo}\n\nCreate a beautiful, eye-catching cover that captures the essence of the story.`;
+      frontCover = await callGeminiAPIForImage(frontCoverPrompt);
+      console.log(`✅ [PIPELINE] Front cover generated successfully`);
+    } catch (error) {
+      console.error(`❌ [PIPELINE] Failed to generate front cover for job ${jobId}:`, error);
+      throw new Error(`Front cover generation failed: ${error.message}`);
+    }
 
     // Generate page 0 (dedication page) - warm, inviting illustration
-    const page0Prompt = `Children's book page 0 dedication/introduction page illustration. Style: ${artStyle}. ${characterInfo}\n\nCreate a warm, inviting illustration that welcomes readers into the story world.${inputData.dedication ? `\n\nDedication text: "${inputData.dedication}"` : ''}`;
-    const page0 = await callGeminiAPIForImage(page0Prompt);
+    try {
+      console.log(`📕 [PIPELINE] Generating page 0 (dedication) for job ${jobId}`);
+      const page0Prompt = `Children's book page 0 dedication/introduction page illustration. Style: ${artStyle}. ${characterInfo}\n\nCreate a warm, inviting illustration that welcomes readers into the story world.${inputData.dedication ? `\n\nDedication text: "${inputData.dedication}"` : ''}`;
+      page0 = await callGeminiAPIForImage(page0Prompt);
+      console.log(`✅ [PIPELINE] Page 0 generated successfully`);
+    } catch (error) {
+      console.error(`❌ [PIPELINE] Failed to generate page 0 for job ${jobId}:`, error);
+      throw new Error(`Page 0 generation failed: ${error.message}`);
+    }
 
     // Generate back cover
-    const backCoverPrompt = `Children's book back cover illustration. Style: ${artStyle}. ${characterInfo}\n\nCreate a complementary illustration for the back cover that ties the story together.`;
-    const backCover = await callGeminiAPIForImage(backCoverPrompt);
+    try {
+      console.log(`📕 [PIPELINE] Generating back cover for job ${jobId}`);
+      const backCoverPrompt = `Children's book back cover illustration. Style: ${artStyle}. ${characterInfo}\n\nCreate a complementary illustration for the back cover that ties the story together.`;
+      backCover = await callGeminiAPIForImage(backCoverPrompt);
+      console.log(`✅ [PIPELINE] Back cover generated successfully`);
+    } catch (error) {
+      console.error(`❌ [PIPELINE] Failed to generate back cover for job ${jobId}:`, error);
+      throw new Error(`Back cover generation failed: ${error.message}`);
+    }
 
     const coverImages = {
       frontCover,
@@ -3058,43 +3092,61 @@ async function callGeminiAPIForImage(prompt) {
     throw new Error('Gemini API key not configured');
   }
 
+  const requestBody = {
+    contents: [{
+      parts: [{ text: prompt }]
+    }]
+  };
+
+  console.log('🖼️  [IMAGE GEN] Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
+  console.log('🖼️  [IMAGE GEN] Model: gemini-2.5-flash-image');
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }]
-      })
+      body: JSON.stringify(requestBody)
     }
   );
 
+  console.log('🖼️  [IMAGE GEN] Response status:', response.status, response.statusText);
+
   if (!response.ok) {
     const error = await response.text();
-    console.error('Gemini image API error:', error);
-    throw new Error(`Gemini API error: ${error}`);
+    console.error('❌ [IMAGE GEN] Gemini API error response:', error);
+    throw new Error(`Gemini API error (${response.status}): ${error}`);
   }
 
   const data = await response.json();
-  console.log('Gemini API response structure:', JSON.stringify(data).substring(0, 300));
+
+  // Log full response structure for debugging
+  console.log('🖼️  [IMAGE GEN] Full API response:', JSON.stringify(data, null, 2));
 
   if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('No image generated');
+    console.error('❌ [IMAGE GEN] No candidates in response. Response keys:', Object.keys(data));
+    throw new Error('No image generated - no candidates in response');
   }
 
   // Extract image data
   const candidate = data.candidates[0];
+  console.log('🖼️  [IMAGE GEN] Candidate structure:', JSON.stringify(candidate, null, 2));
+
   if (candidate.content && candidate.content.parts) {
+    console.log('🖼️  [IMAGE GEN] Found', candidate.content.parts.length, 'parts in candidate');
     for (const part of candidate.content.parts) {
+      console.log('🖼️  [IMAGE GEN] Part keys:', Object.keys(part));
       if (part.inlineData && part.inlineData.data) {
+        console.log('✅ [IMAGE GEN] Successfully extracted image data');
         return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
+  } else {
+    console.error('❌ [IMAGE GEN] Unexpected candidate structure. Keys:', Object.keys(candidate));
   }
 
-  throw new Error('No image data in response');
+  console.error('❌ [IMAGE GEN] No image data found in any part');
+  throw new Error('No image data in response - check logs for API response structure');
 }
 
 // Create a new story generation job
