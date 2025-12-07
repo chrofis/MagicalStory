@@ -1246,9 +1246,9 @@ app.get('/api/characters', authenticateToken, async (req, res) => {
       relationships: {},
       relationshipTexts: {},
       customRelationships: [],
-      customStrengths: {},
-      customWeaknesses: {},
-      customFears: {}
+      customStrengths: [],
+      customWeaknesses: [],
+      customFears: []
     };
 
     if (STORAGE_MODE === 'database' && dbPool) {
@@ -1304,9 +1304,9 @@ app.post('/api/characters', authenticateToken, async (req, res) => {
       relationships: relationships || {},
       relationshipTexts: relationshipTexts || {},
       customRelationships: customRelationships || [],
-      customStrengths: customStrengths || {},
-      customWeaknesses: customWeaknesses || {},
-      customFears: customFears || {}
+      customStrengths: customStrengths || [],
+      customWeaknesses: customWeaknesses || [],
+      customFears: customFears || []
     };
 
     if (STORAGE_MODE === 'database' && dbPool) {
