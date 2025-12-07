@@ -3120,8 +3120,12 @@ async function callGeminiAPIForImage(prompt) {
 
   const data = await response.json();
 
-  // Log full response structure for debugging
-  console.log('🖼️  [IMAGE GEN] Full API response:', JSON.stringify(data, null, 2));
+  // Log response structure (without base64 data to avoid massive logs)
+  console.log('🖼️  [IMAGE GEN] Response structure:', {
+    hasCandidates: !!data.candidates,
+    candidatesCount: data.candidates?.length || 0,
+    responseKeys: Object.keys(data)
+  });
 
   if (!data.candidates || data.candidates.length === 0) {
     console.error('❌ [IMAGE GEN] No candidates in response. Response keys:', Object.keys(data));
@@ -3130,14 +3134,21 @@ async function callGeminiAPIForImage(prompt) {
 
   // Extract image data
   const candidate = data.candidates[0];
-  console.log('🖼️  [IMAGE GEN] Candidate structure:', JSON.stringify(candidate, null, 2));
+  console.log('🖼️  [IMAGE GEN] Candidate structure:', {
+    hasContent: !!candidate.content,
+    hasParts: !!candidate.content?.parts,
+    partsCount: candidate.content?.parts?.length || 0,
+    candidateKeys: Object.keys(candidate)
+  });
 
   if (candidate.content && candidate.content.parts) {
     console.log('🖼️  [IMAGE GEN] Found', candidate.content.parts.length, 'parts in candidate');
     for (const part of candidate.content.parts) {
       console.log('🖼️  [IMAGE GEN] Part keys:', Object.keys(part));
       if (part.inlineData && part.inlineData.data) {
-        console.log('✅ [IMAGE GEN] Successfully extracted image data');
+        const imageDataSize = part.inlineData.data.length;
+        const imageSizeKB = (imageDataSize / 1024).toFixed(2);
+        console.log(`✅ [IMAGE GEN] Successfully extracted image data (${imageSizeKB} KB base64)`);
         return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
