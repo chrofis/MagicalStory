@@ -756,6 +756,8 @@
         available_page_counts: '[24]',
         is_active: true
       });
+      const [showOrderModal, setShowOrderModal] = useState(false);
+      const [orderData, setOrderData] = useState(null); // { orderId, dashboardUrl, pdfUrl, pdfFilename, isDraft, previewUrls }
 
       const characterFormRef = React.useRef(null);
 
@@ -3860,65 +3862,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           const gelatoData = await gelatoResponse.json();
 
           if (gelatoResponse.ok) {
-            // Build message based on draft vs actual order
-            let message = '';
-
-            if (gelatoData.isDraft) {
-              // Draft order - show preview information
-              message = language === 'de'
-                ? `📋 Vorschau-Bestellung erstellt!\n\n` +
-                  `Bestellnummer: ${gelatoData.orderId}\n` +
-                  `Status: ENTWURF (wird nicht gedruckt)\n\n` +
-                  `PDF: ${pdfData.filename}\n\n` +
-                  `✨ Sie können Ihre Bestellung in Ihrem Gelato Dashboard ansehen:\n${gelatoData.dashboardUrl}\n\n` +
-                  (gelatoData.previewUrls && gelatoData.previewUrls.length > 0
-                    ? `Vorschau-Links:\n${gelatoData.previewUrls.map(p => p.url).join('\n')}\n\n`
-                    : '') +
-                  `⚠️ Um tatsächlich zu drucken, ändern Sie GELATO_ORDER_TYPE in .env von 'draft' auf 'order'`
-                : language === 'fr'
-                ? `📋 Commande d'aperçu créée!\n\n` +
-                  `Numéro de commande: ${gelatoData.orderId}\n` +
-                  `Statut: BROUILLON (ne sera pas imprimé)\n\n` +
-                  `PDF: ${pdfData.filename}\n\n` +
-                  `✨ Vous pouvez voir votre commande sur votre tableau de bord Gelato:\n${gelatoData.dashboardUrl}\n\n` +
-                  (gelatoData.previewUrls && gelatoData.previewUrls.length > 0
-                    ? `Liens d'aperçu:\n${gelatoData.previewUrls.map(p => p.url).join('\n')}\n\n`
-                    : '') +
-                  `⚠️ Pour imprimer réellement, changez GELATO_ORDER_TYPE dans .env de 'draft' à 'order'`
-                : `📋 Preview Order Created!\n\n` +
-                  `Order ID: ${gelatoData.orderId}\n` +
-                  `Status: DRAFT (will not be printed)\n\n` +
-                  `PDF: ${pdfData.filename}\n\n` +
-                  `✨ View your order in Gelato Dashboard:\n${gelatoData.dashboardUrl}\n\n` +
-                  (gelatoData.previewUrls && gelatoData.previewUrls.length > 0
-                    ? `Preview Links:\n${gelatoData.previewUrls.map(p => p.url).join('\n')}\n\n`
-                    : '') +
-                  `⚠️ To actually print, change GELATO_ORDER_TYPE in .env from 'draft' to 'order'`;
-            } else {
-              // Actual order - will be printed
-              message = language === 'de'
-                ? `✅ Bestellung erfolgreich erstellt!\n\n` +
-                  `Bestellnummer: ${gelatoData.orderId}\n` +
-                  `Status: WIRD GEDRUCKT\n\n` +
-                  `PDF: ${pdfData.filename}\n\n` +
-                  `Sie erhalten eine Bestätigungs-E-Mail an ${email}\n\n` +
-                  `Dashboard: ${gelatoData.dashboardUrl}`
-                : language === 'fr'
-                ? `✅ Commande créée avec succès!\n\n` +
-                  `Numéro de commande: ${gelatoData.orderId}\n` +
-                  `Statut: EN IMPRESSION\n\n` +
-                  `PDF: ${pdfData.filename}\n\n` +
-                  `Vous recevrez un e-mail de confirmation à ${email}\n\n` +
-                  `Tableau de bord: ${gelatoData.dashboardUrl}`
-                : `✅ Order Created Successfully!\n\n` +
-                  `Order ID: ${gelatoData.orderId}\n` +
-                  `Status: PRINTING\n\n` +
-                  `PDF: ${pdfData.filename}\n\n` +
-                  `You will receive a confirmation email at ${email}\n\n` +
-                  `Dashboard: ${gelatoData.dashboardUrl}`;
-            }
-
-            alert(message);
+            // Show custom modal instead of alert
+            setOrderData({
+              orderId: gelatoData.orderId,
+              dashboardUrl: gelatoData.dashboardUrl,
+              pdfUrl: pdfData.fileUrl,
+              pdfFilename: pdfData.filename,
+              isDraft: gelatoData.isDraft,
+              previewUrls: gelatoData.previewUrls || [],
+              email: email
+            });
+            setShowOrderModal(true);
           } else {
             // PDF was generated but Gelato order failed
             if (gelatoData.setupUrl) {
@@ -7051,6 +7005,133 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Order Success Modal */}
+          {showOrderModal && orderData && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
+                <div className="text-center mb-6">
+                  <h2 className="text-3xl font-bold text-purple-700 mb-2">
+                    {orderData.isDraft
+                      ? (language === 'de' ? '📋 Vorschau-Bestellung' : language === 'fr' ? '📋 Commande d\'aperçu' : '📋 Preview Order')
+                      : (language === 'de' ? '✅ Bestellung erstellt!' : language === 'fr' ? '✅ Commande créée!' : '✅ Order Created!')
+                    }
+                  </h2>
+                  <p className="text-gray-600">
+                    {orderData.isDraft
+                      ? (language === 'de' ? 'ENTWURF (wird nicht gedruckt)' : language === 'fr' ? 'BROUILLON (ne sera pas imprimé)' : 'DRAFT (will not be printed)')
+                      : (language === 'de' ? 'WIRD GEDRUCKT' : language === 'fr' ? 'EN IMPRESSION' : 'PRINTING')
+                    }
+                  </p>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  {/* Order ID */}
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="text-sm font-medium text-gray-700 mb-1">
+                      {language === 'de' ? 'Bestellnummer' : language === 'fr' ? 'Numéro de commande' : 'Order ID'}
+                    </div>
+                    <div className="text-lg font-mono font-bold text-purple-700 select-all">
+                      {orderData.orderId}
+                    </div>
+                  </div>
+
+                  {/* PDF Filename */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="text-sm font-medium text-gray-700 mb-1">PDF</div>
+                    <div className="text-gray-900 select-all break-all">{orderData.pdfFilename}</div>
+                  </div>
+
+                  {/* Dashboard Link */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="text-sm font-medium text-gray-700 mb-2">
+                      {language === 'de' ? 'Gelato Dashboard' : language === 'fr' ? 'Tableau de bord Gelato' : 'Gelato Dashboard'}
+                    </div>
+                    <a
+                      href={orderData.dashboardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline break-all select-all"
+                    >
+                      {orderData.dashboardUrl}
+                    </a>
+                  </div>
+
+                  {/* Preview URLs (if draft) */}
+                  {orderData.isDraft && orderData.previewUrls && orderData.previewUrls.length > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="text-sm font-medium text-gray-700 mb-2">
+                        {language === 'de' ? 'Vorschau-Links' : language === 'fr' ? 'Liens d\'aperçu' : 'Preview Links'}
+                      </div>
+                      <div className="space-y-2">
+                        {orderData.previewUrls.map((preview, idx) => (
+                          <a
+                            key={idx}
+                            href={preview.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-green-600 hover:text-green-800 underline break-all select-all text-sm"
+                          >
+                            {preview.url}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Email confirmation (non-draft) */}
+                  {!orderData.isDraft && orderData.email && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="text-sm text-gray-700">
+                        {language === 'de'
+                          ? `Sie erhalten eine Bestätigungs-E-Mail an ${orderData.email}`
+                          : language === 'fr'
+                          ? `Vous recevrez un e-mail de confirmation à ${orderData.email}`
+                          : `You will receive a confirmation email at ${orderData.email}`
+                        }
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Draft warning */}
+                  {orderData.isDraft && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                      <div className="text-sm text-orange-700">
+                        ⚠️ {language === 'de'
+                          ? 'Um tatsächlich zu drucken, ändern Sie GELATO_ORDER_TYPE in .env von "draft" auf "order"'
+                          : language === 'fr'
+                          ? 'Pour imprimer réellement, changez GELATO_ORDER_TYPE dans .env de "draft" à "order"'
+                          : 'To actually print, change GELATO_ORDER_TYPE in .env from "draft" to "order"'
+                        }
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4">
+                  {/* Admin-only PDF Download Button */}
+                  {currentUser && currentUser.role === 'admin' && orderData.pdfUrl && (
+                    <a
+                      href={orderData.pdfUrl}
+                      download={orderData.pdfFilename}
+                      className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2"
+                    >
+                      <Icon name="download" size={20} />
+                      {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
+                    </a>
+                  )}
+
+                  <button
+                    onClick={() => setShowOrderModal(false)}
+                    className={`${currentUser && currentUser.role === 'admin' ? 'flex-1' : 'w-full'} bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-semibold`}
+                  >
+                    {language === 'de' ? 'Schließen' : language === 'fr' ? 'Fermer' : 'Close'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
