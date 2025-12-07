@@ -733,6 +733,8 @@
       const [apiCalls, setApiCalls] = useState({}); // Store full API calls for admin debugging
       const [editingImageIndex, setEditingImageIndex] = useState(null);
       const [imageEditInstruction, setImageEditInstruction] = useState('');
+      const [editingCoverImage, setEditingCoverImage] = useState(null); // 'frontCover', 'page0', 'backCover', or null
+      const [coverEditInstruction, setCoverEditInstruction] = useState('');
       const [avatarPrompt, setAvatarPrompt] = useState('');
       const [showAvatarPrompt, setShowAvatarPrompt] = useState(false);
       const [analyzedTraitsText, setAnalyzedTraitsText] = useState(''); // Full analyzed description
@@ -6289,49 +6291,324 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
           )}
 
-          {/* Display Cover Images */}
-          {(coverImages.frontCover || coverImages.page0 || coverImages.backCover) && (
+          {/* Display Cover Images with Controls */}
+          {(coverImages.frontCover || coverImages.page0 || coverImages.backCover || coverImagePrompts.frontCover || coverImagePrompts.page0 || coverImagePrompts.backCover) && (
             <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 mt-6">
               <h3 className="text-xl font-bold text-purple-700 mb-4 flex items-center gap-2">
                 <Icon name="book" size={24} /> Cover Pages
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {coverImages.frontCover && (
+                {/* Front Cover / Title Page */}
+                {(coverImages.frontCover || coverImagePrompts.frontCover) && (
                   <div className="bg-white border-2 border-purple-300 rounded-lg p-4 shadow-lg">
                     <h4 className="text-lg font-bold text-purple-700 mb-3">Front Cover / Title Page</h4>
-                    <img
-                      src={coverImages.frontCover}
-                      alt="Front Cover"
-                      className="w-full rounded-lg shadow-md mb-3"
-                    />
-                    {coverImages.descriptions && (
-                      <p className="text-sm text-gray-600 italic">{coverImages.descriptions.frontCover}</p>
+                    {coverImages.frontCover ? (
+                      <>
+                        <img
+                          src={coverImages.frontCover}
+                          alt="Front Cover"
+                          className="w-full rounded-lg shadow-md mb-3"
+                        />
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={async () => {
+                              if (confirm('Regenerate front cover?')) {
+                                try {
+                                  const prompt = coverImagePrompts.frontCover;
+                                  const newImage = await callGeminiAPI(prompt);
+                                  setCoverImages({...coverImages, frontCover: newImage});
+                                } catch (error) {
+                                  alert(`Error: ${error.message}`);
+                                }
+                              }
+                            }}
+                            className="flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center gap-1 text-sm font-semibold"
+                          >
+                            <Icon name="refresh-cw" size={14} /> {t.regenerateImage}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingCoverImage(editingCoverImage === 'frontCover' ? null : 'frontCover');
+                              setCoverEditInstruction('');
+                            }}
+                            className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                          >
+                            <Icon name="edit" size={14} /> {t.editImage}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 text-red-700 mb-3">
+                        <p className="font-semibold">⚠️ Error generating image</p>
+                      </div>
+                    )}
+
+                    {editingCoverImage === 'frontCover' && (
+                      <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
+                        <p className="text-sm font-semibold text-purple-700 mb-2">{t.editInstruction}</p>
+                        <textarea
+                          value={coverEditInstruction}
+                          onChange={(e) => setCoverEditInstruction(e.target.value)}
+                          placeholder={coverImagePrompts.frontCover || "Enter prompt..."}
+                          className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!coverEditInstruction.trim()) {
+                              alert('Please enter a prompt');
+                              return;
+                            }
+                            try {
+                              const newImage = await callGeminiAPI(coverEditInstruction);
+                              setCoverImages({...coverImages, frontCover: newImage});
+                              setCoverImagePrompts({...coverImagePrompts, frontCover: coverEditInstruction});
+                              setEditingCoverImage(null);
+                              setCoverEditInstruction('');
+                            } catch (error) {
+                              alert(`Error: ${error.message}`);
+                            }
+                          }}
+                          className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                        >
+                          {t.applyEdit}
+                        </button>
+                      </div>
+                    )}
+
+                    {coverImagePrompts.frontCover && (
+                      <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                          {t.showPrompt}
+                        </summary>
+                        <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                          {coverImagePrompts.frontCover}
+                        </pre>
+                      </details>
+                    )}
+
+                    {currentUser && currentUser.role === 'admin' && coverImageApiCalls.frontCover && (
+                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                          {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
+                        </summary>
+                        <div className="mt-2 text-xs text-gray-700">
+                          <div className="mb-2"><span className="font-semibold">Model:</span> {coverImageApiCalls.frontCover.model}</div>
+                          <div className="mb-2"><span className="font-semibold">Type:</span> {coverImageApiCalls.frontCover.type}</div>
+                          <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                            {JSON.stringify(coverImageApiCalls.frontCover, null, 2)}
+                          </pre>
+                        </div>
+                      </details>
                     )}
                   </div>
                 )}
-                {coverImages.page0 && (
+
+                {/* Page 0 */}
+                {(coverImages.page0 || coverImagePrompts.page0) && (
                   <div className="bg-white border-2 border-purple-300 rounded-lg p-4 shadow-lg">
                     <h4 className="text-lg font-bold text-purple-700 mb-3">Page 0</h4>
-                    <img
-                      src={coverImages.page0}
-                      alt="Page 0"
-                      className="w-full rounded-lg shadow-md mb-3"
-                    />
-                    {coverImages.descriptions && (
-                      <p className="text-sm text-gray-600 italic">{coverImages.descriptions.page0}</p>
+                    {coverImages.page0 ? (
+                      <>
+                        <img
+                          src={coverImages.page0}
+                          alt="Page 0"
+                          className="w-full rounded-lg shadow-md mb-3"
+                        />
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={async () => {
+                              if (confirm('Regenerate Page 0?')) {
+                                try {
+                                  const prompt = coverImagePrompts.page0;
+                                  const newImage = await callGeminiAPI(prompt);
+                                  setCoverImages({...coverImages, page0: newImage});
+                                } catch (error) {
+                                  alert(`Error: ${error.message}`);
+                                }
+                              }
+                            }}
+                            className="flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center gap-1 text-sm font-semibold"
+                          >
+                            <Icon name="refresh-cw" size={14} /> {t.regenerateImage}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingCoverImage(editingCoverImage === 'page0' ? null : 'page0');
+                              setCoverEditInstruction('');
+                            }}
+                            className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                          >
+                            <Icon name="edit" size={14} /> {t.editImage}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 text-red-700 mb-3">
+                        <p className="font-semibold">⚠️ Error generating image</p>
+                      </div>
+                    )}
+
+                    {editingCoverImage === 'page0' && (
+                      <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
+                        <p className="text-sm font-semibold text-purple-700 mb-2">{t.editInstruction}</p>
+                        <textarea
+                          value={coverEditInstruction}
+                          onChange={(e) => setCoverEditInstruction(e.target.value)}
+                          placeholder={coverImagePrompts.page0 || "Enter prompt..."}
+                          className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!coverEditInstruction.trim()) {
+                              alert('Please enter a prompt');
+                              return;
+                            }
+                            try {
+                              const newImage = await callGeminiAPI(coverEditInstruction);
+                              setCoverImages({...coverImages, page0: newImage});
+                              setCoverImagePrompts({...coverImagePrompts, page0: coverEditInstruction});
+                              setEditingCoverImage(null);
+                              setCoverEditInstruction('');
+                            } catch (error) {
+                              alert(`Error: ${error.message}`);
+                            }
+                          }}
+                          className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                        >
+                          {t.applyEdit}
+                        </button>
+                      </div>
+                    )}
+
+                    {coverImagePrompts.page0 && (
+                      <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                          {t.showPrompt}
+                        </summary>
+                        <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                          {coverImagePrompts.page0}
+                        </pre>
+                      </details>
+                    )}
+
+                    {currentUser && currentUser.role === 'admin' && coverImageApiCalls.page0 && (
+                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                          {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
+                        </summary>
+                        <div className="mt-2 text-xs text-gray-700">
+                          <div className="mb-2"><span className="font-semibold">Model:</span> {coverImageApiCalls.page0.model}</div>
+                          <div className="mb-2"><span className="font-semibold">Type:</span> {coverImageApiCalls.page0.type}</div>
+                          <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                            {JSON.stringify(coverImageApiCalls.page0, null, 2)}
+                          </pre>
+                        </div>
+                      </details>
                     )}
                   </div>
                 )}
-                {coverImages.backCover && (
+
+                {/* Back Cover */}
+                {(coverImages.backCover || coverImagePrompts.backCover) && (
                   <div className="bg-white border-2 border-purple-300 rounded-lg p-4 shadow-lg">
                     <h4 className="text-lg font-bold text-purple-700 mb-3">Back Cover</h4>
-                    <img
-                      src={coverImages.backCover}
-                      alt="Back Cover"
-                      className="w-full rounded-lg shadow-md mb-3"
-                    />
-                    {coverImages.descriptions && (
-                      <p className="text-sm text-gray-600 italic">{coverImages.descriptions.backCover}</p>
+                    {coverImages.backCover ? (
+                      <>
+                        <img
+                          src={coverImages.backCover}
+                          alt="Back Cover"
+                          className="w-full rounded-lg shadow-md mb-3"
+                        />
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={async () => {
+                              if (confirm('Regenerate back cover?')) {
+                                try {
+                                  const prompt = coverImagePrompts.backCover;
+                                  const newImage = await callGeminiAPI(prompt);
+                                  setCoverImages({...coverImages, backCover: newImage});
+                                } catch (error) {
+                                  alert(`Error: ${error.message}`);
+                                }
+                              }
+                            }}
+                            className="flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center gap-1 text-sm font-semibold"
+                          >
+                            <Icon name="refresh-cw" size={14} /> {t.regenerateImage}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingCoverImage(editingCoverImage === 'backCover' ? null : 'backCover');
+                              setCoverEditInstruction('');
+                            }}
+                            className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                          >
+                            <Icon name="edit" size={14} /> {t.editImage}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 text-red-700 mb-3">
+                        <p className="font-semibold">⚠️ Error generating image</p>
+                      </div>
+                    )}
+
+                    {editingCoverImage === 'backCover' && (
+                      <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
+                        <p className="text-sm font-semibold text-purple-700 mb-2">{t.editInstruction}</p>
+                        <textarea
+                          value={coverEditInstruction}
+                          onChange={(e) => setCoverEditInstruction(e.target.value)}
+                          placeholder={coverImagePrompts.backCover || "Enter prompt..."}
+                          className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!coverEditInstruction.trim()) {
+                              alert('Please enter a prompt');
+                              return;
+                            }
+                            try {
+                              const newImage = await callGeminiAPI(coverEditInstruction);
+                              setCoverImages({...coverImages, backCover: newImage});
+                              setCoverImagePrompts({...coverImagePrompts, backCover: coverEditInstruction});
+                              setEditingCoverImage(null);
+                              setCoverEditInstruction('');
+                            } catch (error) {
+                              alert(`Error: ${error.message}`);
+                            }
+                          }}
+                          className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                        >
+                          {t.applyEdit}
+                        </button>
+                      </div>
+                    )}
+
+                    {coverImagePrompts.backCover && (
+                      <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                          {t.showPrompt}
+                        </summary>
+                        <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                          {coverImagePrompts.backCover}
+                        </pre>
+                      </details>
+                    )}
+
+                    {currentUser && currentUser.role === 'admin' && coverImageApiCalls.backCover && (
+                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                          {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
+                        </summary>
+                        <div className="mt-2 text-xs text-gray-700">
+                          <div className="mb-2"><span className="font-semibold">Model:</span> {coverImageApiCalls.backCover.model}</div>
+                          <div className="mb-2"><span className="font-semibold">Type:</span> {coverImageApiCalls.backCover.type}</div>
+                          <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                            {JSON.stringify(coverImageApiCalls.backCover, null, 2)}
+                          </pre>
+                        </div>
+                      </details>
                     )}
                   </div>
                 )}
