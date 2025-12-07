@@ -609,8 +609,8 @@ app.post('/api/claude', authenticateToken, async (req, res) => {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: max_tokens || 4096,
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: max_tokens || 8192,
         messages: [{ role: 'user', content: prompt }]
       })
     });
