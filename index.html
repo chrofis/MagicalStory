@@ -2824,6 +2824,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
             let characterPrompts = '';
             const characterImages = [];
+            const characterImageMap = []; // Track which image belongs to which character
 
             if (charactersInScene.length > 0) {
               characterPrompts = '\n\nThe scene MUST feature the following characters with strict adherence to their physical description (Age, Height, Build):\n';
@@ -2863,13 +2864,26 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 if (char.otherFeatures) physicalDesc += char.otherFeatures;
                 if (!physicalDesc) physicalDesc = '3D character';
 
-                characterPrompts += `Character ${idx + 1} (${char.name}): Age ${char.age}, ${physicalDesc.trim()}. Wearing: ${characterClothing[char.name]}. Eyes must be correctly aligned, not cross-eyed, with a natural gaze.\n`;
+                // Track if this character has a reference image
+                const hasImage = char.photoUrl ? true : false;
+                const imageRef = hasImage ? ` [Reference Image ${characterImages.length + 1}]` : '';
+
+                characterPrompts += `Character ${idx + 1} (${char.name})${imageRef}: Age ${char.age}, ${physicalDesc.trim()}. Wearing: ${characterClothing[char.name]}. Eyes must be correctly aligned, not cross-eyed, with a natural gaze.\n`;
 
                 // Use avatar (photoUrl) for better character consistency
                 if (char.photoUrl) {
                   characterImages.push(char.photoUrl);
+                  characterImageMap.push({ name: char.name, imageIndex: characterImages.length });
                 }
               });
+
+              // Add image reference explanation if we have character images
+              if (characterImageMap.length > 0) {
+                characterPrompts += '\n**CHARACTER REFERENCE IMAGES:**\n';
+                characterImageMap.forEach((mapping) => {
+                  characterPrompts += `- Image ${mapping.imageIndex}: ${mapping.name}'s portrait (use for facial features, appearance consistency)\n`;
+                });
+              }
 
               characterPrompts += '\nMaintain their visual identity, relative heights, and ages as described.';
             }
