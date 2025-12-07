@@ -917,6 +917,54 @@
         }
       }, [authToken, isAuthenticated]);
 
+      // Check for Stripe payment callback on page load
+      useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentStatus = urlParams.get('payment');
+        const sessionId = urlParams.get('session_id');
+
+        if (paymentStatus === 'success' && sessionId) {
+          console.log('✅ [STRIPE] Payment successful!');
+          console.log('   Session ID:', sessionId);
+          console.log('   Checking order status...');
+
+          // Check order status in database
+          fetch(`${API_URL}/api/stripe/order-status/${sessionId}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          })
+            .then(res => res.json())
+            .then(data => {
+              console.log('📦 [STRIPE] Order Status:', data);
+              if (data.order) {
+                console.log('   Customer:', data.order.customer_name);
+                console.log('   Email:', data.order.customer_email);
+                console.log('   Shipping Address:', {
+                  name: data.order.shipping_name,
+                  line1: data.order.shipping_address_line1,
+                  city: data.order.shipping_city,
+                  postal_code: data.order.shipping_postal_code,
+                  country: data.order.shipping_country
+                });
+                console.log('   Amount:', (data.order.amount_total / 100).toFixed(2), data.order.currency.toUpperCase());
+                alert(`Payment successful! Your book order has been received.\n\nOrder Details:\nCustomer: ${data.order.customer_name}\nEmail: ${data.order.customer_email}\nAmount: €${(data.order.amount_total / 100).toFixed(2)}\n\nYour book will be printed and shipped to:\n${data.order.shipping_name}\n${data.order.shipping_address_line1}\n${data.order.shipping_city}, ${data.order.shipping_postal_code}\n${data.order.shipping_country}`);
+              }
+
+              // Clean up URL
+              window.history.replaceState({}, document.title, window.location.pathname);
+            })
+            .catch(err => {
+              console.error('❌ [STRIPE] Error checking order status:', err);
+            });
+
+        } else if (paymentStatus === 'cancelled') {
+          console.log('⚠️  [STRIPE] Payment cancelled by user');
+          alert('Payment was cancelled. You can try again when ready.');
+
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }, []);
+
       // Always load stories when user opens the stories modal
       useEffect(() => {
         if (showSavedStories && authToken) {
@@ -7212,15 +7260,46 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               </button>
             )}
             {/* Developer Mode Only: Buy Book via Stripe */}
-            {developerMode && sceneImages.length > 0 && (
-              <a
-                href="https://buy.stripe.com/test_3cIaEQ5kZ8Rsegnf3i1ck00"
-                target="_blank"
-                rel="noopener noreferrer"
+            {developerMode && sceneImages.length > 0 && currentStoryId && (
+              <button
+                onClick={async () => {
+                  try {
+                    console.log('💳 [STRIPE] Initiating checkout for story:', currentStoryId);
+                    console.log('   Story Title:', storyTitle);
+                    console.log('   User:', currentUser?.username);
+
+                    const response = await fetch(`${API_URL}/api/stripe/create-checkout-session`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                      },
+                      body: JSON.stringify({ storyId: currentStoryId })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                      console.error('❌ [STRIPE] Failed to create checkout session:', data.error);
+                      alert('Failed to create checkout session: ' + data.error);
+                      return;
+                    }
+
+                    console.log('✅ [STRIPE] Checkout session created:', data.sessionId);
+                    console.log('   Checkout URL:', data.url);
+                    console.log('   Redirecting to Stripe...');
+
+                    // Redirect to Stripe Checkout
+                    window.location.href = data.url;
+                  } catch (err) {
+                    console.error('❌ [STRIPE] Error:', err);
+                    alert('Error creating checkout: ' + err.message);
+                  }
+                }}
                 className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 font-semibold flex items-center justify-center gap-2"
               >
-                <Icon name="shopping-cart" size={20} /> Buy Book
-              </a>
+                <Icon name="shopping-cart" size={20} /> Buy Book (€29.90)
+              </button>
             )}
             {currentUser && currentUser.role === 'admin' && generatedPrompt && (
               <button
