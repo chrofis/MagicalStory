@@ -713,6 +713,11 @@
         backCover: null
       });
       const [storyTitle, setStoryTitle] = useState('');
+      const [coverSceneDescriptions, setCoverSceneDescriptions] = useState({
+        titlePage: '',
+        page0: '',
+        backCover: ''
+      });
       const [geminiApiKey, setGeminiApiKey] = useState('');
       const [showGeminiApiKeyPrompt, setShowGeminiApiKeyPrompt] = useState(false);
       const [tempGeminiApiKey, setTempGeminiApiKey] = useState('');
@@ -1821,45 +1826,76 @@
           // Get list of non-main characters (secondary characters)
           const secondaryCharacters = characters.filter(c => !mainCharacters.includes(c.id));
 
-          let characterManifestPrompt = '';
-          if (secondaryCharacters.length > 0) {
-            characterManifestPrompt = `\n\nAFTER the outline, create a CHARACTER MANIFEST for visual consistency. For each secondary/supporting character that appears in the story, provide detailed appearance descriptions in this JSON format:
+          // Character manifest removed - will be generated during scene generation phase
 
-{
-  "characters": [
-    {
-      "name": "Character Name",
-      "role": "supporting/minor/creature",
-      "appearance": {
-        "ageDescription": "age range and physical age indicators",
-        "hairDescription": "hair color, style, length",
-        "faceDescription": "facial features, expression tendencies, skin tone",
-        "buildDescription": "height, body type, physical characteristics",
-        "clothingDescription": "typical outfit with specific colors and details",
-        "accessoriesDescription": "glasses, hats, jewelry, etc (optional)",
-        "distinctiveFeatures": "unique identifying characteristics (optional)"
-      }
-    }
-  ]
-}
+          const outlinePrompt = `# Role and Context
 
-Secondary characters to describe: ${secondaryCharacters.map(c => `${c.name} (${c.gender}, age ${c.age})`).join(', ')}
+You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure, and visual storytelling for illustrated books. Your expertise includes:
 
-Be VERY specific with colors, styles, and physical details - these descriptions will ensure visual consistency across all illustrations.`;
-          }
+- Creating engaging, age-appropriate narratives that captivate young readers
+- Crafting clear story arcs with proper setup, conflict, and resolution
+- Writing vivid scene descriptions that translate beautifully to illustrations
+- Balancing text and visual elements for maximum impact
+- Understanding pacing and page turns in illustrated books
+- Creating memorable characters and meaningful moments
 
-          const outlinePrompt = `${basePrompt}\n\nIMPORTANT: First, create a detailed outline for this ${pages}-page story. Include:\n- Brief summary of each page (what happens on that page)\n- Key events and character moments\n- Story arc and progression\n- How the story builds and resolves\n\nFor EACH page, also provide a SHORT SCENE DESCRIPTION (1-2 sentences) that describes the visual scene - what the characters are doing, where they are, and the setting. This will be used for illustration purposes.
+Your task is to create a compelling, well-structured story outline that will guide both the narrative text and visual illustrations.
 
-Format your response like this:
+${basePrompt}
+
+# Part 1: Story Title
+
+Create an engaging, age-appropriate title for this story. The title should:
+- Capture the essence of the story
+- Be appealing to the target age group
+- Be memorable and creative
+- Reflect the main theme or adventure
+
+Format:
+Title: [Your creative title here]
+
+# Part 2: Story Outline
+
+Create a detailed outline for this ${pages}-page story. Include:
+- Brief summary of each page (what happens on that page)
+- Key events and character moments
+- Story arc and progression (clear beginning, middle, and end)
+- How the story builds tension and resolves satisfyingly
+
+For EACH of the ${pages} story pages, provide a SHORT SCENE DESCRIPTION (1-2 sentences) that describes the visual scene - what the characters are doing, where they are, and the setting. This will be used for illustration purposes.
+
+# Part 3: Cover Scene Descriptions
+
+In addition to the ${pages} story pages, provide scene descriptions for these 3 cover elements:
+
+**Title Page Scene**: A captivating cover illustration that features the main characters and sets the tone for the story. This should be visually striking and focus on the protagonist(s) in a way that draws readers in.
+
+**Page 0 Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
+
+**Back Cover Scene**: A satisfying concluding illustration that provides closure and leaves readers with a positive feeling. This should feel like a natural ending to the visual journey.
+
+# Format Your Response
+
+Title: [Story title]
+
 Page 1: [Summary]
 Scene: [Short visual description]
 
 Page 2: [Summary]
 Scene: [Short visual description]
 
-...and so on for all ${pages} pages.${characterManifestPrompt}
+...and so on for all ${pages} pages.
 
-Provide the outline first, then the character manifest (if applicable). Be specific about what happens on each page.`;
+Title Page: [Summary of title page concept]
+Scene: [Visual description focusing on main characters]
+
+Page 0: [Summary of dedication/intro concept]
+Scene: [Visual description for welcoming scene]
+
+Back Cover: [Summary of back cover concept]
+Scene: [Visual description for concluding scene]
+
+Be specific and creative. Each scene description should paint a clear picture for the illustrator.`;
 
           const response = await makeApiCall(outlinePrompt, 8192);  // Increased for 24-page stories
 
@@ -1873,53 +1909,79 @@ Provide the outline first, then the character manifest (if applicable). Be speci
             timestamp: new Date().toISOString()
           });
 
-          // Try to extract character manifest if present
+          // Parse the response to extract title, cover scenes, and page scenes
           let outline = response;
-          const jsonMatch = response.match(/\{[\s\S]*"characters"[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              const manifest = JSON.parse(jsonMatch[0]);
-              setCharacterManifest(manifest);
 
-              // Build consistency guide
-              const guide = buildCharacterConsistencyGuide(manifest);
-              setCharacterConsistencyGuide(guide);
-
-              console.log('Character manifest extracted:', manifest);
-
-              // Remove the JSON from the outline
-              outline = response.replace(jsonMatch[0], '').trim();
-            } catch (e) {
-              console.warn('Failed to parse character manifest:', e);
-            }
+          // Extract title
+          const titleMatch = response.match(/Title:\s*(.+)/i);
+          if (titleMatch) {
+            const extractedTitle = titleMatch[1].trim();
+            setStoryTitle(extractedTitle);
+            console.log('Extracted title:', extractedTitle);
           }
 
           setStoryOutline(outline);
           setEditableOutline(outline);
 
-          // Parse outline to extract short scene descriptions
+          // Parse outline to extract scene descriptions
           const sceneDescMap = {};
+          const coverScenes = {
+            titlePage: '',
+            page0: '',
+            backCover: ''
+          };
+
           const lines = outline.split('\n');
           let currentPage = null;
+          let currentCoverType = null;
 
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
 
-            // Look for "Page X:" pattern
+            // Look for "Page X:" pattern (story pages)
             const pageMatch = line.match(/^Page\s+(\d+):/i);
             if (pageMatch) {
               currentPage = parseInt(pageMatch[1]);
+              currentCoverType = null;
+            }
+
+            // Look for cover page patterns
+            const titlePageMatch = line.match(/^Title\s+Page:/i);
+            if (titlePageMatch) {
+              currentCoverType = 'titlePage';
+              currentPage = null;
+            }
+
+            const page0Match = line.match(/^Page\s+0:/i);
+            if (page0Match) {
+              currentCoverType = 'page0';
+              currentPage = null;
+            }
+
+            const backCoverMatch = line.match(/^Back\s+Cover:/i);
+            if (backCoverMatch) {
+              currentCoverType = 'backCover';
+              currentPage = null;
             }
 
             // Look for "Scene:" pattern
             const sceneMatch = line.match(/^Scene:\s*(.+)/i);
-            if (sceneMatch && currentPage !== null) {
-              sceneDescMap[currentPage] = sceneMatch[1].trim();
+            if (sceneMatch) {
+              const sceneDesc = sceneMatch[1].trim();
+              if (currentPage !== null) {
+                // Story page scene
+                sceneDescMap[currentPage] = sceneDesc;
+              } else if (currentCoverType) {
+                // Cover page scene
+                coverScenes[currentCoverType] = sceneDesc;
+              }
             }
           }
 
           setShortSceneDescriptions(sceneDescMap);
-          console.log('Parsed short scene descriptions:', sceneDescMap);
+          setCoverSceneDescriptions(coverScenes);
+          console.log('Parsed story scene descriptions:', sceneDescMap);
+          console.log('Parsed cover scene descriptions:', coverScenes);
         } catch (error) {
           console.error('Error generating outline:', error);
           alert(`Error generating outline: ${error.message}\n\nPlease check your API key and try again!`);
