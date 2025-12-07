@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');
 const { Pool } = require('pg');
+const stripe = require('stripe')(process.env.STRIPE_TEST_API_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2795,6 +2796,52 @@ app.post('/api/log-error', (req, res) => {
   }
 });
 
+// Stripe webhook endpoint - receives payment events
+app.post('/api/stripe/webhook', async (req, res) => {
+  try {
+    const event = req.body;
+
+    console.log('💳 Stripe webhook received:', event.type);
+
+    // Handle the checkout.session.completed event
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+
+      console.log('✅ Payment successful! Session ID:', session.id);
+
+      // Retrieve full session with customer details
+      try {
+        const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+          expand: ['customer', 'shipping_details']
+        });
+
+        // Extract customer information
+        const customerInfo = {
+          name: fullSession.customer_details?.name || fullSession.shipping_details?.name || 'N/A',
+          email: fullSession.customer_details?.email || 'N/A',
+          address: fullSession.customer_details?.address || fullSession.shipping_details?.address || {}
+        };
+
+        console.log('📦 Customer Information:');
+        console.log('  Name:', customerInfo.name);
+        console.log('  Email:', customerInfo.email);
+        console.log('  Address:', JSON.stringify(customerInfo.address, null, 2));
+
+        // TODO: Store customer information in database
+        // You can save this to the database here, associated with the user who made the purchase
+
+      } catch (retrieveError) {
+        console.error('Error retrieving session details:', retrieveError);
+      }
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Error processing Stripe webhook:', err);
+    res.status(400).json({ error: 'Webhook error' });
+  }
+});
+
 // ===================================
 // BACKGROUND STORY GENERATION JOBS
 // ===================================
@@ -3012,24 +3059,29 @@ async function callGeminiAPIForImage(prompt) {
   }
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
           parts: [{ text: prompt }]
-        }]
+        }],
+        generationConfig: {
+          responseModalities: ["image"]
+        }
       })
     }
   );
 
   if (!response.ok) {
     const error = await response.text();
+    console.error('Gemini image API error:', error);
     throw new Error(`Gemini API error: ${error}`);
   }
 
   const data = await response.json();
+  console.log('Gemini API response structure:', JSON.stringify(data).substring(0, 300));
 
   if (!data.candidates || data.candidates.length === 0) {
     throw new Error('No image generated');
