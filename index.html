@@ -734,6 +734,12 @@
       const [sceneDescriptionPrompts, setSceneDescriptionPrompts] = useState({}); // Map of pageNumber -> prompt
       const [showSceneDescriptionPrompt, setShowSceneDescriptionPrompt] = useState(false);
       const [relationshipTexts, setRelationshipTexts] = useState({}); // Custom text for each relationship
+      const [coverImagePrompts, setCoverImagePrompts] = useState({}); // Store prompts for cover images
+      const [coverImageApiCalls, setCoverImageApiCalls] = useState({}); // Store API calls for cover images
+      const [storyOutlinePrompt, setStoryOutlinePrompt] = useState(''); // Store outline generation prompt
+      const [storyOutlineApiCall, setStoryOutlineApiCall] = useState(null); // Store outline API call
+      const [storyTextPrompt, setStoryTextPrompt] = useState(''); // Store story text generation prompt
+      const [storyTextApiCall, setStoryTextApiCall] = useState(null); // Store story text API call
 
       // Character Consistency System
       const [characterManifest, setCharacterManifest] = useState(null); // Character manifest from story generation
@@ -1857,6 +1863,16 @@ Provide the outline first, then the character manifest (if applicable). Be speci
 
           const response = await makeApiCall(outlinePrompt, 8192);  // Increased for 24-page stories
 
+          // Store outline prompt and API call for debugging
+          setStoryOutlinePrompt(outlinePrompt);
+          setStoryOutlineApiCall({
+            type: 'text',
+            model: 'gemini-2.0-flash-thinking-exp-1219',
+            prompt: outlinePrompt,
+            maxTokens: 8192,
+            timestamp: new Date().toISOString()
+          });
+
           // Try to extract character manifest if present
           let outline = response;
           const jsonMatch = response.match(/\{[\s\S]*"characters"[\s\S]*\}/);
@@ -2173,6 +2189,17 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
             : basePrompt;
 
           const storyText = await makeApiCall(fullPrompt, 4096);
+
+          // Store story text prompt and API call for debugging
+          setStoryTextPrompt(fullPrompt);
+          setStoryTextApiCall({
+            type: 'text',
+            model: 'gemini-2.0-flash-thinking-exp-1219',
+            prompt: fullPrompt,
+            maxTokens: 4096,
+            timestamp: new Date().toISOString()
+          });
+
           setGeneratedStory(storyText);
           setStep(5);
         } catch (error) {
@@ -2710,6 +2737,18 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
           const styleDescription = selectedStyle.prompt;
 
+          // Define cover image prompts with full details
+          const frontCoverPrompt = `Create a beautiful title page for a children's book called "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Include decorative elements but leave space for the title text. Magical and inviting.`;
+          const page0Prompt = `Create a dedication page or introduction illustration for "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Warm, inviting scene that sets the mood for the story.`;
+          const backCoverPrompt = `Create a back cover illustration for "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Conclusive, satisfying ending scene.`;
+
+          // Define detailed cover scene descriptions
+          const coverDescriptions = {
+            frontCover: `**Title Page / Front Cover**\n\nA beautiful, magical title page for "${storyTitle}". This cover sets the tone for the entire book with decorative elements that reflect the story's theme. The illustration leaves space for the title text while creating an inviting, enchanting atmosphere that draws readers into the story.`,
+            page0: `**Page 0 - Dedication/Introduction**\n\nAn introductory illustration for "${storyTitle}" that warmly welcomes readers into the story world. This page creates an inviting atmosphere and sets the emotional tone, preparing readers for the adventure ahead. The scene is warm, engaging, and hints at the magic to come.`,
+            backCover: `**Back Cover**\n\nA conclusive, satisfying illustration for the back cover of "${storyTitle}". This final image provides a sense of completion and closure, reflecting the journey's end. The scene is peaceful, fulfilling, and leaves readers with a warm, satisfied feeling about the story they've experienced.`
+          };
+
           const generateCoverImage = async (coverType, prompt) => {
             try {
               const imageData = await callGeminiAPI(prompt);
@@ -2720,27 +2759,35 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             }
           };
 
-          // Define cover descriptions
-          const coverDescriptions = {
-            frontCover: `Title page for "${storyTitle}" - Beautiful, magical cover illustration with decorative elements`,
-            page0: `Dedication page for "${storyTitle}" - Warm, inviting introduction scene`,
-            backCover: `Back cover for "${storyTitle}" - Conclusive, satisfying ending illustration`
-          };
-
           const coverPromises = [
-            generateCoverImage('front', `Create a beautiful title page for a children's book called "${storyTitle}". ${styleDescription}. Include decorative elements but leave space for the title text. Magical and inviting.`),
-            generateCoverImage('page0', `Create a dedication page or introduction illustration for "${storyTitle}". ${styleDescription}. Warm, inviting scene that sets the mood for the story.`),
-            generateCoverImage('back', `Create a back cover illustration for "${storyTitle}". ${styleDescription}. Conclusive, satisfying ending scene.`)
+            generateCoverImage('frontCover', frontCoverPrompt),
+            generateCoverImage('page0', page0Prompt),
+            generateCoverImage('backCover', backCoverPrompt)
           ];
 
           const [frontCover, page0, backCover] = await Promise.all(coverPromises);
+
+          // Store cover image prompts
+          setCoverImagePrompts({
+            frontCover: frontCoverPrompt,
+            page0: page0Prompt,
+            backCover: backCoverPrompt
+          });
+
+          // Store cover image API calls for debugging
+          setCoverImageApiCalls({
+            frontCover: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: frontCoverPrompt },
+            page0: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: page0Prompt },
+            backCover: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: backCoverPrompt }
+          });
+
           setCoverImages({
             frontCover,
             page0,
             backCover,
             descriptions: coverDescriptions
           });
-          console.log('Cover images generated with descriptions');
+          console.log('Cover images generated with full scene descriptions and prompts stored');
 
           setIsGeneratingImages(false);
 
@@ -3224,6 +3271,18 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
           const styleDescription = selectedStyle.prompt;
 
+          // Define cover image prompts with full details
+          const frontCoverPrompt = `Create a beautiful title page for a children's book called "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Include decorative elements but leave space for the title text. Magical and inviting.`;
+          const page0Prompt = `Create a dedication page or introduction illustration for "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Warm, inviting scene that sets the mood for the story.`;
+          const backCoverPrompt = `Create a back cover illustration for "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Conclusive, satisfying ending scene.`;
+
+          // Define detailed cover scene descriptions
+          const coverDescriptions = {
+            frontCover: `**Title Page / Front Cover**\n\nA beautiful, magical title page for "${storyTitle}". This cover sets the tone for the entire book with decorative elements that reflect the story's theme. The illustration leaves space for the title text while creating an inviting, enchanting atmosphere that draws readers into the story.`,
+            page0: `**Page 0 - Dedication/Introduction**\n\nAn introductory illustration for "${storyTitle}" that warmly welcomes readers into the story world. This page creates an inviting atmosphere and sets the emotional tone, preparing readers for the adventure ahead. The scene is warm, engaging, and hints at the magic to come.`,
+            backCover: `**Back Cover**\n\nA conclusive, satisfying illustration for the back cover of "${storyTitle}". This final image provides a sense of completion and closure, reflecting the journey's end. The scene is peaceful, fulfilling, and leaves readers with a warm, satisfied feeling about the story they've experienced.`
+          };
+
           const generateCoverImage = async (coverType, prompt) => {
             try {
               const imageData = await callGeminiAPI(prompt);
@@ -3234,27 +3293,35 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             }
           };
 
-          // Define cover descriptions
-          const coverDescriptions = {
-            frontCover: `Title page for "${storyTitle}" - Beautiful, magical cover illustration with decorative elements`,
-            page0: `Dedication page for "${storyTitle}" - Warm, inviting introduction scene`,
-            backCover: `Back cover for "${storyTitle}" - Conclusive, satisfying ending illustration`
-          };
-
           const coverPromises = [
-            generateCoverImage('front', `Create a beautiful title page for a children's book called "${storyTitle}". ${styleDescription}. Include decorative elements but leave space for the title text. Magical and inviting.`),
-            generateCoverImage('page0', `Create a dedication page or introduction illustration for "${storyTitle}". ${styleDescription}. Warm, inviting scene that sets the mood for the story.`),
-            generateCoverImage('back', `Create a back cover illustration for "${storyTitle}". ${styleDescription}. Conclusive, satisfying ending scene.`)
+            generateCoverImage('frontCover', frontCoverPrompt),
+            generateCoverImage('page0', page0Prompt),
+            generateCoverImage('backCover', backCoverPrompt)
           ];
 
           const [frontCover, page0, backCover] = await Promise.all(coverPromises);
+
+          // Store cover image prompts
+          setCoverImagePrompts({
+            frontCover: frontCoverPrompt,
+            page0: page0Prompt,
+            backCover: backCoverPrompt
+          });
+
+          // Store cover image API calls for debugging
+          setCoverImageApiCalls({
+            frontCover: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: frontCoverPrompt },
+            page0: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: page0Prompt },
+            backCover: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: backCoverPrompt }
+          });
+
           setCoverImages({
             frontCover,
             page0,
             backCover,
             descriptions: coverDescriptions
           });
-          console.log('Cover images generated with descriptions');
+          console.log('Cover images generated with full scene descriptions and prompts stored');
 
           setGenerationProgress({ current: scenesToGenerate.length, total: scenesToGenerate.length, message: 'All images generated!' });
         } catch (error) {
