@@ -5792,7 +5792,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       const renderStep1 = () => (
         <div className="space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-2 mb-4">
-            <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+            <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
               <Icon name="book-open" size={24} /> {t.chooseStoryType}
             </h2>
             {currentUser && currentUser.role === 'admin' && (
@@ -5839,7 +5839,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 }`}
               >
                 <div className="text-2xl mb-1">{type.emoji}</div>
-                <div className="font-semibold text-[10px]">{type.name[language]}</div>
+                <div className="font-semibold text-xs">{type.name[language]}</div>
               </button>
             ))}
             {/* Add Custom Type Button */}
@@ -5866,7 +5866,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               className="p-2 rounded-lg border-2 border-dashed border-purple-300 hover:border-purple-500 transition-all hover:bg-purple-50"
             >
               <div className="text-2xl mb-1">➕</div>
-              <div className="font-semibold text-[10px] text-purple-600">{t.addCustomStoryType}</div>
+              <div className="font-semibold text-xs text-purple-600">{t.addCustomStoryType}</div>
             </button>
           </div>
 
@@ -5875,9 +5875,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             <div id="art-style-section" className="md:bg-gradient-to-br md:from-pink-50 md:to-purple-50 md:border-2 md:border-pink-300 md:rounded-lg md:p-4 mt-4">
               <div className="flex items-center gap-2 mb-2">
                 <Icon name="palette" size={18} className="text-pink-600" />
-                <h2 className="text-base md:text-lg font-bold text-gray-800 md:text-pink-700">{t.chooseArtStyle}</h2>
+                <h2 className="text-lg md:text-xl font-bold text-gray-800 md:text-pink-700">{t.chooseArtStyle}</h2>
               </div>
-              <p className="text-xs text-gray-600 mb-2 md:mb-3">{t.artStyleDescription}</p>
+              <p className="text-sm text-gray-600 mb-2 md:mb-3">{t.artStyleDescription}</p>
               <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
                 {artStyles.map(style => (
                   <button
@@ -5900,7 +5900,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                     {/* Text content below image - No emoji */}
                     <div className="p-1.5 flex flex-col items-center text-center">
-                      <div className="font-bold text-[10px] text-gray-800">{style.name[language]}</div>
+                      <div className="font-bold text-xs text-gray-800">{style.name[language]}</div>
                     </div>
                   </button>
                 ))}
@@ -5927,7 +5927,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+            <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
               <Icon name="users" size={24} /> {t.createCharacters}
             </h2>
 
@@ -5950,43 +5950,51 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 {/* Existing characters */}
                 <div className="bg-white border-2 border-purple-200 rounded-lg p-3">
-                  <h3 className="text-sm font-bold text-purple-700 mb-2">{t.yourCharacters}</h3>
+                  <h3 className="text-base font-bold text-purple-700 mb-2">{t.yourCharacters}</h3>
                   <div className="grid md:grid-cols-2 gap-2">
                     {characters.map((char) => (
-                      <div key={char.id} className="border border-gray-200 rounded p-2 relative">
-                        <div className="absolute top-1 right-1 flex gap-1">
-                          <button
-                            onClick={() => editCharacter(char)}
-                            className="bg-blue-500 text-white px-2 py-0.5 rounded text-[10px] hover:bg-blue-600"
-                          >
-                            {t.editCharacter}
-                          </button>
-                          <button
-                            onClick={() => deleteCharacter(char.id)}
-                            className="bg-red-500 text-white px-2 py-0.5 rounded text-[10px] hover:bg-red-600"
-                          >
-                            {t.deleteCharacter}
-                          </button>
+                      <div key={char.id} className="border border-gray-200 rounded p-2">
+                        {/* Top row: Photo/Name on left, Buttons on right */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {char.photoUrl && (
+                              <img src={char.photoUrl} alt={char.name} className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-purple-200 flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-sm md:text-base truncate">{char.name}</h4>
+                              <p className="text-xs md:text-sm text-gray-600">
+                                {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => editCharacter(char)}
+                              className="bg-blue-500 text-white px-2 md:px-3 py-1 rounded text-xs hover:bg-blue-600"
+                            >
+                              {t.editCharacter}
+                            </button>
+                            <button
+                              onClick={() => deleteCharacter(char.id)}
+                              className="bg-red-500 text-white px-2 md:px-3 py-1 rounded text-xs hover:bg-red-600"
+                            >
+                              {t.deleteCharacter}
+                            </button>
+                          </div>
                         </div>
-                        {char.photoUrl && (
-                          <img src={char.photoUrl} alt={char.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover border-2 border-purple-200" />
-                        )}
-                        <h4 className="font-bold text-center mb-1 text-sm">{char.name}</h4>
-                        <p className="text-xs text-gray-600 text-center mb-2">
-                          {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
-                        </p>
+                        {/* Character traits below */}
                         {char.strengths && char.strengths.length > 0 && (
-                          <p className="text-[10px] text-gray-700 mb-1">
+                          <p className="text-xs text-gray-700 mb-1">
                             <strong className="text-green-600">{t.strengths}:</strong> {char.strengths.join(', ')}
                           </p>
                         )}
                         {char.weaknesses && char.weaknesses.length > 0 && (
-                          <p className="text-[10px] text-gray-700 mb-1">
+                          <p className="text-xs text-gray-700 mb-1">
                             <strong className="text-orange-600">{t.weaknesses}:</strong> {char.weaknesses.join(', ')}
                           </p>
                         )}
                         {char.fears && char.fears.length > 0 && (
-                          <p className="text-[10px] text-gray-700 mb-1">
+                          <p className="text-xs text-gray-700 mb-1">
                             <strong className="text-red-600">{t.fears}:</strong> {char.fears.join(', ')}
                           </p>
                         )}
@@ -6473,10 +6481,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
       const renderStep3 = () => (
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+          <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
             <Icon name="heart" size={24} /> {t.defineRelationships}
           </h2>
-          <p className="text-gray-600">{t.defineRelationshipsDesc}</p>
+          <p className="text-base text-gray-600">{t.defineRelationshipsDesc}</p>
 
           <div className="space-y-4">
             {characters.map((char1, i) => (
@@ -6501,11 +6509,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               {char1.photoUrl && (
                                 <img src={char1.photoUrl} alt={char1.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
                               )}
-                              <div className="font-bold">{char1.name}</div>
+                              <div className="font-bold text-base">{char1.name}</div>
                             </div>
 
                             <div className="space-y-2">
-                              <label className="block text-sm font-semibold text-center">{t.is}</label>
+                              <label className="block text-base font-semibold text-center">{t.is}</label>
                               <select
                                 value={relationships[key1] || relationshipTypes[10].value[language]}
                                 onChange={(e) => {
@@ -6535,7 +6543,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               {char2.photoUrl && (
                                 <img src={char2.photoUrl} alt={char2.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
                               )}
-                              <div className="font-bold">{char2.name}</div>
+                              <div className="font-bold text-base">{char2.name}</div>
                             </div>
                           </div>
                         </div>
@@ -6543,14 +6551,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         {/* Right (wide screens) / Bottom (narrow screens): Relationship Description */}
                         {relationships[key1] && relationships[key2] && (
                           <div className="lg:border-l lg:pl-4 lg:border-gray-200">
-                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                            <label className="block text-sm font-semibold text-gray-600 mb-1">
                               {language === 'de' ? 'Beziehung beschreiben' : language === 'fr' ? 'Décrire la relation' : 'Describe Relationship'}
                             </label>
                             <textarea
                               value={relationshipTexts[key1] || ''}
                               onChange={(e) => setRelationshipTexts({ ...relationshipTexts, [key1]: e.target.value })}
                               placeholder={language === 'de' ? 'z.B. Sie sind seit 10 Jahren beste Freunde...' : language === 'fr' ? 'par ex. Ils sont meilleurs amis depuis 10 ans...' : 'e.g., They have been best friends for 10 years...'}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base resize-none"
                               rows="4"
                             />
                           </div>
@@ -6574,7 +6582,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       const renderStep4 = () => (
         <div className="space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-2">
-            <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+            <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
               <Icon name="wand-2" size={24} /> {t.storySettings}
             </h2>
             {currentUser && currentUser.role === 'admin' && (
@@ -6606,7 +6614,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
             <div>
-              <label className="block text-lg font-semibold mb-3">{t.selectMainCharacters}</label>
+              <label className="block text-xl font-semibold mb-3">{t.selectMainCharacters}</label>
               <div className="grid md:grid-cols-2 gap-3">
                 {characters.map(char => (
                   <button
@@ -6623,13 +6631,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full object-cover" />
                       )}
                       <div className="flex-1">
-                        <div className="font-bold flex items-center gap-2">
+                        <div className="font-bold text-base flex items-center gap-2">
                           {char.name}
                           <span className={mainCharacters.includes(char.id) ? 'inline-block' : 'hidden'}>
                             <Icon name="star" size={16} className="text-yellow-500" />
                           </span>
                         </div>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm md:text-base text-gray-600">
                           {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
                         </div>
                       </div>
@@ -6640,13 +6648,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
 
             <div>
-              <label className="block text-lg font-semibold mb-3">
+              <label className="block text-xl font-semibold mb-3">
                 {t.numberOfPages}
               </label>
               <select
                 value={pages}
                 onChange={(e) => setPages(parseInt(e.target.value))}
-                className="w-full px-4 py-3 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none text-lg font-semibold"
+                className="w-full px-4 py-3 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none text-base md:text-lg font-semibold"
               >
                 {currentUser && currentUser.role === 'admin' && (
                   <>
@@ -6660,7 +6668,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
 
             <div>
-              <label className="block text-lg font-semibold mb-3">{t.readingLevel}</label>
+              <label className="block text-xl font-semibold mb-3">{t.readingLevel}</label>
               <div className="space-y-2">
                 {[
                   { value: '1st-grade', label: t.firstGrade, desc: t.firstGradeDesc },
@@ -6676,8 +6684,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         : 'border-gray-200 hover:border-purple-300'
                     }`}
                   >
-                    <div className="font-semibold">{level.label}</div>
-                    <div className="text-sm text-gray-600">{level.desc}</div>
+                    <div className="font-semibold text-base">{level.label}</div>
+                    <div className="text-sm md:text-base text-gray-600">{level.desc}</div>
                   </button>
                 ))}
               </div>
@@ -6685,19 +6693,19 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
             {/* Additional Story Details */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">{t.storyDetails}</label>
+              <label className="block text-base font-semibold text-gray-700 mb-2">{t.storyDetails}</label>
               <textarea
                 value={storyDetails}
                 onChange={(e) => setStoryDetails(e.target.value)}
                 placeholder={t.storyDetailsPlaceholder}
-                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-base"
                 rows="3"
               />
             </div>
 
             {/* Dedication (Widmung) - Optional */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-base font-semibold text-gray-700 mb-2">
                 {language === 'de' ? 'Widmung (Optional)' : language === 'fr' ? 'Dédicace (Facultatif)' : 'Dedication (Optional)'}
               </label>
               <textarea
@@ -6708,11 +6716,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   : language === 'fr'
                   ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
                   : 'e.g. "For my dear daughter Emma on her 5th birthday"'}
-                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-base"
                 rows="2"
                 maxLength="200"
               />
-              <p className="text-xs text-gray-600 mt-1">
+              <p className="text-sm text-gray-600 mt-1">
                 {language === 'de'
                   ? 'Dieser Text wird auf Seite 0 Ihres Buches gedruckt. Wenn Sie nichts eingeben, wird Seite 0 nur eine Illustration ohne Text enthalten.'
                   : language === 'fr'
