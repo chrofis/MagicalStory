@@ -2397,10 +2397,10 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
               ]
             }],
             safetySettings: [
-              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
             ]
           })
         });
@@ -2802,12 +2802,22 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
         try {
           // Show 10-minute wait message
-          const confirmRun = window.confirm(
-            `Creating your story will take approximately 10 minutes.\n\n` +
-            `The story will be generated in the background on our servers.\n\n` +
-            `You can close this page and come back later to check on progress.\n\n` +
-            `Click OK to start generation.`
-          );
+          const waitMessage = language === 'de'
+            ? 'Die Erstellung Ihrer Geschichte dauert ca. 10 Minuten.\n\n' +
+              'Die Geschichte wird im Hintergrund auf unseren Servern generiert.\n\n' +
+              'Sie können diese Seite schließen und später zurückkommen, um den Fortschritt zu überprüfen.\n\n' +
+              'Klicken Sie auf OK, um die Generierung zu starten.'
+            : language === 'fr'
+            ? 'La création de votre histoire prendra environ 10 minutes.\n\n' +
+              'L\'histoire sera générée en arrière-plan sur nos serveurs.\n\n' +
+              'Vous pouvez fermer cette page et revenir plus tard pour vérifier la progression.\n\n' +
+              'Cliquez sur OK pour démarrer la génération.'
+            : 'Creating your story will take approximately 10 minutes.\n\n' +
+              'The story will be generated in the background on our servers.\n\n' +
+              'You can close this page and come back later to check on progress.\n\n' +
+              'Click OK to start generation.';
+
+          const confirmRun = window.confirm(waitMessage);
 
           if (!confirmRun) {
             return;
@@ -4365,10 +4375,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               ]
             }],
             safetySettings: [
-              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
             ]
           })
         });
@@ -6674,8 +6684,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
 
             {/* Additional Story Details */}
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-              <label className="block text-sm font-semibold text-blue-700 mb-2">{t.storyDetails}</label>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">{t.storyDetails}</label>
               <textarea
                 value={storyDetails}
                 onChange={(e) => setStoryDetails(e.target.value)}
@@ -6686,8 +6696,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
 
             {/* Dedication (Widmung) - Optional */}
-            <div className="bg-pink-50 border-2 border-pink-200 rounded-lg p-4">
-              <label className="block text-sm font-semibold text-pink-700 mb-2">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 {language === 'de' ? 'Widmung (Optional)' : language === 'fr' ? 'Dédicace (Facultatif)' : 'Dedication (Optional)'}
               </label>
               <textarea
@@ -6698,7 +6708,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   : language === 'fr'
                   ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
                   : 'e.g. "For my dear daughter Emma on her 5th birthday"'}
-                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none text-sm"
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
                 rows="2"
                 maxLength="200"
               />
