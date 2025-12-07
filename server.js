@@ -2392,6 +2392,30 @@ app.get('/api/check-ip', async (req, res) => {
   }
 });
 
+// Browser error logging endpoint - receives errors from frontend
+app.post('/api/log-error', (req, res) => {
+  try {
+    const { message, stack, url, line, column, userAgent, userId, timestamp, errorType } = req.body;
+
+    // Log to console with emoji for visibility in Railway logs
+    console.error('🔴 BROWSER ERROR:', {
+      type: errorType || 'JavaScript Error',
+      message,
+      url,
+      location: line && column ? `Line ${line}, Column ${column}` : 'Unknown',
+      user: userId || 'Anonymous',
+      userAgent: userAgent || 'Unknown',
+      timestamp: timestamp || new Date().toISOString(),
+      stack: stack ? stack.substring(0, 500) : 'No stack trace' // Limit stack trace length
+    });
+
+    res.json({ success: true, message: 'Error logged' });
+  } catch (err) {
+    console.error('Error logging browser error:', err);
+    res.status(500).json({ success: false, error: 'Failed to log error' });
+  }
+});
+
 // Initialize and start server
 // Initialize database or files based on mode
 async function initialize() {

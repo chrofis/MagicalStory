@@ -797,6 +797,77 @@
         }
       }, []); // Run only once on mount - don't re-run when step changes!
 
+      // Set up browser error tracking - send errors to server
+      useEffect(() => {
+        const logErrorToServer = async (errorData) => {
+          try {
+            await fetch(`${API_URL}/api/log-error`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...errorData,
+                userId: currentUser?.id || 'anonymous',
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString()
+              })
+            });
+          } catch (err) {
+            // Silently fail if logging fails - don't want to create error loops
+            console.warn('Failed to log error to server:', err);
+          }
+        };
+
+        // Capture global JavaScript errors
+        const handleError = (event) => {
+          logErrorToServer({
+            errorType: 'JavaScript Error',
+            message: event.message || 'Unknown error',
+            url: event.filename || window.location.href,
+            line: event.lineno,
+            column: event.colno,
+            stack: event.error?.stack || 'No stack trace'
+          });
+        };
+
+        // Capture unhandled promise rejections
+        const handleUnhandledRejection = (event) => {
+          logErrorToServer({
+            errorType: 'Unhandled Promise Rejection',
+            message: event.reason?.message || String(event.reason) || 'Unknown rejection',
+            url: window.location.href,
+            stack: event.reason?.stack || 'No stack trace'
+          });
+        };
+
+        // Capture console errors
+        const originalConsoleError = console.error;
+        console.error = function(...args) {
+          // Call original console.error
+          originalConsoleError.apply(console, args);
+
+          // Log to server (but skip if it's our own error logging to avoid loops)
+          if (!args[0]?.toString().includes('BROWSER ERROR:')) {
+            logErrorToServer({
+              errorType: 'Console Error',
+              message: args.map(arg => String(arg)).join(' '),
+              url: window.location.href,
+              stack: new Error().stack
+            });
+          }
+        };
+
+        // Attach event listeners
+        window.addEventListener('error', handleError);
+        window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+        // Cleanup on unmount
+        return () => {
+          window.removeEventListener('error', handleError);
+          window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+          console.error = originalConsoleError;
+        };
+      }, [currentUser]);
+
       // Load characters and stories when user logs in
       useEffect(() => {
         if (authToken && isAuthenticated) {
