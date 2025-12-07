@@ -672,7 +672,7 @@
       const [newFear, setNewFear] = useState('');
       const [newRelationship, setNewRelationship] = useState('');
       const [relationships, setRelationships] = useState({});
-      const [pages, setPages] = useState(24); // Default to 24 scenes (13 minimum for Gelato printing = 28 PDF pages)
+      const [pages, setPages] = useState(24); // Default to 24 scenes (14 minimum for Gelato printing = 28 pages)
       const [languageLevel, setLanguageLevel] = useState('standard');
       const [mainCharacters, setMainCharacters] = useState([]);
       const [generatedStory, setGeneratedStory] = useState('');
@@ -3779,16 +3779,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           }
 
           // Check minimum page count for Gelato printing
-          // Minimum 28 PDF pages = 2 cover pages + 13 scenes * 2 = 28 pages
-          const minimumScenes = 13;
-          const totalPdfPages = 2 + (pages * 2);
+          // Minimum 28 Gelato pages = 14 scenes * 2 (covers NOT counted by Gelato)
+          const minimumScenes = 14;
+          const gelatoPages = pages * 2;
 
           if (pages < minimumScenes) {
             alert(language === 'de'
-              ? `Gedruckte Bücher benötigen mindestens ${minimumScenes} Szenen (${2 + minimumScenes * 2} PDF-Seiten). Ihre Geschichte hat ${pages} Szenen (${totalPdfPages} PDF-Seiten).\n\nBitte erstellen Sie eine neue Geschichte mit mindestens ${minimumScenes} Szenen oder laden Sie die Geschichte als PDF herunter.`
+              ? `Gedruckte Bücher benötigen mindestens ${minimumScenes} Szenen (${minimumScenes * 2} Gelato-Seiten). Ihre Geschichte hat ${pages} Szenen (${gelatoPages} Gelato-Seiten).\n\nBitte erstellen Sie eine neue Geschichte mit mindestens ${minimumScenes} Szenen oder laden Sie die Geschichte als PDF herunter.`
               : language === 'fr'
-              ? `Les livres imprimés nécessitent au moins ${minimumScenes} scènes (${2 + minimumScenes * 2} pages PDF). Votre histoire a ${pages} scènes (${totalPdfPages} pages PDF).\n\nVeuillez créer une nouvelle histoire avec au moins ${minimumScenes} scènes ou télécharger l'histoire en PDF.`
-              : `Printed books require at least ${minimumScenes} scenes (${2 + minimumScenes * 2} PDF pages). Your story has ${pages} scenes (${totalPdfPages} PDF pages).\n\nPlease create a new story with at least ${minimumScenes} scenes or download the story as PDF.`);
+              ? `Les livres imprimés nécessitent au moins ${minimumScenes} scènes (${minimumScenes * 2} pages Gelato). Votre histoire a ${pages} scènes (${gelatoPages} pages Gelato).\n\nVeuillez créer une nouvelle histoire avec au moins ${minimumScenes} scènes ou télécharger l'histoire en PDF.`
+              : `Printed books require at least ${minimumScenes} scenes (${minimumScenes * 2} Gelato pages). Your story has ${pages} scenes (${gelatoPages} Gelato pages).\n\nPlease create a new story with at least ${minimumScenes} scenes or download the story as PDF.`);
             return;
           }
 
@@ -3941,11 +3941,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           console.log('PDF generated:', pdfData);
 
           // Step 2: Get product UID from backend (with fallback to default)
-          // IMPORTANT: PDF structure:
-          // - Page 1: Back + Front cover (1 PDF page)
-          // - Page 2: Page 0 (1 PDF page)
-          // - Pages 3+: Story content (2 pages per scene: text + image)
-          const actualPdfPages = 2 + (pages * 2);  // Include 2 cover pages
+          // IMPORTANT: Gelato only counts story content pages (not covers)
+          // - Each scene = 2 pages (1 text page + 1 image page)
+          // - Covers (back, front, page 0) are NOT counted by Gelato
+          const actualPdfPages = pages * 2;  // Gelato page count (story content only)
           let productUid;
 
           try {
@@ -5571,7 +5570,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <label className="block text-lg font-semibold mb-3">
                 {t.numberOfPages}
                 <span className="text-sm font-normal text-gray-600 ml-2">
-                  ({language === 'de' ? 'Für Druck: mind. 13 Seiten (28 PDF-Seiten)' : language === 'fr' ? 'Pour impression: min. 13 scènes (28 pages PDF)' : 'For printing: min. 13 scenes (28 PDF pages)'})
+                  ({language === 'de' ? 'Für Druck: mind. 14 Szenen (28 Gelato-Seiten)' : language === 'fr' ? 'Pour impression: min. 14 scènes (28 pages Gelato)' : 'For printing: min. 14 scenes (28 Gelato pages)'})
                 </span>
               </label>
               <select

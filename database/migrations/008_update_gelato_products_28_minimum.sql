@@ -1,6 +1,7 @@
 -- Migration: Update Gelato products to 28-page minimum
 -- Date: 2025-12-07
--- Updates product configuration to support 28-52 pages (covering 13-25 scenes)
+-- Updates product configuration to support 28-52 pages (covering 14-26 scenes)
+-- Note: Gelato only counts story content pages, not covers
 
 -- Update the existing product to change minimum from 24 to 28
 -- and update available page counts to include all valid options
@@ -10,7 +11,7 @@ SET
   max_pages = 52,
   available_page_counts = '[28,32,36,40,44,48,52]',
   product_name = '14x14cm Softcover Photobook',
-  description = 'Square softcover photobook, 28-52 pages (13-25 scenes with covers)',
+  description = 'Square softcover photobook, 28-52 Gelato pages (14-26 scenes)',
   updated_at = CURRENT_TIMESTAMP
 WHERE product_uid = 'photobooks-softcover_pf_140x140-mm_pt_170-gsm-65lb-coated-silk_cl_4-4_bt_glued-left_prt_1-0';
 
@@ -19,7 +20,7 @@ INSERT INTO gelato_products (product_uid, product_name, description, size, cover
 SELECT
   'photobooks-softcover_pf_140x140-mm_pt_170-gsm-65lb-coated-silk_cl_4-4_bt_glued-left_prt_1-0',
   '14x14cm Softcover Photobook',
-  'Square softcover photobook, 28-52 pages (13-25 scenes with covers)',
+  'Square softcover photobook, 28-52 Gelato pages (14-26 scenes)',
   '14x14cm (5.5x5.5 inch)',
   'Softcover',
   28, 52,
