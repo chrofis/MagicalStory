@@ -250,6 +250,35 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_gelato_products_active ON gelato_products(is_active)`);
 
+    // Orders table for Stripe payments and book printing
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) REFERENCES users(id) ON DELETE CASCADE,
+        story_id VARCHAR(255),
+        stripe_session_id VARCHAR(255) UNIQUE NOT NULL,
+        stripe_payment_intent_id VARCHAR(255),
+        customer_name VARCHAR(255),
+        customer_email VARCHAR(255),
+        shipping_name VARCHAR(255),
+        shipping_address_line1 VARCHAR(255),
+        shipping_address_line2 VARCHAR(255),
+        shipping_city VARCHAR(100),
+        shipping_state VARCHAR(100),
+        shipping_postal_code VARCHAR(20),
+        shipping_country VARCHAR(2),
+        amount_total INTEGER,
+        currency VARCHAR(3),
+        payment_status VARCHAR(50),
+        gelato_order_id VARCHAR(255),
+        gelato_status VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_orders_stripe_session_id ON orders(stripe_session_id)`);
+
     // Story generation jobs table for background processing
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS story_jobs (
@@ -2798,48 +2827,173 @@ app.post('/api/log-error', (req, res) => {
   }
 });
 
+// Create Stripe checkout session for book purchase
+app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, res) => {
+  try {
+    const { storyId } = req.body;
+    const userId = req.user.userId;
+
+    console.log(`💳 Creating Stripe checkout session for user ${userId}, story ${storyId}`);
+
+    // Get story details
+    const story = await (storageMode === 'database'
+      ? dbPool.query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [storyId, userId]).then(r => r.rows[0])
+      : JSON.parse(await fs.readFile(path.join(dataDir, 'stories.json'), 'utf8')).find(s => s.id === storyId));
+
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: `Personalized Storybook: ${story.title}`,
+            description: `A personalized ${story.pages}-page storybook`,
+          },
+          unit_amount: 2990, // €29.90 in cents
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL || 'https://magicalstory.ch'}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'https://magicalstory.ch'}?payment=cancelled`,
+      metadata: {
+        userId: userId.toString(),
+        storyId: storyId.toString(),
+        storyTitle: story.title
+      },
+      shipping_address_collection: {
+        allowed_countries: ['DE', 'AT', 'CH', 'FR', 'IT', 'NL', 'BE', 'LU']
+      },
+    });
+
+    console.log(`✅ Checkout session created: ${session.id}`);
+    console.log(`   URL: ${session.url}`);
+
+    res.json({ sessionId: session.id, url: session.url });
+  } catch (err) {
+    console.error('❌ Error creating checkout session:', err);
+    res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+// Check payment/order status
+app.get('/api/stripe/order-status/:sessionId', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    console.log(`🔍 Checking order status for session: ${sessionId}`);
+
+    // Check database for order
+    if (storageMode === 'database') {
+      const order = await dbPool.query(
+        'SELECT * FROM orders WHERE stripe_session_id = $1',
+        [sessionId]
+      );
+
+      if (order.rows.length > 0) {
+        console.log(`✅ Order found in database:`, order.rows[0]);
+        return res.json({
+          status: 'completed',
+          order: order.rows[0]
+        });
+      }
+    }
+
+    // If not in database yet, check Stripe
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    console.log(`📋 Stripe session status: ${session.payment_status}`);
+
+    res.json({
+      status: session.payment_status,
+      session: {
+        id: session.id,
+        payment_status: session.payment_status,
+        amount_total: session.amount_total,
+        currency: session.currency
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error checking order status:', err);
+    res.status(500).json({ error: 'Failed to check order status' });
+  }
+});
+
 // Stripe webhook endpoint - receives payment events
 app.post('/api/stripe/webhook', async (req, res) => {
   try {
     const event = req.body;
 
-    console.log('💳 Stripe webhook received:', event.type);
+    console.log('💳 [STRIPE WEBHOOK] Received event:', event.type);
 
     // Handle the checkout.session.completed event
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
 
-      console.log('✅ Payment successful! Session ID:', session.id);
+      console.log('✅ [STRIPE WEBHOOK] Payment successful!');
+      console.log('   Session ID:', session.id);
+      console.log('   Payment Intent:', session.payment_intent);
+      console.log('   Amount:', session.amount_total, session.currency);
 
       // Retrieve full session with customer details
       try {
         const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
-          expand: ['customer', 'shipping_details']
+          expand: ['customer', 'line_items', 'shipping_details']
         });
 
         // Extract customer information
         const customerInfo = {
-          name: fullSession.customer_details?.name || fullSession.shipping_details?.name || 'N/A',
+          name: fullSession.customer_details?.name || fullSession.shipping?.name || 'N/A',
           email: fullSession.customer_details?.email || 'N/A',
-          address: fullSession.customer_details?.address || fullSession.shipping_details?.address || {}
+          address: fullSession.shipping?.address || fullSession.customer_details?.address || {}
         };
 
-        console.log('📦 Customer Information:');
-        console.log('  Name:', customerInfo.name);
-        console.log('  Email:', customerInfo.email);
-        console.log('  Address:', JSON.stringify(customerInfo.address, null, 2));
+        console.log('📦 [STRIPE WEBHOOK] Customer Information:');
+        console.log('   Name:', customerInfo.name);
+        console.log('   Email:', customerInfo.email);
+        console.log('   Address:', JSON.stringify(customerInfo.address, null, 2));
+        console.log('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
 
-        // TODO: Store customer information in database
-        // You can save this to the database here, associated with the user who made the purchase
+        // Store order in database
+        if (storageMode === 'database') {
+          const userId = parseInt(fullSession.metadata.userId);
+          const storyId = parseInt(fullSession.metadata.storyId);
+          const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
+
+          await dbPool.query(`
+            INSERT INTO orders (
+              user_id, story_id, stripe_session_id, stripe_payment_intent_id,
+              customer_name, customer_email,
+              shipping_name, shipping_address_line1, shipping_address_line2,
+              shipping_city, shipping_state, shipping_postal_code, shipping_country,
+              amount_total, currency, payment_status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          `, [
+            userId, storyId, fullSession.id, fullSession.payment_intent,
+            customerInfo.name, customerInfo.email,
+            fullSession.shipping?.name || customerInfo.name,
+            address.line1, address.line2,
+            address.city, address.state, address.postal_code, address.country,
+            fullSession.amount_total, fullSession.currency, fullSession.payment_status
+          ]);
+
+          console.log('💾 [STRIPE WEBHOOK] Order saved to database');
+          console.log('   User ID:', userId);
+          console.log('   Story ID:', storyId);
+        }
 
       } catch (retrieveError) {
-        console.error('Error retrieving session details:', retrieveError);
+        console.error('❌ [STRIPE WEBHOOK] Error retrieving/storing session details:', retrieveError);
       }
     }
 
     res.json({ received: true });
   } catch (err) {
-    console.error('Error processing Stripe webhook:', err);
+    console.error('❌ [STRIPE WEBHOOK] Error processing webhook:', err);
     res.status(400).json({ error: 'Webhook error' });
   }
 });
