@@ -2236,10 +2236,19 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
     const PDFDocument = require('pdfkit');
     const stream = require('stream');
 
-    // Create PDF document
+    // Convert mm to points (1mm = 2.83465 points)
+    const mmToPoints = (mm) => mm * 2.83465;
+
+    // Page dimensions for 14x14cm photobook
+    const coverWidth = mmToPoints(290.27);  // Cover spread width with bleed
+    const coverHeight = mmToPoints(146.0);   // Cover height with bleed
+    const pageSize = mmToPoints(140);        // Interior pages: 140x140mm
+
+    // Create PDF document - start with cover page
     const doc = new PDFDocument({
-      size: 'A4',
-      margins: { top: 72, bottom: 72, left: 72, right: 72 }
+      size: [coverWidth, coverHeight],
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      autoFirstPage: false  // We'll add pages manually
     });
 
     // Collect PDF data in a buffer
@@ -2255,33 +2264,45 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       doc.on('error', reject);
     });
 
-    // Add content to PDF
+    // Add page 0 - blank page (140 x 140 mm)
+    doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    // TODO: Add page 0 content here later
+    // For now, just blank white page
+
+    // Add page 1 - blank cover page (290.27 x 146.0 mm)
+    doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    // TODO: Add cover design here later
+    // For now, just blank white page
+
+    // Add content pages (140 x 140 mm square)
     storyPages.forEach((page, index) => {
       const pageNumber = index + 1;
 
-      // Add text page
-      if (index > 0) doc.addPage();
+      // Add text page (square format)
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 28, bottom: 28, left: 28, right: 28 } });
 
-      doc.fontSize(16)
+      doc.fontSize(14)
+         .fillColor('#333333')  // Dark gray instead of pure black to reduce ink
          .font('Helvetica')
          .text(page.text, {
            align: 'center',
            valign: 'center'
          });
 
-      // Add image page if available
+      // Add image page if available (square format)
       const sceneImage = sceneImages.find(img => img.pageNumber === pageNumber);
       if (sceneImage && sceneImage.imageData) {
-        doc.addPage();
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
         // Extract base64 data
         const base64Data = sceneImage.imageData.replace(/^data:image\/\w+;base64,/, '');
         const imageBuffer = Buffer.from(base64Data, 'base64');
 
-        // Add image centered on page
+        // Add image to fill page with small margin
         try {
-          doc.image(imageBuffer, {
-            fit: [doc.page.width - 144, doc.page.height - 144],
+          const margin = mmToPoints(5);  // 5mm margin
+          doc.image(imageBuffer, margin, margin, {
+            fit: [pageSize - (margin * 2), pageSize - (margin * 2)],
             align: 'center',
             valign: 'center'
           });
