@@ -2427,6 +2427,34 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
   }
 });
 
+// ADMIN: Force add shipping columns (emergency fix)
+app.post('/api/admin/fix-shipping-columns', async (req, res) => {
+  try {
+    const results = [];
+    const columns = [
+      { name: 'shipping_first_name', type: 'VARCHAR(255)' },
+      { name: 'shipping_last_name', type: 'VARCHAR(255)' },
+      { name: 'shipping_address_line1', type: 'VARCHAR(500)' },
+      { name: 'shipping_city', type: 'VARCHAR(255)' },
+      { name: 'shipping_post_code', type: 'VARCHAR(50)' },
+      { name: 'shipping_country', type: 'VARCHAR(2)' },
+      { name: 'shipping_email', type: 'VARCHAR(255)' }
+    ];
+
+    for (const col of columns) {
+      try {
+        await dbQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+        results.push({ column: col.name, status: 'OK' });
+      } catch (err) {
+        results.push({ column: col.name, status: 'ERROR', error: err.message });
+      }
+    }
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
