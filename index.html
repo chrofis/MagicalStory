@@ -2023,8 +2023,10 @@ Be specific and creative. Each scene description should paint a clear picture fo
           setEditableOutline(outline);
 
           // Parse outline to extract scene descriptions
-          console.log('=== OUTLINE PARSING DEBUG ===');
-          console.log('Full outline response:', outline);
+          if (currentUser?.role === 'admin') {
+            console.log('📋 Outline generated successfully');
+            console.log('Full outline:', outline.substring(0, 200) + '...');
+          }
 
           const sceneDescMap = {};
           const coverScenes = {
@@ -2045,7 +2047,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
             if (pageMatch) {
               currentPage = parseInt(pageMatch[1]);
               currentCoverType = null;
-              console.log(`Found story page ${currentPage}`);
+              // Debug: Found story page
             }
 
             // Look for cover page patterns - more flexible matching
@@ -2054,7 +2056,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
             if (titlePageMatch) {
               currentCoverType = 'titlePage';
               currentPage = null;
-              console.log('Found Title Page section');
+              // Debug: Found Title Page
             }
 
             const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?[\s:]/i);
@@ -2089,9 +2091,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
           setShortSceneDescriptions(sceneDescMap);
           setCoverSceneDescriptions(coverScenes);
-          console.log('=== PARSING COMPLETE ===');
-          console.log('Parsed story scene descriptions:', sceneDescMap);
-          console.log('Parsed cover scene descriptions:', coverScenes);
+          if (currentUser?.role === 'admin') {
+            console.log('✅ Parsing complete -', Object.keys(sceneDescMap).length, 'scenes');
+          }
 
           // Warning if cover scenes are empty
           if (!coverScenes.titlePage || !coverScenes.page0 || !coverScenes.backCover) {
@@ -2699,8 +2701,10 @@ Be specific and creative. Each scene description should paint a clear picture fo
           setEditableOutline(outline);
 
           // Parse outline to extract scene descriptions
-          console.log('=== OUTLINE PARSING DEBUG ===');
-          console.log('Full outline response:', outline);
+          if (currentUser?.role === 'admin') {
+            console.log('📋 Outline generated successfully');
+            console.log('Full outline:', outline.substring(0, 200) + '...');
+          }
 
           const sceneDescMap = {};
           const coverScenes = {
@@ -2721,7 +2725,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
             if (pageMatch) {
               currentPage = parseInt(pageMatch[1]);
               currentCoverType = null;
-              console.log(`Found story page ${currentPage}`);
+              // Debug: Found story page
             }
 
             // Look for cover page patterns - more flexible matching
@@ -2730,7 +2734,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
             if (titlePageMatch) {
               currentCoverType = 'titlePage';
               currentPage = null;
-              console.log('Found Title Page section');
+              // Debug: Found Title Page
             }
 
             const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?[\s:]/i);
@@ -2765,9 +2769,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
           setShortSceneDescriptions(sceneDescMap);
           setCoverSceneDescriptions(coverScenes);
-          console.log('=== PARSING COMPLETE ===');
-          console.log('Parsed story scene descriptions:', sceneDescMap);
-          console.log('Parsed cover scene descriptions:', coverScenes);
+          if (currentUser?.role === 'admin') {
+            console.log('✅ Parsing complete -', Object.keys(sceneDescMap).length, 'scenes');
+          }
 
           // Warning if cover scenes are empty
           if (!coverScenes.titlePage || !coverScenes.page0 || !coverScenes.backCover) {
