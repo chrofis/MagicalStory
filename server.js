@@ -2227,7 +2227,7 @@ app.delete('/api/files/:fileId', authenticateToken, async (req, res) => {
 // Generate PDF from story
 app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
   try {
-    const { storyId, storyTitle, storyPages, sceneImages } = req.body;
+    const { storyId, storyTitle, storyPages, sceneImages, coverImages } = req.body;
 
     if (!storyPages || !Array.isArray(storyPages) || storyPages.length === 0) {
       return res.status(400).json({ error: 'Missing or invalid storyPages' });
@@ -2264,15 +2264,43 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       doc.on('error', reject);
     });
 
-    // Add page 0 - blank page (140 x 140 mm)
-    doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    // TODO: Add page 0 content here later
-    // For now, just blank white page
-
-    // Add page 1 - blank cover page (290.27 x 146.0 mm)
+    // PDF Page 1: Back Cover + Front Cover (spread, 290.27 x 146.0 mm)
     doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    // TODO: Add cover design here later
-    // For now, just blank white page
+
+    if (coverImages && coverImages.backCover && coverImages.frontCover) {
+      // Add back cover on left half
+      const backCoverData = coverImages.backCover.replace(/^data:image\/\w+;base64,/, '');
+      const backCoverBuffer = Buffer.from(backCoverData, 'base64');
+      doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
+
+      // Add front cover on right half
+      const frontCoverData = coverImages.frontCover.replace(/^data:image\/\w+;base64,/, '');
+      const frontCoverBuffer = Buffer.from(frontCoverData, 'base64');
+      doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
+
+      // Add title text overlay on front cover (right half)
+      if (storyTitle) {
+        const titleX = coverWidth / 2 + 20;
+        const titleY = 40;
+        const titleWidth = (coverWidth / 2) - 40;
+
+        doc.fontSize(24)
+          .fillColor('white')
+          .text(storyTitle, titleX, titleY, {
+            width: titleWidth,
+            align: 'center'
+          });
+      }
+    }
+
+    // PDF Page 2: Page 0 (140 x 140 mm)
+    doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+    if (coverImages && coverImages.page0) {
+      const page0Data = coverImages.page0.replace(/^data:image\/\w+;base64,/, '');
+      const page0Buffer = Buffer.from(page0Data, 'base64');
+      doc.image(page0Buffer, 0, 0, { width: pageSize, height: pageSize });
+    }
 
     // Add content pages (140 x 140 mm square)
     storyPages.forEach((page, index) => {
