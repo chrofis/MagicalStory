@@ -4791,6 +4791,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         setGeneratedAvatars([]);
       };
 
+      // Helper function to safely navigate between steps
+      // Restores any character being edited before changing steps
+      const safeSetStep = (newStep) => {
+        // If a character is being edited, restore it first
+        if (characterBackup) {
+          console.log('⚠️ Character was being edited - restoring backup before navigation');
+          setCharacters([...characters, characterBackup]);
+          setCharacterBackup(null);
+          setCurrentCharacter(null);
+          setShowCharacterCreated(false);
+          setGeneratedAvatar(null);
+          setGeneratedAvatars([]);
+        }
+        setStep(newStep);
+      };
+
       const deleteCharacter = (charId) => {
         if (confirm(t.deleteCharacter + '?')) {
           setCharacters(characters.filter(c => c.id !== charId));
@@ -8200,7 +8216,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         <button
                           onClick={() => {
                             if (canAccess) {
-                              setStep(s);
+                              safeSetStep(s);
                             }
                           }}
                           disabled={!canAccess}
@@ -8406,7 +8422,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               {step < 5 && step !== 2 && (
                 <div className="flex justify-between">
                 <button
-                  onClick={() => setStep(Math.max(0, step - 1))}
+                  onClick={() => safeSetStep(Math.max(0, step - 1))}
                   className="bg-white text-purple-600 hover:bg-purple-50 border-2 border-purple-500 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
                 >
                   <Icon name="arrow-left" size={20} /> {t.back}
@@ -8421,7 +8437,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       storyType,
                       isDisabled: (step === 1 && !storyType) || (step === 2 && characters.length === 0) || (step === 3 && !areAllRelationshipsDefined())
                     });
-                    setStep(nextStep);
+                    safeSetStep(nextStep);
                   }}
                   disabled={
                     (step === 1 && !storyType) ||
