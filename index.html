@@ -2210,8 +2210,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
               console.log('Found Back Cover section');
             }
 
-            // Look for "Scene:" pattern - start collecting scene description
-            const sceneMatch = line.match(/^Scene:\s*(.+)/i);
+            // Look for "Scene:" pattern - start collecting scene description (handles **Scene:** too)
+            const sceneMatch = line.match(/^(?:\*\*)?Scene(?:\*\*)?:\s*(.+)/i);
             if (sceneMatch) {
               collectingScene = true;
               sceneBuffer = sceneMatch[1].trim();
@@ -2957,8 +2957,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
               console.log('Found Back Cover section');
             }
 
-            // Look for "Scene:" pattern - start collecting scene description
-            const sceneMatch = line.match(/^Scene:\s*(.+)/i);
+            // Look for "Scene:" pattern - start collecting scene description (handles **Scene:** too)
+            const sceneMatch = line.match(/^(?:\*\*)?Scene(?:\*\*)?:\s*(.+)/i);
             if (sceneMatch) {
               collectingScene = true;
               sceneBuffer = sceneMatch[1].trim();
