@@ -623,6 +623,20 @@ app.post('/api/claude', authenticateToken, async (req, res) => {
       throw new Error(errorMsg);
     }
 
+    // Log token usage
+    if (data.usage) {
+      console.log('📊 Token Usage:');
+      console.log(`  Input tokens:  ${data.usage.input_tokens.toLocaleString()}`);
+      console.log(`  Output tokens: ${data.usage.output_tokens.toLocaleString()}`);
+      console.log(`  Total tokens:  ${(data.usage.input_tokens + data.usage.output_tokens).toLocaleString()}`);
+      console.log(`  Max requested: ${max_tokens?.toLocaleString() || 'default'}`);
+
+      // Warn if output limit was reached
+      if (data.stop_reason === 'max_tokens') {
+        console.warn('⚠️  WARNING: Output was truncated - max_tokens limit reached!');
+      }
+    }
+
     res.json(data);
   } catch (err) {
     console.error('Claude API error:', err.message);

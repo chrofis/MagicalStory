@@ -1667,6 +1667,21 @@ Be specific and creative. Each scene description should paint a clear picture fo
           throw new Error('No content received from API');
         }
 
+        // Log token usage
+        if (data.usage) {
+          console.log('📊 Token Usage:');
+          console.log(`  Input tokens:  ${data.usage.input_tokens.toLocaleString()}`);
+          console.log(`  Output tokens: ${data.usage.output_tokens.toLocaleString()}`);
+          console.log(`  Total tokens:  ${(data.usage.input_tokens + data.usage.output_tokens).toLocaleString()}`);
+          console.log(`  Max requested: ${maxTokens.toLocaleString()}`);
+
+          // Warn if output limit was reached
+          if (data.stop_reason === 'max_tokens') {
+            console.warn('⚠️  WARNING: Output was truncated - max_tokens limit reached!');
+            console.warn(`  You requested ${maxTokens.toLocaleString()} tokens but the response was cut off.`);
+          }
+        }
+
         const text = data.content
           .filter(block => block.type === 'text')
           .map(block => block.text)
