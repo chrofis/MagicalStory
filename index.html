@@ -4225,74 +4225,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
       const analyzeImageForTraits = async (imageData) => {
         try {
-          console.log('🔍 Analyzing photo with DeepFace...');
+          console.log('🔍 Analyzing photo with Gemini API...');
 
-          // Call Python photo analyzer service via Node.js backend
-          const response = await fetch(`${API_URL}/api/analyze-photo`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
-              imageData: imageData
-            })
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-
-            // If Python service is unavailable, fall back to Gemini analysis
-            if (errorData.fallback || response.status === 503) {
-              console.warn('⚠️  DeepFace unavailable, falling back to Gemini analysis');
-              return await analyzeImageForTraitsGemini(imageData);
-            }
-
-            console.error('Photo analysis failed:', errorData);
-            return null;
-          }
-
-          const data = await response.json();
-
-          if (data.success && data.attributes) {
-            console.log('✓ Photo analyzed:', data.attributes);
-
-            // Update character photo with cropped version
-            if (data.cropped_image) {
-              setCurrentCharacter(prev => ({
-                ...prev,
-                photoUrl: data.cropped_image
-              }));
-            }
-
-            // Return extracted traits
-            return {
-              age: data.attributes.age,
-              height: data.attributes.height,
-              build: data.attributes.build,
-              gender: data.attributes.gender,
-              hairColor: '',  // DeepFace doesn't extract this
-              clothing: '',   // DeepFace doesn't extract this
-              otherFeatures: `Face detected at (${data.face_region.x}, ${data.face_region.y})`,
-              fullText: `Age: ${data.attributes.age}, Gender: ${data.attributes.gender}, Height: ${data.attributes.height}cm, Build: ${data.attributes.build}`
-            };
-          }
-
-          return null;
+          // Use Gemini API directly for feature extraction
+          return await analyzeImageForTraitsGemini(imageData);
         } catch (error) {
           console.error('Error analyzing image:', error);
-          // Fall back to Gemini on any error
-          console.warn('⚠️  DeepFace error, falling back to Gemini analysis');
-          try {
-            return await analyzeImageForTraitsGemini(imageData);
-          } catch (fallbackError) {
-            console.error('Gemini fallback also failed:', fallbackError);
-            return null;
-          }
+          return null;
         }
       };
 
-      // Fallback: Old Gemini-based analysis (if DeepFace unavailable)
+      // Gemini-based character photo analysis
       const analyzeImageForTraitsGemini = async (imageData) => {
         try {
           const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
