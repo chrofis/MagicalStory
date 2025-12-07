@@ -492,6 +492,61 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Dev auto-login (file mode only - for local development)
+app.post('/api/auth/dev-login', async (req, res) => {
+  try {
+    // Only allow in file mode
+    if (STORAGE_MODE === 'database') {
+      return res.status(403).json({ error: 'Dev login only available in file mode' });
+    }
+
+    // Get first admin user or create one
+    const users = await readJSON(USERS_FILE);
+    let user = users.find(u => u.role === 'admin');
+
+    if (!user) {
+      // Create a dev admin user
+      const hashedPassword = await bcrypt.hash('admin', 10);
+      user = {
+        id: Date.now(),
+        username: 'admin@local.dev',
+        email: 'admin@local.dev',
+        password: hashedPassword,
+        role: 'admin',
+        storyQuota: 999,
+        storiesGenerated: 0,
+        createdAt: new Date().toISOString()
+      };
+      users.push(user);
+      await writeJSON(USERS_FILE, users);
+    }
+
+    // Generate token
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '30d' }  // Longer expiration for dev
+    );
+
+    console.log(`🔧 Dev auto-login: ${user.username} (role: ${user.role})`);
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 999,
+        storiesGenerated: user.storiesGenerated || 0
+      }
+    });
+  } catch (err) {
+    console.error('Dev login error:', err);
+    res.status(500).json({ error: 'Dev login failed' });
+  }
+});
+
 // API Key management (admin only)
 app.post('/api/admin/config', authenticateToken, async (req, res) => {
   try {

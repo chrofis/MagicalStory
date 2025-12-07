@@ -1855,7 +1855,7 @@ Scene: [Short visual description]
 
 Provide the outline first, then the character manifest (if applicable). Be specific about what happens on each page.`;
 
-          const response = await makeApiCall(outlinePrompt, 3072);
+          const response = await makeApiCall(outlinePrompt, 8192);  // Increased for 24-page stories
 
           // Try to extract character manifest if present
           let outline = response;
@@ -2208,8 +2208,8 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
           const scenes = [];
           const prompts = {};
 
-          // Generate scene description for each page
-          for (let i = 0; i < Math.min(pages, storyPages.length); i++) {
+          // Generate scene description for each page (always generate for all requested pages)
+          for (let i = 0; i < pages; i++) {
             setGenerationProgress({
               current: i + 1,
               total: pages,
@@ -2218,6 +2218,11 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
 
             const pageContent = storyPages[i] || '';
             const pageNumber = i + 1;
+
+            // Warn if page content is missing
+            if (!pageContent || pageContent.trim().length === 0) {
+              console.warn(`⚠️  Page ${pageNumber}: No story text found, generating scene from outline only`);
+            }
 
             // Get character names for reference
             const characterNames = characters.map(c => c.name).join(', ');
@@ -2715,6 +2720,13 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             }
           };
 
+          // Define cover descriptions
+          const coverDescriptions = {
+            frontCover: `Title page for "${storyTitle}" - Beautiful, magical cover illustration with decorative elements`,
+            page0: `Dedication page for "${storyTitle}" - Warm, inviting introduction scene`,
+            backCover: `Back cover for "${storyTitle}" - Conclusive, satisfying ending illustration`
+          };
+
           const coverPromises = [
             generateCoverImage('front', `Create a beautiful title page for a children's book called "${storyTitle}". ${styleDescription}. Include decorative elements but leave space for the title text. Magical and inviting.`),
             generateCoverImage('page0', `Create a dedication page or introduction illustration for "${storyTitle}". ${styleDescription}. Warm, inviting scene that sets the mood for the story.`),
@@ -2722,8 +2734,13 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           ];
 
           const [frontCover, page0, backCover] = await Promise.all(coverPromises);
-          setCoverImages({ frontCover, page0, backCover });
-          console.log('Cover images generated');
+          setCoverImages({
+            frontCover,
+            page0,
+            backCover,
+            descriptions: coverDescriptions
+          });
+          console.log('Cover images generated with descriptions');
 
           setIsGeneratingImages(false);
 
@@ -3217,6 +3234,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             }
           };
 
+          // Define cover descriptions
+          const coverDescriptions = {
+            frontCover: `Title page for "${storyTitle}" - Beautiful, magical cover illustration with decorative elements`,
+            page0: `Dedication page for "${storyTitle}" - Warm, inviting introduction scene`,
+            backCover: `Back cover for "${storyTitle}" - Conclusive, satisfying ending illustration`
+          };
+
           const coverPromises = [
             generateCoverImage('front', `Create a beautiful title page for a children's book called "${storyTitle}". ${styleDescription}. Include decorative elements but leave space for the title text. Magical and inviting.`),
             generateCoverImage('page0', `Create a dedication page or introduction illustration for "${storyTitle}". ${styleDescription}. Warm, inviting scene that sets the mood for the story.`),
@@ -3224,8 +3248,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           ];
 
           const [frontCover, page0, backCover] = await Promise.all(coverPromises);
-          setCoverImages({ frontCover, page0, backCover });
-          console.log('Cover images generated');
+          setCoverImages({
+            frontCover,
+            page0,
+            backCover,
+            descriptions: coverDescriptions
+          });
+          console.log('Cover images generated with descriptions');
 
           setGenerationProgress({ current: scenesToGenerate.length, total: scenesToGenerate.length, message: 'All images generated!' });
         } catch (error) {
@@ -6124,8 +6153,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <img
                       src={coverImages.frontCover}
                       alt="Front Cover"
-                      className="w-full rounded-lg shadow-md"
+                      className="w-full rounded-lg shadow-md mb-3"
                     />
+                    {coverImages.descriptions && (
+                      <p className="text-sm text-gray-600 italic">{coverImages.descriptions.frontCover}</p>
+                    )}
                   </div>
                 )}
                 {coverImages.page0 && (
@@ -6134,8 +6166,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <img
                       src={coverImages.page0}
                       alt="Page 0"
-                      className="w-full rounded-lg shadow-md"
+                      className="w-full rounded-lg shadow-md mb-3"
                     />
+                    {coverImages.descriptions && (
+                      <p className="text-sm text-gray-600 italic">{coverImages.descriptions.page0}</p>
+                    )}
                   </div>
                 )}
                 {coverImages.backCover && (
@@ -6144,8 +6179,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <img
                       src={coverImages.backCover}
                       alt="Back Cover"
-                      className="w-full rounded-lg shadow-md"
+                      className="w-full rounded-lg shadow-md mb-3"
                     />
+                    {coverImages.descriptions && (
+                      <p className="text-sm text-gray-600 italic">{coverImages.descriptions.backCover}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -7333,8 +7371,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <a
                       href={orderData.pdfUrl}
                       download={orderData.pdfFilename || 'story.pdf'}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2"
                     >
                       <Icon name="download" size={20} />
