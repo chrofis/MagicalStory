@@ -970,7 +970,6 @@
           console.log('📖 Refreshing stories when opening modal...');
           loadStories().then(async (stories) => {
             console.log('📚 Stories refreshed:', stories.length, stories);
-            setSavedStories(stories);
 
             // Lazy load thumbnails for stories that don't have them
             const storiesNeedingThumbnails = stories.filter(story => !story.thumbnail);
@@ -1001,13 +1000,17 @@
 
               const thumbnails = await Promise.all(thumbnailPromises);
 
-              // Update all stories with thumbnails at once
-              setSavedStories(prev => prev.map(story => {
+              // Merge thumbnails into stories before setting state (single update)
+              const storiesWithThumbnails = stories.map(story => {
                 const thumbnailData = thumbnails.find(t => t && t.id === story.id);
                 return thumbnailData ? { ...story, thumbnail: thumbnailData.thumbnail } : story;
-              }));
+              });
 
+              setSavedStories(storiesWithThumbnails);
               console.log('✅ Thumbnails loaded successfully');
+            } else {
+              // No thumbnails to load, just set stories
+              setSavedStories(stories);
             }
           }).catch(err => {
             console.error('❌ Error refreshing stories:', err);
