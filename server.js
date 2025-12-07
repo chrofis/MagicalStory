@@ -2921,23 +2921,42 @@ ${storyText}`;
     console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images for job ${jobId}`);
 
     for (let i = 0; i < sceneArray.length; i++) {
-      try {
-        console.log(`📸 [PIPELINE] Generating image ${i + 1}/${sceneArray.length} for job ${jobId}`);
-        const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
-        const imageData = await callGeminiAPIForImage(imagePrompt);
-        images.push(imageData);
-        console.log(`✅ [PIPELINE] Image ${i + 1}/${sceneArray.length} generated successfully`);
+      let imageData = null;
+      let retries = 0;
+      const MAX_RETRIES = 2;
 
-        // Update progress
-        const imageProgress = 70 + Math.floor((i + 1) / sceneArray.length * 25);
-        await dbPool.query(
-          'UPDATE story_jobs SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-          [imageProgress, jobId]
-        );
-      } catch (error) {
-        console.error(`❌ [PIPELINE] Failed to generate image ${i + 1}/${sceneArray.length} for job ${jobId}:`, error);
-        throw new Error(`Image generation failed for scene ${i + 1}: ${error.message}`);
+      while (retries <= MAX_RETRIES && !imageData) {
+        try {
+          if (retries > 0) {
+            console.log(`🔄 [PIPELINE] Retrying image ${i + 1}/${sceneArray.length} (attempt ${retries + 1}/${MAX_RETRIES + 1}) for job ${jobId}`);
+          } else {
+            console.log(`📸 [PIPELINE] Generating image ${i + 1}/${sceneArray.length} for job ${jobId}`);
+          }
+
+          const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
+          imageData = await callGeminiAPIForImage(imagePrompt);
+          console.log(`✅ [PIPELINE] Image ${i + 1}/${sceneArray.length} generated successfully`);
+        } catch (error) {
+          retries++;
+          console.error(`❌ [PIPELINE] Failed to generate image ${i + 1}/${sceneArray.length} (attempt ${retries}/${MAX_RETRIES + 1}):`, error.message);
+
+          if (retries > MAX_RETRIES) {
+            throw new Error(`Image generation failed for scene ${i + 1} after ${MAX_RETRIES + 1} attempts: ${error.message}`);
+          }
+
+          // Wait a bit before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+        }
       }
+
+      images.push(imageData);
+
+      // Update progress
+      const imageProgress = 70 + Math.floor((i + 1) / sceneArray.length * 25);
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [imageProgress, jobId]
+      );
     }
 
     // Step 5: Generate cover images
