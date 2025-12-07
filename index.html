@@ -2134,8 +2134,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
 
-            // Look for "Page X:" pattern (story pages) - more flexible
-            const pageMatch = line.match(/^Page\s+(\d+)[\s:]/i);
+            // Look for "Page X:" pattern (story pages) - handles **Page X:** too
+            const pageMatch = line.match(/^(?:\*\*)?Page\s+(\d+)(?:\*\*)?[\s:]/i);
             if (pageMatch) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
@@ -2881,8 +2881,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
 
-            // Look for "Page X:" pattern (story pages) - more flexible
-            const pageMatch = line.match(/^Page\s+(\d+)[\s:]/i);
+            // Look for "Page X:" pattern (story pages) - handles **Page X:** too
+            const pageMatch = line.match(/^(?:\*\*)?Page\s+(\d+)(?:\*\*)?[\s:]/i);
             if (pageMatch) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
