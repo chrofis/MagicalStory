@@ -2608,13 +2608,13 @@ app.post('/api/admin/cleanup-orphaned-data', authenticateToken, async (req, res)
     const orphanedCharsResult = await dbQuery(
       `SELECT COUNT(*) as count FROM characters WHERE user_id IS NULL OR user_id = ''`
     );
-    const orphanedCharsCount = parseInt(orphanedCharsResult.rows[0].count);
+    const orphanedCharsCount = parseInt(orphanedCharsResult[0].count);
 
     // Check for orphaned stories
     const orphanedStoriesResult = await dbQuery(
       `SELECT COUNT(*) as count FROM stories WHERE user_id IS NULL OR user_id = ''`
     );
-    const orphanedStoriesCount = parseInt(orphanedStoriesResult.rows[0].count);
+    const orphanedStoriesCount = parseInt(orphanedStoriesResult[0].count);
 
     console.log(`Found ${orphanedCharsCount} orphaned characters, ${orphanedStoriesCount} orphaned stories`);
 

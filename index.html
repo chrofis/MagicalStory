@@ -6395,6 +6395,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 onChange={(e) => setPages(parseInt(e.target.value))}
                 className="w-full px-4 py-3 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none text-lg font-semibold"
               >
+                {currentUser && currentUser.role === 'admin' && (
+                  <option value="1">1 {language === 'de' ? 'Seite (Test)' : language === 'fr' ? 'page (Test)' : 'page (Test)'}</option>
+                )}
                 <option value="15">15 {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}</option>
                 <option value="20">20 {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}</option>
               </select>
