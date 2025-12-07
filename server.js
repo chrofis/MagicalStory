@@ -922,17 +922,11 @@ app.put('/api/admin/gelato-products/:id', authenticateToken, async (req, res) =>
 
     const result = await dbQuery(updateQuery, params);
 
-    // For MySQL, fetch the updated record
-    let updatedProduct;
+    // PostgreSQL RETURNING clause returns the updated record
     if (result.length === 0) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-      updatedProduct = result[0];);
-      }
-      const selectQuery = 'SELECT * FROM gelato_products WHERE id = ?';
-      const rows = await dbQuery(selectQuery, [id]);
-      updatedProduct = rows[0];
+      return res.status(404).json({ error: 'Product not found' });
     }
+    const updatedProduct = result[0];
 
     await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_UPDATED', {
       productId: id,
@@ -964,17 +958,11 @@ app.put('/api/admin/gelato-products/:id/toggle', authenticateToken, async (req, 
 
     const result = await dbQuery(updateQuery, [!is_active, id]);
 
-    // For MySQL, fetch the updated record
-    let updatedProduct;
+    // PostgreSQL RETURNING clause returns the updated record
     if (result.length === 0) {
-        return res.status(404).json({ error: 'Product not found' });
-      }
-      updatedProduct = result[0];);
-      }
-      const selectQuery = 'SELECT * FROM gelato_products WHERE id = ?';
-      const rows = await dbQuery(selectQuery, [id]);
-      updatedProduct = rows[0];
+      return res.status(404).json({ error: 'Product not found' });
     }
+    const updatedProduct = result[0];
 
     await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_TOGGLED', {
       productId: id,
