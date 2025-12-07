@@ -679,6 +679,10 @@
       const [isGenerating, setIsGenerating] = useState(false);
       const [savedStories, setSavedStories] = useState([]);
       const [showSavedStories, setShowSavedStories] = useState(false);
+      const [loadingProgress, setLoadingProgress] = useState(0);
+      const [loadingBytes, setLoadingBytes] = useState(0);
+      const [loadingTotalBytes, setLoadingTotalBytes] = useState(0);
+      const [showLoadingProgress, setShowLoadingProgress] = useState(false);
       const [showAdminPanel, setShowAdminPanel] = useState(false);
       const [showProductsPanel, setShowProductsPanel] = useState(false);
       const [adminUsers, setAdminUsers] = useState([]);
@@ -1702,6 +1706,49 @@
           console.error('Error saving story:', err);
           throw err; // Re-throw so caller can handle it
         }
+      };
+
+      // Helper function to fetch with progress tracking
+      const fetchWithProgress = (url, options = {}) => {
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open(options.method || 'GET', url);
+
+          // Set headers
+          if (options.headers) {
+            Object.keys(options.headers).forEach(key => {
+              xhr.setRequestHeader(key, options.headers[key]);
+            });
+          }
+
+          // Track download progress
+          xhr.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percentComplete = (event.loaded / event.total) * 100;
+              setLoadingProgress(Math.round(percentComplete));
+              setLoadingBytes(event.loaded);
+              setLoadingTotalBytes(event.total);
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                resolve(data);
+              } catch (err) {
+                reject(new Error('Failed to parse JSON response'));
+              }
+            } else {
+              reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Network error'));
+          xhr.ontimeout = () => reject(new Error('Request timeout'));
+
+          xhr.send(options.body);
+        });
       };
 
       const loadStories = async () => {
@@ -6834,16 +6881,18 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           onClick={async () => {
                             try {
                               console.log(`📖 Loading full story: ${story.id}`);
-                              // Fetch full story with all images
-                              const response = await fetch(`${API_URL}/api/stories/${story.id}`, {
+
+                              // Reset progress and show progress modal
+                              setLoadingProgress(0);
+                              setLoadingBytes(0);
+                              setLoadingTotalBytes(0);
+                              setShowLoadingProgress(true);
+
+                              // Fetch full story with all images using progress tracking
+                              const fullStory = await fetchWithProgress(`${API_URL}/api/stories/${story.id}`, {
                                 headers: { 'Authorization': `Bearer ${authToken}` }
                               });
 
-                              if (!response.ok) {
-                                throw new Error(`Failed to load story: ${response.status}`);
-                              }
-
-                              const fullStory = await response.json();
                               console.log(`✅ Loaded full story with ${fullStory.sceneImages?.length || 0} images`);
 
                               // Load the full story data
@@ -6858,8 +6907,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               setSceneImages(fullStory.sceneImages || []);
                               setStep(5);
                               setShowSavedStories(false);
+                              setShowLoadingProgress(false);
                             } catch (err) {
                               console.error('❌ Error loading story:', err);
+                              setShowLoadingProgress(false);
                               alert(`Failed to load story: ${err.message}`);
                             }
                           }}
@@ -7018,6 +7069,38 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Loading Progress Modal */}
+          {showLoadingProgress && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 animate-fade-in">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-purple-700 mb-2">Loading Story...</h2>
+                  <p className="text-gray-600">
+                    {loadingTotalBytes > 0
+                      ? `${(loadingBytes / 1024 / 1024).toFixed(2)} MB / ${(loadingTotalBytes / 1024 / 1024).toFixed(2)} MB`
+                      : 'Preparing download...'}
+                  </p>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-full flex items-center justify-center text-white text-sm font-semibold transition-all duration-300"
+                      style={{ width: `${loadingProgress}%` }}
+                    >
+                      {loadingProgress > 0 && `${loadingProgress}%`}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-500 text-center">
+                  Please wait while we load your story with all images...
+                </p>
               </div>
             </div>
           )}
