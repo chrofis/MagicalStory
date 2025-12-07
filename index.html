@@ -4561,6 +4561,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         console.log('✏️ Character strengths:', char.strengths);
         console.log('✏️ Character weaknesses:', char.weaknesses);
         console.log('✏️ Character fears:', char.fears);
+
+        // Extract custom attributes (not in default lists) and populate custom arrays
+        // This ensures custom attributes show up as buttons in edit form
+        const allDefaultStrengths = [...defaultStrengths.en, ...defaultStrengths.de, ...defaultStrengths.fr];
+        const allDefaultWeaknesses = [...defaultWeaknesses.en, ...defaultWeaknesses.de, ...defaultWeaknesses.fr];
+        const allDefaultFears = [...fearOptions.en, ...fearOptions.de, ...fearOptions.fr];
+
+        const customStrs = (char.strengths || []).filter(s => !allDefaultStrengths.includes(s));
+        const customWeaks = (char.weaknesses || []).filter(w => !allDefaultWeaknesses.includes(w));
+        const customFrs = (char.fears || []).filter(f => !allDefaultFears.includes(f));
+
+        // Merge with existing custom attributes (avoid duplicates)
+        setCustomStrengths([...new Set([...customStrengths, ...customStrs])]);
+        setCustomWeaknesses([...new Set([...customWeaknesses, ...customWeaks])]);
+        setCustomFears([...new Set([...customFears, ...customFrs])]);
+
         // Store backup before editing
         setCharacterBackup(JSON.parse(JSON.stringify(char))); // Deep copy
         setCurrentCharacter(char);
