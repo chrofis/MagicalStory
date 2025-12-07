@@ -3156,6 +3156,17 @@ ${storyText}`;
     const images = [];
     const imagePrompts = {}; // Store prompts for developer features
 
+    // Extract character photos for reference images
+    const characterPhotos = [];
+    if (inputData.characters && inputData.characters.length > 0) {
+      inputData.characters.forEach(char => {
+        if (char.photoUrl) {
+          characterPhotos.push(char.photoUrl);
+        }
+      });
+      console.log(`📸 [PIPELINE] Found ${characterPhotos.length} character photos for reference`);
+    }
+
     console.log(`📸 [PIPELINE] Parsed ${sceneArray.length} scenes (expected ${inputData.pages})`);
     console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images for job ${jobId}`);
 
@@ -3174,7 +3185,7 @@ ${storyText}`;
 
           const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
           imagePrompts[i + 1] = imagePrompt; // Save prompt for this page
-          imageResult = await callGeminiAPIForImage(imagePrompt);
+          imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
           console.log(`✅ [PIPELINE] Image ${i + 1}/${sceneArray.length} generated successfully`);
         } catch (error) {
           retries++;
@@ -3246,7 +3257,7 @@ ${storyText}`;
     try {
       console.log(`📕 [PIPELINE] Generating front cover for job ${jobId}`);
       const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page for the children's book "${storyTitle}".\n\nIMPORTANT: The image should ONLY contain the story title "${storyTitle}" - no other text, no subtitles, no author names. Just the title and the illustration.`;
-      frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt);
+      frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
       console.log(`✅ [PIPELINE] Front cover generated successfully`);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate front cover for job ${jobId}:`, error);
@@ -3259,7 +3270,7 @@ ${storyText}`;
       const page0Prompt = inputData.dedication && inputData.dedication.trim()
         ? `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "${inputData.dedication}"\n\nDo not add any other text. Only "${inputData.dedication}" must appear. No additional words allowed.`
         : `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as an introduction page for "${storyTitle}".\n\nIMPORTANT: This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.`;
-      page0Result = await callGeminiAPIForImage(page0Prompt);
+      page0Result = await callGeminiAPIForImage(page0Prompt, characterPhotos);
       console.log(`✅ [PIPELINE] Page 0 generated successfully`);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate page 0 for job ${jobId}:`, error);
@@ -3270,7 +3281,7 @@ ${storyText}`;
     try {
       console.log(`📕 [PIPELINE] Generating back cover for job ${jobId}`);
       const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "magicalstory.ch" in elegant letters in the bottom left corner.\n\nDo not add any other text. Only "magicalstory.ch" must appear. No additional words allowed.`;
-      backCoverResult = await callGeminiAPIForImage(backCoverPrompt);
+      backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
       console.log(`✅ [PIPELINE] Back cover generated successfully`);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate back cover for job ${jobId}:`, error);
@@ -3440,17 +3451,39 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
   return data.content[0].text;
 }
 
-async function callGeminiAPIForImage(prompt) {
-  // Call Gemini API for image generation
+async function callGeminiAPIForImage(prompt, characterPhotos = []) {
+  // Call Gemini API for image generation with optional character reference images
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     throw new Error('Gemini API key not configured');
   }
 
+  // Build parts array with prompt + character reference images
+  const parts = [{ text: prompt }];
+
+  // Add character photos as reference images
+  if (characterPhotos && characterPhotos.length > 0) {
+    characterPhotos.forEach(photoUrl => {
+      if (photoUrl && photoUrl.startsWith('data:image')) {
+        const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
+        const mimeType = photoUrl.match(/^data:(image\/\w+);base64,/) ?
+          photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+        parts.push({
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        });
+      }
+    });
+    console.log(`🖼️  [IMAGE GEN] Added ${characterPhotos.length} character reference images`);
+  }
+
   const requestBody = {
     contents: [{
-      parts: [{ text: prompt }]
+      parts: parts
     }]
   };
 
