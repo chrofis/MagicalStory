@@ -10,6 +10,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Libre+Baskerville:wght@400&display=swap" rel="stylesheet">
@@ -3555,118 +3556,65 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         }
       };
 
-      const downloadPrintablePDF = () => {
+      const downloadPrintablePDF = async () => {
         try {
           const storyTitle = `${storyTypes.find(t => t.id === storyType)?.name[language] || 'Story'}`;
           const pageMatches = generatedStory ? generatedStory.split(/---\s*Page\s+\d+\s*---/i) : [];
           const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
 
-          const printWindow = window.open('', '_blank', 'width=800,height=600');
-          if (printWindow) {
-            let htmlContent = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title>${storyTitle}</title>
-    <style>
-      /* PDF/X compatible settings - optimized for photobook printing */
-      @page {
-        size: 210mm 210mm; /* Square format 21x21cm for photobook */
-        margin: 0;
-      }
-      @media print {
-        .page-break { page-break-after: always; }
-        header, footer { display: none; }
-      }
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body {
-        font-family: 'Georgia', 'Times New Roman', serif;
-        font-size: 14pt;
-        line-height: 1.6;
-        background: white;
-      }
-      /* Text page - LEFT PAGE in book spread */
-      .text-page {
-        width: 210mm;
-        height: 210mm;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 20mm;
-        page-break-after: always;
-        background: #fffef8; /* Slight cream color for text pages */
-      }
-      .story-text {
-        text-align: center;
-        white-space: pre-wrap;
-        max-width: 100%;
-        font-size: 14pt;
-        line-height: 1.8;
-        color: #333;
-      }
-      /* Image page - RIGHT PAGE in book spread */
-      .image-page {
-        width: 210mm;
-        height: 210mm;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: white;
-        page-break-after: always;
-        padding: 10mm;
-      }
-      .image-page img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        border-radius: 8px;
-      }
-      /* Page numbers */
-      .page-number {
-        position: absolute;
-        bottom: 10mm;
-        font-size: 10pt;
-        color: #999;
-      }
-      .text-page .page-number { left: 10mm; }
-      .image-page .page-number { right: 10mm; }
-    </style>
-  </head>
-  <body>`;
+          // Create a temporary container for PDF generation
+          const tempContainer = document.createElement('div');
+          tempContainer.style.position = 'absolute';
+          tempContainer.style.left = '-9999px';
+          tempContainer.style.top = '0';
+          document.body.appendChild(tempContainer);
 
-            // Alternate between text and images
-            storyPages.forEach((pageText, index) => {
-              const pageNumber = index + 1;
-              const image = sceneImages.find(img => img.pageNumber === pageNumber);
+          // Build HTML content for PDF
+          let htmlContent = `
+            <div style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 14pt; line-height: 1.6;">
+          `;
 
-              // Text page - centered
-              htmlContent += `
-    <div class="text-page">
-      <div class="story-text">${pageText.trim()}</div>
-    </div>`;
+          // Alternate between text and images
+          storyPages.forEach((pageText, index) => {
+            const pageNumber = index + 1;
+            const image = sceneImages.find(img => img.pageNumber === pageNumber);
 
-              // Image page - full page
-              if (image && image.imageData) {
-                htmlContent += `
-    <div class="image-page">
-      <img src="${image.imageData}" alt="" />
-    </div>`;
-              }
-            });
-
+            // Text page
             htmlContent += `
-  </body>
-</html>`;
+              <div style="width: 210mm; height: 210mm; display: flex; justify-content: center; align-items: center; padding: 20mm; background: #fffef8; page-break-after: always;">
+                <div style="text-align: center; white-space: pre-wrap; max-width: 100%; font-size: 14pt; line-height: 1.8; color: #333;">
+                  ${pageText.trim()}
+                </div>
+              </div>
+            `;
 
-            printWindow.document.open();
-            printWindow.document.write(htmlContent);
-            printWindow.document.close();
+            // Image page
+            if (image && image.imageData) {
+              htmlContent += `
+                <div style="width: 210mm; height: 210mm; display: flex; justify-content: center; align-items: center; background: white; page-break-after: always; padding: 10mm;">
+                  <img src="${image.imageData}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" />
+                </div>
+              `;
+            }
+          });
 
-            // Trigger print dialog (users can save as PDF)
-            setTimeout(() => {
-              printWindow.print();
-            }, 500);
-          }
+          htmlContent += '</div>';
+          tempContainer.innerHTML = htmlContent;
+
+          // Configure PDF options
+          const opt = {
+            margin: 0,
+            filename: `${storyTitle}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: [210, 210], orientation: 'portrait' }
+          };
+
+          // Generate and download PDF
+          await html2pdf().set(opt).from(tempContainer).save();
+
+          // Clean up
+          document.body.removeChild(tempContainer);
         } catch (error) {
           console.error('PDF export error:', error);
           alert('PDF export error: ' + error.message);
@@ -3941,7 +3889,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               pdfFilename: pdfData.filename,
               isDraft: gelatoData.isDraft,
               previewUrls: gelatoData.previewUrls || [],
-              email: email
+              email: shippingAddress.email
             });
             setShowOrderModal(true);
           } else {
@@ -5819,12 +5767,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
                 >
                   <Icon name="download" size={20} /> {t.downloadTXT}
-                </button>
-                <button
-                  onClick={() => downloadStory('pdf')}
-                  className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
-                >
-                  <Icon name="download" size={20} /> {t.downloadPDF}
                 </button>
               </>
             )}
