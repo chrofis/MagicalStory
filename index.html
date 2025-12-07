@@ -2025,7 +2025,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
           // Parse outline to extract scene descriptions
           if (currentUser?.role === 'admin') {
             console.log('📋 Outline generated successfully');
-            console.log('Full outline:', outline.substring(0, 200) + '...');
+            console.log('Full outline (first 1000 chars):\n', outline.substring(0, 1000));
+            console.log('\n=== END OUTLINE PREVIEW ===\n');
           }
 
           const sceneDescMap = {};
@@ -2765,7 +2766,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
           // Parse outline to extract scene descriptions
           if (currentUser?.role === 'admin') {
             console.log('📋 Outline generated successfully');
-            console.log('Full outline:', outline.substring(0, 200) + '...');
+            console.log('Full outline (first 1000 chars):\n', outline.substring(0, 1000));
+            console.log('\n=== END OUTLINE PREVIEW ===\n');
           }
 
           const sceneDescMap = {};
