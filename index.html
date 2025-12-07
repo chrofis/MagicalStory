@@ -2854,7 +2854,8 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           const { jobId, message } = await response.json();
 
           console.log(`✅ Story job created: ${jobId}`);
-          alert(message);
+          // Don't show alert - user already confirmed in previous dialog
+          // alert(message);
 
           // Start polling for job status
           pollJobStatus(jobId);
