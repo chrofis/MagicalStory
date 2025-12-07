@@ -2915,6 +2915,8 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                   story: result.storyText,
                   sceneDescriptions: result.sceneDescriptions,
                   sceneImages: result.images,
+                  coverImages: result.coverImages || { frontCover: null, page0: null, backCover: null },
+                  thumbnail: result.coverImages?.frontCover || null,
                   createdAt: new Date().toISOString()
                 };
 

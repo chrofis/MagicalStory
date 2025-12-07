@@ -2867,12 +2867,43 @@ async function processStoryJob(jobId) {
       );
     }
 
+    // Step 5: Generate cover images
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [95, 'Generating cover images...', jobId]
+    );
+
+    const artStyle = inputData.artStyle || 'pixar';
+    const storyTitle = inputData.title || 'My Story';
+    const characterInfo = inputData.characters && inputData.characters.length > 0
+      ? `\n\nMain characters: ${inputData.characters.map(c => `${c.name} (${c.gender}, age ${c.age})`).join(', ')}`
+      : '';
+
+    // Generate front cover
+    const frontCoverPrompt = `Children's book front cover illustration for "${storyTitle}". Style: ${artStyle}. ${characterInfo}\n\nCreate a beautiful, eye-catching cover that captures the essence of the story.`;
+    const frontCover = await callGeminiAPIForImage(frontCoverPrompt);
+
+    // Generate page 0 (dedication page) - warm, inviting illustration
+    const page0Prompt = `Children's book page 0 dedication/introduction page illustration. Style: ${artStyle}. ${characterInfo}\n\nCreate a warm, inviting illustration that welcomes readers into the story world.${inputData.dedication ? `\n\nDedication text: "${inputData.dedication}"` : ''}`;
+    const page0 = await callGeminiAPIForImage(page0Prompt);
+
+    // Generate back cover
+    const backCoverPrompt = `Children's book back cover illustration. Style: ${artStyle}. ${characterInfo}\n\nCreate a complementary illustration for the back cover that ties the story together.`;
+    const backCover = await callGeminiAPIForImage(backCoverPrompt);
+
+    const coverImages = {
+      frontCover,
+      page0,
+      backCover
+    };
+
     // Job complete - save result
     const resultData = {
       outline,
       storyText,
       sceneDescriptions,
       images,
+      coverImages,
       title: inputData.title || 'My Story'
     };
 
