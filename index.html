@@ -2038,6 +2038,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
           const lines = outline.split('\n');
           let currentPage = null;
           let currentCoverType = null;
+          let collectingScene = false;
+          let sceneBuffer = '';
 
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -2045,47 +2047,111 @@ Be specific and creative. Each scene description should paint a clear picture fo
             // Look for "Page X:" pattern (story pages) - more flexible
             const pageMatch = line.match(/^Page\s+(\d+)[\s:]/i);
             if (pageMatch) {
+              // Save any buffered scene before switching context
+              if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                  console.log(`Stored scene for page ${currentPage}:`, sceneBuffer.substring(0, 50) + '...');
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                  console.log(`Stored ${currentCoverType} scene:`, sceneBuffer.substring(0, 50) + '...');
+                }
+              }
+
               currentPage = parseInt(pageMatch[1]);
               currentCoverType = null;
-              // Debug: Found story page
+              collectingScene = false;
+              sceneBuffer = '';
             }
 
             // Look for cover page patterns - more flexible matching
             // Matches: "Title Page:", "**Title Page:**", "Title Page Scene:", etc.
             const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (titlePageMatch) {
+              // Save any buffered scene before switching context
+              if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                }
+              }
+
               currentCoverType = 'titlePage';
               currentPage = null;
-              // Debug: Found Title Page
+              collectingScene = false;
+              sceneBuffer = '';
+              console.log('Found Title Page section');
             }
 
             const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (page0Match) {
+              // Save any buffered scene before switching context
+              if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                }
+              }
+
               currentCoverType = 'page0';
               currentPage = null;
+              collectingScene = false;
+              sceneBuffer = '';
               console.log('Found Page 0 section');
             }
 
             const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (backCoverMatch) {
+              // Save any buffered scene before switching context
+              if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                }
+              }
+
               currentCoverType = 'backCover';
               currentPage = null;
+              collectingScene = false;
+              sceneBuffer = '';
               console.log('Found Back Cover section');
             }
 
-            // Look for "Scene:" pattern
+            // Look for "Scene:" pattern - start collecting scene description
             const sceneMatch = line.match(/^Scene:\s*(.+)/i);
             if (sceneMatch) {
-              const sceneDesc = sceneMatch[1].trim();
-              if (currentPage !== null) {
-                // Story page scene
-                sceneDescMap[currentPage] = sceneDesc;
-                console.log(`Stored scene for page ${currentPage}:`, sceneDesc.substring(0, 50) + '...');
-              } else if (currentCoverType) {
-                // Cover page scene
-                coverScenes[currentCoverType] = sceneDesc;
-                console.log(`Stored ${currentCoverType} scene:`, sceneDesc.substring(0, 50) + '...');
+              collectingScene = true;
+              sceneBuffer = sceneMatch[1].trim();
+            } else if (collectingScene && line.length > 0 && !line.match(/^(Page|Title|Back\s+Cover)/i)) {
+              // Continue collecting multi-line scene descriptions
+              sceneBuffer += ' ' + line;
+            } else if (collectingScene && line.length === 0) {
+              // Empty line ends scene collection
+              if (sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                  console.log(`Stored scene for page ${currentPage}:`, sceneBuffer.substring(0, 50) + '...');
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                  console.log(`Stored ${currentCoverType} scene:`, sceneBuffer.substring(0, 50) + '...');
+                }
               }
+              collectingScene = false;
+              sceneBuffer = '';
+            }
+          }
+
+          // Save any remaining buffered scene at the end
+          if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+            if (currentPage !== null) {
+              sceneDescMap[currentPage] = sceneBuffer.trim();
+              console.log(`Stored scene for page ${currentPage}:`, sceneBuffer.substring(0, 50) + '...');
+            } else if (currentCoverType) {
+              coverScenes[currentCoverType] = sceneBuffer.trim();
+              console.log(`Stored ${currentCoverType} scene:`, sceneBuffer.substring(0, 50) + '...');
             }
           }
 
@@ -2348,11 +2414,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
         //   return;
         // }
 
-        // Use multi-part generation for stories with more than 5 pages
-        if (pages > 5) {
-          return generateStoryMultiPart();
-        }
-
+        // Generate full story in one shot (no chunking)
         setIsGenerating(true);
 
         // Extract and set story title
@@ -2372,15 +2434,15 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
             ? `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write the complete story following the outline above. Use "--- Page X ---" markers for each page. Write engaging, age-appropriate content for each page.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.`
             : basePrompt;
 
-          const storyText = await makeApiCall(fullPrompt, 4096);
+          const storyText = await makeApiCall(fullPrompt, 16000);
 
           // Store story text prompt and API call for debugging
           setStoryTextPrompt(fullPrompt);
           setStoryTextApiCall({
             type: 'text',
-            model: 'gemini-2.0-flash-thinking-exp-1219',
+            model: 'claude-sonnet-4-5-20250929',
             prompt: fullPrompt,
-            maxTokens: 4096,
+            maxTokens: 16000,
             timestamp: new Date().toISOString()
           });
 
@@ -2716,6 +2778,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
           const lines = outline.split('\n');
           let currentPage = null;
           let currentCoverType = null;
+          let collectingScene = false;
+          let sceneBuffer = '';
 
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -2723,47 +2787,111 @@ Be specific and creative. Each scene description should paint a clear picture fo
             // Look for "Page X:" pattern (story pages) - more flexible
             const pageMatch = line.match(/^Page\s+(\d+)[\s:]/i);
             if (pageMatch) {
+              // Save any buffered scene before switching context
+              if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                  console.log(`Stored scene for page ${currentPage}:`, sceneBuffer.substring(0, 50) + '...');
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                  console.log(`Stored ${currentCoverType} scene:`, sceneBuffer.substring(0, 50) + '...');
+                }
+              }
+
               currentPage = parseInt(pageMatch[1]);
               currentCoverType = null;
-              // Debug: Found story page
+              collectingScene = false;
+              sceneBuffer = '';
             }
 
             // Look for cover page patterns - more flexible matching
             // Matches: "Title Page:", "**Title Page:**", "Title Page Scene:", etc.
             const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (titlePageMatch) {
+              // Save any buffered scene before switching context
+              if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                }
+              }
+
               currentCoverType = 'titlePage';
               currentPage = null;
-              // Debug: Found Title Page
+              collectingScene = false;
+              sceneBuffer = '';
+              console.log('Found Title Page section');
             }
 
             const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (page0Match) {
+              // Save any buffered scene before switching context
+              if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                }
+              }
+
               currentCoverType = 'page0';
               currentPage = null;
+              collectingScene = false;
+              sceneBuffer = '';
               console.log('Found Page 0 section');
             }
 
             const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (backCoverMatch) {
+              // Save any buffered scene before switching context
+              if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                }
+              }
+
               currentCoverType = 'backCover';
               currentPage = null;
+              collectingScene = false;
+              sceneBuffer = '';
               console.log('Found Back Cover section');
             }
 
-            // Look for "Scene:" pattern
+            // Look for "Scene:" pattern - start collecting scene description
             const sceneMatch = line.match(/^Scene:\s*(.+)/i);
             if (sceneMatch) {
-              const sceneDesc = sceneMatch[1].trim();
-              if (currentPage !== null) {
-                // Story page scene
-                sceneDescMap[currentPage] = sceneDesc;
-                console.log(`Stored scene for page ${currentPage}:`, sceneDesc.substring(0, 50) + '...');
-              } else if (currentCoverType) {
-                // Cover page scene
-                coverScenes[currentCoverType] = sceneDesc;
-                console.log(`Stored ${currentCoverType} scene:`, sceneDesc.substring(0, 50) + '...');
+              collectingScene = true;
+              sceneBuffer = sceneMatch[1].trim();
+            } else if (collectingScene && line.length > 0 && !line.match(/^(Page|Title|Back\s+Cover)/i)) {
+              // Continue collecting multi-line scene descriptions
+              sceneBuffer += ' ' + line;
+            } else if (collectingScene && line.length === 0) {
+              // Empty line ends scene collection
+              if (sceneBuffer && (currentPage !== null || currentCoverType)) {
+                if (currentPage !== null) {
+                  sceneDescMap[currentPage] = sceneBuffer.trim();
+                  console.log(`Stored scene for page ${currentPage}:`, sceneBuffer.substring(0, 50) + '...');
+                } else if (currentCoverType) {
+                  coverScenes[currentCoverType] = sceneBuffer.trim();
+                  console.log(`Stored ${currentCoverType} scene:`, sceneBuffer.substring(0, 50) + '...');
+                }
               }
+              collectingScene = false;
+              sceneBuffer = '';
+            }
+          }
+
+          // Save any remaining buffered scene at the end
+          if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
+            if (currentPage !== null) {
+              sceneDescMap[currentPage] = sceneBuffer.trim();
+              console.log(`Stored scene for page ${currentPage}:`, sceneBuffer.substring(0, 50) + '...');
+            } else if (currentCoverType) {
+              coverScenes[currentCoverType] = sceneBuffer.trim();
+              console.log(`Stored ${currentCoverType} scene:`, sceneBuffer.substring(0, 50) + '...');
             }
           }
 
