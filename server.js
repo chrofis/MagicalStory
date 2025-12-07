@@ -1192,7 +1192,41 @@ app.get('/api/user/shipping-address', authenticateToken, async (req, res) => {
 // Save user's shipping address
 app.put('/api/user/shipping-address', authenticateToken, async (req, res) => {
   try {
-    const { firstName, lastName, addressLine1, city, postCode, country, email } = req.body;
+    let { firstName, lastName, addressLine1, city, postCode, country, email } = req.body;
+
+    // Validate and normalize country code (must be 2-letter ISO code)
+    if (!country || typeof country !== 'string') {
+      return res.status(400).json({ error: 'Country code is required' });
+    }
+
+    country = country.trim().toUpperCase();
+
+    if (country.length !== 2 || !/^[A-Z]{2}$/.test(country)) {
+      return res.status(400).json({
+        error: 'Country must be a valid 2-letter ISO code (e.g., US, DE, CH, FR)',
+        hint: 'Please use the standard 2-letter country code'
+      });
+    }
+
+    // Validate email format
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    email = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        error: 'Please provide a valid email address',
+        hint: 'Email format should be like: user@example.com'
+      });
+    }
+
+    // Validate required fields
+    if (!firstName || !lastName || !addressLine1 || !city || !postCode) {
+      return res.status(400).json({ error: 'All address fields are required' });
+    }
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
@@ -1614,10 +1648,39 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
 // Gelato Print API - Create photobook order
 app.post('/api/gelato/order', authenticateToken, async (req, res) => {
   try {
-    const { pdfUrl, shippingAddress, orderReference, productUid, pageCount } = req.body;
+    let { pdfUrl, shippingAddress, orderReference, productUid, pageCount } = req.body;
 
     if (!pdfUrl || !shippingAddress || !productUid || !pageCount) {
       return res.status(400).json({ error: 'Missing required fields: pdfUrl, shippingAddress, productUid, pageCount' });
+    }
+
+    // Validate and normalize shipping address
+    if (!shippingAddress.country || typeof shippingAddress.country !== 'string') {
+      return res.status(400).json({ error: 'Country code is required in shipping address' });
+    }
+
+    shippingAddress.country = shippingAddress.country.trim().toUpperCase();
+
+    if (shippingAddress.country.length !== 2 || !/^[A-Z]{2}$/.test(shippingAddress.country)) {
+      return res.status(400).json({
+        error: 'Country must be a valid 2-letter ISO code (e.g., US, DE, CH, FR)',
+        hint: 'Please update your shipping address with a valid country code'
+      });
+    }
+
+    // Validate email
+    if (!shippingAddress.email || typeof shippingAddress.email !== 'string') {
+      return res.status(400).json({ error: 'Email is required in shipping address' });
+    }
+
+    shippingAddress.email = shippingAddress.email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(shippingAddress.email)) {
+      return res.status(400).json({
+        error: 'Please provide a valid email address',
+        hint: 'Email format should be like: user@example.com'
+      });
     }
 
     const gelatoApiKey = process.env.GELATO_API_KEY;
