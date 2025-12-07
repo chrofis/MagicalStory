@@ -6739,44 +6739,46 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             )}
           </div>
 
-          <div>
-            <label className="block text-xl font-semibold mb-3">{t.selectMainCharacters}</label>
-            <div className="grid md:grid-cols-2 gap-3">
-              {characters.map(char => (
-                <button
-                  key={char.id}
-                  onClick={() => toggleMainCharacter(char.id)}
-                  className={`p-4 rounded-lg border-2 transition-all text-left ${
-                    mainCharacters.includes(char.id)
-                      ? 'border-yellow-500 bg-yellow-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {char.photoUrl && (
-                      <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full object-cover" />
-                    )}
-                    <div className="flex-1">
-                      <div className="font-bold text-base flex items-center gap-2">
-                        {char.name}
-                        <span className={mainCharacters.includes(char.id) ? 'inline-block' : 'hidden'}>
-                          <Icon name="star" size={16} className="text-yellow-500" />
-                        </span>
-                      </div>
-                      <div className="text-sm md:text-base text-gray-600">
-                        {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
+
+          <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
+            <div>
+              <label className="block text-xl font-semibold mb-3">{t.selectMainCharacters}</label>
+              <div className="grid md:grid-cols-2 gap-3">
+                {characters.map(char => (
+                  <button
+                    key={char.id}
+                    onClick={() => toggleMainCharacter(char.id)}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      mainCharacters.includes(char.id)
+                        ? 'border-yellow-500 bg-yellow-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {char.photoUrl && (
+                        <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full object-cover" />
+                      )}
+                      <div className="flex-1">
+                        <div className="font-bold text-base flex items-center gap-2">
+                          {char.name}
+                          <span className={mainCharacters.includes(char.id) ? 'inline-block' : 'hidden'}>
+                            <Icon name="star" size={16} className="text-yellow-500" />
+                          </span>
+                        </div>
+                        <div className="text-sm md:text-base text-gray-600">
+                          {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xl font-semibold mb-3">
-              {t.numberOfPages}
-            </label>
+            <div>
+              <label className="block text-xl font-semibold mb-3">
+                {t.numberOfPages}
+              </label>
               <select
                 value={pages}
                 onChange={(e) => setPages(parseInt(e.target.value))}
@@ -7017,6 +7019,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                  'No credits remaining. Contact administrator for more credits.'}
               </p>
             )}
+          </div>
         </div>
       );
 
@@ -7058,6 +7061,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 </label>
               </div>
             )}
+          </div>
 
           {/* 1. Prompt Used - Developer Mode Only */}
           {developerMode && generatedPrompt && (
@@ -7164,7 +7168,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             {/* Developer Mode Only: Buy Book via Stripe */}
             {developerMode && sceneImages.length > 0 && (
               <a
-                href="https://buy.stripe.com/test_3cIaEQ5kZ8Rsegnf3i1ck00"
+                href="https://buy.stripe.com/bJe8wHdtFbqofebgxK8Zq00"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 font-semibold flex items-center justify-center gap-2"
