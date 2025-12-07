@@ -2933,15 +2933,28 @@ async function processStoryJob(jobId) {
 
 function buildStoryPrompt(inputData) {
   // Build the story generation prompt based on input data
-  // This is a simplified version - you'll need to match your existing prompt building logic
+  // Extract only essential character info (NO PHOTOS to avoid token limit)
+  const characterSummary = (inputData.characters || []).map(char => ({
+    name: char.name,
+    gender: char.gender,
+    age: char.age,
+    personality: char.personality,
+    strengths: char.strengths,
+    weaknesses: char.weaknesses,
+    fears: char.fears,
+    specialDetails: char.specialDetails
+    // Explicitly exclude photoUrl and other large fields
+  }));
+
   return `Create a children's story with the following parameters:
     Title: ${inputData.title || 'Untitled'}
     Age: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years
     Length: ${inputData.pages || 15} pages
     Language: ${inputData.language || 'en'}
-    Characters: ${JSON.stringify(inputData.characters || [])}
-    Theme: ${inputData.theme || 'adventure'}
-    Moral: ${inputData.moral || 'friendship'}`;
+    Characters: ${JSON.stringify(characterSummary)}
+    Story Type: ${inputData.storyType || 'adventure'}
+    Story Details: ${inputData.storyDetails || 'None'}
+    Dedication: ${inputData.dedication || 'None'}`;
 }
 
 function parseSceneDescriptions(text) {
