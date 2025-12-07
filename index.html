@@ -1911,7 +1911,7 @@ Scene: [Visual description for concluding scene]
 
 Be specific and creative. Each scene description should paint a clear picture for the illustrator.`;
 
-          const response = await makeApiCall(outlinePrompt, 8192);  // Increased for 24-page stories
+          const response = await makeApiCall(outlinePrompt, 4096);  // Max for Claude 3 Haiku
 
           // Store outline prompt and API call for debugging
           setStoryOutlinePrompt(outlinePrompt);
@@ -1919,7 +1919,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
             type: 'text',
             model: 'gemini-2.0-flash-thinking-exp-1219',
             prompt: outlinePrompt,
-            maxTokens: 8192,
+            maxTokens: 4096,
             timestamp: new Date().toISOString()
           });
 
@@ -2578,7 +2578,7 @@ Scene: [Visual description for concluding scene]
 
 Be specific and creative. Each scene description should paint a clear picture for the illustrator.`;
 
-          const outline = await makeApiCall(outlinePrompt, 8192);  // Increased for 24-page stories
+          const outline = await makeApiCall(outlinePrompt, 4096);  // Max for Claude 3 Haiku
 
           // Store outline prompt and API call for debugging
           setStoryOutlinePrompt(outlinePrompt);
@@ -2586,7 +2586,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
             type: 'text',
             model: 'gemini-2.0-flash-thinking-exp-1219',
             prompt: outlinePrompt,
-            maxTokens: 8192,
+            maxTokens: 4096,
             timestamp: new Date().toISOString()
           });
 
