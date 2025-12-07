@@ -3821,6 +3821,121 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         throw new Error('No image data found in Gemini response');
       };
 
+      // Helper function to analyze image quality with Gemini
+      const analyzeImageQuality = async (generatedImageData, originalPrompt, characterImages = []) => {
+        if (!authToken) {
+          return null; // Skip if not authenticated
+        }
+
+        try {
+          const parts = [];
+
+          // QA Analyst prompt
+          const qaPrompt = `You are a strict QA Visual Analyst.
+
+    Input 1: The GENERATED IMAGE (First image provided).
+    Input 2: The USER PROMPT: "${originalPrompt}"
+    Input 3+: REFERENCE IMAGES (Remaining images provided).
+
+    Your Task:
+    1. Assess prompt adherence and likeness to reference images.
+    2. CRITICALLY inspect for visual artifacts and physical logic failures. Look for:
+       - Objects floating that should be held.
+       - Distorted hands, limbs, or faces.
+       - Items blending into the background or each other.
+       - Nonsensical physics.
+
+    Scoring Criteria (0-100):
+    - Penalize HEAVILY (-20 to -40 points) for physical hallucinations (floating objects, broken anatomy).
+    - Penalize for missing key prompt elements.
+    - 100 is reserved for pixel-perfect, logical execution.
+
+    Output strictly in the following format:
+    Score: [Score]/100
+
+    Reasoning:
+    [Concise explanation. Explicitly mention any artifacts, floating objects, or physics failures if found.]`;
+
+          parts.push({ text: qaPrompt });
+
+          // Add generated image first
+          const base64Data = generatedImageData.replace(/^data:image\/\w+;base64,/, '');
+          const mimeType = generatedImageData.match(/^data:(image\/\w+);base64,/) ?
+            generatedImageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+          parts.push({
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          });
+
+          // Add character reference images
+          characterImages.forEach(charImage => {
+            const charBase64 = charImage.replace(/^data:image\/\w+;base64,/, '');
+            const charMimeType = charImage.match(/^data:(image\/\w+);base64,/) ?
+              charImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+            parts.push({
+              inlineData: {
+                mimeType: charMimeType,
+                data: charBase64
+              }
+            });
+          });
+
+          const apiPayload = {
+            model: 'gemini-2.5-flash',
+            contents: [{ parts: parts }],
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+          };
+
+          const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(apiPayload)
+          }, 60000); // 60 second timeout
+
+          if (!response.ok) {
+            console.error('Quality analysis failed');
+            return null;
+          }
+
+          const data = await response.json();
+
+          if (!data.candidates || data.candidates.length === 0) {
+            return null;
+          }
+
+          const analysisText = data.candidates[0].content.parts[0].text;
+
+          // Parse score from response
+          const scoreMatch = analysisText.match(/Score:\s*(\d+)\/100/i);
+          const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+
+          // Extract reasoning
+          const reasoningMatch = analysisText.match(/Reasoning:\s*(.+)/is);
+          const reasoning = reasoningMatch ? reasoningMatch[1].trim() : '';
+
+          return {
+            score: score,
+            reasoning: reasoning,
+            fullResponse: analysisText
+          };
+        } catch (error) {
+          console.error('Error analyzing image quality:', error);
+          return null;
+        }
+      };
+
       // Helper function to call Gemini API with logging
       const callGeminiAPIWithLogging = async (prompt, imageData = null, pageNumber = null) => {
         if (!authToken) {
@@ -4160,10 +4275,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               }
               console.log(`Page ${scene.pageNumber}: Success!`);
 
+              // Analyze image quality (admin feature)
+              let qualityAnalysis = null;
+              if (currentUser && currentUser.role === 'admin' && imageData) {
+                console.log(`Page ${scene.pageNumber}: Analyzing quality...`);
+                qualityAnalysis = await analyzeImageQuality(imageData, imagePrompt, characterAvatars);
+                if (qualityAnalysis) {
+                  console.log(`Page ${scene.pageNumber}: Quality score: ${qualityAnalysis.score}/100`);
+                }
+              }
+
               return {
                 pageNumber: scene.pageNumber,
                 imageData: imageData,
-                description: scene.description
+                description: scene.description,
+                qualityScore: qualityAnalysis?.score || null,
+                qualityReasoning: qualityAnalysis?.reasoning || null
               };
             } catch (error) {
               console.error(`Error generating image for page ${scene.pageNumber}:`, error);
@@ -7622,6 +7749,25 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           alt={`Scene for page ${image.pageNumber}`}
                           className="w-full rounded-lg shadow-md mb-3"
                         />
+
+                        {/* Quality Score - Admin Only */}
+                        {currentUser && currentUser.role === 'admin' && image.qualityScore !== null && image.qualityScore !== undefined && (
+                          <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3 mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-semibold text-blue-700">Quality Score:</span>
+                              <span className={`text-lg font-bold ${
+                                image.qualityScore >= 80 ? 'text-green-600' :
+                                image.qualityScore >= 60 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {image.qualityScore}/100
+                              </span>
+                            </div>
+                            {image.qualityReasoning && (
+                              <p className="text-xs text-gray-700 mt-2 whitespace-pre-wrap">{image.qualityReasoning}</p>
+                            )}
+                          </div>
+                        )}
 
                         {/* Image Action Buttons */}
                         <div className="flex gap-2 mb-3">
