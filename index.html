@@ -2985,10 +2985,12 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
               const result = job.resultData;
               if (result) {
                 setStoryTitle(result.title || storyTitle);
+                setStoryOutline(result.outline || ''); // Load story outline
                 setGeneratedStory(result.storyText || '');
                 setSceneDescriptions(result.sceneDescriptions || []);
                 setSceneImages(result.images || []);
                 setCoverImages(result.coverImages || { frontCover: null, page0: null, backCover: null });
+                setImagePrompts(result.imagePrompts || {}); // Load image prompts
               }
 
               alert('Story generation complete! Your story is ready.');
@@ -7260,8 +7262,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <Icon name="printer" size={20} /> {language === 'de' ? 'Buch drucken' : language === 'fr' ? 'Imprimer le livre' : 'Print Book'}
               </button>
             )}
-            {/* Developer Mode Only: Buy Book via Stripe */}
-            {developerMode && sceneImages.length > 0 && currentStoryId && (
+            {/* Buy Book via Stripe */}
+            {sceneImages.length > 0 && currentStoryId && (
               <button
                 onClick={async () => {
                   try {
@@ -7997,9 +7999,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                         {/* Quality Score - Admin Only */}
                         {currentUser && currentUser.role === 'admin' && image.qualityScore !== null && image.qualityScore !== undefined && (
-                          <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-blue-700">Quality Score:</span>
+                          <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
+                            <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
+                              <span>
+                                {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                              </span>
                               <span className={`text-lg font-bold ${
                                 image.qualityScore >= 80 ? 'text-green-600' :
                                 image.qualityScore >= 60 ? 'text-yellow-600' :
@@ -8007,8 +8011,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               }`}>
                                 {image.qualityScore}/100
                               </span>
-                            </div>
-                          </div>
+                            </summary>
+                            {image.qualityReasoning && (
+                              <div className="mt-2 text-xs text-gray-700 bg-white p-3 rounded border border-gray-200">
+                                <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                                <p className="whitespace-pre-wrap">{image.qualityReasoning}</p>
+                              </div>
+                            )}
+                          </details>
                         )}
                       </>
                     ) : (
