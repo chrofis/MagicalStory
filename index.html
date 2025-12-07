@@ -686,6 +686,8 @@
       const [showAdminPanel, setShowAdminPanel] = useState(false);
       const [showProductsPanel, setShowProductsPanel] = useState(false);
       const [adminUsers, setAdminUsers] = useState([]);
+      const [orphanedData, setOrphanedData] = useState(null);
+      const [isCheckingOrphaned, setIsCheckingOrphaned] = useState(false);
       const [apiKey, setApiKey] = useState('');
       const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false);
       const [tempApiKey, setTempApiKey] = useState('');
@@ -1426,6 +1428,78 @@ Be specific and creative. Each scene description should paint a clear picture fo
         } catch (err) {
           console.error('Error updating user quota:', err);
           return false;
+        }
+      };
+
+      // Orphaned Data Management Functions
+      const checkOrphanedData = async () => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        setIsCheckingOrphaned(true);
+        try {
+          const response = await fetch(`${API_URL}/api/admin/cleanup-orphaned-data`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ action: 'check' })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setOrphanedData(data.found);
+          } else {
+            console.error('Failed to check orphaned data');
+            setOrphanedData(null);
+          }
+        } catch (err) {
+          console.error('Error checking orphaned data:', err);
+          setOrphanedData(null);
+        } finally {
+          setIsCheckingOrphaned(false);
+        }
+      };
+
+      const deleteOrphanedData = async () => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        const confirmMsg = language === 'de'
+          ? 'Möchten Sie wirklich alle verwaisten Charaktere und Geschichten löschen?'
+          : language === 'fr'
+          ? 'Voulez-vous vraiment supprimer tous les personnages et histoires orphelins ?'
+          : 'Are you sure you want to delete all orphaned characters and stories?';
+
+        if (!confirm(confirmMsg)) return;
+
+        setIsCheckingOrphaned(true);
+        try {
+          const response = await fetch(`${API_URL}/api/admin/cleanup-orphaned-data`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ action: 'delete' })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            alert(language === 'de'
+              ? `Gelöscht: ${data.deleted.characters} Charaktere, ${data.deleted.stories} Geschichten`
+              : language === 'fr'
+              ? `Supprimé: ${data.deleted.characters} personnages, ${data.deleted.stories} histoires`
+              : `Deleted: ${data.deleted.characters} characters, ${data.deleted.stories} stories`);
+            // Re-check after deletion
+            await checkOrphanedData();
+          } else {
+            alert('Failed to delete orphaned data');
+          }
+        } catch (err) {
+          console.error('Error deleting orphaned data:', err);
+          alert('Error deleting orphaned data');
+        } finally {
+          setIsCheckingOrphaned(false);
         }
       };
 
@@ -2941,28 +3015,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
           setGenerationProgress({ current: 2, total: 4, message: 'Step 2/4: Generating full story...' });
           setIsGenerating(true);
 
-          let storyText;
-          if (pages > 5) {
-            // Multi-part generation
-            const pagesPerChunk = 5;
-            const totalChunks = Math.ceil(pages / pagesPerChunk);
-            let fullStory = '';
-
-            for (let i = 0; i < totalChunks; i++) {
-              const startPage = i * pagesPerChunk + 1;
-              const endPage = Math.min((i + 1) * pagesPerChunk, pages);
-
-              const chunkPrompt = `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write ONLY pages ${startPage} to ${endPage} of the story. Follow the outline above. Use "--- Page X ---" markers for each page. Write the complete content for these pages.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.${i > 0 ? `\n\nPrevious story context:\n${fullStory.slice(-500)}` : ''}`;
-
-              const chunk = await makeApiCall(chunkPrompt, 3072);
-              fullStory += (i > 0 ? '\n\n' : '') + chunk;
-            }
-            storyText = fullStory;
-          } else {
-            // Single generation - include the outline
-            const fullPrompt = `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write the complete story following the outline above. Use "--- Page X ---" markers for each page. Write engaging, age-appropriate content for each page.`;
-            storyText = await makeApiCall(fullPrompt, 4096);
-          }
+          // Generate full story in one shot with Claude Sonnet 4.5's 64K output limit
+          const fullPrompt = `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write the complete story following the outline above. You MUST write exactly ${pages} pages (Pages 1 through ${pages}). Do NOT stop until all ${pages} pages are complete. Use "--- Page X ---" markers for each page. Write engaging, age-appropriate content for each page.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.`;
+          const storyText = await makeApiCall(fullPrompt, 64000);
 
           setGeneratedStory(storyText);
           setStep(5);
@@ -6334,29 +6389,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             <div>
               <label className="block text-lg font-semibold mb-3">
                 {t.numberOfPages}
-                <span className="text-sm font-normal text-gray-600 ml-2">
-                  ({language === 'de' ? 'Für Druck: mind. 14 Szenen (28 Gelato-Seiten)' : language === 'fr' ? 'Pour impression: min. 14 scènes (28 pages Gelato)' : 'For printing: min. 14 scenes (28 Gelato pages)'})
-                </span>
               </label>
               <select
                 value={pages}
                 onChange={(e) => setPages(parseInt(e.target.value))}
                 className="w-full px-4 py-3 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none text-lg font-semibold"
               >
-                <option value="15">15 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
-                <option value="24">24 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
-                <option value="28">28 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
-                <option value="32">32 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
-                <option value="36">36 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
-                <option value="40">40 {language === 'de' ? 'Seiten ✓ Druckbar' : language === 'fr' ? 'pages ✓ Imprimable' : 'pages ✓ Printable'}</option>
+                <option value="15">15 {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}</option>
+                <option value="20">20 {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}</option>
               </select>
-              <p className="text-sm text-gray-600 mt-2">
-                {language === 'de'
-                  ? 'Wählen Sie mindestens 24 Seiten für gedruckte Bücher. Kleinere Geschichten können online gelesen werden.'
-                  : language === 'fr'
-                  ? 'Choisissez au moins 24 pages pour les livres imprimés. Les histoires plus courtes peuvent être lues en ligne.'
-                  : 'Choose at least 24 pages for printed books. Shorter stories can be read online.'}
-              </p>
             </div>
 
             <div>
@@ -7792,6 +7833,73 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </table>
                   </div>
                 )}
+
+                {/* Orphaned Data Section */}
+                <div className="mt-8 p-6 bg-orange-50 rounded-lg border-2 border-orange-200">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-orange-900 flex items-center gap-2">
+                      <span>🗑️</span>
+                      {language === 'de' ? 'Verwaiste Daten' : language === 'fr' ? 'Données orphelines' : 'Orphaned Data'}
+                    </h3>
+                    <button
+                      onClick={checkOrphanedData}
+                      disabled={isCheckingOrphaned}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <span>🔍</span>
+                      {isCheckingOrphaned
+                        ? (language === 'de' ? 'Prüfe...' : language === 'fr' ? 'Vérification...' : 'Checking...')
+                        : (language === 'de' ? 'Prüfen' : language === 'fr' ? 'Vérifier' : 'Check')}
+                    </button>
+                  </div>
+
+                  {orphanedData === null ? (
+                    <p className="text-gray-600 text-center py-4">
+                      {language === 'de'
+                        ? 'Klicken Sie auf "Prüfen", um nach verwaisten Charakteren und Geschichten zu suchen'
+                        : language === 'fr'
+                        ? 'Cliquez sur "Vérifier" pour rechercher les personnages et histoires orphelins'
+                        : 'Click "Check" to scan for orphaned characters and stories'}
+                    </p>
+                  ) : (
+                    <div>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-white p-4 rounded-lg border border-orange-300">
+                          <div className="text-3xl font-bold text-orange-600">{orphanedData.characters}</div>
+                          <div className="text-sm text-gray-600">
+                            {language === 'de' ? 'Verwaiste Charaktere' : language === 'fr' ? 'Personnages orphelins' : 'Orphaned Characters'}
+                          </div>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg border border-orange-300">
+                          <div className="text-3xl font-bold text-orange-600">{orphanedData.stories}</div>
+                          <div className="text-sm text-gray-600">
+                            {language === 'de' ? 'Verwaiste Geschichten' : language === 'fr' ? 'Histoires orphelines' : 'Orphaned Stories'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {(orphanedData.characters > 0 || orphanedData.stories > 0) && (
+                        <button
+                          onClick={deleteOrphanedData}
+                          disabled={isCheckingOrphaned}
+                          className="w-full bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 font-semibold disabled:opacity-50"
+                        >
+                          {language === 'de'
+                            ? 'Alle verwaisten Daten löschen'
+                            : language === 'fr'
+                            ? 'Supprimer toutes les données orphelines'
+                            : 'Delete All Orphaned Data'}
+                        </button>
+                      )}
+
+                      {orphanedData.characters === 0 && orphanedData.stories === 0 && (
+                        <div className="text-center text-green-600 font-semibold py-2">
+                          ✅ {language === 'de' ? 'Keine verwaisten Daten gefunden!' : language === 'fr' ? 'Aucune donnée orpheline trouvée !' : 'No orphaned data found!'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h3 className="font-semibold text-blue-900 mb-2">Quick Guide:</h3>
