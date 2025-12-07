@@ -902,17 +902,11 @@
         };
       }, [currentUser]);
 
-      // Load characters and stories when user logs in
+      // Load characters when user logs in (stories loaded on-demand when opening "My Stories")
       useEffect(() => {
         if (authToken && isAuthenticated) {
-          console.log('🔄 Loading user data (characters, stories, quota)...');
+          console.log('🔄 Loading user data (characters, quota)...');
           loadCharacters();
-          loadStories().then(stories => {
-            console.log('📚 Loaded stories:', stories.length);
-            setSavedStories(stories);
-          }).catch(err => {
-            console.error('❌ Error loading stories:', err);
-          });
           fetchUserQuota();
         }
       }, [authToken, isAuthenticated]);
@@ -964,6 +958,11 @@
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }, []);
+
+      // Scroll to top when step changes
+      useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, [step]);
 
       // Always load stories when user opens the stories modal
       useEffect(() => {
@@ -2994,7 +2993,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
               alert('Story generation complete! Your story is ready.');
 
               // Auto-navigate to page 5 to view the story
-              setCurrentStep(5);
+              setStep(5);
 
               // Auto-save the story
               if (result) {
