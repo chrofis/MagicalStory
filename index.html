@@ -6488,10 +6488,137 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         )}
                       </>
                     ) : (
-                      <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 text-red-700">
-                        <p className="font-semibold">Error generating image:</p>
-                        <p className="text-sm mt-1">{image.error}</p>
-                      </div>
+                      <>
+                        {/* Error Display for Blocked/Failed Images */}
+                        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 text-red-700 mb-3">
+                          <p className="font-semibold">⚠️ Error generating image:</p>
+                          <p className="text-sm mt-1">{image.error || 'Unknown error'}</p>
+                        </div>
+
+                        {/* Action Buttons - Even for Failed Images */}
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={() => {
+                              const scene = sceneDescriptions.find(s => s.pageNumber === image.pageNumber);
+                              if (scene) {
+                                const confirmed = confirm(`Retry generating image for page ${image.pageNumber}?`);
+                                if (confirmed) {
+                                  (async () => {
+                                    try {
+                                      const imagePrompt = imagePrompts[image.pageNumber];
+                                      if (imagePrompt) {
+                                        const newImageData = await callGeminiAPI(imagePrompt);
+                                        const updatedImages = [...sceneImages];
+                                        updatedImages[index] = { ...image, imageData: newImageData, error: null };
+                                        setSceneImages(updatedImages);
+                                      }
+                                    } catch (error) {
+                                      alert(`Error regenerating image: ${error.message}`);
+                                      const updatedImages = [...sceneImages];
+                                      updatedImages[index] = { ...image, error: error.message };
+                                      setSceneImages(updatedImages);
+                                    }
+                                  })();
+                                }
+                              }
+                            }}
+                            className="flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center gap-1 text-sm font-semibold"
+                          >
+                            <Icon name="refresh-cw" size={14} /> {language === 'de' ? 'Erneut versuchen' : language === 'fr' ? 'Réessayer' : 'Retry'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (editingImageIndex === index) {
+                                setEditingImageIndex(null);
+                                setImageEditInstruction('');
+                              } else {
+                                setEditingImageIndex(index);
+                                setImageEditInstruction('');
+                              }
+                            }}
+                            className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                          >
+                            <Icon name="edit" size={14} /> {language === 'de' ? 'Prompt bearbeiten' : language === 'fr' ? 'Modifier le prompt' : 'Edit Prompt'}
+                          </button>
+                        </div>
+
+                        {/* Edit Prompt Interface for Failed Images */}
+                        {editingImageIndex === index && (
+                          <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
+                            <p className="text-sm font-semibold text-purple-700 mb-2">
+                              {language === 'de' ? 'Prompt bearbeiten und erneut versuchen:' : language === 'fr' ? 'Modifier le prompt et réessayer:' : 'Edit prompt and retry:'}
+                            </p>
+                            <textarea
+                              value={imageEditInstruction}
+                              onChange={(e) => setImageEditInstruction(e.target.value)}
+                              placeholder={imagePrompts[image.pageNumber] || "Enter new prompt..."}
+                              className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
+                            />
+                            <button
+                              onClick={async () => {
+                                if (!imageEditInstruction.trim()) {
+                                  alert('Please enter a prompt');
+                                  return;
+                                }
+                                try {
+                                  const newImageData = await callGeminiAPI(imageEditInstruction);
+                                  const updatedImages = [...sceneImages];
+                                  updatedImages[index] = { ...image, imageData: newImageData, error: null };
+                                  setSceneImages(updatedImages);
+                                  // Update the prompt
+                                  setImagePrompts({...imagePrompts, [image.pageNumber]: imageEditInstruction});
+                                  setEditingImageIndex(null);
+                                  setImageEditInstruction('');
+                                } catch (error) {
+                                  alert(`Error generating image: ${error.message}`);
+                                  const updatedImages = [...sceneImages];
+                                  updatedImages[index] = { ...image, error: error.message };
+                                  setSceneImages(updatedImages);
+                                }
+                              }}
+                              className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                            >
+                              {language === 'de' ? 'Mit neuem Prompt generieren' : language === 'fr' ? 'Générer avec nouveau prompt' : 'Generate with new prompt'}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Show Prompt - Even for Failed Images */}
+                        {imagePrompts[image.pageNumber] && (
+                          <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
+                            <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                              {language === 'de' ? 'Verwendeten Prompt anzeigen' : language === 'fr' ? 'Afficher le prompt utilisé' : 'Show Used Prompt'}
+                            </summary>
+                            <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                              {imagePrompts[image.pageNumber]}
+                            </pre>
+                          </details>
+                        )}
+
+                        {/* Show API Call - Admin only - Even for Failed Images */}
+                        {currentUser && currentUser.role === 'admin' && apiCalls[image.pageNumber] && (
+                          <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                            <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                              {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
+                            </summary>
+                            <div className="mt-2 text-xs text-gray-700">
+                              <div className="mb-2">
+                                <span className="font-semibold">Endpoint:</span> {apiCalls[image.pageNumber].endpoint || 'N/A'}
+                              </div>
+                              <div className="mb-2">
+                                <span className="font-semibold">Method:</span> {apiCalls[image.pageNumber].method || 'N/A'}
+                              </div>
+                              <div className="mb-2">
+                                <span className="font-semibold">Timestamp:</span> {apiCalls[image.pageNumber].timestamp ? new Date(apiCalls[image.pageNumber].timestamp).toLocaleString() : 'N/A'}
+                              </div>
+                              <div className="mb-1 font-semibold">Payload:</div>
+                              <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                                {JSON.stringify(apiCalls[image.pageNumber].payload || {}, null, 2)}
+                              </pre>
+                            </div>
+                          </details>
+                        )}
+                      </>
                     )}
                   </div>
                 ))}
