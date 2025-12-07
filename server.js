@@ -249,6 +249,25 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_gelato_products_active ON gelato_products(is_active)`);
 
+    // Story generation jobs table for background processing
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS story_jobs (
+        id VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        input_data JSONB NOT NULL,
+        result_data JSONB,
+        error_message TEXT,
+        progress INT DEFAULT 0,
+        progress_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_jobs_user ON story_jobs(user_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_jobs_status ON story_jobs(status)`);
+
     console.log('✓ Database tables initialized');
 
     // Run database migrations
@@ -2710,6 +2729,317 @@ app.post('/api/log-error', (req, res) => {
   } catch (err) {
     console.error('Error logging browser error:', err);
     res.status(500).json({ success: false, error: 'Failed to log error' });
+  }
+});
+
+// ===================================
+// BACKGROUND STORY GENERATION JOBS
+// ===================================
+
+// Background worker function to process a story generation job
+async function processStoryJob(jobId) {
+  console.log(`🎬 Starting processing for job ${jobId}`);
+
+  try {
+    // Get job data
+    const jobResult = await dbPool.query(
+      'SELECT * FROM story_jobs WHERE id = $1',
+      [jobId]
+    );
+
+    if (jobResult.rows.length === 0) {
+      throw new Error('Job not found');
+    }
+
+    const job = jobResult.rows[0];
+    const inputData = job.input_data;
+
+    // Update status to processing
+    await dbPool.query(
+      'UPDATE story_jobs SET status = $1, progress = $2, progress_message = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
+      ['processing', 10, 'Step 1/4: Generating story outline...', jobId]
+    );
+
+    // Step 1: Generate story outline (using Claude API)
+    const outlinePrompt = buildStoryPrompt(inputData);
+    const outline = await callClaudeAPI(outlinePrompt, 4096);
+
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [30, 'Step 2/4: Writing full story...', jobId]
+    );
+
+    // Step 2: Generate full story text (using Claude API)
+    const storyPrompt = `Based on this outline:\n\n${outline}\n\nNow write the complete story text...`;
+    const storyText = await callClaudeAPI(storyPrompt, 8192);
+
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [50, 'Step 3/4: Generating scene descriptions...', jobId]
+    );
+
+    // Step 3: Generate scene descriptions (using Claude API)
+    const sceneDescriptionsPrompt = `From this story, create scene descriptions for each page:\n\n${storyText}`;
+    const sceneDescriptions = await callClaudeAPI(sceneDescriptionsPrompt, 4096);
+
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [70, 'Step 4/4: Generating illustrations (this may take several minutes)...', jobId]
+    );
+
+    // Step 4: Generate images (using Gemini API)
+    const sceneArray = parseSceneDescriptions(sceneDescriptions);
+    const images = [];
+
+    for (let i = 0; i < sceneArray.length; i++) {
+      const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
+      const imageData = await callGeminiAPIForImage(imagePrompt);
+      images.push(imageData);
+
+      // Update progress
+      const imageProgress = 70 + Math.floor((i + 1) / sceneArray.length * 25);
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [imageProgress, jobId]
+      );
+    }
+
+    // Job complete - save result
+    const resultData = {
+      outline,
+      storyText,
+      sceneDescriptions,
+      images,
+      title: inputData.title || 'My Story'
+    };
+
+    await dbPool.query(
+      `UPDATE story_jobs
+       SET status = $1, progress = $2, progress_message = $3, result_data = $4,
+           completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5`,
+      ['completed', 100, 'Story generation complete!', JSON.stringify(resultData), jobId]
+    );
+
+    console.log(`✅ Job ${jobId} completed successfully`);
+
+  } catch (error) {
+    console.error(`❌ Job ${jobId} failed:`, error);
+
+    await dbPool.query(
+      `UPDATE story_jobs
+       SET status = $1, error_message = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      ['failed', error.message, jobId]
+    );
+  }
+}
+
+// Helper functions for story generation
+
+function buildStoryPrompt(inputData) {
+  // Build the story generation prompt based on input data
+  // This is a simplified version - you'll need to match your existing prompt building logic
+  return `Create a children's story with the following parameters:
+    Title: ${inputData.title || 'Untitled'}
+    Age: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years
+    Length: ${inputData.pages || 15} pages
+    Language: ${inputData.language || 'en'}
+    Characters: ${JSON.stringify(inputData.characters || [])}
+    Theme: ${inputData.theme || 'adventure'}
+    Moral: ${inputData.moral || 'friendship'}`;
+}
+
+function parseSceneDescriptions(text) {
+  // Parse scene descriptions from the generated text
+  // This is a placeholder - implement based on your format
+  const scenes = text.split('\n\n').filter(s => s.trim());
+  return scenes;
+}
+
+function buildImagePrompt(sceneDescription, inputData) {
+  // Build image generation prompt
+  return `Children's book illustration: ${sceneDescription}. Style: colorful, friendly, age-appropriate for ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years old.`;
+}
+
+async function callClaudeAPI(prompt, maxTokens = 4096) {
+  // Call Claude API for text generation
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Claude API key not configured');
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: maxTokens,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Claude API error: ${error}`);
+  }
+
+  const data = await response.json();
+  return data.content[0].text;
+}
+
+async function callGeminiAPIForImage(prompt) {
+  // Call Gemini API for image generation
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }]
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini API error: ${error}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.candidates || data.candidates.length === 0) {
+    throw new Error('No image generated');
+  }
+
+  // Extract image data
+  const candidate = data.candidates[0];
+  if (candidate.content && candidate.content.parts) {
+    for (const part of candidate.content.parts) {
+      if (part.inlineData && part.inlineData.data) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+  }
+
+  throw new Error('No image data in response');
+}
+
+// Create a new story generation job
+app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
+  try {
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const userId = req.user.id;
+    const inputData = req.body;
+
+    console.log(`📝 Creating story job ${jobId} for user ${req.user.username}`);
+
+    if (STORAGE_MODE === 'database') {
+      await dbPool.query(
+        `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...']
+      );
+    } else {
+      // File mode fallback - not supported for background jobs
+      return res.status(503).json({
+        error: 'Background jobs require database mode. Please use manual generation instead.'
+      });
+    }
+
+    // Start processing the job asynchronously (don't await)
+    processStoryJob(jobId).catch(err => {
+      console.error(`❌ Job ${jobId} failed:`, err);
+    });
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Story generation started. This will take approximately 10 minutes.'
+    });
+  } catch (err) {
+    console.error('Error creating story job:', err);
+    res.status(500).json({ error: 'Failed to create story job' });
+  }
+});
+
+// Get job status
+app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const userId = req.user.id;
+
+    if (STORAGE_MODE === 'database') {
+      const result = await dbPool.query(
+        `SELECT id, status, progress, progress_message, result_data, error_message, created_at, completed_at
+         FROM story_jobs
+         WHERE id = $1 AND user_id = $2`,
+        [jobId, userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+
+      const job = result.rows[0];
+      res.json({
+        jobId: job.id,
+        status: job.status,
+        progress: job.progress,
+        progressMessage: job.progress_message,
+        resultData: job.result_data,
+        errorMessage: job.error_message,
+        createdAt: job.created_at,
+        completedAt: job.completed_at
+      });
+    } else {
+      return res.status(503).json({ error: 'Background jobs require database mode' });
+    }
+  } catch (err) {
+    console.error('Error fetching job status:', err);
+    res.status(500).json({ error: 'Failed to fetch job status' });
+  }
+});
+
+// Get user's story jobs
+app.get('/api/jobs/my-jobs', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 10;
+
+    if (STORAGE_MODE === 'database') {
+      const result = await dbPool.query(
+        `SELECT id, status, progress, progress_message, created_at, completed_at
+         FROM story_jobs
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [userId, limit]
+      );
+
+      res.json({ jobs: result.rows });
+    } else {
+      return res.status(503).json({ error: 'Background jobs require database mode' });
+    }
+  } catch (err) {
+    console.error('Error fetching user jobs:', err);
+    res.status(500).json({ error: 'Failed to fetch jobs' });
   }
 });
 

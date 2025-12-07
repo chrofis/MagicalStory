@@ -1707,7 +1707,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
           throw new Error('Authentication required');
         }
 
-        const response = await fetch(`${API_URL}/api/claude`, {
+        const response = await fetchWithTimeout(`${API_URL}/api/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1717,7 +1717,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
             prompt: prompt,
             max_tokens: maxTokens
           })
-        });
+        }, 120000); // 120 second timeout for Claude API calls
 
         if (!response.ok) {
           let errorMessage = 'Unknown error';
@@ -2367,7 +2367,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
           character.photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
         // Call backend API endpoint which has the Gemini API key
-        const response = await fetch(`${API_URL}/api/gemini`, {
+        const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2779,8 +2779,155 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         }
       };
 
-      // Auto-Run Mode: Execute all steps automatically
-      const runAutoMode = async () => {
+      // ========================================
+      // AUTO-RUN WITH BACKGROUND JOB PROCESSING
+      // ========================================
+
+      // Background job auto-run mode: Submit job to server and poll for completion
+      const runAutoModeBackground = async () => {
+        if (!authToken) {
+          alert('Please log in to use Auto-Run mode');
+          return;
+        }
+
+        try {
+          // Show 10-minute wait message
+          const confirmRun = window.confirm(
+            `Creating your story will take approximately 10 minutes.\n\n` +
+            `The story will be generated in the background on our servers.\n\n` +
+            `You can close this page and come back later to check on progress.\n\n` +
+            `Click OK to start generation.`
+          );
+
+          if (!confirmRun) {
+            return;
+          }
+
+          // Collect all input data
+          const inputData = {
+            title: storyTitle,
+            ageFrom,
+            ageTo,
+            pages,
+            language,
+            characters,
+            theme,
+            moral,
+            userNotes,
+            style,
+            sceneTransitions
+          };
+
+          // Create the background job
+          const response = await fetchWithTimeout(`${API_URL}/api/jobs/create-story`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(inputData)
+          }, 30000);
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create story job');
+          }
+
+          const { jobId, message } = await response.json();
+
+          console.log(`✅ Story job created: ${jobId}`);
+          alert(message);
+
+          // Start polling for job status
+          pollJobStatus(jobId);
+
+        } catch (error) {
+          console.error('Error starting background job:', error);
+          alert(`Failed to start background generation: ${error.message}\n\nPlease try again or use manual mode.`);
+        }
+      };
+
+      // Poll job status and update UI
+      const pollJobStatus = async (jobId) => {
+        let pollInterval = null;
+
+        const checkStatus = async () => {
+          try {
+            const response = await fetch(`${API_URL}/api/jobs/${jobId}/status`, {
+              headers: {
+                'Authorization': `Bearer ${authToken}`
+              }
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to fetch job status');
+            }
+
+            const job = await response.json();
+
+            // Update progress UI
+            setGenerationProgress({
+              current: job.progress || 0,
+              total: 100,
+              message: job.progressMessage || 'Processing...'
+            });
+
+            if (job.status === 'completed') {
+              // Job completed successfully
+              clearInterval(pollInterval);
+              setGenerationProgress({ current: 100, total: 100, message: 'Complete!' });
+
+              // Parse and display the result
+              const result = job.resultData;
+              if (result) {
+                setStoryTitle(result.title || storyTitle);
+                setGeneratedStory(result.storyText || '');
+                setSceneDescriptions(result.sceneDescriptions || []);
+                setSceneImages(result.images || []);
+              }
+
+              alert('Story generation complete! Your story is ready.');
+
+              // Auto-save the story
+              if (result) {
+                const storyToSave = {
+                  title: result.title || storyTitle,
+                  ...inputData,
+                  outline: result.outline,
+                  story: result.storyText,
+                  sceneDescriptions: result.sceneDescriptions,
+                  sceneImages: result.images,
+                  createdAt: new Date().toISOString()
+                };
+
+                await saveStory(storyToSave);
+              }
+
+            } else if (job.status === 'failed') {
+              // Job failed
+              clearInterval(pollInterval);
+              setGenerationProgress({ current: 0, total: 0, message: '' });
+              alert(`Story generation failed: ${job.errorMessage || 'Unknown error'}\n\nPlease try again.`);
+
+            } else {
+              // Still processing (pending or processing status)
+              console.log(`Job ${jobId} status: ${job.status}, progress: ${job.progress}%`);
+            }
+
+          } catch (error) {
+            console.error('Error polling job status:', error);
+            // Don't stop polling on transient errors, just log them
+          }
+        };
+
+        // Check immediately, then every 10 seconds
+        await checkStatus();
+        pollInterval = setInterval(checkStatus, 10000); // Poll every 10 seconds
+      };
+
+      // Auto-Run Mode: Execute all steps automatically (CLIENT-SIDE - LEGACY)
+      // This is the old client-side version, kept as fallback
+      const runAutoModeClientSide = async () => {
         // Backend now handles API key - no need to check locally
         // if (!apiKey) {
         //   setShowApiKeyPrompt(true);
@@ -3294,7 +3441,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 }
                 setApiCalls(prev => ({ ...prev, [scene.pageNumber]: apiCallLog }));
 
-                const response = await fetch(`${API_URL}/api/gemini`, {
+                const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -3432,7 +3579,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                   ]
                 };
 
-                const response = await fetch(`${API_URL}/api/gemini`, {
+                const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -3548,6 +3695,34 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         }
       };
 
+      // Auto-Run Mode: Main entry point
+      // Uses background processing by default for better reliability and user experience
+      const runAutoMode = async () => {
+        // Use background job processing (server-side generation)
+        await runAutoModeBackground();
+      };
+
+      // Fetch with timeout helper (to prevent iOS Safari "Load failed" errors)
+      const fetchWithTimeout = async (url, options = {}, timeoutMs = 120000) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          return response;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          if (error.name === 'AbortError') {
+            throw new Error(`Request timeout after ${timeoutMs/1000} seconds. Please check your internet connection and try again.`);
+          }
+          throw error;
+        }
+      };
+
       // Gemini API Helper Functions
       const callGeminiAPI = async (prompt, imageData = null) => {
         if (!authToken) {
@@ -3581,14 +3756,14 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           ]
         };
 
-        const response = await fetch(`${API_URL}/api/gemini`, {
+        const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
           },
           body: JSON.stringify(apiPayload)
-        });
+        }, 120000); // 120 second timeout for Gemini API calls
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -3676,14 +3851,14 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           setApiCalls(prev => ({ ...prev, [pageNumber]: apiCallLog }));
         }
 
-        const response = await fetch(`${API_URL}/api/gemini`, {
+        const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
           },
           body: JSON.stringify(apiPayload)
-        });
+        }, 120000); // 120 second timeout for Gemini API calls
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -3768,14 +3943,14 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           setApiCalls(prev => ({ ...prev, [pageNumber]: apiCallLog }));
         }
 
-        const response = await fetch(`${API_URL}/api/gemini`, {
+        const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authToken}`
           },
           body: JSON.stringify(apiPayload)
-        });
+        }, 120000); // 120 second timeout for Gemini API calls
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -4068,7 +4243,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   ]
                 };
 
-                const response = await fetch(`${API_URL}/api/gemini`, {
+                const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -4161,7 +4336,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           referenceImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
         // Call backend API endpoint which has the Gemini API key
-        const response = await fetch(`${API_URL}/api/gemini`, {
+        const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -4276,7 +4451,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           const finalPrompt = `Edit this scene: ${editInstruction}. Maintain the same 3D Pixar/Disney animation style, character appearances, and overall art style.`;
 
           // Call backend API endpoint which has the Gemini API key
-          const response = await fetch(`${API_URL}/api/gemini`, {
+          const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -4364,7 +4539,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
           // Call backend API endpoint which has the Gemini API key
-          const response = await fetch(`${API_URL}/api/gemini`, {
+          const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
