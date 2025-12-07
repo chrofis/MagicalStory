@@ -1427,7 +1427,8 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           pages: story.pages,
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: story.sceneImages?.length || 0
+          pageCount: story.sceneImages?.length || 0,
+          thumbnail: story.coverImages?.frontCover || story.thumbnail || null
         };
       });
       console.log(`📚 Parsed ${userStories.length} stories (metadata only, NO images)`);
@@ -1448,7 +1449,8 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
         pages: story.pages,
         language: story.language,
         characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: story.sceneImages?.length || 0
+        pageCount: story.sceneImages?.length || 0,
+        thumbnail: story.coverImages?.frontCover || story.thumbnail || null
       }));
       console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (metadata only, NO images)`);
     }
