@@ -2889,8 +2889,22 @@ async function processStoryJob(jobId) {
     );
 
     // Step 3: Generate scene descriptions (using Claude API)
-    const sceneDescriptionsPrompt = `From this story, create scene descriptions for each page:\n\n${storyText}`;
+    const sceneDescriptionsPrompt = `From this story, create EXACTLY ${inputData.pages} scene descriptions for the ${inputData.pages} pages of the story.
+
+Format: Provide ONLY the scene descriptions, one per line, separated by double newlines. Do NOT include:
+- Page numbers
+- Introductory text
+- Explanations
+- Separators like "---"
+- Any other formatting
+
+Each scene description should be a single paragraph describing what should be illustrated for that page.
+
+Story:
+${storyText}`;
     const sceneDescriptions = await callClaudeAPI(sceneDescriptionsPrompt, 4096);
+
+    console.log(`📋 [PIPELINE] Raw scene descriptions length: ${sceneDescriptions.length} characters`);
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -2898,9 +2912,10 @@ async function processStoryJob(jobId) {
     );
 
     // Step 4: Generate images (using Gemini API)
-    const sceneArray = parseSceneDescriptions(sceneDescriptions);
+    const sceneArray = parseSceneDescriptions(sceneDescriptions, inputData.pages);
     const images = [];
 
+    console.log(`📸 [PIPELINE] Parsed ${sceneArray.length} scenes (expected ${inputData.pages})`);
     console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images for job ${jobId}`);
 
     for (let i = 0; i < sceneArray.length; i++) {
@@ -3038,10 +3053,39 @@ function buildStoryPrompt(inputData) {
     Dedication: ${inputData.dedication || 'None'}`;
 }
 
-function parseSceneDescriptions(text) {
+function parseSceneDescriptions(text, expectedCount) {
   // Parse scene descriptions from the generated text
-  // This is a placeholder - implement based on your format
-  const scenes = text.split('\n\n').filter(s => s.trim());
+  // Split by double newlines and filter out invalid entries
+  const scenes = text.split('\n\n')
+    .map(s => s.trim())
+    .filter(s => {
+      // Filter out empty, separators, or very short scenes
+      if (!s) return false;
+      if (s === '---' || s === '***' || s === '___') return false;
+      if (s.length < 20) return false; // Too short to be a real scene description
+      if (s.match(/^(Page|Scene|Chapter)\s+\d+/i)) return false; // Page headers
+      return true;
+    });
+
+  console.log(`📋 [PARSE] Found ${scenes.length} valid scenes (expected ${expectedCount})`);
+
+  // Log each scene for debugging
+  scenes.forEach((scene, i) => {
+    const preview = scene.substring(0, 80) + (scene.length > 80 ? '...' : '');
+    console.log(`📋 [PARSE] Scene ${i + 1}: ${preview}`);
+  });
+
+  // If we have more scenes than expected, take only the first expectedCount
+  if (scenes.length > expectedCount) {
+    console.warn(`⚠️  [PARSE] Got ${scenes.length} scenes but expected ${expectedCount}, trimming excess`);
+    return scenes.slice(0, expectedCount);
+  }
+
+  // If we have fewer scenes than expected, warn but continue
+  if (scenes.length < expectedCount) {
+    console.warn(`⚠️  [PARSE] Got only ${scenes.length} scenes but expected ${expectedCount}`);
+  }
+
   return scenes;
 }
 
