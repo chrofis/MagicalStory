@@ -1030,7 +1030,7 @@
 
           return () => clearTimeout(timeoutId);
         }
-      }, [characters, relationships, relationshipTexts, customRelationships, authToken]);
+      }, [characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears, authToken]);
 
       // Update prompt when returning to step 4 with prompt visible
       useEffect(() => {
@@ -1620,7 +1620,10 @@
               characters: charactersToSave,
               relationships: relationships,
               relationshipTexts: relationshipTexts,
-              customRelationships: customRelationships
+              customRelationships: customRelationships,
+              customStrengths: customStrengths,
+              customWeaknesses: customWeaknesses,
+              customFears: customFears
             })
           });
 
@@ -1672,6 +1675,15 @@
               }
               if (data.customRelationships) {
                 setCustomRelationships(data.customRelationships);
+              }
+              if (data.customStrengths) {
+                setCustomStrengths(data.customStrengths);
+              }
+              if (data.customWeaknesses) {
+                setCustomWeaknesses(data.customWeaknesses);
+              }
+              if (data.customFears) {
+                setCustomFears(data.customFears);
               }
             }
           }

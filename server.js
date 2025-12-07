@@ -1245,7 +1245,10 @@ app.get('/api/characters', authenticateToken, async (req, res) => {
       characters: [],
       relationships: {},
       relationshipTexts: {},
-      customRelationships: []
+      customRelationships: [],
+      customStrengths: {},
+      customWeaknesses: {},
+      customFears: {}
     };
 
     if (STORAGE_MODE === 'database' && dbPool) {
@@ -1259,7 +1262,10 @@ app.get('/api/characters', authenticateToken, async (req, res) => {
         if (Array.isArray(data)) {
           characterData.characters = data;
         } else {
-          characterData = data;
+          characterData = {
+            ...characterData,
+            ...data
+          };
         }
       }
     } else {
@@ -1272,7 +1278,10 @@ app.get('/api/characters', authenticateToken, async (req, res) => {
         if (Array.isArray(data)) {
           characterData.characters = data;
         } else {
-          characterData = data;
+          characterData = {
+            ...characterData,
+            ...data
+          };
         }
       }
     }
@@ -1287,14 +1296,17 @@ app.get('/api/characters', authenticateToken, async (req, res) => {
 
 app.post('/api/characters', authenticateToken, async (req, res) => {
   try {
-    const { characters, relationships, relationshipTexts, customRelationships } = req.body;
+    const { characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears } = req.body;
 
     // Store character data as an object with all related information
     const characterData = {
       characters: characters || [],
       relationships: relationships || {},
       relationshipTexts: relationshipTexts || {},
-      customRelationships: customRelationships || []
+      customRelationships: customRelationships || [],
+      customStrengths: customStrengths || {},
+      customWeaknesses: customWeaknesses || {},
+      customFears: customFears || {}
     };
 
     if (STORAGE_MODE === 'database' && dbPool) {
