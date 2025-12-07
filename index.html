@@ -2805,16 +2805,21 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
           const styleDescription = selectedStyle.prompt;
 
-          // Define cover image prompts with full details
-          const frontCoverPrompt = `Create a beautiful title page for a children's book called "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Include decorative elements but leave space for the title text. Magical and inviting.`;
-          const page0Prompt = `Create a dedication page or introduction illustration for "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Warm, inviting scene that sets the mood for the story.`;
-          const backCoverPrompt = `Create a back cover illustration for "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Conclusive, satisfying ending scene.`;
+          // Use scene descriptions from outline if available, otherwise use defaults
+          const titlePageScene = coverSceneDescriptions.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+          const page0Scene = coverSceneDescriptions.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+          const backCoverScene = coverSceneDescriptions.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
-          // Define detailed cover scene descriptions
+          // Define cover image prompts with scene descriptions from outline
+          const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as a beautiful title page for the children's book "${storyTitle}". Magical and inviting.`;
+          const page0Prompt = `${page0Scene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as the dedication/introduction page for "${storyTitle}".`;
+          const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as the back cover illustration for "${storyTitle}".`;
+
+          // Define detailed cover scene descriptions for display
           const coverDescriptions = {
-            frontCover: `**Title Page / Front Cover**\n\nA beautiful, magical title page for "${storyTitle}". This cover sets the tone for the entire book with decorative elements that reflect the story's theme. The illustration leaves space for the title text while creating an inviting, enchanting atmosphere that draws readers into the story.`,
-            page0: `**Page 0 - Dedication/Introduction**\n\nAn introductory illustration for "${storyTitle}" that warmly welcomes readers into the story world. This page creates an inviting atmosphere and sets the emotional tone, preparing readers for the adventure ahead. The scene is warm, engaging, and hints at the magic to come.`,
-            backCover: `**Back Cover**\n\nA conclusive, satisfying illustration for the back cover of "${storyTitle}". This final image provides a sense of completion and closure, reflecting the journey's end. The scene is peaceful, fulfilling, and leaves readers with a warm, satisfied feeling about the story they've experienced.`
+            frontCover: `**Title Page / Front Cover**\n\n${titlePageScene}`,
+            page0: `**Page 0 - Dedication/Introduction**\n\n${page0Scene}`,
+            backCover: `**Back Cover**\n\n${backCoverScene}`
           };
 
           const generateCoverImage = async (coverType, prompt) => {
@@ -3339,16 +3344,21 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
           const styleDescription = selectedStyle.prompt;
 
-          // Define cover image prompts with full details
-          const frontCoverPrompt = `Create a beautiful title page for a children's book called "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Include decorative elements but leave space for the title text. Magical and inviting.`;
-          const page0Prompt = `Create a dedication page or introduction illustration for "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Warm, inviting scene that sets the mood for the story.`;
-          const backCoverPrompt = `Create a back cover illustration for "${storyTitle}". ${styleDescription}. ${characterConsistencyGuide}. Conclusive, satisfying ending scene.`;
+          // Use scene descriptions from outline if available, otherwise use defaults
+          const titlePageScene = coverSceneDescriptions.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+          const page0Scene = coverSceneDescriptions.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+          const backCoverScene = coverSceneDescriptions.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
-          // Define detailed cover scene descriptions
+          // Define cover image prompts with scene descriptions from outline
+          const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as a beautiful title page for the children's book "${storyTitle}". Magical and inviting.`;
+          const page0Prompt = `${page0Scene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as the dedication/introduction page for "${storyTitle}".`;
+          const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.\n\nCharacters: ${characterConsistencyGuide}.\n\nCreate this as the back cover illustration for "${storyTitle}".`;
+
+          // Define detailed cover scene descriptions for display
           const coverDescriptions = {
-            frontCover: `**Title Page / Front Cover**\n\nA beautiful, magical title page for "${storyTitle}". This cover sets the tone for the entire book with decorative elements that reflect the story's theme. The illustration leaves space for the title text while creating an inviting, enchanting atmosphere that draws readers into the story.`,
-            page0: `**Page 0 - Dedication/Introduction**\n\nAn introductory illustration for "${storyTitle}" that warmly welcomes readers into the story world. This page creates an inviting atmosphere and sets the emotional tone, preparing readers for the adventure ahead. The scene is warm, engaging, and hints at the magic to come.`,
-            backCover: `**Back Cover**\n\nA conclusive, satisfying illustration for the back cover of "${storyTitle}". This final image provides a sense of completion and closure, reflecting the journey's end. The scene is peaceful, fulfilling, and leaves readers with a warm, satisfied feeling about the story they've experienced.`
+            frontCover: `**Title Page / Front Cover**\n\n${titlePageScene}`,
+            page0: `**Page 0 - Dedication/Introduction**\n\n${page0Scene}`,
+            backCover: `**Back Cover**\n\n${backCoverScene}`
           };
 
           const generateCoverImage = async (coverType, prompt) => {
