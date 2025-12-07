@@ -2434,7 +2434,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
             ? `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write the complete story following the outline above. Use "--- Page X ---" markers for each page. Write engaging, age-appropriate content for each page.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.`
             : basePrompt;
 
-          const storyText = await makeApiCall(fullPrompt, 16000);
+          const storyText = await makeApiCall(fullPrompt, 64000);
 
           // Store story text prompt and API call for debugging
           setStoryTextPrompt(fullPrompt);
@@ -2442,7 +2442,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
             type: 'text',
             model: 'claude-sonnet-4-5-20250929',
             prompt: fullPrompt,
-            maxTokens: 16000,
+            maxTokens: 64000,
             timestamp: new Date().toISOString()
           });
 
