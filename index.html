@@ -2432,7 +2432,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
           // Include the outline in the story generation prompt
           const outline = editableOutline || storyOutline;
           const fullPrompt = outline
-            ? `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write the complete story following the outline above. Use "--- Page X ---" markers for each page. Write engaging, age-appropriate content for each page.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.`
+            ? `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write the complete story following the outline above. You MUST write exactly ${pages} pages (Pages 1 through ${pages}). Do NOT stop until all ${pages} pages are complete. Use "--- Page X ---" markers for each page. Write engaging, age-appropriate content for each page.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.`
             : basePrompt;
 
           const storyText = await makeApiCall(fullPrompt, 64000);
@@ -2477,7 +2477,13 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
           // Split story into pages
           const pageMatches = generatedStory.split(/---\s*Page\s+\d+\s*---/i);
           // Remove first element if it's just intro/empty text before "--- Page 1 ---"
-          const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
+          // Don't filter out empty pages - we need to maintain the page count
+          const storyPages = pageMatches.slice(1);
+
+          // Log warning if page count doesn't match
+          if (storyPages.length < pages) {
+            console.warn(`⚠️  Story has only ${storyPages.length} pages, expected ${pages} pages`);
+          }
 
           const scenes = [];
           const prompts = {};
