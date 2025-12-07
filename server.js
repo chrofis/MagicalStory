@@ -1457,7 +1457,7 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
           pageCount: story.sceneImages?.length || 0,
-          thumbnail: story.coverImages?.frontCover || story.thumbnail || null
+          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
         };
       });
       console.log(`📚 Parsed ${userStories.length} stories (metadata only, NO images)`);
@@ -1479,7 +1479,7 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
         language: story.language,
         characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
         pageCount: story.sceneImages?.length || 0,
-        thumbnail: story.coverImages?.frontCover || story.thumbnail || null
+        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
       }));
       console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (metadata only, NO images)`);
     }
@@ -3154,6 +3154,7 @@ ${storyText}`;
     // Step 4: Generate images (using Gemini API)
     const sceneArray = parseSceneDescriptions(sceneDescriptions, inputData.pages);
     const images = [];
+    const imagePrompts = {}; // Store prompts for developer features
 
     console.log(`📸 [PIPELINE] Parsed ${sceneArray.length} scenes (expected ${inputData.pages})`);
     console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images for job ${jobId}`);
@@ -3172,6 +3173,7 @@ ${storyText}`;
           }
 
           const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
+          imagePrompts[i + 1] = imagePrompt; // Save prompt for this page
           imageResult = await callGeminiAPIForImage(imagePrompt);
           console.log(`✅ [PIPELINE] Image ${i + 1}/${sceneArray.length} generated successfully`);
         } catch (error) {
@@ -3203,6 +3205,12 @@ ${storyText}`;
         [imageProgress, jobId]
       );
     }
+
+    // Build sceneDescriptions array in proper format (matches step-by-step structure)
+    const sceneDescriptionsArray = sceneArray.map((desc, i) => ({
+      pageNumber: i + 1,
+      description: desc
+    }));
 
     // Step 5: Generate cover images
     await dbPool.query(
@@ -3279,9 +3287,10 @@ ${storyText}`;
     const resultData = {
       outline,
       storyText,
-      sceneDescriptions,
+      sceneDescriptions: sceneDescriptionsArray, // Use parsed array instead of raw string
       images,
       coverImages,
+      imagePrompts, // Include image prompts for developer features
       title: inputData.title || 'My Story'
     };
 
