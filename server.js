@@ -3002,6 +3002,90 @@ app.post('/api/stripe/webhook', async (req, res) => {
 // BACKGROUND STORY GENERATION JOBS
 // ===================================
 
+// Art styles definitions (matches index.html)
+const ART_STYLES = {
+  pixar: 'pixar style 3d character, vibrant Disney/Pixar 3D animation, warm lighting, child-friendly',
+  cartoon: '2D cartoon style, bold outlines, vibrant flat colors, classic animation look',
+  anime: 'anime style, Japanese animation, expressive eyes, dynamic poses, cel-shaded',
+  chibi: 'chibi style, super deformed, cute, big head, small body, kawaii, adorable',
+  steampunk: 'steampunk style, Victorian era, gears, brass, copper, goggles, mechanical details, vintage technology',
+  comic: 'comic book style, bold ink lines, halftone dots, dynamic action, speech bubbles aesthetic, superhero comic art',
+  manga: 'manga style, Japanese comic art, detailed linework, screentones, dramatic shading, expressive characters'
+};
+
+// Helper function to extract cover scene descriptions from outline
+function extractCoverScenes(outline) {
+  const coverScenes = {
+    titlePage: '',
+    page0: '',
+    backCover: ''
+  };
+
+  const lines = outline.split('\n');
+  let currentCoverType = null;
+  let sceneBuffer = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Look for cover page patterns
+    const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
+    if (titlePageMatch) {
+      if (currentCoverType && sceneBuffer) {
+        coverScenes[currentCoverType] = sceneBuffer.trim();
+      }
+      currentCoverType = 'titlePage';
+      sceneBuffer = titlePageMatch[1].trim();
+      continue;
+    }
+
+    const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
+    if (page0Match) {
+      if (currentCoverType && sceneBuffer) {
+        coverScenes[currentCoverType] = sceneBuffer.trim();
+      }
+      currentCoverType = 'page0';
+      sceneBuffer = page0Match[1].trim();
+      continue;
+    }
+
+    const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
+    if (backCoverMatch) {
+      if (currentCoverType && sceneBuffer) {
+        coverScenes[currentCoverType] = sceneBuffer.trim();
+      }
+      currentCoverType = 'backCover';
+      sceneBuffer = backCoverMatch[1].trim();
+      continue;
+    }
+
+    // Look for "Scene:" pattern
+    const sceneMatch = line.match(/^(?:\*\*)?Scene(?:\*\*)?:\s*(.+)/i);
+    if (sceneMatch) {
+      sceneBuffer = sceneMatch[1].trim();
+    } else if (currentCoverType && line.length > 0 && !line.match(/^(Page|Title|Back\s+Cover)/i)) {
+      // Continue collecting multi-line scene descriptions
+      sceneBuffer += ' ' + line;
+    }
+
+    // If we hit a regular page number, stop collecting cover scenes
+    if (line.match(/^(?:\*\*)?Page\s+\d+(?:\*\*)?[\s:]/i)) {
+      if (currentCoverType && sceneBuffer) {
+        coverScenes[currentCoverType] = sceneBuffer.trim();
+      }
+      currentCoverType = null;
+      sceneBuffer = '';
+    }
+  }
+
+  // Save last buffer
+  if (currentCoverType && sceneBuffer) {
+    coverScenes[currentCoverType] = sceneBuffer.trim();
+  }
+
+  return coverScenes;
+}
+
 // Background worker function to process a story generation job
 async function processStoryJob(jobId) {
   console.log(`🎬 Starting processing for job ${jobId}`);
@@ -3075,11 +3159,11 @@ ${storyText}`;
     console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images for job ${jobId}`);
 
     for (let i = 0; i < sceneArray.length; i++) {
-      let imageData = null;
+      let imageResult = null;
       let retries = 0;
       const MAX_RETRIES = 2;
 
-      while (retries <= MAX_RETRIES && !imageData) {
+      while (retries <= MAX_RETRIES && !imageResult) {
         try {
           if (retries > 0) {
             console.log(`🔄 [PIPELINE] Retrying image ${i + 1}/${sceneArray.length} (attempt ${retries + 1}/${MAX_RETRIES + 1}) for job ${jobId}`);
@@ -3088,7 +3172,7 @@ ${storyText}`;
           }
 
           const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
-          imageData = await callGeminiAPIForImage(imagePrompt);
+          imageResult = await callGeminiAPIForImage(imagePrompt);
           console.log(`✅ [PIPELINE] Image ${i + 1}/${sceneArray.length} generated successfully`);
         } catch (error) {
           retries++;
@@ -3103,7 +3187,14 @@ ${storyText}`;
         }
       }
 
-      images.push(imageData);
+      // Store image data with quality score (matches step-by-step structure)
+      images.push({
+        pageNumber: i + 1,
+        imageData: imageResult.imageData,
+        description: sceneArray[i],
+        qualityScore: imageResult.score,
+        qualityReasoning: null
+      });
 
       // Update progress
       const imageProgress = 70 + Math.floor((i + 1) / sceneArray.length * 25);
@@ -3121,41 +3212,57 @@ ${storyText}`;
 
     console.log(`📕 [PIPELINE] Generating cover images for job ${jobId}`);
 
-    const artStyle = inputData.artStyle || 'pixar';
+    // Get art style description
+    const artStyleId = inputData.artStyle || 'pixar';
+    const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
     const storyTitle = inputData.title || 'My Story';
-    const characterInfo = inputData.characters && inputData.characters.length > 0
-      ? `\n\nMain characters: ${inputData.characters.map(c => `${c.name} (${c.gender}, age ${c.age})`).join(', ')}`
-      : '';
 
-    let frontCover, page0, backCover;
+    // Build character info (matches step-by-step format)
+    let characterInfo = '';
+    if (inputData.characters && inputData.characters.length > 0) {
+      characterInfo = '\n\nThe cover MUST feature the following characters:\n';
+      inputData.characters.forEach((char, idx) => {
+        characterInfo += `Character ${idx + 1} (${char.name}): ${char.age} years old, ${char.gender}.\n`;
+      });
+    }
 
-    // Generate front cover
+    // Extract cover scene descriptions from outline (matches step-by-step)
+    const coverScenes = extractCoverScenes(outline);
+    const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+    const page0Scene = coverScenes.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+    const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
+
+    let frontCoverResult, page0Result, backCoverResult;
+
+    // Generate front cover (matches step-by-step prompt format)
     try {
       console.log(`📕 [PIPELINE] Generating front cover for job ${jobId}`);
-      const frontCoverPrompt = `Children's book front cover illustration for "${storyTitle}". Style: ${artStyle}. ${characterInfo}\n\nCreate a beautiful, eye-catching cover that captures the essence of the story.`;
-      frontCover = await callGeminiAPIForImage(frontCoverPrompt);
+      const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page for the children's book "${storyTitle}".\n\nIMPORTANT: The image should ONLY contain the story title "${storyTitle}" - no other text, no subtitles, no author names. Just the title and the illustration.`;
+      frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt);
       console.log(`✅ [PIPELINE] Front cover generated successfully`);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate front cover for job ${jobId}:`, error);
       throw new Error(`Front cover generation failed: ${error.message}`);
     }
 
-    // Generate page 0 (dedication page) - warm, inviting illustration
+    // Generate page 0 (dedication page) - matches step-by-step prompt format
     try {
       console.log(`📕 [PIPELINE] Generating page 0 (dedication) for job ${jobId}`);
-      const page0Prompt = `Children's book page 0 dedication page illustration. Style: ${artStyle}. ${characterInfo}${inputData.dedication ? `\n\nCRITICAL: Include ONLY this exact text in the image: "${inputData.dedication}"\n\nDo not add any other text. Only "${inputData.dedication}" must appear. No additional words allowed.` : '\n\nCreate a warm, inviting illustration that welcomes readers into the story world.'}`;
-      page0 = await callGeminiAPIForImage(page0Prompt);
+      const page0Prompt = inputData.dedication && inputData.dedication.trim()
+        ? `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "${inputData.dedication}"\n\nDo not add any other text. Only "${inputData.dedication}" must appear. No additional words allowed.`
+        : `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as an introduction page for "${storyTitle}".\n\nIMPORTANT: This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.`;
+      page0Result = await callGeminiAPIForImage(page0Prompt);
       console.log(`✅ [PIPELINE] Page 0 generated successfully`);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate page 0 for job ${jobId}:`, error);
       throw new Error(`Page 0 generation failed: ${error.message}`);
     }
 
-    // Generate back cover
+    // Generate back cover (matches step-by-step prompt format)
     try {
       console.log(`📕 [PIPELINE] Generating back cover for job ${jobId}`);
-      const backCoverPrompt = `Children's book back cover illustration. Style: ${artStyle}. ${characterInfo}\n\nCreate a complementary illustration for the back cover that ties the story together.`;
-      backCover = await callGeminiAPIForImage(backCoverPrompt);
+      const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "magicalstory.ch" in elegant letters in the bottom left corner.\n\nDo not add any other text. Only "magicalstory.ch" must appear. No additional words allowed.`;
+      backCoverResult = await callGeminiAPIForImage(backCoverPrompt);
       console.log(`✅ [PIPELINE] Back cover generated successfully`);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate back cover for job ${jobId}:`, error);
@@ -3163,9 +3270,9 @@ ${storyText}`;
     }
 
     const coverImages = {
-      frontCover,
-      page0,
-      backCover
+      frontCover: frontCoverResult.imageData,
+      page0: page0Result.imageData,
+      backCover: backCoverResult.imageData
     };
 
     // Job complete - save result
@@ -3265,8 +3372,29 @@ function parseSceneDescriptions(text, expectedCount) {
 }
 
 function buildImagePrompt(sceneDescription, inputData) {
-  // Build image generation prompt
-  return `Children's book illustration: ${sceneDescription}. Style: colorful, friendly, age-appropriate for ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years old.`;
+  // Build image generation prompt (matches step-by-step format)
+  const artStyleId = inputData.artStyle || 'pixar';
+  const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+
+  // Build character info for consistency
+  let characterPrompts = '';
+  if (inputData.characters && inputData.characters.length > 0) {
+    characterPrompts = '\n\nCHARACTER APPEARANCE GUIDE - Maintain consistency:\n\n';
+    inputData.characters.forEach((char, idx) => {
+      characterPrompts += `[${char.name}]: ${char.age} years old, ${char.gender}.\n`;
+    });
+    characterPrompts += '\nCRITICAL: These characters must maintain visual consistency across ALL pages.';
+  }
+
+  return `Create a cinematic scene in ${styleDescription}.
+
+Scene Description: ${sceneDescription}${characterPrompts}
+
+Important:
+- Show only the emotions visible on faces (happy, sad, surprised, worried, excited)
+- Maintain consistent character appearance across ALL pages
+- Clean, clear composition
+- Age-appropriate for ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years old`;
 }
 
 async function callClaudeAPI(prompt, maxTokens = 4096) {
@@ -3368,7 +3496,9 @@ async function callGeminiAPIForImage(prompt) {
         const imageDataSize = part.inlineData.data.length;
         const imageSizeKB = (imageDataSize / 1024).toFixed(2);
         console.log(`✅ [IMAGE GEN] Successfully extracted image data (${imageSizeKB} KB base64)`);
-        return `data:image/png;base64,${part.inlineData.data}`;
+        const imageData = `data:image/png;base64,${part.inlineData.data}`;
+        // Return object with imageData and score (null for pipeline, matches step-by-step structure)
+        return { imageData, score: null };
       }
     }
   } else {
