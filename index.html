@@ -1938,6 +1938,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
           setEditableOutline(outline);
 
           // Parse outline to extract scene descriptions
+          console.log('=== OUTLINE PARSING DEBUG ===');
+          console.log('Full outline response:', outline);
+
           const sceneDescMap = {};
           const coverScenes = {
             titlePage: '',
@@ -1952,30 +1955,35 @@ Be specific and creative. Each scene description should paint a clear picture fo
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
 
-            // Look for "Page X:" pattern (story pages)
-            const pageMatch = line.match(/^Page\s+(\d+):/i);
+            // Look for "Page X:" pattern (story pages) - more flexible
+            const pageMatch = line.match(/^Page\s+(\d+)[\s:]/i);
             if (pageMatch) {
               currentPage = parseInt(pageMatch[1]);
               currentCoverType = null;
+              console.log(`Found story page ${currentPage}`);
             }
 
-            // Look for cover page patterns
-            const titlePageMatch = line.match(/^Title\s+Page:/i);
+            // Look for cover page patterns - more flexible matching
+            // Matches: "Title Page:", "**Title Page:**", "Title Page Scene:", etc.
+            const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (titlePageMatch) {
               currentCoverType = 'titlePage';
               currentPage = null;
+              console.log('Found Title Page section');
             }
 
-            const page0Match = line.match(/^Page\s+0:/i);
+            const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (page0Match) {
               currentCoverType = 'page0';
               currentPage = null;
+              console.log('Found Page 0 section');
             }
 
-            const backCoverMatch = line.match(/^Back\s+Cover:/i);
+            const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?[\s:]/i);
             if (backCoverMatch) {
               currentCoverType = 'backCover';
               currentPage = null;
+              console.log('Found Back Cover section');
             }
 
             // Look for "Scene:" pattern
@@ -1985,17 +1993,30 @@ Be specific and creative. Each scene description should paint a clear picture fo
               if (currentPage !== null) {
                 // Story page scene
                 sceneDescMap[currentPage] = sceneDesc;
+                console.log(`Stored scene for page ${currentPage}:`, sceneDesc.substring(0, 50) + '...');
               } else if (currentCoverType) {
                 // Cover page scene
                 coverScenes[currentCoverType] = sceneDesc;
+                console.log(`Stored ${currentCoverType} scene:`, sceneDesc.substring(0, 50) + '...');
               }
             }
           }
 
           setShortSceneDescriptions(sceneDescMap);
           setCoverSceneDescriptions(coverScenes);
+          console.log('=== PARSING COMPLETE ===');
           console.log('Parsed story scene descriptions:', sceneDescMap);
           console.log('Parsed cover scene descriptions:', coverScenes);
+
+          // Warning if cover scenes are empty
+          if (!coverScenes.titlePage || !coverScenes.page0 || !coverScenes.backCover) {
+            console.warn('⚠️ WARNING: Some cover scene descriptions are empty!');
+            console.warn('Missing:', {
+              titlePage: !coverScenes.titlePage,
+              page0: !coverScenes.page0,
+              backCover: !coverScenes.backCover
+            });
+          }
         } catch (error) {
           console.error('Error generating outline:', error);
           alert(`Error generating outline: ${error.message}\n\nPlease check your API key and try again!`);
