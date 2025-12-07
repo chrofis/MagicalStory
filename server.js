@@ -2972,7 +2972,7 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20240620',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: maxTokens,
       messages: [{
         role: 'user',
