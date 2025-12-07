@@ -2591,6 +2591,9 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           setGenerationProgress({ current: 1, total: 4, message: 'Step 1/4: Generating story outline...' });
           setIsGeneratingOutline(true);
 
+          // Build base prompt for later use in story generation
+          const basePrompt = buildPrompt();
+
           // If user edited the prompt in preview, use it directly
           // Otherwise, build the full outline prompt with structure
           let outlinePrompt;
@@ -2599,7 +2602,6 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             outlinePrompt = editablePrompt;
           } else {
             // No edits - build the full structured prompt
-            const basePrompt = buildPrompt();
             outlinePrompt = `# Role and Context
 
 You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure, and visual storytelling for illustrated books. Your expertise includes:
