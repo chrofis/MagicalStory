@@ -53,8 +53,8 @@
     };
 
     const storyTypes = [
-      { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachtsgeschichte', fr: 'Histoire de Noël' }, emoji: '🎄' },
-      { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrsgeschichte', fr: 'Histoire du Nouvel An' }, emoji: '🎆' },
+      { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachts-\nGeschichte', fr: 'Histoire de Noël' }, emoji: '🎄' },
+      { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrs-\nGeschichte', fr: 'Histoire du Nouvel An' }, emoji: '🎆' },
       { id: 'pirate', name: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de Pirates' }, emoji: '🏴‍☠️' },
       { id: 'cowboy', name: { en: 'Wild West', de: 'Wilder Westen', fr: 'Far West' }, emoji: '🤠' },
       { id: 'fireman', name: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier Courageux' }, emoji: '🚒' },
@@ -1864,33 +1864,42 @@ Be specific and creative. Each scene description should paint a clear picture fo
               console.log('👥 Setting characters (array format):', data.length, data);
               loadedCharacters = data.map(normalizeCharacter);
               setCharacters(loadedCharacters);
-            } else {
+            } else if (data && typeof data === 'object') {
               console.log('👥 Setting characters (object format):', data.characters?.length, data.characters);
               console.log('👥 First character details:', data.characters?.[0]);
-              loadedCharacters = (data.characters || []).map(normalizeCharacter);
+
+              // Ensure data.characters is an array before mapping
+              const charactersArray = Array.isArray(data.characters) ? data.characters : [];
+              loadedCharacters = charactersArray.map(normalizeCharacter);
               setCharacters(loadedCharacters);
-              if (data.relationships) {
+
+              if (data.relationships && typeof data.relationships === 'object') {
                 setRelationships(data.relationships);
               }
-              if (data.relationshipTexts) {
+              if (Array.isArray(data.relationshipTexts)) {
                 setRelationshipTexts(data.relationshipTexts);
               }
-              if (data.customRelationships) {
+              if (Array.isArray(data.customRelationships)) {
                 setCustomRelationships(data.customRelationships);
               }
-              if (data.customStrengths) {
+              if (Array.isArray(data.customStrengths)) {
                 setCustomStrengths(data.customStrengths);
               }
-              if (data.customWeaknesses) {
+              if (Array.isArray(data.customWeaknesses)) {
                 setCustomWeaknesses(data.customWeaknesses);
               }
-              if (data.customFears) {
+              if (Array.isArray(data.customFears)) {
                 setCustomFears(data.customFears);
               }
+            } else {
+              console.warn('👥 Unexpected data format, initializing with empty array');
+              setCharacters([]);
             }
 
-            // Auto-select main characters based on age
-            autoSelectMainCharacters(loadedCharacters);
+            // Auto-select main characters based on age (only if we have characters)
+            if (Array.isArray(loadedCharacters) && loadedCharacters.length > 0) {
+              autoSelectMainCharacters(loadedCharacters);
+            }
           }
         } catch (err) {
           console.error('Error loading characters:', err);
