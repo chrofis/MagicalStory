@@ -2320,7 +2320,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
               message: `Generating pages ${startPage}-${endPage}...`
             });
 
-            const chunkPrompt = `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write ONLY pages ${startPage} to ${endPage} of the story. Follow the outline above. Use "--- Page X ---" markers for each page. Write the complete content for these pages.${i > 0 ? `\n\nPrevious story context:\n${fullStory.slice(-500)}` : ''}`;
+            const chunkPrompt = `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write ONLY pages ${startPage} to ${endPage} of the story. Follow the outline above. Use "--- Page X ---" markers for each page. Write the complete content for these pages.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.${i > 0 ? `\n\nPrevious story context:\n${fullStory.slice(-500)}` : ''}`;
 
             const chunk = await makeApiCall(chunkPrompt, 3072);
             fullStory += (i > 0 ? '\n\n' : '') + chunk;
@@ -2367,7 +2367,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
           // Include the outline in the story generation prompt
           const outline = editableOutline || storyOutline;
           const fullPrompt = outline
-            ? `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write the complete story following the outline above. Use "--- Page X ---" markers for each page. Write engaging, age-appropriate content for each page.`
+            ? `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write the complete story following the outline above. Use "--- Page X ---" markers for each page. Write engaging, age-appropriate content for each page.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.`
             : basePrompt;
 
           const storyText = await makeApiCall(fullPrompt, 4096);
@@ -2795,7 +2795,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
               const startPage = i * pagesPerChunk + 1;
               const endPage = Math.min((i + 1) * pagesPerChunk, pages);
 
-              const chunkPrompt = `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write ONLY pages ${startPage} to ${endPage} of the story. Follow the outline above. Use "--- Page X ---" markers for each page. Write the complete content for these pages.${i > 0 ? `\n\nPrevious story context:\n${fullStory.slice(-500)}` : ''}`;
+              const chunkPrompt = `${basePrompt}\n\nHere is the story outline:\n${outline}\n\nIMPORTANT: Now write ONLY pages ${startPage} to ${endPage} of the story. Follow the outline above. Use "--- Page X ---" markers for each page. Write the complete content for these pages.\n\nFORMATTING: Format dialogues inline within paragraphs. Do not add extra line breaks between dialogue lines. Keep conversations flowing in continuous prose like a traditional novel.${i > 0 ? `\n\nPrevious story context:\n${fullStory.slice(-500)}` : ''}`;
 
               const chunk = await makeApiCall(chunkPrompt, 3072);
               fullStory += (i > 0 ? '\n\n' : '') + chunk;
