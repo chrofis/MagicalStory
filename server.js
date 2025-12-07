@@ -1,69 +1,47 @@
-// MagicalStory Backend Server v1.0.2
-// Includes: User quota system, email authentication, admin panel, MySQL database support
+// MagicalStory Backend Server v1.0.3
+// Includes: User quota system, email authentication, admin panel, PostgreSQL database support
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');
-const mysql = require('mysql2/promise');
 const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
 
-// Detect database type: PostgreSQL (Railway) or MySQL (IONOS)
-const DATABASE_URL = process.env.DATABASE_URL; // Railway PostgreSQL
-const DB_TYPE = DATABASE_URL ? 'postgresql' : 'mysql';
+// Database Configuration - PostgreSQL (Railway)
+const DATABASE_URL = process.env.DATABASE_URL;
 
 // Debug logging
 console.log('🔍 Environment Check:');
 console.log(`  DATABASE_URL: ${DATABASE_URL ? 'SET (length: ' + DATABASE_URL.length + ')' : 'NOT SET'}`);
 console.log(`  STORAGE_MODE: ${process.env.STORAGE_MODE}`);
-console.log(`  DB_HOST: ${process.env.DB_HOST || 'NOT SET'}`);
-console.log(`  DB_USER: ${process.env.DB_USER || 'NOT SET'}`);
 console.log(`  GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'SET (length: ' + process.env.GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
 console.log(`  ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'SET (length: ' + process.env.ANTHROPIC_API_KEY.length + ')' : 'NOT SET'}`);
 
-// Default to file mode for safety - only use database if explicitly configured AND credentials exist
-const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' &&
-                     (DATABASE_URL || (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME)))
+// Default to file mode for safety - only use database if explicitly configured
+const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' && DATABASE_URL)
                      ? 'database'
                      : 'file';
 
 console.log(`📦 Storage mode: ${STORAGE_MODE}`);
 if (STORAGE_MODE === 'database') {
-  console.log(`🗄️  Database type: ${DB_TYPE}`);
+  console.log(`🗄️  Database: PostgreSQL (Railway)`);
 }
 
-// Database connection pool (only used if STORAGE_MODE=database)
+// Database connection pool (PostgreSQL - Railway)
 let dbPool = null;
 if (STORAGE_MODE === 'database') {
-  if (DB_TYPE === 'postgresql') {
-    // Railway PostgreSQL
-    dbPool = new Pool({
-      connectionString: DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false
-      }
-    });
-    console.log(`✓ PostgreSQL pool created (Railway)`);
-  } else {
-    // MySQL (IONOS)
-    dbPool = mysql.createPool({
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT || 3306,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      connectTimeout: 10000
-    });
-    console.log(`✓ MySQL pool created: ${process.env.DB_HOST}`);
-  }
+  dbPool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  });
+  console.log(`✓ PostgreSQL pool created (Railway)`);
 }
 
 // Middleware
@@ -162,22 +140,14 @@ async function initializeDataFiles() {
   }
 }
 
-// Database query wrapper - works with both PostgreSQL and MySQL
+// Database query wrapper - PostgreSQL
 async function dbQuery(sql, params = []) {
-  if (DB_TYPE === 'postgresql') {
-    // PostgreSQL uses $1, $2, etc for parameters
-    const result = await dbPool.query(sql, params);
-    // Return rows with metadata for DELETE/UPDATE operations
-    result.rows.rowCount = result.rowCount;
-    result.rows.command = result.command;
-    return result.rows;
-  } else {
-    // MySQL uses ? for parameters
-    const [rows, fields] = await dbPool.execute(sql, params);
-    // Add affectedRows for consistency
-    rows.rowCount = rows.affectedRows || 0;
-    return rows;
-  }
+  // PostgreSQL uses $1, $2, etc for parameters
+  const result = await dbPool.query(sql, params);
+  // Return rows with metadata for DELETE/UPDATE operations
+  result.rows.rowCount = result.rowCount;
+  result.rows.command = result.command;
+  return result.rows;
 }
 
 // Initialize database tables
@@ -189,196 +159,102 @@ async function initializeDatabase() {
 
   try {
     // Test connection first
-    if (DB_TYPE === 'postgresql') {
-      await dbPool.query('SELECT 1');
-    } else {
-      await dbPool.execute('SELECT 1');
-    }
+    await dbPool.query('SELECT 1');
     console.log('✓ Database connection successful');
 
-    if (DB_TYPE === 'postgresql') {
-      // PostgreSQL table creation
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS users (
-          id VARCHAR(255) PRIMARY KEY,
-          username VARCHAR(255) UNIQUE NOT NULL,
-          email VARCHAR(255) NOT NULL,
-          password VARCHAR(255) NOT NULL,
-          role VARCHAR(50) DEFAULT 'user',
-          story_quota INT DEFAULT 2,
-          stories_generated INT DEFAULT 0,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+    // PostgreSQL table creation
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'user',
+        story_quota INT DEFAULT 2,
+        stories_generated INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS config (
-          id SERIAL PRIMARY KEY,
-          config_key VARCHAR(255) UNIQUE NOT NULL,
-          config_value TEXT
-        )
-      `);
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS config (
+        id SERIAL PRIMARY KEY,
+        config_key VARCHAR(255) UNIQUE NOT NULL,
+        config_value TEXT
+      )
+    `);
 
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS logs (
-          id SERIAL PRIMARY KEY,
-          user_id VARCHAR(255),
-          username VARCHAR(255),
-          action VARCHAR(255),
-          details TEXT,
-          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS logs (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255),
+        username VARCHAR(255),
+        action VARCHAR(255),
+        details TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS characters (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          data TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id)`);
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS characters (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        data TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id)`);
 
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS stories (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          data TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS stories (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        data TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
 
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS files (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          file_type VARCHAR(50) NOT NULL,
-          story_id VARCHAR(255),
-          mime_type VARCHAR(100) NOT NULL,
-          file_data BYTEA NOT NULL,
-          file_size INT,
-          filename VARCHAR(255),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id)`);
-      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_files_story_id ON files(story_id)`);
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS files (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        file_type VARCHAR(50) NOT NULL,
+        story_id VARCHAR(255),
+        mime_type VARCHAR(100) NOT NULL,
+        file_data BYTEA NOT NULL,
+        file_size INT,
+        filename VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_files_story_id ON files(story_id)`);
 
-      await dbPool.query(`
-        CREATE TABLE IF NOT EXISTS gelato_products (
-          id SERIAL PRIMARY KEY,
-          product_uid VARCHAR(500) UNIQUE NOT NULL,
-          product_name VARCHAR(255) NOT NULL,
-          description TEXT,
-          size VARCHAR(100),
-          cover_type VARCHAR(100),
-          min_pages INT,
-          max_pages INT,
-          available_page_counts TEXT,
-          is_active BOOLEAN DEFAULT true,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_gelato_products_active ON gelato_products(is_active)`);
-
-    } else {
-      // MySQL table creation
-      await dbPool.execute(`
-        CREATE TABLE IF NOT EXISTS users (
-          id VARCHAR(255) PRIMARY KEY,
-          username VARCHAR(255) UNIQUE NOT NULL,
-          email VARCHAR(255) NOT NULL,
-          password VARCHAR(255) NOT NULL,
-          role VARCHAR(50) DEFAULT 'user',
-          story_quota INT DEFAULT 2,
-          stories_generated INT DEFAULT 0,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      await dbPool.execute(`
-        CREATE TABLE IF NOT EXISTS config (
-          id INT PRIMARY KEY AUTO_INCREMENT,
-          config_key VARCHAR(255) UNIQUE NOT NULL,
-          config_value TEXT
-        )
-      `);
-
-      await dbPool.execute(`
-        CREATE TABLE IF NOT EXISTS logs (
-          id INT PRIMARY KEY AUTO_INCREMENT,
-          user_id VARCHAR(255),
-          username VARCHAR(255),
-          action VARCHAR(255),
-          details TEXT,
-          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      await dbPool.execute(`
-        CREATE TABLE IF NOT EXISTS characters (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          data TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX(user_id)
-        )
-      `);
-
-      await dbPool.execute(`
-        CREATE TABLE IF NOT EXISTS stories (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          data TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX(user_id)
-        )
-      `);
-
-      await dbPool.execute(`
-        CREATE TABLE IF NOT EXISTS files (
-          id VARCHAR(255) PRIMARY KEY,
-          user_id VARCHAR(255) NOT NULL,
-          file_type VARCHAR(50) NOT NULL,
-          story_id VARCHAR(255),
-          mime_type VARCHAR(100) NOT NULL,
-          file_data LONGBLOB NOT NULL,
-          file_size INT,
-          filename VARCHAR(255),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          INDEX(user_id),
-          INDEX(story_id)
-        )
-      `);
-
-      await dbPool.execute(`
-        CREATE TABLE IF NOT EXISTS gelato_products (
-          id INT PRIMARY KEY AUTO_INCREMENT,
-          product_uid VARCHAR(500) UNIQUE NOT NULL,
-          product_name VARCHAR(255) NOT NULL,
-          description TEXT,
-          size VARCHAR(100),
-          cover_type VARCHAR(100),
-          min_pages INT,
-          max_pages INT,
-          available_page_counts TEXT,
-          is_active BOOLEAN DEFAULT true,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          INDEX(is_active)
-        )
-      `);
-    }
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS gelato_products (
+        id SERIAL PRIMARY KEY,
+        product_uid VARCHAR(500) UNIQUE NOT NULL,
+        product_name VARCHAR(255) NOT NULL,
+        description TEXT,
+        size VARCHAR(100),
+        cover_type VARCHAR(100),
+        min_pages INT,
+        max_pages INT,
+        available_page_counts TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_gelato_products_active ON gelato_products(is_active)`);
 
     console.log('✓ Database tables initialized');
 
     // Run database migrations
     try {
       const { runMigrations } = require('./run-migrations');
-      await runMigrations(dbPool, DB_TYPE);
+      await runMigrations(dbPool, 'postgresql');
     } catch (err) {
       console.error('⚠️  Migration warning:', err.message);
       // Don't fail initialization if migrations fail
@@ -411,9 +287,7 @@ async function writeJSON(filePath, data) {
 async function logActivity(userId, username, action, details) {
   if (STORAGE_MODE === 'database' && dbPool) {
     try {
-      const insertQuery = DB_TYPE === 'postgresql'
-        ? 'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)'
-        : 'INSERT INTO logs (user_id, username, action, details) VALUES (?, ?, ?, ?)';
+      const insertQuery = 'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)';
       await dbQuery(insertQuery, [userId, username, action, JSON.stringify(details)]);
     } catch (err) {
       console.error('Log error:', err);
@@ -466,9 +340,7 @@ app.post('/api/auth/register', async (req, res) => {
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
       // Check if user already exists
-      const existingQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT id FROM users WHERE username = $1'
-        : 'SELECT id FROM users WHERE username = ?';
+      const existingQuery = 'SELECT id FROM users WHERE username = $1';
       const existing = await dbQuery(existingQuery, [username]);
 
       if (existing.length > 0) {
@@ -483,9 +355,7 @@ app.post('/api/auth/register', async (req, res) => {
       const role = isFirstUser ? 'admin' : 'user';
       const storyQuota = isFirstUser ? -1 : 2;
 
-      const insertQuery = DB_TYPE === 'postgresql'
-        ? 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated) VALUES ($1, $2, $3, $4, $5, $6, $7)'
-        : 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated) VALUES (?, ?, ?, ?, ?, ?, ?)';
+      const insertQuery = 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated) VALUES ($1, $2, $3, $4, $5, $6, $7)';
       await dbQuery(insertQuery, [userId, username, username, hashedPassword, role, storyQuota, 0]);
 
       newUser = {
@@ -560,9 +430,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT * FROM users WHERE username = $1'
-        : 'SELECT * FROM users WHERE username = ?';
+      const selectQuery = 'SELECT * FROM users WHERE username = $1';
       const rows = await dbQuery(selectQuery, [username]);
 
       if (rows.length === 0) {
@@ -842,18 +710,14 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT * FROM users WHERE id = $1'
-        : 'SELECT * FROM users WHERE id = ?';
+      const selectQuery = 'SELECT * FROM users WHERE id = $1';
       const rows = await dbQuery(selectQuery, [userId]);
 
       if (rows.length === 0) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const updateQuery = DB_TYPE === 'postgresql'
-        ? 'UPDATE users SET story_quota = $1 WHERE id = $2'
-        : 'UPDATE users SET story_quota = ? WHERE id = ?';
+      const updateQuery = 'UPDATE users SET story_quota = $1 WHERE id = $2';
       await dbQuery(updateQuery, [storyQuota, userId]);
 
       user = {
@@ -962,14 +826,10 @@ app.post('/api/admin/gelato-products', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'available_page_counts must be a valid JSON array' });
     }
 
-    const insertQuery = DB_TYPE === 'postgresql'
-      ? `INSERT INTO gelato_products
+    const insertQuery = `INSERT INTO gelato_products
          (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         RETURNING *`
-      : `INSERT INTO gelato_products
-         (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+         RETURNING *`;
 
     const pageCountsJson = JSON.stringify(pageCounts);
     const params = [
@@ -988,13 +848,7 @@ app.post('/api/admin/gelato-products', authenticateToken, async (req, res) => {
 
     // For MySQL, fetch the inserted record
     let newProduct;
-    if (DB_TYPE === 'postgresql') {
-      newProduct = result[0];
-    } else {
-      const selectQuery = 'SELECT * FROM gelato_products WHERE id = ?';
-      const rows = await dbQuery(selectQuery, [result.insertId]);
-      newProduct = rows[0];
-    }
+    newProduct = result[0];
 
     await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_CREATED', {
       productId: newProduct.id,
@@ -1045,18 +899,12 @@ app.put('/api/admin/gelato-products/:id', authenticateToken, async (req, res) =>
       return res.status(400).json({ error: 'available_page_counts must be a valid JSON array' });
     }
 
-    const updateQuery = DB_TYPE === 'postgresql'
-      ? `UPDATE gelato_products
+    const updateQuery = `UPDATE gelato_products
          SET product_uid = $1, product_name = $2, description = $3, size = $4,
              cover_type = $5, min_pages = $6, max_pages = $7,
              available_page_counts = $8, is_active = $9
          WHERE id = $10
-         RETURNING *`
-      : `UPDATE gelato_products
-         SET product_uid = ?, product_name = ?, description = ?, size = ?,
-             cover_type = ?, min_pages = ?, max_pages = ?,
-             available_page_counts = ?, is_active = ?
-         WHERE id = ?`;
+         RETURNING *`;
 
     const pageCountsJson = JSON.stringify(pageCounts);
     const params = [
@@ -1076,14 +924,10 @@ app.put('/api/admin/gelato-products/:id', authenticateToken, async (req, res) =>
 
     // For MySQL, fetch the updated record
     let updatedProduct;
-    if (DB_TYPE === 'postgresql') {
-      if (result.length === 0) {
+    if (result.length === 0) {
         return res.status(404).json({ error: 'Product not found' });
       }
-      updatedProduct = result[0];
-    } else {
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: 'Product not found' });
+      updatedProduct = result[0];);
       }
       const selectQuery = 'SELECT * FROM gelato_products WHERE id = ?';
       const rows = await dbQuery(selectQuery, [id]);
@@ -1116,22 +960,16 @@ app.put('/api/admin/gelato-products/:id/toggle', authenticateToken, async (req, 
     const { id } = req.params;
     const { is_active } = req.body;
 
-    const updateQuery = DB_TYPE === 'postgresql'
-      ? 'UPDATE gelato_products SET is_active = $1 WHERE id = $2 RETURNING *'
-      : 'UPDATE gelato_products SET is_active = ? WHERE id = ?';
+    const updateQuery = 'UPDATE gelato_products SET is_active = $1 WHERE id = $2 RETURNING *';
 
     const result = await dbQuery(updateQuery, [!is_active, id]);
 
     // For MySQL, fetch the updated record
     let updatedProduct;
-    if (DB_TYPE === 'postgresql') {
-      if (result.length === 0) {
+    if (result.length === 0) {
         return res.status(404).json({ error: 'Product not found' });
       }
-      updatedProduct = result[0];
-    } else {
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: 'Product not found' });
+      updatedProduct = result[0];);
       }
       const selectQuery = 'SELECT * FROM gelato_products WHERE id = ?';
       const rows = await dbQuery(selectQuery, [id]);
@@ -1164,9 +1002,7 @@ app.delete('/api/admin/gelato-products/:id', authenticateToken, async (req, res)
     const { id } = req.params;
 
     // Get product name before deleting for logging
-    const selectQuery = DB_TYPE === 'postgresql'
-      ? 'SELECT product_name FROM gelato_products WHERE id = $1'
-      : 'SELECT product_name FROM gelato_products WHERE id = ?';
+    const selectQuery = 'SELECT product_name FROM gelato_products WHERE id = $1';
     const rows = await dbQuery(selectQuery, [id]);
 
     if (rows.length === 0) {
@@ -1175,9 +1011,7 @@ app.delete('/api/admin/gelato-products/:id', authenticateToken, async (req, res)
 
     const productName = rows[0].product_name;
 
-    const deleteQuery = DB_TYPE === 'postgresql'
-      ? 'DELETE FROM gelato_products WHERE id = $1'
-      : 'DELETE FROM gelato_products WHERE id = ?';
+    const deleteQuery = 'DELETE FROM gelato_products WHERE id = $1';
 
     await dbQuery(deleteQuery, [id]);
 
@@ -1200,9 +1034,7 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT story_quota, stories_generated FROM users WHERE id = $1'
-        : 'SELECT story_quota, stories_generated FROM users WHERE id = ?';
+      const selectQuery = 'SELECT story_quota, stories_generated FROM users WHERE id = $1';
       const rows = await dbQuery(selectQuery, [req.user.id]);
 
       if (rows.length === 0) {
@@ -1243,9 +1075,7 @@ app.get('/api/user/shipping-address', authenticateToken, async (req, res) => {
   try {
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT shipping_first_name, shipping_last_name, shipping_address_line1, shipping_city, shipping_post_code, shipping_country, shipping_email FROM users WHERE id = $1'
-        : 'SELECT shipping_first_name, shipping_last_name, shipping_address_line1, shipping_city, shipping_post_code, shipping_country, shipping_email FROM users WHERE id = ?';
+      const selectQuery = 'SELECT shipping_first_name, shipping_last_name, shipping_address_line1, shipping_city, shipping_post_code, shipping_country, shipping_email FROM users WHERE id = $1';
       const rows = await dbQuery(selectQuery, [req.user.id]);
 
       if (rows.length === 0) {
@@ -1290,9 +1120,7 @@ app.put('/api/user/shipping-address', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const updateQuery = DB_TYPE === 'postgresql'
-        ? 'UPDATE users SET shipping_first_name = $1, shipping_last_name = $2, shipping_address_line1 = $3, shipping_city = $4, shipping_post_code = $5, shipping_country = $6, shipping_email = $7 WHERE id = $8'
-        : 'UPDATE users SET shipping_first_name = ?, shipping_last_name = ?, shipping_address_line1 = ?, shipping_city = ?, shipping_post_code = ?, shipping_country = ?, shipping_email = ? WHERE id = ?';
+      const updateQuery = 'UPDATE users SET shipping_first_name = $1, shipping_last_name = $2, shipping_address_line1 = $3, shipping_city = $4, shipping_post_code = $5, shipping_country = $6, shipping_email = $7 WHERE id = $8';
       await dbQuery(updateQuery, [firstName, lastName, addressLine1, city, postCode, country, email, req.user.id]);
 
       await logActivity(req.user.id, req.user.username, 'SHIPPING_ADDRESS_SAVED', { country });
@@ -1329,18 +1157,14 @@ app.put('/api/user/update-email', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode - check if email already exists
-      const checkQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT id FROM users WHERE username = $1 AND id != $2'
-        : 'SELECT id FROM users WHERE username = ? AND id != ?';
+      const checkQuery = 'SELECT id FROM users WHERE username = $1 AND id != $2';
       const existing = await dbQuery(checkQuery, [newEmail, req.user.id]);
 
       if (existing.length > 0) {
         return res.status(400).json({ error: 'Email already in use' });
       }
 
-      const updateQuery = DB_TYPE === 'postgresql'
-        ? 'UPDATE users SET username = $1 WHERE id = $2'
-        : 'UPDATE users SET username = ? WHERE id = ?';
+      const updateQuery = 'UPDATE users SET username = $1 WHERE id = $2';
       await dbQuery(updateQuery, [newEmail, req.user.id]);
 
       await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
@@ -1383,9 +1207,7 @@ app.get('/api/characters', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT data FROM characters WHERE user_id = $1 ORDER BY id DESC LIMIT 1'
-        : 'SELECT data FROM characters WHERE user_id = ? ORDER BY id DESC LIMIT 1';
+      const selectQuery = 'SELECT data FROM characters WHERE user_id = $1 ORDER BY id DESC LIMIT 1';
       const rows = await dbQuery(selectQuery, [req.user.id]);
 
       if (rows.length > 0) {
@@ -1434,16 +1256,12 @@ app.post('/api/characters', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode - delete old characters and insert new ones
-      const deleteQuery = DB_TYPE === 'postgresql'
-        ? 'DELETE FROM characters WHERE user_id = $1'
-        : 'DELETE FROM characters WHERE user_id = ?';
+      const deleteQuery = 'DELETE FROM characters WHERE user_id = $1';
       await dbQuery(deleteQuery, [req.user.id]);
 
       // Insert character data as a single record with all information
       const characterId = `characters_${req.user.id}_${Date.now()}`;
-      const insertQuery = DB_TYPE === 'postgresql'
-        ? 'INSERT INTO characters (id, user_id, data) VALUES ($1, $2, $3)'
-        : 'INSERT INTO characters (id, user_id, data) VALUES (?, ?, ?)';
+      const insertQuery = 'INSERT INTO characters (id, user_id, data) VALUES ($1, $2, $3)';
       await dbQuery(insertQuery, [characterId, req.user.id, JSON.stringify(characterData)]);
     } else {
       // File mode - save all character data as an object
@@ -1468,9 +1286,7 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC'
-        : 'SELECT data FROM stories WHERE user_id = ? ORDER BY created_at DESC';
+      const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC';
 
       console.log(`📚 Executing query: ${selectQuery} with user_id: ${req.user.id}`);
       const rows = await dbQuery(selectQuery, [req.user.id]);
@@ -1533,9 +1349,7 @@ app.get('/api/stories/:id', authenticateToken, async (req, res) => {
     let story = null;
 
     if (STORAGE_MODE === 'database' && dbPool) {
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT data FROM stories WHERE id = $1 AND user_id = $2'
-        : 'SELECT data FROM stories WHERE id = ? AND user_id = ?';
+      const selectQuery = 'SELECT data FROM stories WHERE id = $1 AND user_id = $2';
       const rows = await dbQuery(selectQuery, [id, req.user.id]);
 
       if (rows.length > 0) {
@@ -1575,17 +1389,13 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
       // Check if story exists
-      const checkQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT id FROM stories WHERE id = $1 AND user_id = $2'
-        : 'SELECT id FROM stories WHERE id = ? AND user_id = ?';
+      const checkQuery = 'SELECT id FROM stories WHERE id = $1 AND user_id = $2';
       const existing = await dbQuery(checkQuery, [story.id, req.user.id]);
       isNewStory = existing.length === 0;
 
       // Check quota only for new stories
       if (isNewStory) {
-        const userQuery = DB_TYPE === 'postgresql'
-          ? 'SELECT story_quota, stories_generated FROM users WHERE id = $1'
-          : 'SELECT story_quota, stories_generated FROM users WHERE id = ?';
+        const userQuery = 'SELECT story_quota, stories_generated FROM users WHERE id = $1';
         const userRows = await dbQuery(userQuery, [req.user.id]);
         if (userRows.length > 0) {
           const quota = userRows[0].story_quota !== undefined ? userRows[0].story_quota : 2;
@@ -1601,23 +1411,17 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
           }
 
           // Increment story counter
-          const updateQuery = DB_TYPE === 'postgresql'
-            ? 'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = $1'
-            : 'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = ?';
+          const updateQuery = 'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = $1';
           await dbQuery(updateQuery, [req.user.id]);
         }
       }
 
       // Save or update story
       if (isNewStory) {
-        const insertQuery = DB_TYPE === 'postgresql'
-          ? 'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3)'
-          : 'INSERT INTO stories (id, user_id, data) VALUES (?, ?, ?)';
+        const insertQuery = 'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3)';
         await dbQuery(insertQuery, [story.id, req.user.id, JSON.stringify(story)]);
       } else {
-        const updateQuery = DB_TYPE === 'postgresql'
-          ? 'UPDATE stories SET data = $1 WHERE id = $2 AND user_id = $3'
-          : 'UPDATE stories SET data = ? WHERE id = ? AND user_id = ?';
+        const updateQuery = 'UPDATE stories SET data = $1 WHERE id = $2 AND user_id = $3';
         await dbQuery(updateQuery, [JSON.stringify(story), story.id, req.user.id]);
       }
     } else {
@@ -1681,9 +1485,7 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const deleteQuery = DB_TYPE === 'postgresql'
-        ? 'DELETE FROM stories WHERE id = $1 AND user_id = $2'
-        : 'DELETE FROM stories WHERE id = ? AND user_id = ?';
+      const deleteQuery = 'DELETE FROM stories WHERE id = $1 AND user_id = $2';
       const result = await dbQuery(deleteQuery, [id, req.user.id]);
 
       console.log(`🗑️  Delete result:`, { rowCount: result.rowCount, command: result.command });
@@ -1961,9 +1763,7 @@ app.get('/api/admin/gelato/products', authenticateToken, async (req, res) => {
     }
 
     if (STORAGE_MODE === 'database' && dbPool) {
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT * FROM gelato_products ORDER BY is_active DESC, created_at DESC'
-        : 'SELECT * FROM gelato_products ORDER BY is_active DESC, created_at DESC';
+      const selectQuery = 'SELECT * FROM gelato_products ORDER BY is_active DESC, created_at DESC';
 
       const rows = await dbQuery(selectQuery, []);
       res.json({ success: true, products: rows });
@@ -2018,8 +1818,7 @@ app.post('/api/admin/gelato/products', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Try to insert, if exists, update
-      const upsertQuery = DB_TYPE === 'postgresql'
-        ? `INSERT INTO gelato_products
+      const upsertQuery = `INSERT INTO gelato_products
            (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active, updated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
            ON CONFLICT (product_uid)
@@ -2032,19 +1831,6 @@ app.post('/api/admin/gelato/products', authenticateToken, async (req, res) => {
              max_pages = $7,
              available_page_counts = $8,
              is_active = $9,
-             updated_at = CURRENT_TIMESTAMP`
-        : `INSERT INTO gelato_products
-           (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             product_name = VALUES(product_name),
-             description = VALUES(description),
-             size = VALUES(size),
-             cover_type = VALUES(cover_type),
-             min_pages = VALUES(min_pages),
-             max_pages = VALUES(max_pages),
-             available_page_counts = VALUES(available_page_counts),
-             is_active = VALUES(is_active),
              updated_at = CURRENT_TIMESTAMP`;
 
       await dbQuery(upsertQuery, [
@@ -2119,8 +1905,7 @@ app.post('/api/admin/gelato/seed-products', authenticateToken, async (req, res) 
     };
 
     if (STORAGE_MODE === 'database' && dbPool) {
-      const upsertQuery = DB_TYPE === 'postgresql'
-        ? `INSERT INTO gelato_products
+      const upsertQuery = `INSERT INTO gelato_products
            (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            ON CONFLICT (product_uid)
@@ -2133,19 +1918,6 @@ app.post('/api/admin/gelato/seed-products', authenticateToken, async (req, res) 
              max_pages = $7,
              available_page_counts = $8,
              is_active = $9,
-             updated_at = CURRENT_TIMESTAMP`
-        : `INSERT INTO gelato_products
-           (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             product_name = VALUES(product_name),
-             description = VALUES(description),
-             size = VALUES(size),
-             cover_type = VALUES(cover_type),
-             min_pages = VALUES(min_pages),
-             max_pages = VALUES(max_pages),
-             available_page_counts = VALUES(available_page_counts),
-             is_active = VALUES(is_active),
              updated_at = CURRENT_TIMESTAMP`;
 
       await dbQuery(upsertQuery, [
@@ -2189,9 +1961,7 @@ app.get('/api/config/gelato-product-uid', authenticateToken, (req, res) => {
 app.get('/api/gelato/products', async (req, res) => {
   try {
     if (STORAGE_MODE === 'database' && dbPool) {
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true ORDER BY product_name'
-        : 'SELECT product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = 1 ORDER BY product_name';
+      const selectQuery = 'SELECT product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true ORDER BY product_name';
 
       const rows = await dbQuery(selectQuery, []);
       res.json({ success: true, products: rows });
@@ -2301,9 +2071,7 @@ app.post('/api/files', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const insertQuery = DB_TYPE === 'postgresql'
-        ? 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)'
-        : 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+      const insertQuery = 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
 
       await dbQuery(insertQuery, [
         fileId,
@@ -2377,9 +2145,7 @@ app.get('/api/files/:fileId', async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = DB_TYPE === 'postgresql'
-        ? 'SELECT mime_type, file_data, filename FROM files WHERE id = $1'
-        : 'SELECT mime_type, file_data, filename FROM files WHERE id = ?';
+      const selectQuery = 'SELECT mime_type, file_data, filename FROM files WHERE id = $1';
 
       const rows = await dbQuery(selectQuery, [fileId]);
 
@@ -2432,13 +2198,11 @@ app.delete('/api/files/:fileId', authenticateToken, async (req, res) => {
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode - verify ownership before deleting
-      const deleteQuery = DB_TYPE === 'postgresql'
-        ? 'DELETE FROM files WHERE id = $1 AND user_id = $2'
-        : 'DELETE FROM files WHERE id = ? AND user_id = ?';
+      const deleteQuery = 'DELETE FROM files WHERE id = $1 AND user_id = $2';
 
       const result = await dbQuery(deleteQuery, [fileId, req.user.id]);
 
-      if (DB_TYPE === 'postgresql' && result.length === 0) {
+      if (result.length === 0) {
         return res.status(404).json({ error: 'File not found or unauthorized' });
       }
     } else {
@@ -2551,9 +2315,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 
     // Store PDF in database
     if (STORAGE_MODE === 'database' && dbPool) {
-      const insertQuery = DB_TYPE === 'postgresql'
-        ? 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)'
-        : 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+      const insertQuery = 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
 
       await dbQuery(insertQuery, [
         fileId,
@@ -2626,7 +2388,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// IP check endpoint - shows Railway's outgoing IP for database whitelisting
+// IP check endpoint - shows Railway's outgoing IP
 app.get('/api/check-ip', async (req, res) => {
   try {
     const response = await fetch('https://api.ipify.org?format=json');
@@ -2635,7 +2397,7 @@ app.get('/api/check-ip', async (req, res) => {
       railwayOutgoingIp: data.ip,
       requestIp: req.ip,
       forwardedFor: req.headers['x-forwarded-for'],
-      message: 'Add the railwayOutgoingIp to your IONOS database whitelist'
+      message: 'Railway outgoing IP address for debugging'
     });
   } catch (err) {
     res.json({ error: err.message });
@@ -2665,17 +2427,13 @@ initialize().then(() => {
     console.log(`📍 URL: http://localhost:${PORT}`);
     console.log(`💾 Storage: ${STORAGE_MODE.toUpperCase()}`);
     if (STORAGE_MODE === 'database') {
-      if (DB_TYPE === 'postgresql') {
-        // Parse DATABASE_URL to show host and database name
-        try {
-          const url = new URL(DATABASE_URL);
-          const dbName = url.pathname.slice(1); // Remove leading /
-          console.log(`🗄️  Database: ${url.hostname}/${dbName} (PostgreSQL)`);
-        } catch (err) {
-          console.log(`🗄️  Database: PostgreSQL (Railway)`);
-        }
-      } else {
-        console.log(`🗄️  Database: ${process.env.DB_HOST}/${process.env.DB_NAME} (MySQL)`);
+      // Parse DATABASE_URL to show host and database name
+      try {
+        const url = new URL(DATABASE_URL);
+        const dbName = url.pathname.slice(1); // Remove leading /
+        console.log(`🗄️  Database: ${url.hostname}/${dbName} (PostgreSQL)`);
+      } catch (err) {
+        console.log(`🗄️  Database: PostgreSQL (Railway)`);
       }
     } else {
       console.log(`📝 Logs: data/logs.json`);
