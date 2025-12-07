@@ -2279,14 +2279,49 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       const pageNumber = index + 1;
 
       // Add text page (square format)
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: 28, bottom: 28, left: 28, right: 28 } });
+      const margin = 28;
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
 
-      doc.fontSize(14)
-         .fillColor('#333333')  // Dark gray instead of pure black to reduce ink
-         .font('Helvetica')
-         .text(page.text, {
-           align: 'center',
-           valign: 'center'
+      // Calculate available space
+      const availableWidth = pageSize - (margin * 2);
+      const availableHeight = pageSize - (margin * 2);
+
+      // Start with default font size, reduce if text doesn't fit
+      let fontSize = 11;  // Reduced from 14 to 11
+      let textHeight;
+      let fontReduced = false;
+
+      // Measure text height and reduce font if needed
+      doc.fontSize(fontSize).font('Helvetica');
+      textHeight = doc.heightOfString(page.text, {
+        width: availableWidth,
+        align: 'left'
+      });
+
+      // If text doesn't fit, reduce font size
+      while (textHeight > availableHeight && fontSize > 7) {
+        fontSize -= 0.5;
+        doc.fontSize(fontSize);
+        textHeight = doc.heightOfString(page.text, {
+          width: availableWidth,
+          align: 'left'
+        });
+        fontReduced = true;
+      }
+
+      // Log warning if font was reduced
+      if (fontReduced) {
+        console.warn(`⚠️  Page ${pageNumber}: Text too long, reduced font to ${fontSize}pt`);
+      }
+
+      // Calculate vertical position to center text
+      const yPosition = margin + (availableHeight - textHeight) / 2;
+
+      // Render text (left-aligned, vertically centered)
+      doc.fillColor('#333333')  // Dark gray instead of pure black to reduce ink
+         .text(page.text, margin, yPosition, {
+           width: availableWidth,
+           align: 'left'
          });
 
       // Add image page if available (square format)
