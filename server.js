@@ -1615,7 +1615,7 @@ app.post('/api/gelato/order', authenticateToken, async (req, res) => {
       orderType: orderType,
       isDraft: orderType === 'draft',
       previewUrls: previewUrls,
-      dashboardUrl: `https://dashboard.gelato.com/orders/${gelatoData.orderId || gelatoData.id}`,
+      dashboardUrl: `https://dashboard.gelato.com/checkout/${gelatoData.orderId || gelatoData.id}/product`,
       data: gelatoData
     });
 
