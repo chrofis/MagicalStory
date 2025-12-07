@@ -2576,6 +2576,84 @@ app.post('/api/admin/fix-shipping-columns', async (req, res) => {
   }
 });
 
+// ADMIN: Check and cleanup orphaned data (characters/stories without user_id)
+app.post('/api/admin/cleanup-orphaned-data', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(400).json({ error: 'This operation is only available in database mode' });
+    }
+
+    console.log('🔍 Checking for orphaned data...');
+
+    // Check for orphaned characters
+    const orphanedCharsResult = await dbQuery(
+      `SELECT COUNT(*) as count FROM characters WHERE user_id IS NULL OR user_id = ''`
+    );
+    const orphanedCharsCount = parseInt(orphanedCharsResult.rows[0].count);
+
+    // Check for orphaned stories
+    const orphanedStoriesResult = await dbQuery(
+      `SELECT COUNT(*) as count FROM stories WHERE user_id IS NULL OR user_id = ''`
+    );
+    const orphanedStoriesCount = parseInt(orphanedStoriesResult.rows[0].count);
+
+    console.log(`Found ${orphanedCharsCount} orphaned characters, ${orphanedStoriesCount} orphaned stories`);
+
+    // Only delete if requested
+    const { action } = req.body;
+    if (action === 'delete') {
+      console.log('🗑️  Deleting orphaned data...');
+
+      let deletedChars = 0;
+      let deletedStories = 0;
+
+      if (orphanedCharsCount > 0) {
+        const deleteCharsResult = await dbQuery(
+          `DELETE FROM characters WHERE user_id IS NULL OR user_id = ''`
+        );
+        deletedChars = deleteCharsResult.rowCount;
+        console.log(`✓ Deleted ${deletedChars} orphaned characters`);
+      }
+
+      if (orphanedStoriesCount > 0) {
+        const deleteStoriesResult = await dbQuery(
+          `DELETE FROM stories WHERE user_id IS NULL OR user_id = ''`
+        );
+        deletedStories = deleteStoriesResult.rowCount;
+        console.log(`✓ Deleted ${deletedStories} orphaned stories`);
+      }
+
+      res.json({
+        success: true,
+        action: 'deleted',
+        deleted: {
+          characters: deletedChars,
+          stories: deletedStories
+        }
+      });
+    } else {
+      // Just return counts without deleting
+      res.json({
+        success: true,
+        action: 'check',
+        found: {
+          characters: orphanedCharsCount,
+          stories: orphanedStoriesCount
+        },
+        message: 'Use action=delete to remove orphaned data'
+      });
+    }
+  } catch (err) {
+    console.error('Error cleaning orphaned data:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
