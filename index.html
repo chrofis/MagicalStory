@@ -2754,7 +2754,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
       };
 
       const downloadScenes = () => {
-        if (sceneDescriptions.length === 0) {
+        if (!Array.isArray(sceneDescriptions) || sceneDescriptions.length === 0) {
           alert('No scenes to download. Please create scenes first!');
           return;
         }
@@ -2940,9 +2940,13 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 setGeneratedStory(result.storyText || '');
                 setSceneDescriptions(result.sceneDescriptions || []);
                 setSceneImages(result.images || []);
+                setCoverImages(result.coverImages || { frontCover: null, page0: null, backCover: null });
               }
 
               alert('Story generation complete! Your story is ready.');
+
+              // Auto-navigate to page 5 to view the story
+              setCurrentStep(5);
 
               // Auto-save the story
               if (result) {
@@ -4164,7 +4168,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
       };
 
       const generateSceneImages = async () => {
-        if (sceneDescriptions.length === 0) {
+        if (!Array.isArray(sceneDescriptions) || sceneDescriptions.length === 0) {
           alert('Please create scene descriptions first!');
           return;
         }
@@ -7247,7 +7251,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 </button>
               </>
             )}
-            {currentUser && currentUser.role === 'admin' && sceneDescriptions.length > 0 && (
+            {currentUser && currentUser.role === 'admin' && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
               <>
                 <button
                   onClick={downloadScenes}
@@ -7364,14 +7368,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           )}
 
           {/* Display Scene Descriptions - Developer Mode Only */}
-          {developerMode && sceneDescriptions.length > 0 && (
+          {developerMode && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
             <div className="md:bg-green-50 md:border-2 md:border-green-200 md:rounded-xl p-4 md:p-6 mt-6">
               <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">
                 <Icon name="image" size={24} /> {t.scenesReady}
               </h3>
 
               <div className="space-y-6">
-                {sceneDescriptions.map((scene, index) => (
+                {(Array.isArray(sceneDescriptions) ? sceneDescriptions : []).map((scene, index) => (
                   <div key={index} className="bg-white border-2 border-green-300 rounded-lg p-6">
                     <div className="flex justify-between items-center mb-3">
                       <h4 className="text-lg font-bold text-green-700">
