@@ -2968,7 +2968,7 @@ ${storyText}`;
     // Generate page 0 (dedication page) - warm, inviting illustration
     try {
       console.log(`📕 [PIPELINE] Generating page 0 (dedication) for job ${jobId}`);
-      const page0Prompt = `Children's book page 0 dedication/introduction page illustration. Style: ${artStyle}. ${characterInfo}\n\nCreate a warm, inviting illustration that welcomes readers into the story world.${inputData.dedication ? `\n\nDedication text: "${inputData.dedication}"` : ''}`;
+      const page0Prompt = `Children's book page 0 dedication page illustration. Style: ${artStyle}. ${characterInfo}${inputData.dedication ? `\n\nCRITICAL: Include ONLY this exact text in the image: "${inputData.dedication}"\n\nDo not add any other text. Only "${inputData.dedication}" must appear. No additional words allowed.` : '\n\nCreate a warm, inviting illustration that welcomes readers into the story world.'}`;
       page0 = await callGeminiAPIForImage(page0Prompt);
       console.log(`✅ [PIPELINE] Page 0 generated successfully`);
     } catch (error) {
