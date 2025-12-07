@@ -672,7 +672,7 @@
       const [newFear, setNewFear] = useState('');
       const [newRelationship, setNewRelationship] = useState('');
       const [relationships, setRelationships] = useState({});
-      const [pages, setPages] = useState(1); // Default to 1 page for testing
+      const [pages, setPages] = useState(5); // Default to 5 pages
       const [languageLevel, setLanguageLevel] = useState('standard');
       const [mainCharacters, setMainCharacters] = useState([]);
       const [generatedStory, setGeneratedStory] = useState('');
@@ -1173,7 +1173,7 @@
 
         const storyTypeName = allStoryTypes.find(t => t.id === storyType)?.name[language] || 'adventure';
 
-        let prompt = `Create a ${pages}-page children's story about a ${storyTypeName} in ${language === 'de' ? 'Swiss German (use "ss" instead of "ß")' : language === 'fr' ? 'French' : 'English'}.\n\n`;
+        let prompt = `Create a ${pages}-page children's story about a ${storyTypeName} in ${language === 'de' ? 'German (always use "ss" instead of "ß")' : language === 'fr' ? 'French' : 'English'}.\n\n`;
 
         if (storyDetails) {
           prompt += `Additional Story Requirements:\n${storyDetails}\n\n`;
@@ -1192,7 +1192,7 @@
         prompt += `- Refer to additional characters only by their role or relationship (e.g., "the grandfather", "the shopkeeper", "her teacher") - NEVER give them names like "Grandfather Steve" or "Shopkeeper Paul".\n`;
         prompt += `- Use the characters' ages and traits to inform their personality and behavior, but DO NOT explicitly state their age or characteristics in the story.\n`;
         prompt += `- SHOW the characteristics through actions and dialogue instead of stating them. For example, instead of "Sophie was brave", show Sophie doing something brave. Instead of "Max, who was 8 years old", just use "Max" and let his behavior reflect his age.\n\n`;
-        prompt += `Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'Swiss German (always use "ss" instead of "ß")' : language === 'fr' ? 'French' : 'English'}.`;
+        prompt += `Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German (always use "ss" instead of "ß")' : language === 'fr' ? 'French' : 'English'}.`;
 
         return prompt;
       };
@@ -1798,6 +1798,33 @@ Be specific and creative. Each scene description should paint a clear picture fo
         }
       };
 
+      // Auto-select main characters based on age
+      const autoSelectMainCharacters = (charactersList) => {
+        if (charactersList.length === 0) return;
+
+        // Find characters aged 1-10
+        const youngCharacters = charactersList.filter(char => {
+          const age = parseInt(char.age);
+          return age >= 1 && age <= 10;
+        });
+
+        if (youngCharacters.length > 0) {
+          // Select all characters aged 1-10 as main characters
+          const mainCharIds = youngCharacters.map(char => char.id);
+          setMainCharacters(mainCharIds);
+          console.log(`✨ Auto-selected ${youngCharacters.length} main character(s) aged 1-10`);
+        } else {
+          // No characters aged 1-10, select the youngest one
+          const youngest = charactersList.reduce((min, char) => {
+            const age = parseInt(char.age);
+            const minAge = parseInt(min.age);
+            return age < minAge ? char : min;
+          });
+          setMainCharacters([youngest.id]);
+          console.log(`✨ Auto-selected youngest character as main: ${youngest.name} (age ${youngest.age})`);
+        }
+      };
+
       const loadCharacters = async () => {
         if (!authToken) return;
 
@@ -1822,14 +1849,18 @@ Be specific and creative. Each scene description should paint a clear picture fo
               photoUrl: char.photoUrl || null
             });
 
+            let loadedCharacters = [];
+
             // Handle both old format (array) and new format (object with characters and relationships)
             if (Array.isArray(data)) {
               console.log('👥 Setting characters (array format):', data.length, data);
-              setCharacters(data.map(normalizeCharacter));
+              loadedCharacters = data.map(normalizeCharacter);
+              setCharacters(loadedCharacters);
             } else {
               console.log('👥 Setting characters (object format):', data.characters?.length, data.characters);
               console.log('👥 First character details:', data.characters?.[0]);
-              setCharacters((data.characters || []).map(normalizeCharacter));
+              loadedCharacters = (data.characters || []).map(normalizeCharacter);
+              setCharacters(loadedCharacters);
               if (data.relationships) {
                 setRelationships(data.relationships);
               }
@@ -1849,6 +1880,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
                 setCustomFears(data.customFears);
               }
             }
+
+            // Auto-select main characters based on age
+            autoSelectMainCharacters(loadedCharacters);
           }
         } catch (err) {
           console.error('Error loading characters:', err);
@@ -2156,7 +2190,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
             // Look for cover page patterns - more flexible matching
             // Matches: "Title Page:", "**Title Page:**", "Title Page Scene:", etc.
-            const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?[\s:]/i);
+            const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
             if (titlePageMatch) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
@@ -2169,12 +2203,12 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
               currentCoverType = 'titlePage';
               currentPage = null;
-              collectingScene = false;
-              sceneBuffer = '';
-              console.log('Found Title Page section');
+              collectingScene = true;
+              sceneBuffer = titlePageMatch[1].trim();
+              console.log('Found Title Page scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
-            const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?[\s:]/i);
+            const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
             if (page0Match) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
@@ -2187,12 +2221,12 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
               currentCoverType = 'page0';
               currentPage = null;
-              collectingScene = false;
-              sceneBuffer = '';
-              console.log('Found Page 0 section');
+              collectingScene = true;
+              sceneBuffer = page0Match[1].trim();
+              console.log('Found Page 0 scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
-            const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?[\s:]/i);
+            const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
             if (backCoverMatch) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
@@ -2205,9 +2239,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
               currentCoverType = 'backCover';
               currentPage = null;
-              collectingScene = false;
-              sceneBuffer = '';
-              console.log('Found Back Cover section');
+              collectingScene = true;
+              sceneBuffer = backCoverMatch[1].trim();
+              console.log('Found Back Cover scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
             // Look for "Scene:" pattern - start collecting scene description (handles **Scene:** too)
@@ -2903,7 +2937,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
             // Look for cover page patterns - more flexible matching
             // Matches: "Title Page:", "**Title Page:**", "Title Page Scene:", etc.
-            const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?[\s:]/i);
+            const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
             if (titlePageMatch) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
@@ -2916,12 +2950,12 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
               currentCoverType = 'titlePage';
               currentPage = null;
-              collectingScene = false;
-              sceneBuffer = '';
-              console.log('Found Title Page section');
+              collectingScene = true;
+              sceneBuffer = titlePageMatch[1].trim();
+              console.log('Found Title Page scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
-            const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?[\s:]/i);
+            const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
             if (page0Match) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
@@ -2934,12 +2968,12 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
               currentCoverType = 'page0';
               currentPage = null;
-              collectingScene = false;
-              sceneBuffer = '';
-              console.log('Found Page 0 section');
+              collectingScene = true;
+              sceneBuffer = page0Match[1].trim();
+              console.log('Found Page 0 scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
-            const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?[\s:]/i);
+            const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
             if (backCoverMatch) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
@@ -2952,9 +2986,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
               currentCoverType = 'backCover';
               currentPage = null;
-              collectingScene = false;
-              sceneBuffer = '';
-              console.log('Found Back Cover section');
+              collectingScene = true;
+              sceneBuffer = backCoverMatch[1].trim();
+              console.log('Found Back Cover scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
             // Look for "Scene:" pattern - start collecting scene description (handles **Scene:** too)
@@ -5269,12 +5303,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         if (currentCharacter.name &&
             currentCharacter.strengths && currentCharacter.strengths.length >= 3 &&
             currentCharacter.weaknesses && currentCharacter.weaknesses.length >= 2) {
-          setCharacters([...characters, currentCharacter]);
+          const updatedCharacters = [...characters, currentCharacter];
+          setCharacters(updatedCharacters);
 
-          // Auto-select first character as main character
-          if (characters.length === 0 && !mainCharacters.includes(currentCharacter.id)) {
-            setMainCharacters([currentCharacter.id]);
-          }
+          // Auto-select main characters based on age
+          autoSelectMainCharacters(updatedCharacters);
 
           setShowCharacterCreated(true);
           setCurrentCharacter(null);
