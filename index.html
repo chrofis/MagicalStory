@@ -5047,8 +5047,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           // Generate and download PDF
           await html2pdf().set(opt).from(tempContainer).save();
 
-          // Clean up
-          document.body.removeChild(tempContainer);
+          // Clean up - Add delay to ensure html2pdf finishes all async operations (Safari compatibility)
+          setTimeout(() => {
+            try {
+              if (tempContainer && tempContainer.parentNode) {
+                document.body.removeChild(tempContainer);
+              }
+            } catch (e) {
+              console.warn('PDF cleanup warning:', e);
+            }
+          }, 100);
         } catch (error) {
           console.error('PDF export error:', error);
           alert('PDF export error: ' + error.message);
