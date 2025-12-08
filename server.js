@@ -2831,7 +2831,7 @@ app.post('/api/log-error', (req, res) => {
 app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     const { storyId } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     console.log(`💳 Creating Stripe checkout session for user ${userId}, story ${storyId}`);
 
