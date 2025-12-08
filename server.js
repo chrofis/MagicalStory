@@ -3265,7 +3265,7 @@ ${storyText}`;
     // Generate front cover (matches step-by-step prompt format)
     try {
       console.log(`📕 [PIPELINE] Generating front cover for job ${jobId}`);
-      const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page for the children's book "${storyTitle}".\n\nIMPORTANT: The image should ONLY contain the story title "${storyTitle}" - no other text, no subtitles, no author names. Just the title and the illustration.`;
+      const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page illustration for the children's book "${storyTitle}".\n\nIMPORTANT: The image should include the story title "${storyTitle}" integrated beautifully into the illustration. Make the title prominent and visually appealing as part of the cover art.`;
       frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
       console.log(`✅ [PIPELINE] Front cover generated successfully`);
     } catch (error) {
