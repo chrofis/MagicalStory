@@ -2737,7 +2737,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
               message: `Creating scene description for page ${i + 1}...`
             });
 
-            const pageContent = storyPages[i] || '';
+            const pageContent = (storyPages[i] || '').trim().replace(/^-+|-+$/g, '').trim();
             const pageNumber = i + 1;
 
             // Warn if page content is missing
@@ -3377,7 +3377,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
           // Create all scene generation promises at once
           const scenePromises = Array.from({ length: Math.min(pages, storyPages.length) }, async (_, i) => {
-            const pageContent = storyPages[i] || '';
+            const pageContent = (storyPages[i] || '').trim().replace(/^-+|-+$/g, '').trim();
             const pageNumber = i + 1;
             const characterNames = characters.map(c => c.name).join(', ');
 
