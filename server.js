@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');
 const { Pool } = require('pg');
+const pLimit = require('p-limit');
 const stripe = require('stripe')(process.env.STRIPE_TEST_API_KEY);
 
 const app = express();
@@ -3175,31 +3176,35 @@ ${storyText}`;
     }
 
     console.log(`📸 [PIPELINE] Parsed ${sceneArray.length} scenes (expected ${inputData.pages})`);
-    console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images for job ${jobId}`);
+    console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images IN PARALLEL for job ${jobId}`);
 
-    for (let i = 0; i < sceneArray.length; i++) {
+    // Create rate limiter: max 5 concurrent image generations
+    const limit = pLimit(5);
+    const MAX_RETRIES = 2;
+
+    // Helper function to generate a single image with retry logic
+    const generateImageWithRetry = async (sceneDescription, sceneIndex) => {
       let imageResult = null;
       let retries = 0;
-      const MAX_RETRIES = 2;
 
       while (retries <= MAX_RETRIES && !imageResult) {
         try {
           if (retries > 0) {
-            console.log(`🔄 [PIPELINE] Retrying image ${i + 1}/${sceneArray.length} (attempt ${retries + 1}/${MAX_RETRIES + 1}) for job ${jobId}`);
+            console.log(`🔄 [PIPELINE] Retrying image ${sceneIndex + 1}/${sceneArray.length} (attempt ${retries + 1}/${MAX_RETRIES + 1}) for job ${jobId}`);
           } else {
-            console.log(`📸 [PIPELINE] Generating image ${i + 1}/${sceneArray.length} for job ${jobId}`);
+            console.log(`📸 [PIPELINE] Generating image ${sceneIndex + 1}/${sceneArray.length} for job ${jobId}`);
           }
 
-          const imagePrompt = buildImagePrompt(sceneArray[i], inputData);
-          imagePrompts[i + 1] = imagePrompt; // Save prompt for this page
+          const imagePrompt = buildImagePrompt(sceneDescription, inputData);
+          imagePrompts[sceneIndex + 1] = imagePrompt; // Save prompt for this page
           imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
-          console.log(`✅ [PIPELINE] Image ${i + 1}/${sceneArray.length} generated successfully`);
+          console.log(`✅ [PIPELINE] Image ${sceneIndex + 1}/${sceneArray.length} generated successfully`);
         } catch (error) {
           retries++;
-          console.error(`❌ [PIPELINE] Failed to generate image ${i + 1}/${sceneArray.length} (attempt ${retries}/${MAX_RETRIES + 1}):`, error.message);
+          console.error(`❌ [PIPELINE] Failed to generate image ${sceneIndex + 1}/${sceneArray.length} (attempt ${retries}/${MAX_RETRIES + 1}):`, error.message);
 
           if (retries > MAX_RETRIES) {
-            throw new Error(`Image generation failed for scene ${i + 1} after ${MAX_RETRIES + 1} attempts: ${error.message}`);
+            throw new Error(`Image generation failed for scene ${sceneIndex + 1} after ${MAX_RETRIES + 1} attempts: ${error.message}`);
           }
 
           // Wait a bit before retrying (exponential backoff)
@@ -3207,22 +3212,42 @@ ${storyText}`;
         }
       }
 
-      // Store image data with quality score (matches step-by-step structure)
-      images.push({
-        pageNumber: i + 1,
+      return {
+        pageNumber: sceneIndex + 1,
         imageData: imageResult.imageData,
-        description: sceneArray[i],
+        description: sceneDescription,
         qualityScore: imageResult.score,
         qualityReasoning: null
-      });
+      };
+    };
 
-      // Update progress
-      const imageProgress = 70 + Math.floor((i + 1) / sceneArray.length * 25);
-      await dbPool.query(
-        'UPDATE story_jobs SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [imageProgress, jobId]
-      );
-    }
+    // Generate all images in parallel with rate limiting
+    const imageGenerationPromises = sceneArray.map((scene, index) =>
+      limit(() => generateImageWithRetry(scene, index))
+    );
+
+    // Track progress as images complete
+    let completedImages = 0;
+    const imageResults = await Promise.all(
+      imageGenerationPromises.map(async (promise) => {
+        const result = await promise;
+        completedImages++;
+
+        // Update progress in database
+        const imageProgress = 70 + Math.floor(completedImages / sceneArray.length * 25);
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [imageProgress, jobId]
+        );
+
+        return result;
+      })
+    );
+
+    // Store images in order by page number
+    images.push(...imageResults.sort((a, b) => a.pageNumber - b.pageNumber));
+
+    console.log(`🚀 [PIPELINE] All ${sceneArray.length} images generated in parallel!`);
 
     // Build sceneDescriptions array in proper format (matches step-by-step structure)
     const sceneDescriptionsArray = sceneArray.map((desc, i) => ({
