@@ -3112,7 +3112,7 @@ async function processStoryJob(jobId) {
 
     // Step 1: Generate story outline (using Claude API)
     const outlinePrompt = buildStoryPrompt(inputData);
-    const outline = await callClaudeAPI(outlinePrompt, 4096);
+    const outline = await callClaudeAPI(outlinePrompt, 8192);  // Increased to match frontend
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -3128,7 +3128,7 @@ CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outli
 - The structure must remain: Title, dedication, then each page with its marker
 
 Write the full story content for each page, but maintain the exact page structure from the outline.`;
-    const storyText = await callClaudeAPI(storyPrompt, 8192);
+    const storyText = await callClaudeAPI(storyPrompt, 64000);  // Claude Sonnet 4.5's 64K output limit
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
