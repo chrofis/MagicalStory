@@ -2837,7 +2837,7 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
 
     // Get story details
     const story = await (STORAGE_MODE === 'database'
-      ? dbPool.query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [storyId, userId]).then(r => r.rows[0])
+      ? dbPool.query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [storyId, userId]).then(r => r.rows[0] ? JSON.parse(r.rows[0].data) : null)
       : JSON.parse(await fs.readFile(path.join(dataDir, 'stories.json'), 'utf8')).find(s => s.id === storyId));
 
     if (!story) {
@@ -3234,7 +3234,16 @@ ${storyText}`;
     // Get art style description
     const artStyleId = inputData.artStyle || 'pixar';
     const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
-    const storyTitle = inputData.title || 'My Story';
+
+    // Extract title from generated story text (AI-generated title, not user input)
+    let storyTitle = inputData.title || 'My Story';
+    if (storyText) {
+      const titleMatch = storyText.match(/^#\s+(.+?)$/m);
+      if (titleMatch) {
+        storyTitle = titleMatch[1].trim();
+        console.log(`📖 [PIPELINE] Extracted AI-generated title from storyText: "${storyTitle}"`);
+      }
+    }
 
     // Build character info (matches step-by-step format)
     let characterInfo = '';

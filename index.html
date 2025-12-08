@@ -3051,7 +3051,10 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                   createdAt: new Date().toISOString()
                 };
 
-                await saveStory(storyToSave);
+                const savedId = await saveStory(storyToSave);
+                if (savedId) {
+                  setCurrentStoryId(savedId);
+                }
               }
 
             } else if (job.status === 'failed') {
@@ -5206,8 +5209,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             : 'Generating PDF, please wait...'
           );
 
-          // Parse story pages from generatedStory
-          const pageMatches = generatedStory.split(/---\s*Page\s+\d+\s*---/i);
+          // Parse story pages from generatedStory (markdown format: ## Seite 1 or ## Page 1)
+          const pageMatches = generatedStory.split(/##\s*(?:Seite|Page)\s+\d+/i);
           const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0).map((text, index) => ({
             pageNumber: index + 1,
             text: text.trim()
