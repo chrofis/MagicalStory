@@ -8,7 +8,12 @@ const fs = require('fs').promises;
 const path = require('path');
 const { Pool } = require('pg');
 const pLimit = require('p-limit');
+const crypto = require('crypto');
 const stripe = require('stripe')(process.env.STRIPE_TEST_API_KEY);
+
+// Image cache for storing generated images (hash of prompt + photos → image data)
+const imageCache = new Map();
+console.log('💾 Image cache initialized');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -3676,7 +3681,40 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
   return data.content[0].text;
 }
 
+/**
+ * Generate cache key for image generation
+ * Creates a hash from prompt + character photo hashes
+ */
+function generateImageCacheKey(prompt, characterPhotos = []) {
+  // Hash each photo and sort them for consistency
+  const photoHashes = characterPhotos
+    .filter(p => p && p.startsWith('data:image'))
+    .map(photoUrl => {
+      const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
+      return crypto.createHash('sha256').update(base64Data).digest('hex').substring(0, 16);
+    })
+    .sort()
+    .join('|');
+
+  // Combine prompt + photo hashes
+  const combined = `${prompt}|${photoHashes}`;
+  return crypto.createHash('sha256').update(combined).digest('hex');
+}
+
 async function callGeminiAPIForImage(prompt, characterPhotos = []) {
+  // Check cache first
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos);
+
+  if (imageCache.has(cacheKey)) {
+    console.log('💾 [IMAGE CACHE] Cache HIT - reusing previously generated image');
+    console.log('💾 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
+    console.log('💾 [IMAGE CACHE] Cache size:', imageCache.size, 'images');
+    return imageCache.get(cacheKey);
+  }
+
+  console.log('🆕 [IMAGE CACHE] Cache MISS - generating new image');
+  console.log('🆕 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
+
   // Call Gemini API for image generation with optional character reference images
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -3764,8 +3802,13 @@ async function callGeminiAPIForImage(prompt, characterPhotos = []) {
         const imageSizeKB = (imageDataSize / 1024).toFixed(2);
         console.log(`✅ [IMAGE GEN] Successfully extracted image data (${imageSizeKB} KB base64)`);
         const imageData = `data:image/png;base64,${part.inlineData.data}`;
-        // Return object with imageData and score (null for pipeline, matches step-by-step structure)
-        return { imageData, score: null };
+
+        // Store in cache
+        const result = { imageData, score: null };
+        imageCache.set(cacheKey, result);
+        console.log('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
+
+        return result;
       }
     }
   } else {
