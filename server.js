@@ -2836,7 +2836,7 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
     console.log(`💳 Creating Stripe checkout session for user ${userId}, story ${storyId}`);
 
     // Get story details
-    const story = await (storageMode === 'database'
+    const story = await (STORAGE_MODE === 'database'
       ? dbPool.query('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [storyId, userId]).then(r => r.rows[0])
       : JSON.parse(await fs.readFile(path.join(dataDir, 'stories.json'), 'utf8')).find(s => s.id === storyId));
 

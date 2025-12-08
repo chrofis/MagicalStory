@@ -8210,8 +8210,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               </h3>
 
               {(() => {
-                // Split story into pages
-                const pageMatches = generatedStory.split(/---\s*Page\s+\d+\s*---/i);
+                // Split story into pages - handle both markdown (## Seite/Page 1) and old format (--- Page 1 ---)
+                const pageMatches = generatedStory.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i);
                 const storyPages = pageMatches.slice(1);
 
                 return storyPages.map((pageText, index) => {
