@@ -15,6 +15,15 @@ const stripe = require('stripe')(process.env.STRIPE_TEST_API_KEY);
 const imageCache = new Map();
 console.log('💾 Image cache initialized');
 
+// Story Generation Batch Size Configuration
+// Set to 0 or a number >= total pages to generate entire story in one API call
+// Set to 5-10 for lower API tiers to stay under rate limits (e.g. 8K tokens/minute)
+// Recommended values:
+//   - Tier 1 (8K tokens/min): 5-8 pages per batch
+//   - Tier 2+ (400K tokens/min): 0 (generate all at once)
+const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;  // 0 = no batching (generate all at once)
+console.log(`📚 Story batch size: ${STORY_BATCH_SIZE === 0 ? 'DISABLED (generate all at once)' : STORY_BATCH_SIZE + ' pages per batch'}`);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
@@ -3305,7 +3314,52 @@ async function processStoryJob(jobId) {
     );
 
     // Step 2: Generate full story text (using Claude API)
-    const storyPrompt = `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue.
+    // Check if batch processing is needed
+    const totalPages = inputData.pages;
+    const useBatching = STORY_BATCH_SIZE > 0 && STORY_BATCH_SIZE < totalPages;
+
+    let storyText = '';
+
+    if (useBatching) {
+      // BATCH MODE: Generate story in batches to stay under rate limits
+      console.log(`📚 [BATCH MODE] Generating ${totalPages} pages in batches of ${STORY_BATCH_SIZE}`);
+      const numBatches = Math.ceil(totalPages / STORY_BATCH_SIZE);
+
+      for (let batchNum = 0; batchNum < numBatches; batchNum++) {
+        const startPage = batchNum * STORY_BATCH_SIZE + 1;
+        const endPage = Math.min((batchNum + 1) * STORY_BATCH_SIZE, totalPages);
+        const pagesInBatch = endPage - startPage + 1;
+
+        console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating pages ${startPage}-${endPage} (${pagesInBatch} pages)`);
+
+        const batchPrompt = `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue for PAGES ${startPage} through ${endPage} ONLY.
+
+CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
+- Keep all "## Seite X" or "## Page X" headers for pages ${startPage}-${endPage}
+- Keep all "---" separators between pages
+- ${batchNum === 0 ? 'Include the title and dedication at the beginning' : 'Start directly with the page content (no title/dedication)'}
+- Write ONLY pages ${startPage} through ${endPage}
+
+Write the full story content for each page in this range, but maintain the exact page structure from the outline.`;
+
+        const batchText = await callClaudeAPI(batchPrompt, 16000);  // Smaller output per batch
+        storyText += batchText + '\n\n';
+
+        // Update progress
+        const batchProgress = 30 + Math.floor((batchNum + 1) / numBatches * 20);
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [batchProgress, `Step 2/4: Writing story (batch ${batchNum + 1}/${numBatches})...`, jobId]
+        );
+
+        console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Completed (${batchText.length} chars)`);
+      }
+
+      console.log(`✅ [BATCH MODE] All ${numBatches} batches complete. Total story length: ${storyText.length} chars`);
+    } else {
+      // SINGLE-SHOT MODE: Generate entire story in one API call
+      console.log(`📚 [SINGLE-SHOT MODE] Generating all ${totalPages} pages in one call`);
+      const storyPrompt = `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue.
 
 CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
 - Keep all "## Seite X" or "## Page X" headers
@@ -3313,7 +3367,9 @@ CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outli
 - The structure must remain: Title, dedication, then each page with its marker
 
 Write the full story content for each page, but maintain the exact page structure from the outline.`;
-    const storyText = await callClaudeAPI(storyPrompt, 64000);  // Claude Sonnet 4.5's 64K output limit
+      storyText = await callClaudeAPI(storyPrompt, 64000);  // Claude Sonnet 4.5's 64K output limit
+      console.log(`✅ [SINGLE-SHOT MODE] Story generated (${storyText.length} chars)`);
+    }
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
