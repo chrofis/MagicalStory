@@ -2924,6 +2924,178 @@ app.get('/api/stripe/order-status/:sessionId', authenticateToken, async (req, re
   }
 });
 
+// Background function to process book orders after payment
+async function processBookOrder(sessionId, userId, storyId, customerInfo, shippingAddress) {
+  console.log(`📚 [BACKGROUND] Starting book order processing for session ${sessionId}`);
+
+  try {
+    // Step 1: Update order status to "processing"
+    await dbPool.query(`
+      UPDATE orders
+      SET payment_status = 'processing', updated_at = CURRENT_TIMESTAMP
+      WHERE stripe_session_id = $1
+    `, [sessionId]);
+    console.log('✅ [BACKGROUND] Order status updated to processing');
+
+    // Step 2: Fetch story data from database
+    const storyResult = await dbPool.query('SELECT data FROM stories WHERE id = $1', [storyId]);
+    if (storyResult.rows.length === 0) {
+      throw new Error(`Story ${storyId} not found`);
+    }
+
+    const storyData = storyResult.rows[0].data;
+    console.log('✅ [BACKGROUND] Story data fetched');
+
+    // Step 3: Generate PDF using PDFKit
+    console.log('📄 [BACKGROUND] Generating PDF...');
+    const PDFDocument = require('pdfkit');
+
+    const mmToPoints = (mm) => mm * 2.83465;
+    const coverWidth = mmToPoints(290.27);
+    const coverHeight = mmToPoints(146.0);
+    const pageSize = mmToPoints(140);
+
+    const doc = new PDFDocument({
+      size: [coverWidth, coverHeight],
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      autoFirstPage: false
+    });
+
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+
+    const pdfPromise = new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+    });
+
+    // Add cover page
+    doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+    if (storyData.coverImages?.backCover && storyData.coverImages?.frontCover) {
+      const backCoverBuffer = Buffer.from(storyData.coverImages.backCover.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const frontCoverBuffer = Buffer.from(storyData.coverImages.frontCover.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+
+      doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
+      doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
+    }
+
+    // Add story pages (text + images alternating)
+    const storyPages = storyData.generatedStory.split(/---\s*Page\s+\d+\s*---/i).slice(1).filter(p => p.trim());
+
+    storyPages.forEach((pageText, index) => {
+      const pageNumber = index + 1;
+      const image = storyData.sceneImages.find(img => img.pageNumber === pageNumber);
+
+      // Text page
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      doc.fontSize(14).fillColor('#333').text(pageText.trim(), mmToPoints(20), mmToPoints(20), {
+        width: mmToPoints(100),
+        height: mmToPoints(100),
+        align: 'center',
+        valign: 'center'
+      });
+
+      // Image page
+      if (image && image.imageData) {
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(imageBuffer, mmToPoints(10), mmToPoints(10), {
+          width: mmToPoints(120),
+          height: mmToPoints(120),
+          fit: [mmToPoints(120), mmToPoints(120)],
+          align: 'center',
+          valign: 'center'
+        });
+      }
+    });
+
+    doc.end();
+    const pdfBuffer = await pdfPromise;
+    const pdfBase64 = pdfBuffer.toString('base64');
+    console.log(`✅ [BACKGROUND] PDF generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+
+    // Step 4: Create Gelato order
+    console.log('📦 [BACKGROUND] Creating Gelato order...');
+
+    const gelatoApiKey = process.env.GELATO_API_KEY;
+    if (!gelatoApiKey) {
+      throw new Error('GELATO_API_KEY not configured');
+    }
+
+    const gelatoProductUid = storyData.gelatoProductUid || 'photobooks_photobooks_140x140_hardcover_170gsm-gloss_gloss-lamination_32';
+
+    const gelatoOrderPayload = {
+      orderReferenceId: `story-${storyId}-${Date.now()}`,
+      customerReferenceId: `user-${userId}`,
+      items: [{
+        productUid: gelatoProductUid,
+        files: [{
+          type: 'default',
+          url: `data:application/pdf;base64,${pdfBase64}`
+        }]
+      }],
+      shippingAddress: {
+        firstName: customerInfo.name.split(' ')[0] || customerInfo.name,
+        lastName: customerInfo.name.split(' ').slice(1).join(' ') || '',
+        addressLine1: shippingAddress.line1 || '',
+        addressLine2: shippingAddress.line2 || '',
+        city: shippingAddress.city || '',
+        postCode: shippingAddress.postal_code || '',
+        state: shippingAddress.state || '',
+        country: shippingAddress.country || 'CH',
+        email: customerInfo.email
+      }
+    };
+
+    const gelatoResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': gelatoApiKey
+      },
+      body: JSON.stringify(gelatoOrderPayload)
+    });
+
+    if (!gelatoResponse.ok) {
+      const errorText = await gelatoResponse.text();
+      throw new Error(`Gelato API error: ${gelatoResponse.status} - ${errorText}`);
+    }
+
+    const gelatoOrder = await gelatoResponse.json();
+    console.log('✅ [BACKGROUND] Gelato order created:', gelatoOrder.orderId);
+
+    // Step 5: Update order with Gelato order ID and status
+    await dbPool.query(`
+      UPDATE orders
+      SET gelato_order_id = $1,
+          gelato_status = 'submitted',
+          payment_status = 'completed',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE stripe_session_id = $2
+    `, [gelatoOrder.orderId, sessionId]);
+
+    console.log('🎉 [BACKGROUND] Book order processing completed successfully!');
+
+  } catch (error) {
+    console.error('❌ [BACKGROUND] Error processing book order:', error);
+
+    // Update order status to failed
+    try {
+      await dbPool.query(`
+        UPDATE orders
+        SET payment_status = 'failed',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE stripe_session_id = $1
+      `, [sessionId]);
+    } catch (updateError) {
+      console.error('❌ [BACKGROUND] Failed to update order status:', updateError);
+    }
+
+    throw error;
+  }
+}
+
 // Stripe webhook endpoint - receives payment events
 app.post('/api/stripe/webhook', async (req, res) => {
   try {
@@ -2985,6 +3157,13 @@ app.post('/api/stripe/webhook', async (req, res) => {
           console.log('💾 [STRIPE WEBHOOK] Order saved to database');
           console.log('   User ID:', userId);
           console.log('   Story ID:', storyId);
+
+          // Trigger background PDF generation and Gelato order (don't await - fire and forget)
+          processBookOrder(fullSession.id, userId, storyId, customerInfo, address).catch(err => {
+            console.error('❌ [BACKGROUND] Error processing book order:', err);
+          });
+
+          console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
         }
 
       } catch (retrieveError) {
