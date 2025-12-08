@@ -1,4 +1,4 @@
-// MagicalStory Backend Server v1.0.3
+// MagicalStory Backend Server v1.0.4
 // Includes: User quota system, email authentication, admin panel, PostgreSQL database support
 const express = require('express');
 const cors = require('cors');
