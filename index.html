@@ -2999,10 +2999,16 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
               // Parse and display the result
               const result = job.resultData;
+              console.log('📖 [PIPELINE RESULT] Full result keys:', Object.keys(result || {}));
+              console.log('📖 [PIPELINE RESULT] storyText exists?', !!result?.storyText);
+              console.log('📖 [PIPELINE RESULT] storyText length:', result?.storyText?.length || 0);
+              console.log('📖 [PIPELINE RESULT] storyText preview:', result?.storyText?.substring(0, 200));
+
               if (result) {
                 setStoryTitle(result.title || storyTitle);
                 setStoryOutline(result.outline || ''); // Load story outline
                 setGeneratedStory(result.storyText || '');
+                console.log('📖 [SETTING STATE] generatedStory set to:', (result.storyText || '').substring(0, 200));
                 setSceneDescriptions(result.sceneDescriptions || []);
                 setSceneImages(result.images || []);
                 setCoverImages(result.coverImages || { frontCover: null, page0: null, backCover: null });

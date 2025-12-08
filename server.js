@@ -3305,6 +3305,11 @@ ${storyText}`;
       title: inputData.title || 'My Story'
     };
 
+    console.log('📖 [SERVER] resultData keys:', Object.keys(resultData));
+    console.log('📖 [SERVER] storyText exists?', !!resultData.storyText);
+    console.log('📖 [SERVER] storyText length:', resultData.storyText?.length || 0);
+    console.log('📖 [SERVER] storyText preview:', resultData.storyText?.substring(0, 200));
+
     await dbPool.query(
       `UPDATE story_jobs
        SET status = $1, progress = $2, progress_message = $3, result_data = $4,
