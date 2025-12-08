@@ -2797,6 +2797,70 @@ app.post('/api/admin/cleanup-orphaned-data', authenticateToken, async (req, res)
   }
 });
 
+// Get all orders (admin only) - for tracking fulfillment and catching failures
+app.get('/api/admin/orders', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(400).json({ error: 'Orders are only available in database mode' });
+    }
+
+    console.log('📦 [ADMIN] Fetching all orders...');
+
+    // Get all orders with user info
+    const orders = await dbPool.query(`
+      SELECT
+        o.id,
+        o.user_id,
+        u.email as user_email,
+        o.story_id,
+        o.stripe_session_id,
+        o.stripe_payment_intent_id,
+        o.customer_name,
+        o.customer_email,
+        o.shipping_name,
+        o.shipping_address_line1,
+        o.shipping_city,
+        o.shipping_postal_code,
+        o.shipping_country,
+        o.amount_total,
+        o.currency,
+        o.payment_status,
+        o.gelato_order_id,
+        o.gelato_status,
+        o.created_at,
+        o.updated_at,
+        CASE
+          WHEN o.payment_status = 'paid' AND o.gelato_order_id IS NULL THEN true
+          ELSE false
+        END as has_issue
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      ORDER BY o.created_at DESC
+      LIMIT 100
+    `);
+
+    const totalOrders = orders.rows.length;
+    const failedOrders = orders.rows.filter(o => o.has_issue);
+
+    console.log(`✅ [ADMIN] Found ${totalOrders} orders, ${failedOrders.length} with issues`);
+
+    res.json({
+      success: true,
+      totalOrders,
+      failedOrdersCount: failedOrders.length,
+      orders: orders.rows
+    });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching orders:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -2904,7 +2968,7 @@ app.get('/api/stripe/order-status/:sessionId', authenticateToken, async (req, re
     console.log(`🔍 Checking order status for session: ${sessionId}`);
 
     // Check database for order
-    if (storageMode === 'database') {
+    if (STORAGE_MODE === 'database') {
       const order = await dbPool.query(
         'SELECT * FROM orders WHERE stripe_session_id = $1',
         [sessionId]
@@ -3146,7 +3210,7 @@ app.post('/api/stripe/webhook', async (req, res) => {
         console.log('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
 
         // Store order in database
-        if (storageMode === 'database') {
+        if (STORAGE_MODE === 'database') {
           const userId = parseInt(fullSession.metadata.userId);
           const storyId = parseInt(fullSession.metadata.storyId);
           const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
@@ -3175,13 +3239,27 @@ app.post('/api/stripe/webhook', async (req, res) => {
           // Trigger background PDF generation and Gelato order (don't await - fire and forget)
           processBookOrder(fullSession.id, userId, storyId, customerInfo, address).catch(err => {
             console.error('❌ [BACKGROUND] Error processing book order:', err);
+            console.error('   Error stack:', err.stack);
+            console.error('   Session ID:', fullSession.id);
+            console.error('   User ID:', userId);
+            console.error('   Story ID:', storyId);
+            console.error('   CRITICAL: Customer paid but book order failed! Check database for stripe_session_id:', fullSession.id);
           });
 
           console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
+        } else {
+          console.warn('⚠️  [STRIPE WEBHOOK] Payment received but STORAGE_MODE is not "database" - order not processed!');
+          console.warn('   Current STORAGE_MODE:', STORAGE_MODE);
+          console.warn('   Session ID:', fullSession.id);
+          console.warn('   Amount:', fullSession.amount_total, fullSession.currency);
+          console.warn('   This payment succeeded but the customer will NOT receive their book!');
         }
 
       } catch (retrieveError) {
         console.error('❌ [STRIPE WEBHOOK] Error retrieving/storing session details:', retrieveError);
+        console.error('   Error stack:', retrieveError.stack);
+        console.error('   Session ID:', session.id);
+        console.error('   This payment succeeded but order processing failed!');
       }
     }
 

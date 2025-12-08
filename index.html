@@ -2970,6 +2970,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
       // Poll job status and update UI
       const pollJobStatus = async (jobId) => {
         let pollInterval = null;
+        let completedAlertShown = false; // Prevent duplicate completion alerts
 
         const checkStatus = async () => {
           try {
@@ -2992,8 +2993,9 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
               message: job.progressMessage || 'Processing...'
             });
 
-            if (job.status === 'completed') {
-              // Job completed successfully
+            if (job.status === 'completed' && !completedAlertShown) {
+              // Job completed successfully - mark alert as shown first to prevent duplicates
+              completedAlertShown = true;
               clearInterval(pollInterval);
               setGenerationProgress({ current: 100, total: 100, message: 'Complete!' });
 
