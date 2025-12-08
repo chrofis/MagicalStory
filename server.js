@@ -3120,7 +3120,14 @@ async function processStoryJob(jobId) {
     );
 
     // Step 2: Generate full story text (using Claude API)
-    const storyPrompt = `Based on this outline:\n\n${outline}\n\nNow write the complete story text...`;
+    const storyPrompt = `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue.
+
+CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
+- Keep all "## Seite X" or "## Page X" headers
+- Keep all "---" separators between pages
+- The structure must remain: Title, dedication, then each page with its marker
+
+Write the full story content for each page, but maintain the exact page structure from the outline.`;
     const storyText = await callClaudeAPI(storyPrompt, 8192);
 
     await dbPool.query(
