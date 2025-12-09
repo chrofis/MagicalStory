@@ -10,6 +10,7 @@ const { Pool } = require('pg');
 const pLimit = require('p-limit');
 const crypto = require('crypto');
 const stripe = require('stripe')(process.env.STRIPE_TEST_API_KEY);
+const sharp = require('sharp');
 
 // Image cache for storing generated images (hash of prompt + photos → image data)
 const imageCache = new Map();
@@ -3948,6 +3949,114 @@ function generateImageCacheKey(prompt, characterPhotos = []) {
   return crypto.createHash('sha256').update(combined).digest('hex');
 }
 
+/**
+ * Compress PNG image to JPEG format
+ * Converts base64 PNG to JPEG with compression to reduce file size
+ * @param {string} pngBase64 - Base64 encoded PNG image (with or without data URI prefix)
+ * @returns {Promise<string>} Base64 encoded JPEG image with data URI prefix
+ */
+async function compressImageToJPEG(pngBase64) {
+  try {
+    // Remove data URI prefix if present
+    const base64Data = pngBase64.replace(/^data:image\/\w+;base64,/, '');
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Get original size
+    const originalSizeKB = (imageBuffer.length / 1024).toFixed(2);
+
+    // Compress to JPEG with quality 85 (good balance between quality and size)
+    const compressedBuffer = await sharp(imageBuffer)
+      .jpeg({ quality: 85, progressive: true })
+      .toBuffer();
+
+    // Convert back to base64
+    const compressedBase64 = compressedBuffer.toString('base64');
+    const compressedSizeKB = (compressedBuffer.length / 1024).toFixed(2);
+
+    console.log(`🗜️  [COMPRESSION] PNG ${originalSizeKB} KB → JPEG ${compressedSizeKB} KB (${((1 - compressedBuffer.length / imageBuffer.length) * 100).toFixed(1)}% reduction)`);
+
+    return `data:image/jpeg;base64,${compressedBase64}`;
+  } catch (error) {
+    console.error('❌ [COMPRESSION] Error compressing image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Evaluate image quality using Claude API
+ * Sends the image to Claude for quality assessment
+ * @param {string} imageData - Base64 encoded image with data URI prefix
+ * @returns {Promise<number>} Quality score from 0-10
+ */
+async function evaluateImageQuality(imageData) {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
+      console.warn('⚠️  [QUALITY] Claude API key not configured, skipping quality evaluation');
+      return null;
+    }
+
+    // Extract base64 and mime type
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mimeType,
+                data: base64Data
+              }
+            },
+            {
+              type: 'text',
+              text: 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-10. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality (no artifacts, good composition). Respond with ONLY a number between 0-10, nothing else.'
+            }
+          ]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('❌ [QUALITY] Claude API error:', error);
+      return null;
+    }
+
+    const data = await response.json();
+    const scoreText = data.content[0].text.trim();
+    const score = parseFloat(scoreText);
+
+    if (isNaN(score) || score < 0 || score > 10) {
+      console.warn('⚠️  [QUALITY] Invalid score received:', scoreText);
+      return null;
+    }
+
+    console.log(`⭐ [QUALITY] Image quality score: ${score}/10`);
+    return score;
+  } catch (error) {
+    console.error('❌ [QUALITY] Error evaluating image quality:', error);
+    return null;
+  }
+}
+
 async function callGeminiAPIForImage(prompt, characterPhotos = []) {
   // Check cache first
   const cacheKey = generateImageCacheKey(prompt, characterPhotos);
@@ -4048,10 +4157,18 @@ async function callGeminiAPIForImage(prompt, characterPhotos = []) {
         const imageDataSize = part.inlineData.data.length;
         const imageSizeKB = (imageDataSize / 1024).toFixed(2);
         console.log(`✅ [IMAGE GEN] Successfully extracted image data (${imageSizeKB} KB base64)`);
-        const imageData = `data:image/png;base64,${part.inlineData.data}`;
+        const pngImageData = `data:image/png;base64,${part.inlineData.data}`;
+
+        // Compress PNG to JPEG
+        console.log('🗜️  [COMPRESSION] Compressing image to JPEG...');
+        const compressedImageData = await compressImageToJPEG(pngImageData);
+
+        // Evaluate image quality
+        console.log('⭐ [QUALITY] Evaluating image quality...');
+        const qualityScore = await evaluateImageQuality(compressedImageData);
 
         // Store in cache
-        const result = { imageData, score: null };
+        const result = { imageData: compressedImageData, score: qualityScore };
         imageCache.set(cacheKey, result);
         console.log('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
 
