@@ -3443,8 +3443,8 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     const gelatoProductUid = storyData.gelatoProductUid || 'photobooks_photobooks_140x140_hardcover_170gsm-gloss_gloss-lamination_32';
     const orderType = process.env.GELATO_ORDER_TYPE || 'order'; // 'draft' or 'order'
 
-    // Extract currency from Stripe session (amount is in cents)
-    const currency = fullSession.currency ? fullSession.currency.toUpperCase() : 'USD';
+    // Use CHF currency for Gelato orders
+    const currency = 'CHF';
 
     // Calculate page count from story data
     const pageCount = storyData.pages || 32;
