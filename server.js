@@ -182,38 +182,23 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             }
           }
 
-          // If not found by numeric ID, try as job ID
+          // If not found by numeric ID, try as job ID (which IS the database ID for job-based stories)
           if (!storyId && storyIdRaw.startsWith('job_')) {
-            console.log('🔍 [STRIPE WEBHOOK] Searching for story with job_id:', storyIdRaw);
+            console.log('🔍 [STRIPE WEBHOOK] Searching for story with ID:', storyIdRaw);
             console.log('🔍 [STRIPE WEBHOOK] User ID:', userId);
 
-            // It's a job ID - look up the story that was created by this job
-            // The data column is stored as TEXT (JSON string), so we need to use LIKE or parse it
-            // Try multiple approaches to find the story
-
-            // First try: Parse data as JSON and look for job_id
-            let result = await dbPool.query(
-              `SELECT id, data FROM stories WHERE user_id = $1 ORDER BY created_at DESC`,
-              [userId]
+            // The job_id IS the primary key in the stories table
+            const result = await dbPool.query(
+              'SELECT id, data FROM stories WHERE id = $1 AND user_id = $2',
+              [storyIdRaw, userId]
             );
 
-            console.log(`🔍 [STRIPE WEBHOOK] Found ${result.rows.length} stories for user ${userId}`);
-
-            // Search through stories to find one with matching job_id
-            for (const row of result.rows) {
-              try {
-                const parsedData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
-                console.log(`🔍 [STRIPE WEBHOOK] Checking story ${row.id}, job_id:`, parsedData.job_id);
-
-                if (parsedData.job_id === storyIdRaw) {
-                  storyId = row.id;
-                  storyData = row.data;
-                  console.log('✅ [STRIPE WEBHOOK] Found story by job ID:', storyIdRaw, '→ Story ID:', storyId);
-                  break;
-                }
-              } catch (parseErr) {
-                console.error('⚠️ [STRIPE WEBHOOK] Error parsing story data for story', row.id, ':', parseErr.message);
-              }
+            if (result.rows.length > 0) {
+              storyId = result.rows[0].id;
+              storyData = result.rows[0].data;
+              console.log('✅ [STRIPE WEBHOOK] Found story by ID:', storyIdRaw);
+            } else {
+              console.log('❌ [STRIPE WEBHOOK] Story not found in database with ID:', storyIdRaw);
             }
           }
 
