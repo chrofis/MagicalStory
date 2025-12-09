@@ -3073,8 +3073,8 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
   }
 });
 
-// Check payment/order status
-app.get('/api/stripe/order-status/:sessionId', authenticateToken, async (req, res) => {
+// Check payment/order status (no auth required - session ID is already secure)
+app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
 
@@ -3774,7 +3774,7 @@ ${storyText}`;
       images,
       coverImages,
       imagePrompts, // Include image prompts for developer features
-      title: inputData.title || 'My Story'
+      title: storyTitle // Use AI-extracted title from story text
     };
 
     console.log('📖 [SERVER] resultData keys:', Object.keys(resultData));
