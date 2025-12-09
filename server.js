@@ -3977,7 +3977,111 @@ function extractCoverScenes(outline) {
   return coverScenes;
 }
 
+// Helper function to build Art Director scene description prompt (matches frontend)
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '') {
+  const characterDetails = characters.map(c => {
+    const details = [];
+    if (c.age) details.push(`Age ${c.age}`);
+    if (c.gender) details.push(c.gender === 'male' ? 'Male' : c.gender === 'female' ? 'Female' : 'Non-binary');
+    if (c.hairColor) details.push(c.hairColor);
+    if (c.clothing) details.push(c.clothing);
+    if (c.otherFeatures) details.push(c.otherFeatures);
+    if (c.specialDetails) details.push(c.specialDetails);
+    return `* **${c.name}:** ${details.join(', ')}`;
+  }).join('\n');
+
+  return `**ROLE:**
+You are an expert Art Director creating an illustration brief for a children's book.
+
+**SCENE CONTEXT:**
+${shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : ''}Story Text (Page ${pageNumber}):
+${pageContent}
+
+**AVAILABLE CHARACTERS & VISUAL REFERENCES:**
+${characterDetails}
+
+**TASK:**
+Create a detailed visual description of ONE key moment from the scene context provided.
+
+Focus on essential characters only (1-2 maximum unless the story specifically requires more). Choose the most impactful visual moment that captures the essence of the scene.
+
+**OUTPUT FORMAT:**
+1. **Setting & Atmosphere:** Describe the background, time of day, lighting, and mood.
+2. **Composition:** Describe the camera angle (e.g., low angle, wide shot) and framing.
+3. **Characters:**
+   * **[Character Name]:** Exact action, body language, facial expression, and location in the frame.
+   (Repeat for each character present in this specific scene)
+
+**CONSTRAINTS:**
+- Do not include dialogue or speech
+- Focus purely on visual elements
+- Use simple, clear language
+- Only include characters essential to this scene`;
+}
+
+// Helper function to parse story text into pages
+function parseStoryPages(storyText) {
+  // Split by page markers (## Seite X, ## Page X, or --- Page X ---)
+  const pageRegex = /(?:##\s*(?:Seite|Page)\s+(\d+)|---\s*Page\s+(\d+)\s*---)/gi;
+  const pages = [];
+  let lastIndex = 0;
+  let lastPageNum = 0;
+  let match;
+
+  // Find all page markers
+  const matches = [];
+  while ((match = pageRegex.exec(storyText)) !== null) {
+    const pageNum = parseInt(match[1] || match[2]);
+    matches.push({ index: match.index, pageNum, length: match[0].length });
+  }
+
+  // Extract content between markers
+  for (let i = 0; i < matches.length; i++) {
+    const current = matches[i];
+    const next = matches[i + 1];
+    const contentStart = current.index + current.length;
+    const contentEnd = next ? next.index : storyText.length;
+    const content = storyText.substring(contentStart, contentEnd).trim();
+
+    if (content) {
+      pages.push({
+        pageNumber: current.pageNum,
+        content: content
+      });
+    }
+  }
+
+  return pages;
+}
+
+// Helper function to extract short scene descriptions from outline
+function extractShortSceneDescriptions(outline) {
+  const descriptions = {};
+  const lines = outline.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Look for "Scene:" lines after "Page X:" lines
+    const pageMatch = line.match(/^Page\s+(\d+):/i);
+    if (pageMatch) {
+      const pageNum = parseInt(pageMatch[1]);
+      // Look for Scene: in the next few lines
+      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+        if (lines[j].startsWith('Scene:')) {
+          descriptions[pageNum] = lines[j].substring(6).trim();
+          break;
+        }
+        // Stop if we hit another Page: marker
+        if (lines[j].match(/^Page\s+\d+:/i)) break;
+      }
+    }
+  }
+
+  return descriptions;
+}
+
 // Background worker function to process a story generation job
+// NEW STREAMING ARCHITECTURE: Generate images as story batches complete
 async function processStoryJob(jobId) {
   console.log(`🎬 Starting processing for job ${jobId}`);
 
@@ -3994,134 +4098,7 @@ async function processStoryJob(jobId) {
 
     const job = jobResult.rows[0];
     const inputData = job.input_data;
-
-    // Update status to processing
-    await dbPool.query(
-      'UPDATE story_jobs SET status = $1, progress = $2, progress_message = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
-      ['processing', 10, 'Step 1/4: Generating story outline...', jobId]
-    );
-
-    // Step 1: Generate story outline (using Claude API)
-    const outlinePrompt = buildStoryPrompt(inputData);
-    const outline = await callClaudeAPI(outlinePrompt, 8192);  // Increased to match frontend
-
-    await dbPool.query(
-      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [30, 'Step 2/4: Writing full story...', jobId]
-    );
-
-    // Step 2: Generate full story text (using Claude API)
-    // Check if batch processing is needed
     const totalPages = inputData.pages;
-    const useBatching = STORY_BATCH_SIZE > 0 && STORY_BATCH_SIZE < totalPages;
-
-    let storyText = '';
-
-    if (useBatching) {
-      // BATCH MODE: Generate story in batches to stay under rate limits
-      console.log(`📚 [BATCH MODE] Generating ${totalPages} pages in batches of ${STORY_BATCH_SIZE}`);
-      const numBatches = Math.ceil(totalPages / STORY_BATCH_SIZE);
-
-      for (let batchNum = 0; batchNum < numBatches; batchNum++) {
-        const startPage = batchNum * STORY_BATCH_SIZE + 1;
-        const endPage = Math.min((batchNum + 1) * STORY_BATCH_SIZE, totalPages);
-        const pagesInBatch = endPage - startPage + 1;
-
-        console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating pages ${startPage}-${endPage} (${pagesInBatch} pages)`);
-
-        // Use template if available, otherwise fall back to hardcoded prompt
-        const batchPrompt = PROMPT_TEMPLATES.storyTextBatch
-          ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
-              OUTLINE: outline,
-              START_PAGE: startPage,
-              END_PAGE: endPage,
-              INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning' : 'Start directly with the page content (no title/dedication)'
-            })
-          : `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue for PAGES ${startPage} through ${endPage} ONLY.
-
-CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
-- Keep all "## Seite X" or "## Page X" headers for pages ${startPage}-${endPage}
-- Keep all "---" separators between pages
-- ${batchNum === 0 ? 'Include the title and dedication at the beginning' : 'Start directly with the page content (no title/dedication)'}
-- Write ONLY pages ${startPage} through ${endPage}
-
-Write the full story content for each page in this range, but maintain the exact page structure from the outline.`;
-
-        const batchText = await callClaudeAPI(batchPrompt, 16000);  // Smaller output per batch
-        storyText += batchText + '\n\n';
-
-        // Update progress
-        const batchProgress = 30 + Math.floor((batchNum + 1) / numBatches * 20);
-        await dbPool.query(
-          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [batchProgress, `Step 2/4: Writing story (batch ${batchNum + 1}/${numBatches})...`, jobId]
-        );
-
-        console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Completed (${batchText.length} chars)`);
-      }
-
-      console.log(`✅ [BATCH MODE] All ${numBatches} batches complete. Total story length: ${storyText.length} chars`);
-    } else {
-      // SINGLE-SHOT MODE: Generate entire story in one API call
-      console.log(`📚 [SINGLE-SHOT MODE] Generating all ${totalPages} pages in one call`);
-
-      // Use template if available, otherwise fall back to hardcoded prompt
-      const storyPrompt = PROMPT_TEMPLATES.storyTextSingle
-        ? fillTemplate(PROMPT_TEMPLATES.storyTextSingle, {
-            OUTLINE: outline
-          })
-        : `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue.
-
-CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
-- Keep all "## Seite X" or "## Page X" headers
-- Keep all "---" separators between pages
-- The structure must remain: Title, dedication, then each page with its marker
-
-Write the full story content for each page, but maintain the exact page structure from the outline.`;
-
-      storyText = await callClaudeAPI(storyPrompt, 64000);  // Claude Sonnet 4.5's 64K output limit
-      console.log(`✅ [SINGLE-SHOT MODE] Story generated (${storyText.length} chars)`);
-    }
-
-    await dbPool.query(
-      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [50, 'Step 3/4: Generating scene descriptions...', jobId]
-    );
-
-    // Step 3: Generate scene descriptions (using Claude API)
-    // Use template if available, otherwise fall back to hardcoded prompt
-    const sceneDescriptionsPrompt = PROMPT_TEMPLATES.sceneDescriptions
-      ? fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
-          PAGES: inputData.pages,
-          STORY_TEXT: storyText
-        })
-      : `From this story, create EXACTLY ${inputData.pages} scene descriptions for the ${inputData.pages} pages of the story.
-
-Format: Provide ONLY the scene descriptions, one per line, separated by double newlines. Do NOT include:
-- Page numbers
-- Introductory text
-- Explanations
-- Separators like "---"
-- Any other formatting
-
-Each scene description should be a single paragraph describing what should be illustrated for that page.
-
-Story:
-${storyText}`;
-
-    const sceneDescriptions = await callClaudeAPI(sceneDescriptionsPrompt, 4096);
-
-    console.log(`📋 [PIPELINE] Raw scene descriptions length: ${sceneDescriptions.length} characters`);
-
-    await dbPool.query(
-      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [70, 'Step 4/4: Generating illustrations (this may take several minutes)...', jobId]
-    );
-
-    // Step 4: Generate images (using Gemini API)
-    const sceneArray = parseSceneDescriptions(sceneDescriptions, inputData.pages);
-    const images = [];
-    const imagePrompts = {}; // Store prompts for developer features
 
     // Extract character photos for reference images
     const characterPhotos = [];
@@ -4134,85 +4111,180 @@ ${storyText}`;
       console.log(`📸 [PIPELINE] Found ${characterPhotos.length} character photos for reference`);
     }
 
-    console.log(`📸 [PIPELINE] Parsed ${sceneArray.length} scenes (expected ${inputData.pages})`);
-    console.log(`📸 [PIPELINE] Generating ${sceneArray.length} scene images IN PARALLEL for job ${jobId}`);
+    // Update status to processing
+    await dbPool.query(
+      'UPDATE story_jobs SET status = $1, progress = $2, progress_message = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
+      ['processing', 5, 'Step 1: Generating story outline...', jobId]
+    );
 
-    // Create rate limiter: max 5 concurrent image generations
+    // Step 1: Generate story outline (using Claude API)
+    const outlinePrompt = buildStoryPrompt(inputData);
+    const outline = await callClaudeAPI(outlinePrompt, 8192);
+
+    // Extract short scene descriptions from outline for better image generation
+    const shortSceneDescriptions = extractShortSceneDescriptions(outline);
+    console.log(`📋 [PIPELINE] Extracted ${Object.keys(shortSceneDescriptions).length} short scene descriptions from outline`);
+
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [10, 'Step 2: Writing story and generating images...', jobId]
+    );
+
+    // STREAMING PIPELINE: Generate story in batches, immediately generate images as pages complete
+    const BATCH_SIZE = 5; // Generate 5 pages at a time
+    const numBatches = Math.ceil(totalPages / BATCH_SIZE);
+
+    let fullStoryText = '';
+    const allImages = [];
+    const allSceneDescriptions = [];
+    const imagePrompts = {};
+
+    // Create rate limiter for parallel image generation: max 5 concurrent
     const limit = pLimit(5);
     const MAX_RETRIES = 2;
 
-    // Helper function to generate a single image with retry logic
-    const generateImageWithRetry = async (sceneDescription, sceneIndex) => {
-      let imageResult = null;
-      let retries = 0;
+    // Track active image generation promises
+    let activeImagePromises = [];
 
-      while (retries <= MAX_RETRIES && !imageResult) {
-        try {
-          if (retries > 0) {
-            console.log(`🔄 [PIPELINE] Retrying image ${sceneIndex + 1}/${sceneArray.length} (attempt ${retries + 1}/${MAX_RETRIES + 1}) for job ${jobId}`);
-          } else {
-            console.log(`📸 [PIPELINE] Generating image ${sceneIndex + 1}/${sceneArray.length} for job ${jobId}`);
+    console.log(`📚 [STREAMING] Starting streaming pipeline: ${totalPages} pages in ${numBatches} batches of ${BATCH_SIZE}`);
+
+    for (let batchNum = 0; batchNum < numBatches; batchNum++) {
+      const startPage = batchNum * BATCH_SIZE + 1;
+      const endPage = Math.min((batchNum + 1) * BATCH_SIZE, totalPages);
+
+      console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating pages ${startPage}-${endPage}`);
+
+      // Generate story text for this batch
+      const batchPrompt = PROMPT_TEMPLATES.storyTextBatch
+        ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
+            OUTLINE: outline,
+            START_PAGE: startPage,
+            END_PAGE: endPage,
+            INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning' : 'Start directly with the page content (no title/dedication)'
+          })
+        : `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue for PAGES ${startPage} through ${endPage} ONLY.
+
+CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
+- Keep all "## Seite X" or "## Page X" headers for pages ${startPage}-${endPage}
+- Keep all "---" separators between pages
+- ${batchNum === 0 ? 'Include the title and dedication at the beginning' : 'Start directly with the page content (no title/dedication)'}
+- Write ONLY pages ${startPage} through ${endPage}
+
+Write the full story content for each page in this range, but maintain the exact page structure from the outline.`;
+
+      const batchText = await callClaudeAPI(batchPrompt, 16000);
+      fullStoryText += batchText + '\n\n';
+
+      console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
+
+      // Parse the pages from this batch
+      const batchPages = parseStoryPages(batchText);
+      console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
+
+      // IMMEDIATELY start generating scene descriptions and images for these pages
+      for (const page of batchPages) {
+        const pageNum = page.pageNumber;
+        const pageContent = page.content;
+        const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
+
+        // Generate scene description using Art Director prompt
+        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc);
+
+        // Start scene description + image generation (don't await yet)
+        const imagePromise = limit(async () => {
+          try {
+            console.log(`🎨 [PAGE ${pageNum}] Generating scene description...`);
+
+            // Generate detailed scene description
+            const sceneDescription = await callClaudeAPI(scenePrompt, 768);
+
+            allSceneDescriptions.push({
+              pageNumber: pageNum,
+              description: sceneDescription
+            });
+
+            console.log(`📸 [PAGE ${pageNum}] Generating image...`);
+
+            // Generate image from scene description
+            const imagePrompt = buildImagePrompt(sceneDescription, inputData);
+            imagePrompts[pageNum] = imagePrompt;
+
+            let imageResult = null;
+            let retries = 0;
+
+            while (retries <= MAX_RETRIES && !imageResult) {
+              try {
+                imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
+              } catch (error) {
+                retries++;
+                console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
+                if (retries > MAX_RETRIES) {
+                  throw error;
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+              }
+            }
+
+            console.log(`✅ [PAGE ${pageNum}] Image generated successfully`);
+
+            return {
+              pageNumber: pageNum,
+              imageData: imageResult.imageData,
+              description: sceneDescription,
+              qualityScore: imageResult.score,
+              qualityReasoning: null
+            };
+          } catch (error) {
+            console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
+            throw error;
           }
+        });
 
-          const imagePrompt = buildImagePrompt(sceneDescription, inputData);
-          imagePrompts[sceneIndex + 1] = imagePrompt; // Save prompt for this page
-          imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
-          console.log(`✅ [PIPELINE] Image ${sceneIndex + 1}/${sceneArray.length} generated successfully`);
-        } catch (error) {
-          retries++;
-          console.error(`❌ [PIPELINE] Failed to generate image ${sceneIndex + 1}/${sceneArray.length} (attempt ${retries}/${MAX_RETRIES + 1}):`, error.message);
-
-          if (retries > MAX_RETRIES) {
-            throw new Error(`Image generation failed for scene ${sceneIndex + 1} after ${MAX_RETRIES + 1} attempts: ${error.message}`);
-          }
-
-          // Wait a bit before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-        }
+        activeImagePromises.push(imagePromise);
       }
 
-      return {
-        pageNumber: sceneIndex + 1,
-        imageData: imageResult.imageData,
-        description: sceneDescription,
-        qualityScore: imageResult.score,
-        qualityReasoning: null
-      };
-    };
+      // Update progress after each batch
+      const storyProgress = 10 + Math.floor((batchNum + 1) / numBatches * 30); // 10-40%
+      const completedImageCount = allImages.length;
+      const progressMsg = `Writing story (${endPage}/${totalPages} pages), generating images (${completedImageCount}/${totalPages})...`;
 
-    // Generate all images in parallel with rate limiting
-    const imageGenerationPromises = sceneArray.map((scene, index) =>
-      limit(() => generateImageWithRetry(scene, index))
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [storyProgress, progressMsg, jobId]
+      );
+    }
+
+    console.log(`📚 [STREAMING] All story batches submitted. Waiting for ${activeImagePromises.length} images to complete...`);
+
+    // Wait for all images to complete
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [50, `Generating images (0/${totalPages} complete)...`, jobId]
     );
 
-    // Track progress as images complete
-    let completedImages = 0;
+    let completedCount = 0;
     const imageResults = await Promise.all(
-      imageGenerationPromises.map(async (promise) => {
+      activeImagePromises.map(async (promise) => {
         const result = await promise;
-        completedImages++;
+        completedCount++;
 
-        // Update progress in database
-        const imageProgress = 70 + Math.floor(completedImages / sceneArray.length * 25);
+        // Update progress
+        const imageProgress = 50 + Math.floor(completedCount / totalPages * 40); // 50-90%
         await dbPool.query(
-          'UPDATE story_jobs SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-          [imageProgress, jobId]
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [imageProgress, `Generating images (${completedCount}/${totalPages} complete)...`, jobId]
         );
 
+        allImages.push(result);
         return result;
       })
     );
 
-    // Store images in order by page number
-    images.push(...imageResults.sort((a, b) => a.pageNumber - b.pageNumber));
+    // Sort images by page number
+    allImages.sort((a, b) => a.pageNumber - b.pageNumber);
+    allSceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
 
-    console.log(`🚀 [PIPELINE] All ${sceneArray.length} images generated in parallel!`);
-
-    // Build sceneDescriptions array in proper format (matches step-by-step structure)
-    const sceneDescriptionsArray = sceneArray.map((desc, i) => ({
-      pageNumber: i + 1,
-      description: desc
-    }));
+    console.log(`🚀 [STREAMING] All ${allImages.length} images generated!`);
 
     // Step 5: Generate cover images
     await dbPool.query(
@@ -4228,8 +4300,8 @@ ${storyText}`;
 
     // Extract title from generated story text (AI-generated title, not user input)
     let storyTitle = inputData.title || 'My Story';
-    if (storyText) {
-      const titleMatch = storyText.match(/^#\s+(.+?)$/m);
+    if (fullStoryText) {
+      const titleMatch = fullStoryText.match(/^#\s+(.+?)$/m);
       if (titleMatch) {
         storyTitle = titleMatch[1].trim();
         console.log(`📖 [PIPELINE] Extracted AI-generated title from storyText: "${storyTitle}"`);
@@ -4297,12 +4369,12 @@ ${storyText}`;
     // Job complete - save result
     const resultData = {
       outline,
-      storyText,
-      sceneDescriptions: sceneDescriptionsArray, // Use parsed array instead of raw string
-      images,
+      storyText: fullStoryText,
+      sceneDescriptions: allSceneDescriptions,
+      images: allImages,
       coverImages,
-      imagePrompts, // Include image prompts for developer features
-      title: storyTitle // Use AI-extracted title from story text
+      imagePrompts,
+      title: storyTitle
     };
 
     console.log('📖 [SERVER] resultData keys:', Object.keys(resultData));
