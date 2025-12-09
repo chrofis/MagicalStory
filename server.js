@@ -3188,17 +3188,17 @@ app.get('/api/admin/database-size', authenticateToken, async (req, res) => {
       ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
     `);
 
-    // Get row counts for each table
-    const rowCounts = await dbPool.query(`
-      SELECT
-        'users' as table_name, COUNT(*) as row_count FROM users
-      UNION ALL SELECT 'stories', COUNT(*) FROM stories
-      UNION ALL SELECT 'files', COUNT(*) FROM files
-      UNION ALL SELECT 'activity_logs', COUNT(*) FROM activity_logs
-      UNION ALL SELECT 'api_keys', COUNT(*) FROM api_keys
-      UNION ALL SELECT 'orders', COUNT(*) FROM orders
-      UNION ALL SELECT 'gelato_products', COUNT(*) FROM gelato_products
-    `);
+    // Get row counts for each table dynamically
+    const rowCountMap = {};
+    for (const table of tableSizes.rows) {
+      try {
+        const result = await dbPool.query(`SELECT COUNT(*) as row_count FROM ${table.tablename}`);
+        rowCountMap[table.tablename] = parseInt(result.rows[0].row_count);
+      } catch (err) {
+        console.warn(`⚠️  Could not get row count for table ${table.tablename}:`, err.message);
+        rowCountMap[table.tablename] = 0;
+      }
+    }
 
     // Get total database size
     const dbSize = await dbPool.query(`
@@ -3207,17 +3207,14 @@ app.get('/api/admin/database-size', authenticateToken, async (req, res) => {
     `);
 
     res.json({
-      totalDatabaseSize: dbSize.rows[0].total_size,
-      totalDatabaseSizeBytes: parseInt(dbSize.rows[0].total_size_bytes),
+      totalSize: dbSize.rows[0].total_size,
+      totalSizeBytes: parseInt(dbSize.rows[0].total_size_bytes),
       tables: tableSizes.rows.map(row => ({
-        name: row.tablename,
+        tablename: row.tablename,
         size: row.size,
-        sizeBytes: parseInt(row.size_bytes)
-      })),
-      rowCounts: rowCounts.rows.reduce((acc, row) => {
-        acc[row.table_name] = parseInt(row.row_count);
-        return acc;
-      }, {})
+        size_bytes: parseInt(row.size_bytes),
+        row_count: rowCountMap[row.tablename] || 0
+      }))
     });
   } catch (err) {
     console.error('❌ [ADMIN] Error fetching database size:', err);
