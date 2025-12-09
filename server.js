@@ -3408,6 +3408,30 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     const pdfBase64 = pdfBuffer.toString('base64');
     console.log(`✅ [BACKGROUND] PDF generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 
+    // Step 3.5: Save PDF to database and get public URL
+    console.log('💾 [BACKGROUND] Saving PDF to database...');
+    const pdfFileId = `pdf-${storyId}-${Date.now()}`;
+    const pdfInsertQuery = `
+      INSERT INTO files (id, user_id, story_id, file_data, file_type, file_name, file_size, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      ON CONFLICT (id) DO UPDATE SET file_data = EXCLUDED.file_data, updated_at = CURRENT_TIMESTAMP
+      RETURNING id
+    `;
+    await dbPool.query(pdfInsertQuery, [
+      pdfFileId,
+      userId,
+      storyId,
+      pdfBase64,
+      'application/pdf',
+      `story-${storyId}.pdf`,
+      pdfBuffer.length
+    ]);
+
+    // Get the base URL from environment or construct it
+    const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
+    const pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
+    console.log(`✅ [BACKGROUND] PDF saved with URL: ${pdfUrl}`);
+
     // Step 4: Create Gelato order
     console.log('📦 [BACKGROUND] Creating Gelato order...');
 
@@ -3417,17 +3441,30 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     }
 
     const gelatoProductUid = storyData.gelatoProductUid || 'photobooks_photobooks_140x140_hardcover_170gsm-gloss_gloss-lamination_32';
+    const orderType = process.env.GELATO_ORDER_TYPE || 'order'; // 'draft' or 'order'
+
+    // Extract currency from Stripe session (amount is in cents)
+    const currency = fullSession.currency ? fullSession.currency.toUpperCase() : 'USD';
+
+    // Calculate page count from story data
+    const pageCount = storyData.pages || 32;
 
     const gelatoOrderPayload = {
+      orderType: orderType,
       orderReferenceId: `story-${storyId}-${Date.now()}`,
-      customerReferenceId: `user-${userId}`,
+      customerReferenceId: userId,
+      currency: currency,
       items: [{
+        itemReferenceId: `item-${storyId}-${Date.now()}`,
         productUid: gelatoProductUid,
+        pageCount: parseInt(pageCount),
         files: [{
           type: 'default',
-          url: `data:application/pdf;base64,${pdfBase64}`
-        }]
+          url: pdfUrl
+        }],
+        quantity: 1
       }],
+      shipmentMethodUid: 'standard',
       shippingAddress: {
         firstName: customerInfo.name.split(' ')[0] || customerInfo.name,
         lastName: customerInfo.name.split(' ').slice(1).join(' ') || '',
@@ -3437,7 +3474,8 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
         postCode: shippingAddress.postal_code || '',
         state: shippingAddress.state || '',
         country: shippingAddress.country || 'CH',
-        email: customerInfo.email
+        email: customerInfo.email,
+        phone: shippingAddress.phone || ''
       }
     };
 
