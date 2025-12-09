@@ -3708,19 +3708,20 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     console.log('💾 [BACKGROUND] Saving PDF to database...');
     const pdfFileId = `pdf-${storyId}-${Date.now()}`;
     const pdfInsertQuery = `
-      INSERT INTO files (id, user_id, story_id, file_data, file_type, file_name, file_size, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
-      ON CONFLICT (id) DO UPDATE SET file_data = EXCLUDED.file_data, updated_at = CURRENT_TIMESTAMP
+      INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (id) DO UPDATE SET file_data = EXCLUDED.file_data
       RETURNING id
     `;
     await dbPool.query(pdfInsertQuery, [
       pdfFileId,
       userId,
+      'story_pdf',
       storyId,
-      pdfBase64,
       'application/pdf',
-      `story-${storyId}.pdf`,
-      pdfBuffer.length
+      pdfBase64,
+      pdfBuffer.length,
+      `story-${storyId}.pdf`
     ]);
 
     // Get the base URL from environment or construct it
