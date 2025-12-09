@@ -35,13 +35,13 @@
       const [stats, setStats] = useState(null);
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState(null);
-      const [authToken, setAuthToken] = useState(localStorage.getItem('authToken'));
+      const [authToken, setAuthToken] = useState(localStorage.getItem('auth_token'));
       const [user, setUser] = useState(null);
 
       useEffect(() => {
         // Check authentication
-        const token = localStorage.getItem('authToken');
-        const userData = localStorage.getItem('currentUser');
+        const token = localStorage.getItem('auth_token');
+        const userData = localStorage.getItem('current_user');
 
         if (!token || !userData) {
           window.location.href = '/index.html';
