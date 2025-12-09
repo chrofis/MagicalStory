@@ -988,7 +988,7 @@
                     const fullStory = await response.json();
                     if (fullStory.coverImages?.frontCover) {
                       console.log(`✅ Got thumbnail for story: ${story.id}`);
-                      const thumbnail = fullStory.coverImages.frontCover.imageData || fullStory.coverImages.frontCover;
+                      const thumbnail = getCoverImageData(fullStory.coverImages.frontCover);
                       return { id: story.id, thumbnail };
                     }
                   }
@@ -2006,6 +2006,10 @@ Be specific and creative. Each scene description should paint a clear picture fo
           console.error('Error loading characters:', err);
         }
       };
+
+      // Helper function for backward compatibility with cover images
+      // Old stories have cover images as strings, new ones have objects with imageData, qualityScore, qualityReasoning
+      const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
 
       // Story persistence functions
       const saveStory = async (storyData) => {
@@ -3776,7 +3780,14 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 imageData = await callGeminiAPI(prompt);
               }
 
-              return imageData;
+              // Analyze image quality
+              const analysis = await analyzeImageQuality(imageData, prompt, charImages);
+
+              return {
+                imageData,
+                qualityScore: analysis?.score || null,
+                qualityReasoning: analysis?.reasoning || null
+              };
             } catch (error) {
               console.error(`Error generating ${coverType} cover:`, error);
               return null;
@@ -3827,7 +3838,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             sceneDescriptions: scenes,
             sceneImages: images,
             coverImages: coverImages,
-            thumbnail: coverImages.frontCover, // Use front cover as thumbnail
+            thumbnail: getCoverImageData(coverImages.frontCover), // Use front cover as thumbnail
             createdAt: new Date().toISOString()
           };
 
@@ -4568,7 +4579,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 imageData = await callGeminiAPI(prompt);
               }
 
-              return imageData;
+              // Analyze image quality
+              const analysis = await analyzeImageQuality(imageData, prompt, charImages);
+
+              return {
+                imageData,
+                qualityScore: analysis?.score || null,
+                qualityReasoning: analysis?.reasoning || null
+              };
             } catch (error) {
               console.error(`Error generating ${coverType} cover:`, error);
               return null;
@@ -7580,7 +7598,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       <>
                         <div className="relative mb-3">
                           <img
-                            src={coverImages.frontCover}
+                            src={getCoverImageData(coverImages.frontCover)}
                             alt="Front Cover"
                             className="w-full rounded-lg shadow-md"
                           />
@@ -7666,6 +7684,29 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </details>
                     )}
 
+                    {currentUser && currentUser.role === 'admin' && coverImages.frontCover?.qualityScore !== null && coverImages.frontCover?.qualityScore !== undefined && (
+                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
+                          <span>
+                            {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                          </span>
+                          <span className={`text-lg font-bold ${
+                            coverImages.frontCover.qualityScore >= 80 ? 'text-green-600' :
+                            coverImages.frontCover.qualityScore >= 60 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {(coverImages.frontCover.qualityScore / 10).toFixed(1)}/10
+                          </span>
+                        </summary>
+                        {coverImages.frontCover.qualityReasoning && (
+                          <div className="mt-2 text-xs text-gray-700 bg-white p-3 rounded border border-gray-200">
+                            <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                            <p className="whitespace-pre-wrap">{coverImages.frontCover.qualityReasoning}</p>
+                          </div>
+                        )}
+                      </details>
+                    )}
+
                     {currentUser && currentUser.role === 'admin' && coverImageApiCalls.frontCover && (
                       <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
                         <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
@@ -7690,7 +7731,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     {coverImages.page0 ? (
                       <>
                         <img
-                          src={coverImages.page0}
+                          src={getCoverImageData(coverImages.page0)}
                           alt="Page 0"
                           className="w-full rounded-lg shadow-md mb-3"
                         />
@@ -7775,6 +7816,29 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </details>
                     )}
 
+                    {currentUser && currentUser.role === 'admin' && coverImages.page0?.qualityScore !== null && coverImages.page0?.qualityScore !== undefined && (
+                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
+                          <span>
+                            {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                          </span>
+                          <span className={`text-lg font-bold ${
+                            coverImages.page0.qualityScore >= 80 ? 'text-green-600' :
+                            coverImages.page0.qualityScore >= 60 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {(coverImages.page0.qualityScore / 10).toFixed(1)}/10
+                          </span>
+                        </summary>
+                        {coverImages.page0.qualityReasoning && (
+                          <div className="mt-2 text-xs text-gray-700 bg-white p-3 rounded border border-gray-200">
+                            <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                            <p className="whitespace-pre-wrap">{coverImages.page0.qualityReasoning}</p>
+                          </div>
+                        )}
+                      </details>
+                    )}
+
                     {currentUser && currentUser.role === 'admin' && coverImageApiCalls.page0 && (
                       <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
                         <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
@@ -7799,7 +7863,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     {coverImages.backCover ? (
                       <>
                         <img
-                          src={coverImages.backCover}
+                          src={getCoverImageData(coverImages.backCover)}
                           alt="Back Cover"
                           className="w-full rounded-lg shadow-md mb-3"
                         />
@@ -7881,6 +7945,29 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                           {coverImagePrompts.backCover}
                         </pre>
+                      </details>
+                    )}
+
+                    {currentUser && currentUser.role === 'admin' && coverImages.backCover?.qualityScore !== null && coverImages.backCover?.qualityScore !== undefined && (
+                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
+                          <span>
+                            {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                          </span>
+                          <span className={`text-lg font-bold ${
+                            coverImages.backCover.qualityScore >= 80 ? 'text-green-600' :
+                            coverImages.backCover.qualityScore >= 60 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {(coverImages.backCover.qualityScore / 10).toFixed(1)}/10
+                          </span>
+                        </summary>
+                        {coverImages.backCover.qualityReasoning && (
+                          <div className="mt-2 text-xs text-gray-700 bg-white p-3 rounded border border-gray-200">
+                            <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                            <p className="whitespace-pre-wrap">{coverImages.backCover.qualityReasoning}</p>
+                          </div>
+                        )}
                       </details>
                     )}
 
@@ -8054,7 +8141,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         )}
 
                         {/* Quality Score with Collapsible Explanation */}
-                        {image.qualityScore !== null && image.qualityScore !== undefined && (
+                        {currentUser && currentUser.role === 'admin' && image.qualityScore !== null && image.qualityScore !== undefined && (
                           <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
                             <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
                               <span>
