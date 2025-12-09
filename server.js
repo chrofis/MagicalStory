@@ -3231,12 +3231,12 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
       payment_method_types: ['card'],
       line_items: [{
         price_data: {
-          currency: 'eur',
+          currency: 'chf',
           product_data: {
             name: `Personalized Storybook: ${story.title}`,
             description: `A personalized ${story.pages}-page storybook`,
           },
-          unit_amount: 2990, // €29.90 in cents
+          unit_amount: 3600, // CHF 36.00 in cents
         },
         quantity: 1,
       }],
