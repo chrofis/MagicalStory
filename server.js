@@ -151,9 +151,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         // Store order in database
         if (STORAGE_MODE === 'database') {
           const userId = parseInt(fullSession.metadata?.userId);
-          // Get storyId from metadata and parse to integer
+          // Get storyId from metadata - could be numeric ID or job ID
           const storyIdRaw = fullSession.metadata?.storyId || fullSession.metadata?.story_id;
-          const storyId = storyIdRaw ? parseInt(storyIdRaw) : null;
           const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
 
           // Validate required metadata
@@ -161,12 +160,49 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             console.error('❌ [STRIPE WEBHOOK] Invalid or missing userId in metadata:', fullSession.metadata);
             throw new Error('Invalid userId in session metadata');
           }
-          if (!storyId || isNaN(storyId)) {
-            console.error('❌ [STRIPE WEBHOOK] Missing or invalid storyId in metadata:', fullSession.metadata);
-            console.error('❌ [STRIPE WEBHOOK] Raw storyId value:', storyIdRaw);
-            console.error('❌ [STRIPE WEBHOOK] This usually means the checkout session was created without metadata');
+          if (!storyIdRaw) {
+            console.error('❌ [STRIPE WEBHOOK] Missing storyId in metadata:', fullSession.metadata);
             console.error('❌ [STRIPE WEBHOOK] Session ID:', fullSession.id);
-            throw new Error('Invalid storyId in session metadata - cannot process book order');
+            throw new Error('Missing storyId in session metadata - cannot process book order');
+          }
+
+          // Handle both numeric story IDs and job IDs
+          let storyId = null;
+          let storyData = null;
+
+          // Try as numeric ID first
+          const numericId = parseInt(storyIdRaw);
+          if (!isNaN(numericId)) {
+            // It's a numeric story ID
+            const result = await dbPool.query('SELECT id, data FROM stories WHERE id = $1 AND user_id = $2', [numericId, userId]);
+            if (result.rows.length > 0) {
+              storyId = numericId;
+              storyData = result.rows[0].data;
+              console.log('✅ [STRIPE WEBHOOK] Found story by numeric ID:', storyId);
+            }
+          }
+
+          // If not found by numeric ID, try as job ID
+          if (!storyId && storyIdRaw.startsWith('job_')) {
+            // It's a job ID - look up the story that was created by this job
+            // Stories created by background jobs have the job_id stored in the data
+            const result = await dbPool.query(
+              `SELECT id, data FROM stories WHERE user_id = $1 AND data::jsonb->>'job_id' = $2 ORDER BY created_at DESC LIMIT 1`,
+              [userId, storyIdRaw]
+            );
+            if (result.rows.length > 0) {
+              storyId = result.rows[0].id;
+              storyData = result.rows[0].data;
+              console.log('✅ [STRIPE WEBHOOK] Found story by job ID:', storyIdRaw, '→ Story ID:', storyId);
+            }
+          }
+
+          // If still not found, error out
+          if (!storyId) {
+            console.error('❌ [STRIPE WEBHOOK] Story not found for storyId:', storyIdRaw);
+            console.error('❌ [STRIPE WEBHOOK] User ID:', userId);
+            console.error('❌ [STRIPE WEBHOOK] This might be a job that hasn\'t completed or been saved yet');
+            throw new Error(`Story not found: ${storyIdRaw}`);
           }
 
           await dbPool.query(`
