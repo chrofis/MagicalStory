@@ -25,6 +25,33 @@ console.log('💾 Image cache initialized');
 const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;  // 0 = no batching (generate all at once)
 console.log(`📚 Story batch size: ${STORY_BATCH_SIZE === 0 ? 'DISABLED (generate all at once)' : STORY_BATCH_SIZE + ' pages per batch'}`);
 
+// Load prompt templates from files
+const PROMPT_TEMPLATES = {};
+async function loadPromptTemplates() {
+  try {
+    const promptsDir = path.join(__dirname, 'prompts');
+    PROMPT_TEMPLATES.outline = await fs.readFile(path.join(promptsDir, 'outline.txt'), 'utf-8');
+    PROMPT_TEMPLATES.storyTextBatch = await fs.readFile(path.join(promptsDir, 'story-text-batch.txt'), 'utf-8');
+    PROMPT_TEMPLATES.storyTextSingle = await fs.readFile(path.join(promptsDir, 'story-text-single.txt'), 'utf-8');
+    PROMPT_TEMPLATES.sceneDescriptions = await fs.readFile(path.join(promptsDir, 'scene-descriptions.txt'), 'utf-8');
+    PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
+    console.log('📝 Prompt templates loaded from prompts/ folder');
+  } catch (err) {
+    console.error('❌ Failed to load prompt templates:', err.message);
+    console.error('   Falling back to hardcoded prompts');
+  }
+}
+
+// Helper function to replace placeholders in prompt templates
+function fillTemplate(template, replacements) {
+  if (!template) return '';
+  let result = template;
+  for (const [key, value] of Object.entries(replacements)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+  }
+  return result;
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
@@ -3964,7 +3991,15 @@ async function processStoryJob(jobId) {
 
         console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating pages ${startPage}-${endPage} (${pagesInBatch} pages)`);
 
-        const batchPrompt = `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue for PAGES ${startPage} through ${endPage} ONLY.
+        // Use template if available, otherwise fall back to hardcoded prompt
+        const batchPrompt = PROMPT_TEMPLATES.storyTextBatch
+          ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
+              OUTLINE: outline,
+              START_PAGE: startPage,
+              END_PAGE: endPage,
+              INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning' : 'Start directly with the page content (no title/dedication)'
+            })
+          : `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue for PAGES ${startPage} through ${endPage} ONLY.
 
 CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
 - Keep all "## Seite X" or "## Page X" headers for pages ${startPage}-${endPage}
@@ -3991,7 +4026,13 @@ Write the full story content for each page in this range, but maintain the exact
     } else {
       // SINGLE-SHOT MODE: Generate entire story in one API call
       console.log(`📚 [SINGLE-SHOT MODE] Generating all ${totalPages} pages in one call`);
-      const storyPrompt = `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue.
+
+      // Use template if available, otherwise fall back to hardcoded prompt
+      const storyPrompt = PROMPT_TEMPLATES.storyTextSingle
+        ? fillTemplate(PROMPT_TEMPLATES.storyTextSingle, {
+            OUTLINE: outline
+          })
+        : `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue.
 
 CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
 - Keep all "## Seite X" or "## Page X" headers
@@ -3999,6 +4040,7 @@ CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outli
 - The structure must remain: Title, dedication, then each page with its marker
 
 Write the full story content for each page, but maintain the exact page structure from the outline.`;
+
       storyText = await callClaudeAPI(storyPrompt, 64000);  // Claude Sonnet 4.5's 64K output limit
       console.log(`✅ [SINGLE-SHOT MODE] Story generated (${storyText.length} chars)`);
     }
@@ -4009,7 +4051,13 @@ Write the full story content for each page, but maintain the exact page structur
     );
 
     // Step 3: Generate scene descriptions (using Claude API)
-    const sceneDescriptionsPrompt = `From this story, create EXACTLY ${inputData.pages} scene descriptions for the ${inputData.pages} pages of the story.
+    // Use template if available, otherwise fall back to hardcoded prompt
+    const sceneDescriptionsPrompt = PROMPT_TEMPLATES.sceneDescriptions
+      ? fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
+          PAGES: inputData.pages,
+          STORY_TEXT: storyText
+        })
+      : `From this story, create EXACTLY ${inputData.pages} scene descriptions for the ${inputData.pages} pages of the story.
 
 Format: Provide ONLY the scene descriptions, one per line, separated by double newlines. Do NOT include:
 - Page numbers
@@ -4022,6 +4070,7 @@ Each scene description should be a single paragraph describing what should be il
 
 Story:
 ${storyText}`;
+
     const sceneDescriptions = await callClaudeAPI(sceneDescriptionsPrompt, 4096);
 
     console.log(`📋 [PIPELINE] Raw scene descriptions length: ${sceneDescriptions.length} characters`);
@@ -4262,6 +4311,22 @@ function buildStoryPrompt(inputData) {
     // Explicitly exclude photoUrl and other large fields
   }));
 
+  // Use template if available, otherwise fall back to hardcoded prompt
+  if (PROMPT_TEMPLATES.outline) {
+    return fillTemplate(PROMPT_TEMPLATES.outline, {
+      TITLE: inputData.title || 'Untitled',
+      AGE_FROM: inputData.ageFrom || 3,
+      AGE_TO: inputData.ageTo || 8,
+      PAGES: inputData.pages || 15,
+      LANGUAGE: inputData.language || 'en',
+      CHARACTERS: JSON.stringify(characterSummary),
+      STORY_TYPE: inputData.storyType || 'adventure',
+      STORY_DETAILS: inputData.storyDetails || 'None',
+      DEDICATION: inputData.dedication || 'None'
+    });
+  }
+
+  // Fallback to hardcoded prompt
   return `Create a children's story with the following parameters:
     Title: ${inputData.title || 'Untitled'}
     Age: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years
@@ -4324,6 +4389,18 @@ function buildImagePrompt(sceneDescription, inputData) {
     characterPrompts += '\nCRITICAL: These characters must maintain visual consistency across ALL pages.';
   }
 
+  // Use template if available, otherwise fall back to hardcoded prompt
+  if (PROMPT_TEMPLATES.imageGeneration) {
+    return fillTemplate(PROMPT_TEMPLATES.imageGeneration, {
+      STYLE_DESCRIPTION: styleDescription,
+      SCENE_DESCRIPTION: sceneDescription,
+      CHARACTER_PROMPTS: characterPrompts,
+      AGE_FROM: inputData.ageFrom || 3,
+      AGE_TO: inputData.ageTo || 8
+    });
+  }
+
+  // Fallback to hardcoded prompt
   return `Create a cinematic scene in ${styleDescription}.
 
 Scene Description: ${sceneDescription}${characterPrompts}
@@ -4728,6 +4805,9 @@ app.get('/api/jobs/my-jobs', authenticateToken, async (req, res) => {
 // Initialize and start server
 // Initialize database or files based on mode
 async function initialize() {
+  // Load prompt templates first
+  await loadPromptTemplates();
+
   if (STORAGE_MODE === 'database' && dbPool) {
     try {
       await initializeDatabase();

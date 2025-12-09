@@ -1,0 +1,12 @@
+Based on this outline:
+
+{OUTLINE}
+
+Now write the complete story text with full narrative details, descriptions, and dialogue.
+
+CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
+- Keep all "## Seite X" or "## Page X" headers
+- Keep all "---" separators between pages
+- The structure must remain: Title, dedication, then each page with its marker
+
+Write the full story content for each page, but maintain the exact page structure from the outline.

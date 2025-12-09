@@ -1,0 +1,9 @@
+Create a children's story with the following parameters:
+    Title: {TITLE}
+    Age: {AGE_FROM}-{AGE_TO} years
+    Length: {PAGES} pages
+    Language: {LANGUAGE}
+    Characters: {CHARACTERS}
+    Story Type: {STORY_TYPE}
+    Story Details: {STORY_DETAILS}
+    Dedication: {DEDICATION}

@@ -1,0 +1,13 @@
+From this story, create EXACTLY {PAGES} scene descriptions for the {PAGES} pages of the story.
+
+Format: Provide ONLY the scene descriptions, one per line, separated by double newlines. Do NOT include:
+- Page numbers
+- Introductory text
+- Explanations
+- Separators like "---"
+- Any other formatting
+
+Each scene description should be a single paragraph describing what should be illustrated for that page.
+
+Story:
+{STORY_TEXT}

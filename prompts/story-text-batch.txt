@@ -1,0 +1,13 @@
+Based on this outline:
+
+{OUTLINE}
+
+Now write the complete story text with full narrative details, descriptions, and dialogue for PAGES {START_PAGE} through {END_PAGE} ONLY.
+
+CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
+- Keep all "## Seite X" or "## Page X" headers for pages {START_PAGE}-{END_PAGE}
+- Keep all "---" separators between pages
+- {INCLUDE_TITLE}
+- Write ONLY pages {START_PAGE} through {END_PAGE}
+
+Write the full story content for each page in this range, but maintain the exact page structure from the outline.

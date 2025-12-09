@@ -1,0 +1,9 @@
+Create a cinematic scene in {STYLE_DESCRIPTION}.
+
+Scene Description: {SCENE_DESCRIPTION}{CHARACTER_PROMPTS}
+
+Important:
+- Show only the emotions visible on faces (happy, sad, surprised, worried, excited)
+- Maintain consistent character appearance across ALL pages
+- Clean, clear composition
+- Age-appropriate for {AGE_FROM}-{AGE_TO} years old
