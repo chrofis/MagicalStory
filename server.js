@@ -150,9 +150,24 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
         // Store order in database
         if (STORAGE_MODE === 'database') {
-          const userId = parseInt(fullSession.metadata.userId);
-          const storyId = parseInt(fullSession.metadata.storyId);
+          const userId = parseInt(fullSession.metadata?.userId);
+          // Get storyId from metadata and parse to integer
+          const storyIdRaw = fullSession.metadata?.storyId || fullSession.metadata?.story_id;
+          const storyId = storyIdRaw ? parseInt(storyIdRaw) : null;
           const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
+
+          // Validate required metadata
+          if (!userId || isNaN(userId)) {
+            console.error('❌ [STRIPE WEBHOOK] Invalid or missing userId in metadata:', fullSession.metadata);
+            throw new Error('Invalid userId in session metadata');
+          }
+          if (!storyId || isNaN(storyId)) {
+            console.error('❌ [STRIPE WEBHOOK] Missing or invalid storyId in metadata:', fullSession.metadata);
+            console.error('❌ [STRIPE WEBHOOK] Raw storyId value:', storyIdRaw);
+            console.error('❌ [STRIPE WEBHOOK] This usually means the checkout session was created without metadata');
+            console.error('❌ [STRIPE WEBHOOK] Session ID:', fullSession.id);
+            throw new Error('Invalid storyId in session metadata - cannot process book order');
+          }
 
           await dbPool.query(`
             INSERT INTO orders (
