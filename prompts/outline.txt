@@ -9,7 +9,16 @@ You are an expert children's book writer with deep understanding of age-appropri
 
 Your task is to create a compelling, well-structured story outline that will guide both the narrative text and visual illustrations.
 
-{BASE_PROMPT}
+# Story Parameters
+
+- **Title**: {TITLE}
+- **Target Age**: {AGE_FROM}-{AGE_TO} years
+- **Length**: {PAGES} pages
+- **Language**: {LANGUAGE}
+- **Story Type**: {STORY_TYPE}
+- **Story Details**: {STORY_DETAILS}
+- **Dedication**: {DEDICATION}
+- **Characters**: {CHARACTERS}
 
 # Part 1: Story Title
 
