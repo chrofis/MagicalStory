@@ -2861,6 +2861,119 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
   }
 });
 
+// Admin Dashboard - Get statistics overview
+app.get('/api/admin/stats', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(400).json({ error: 'Admin stats are only available in database mode' });
+    }
+
+    console.log('📊 [ADMIN] Fetching dashboard statistics...');
+
+    // Get counts for all main entities
+    const userCountResult = await dbPool.query('SELECT COUNT(*) as count FROM users');
+    const storyCountResult = await dbPool.query('SELECT COUNT(*) as count FROM stories');
+    const characterCountResult = await dbPool.query('SELECT COUNT(*) as count FROM characters');
+    const fileCountResult = await dbPool.query('SELECT COUNT(*) as count FROM files');
+
+    // Get orphaned files (files with story_id that doesn't exist in stories table)
+    const orphanedFilesResult = await dbPool.query(`
+      SELECT f.id, f.story_id, f.file_type, f.file_size, f.filename, f.created_at
+      FROM files f
+      WHERE f.story_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM stories s WHERE s.id = f.story_id
+        )
+      ORDER BY f.created_at DESC
+      LIMIT 100
+    `);
+
+    // Count images in files table
+    const imageFilesResult = await dbPool.query(
+      "SELECT COUNT(*) as count FROM files WHERE file_type = 'image' OR mime_type LIKE 'image/%'"
+    );
+
+    // Count total size of orphaned files
+    const orphanedSizeResult = await dbPool.query(`
+      SELECT COALESCE(SUM(f.file_size), 0) as total_size
+      FROM files f
+      WHERE f.story_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM stories s WHERE s.id = f.story_id
+        )
+    `);
+
+    // Count images embedded in story data (sceneImages)
+    const storiesWithData = await dbPool.query('SELECT data FROM stories');
+    let embeddedImagesCount = 0;
+    let totalSceneImagesSize = 0;
+
+    for (const row of storiesWithData.rows) {
+      try {
+        const storyData = JSON.parse(row.data);
+        if (storyData.sceneImages && Array.isArray(storyData.sceneImages)) {
+          embeddedImagesCount += storyData.sceneImages.length;
+          // Estimate size of base64 images
+          storyData.sceneImages.forEach(img => {
+            if (img.imageData) {
+              // Base64 encoded size is roughly 4/3 of original
+              totalSceneImagesSize += img.imageData.length * 0.75;
+            }
+          });
+        }
+      } catch (err) {
+        // Skip malformed JSON
+        console.warn('⚠️ Skipping malformed story data');
+      }
+    }
+
+    const stats = {
+      users: {
+        total: parseInt(userCountResult.rows[0].count)
+      },
+      stories: {
+        total: parseInt(storyCountResult.rows[0].count),
+        embeddedImagesCount: embeddedImagesCount,
+        embeddedImagesSizeMB: (totalSceneImagesSize / 1024 / 1024).toFixed(2)
+      },
+      characters: {
+        total: parseInt(characterCountResult.rows[0].count)
+      },
+      files: {
+        total: parseInt(fileCountResult.rows[0].count),
+        images: parseInt(imageFilesResult.rows[0].count),
+        orphaned: orphanedFilesResult.rows.length,
+        orphanedSizeMB: (parseInt(orphanedSizeResult.rows[0].total_size) / 1024 / 1024).toFixed(2)
+      },
+      orphanedFiles: orphanedFilesResult.rows.map(f => ({
+        id: f.id,
+        storyId: f.story_id,
+        fileType: f.file_type,
+        fileSizeKB: (f.file_size / 1024).toFixed(2),
+        filename: f.filename,
+        createdAt: f.created_at
+      })),
+      totalImages: embeddedImagesCount + parseInt(imageFilesResult.rows[0].count)
+    };
+
+    console.log(`✅ [ADMIN] Stats: ${stats.users.total} users, ${stats.stories.total} stories, ${stats.characters.total} characters, ${stats.totalImages} total images, ${stats.files.orphaned} orphaned files`);
+
+    res.json({
+      success: true,
+      stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching stats:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
