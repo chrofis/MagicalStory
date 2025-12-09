@@ -3764,14 +3764,50 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       throw new Error('GELATO_API_KEY not configured');
     }
 
-    const gelatoProductUid = storyData.gelatoProductUid || 'product_photobooks_hardcover_140x140_32';
+    // Calculate page count: each scene = 2 Gelato pages (1 text + 1 image)
+    const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
+    const gelatoPageCount = storyScenes * 2;
+    console.log(`📊 [BACKGROUND] Story scenes: ${storyScenes}, Gelato pages: ${gelatoPageCount}`);
+
+    // Fetch product UID from database based on page count (same logic as frontend)
+    let gelatoProductUid = null;
+    try {
+      const productsResult = await dbPool.query(
+        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true'
+      );
+
+      if (productsResult.rows.length > 0) {
+        // Find product matching the page count
+        const matchingProduct = productsResult.rows.find(p => {
+          if (p.available_page_counts) {
+            const availableCounts = JSON.parse(p.available_page_counts || '[]');
+            return availableCounts.includes(gelatoPageCount);
+          }
+          // Fallback: check min/max range
+          return gelatoPageCount >= (p.min_pages || 0) && gelatoPageCount <= (p.max_pages || 999);
+        });
+
+        if (matchingProduct) {
+          gelatoProductUid = matchingProduct.product_uid;
+          console.log(`✅ [BACKGROUND] Found matching product: ${matchingProduct.product_name}`);
+        } else {
+          console.warn(`⚠️ [BACKGROUND] No product matches page count ${gelatoPageCount}`);
+        }
+      }
+    } catch (err) {
+      console.error('❌ [BACKGROUND] Error fetching products:', err.message);
+    }
+
+    // Fallback to environment variable or hardcoded default
+    if (!gelatoProductUid) {
+      gelatoProductUid = process.env.GELATO_PHOTOBOOK_UID || 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
+      console.log(`⚠️ [BACKGROUND] Using fallback product UID: ${gelatoProductUid}`);
+    }
+
     const orderType = process.env.GELATO_ORDER_TYPE || 'order'; // 'draft' or 'order'
 
     // Use CHF currency for Gelato orders
     const currency = 'CHF';
-
-    // Calculate page count from story data
-    const pageCount = storyData.pages || 32;
 
     const gelatoOrderPayload = {
       orderType: orderType,
@@ -3781,7 +3817,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       items: [{
         itemReferenceId: `item-${storyId}-${Date.now()}`,
         productUid: gelatoProductUid,
-        pageCount: parseInt(pageCount),
+        pageCount: gelatoPageCount,
         files: [{
           type: 'default',
           url: pdfUrl
@@ -3802,6 +3838,8 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
         phone: shippingAddress.phone || ''
       }
     };
+
+    console.log(`📦 [BACKGROUND] Gelato order payload: productUid=${gelatoProductUid}, pageCount=${gelatoPageCount}, orderType=${orderType}`);
 
     const gelatoResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
       method: 'POST',
