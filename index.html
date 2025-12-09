@@ -4269,6 +4269,137 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         throw new Error('No image data found in Gemini response');
       };
 
+      // ========================================
+      // HELPER FUNCTIONS - Extracted for clarity
+      // ========================================
+
+      // Toggle cover image edit mode
+      const toggleCoverImageEdit = (coverType) => {
+        setEditingCoverImage(editingCoverImage === coverType ? null : coverType);
+        setCoverEditInstruction('');
+      };
+
+      // Apply cover image edit with new prompt
+      const applyCoverImageEdit = async (coverType) => {
+        if (!coverEditInstruction.trim()) {
+          alert(language === 'de' ? 'Bitte geben Sie einen Prompt ein' :
+                language === 'fr' ? 'Veuillez entrer un prompt' :
+                'Please enter a prompt');
+          return;
+        }
+        try {
+          const newImage = await callGeminiAPI(coverEditInstruction);
+          setCoverImages({...coverImages, [coverType]: newImage});
+          setCoverImagePrompts({...coverImagePrompts, [coverType]: coverEditInstruction});
+          setEditingCoverImage(null);
+          setCoverEditInstruction('');
+        } catch (error) {
+          alert(`Error: ${error.message}`);
+        }
+      };
+
+      // Regenerate a cover image with existing prompt
+      const regenerateCoverImage = async (coverType) => {
+        const confirmMsg = language === 'de' ? `${coverType} neu generieren?` :
+                          language === 'fr' ? `Régénérer ${coverType}?` :
+                          `Regenerate ${coverType}?`;
+        if (confirm(confirmMsg)) {
+          try {
+            const prompt = coverImagePrompts[coverType];
+            const newImage = await callGeminiAPI(prompt);
+            setCoverImages({...coverImages, [coverType]: newImage});
+          } catch (error) {
+            alert(`Error: ${error.message}`);
+          }
+        }
+      };
+
+      // Toggle scene image edit mode
+      const toggleSceneImageEdit = (index) => {
+        if (editingImageIndex === index) {
+          setEditingImageIndex(null);
+          setImageEditInstruction('');
+        } else {
+          setEditingImageIndex(index);
+          setImageEditInstruction('');
+        }
+      };
+
+      // Smooth scroll to element by ID
+      const smoothScrollToElement = (elementId, delay = 100) => {
+        setTimeout(() => {
+          const element = document.getElementById(elementId);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, delay);
+      };
+
+      // Reset all story state for "Create Another Story"
+      const resetAllStoryState = () => {
+        setStep(1);
+        setGeneratedStory('');
+        setGeneratedPrompt('');
+        setShowPrompt(false);
+        setCharacters([]);
+        setRelationships({});
+        setStoryType('');
+        setMainCharacters([]);
+        setSceneDescriptions([]);
+        setSceneImages([]);
+        setEditableOutline('');
+        setStoryOutline('');
+        setStoryTitle('');
+        setDedication('');
+        setCoverImages({ frontCover: null, page0: null, backCover: null });
+        setCoverImagePrompts({});
+        setCurrentStoryId(null);
+      };
+
+      // Delete a saved story
+      const deleteStory = async (storyId) => {
+        const confirmMsg = language === 'de' ? 'Diese Geschichte löschen?' :
+                          language === 'fr' ? 'Supprimer cette histoire?' :
+                          'Delete this story?';
+        if (confirm(confirmMsg)) {
+          try {
+            const response = await fetch(`${API_URL}/api/stories/${storyId}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            if (response.ok) {
+              const updated = await loadStories();
+              setSavedStories(updated);
+            }
+          } catch (err) {
+            console.error('Error deleting story:', err);
+          }
+        }
+      };
+
+      // Add a custom story type
+      const addCustomStoryType = () => {
+        const promptMsg = language === 'de' ? 'Name des Story-Typs eingeben:' :
+                         language === 'fr' ? 'Entrez le nom du type d\'histoire:' :
+                         'Enter story type name:';
+        const name = prompt(promptMsg);
+        if (name) {
+          const newType = {
+            id: `custom-${Date.now()}`,
+            name: { en: name, de: name, fr: name },
+            emoji: '✨',
+            isCustom: true
+          };
+          setCustomStoryTypes([...customStoryTypes, newType]);
+          setStoryType(newType.id);
+          smoothScrollToElement('art-style-section');
+        }
+      };
+
+      // ========================================
+      // END HELPER FUNCTIONS
+      // ========================================
+
       const generateSceneImages = async () => {
         if (!Array.isArray(sceneDescriptions) || sceneDescriptions.length === 0) {
           alert('Please create scene descriptions first!');
@@ -6135,25 +6266,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             ))}
             {/* Add Custom Type Button */}
             <button
-              onClick={() => {
-                const name = prompt('Enter story type name:');
-                if (name) {
-                  const newType = {
-                    id: `custom_${Date.now()}`,
-                    name: { en: name, de: name, fr: name },
-                    emoji: '📖'
-                  };
-                  setCustomStoryTypes([...customStoryTypes, newType]);
-                  setStoryType(newType.id); // Auto-select the new custom type
-                  // Auto-scroll to art style selection
-                  setTimeout(() => {
-                    const artStyleSection = document.getElementById('art-style-section');
-                    if (artStyleSection) {
-                      artStyleSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                  }, 100);
-                }
-              }}
+              onClick={addCustomStoryType}
               className="p-2 rounded-lg border-2 border-dashed border-purple-300 hover:border-purple-500 transition-all hover:bg-purple-50"
             >
               <div className="text-2xl mb-1">➕</div>
@@ -7466,93 +7579,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               </button>
             )}
             <button
-              onClick={() => {
-                setStep(1);
-                setGeneratedStory('');
-                setGeneratedPrompt('');
-                setShowPrompt(false);
-                setCharacters([]);
-                setRelationships({});
-                setStoryType('');
-                setMainCharacters([]);
-                setSceneDescriptions([]);
-                setSceneImages([]);
-                setEditableOutline('');
-                setStoryOutline('');
-                setStoryTitle('');
-                setDedication(''); // Reset dedication field
-              }}
+              onClick={resetAllStoryState}
               className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold flex items-center justify-center gap-2 sm:col-span-2 lg:col-span-1"
             >
               {t.createAnotherStory}
             </button>
           </div>
-
-          {/* MOVED: Side-by-Side story moved to end after images section */}
-          {false && sceneImages.length > 0 && (
-            <div className="space-y-8 mt-8">
-              <h3 className="text-2xl font-bold text-purple-700 text-center mb-6">
-                {language === 'de' ? 'Ihre vollständige Geschichte' : language === 'fr' ? 'Votre histoire complète' : 'Your Complete Story'}
-              </h3>
-
-              {storyPages.map((pageText, index) => {
-                const pageNumber = index + 1;
-                const image = sceneImages.find(img => img.pageNumber === pageNumber);
-
-                return (
-                  <div key={pageNumber} className="bg-white border-2 border-purple-300 rounded-xl p-6 shadow-lg">
-                    <h4 className="text-xl font-bold text-purple-700 mb-4 text-center">
-                      {language === 'de' ? `Seite ${pageNumber}` : language === 'fr' ? `Page ${pageNumber}` : `Page ${pageNumber}`}
-                    </h4>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {/* Image on the left */}
-                      {image && image.imageData ? (
-                        <div className="flex flex-col">
-                          <div className="relative">
-                            <img
-                              src={image.imageData}
-                              alt={`Scene for page ${pageNumber}`}
-                              className="w-full rounded-lg shadow-md object-cover"
-                            />
-                            {(developerMode || (currentUser && currentUser.role === 'admin')) && image.score !== null && image.score !== undefined && (
-                              <div className="absolute top-2 right-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-3 py-1 rounded-full shadow-lg flex items-center gap-1 text-sm font-bold">
-                                <span>⭐</span>
-                                <span>{typeof image.score === 'number' ? image.score.toFixed(1) : image.score}/10</span>
-                              </div>
-                            )}
-                          </div>
-                          {developerMode && (
-                            <button
-                              onClick={() => downloadImage(image.imageData, pageNumber)}
-                              className="mt-3 bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-2 text-sm"
-                            >
-                              <Icon name="download" size={16} /> Download Image
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center bg-gray-100 rounded-lg p-8">
-                          <p className="text-gray-500 text-center">
-                            {language === 'de' ? 'Kein Bild für diese Seite' : language === 'fr' ? 'Pas d\'image pour cette page' : 'No image for this page'}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Text on the right */}
-                      <div className="flex items-center">
-                        <div className="prose max-w-none">
-                          <p className="text-gray-800 leading-relaxed whitespace-pre-wrap font-serif text-xl">
-                            {pageText.trim()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
 
           {/* Display Scene Descriptions - Developer Mode Only */}
           {developerMode && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
@@ -7641,26 +7673,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           <>
                             <div className="flex gap-2 mb-3">
                               <button
-                                onClick={async () => {
-                                  if (confirm('Regenerate front cover?')) {
-                                    try {
-                                      const prompt = coverImagePrompts.frontCover;
-                                      const newImage = await callGeminiAPI(prompt);
-                                      setCoverImages({...coverImages, frontCover: newImage});
-                                    } catch (error) {
-                                      alert(`Error: ${error.message}`);
-                                    }
-                                  }
-                                }}
+                                onClick={() => regenerateCoverImage('frontCover')}
                                 className="flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center gap-1 text-sm font-semibold"
                               >
                                 <Icon name="refresh-cw" size={14} /> {t.regenerateImage}
                               </button>
                               <button
-                                onClick={() => {
-                                  setEditingCoverImage(editingCoverImage === 'frontCover' ? null : 'frontCover');
-                                  setCoverEditInstruction('');
-                                }}
+                                onClick={() => toggleCoverImageEdit('frontCover')}
                                 className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
                               >
                                 <Icon name="edit" size={14} /> {t.editImage}
@@ -7685,21 +7704,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
                         />
                         <button
-                          onClick={async () => {
-                            if (!coverEditInstruction.trim()) {
-                              alert('Please enter a prompt');
-                              return;
-                            }
-                            try {
-                              const newImage = await callGeminiAPI(coverEditInstruction);
-                              setCoverImages({...coverImages, frontCover: newImage});
-                              setCoverImagePrompts({...coverImagePrompts, frontCover: coverEditInstruction});
-                              setEditingCoverImage(null);
-                              setCoverEditInstruction('');
-                            } catch (error) {
-                              alert(`Error: ${error.message}`);
-                            }
-                          }}
+                          onClick={() => applyCoverImageEdit('frontCover')}
                           className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
                         >
                           {t.applyEdit}
@@ -7773,26 +7778,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           <>
                             <div className="flex gap-2 mb-3">
                               <button
-                                onClick={async () => {
-                                  if (confirm('Regenerate Page 0?')) {
-                                    try {
-                                      const prompt = coverImagePrompts.page0;
-                                      const newImage = await callGeminiAPI(prompt);
-                                      setCoverImages({...coverImages, page0: newImage});
-                                    } catch (error) {
-                                      alert(`Error: ${error.message}`);
-                                    }
-                                  }
-                                }}
+                                onClick={() => regenerateCoverImage('page0')}
                                 className="flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center gap-1 text-sm font-semibold"
                               >
                                 <Icon name="refresh-cw" size={14} /> {t.regenerateImage}
                               </button>
                               <button
-                                onClick={() => {
-                                  setEditingCoverImage(editingCoverImage === 'page0' ? null : 'page0');
-                                  setCoverEditInstruction('');
-                                }}
+                                onClick={() => toggleCoverImageEdit('page0')}
                                 className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
                               >
                                 <Icon name="edit" size={14} /> {t.editImage}
@@ -7817,21 +7809,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
                         />
                         <button
-                          onClick={async () => {
-                            if (!coverEditInstruction.trim()) {
-                              alert('Please enter a prompt');
-                              return;
-                            }
-                            try {
-                              const newImage = await callGeminiAPI(coverEditInstruction);
-                              setCoverImages({...coverImages, page0: newImage});
-                              setCoverImagePrompts({...coverImagePrompts, page0: coverEditInstruction});
-                              setEditingCoverImage(null);
-                              setCoverEditInstruction('');
-                            } catch (error) {
-                              alert(`Error: ${error.message}`);
-                            }
-                          }}
+                          onClick={() => applyCoverImageEdit('page0')}
                           className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
                         >
                           {t.applyEdit}
@@ -7905,26 +7883,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           <>
                             <div className="flex gap-2 mb-3">
                               <button
-                                onClick={async () => {
-                                  if (confirm('Regenerate back cover?')) {
-                                    try {
-                                      const prompt = coverImagePrompts.backCover;
-                                      const newImage = await callGeminiAPI(prompt);
-                                      setCoverImages({...coverImages, backCover: newImage});
-                                    } catch (error) {
-                                      alert(`Error: ${error.message}`);
-                                    }
-                                  }
-                                }}
+                                onClick={() => regenerateCoverImage('backCover')}
                                 className="flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg hover:bg-orange-600 flex items-center justify-center gap-1 text-sm font-semibold"
                               >
                                 <Icon name="refresh-cw" size={14} /> {t.regenerateImage}
                               </button>
                               <button
-                                onClick={() => {
-                                  setEditingCoverImage(editingCoverImage === 'backCover' ? null : 'backCover');
-                                  setCoverEditInstruction('');
-                                }}
+                                onClick={() => toggleCoverImageEdit('backCover')}
                                 className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
                               >
                                 <Icon name="edit" size={14} /> {t.editImage}
@@ -7949,21 +7914,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
                         />
                         <button
-                          onClick={async () => {
-                            if (!coverEditInstruction.trim()) {
-                              alert('Please enter a prompt');
-                              return;
-                            }
-                            try {
-                              const newImage = await callGeminiAPI(coverEditInstruction);
-                              setCoverImages({...coverImages, backCover: newImage});
-                              setCoverImagePrompts({...coverImagePrompts, backCover: coverEditInstruction});
-                              setEditingCoverImage(null);
-                              setCoverEditInstruction('');
-                            } catch (error) {
-                              alert(`Error: ${error.message}`);
-                            }
-                          }}
+                          onClick={() => applyCoverImageEdit('backCover')}
                           className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
                         >
                           {t.applyEdit}
