@@ -3164,6 +3164,67 @@ app.delete('/api/admin/orphaned-files', authenticateToken, async (req, res) => {
   }
 });
 
+// Admin Dashboard - Get database table sizes
+app.get('/api/admin/database-size', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(400).json({ error: 'Database size check is only available in database mode' });
+    }
+
+    // Query table sizes
+    const tableSizes = await dbPool.query(`
+      SELECT
+        schemaname,
+        tablename,
+        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
+        pg_total_relation_size(schemaname||'.'||tablename) AS size_bytes
+      FROM pg_tables
+      WHERE schemaname = 'public'
+      ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+    `);
+
+    // Get row counts for each table
+    const rowCounts = await dbPool.query(`
+      SELECT
+        'users' as table_name, COUNT(*) as row_count FROM users
+      UNION ALL SELECT 'stories', COUNT(*) FROM stories
+      UNION ALL SELECT 'files', COUNT(*) FROM files
+      UNION ALL SELECT 'activity_logs', COUNT(*) FROM activity_logs
+      UNION ALL SELECT 'api_keys', COUNT(*) FROM api_keys
+      UNION ALL SELECT 'orders', COUNT(*) FROM orders
+      UNION ALL SELECT 'gelato_products', COUNT(*) FROM gelato_products
+    `);
+
+    // Get total database size
+    const dbSize = await dbPool.query(`
+      SELECT pg_size_pretty(pg_database_size(current_database())) as total_size,
+             pg_database_size(current_database()) as total_size_bytes
+    `);
+
+    res.json({
+      totalDatabaseSize: dbSize.rows[0].total_size,
+      totalDatabaseSizeBytes: parseInt(dbSize.rows[0].total_size_bytes),
+      tables: tableSizes.rows.map(row => ({
+        name: row.tablename,
+        size: row.size,
+        sizeBytes: parseInt(row.size_bytes)
+      })),
+      rowCounts: rowCounts.rows.reduce((acc, row) => {
+        acc[row.table_name] = parseInt(row.row_count);
+        return acc;
+      }, {})
+    });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching database size:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
