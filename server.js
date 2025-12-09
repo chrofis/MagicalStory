@@ -3737,7 +3737,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       throw new Error('GELATO_API_KEY not configured');
     }
 
-    const gelatoProductUid = storyData.gelatoProductUid || 'photobooks_photobooks_140x140_hardcover_170gsm-gloss_gloss-lamination_32';
+    const gelatoProductUid = storyData.gelatoProductUid || 'product_photobooks_hardcover_140x140_32';
     const orderType = process.env.GELATO_ORDER_TYPE || 'order'; // 'draft' or 'order'
 
     // Use CHF currency for Gelato orders
