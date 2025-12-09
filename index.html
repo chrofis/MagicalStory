@@ -829,8 +829,12 @@
 
       // Set default page count based on user role
       useEffect(() => {
-        if (currentUser && currentUser.role === 'admin') {
-          setPages(5); // Admin default: 5 pages
+        if (currentUser) {
+          if (currentUser.role === 'admin') {
+            setPages(5); // Admin default: 5 pages
+          } else {
+            setPages(15); // Normal user default: 15 pages
+          }
         }
       }, [currentUser]);
 
