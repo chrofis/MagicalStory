@@ -223,8 +223,9 @@
         yourCharacters: 'Your Characters:',
         startCreating: 'Start Creating Character',
         characterName: 'Character Name',
-        characterPhoto: 'Character Photo (Optional)',
+        characterPhoto: 'Character Photo',
         uploadPhoto: 'Upload Photo',
+        uploadPhotoFirst: 'Please upload a photo to continue',
         orDescribe: 'OR describe the character',
         characterAge: 'Age',
         hairColor: 'Hair Color',
@@ -369,8 +370,9 @@
         yourCharacters: 'Deine Charaktere:',
         startCreating: 'Charakter erstellen beginnen',
         characterName: 'Charaktername',
-        characterPhoto: 'Charakterfoto (Optional)',
+        characterPhoto: 'Charakterfoto',
         uploadPhoto: 'Foto hochladen',
+        uploadPhotoFirst: 'Bitte laden Sie ein Foto hoch, um fortzufahren',
         orDescribe: 'ODER Figur beschreiben',
         characterAge: 'Alter',
         hairColor: 'Haarfarbe',
@@ -515,8 +517,9 @@
         yourCharacters: 'Vos personnages:',
         startCreating: 'Commencer à créer un personnage',
         characterName: 'Nom du personnage',
-        characterPhoto: 'Photo du personnage (Optionnel)',
+        characterPhoto: 'Photo du personnage',
         uploadPhoto: 'Télécharger une photo',
+        uploadPhotoFirst: 'Veuillez télécharger une photo pour continuer',
         orDescribe: 'OU décrire le personnage',
         characterAge: 'Âge',
         hairColor: 'Couleur des cheveux',
@@ -6331,17 +6334,33 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <div ref={characterFormRef} className="bg-white border-2 border-purple-200 rounded-lg p-3 space-y-3">
                 <h3 className="text-base font-bold text-purple-700">{currentCharacter.id ? t.editCharacter : t.startCreating}</h3>
 
-                {/* Character Name */}
-                <div>
-                  <label className="block text-xs font-semibold mb-1">{t.characterName} *</label>
-                  <input
-                    type="text"
-                    value={currentCharacter.name}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                    placeholder={t.characterName}
-                  />
-                </div>
+                {/* Show message when no photo uploaded yet */}
+                {!currentCharacter.photoUrl && (
+                  <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 text-center">
+                    <p className="text-sm font-semibold text-blue-700 mb-2">{t.uploadPhotoFirst}</p>
+                    <p className="text-xs text-blue-600">
+                      {language === 'de'
+                        ? 'Laden Sie zunächst ein Foto hoch, um mit der Charaktererstellung zu beginnen.'
+                        : language === 'fr'
+                        ? 'Veuillez d\'abord télécharger une photo pour commencer la création du personnage.'
+                        : 'Please upload a photo first to begin creating your character.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Character Name - only show after photo is uploaded */}
+                {currentCharacter.photoUrl && (
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">{t.characterName} *</label>
+                    <input
+                      type="text"
+                      value={currentCharacter.name}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                      placeholder={t.characterName}
+                    />
+                  </div>
+                )}
 
                 <div className="grid md:grid-cols-2 gap-3">
                   <div className="md:border md:border-purple-300 md:rounded-lg p-2 md:bg-purple-50">
@@ -6561,206 +6580,221 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </div>
                   </div>
 
-                  <div className="md:border-2 md:border-green-300 md:rounded-lg p-4 md:bg-green-50">
-                    <label className="block text-lg font-semibold mb-3 text-center md:block hidden">{t.orDescribe}</label>
-                    <div className="space-y-2">
-                      {/* Gender */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">{t.gender}:</label>
-                        <select
-                          value={currentCharacter.gender}
-                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, gender: e.target.value })}
-                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
-                        >
-                          <option value="male">{t.male}</option>
-                          <option value="female">{t.female}</option>
-                          <option value="other">{t.other}</option>
-                        </select>
-                      </div>
-
-                      {/* Age and Height on same row */}
-                      <div className="grid grid-cols-2 gap-2">
+                  {/* Character attributes - only show after photo is uploaded */}
+                  {currentCharacter.photoUrl && (
+                    <div className="md:border-2 md:border-green-300 md:rounded-lg p-4 md:bg-green-50">
+                      <label className="block text-lg font-semibold mb-3 text-center md:block hidden">{t.orDescribe}</label>
+                      <div className="space-y-2">
+                        {/* Gender */}
                         <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold whitespace-nowrap">{t.age}:</label>
-                          <input
-                            type="number"
-                            value={currentCharacter.age}
-                            onChange={(e) => setCurrentCharacter({ ...currentCharacter, age: e.target.value })}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                            placeholder={t.age}
-                            min="1"
-                            max="99"
-                          />
+                          <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">{t.gender}:</label>
+                          <select
+                            value={currentCharacter.gender}
+                            onChange={(e) => setCurrentCharacter({ ...currentCharacter, gender: e.target.value })}
+                            className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="male">{t.male}</option>
+                            <option value="female">{t.female}</option>
+                            <option value="other">{t.other}</option>
+                          </select>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs font-semibold whitespace-nowrap">
-                            {language === 'de' ? 'Größe:' : language === 'fr' ? 'Taille:' : 'Height:'}
-                          </label>
-                          <input
-                            type="number"
-                            value={currentCharacter.height}
-                            onChange={(e) => setCurrentCharacter({ ...currentCharacter, height: e.target.value })}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                            placeholder="cm"
-                            min="50"
-                            max="250"
-                          />
-                        </div>
-                      </div>
 
-                      {/* Build */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">
-                          {language === 'de' ? 'Körperbau:' : language === 'fr' ? 'Corpulence:' : 'Build:'}
-                        </label>
-                        <select
-                          value={currentCharacter.build}
-                          onChange={(e) => setCurrentCharacter({ ...currentCharacter, build: e.target.value })}
-                          className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
-                        >
-                          <option value="">{language === 'de' ? 'Wählen...' : language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
-                          <option value="slim">{language === 'de' ? 'Schlank' : language === 'fr' ? 'Mince' : 'Slim'}</option>
-                          <option value="average">{language === 'de' ? 'Durchschnittlich' : language === 'fr' ? 'Moyenne' : 'Average'}</option>
-                          <option value="athletic">{language === 'de' ? 'Athletisch' : language === 'fr' ? 'Athlétique' : 'Athletic'}</option>
-                          <option value="chubby">{language === 'de' ? 'Mollig' : language === 'fr' ? 'Potelé' : 'Chubby'}</option>
-                          <option value="overweight">{language === 'de' ? 'Übergewichtig' : language === 'fr' ? 'En surpoids' : 'Overweight'}</option>
-                          <option value="heavily overweight">{language === 'de' ? 'Stark übergewichtig' : language === 'fr' ? 'Très en surpoids' : 'Heavily Overweight'}</option>
-                        </select>
-                      </div>
-
-                      {/* Hair Color and Other Features - Admin only */}
-                      {currentUser && currentUser.role === 'admin' && (
-                        <>
+                        {/* Age and Height on same row */}
+                        <div className="grid grid-cols-2 gap-2">
                           <div className="flex items-center gap-2">
-                            <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">{t.hairColor}:</label>
+                            <label className="text-xs font-semibold whitespace-nowrap">{t.age}:</label>
                             <input
-                              type="text"
-                              value={currentCharacter.hairColor}
-                              onChange={(e) => setCurrentCharacter({ ...currentCharacter, hairColor: e.target.value })}
-                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
-                              placeholder={t.hairColor}
+                              type="number"
+                              value={currentCharacter.age}
+                              onChange={(e) => setCurrentCharacter({ ...currentCharacter, age: e.target.value })}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                              placeholder={t.age}
+                              min="1"
+                              max="99"
                             />
                           </div>
-                          <div className="flex items-start gap-2">
-                            <label className="text-xs font-semibold whitespace-nowrap min-w-[60px] pt-1.5">{t.otherFeatures}:</label>
-                            <textarea
-                              value={currentCharacter.otherFeatures}
-                              onChange={(e) => setCurrentCharacter({ ...currentCharacter, otherFeatures: e.target.value })}
-                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
-                              placeholder={t.descriptionPlaceholder}
-                              rows={2}
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-semibold whitespace-nowrap">
+                              {language === 'de' ? 'Größe:' : language === 'fr' ? 'Taille:' : 'Height:'}
+                            </label>
+                            <input
+                              type="number"
+                              value={currentCharacter.height}
+                              onChange={(e) => setCurrentCharacter({ ...currentCharacter, height: e.target.value })}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                              placeholder="cm"
+                              min="50"
+                              max="250"
                             />
                           </div>
-                        </>
-                      )}
+                        </div>
+
+                        {/* Build */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">
+                            {language === 'de' ? 'Körperbau:' : language === 'fr' ? 'Corpulence:' : 'Build:'}
+                          </label>
+                          <select
+                            value={currentCharacter.build}
+                            onChange={(e) => setCurrentCharacter({ ...currentCharacter, build: e.target.value })}
+                            className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="">{language === 'de' ? 'Wählen...' : language === 'fr' ? 'Sélectionner...' : 'Select...'}</option>
+                            <option value="slim">{language === 'de' ? 'Schlank' : language === 'fr' ? 'Mince' : 'Slim'}</option>
+                            <option value="average">{language === 'de' ? 'Durchschnittlich' : language === 'fr' ? 'Moyenne' : 'Average'}</option>
+                            <option value="athletic">{language === 'de' ? 'Athletisch' : language === 'fr' ? 'Athlétique' : 'Athletic'}</option>
+                            <option value="chubby">{language === 'de' ? 'Mollig' : language === 'fr' ? 'Potelé' : 'Chubby'}</option>
+                            <option value="overweight">{language === 'de' ? 'Übergewichtig' : language === 'fr' ? 'En surpoids' : 'Overweight'}</option>
+                            <option value="heavily overweight">{language === 'de' ? 'Stark übergewichtig' : language === 'fr' ? 'Très en surpoids' : 'Heavily Overweight'}</option>
+                          </select>
+                        </div>
+
+                        {/* Hair Color and Other Features - Admin only */}
+                        {currentUser && currentUser.role === 'admin' && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs font-semibold whitespace-nowrap min-w-[60px]">{t.hairColor}:</label>
+                              <input
+                                type="text"
+                                value={currentCharacter.hairColor}
+                                onChange={(e) => setCurrentCharacter({ ...currentCharacter, hairColor: e.target.value })}
+                                className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                                placeholder={t.hairColor}
+                              />
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <label className="text-xs font-semibold whitespace-nowrap min-w-[60px] pt-1.5">{t.otherFeatures}:</label>
+                              <textarea
+                                value={currentCharacter.otherFeatures}
+                                onChange={(e) => setCurrentCharacter({ ...currentCharacter, otherFeatures: e.target.value })}
+                                className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                                placeholder={t.descriptionPlaceholder}
+                                rows={2}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Strengths - only show after photo is uploaded */}
+                {currentCharacter.photoUrl && (
+                  <div>
+                    <label className="block text-lg font-semibold mb-2">
+                      {t.strengths} * ({t.selectAtLeast} 3) - {t.selected}: {currentCharacter.strengths.length}
+                    </label>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {allStrengths.map(strength => (
+                        <button
+                          key={strength}
+                          onClick={() => toggleArrayItem('strengths', strength)}
+                          className={`px-3 py-1 rounded-full text-sm ${
+                            currentCharacter.strengths.includes(strength)
+                              ? 'bg-green-500 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          {strength}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newStrength}
+                        onChange={(e) => setNewStrength(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addCustomStrength()}
+                        placeholder={t.addCustomStrengths}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                      <button
+                        onClick={addCustomStrength}
+                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                      >
+                        <Icon name="plus" size={20} />
+                      </button>
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <label className="block text-lg font-semibold mb-2">
-                    {t.strengths} * ({t.selectAtLeast} 3) - {t.selected}: {currentCharacter.strengths.length}
-                  </label>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {allStrengths.map(strength => (
+                {/* Weaknesses - only show after photo is uploaded */}
+                {currentCharacter.photoUrl && (
+                  <div>
+                    <label className="block text-lg font-semibold mb-2">
+                      {t.weaknesses} * ({t.selectAtLeast} 2) - {t.selected}: {currentCharacter.weaknesses.length}
+                    </label>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {allWeaknesses.map(weakness => (
+                        <button
+                          key={weakness}
+                          onClick={() => toggleArrayItem('weaknesses', weakness)}
+                          className={`px-3 py-1 rounded-full text-sm ${
+                            currentCharacter.weaknesses.includes(weakness)
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          {weakness}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newWeakness}
+                        onChange={(e) => setNewWeakness(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addCustomWeakness()}
+                        placeholder={t.addCustomWeaknesses}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                      />
                       <button
-                        key={strength}
-                        onClick={() => toggleArrayItem('strengths', strength)}
-                        className={`px-3 py-1 rounded-full text-sm ${
-                          currentCharacter.strengths.includes(strength)
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
+                        onClick={addCustomWeakness}
+                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
                       >
-                        {strength}
+                        <Icon name="plus" size={20} />
                       </button>
-                    ))}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newStrength}
-                      onChange={(e) => setNewStrength(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && addCustomStrength()}
-                      placeholder={t.addCustomStrengths}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                )}
+
+                {/* Special details - only show after photo is uploaded */}
+                {currentCharacter.photoUrl && (
+                  <div>
+                    <label className="block text-lg font-semibold mb-2">{t.specialDetails}</label>
+                    <textarea
+                      value={currentCharacter.specialDetails}
+                      onChange={(e) => setCurrentCharacter({ ...currentCharacter, specialDetails: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+                      placeholder={t.specialDetailsPlaceholder}
+                      rows={3}
                     />
+                  </div>
+                )}
+
+                {/* Save/Cancel buttons - only show after photo is uploaded */}
+                {currentCharacter.photoUrl && (
+                  <div className="flex gap-4">
                     <button
-                      onClick={addCustomStrength}
-                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                      onClick={cancelEditCharacter}
+                      className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 font-semibold"
                     >
-                      <Icon name="plus" size={20} />
+                      {t.cancel}
+                    </button>
+                    <button
+                      onClick={saveCurrentCharacter}
+                      disabled={!canSave}
+                      className={`flex-1 px-6 py-3 rounded-lg font-semibold ${
+                        canSave
+                          ? 'bg-blue-500 text-white hover:bg-blue-600'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      {t.saveCharacter}
                     </button>
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-lg font-semibold mb-2">
-                    {t.weaknesses} * ({t.selectAtLeast} 2) - {t.selected}: {currentCharacter.weaknesses.length}
-                  </label>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {allWeaknesses.map(weakness => (
-                      <button
-                        key={weakness}
-                        onClick={() => toggleArrayItem('weaknesses', weakness)}
-                        className={`px-3 py-1 rounded-full text-sm ${
-                          currentCharacter.weaknesses.includes(weakness)
-                            ? 'bg-orange-500 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                      >
-                        {weakness}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newWeakness}
-                      onChange={(e) => setNewWeakness(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && addCustomWeakness()}
-                      placeholder={t.addCustomWeaknesses}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-                    />
-                    <button
-                      onClick={addCustomWeakness}
-                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-                    >
-                      <Icon name="plus" size={20} />
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-lg font-semibold mb-2">{t.specialDetails}</label>
-                  <textarea
-                    value={currentCharacter.specialDetails}
-                    onChange={(e) => setCurrentCharacter({ ...currentCharacter, specialDetails: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
-                    placeholder={t.specialDetailsPlaceholder}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    onClick={cancelEditCharacter}
-                    className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 font-semibold"
-                  >
-                    {t.cancel}
-                  </button>
-                  <button
-                    onClick={saveCurrentCharacter}
-                    disabled={!canSave}
-                    className={`flex-1 px-6 py-3 rounded-lg font-semibold ${
-                      canSave
-                        ? 'bg-blue-500 text-white hover:bg-blue-600'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    {t.saveCharacter}
-                  </button>
-                </div>
+                )}
               </div>
             )}
           </div>
