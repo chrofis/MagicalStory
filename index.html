@@ -3034,6 +3034,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
               // Auto-save the story
               if (result) {
                 const storyToSave = {
+                  id: jobId, // Use jobId as story ID to prevent duplicates
                   title: result.title || storyTitle,
                   storyType: result.storyType || storyType,
                   storyDetails: result.storyDetails || storyDetails,
@@ -8378,13 +8379,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </button>
                 </div>
 
-                <button
+                <div className="flex gap-3 mb-4">
+                    <button
                       onClick={fetchAllUsers}
-                      className="mb-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
                     >
                       <span>🔄</span>
                       Refresh Users
                     </button>
+                    <button
+                      onClick={() => window.open('/admin-dashboard.html', '_blank')}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                    >
+                      <span>📊</span>
+                      View Dashboard
+                    </button>
+                  </div>
 
                 {adminUsers.length === 0 ? (
                   <div className="text-center py-12">
