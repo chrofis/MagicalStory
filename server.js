@@ -3324,8 +3324,15 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       throw new Error(`Story ${storyId} not found`);
     }
 
-    const storyData = storyResult.rows[0].data;
+    let storyData = storyResult.rows[0].data;
+
+    // Parse JSON if needed
+    if (typeof storyData === 'string') {
+      storyData = JSON.parse(storyData);
+    }
+
     console.log('✅ [BACKGROUND] Story data fetched');
+    console.log('📊 [BACKGROUND] Story data keys:', Object.keys(storyData));
 
     // Step 3: Generate PDF using PDFKit
     console.log('📄 [BACKGROUND] Generating PDF...');
@@ -3362,7 +3369,12 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     }
 
     // Add story pages (text + images alternating)
-    const storyPages = storyData.generatedStory.split(/---\s*Page\s+\d+\s*---/i).slice(1).filter(p => p.trim());
+    // The generated story might be in different fields depending on how it was saved
+    const generatedStoryText = storyData.generatedStory || storyData.story || storyData.text || '';
+    if (!generatedStoryText) {
+      throw new Error('Story text not found in story data. Available keys: ' + Object.keys(storyData).join(', '));
+    }
+    const storyPages = generatedStoryText.split(/---\s*Page\s+\d+\s*---/i).slice(1).filter(p => p.trim());
 
     storyPages.forEach((pageText, index) => {
       const pageNumber = index + 1;
