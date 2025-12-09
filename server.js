@@ -3293,6 +3293,188 @@ app.get('/api/admin/database-size', authenticateToken, async (req, res) => {
   }
 });
 
+// Admin Dashboard - Get storage usage per user
+app.get('/api/admin/user-storage', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(400).json({ error: 'User storage check is only available in database mode' });
+    }
+
+    // Get storage usage per user
+    const userStorage = await dbPool.query(`
+      WITH user_data AS (
+        SELECT
+          u.id,
+          u.username,
+          u.email,
+          u.role,
+          u.created_at,
+          COALESCE(SUM(LENGTH(s.data::text)), 0) as stories_size,
+          COUNT(DISTINCT s.id) as story_count,
+          COALESCE(SUM(LENGTH(f.data::text)), 0) as files_size,
+          COUNT(DISTINCT f.id) as file_count,
+          COUNT(DISTINCT c.id) as character_count
+        FROM users u
+        LEFT JOIN stories s ON u.id = s.user_id
+        LEFT JOIN files f ON u.id = f.user_id
+        LEFT JOIN characters c ON u.id = c.user_id
+        GROUP BY u.id, u.username, u.email, u.role, u.created_at
+      )
+      SELECT
+        id,
+        username,
+        email,
+        role,
+        created_at,
+        stories_size,
+        story_count,
+        files_size,
+        file_count,
+        character_count,
+        (stories_size + files_size) as total_size
+      FROM user_data
+      ORDER BY total_size DESC
+    `);
+
+    // Format sizes in human-readable format
+    const formatSize = (bytes) => {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const users = userStorage.rows.map(row => ({
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      role: row.role,
+      createdAt: row.created_at,
+      storyCount: parseInt(row.story_count),
+      fileCount: parseInt(row.file_count),
+      characterCount: parseInt(row.character_count),
+      storiesSize: formatSize(parseInt(row.stories_size)),
+      storiesSizeBytes: parseInt(row.stories_size),
+      filesSize: formatSize(parseInt(row.files_size)),
+      filesSizeBytes: parseInt(row.files_size),
+      totalSize: formatSize(parseInt(row.total_size)),
+      totalSizeBytes: parseInt(row.total_size)
+    }));
+
+    res.json({ users });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching user storage:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin Dashboard - Delete user and all their data
+app.delete('/api/admin/users/:userId', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const userIdToDelete = parseInt(req.params.userId);
+
+    if (isNaN(userIdToDelete)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    // Don't allow deleting yourself
+    if (userIdToDelete === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    if (STORAGE_MODE === 'database') {
+      // Get user info before deleting
+      const userResult = await dbPool.query('SELECT username, email FROM users WHERE id = $1', [userIdToDelete]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = userResult.rows[0];
+      console.log(`🗑️  [ADMIN] Deleting user ${user.username} (${user.email}) and all their data...`);
+
+      // Delete in order due to foreign key constraints
+      // 1. Delete story_jobs first
+      const deletedJobs = await dbPool.query('DELETE FROM story_jobs WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+      console.log(`   Deleted ${deletedJobs.rows.length} story jobs`);
+
+      // 2. Delete orders (if any)
+      const deletedOrders = await dbPool.query('DELETE FROM orders WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+      console.log(`   Deleted ${deletedOrders.rows.length} orders`);
+
+      // 3. Delete stories
+      const deletedStories = await dbPool.query('DELETE FROM stories WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+      console.log(`   Deleted ${deletedStories.rows.length} stories`);
+
+      // 4. Delete characters
+      const deletedCharacters = await dbPool.query('DELETE FROM characters WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+      console.log(`   Deleted ${deletedCharacters.rows.length} characters`);
+
+      // 5. Delete files
+      const deletedFiles = await dbPool.query('DELETE FROM files WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+      console.log(`   Deleted ${deletedFiles.rows.length} files`);
+
+      // 6. Delete activity logs
+      const deletedLogs = await dbPool.query('DELETE FROM activity_log WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+      console.log(`   Deleted ${deletedLogs.rows.length} activity logs`);
+
+      // 7. Finally, delete the user
+      await dbPool.query('DELETE FROM users WHERE id = $1', [userIdToDelete]);
+      console.log(`   Deleted user account`);
+
+      console.log(`✅ [ADMIN] Successfully deleted user ${user.username} and all associated data`);
+
+      res.json({
+        success: true,
+        message: `User ${user.username} and all associated data deleted successfully`,
+        deletedCounts: {
+          storyJobs: deletedJobs.rows.length,
+          orders: deletedOrders.rows.length,
+          stories: deletedStories.rows.length,
+          characters: deletedCharacters.rows.length,
+          files: deletedFiles.rows.length,
+          activityLogs: deletedLogs.rows.length
+        }
+      });
+    } else {
+      // File mode - delete from users.json
+      const users = await readJSON(USERS_FILE);
+      const userIndex = users.findIndex(u => u.id === userIdToDelete);
+
+      if (userIndex === -1) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = users[userIndex];
+      console.log(`🗑️  [ADMIN] Deleting user ${user.username} (${user.email}) from file storage...`);
+
+      users.splice(userIndex, 1);
+      await writeJSON(USERS_FILE, users);
+
+      // Note: In file mode, we don't delete stories/files as they are not linked to users
+      console.log(`✅ [ADMIN] Successfully deleted user ${user.username}`);
+
+      res.json({
+        success: true,
+        message: `User ${user.username} deleted successfully`
+      });
+    }
+  } catch (err) {
+    console.error('❌ [ADMIN] Error deleting user:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
