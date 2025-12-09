@@ -89,6 +89,126 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Stripe webhook endpoint needs raw body for signature verification
+// IMPORTANT: This MUST be defined BEFORE express.json() middleware
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  // Check if webhook secret is configured
+  if (!webhookSecret) {
+    console.error('❌ [STRIPE WEBHOOK] STRIPE_WEBHOOK_SECRET not configured in environment variables!');
+    console.error('   Please add STRIPE_WEBHOOK_SECRET to your Railway environment variables');
+    console.error('   Get the webhook signing secret from: https://dashboard.stripe.com/webhooks');
+    return res.status(500).json({ error: 'Webhook secret not configured' });
+  }
+
+  let event;
+
+  try {
+    // Verify the webhook signature to ensure it came from Stripe
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    console.log('✅ [STRIPE WEBHOOK] Signature verified successfully');
+  } catch (err) {
+    console.error('❌ [STRIPE WEBHOOK] Signature verification failed:', err.message);
+    console.error('   This webhook request did not come from Stripe or has been tampered with');
+    return res.status(400).json({ error: `Webhook signature verification failed: ${err.message}` });
+  }
+
+  // Now handle the verified event
+  try {
+    console.log('💳 [STRIPE WEBHOOK] Received verified event:', event.type);
+
+    // Handle the checkout.session.completed event
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+
+      console.log('✅ [STRIPE WEBHOOK] Payment successful!');
+      console.log('   Session ID:', session.id);
+      console.log('   Payment Intent:', session.payment_intent);
+      console.log('   Amount:', session.amount_total, session.currency);
+
+      // Retrieve full session with customer details
+      try {
+        const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+          expand: ['customer', 'line_items', 'shipping_details']
+        });
+
+        // Extract customer information
+        const customerInfo = {
+          name: fullSession.customer_details?.name || fullSession.shipping?.name || 'N/A',
+          email: fullSession.customer_details?.email || 'N/A',
+          address: fullSession.shipping?.address || fullSession.customer_details?.address || {}
+        };
+
+        console.log('📦 [STRIPE WEBHOOK] Customer Information:');
+        console.log('   Name:', customerInfo.name);
+        console.log('   Email:', customerInfo.email);
+        console.log('   Address:', JSON.stringify(customerInfo.address, null, 2));
+        console.log('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
+
+        // Store order in database
+        if (STORAGE_MODE === 'database') {
+          const userId = parseInt(fullSession.metadata.userId);
+          const storyId = parseInt(fullSession.metadata.storyId);
+          const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
+
+          await dbPool.query(`
+            INSERT INTO orders (
+              user_id, story_id, stripe_session_id, stripe_payment_intent_id,
+              customer_name, customer_email,
+              shipping_name, shipping_address_line1, shipping_address_line2,
+              shipping_city, shipping_state, shipping_postal_code, shipping_country,
+              amount_total, currency, payment_status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          `, [
+            userId, storyId, fullSession.id, fullSession.payment_intent,
+            customerInfo.name, customerInfo.email,
+            fullSession.shipping?.name || customerInfo.name,
+            address.line1, address.line2,
+            address.city, address.state, address.postal_code, address.country,
+            fullSession.amount_total, fullSession.currency, fullSession.payment_status
+          ]);
+
+          console.log('💾 [STRIPE WEBHOOK] Order saved to database');
+          console.log('   User ID:', userId);
+          console.log('   Story ID:', storyId);
+
+          // Trigger background PDF generation and Gelato order (don't await - fire and forget)
+          processBookOrder(fullSession.id, userId, storyId, customerInfo, address).catch(err => {
+            console.error('❌ [BACKGROUND] Error processing book order:', err);
+            console.error('   Error stack:', err.stack);
+            console.error('   Session ID:', fullSession.id);
+            console.error('   User ID:', userId);
+            console.error('   Story ID:', storyId);
+            console.error('   CRITICAL: Customer paid but book order failed! Check database for stripe_session_id:', fullSession.id);
+          });
+
+          console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
+        } else {
+          console.warn('⚠️  [STRIPE WEBHOOK] Payment received but STORAGE_MODE is not "database" - order not processed!');
+          console.warn('   Current STORAGE_MODE:', STORAGE_MODE);
+          console.warn('   Session ID:', fullSession.id);
+          console.warn('   Amount:', fullSession.amount_total, fullSession.currency);
+          console.warn('   This payment succeeded but the customer will NOT receive their book!');
+        }
+
+      } catch (retrieveError) {
+        console.error('❌ [STRIPE WEBHOOK] Error retrieving/storing session details:', retrieveError);
+        console.error('   Error stack:', retrieveError.stack);
+        console.error('   Session ID:', session.id);
+        console.error('   This payment succeeded but order processing failed!');
+      }
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    console.error('❌ [STRIPE WEBHOOK] Error processing webhook:', err);
+    res.status(400).json({ error: 'Webhook error' });
+  }
+});
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
@@ -3287,102 +3407,6 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     throw error;
   }
 }
-
-// Stripe webhook endpoint - receives payment events
-app.post('/api/stripe/webhook', async (req, res) => {
-  try {
-    const event = req.body;
-
-    console.log('💳 [STRIPE WEBHOOK] Received event:', event.type);
-
-    // Handle the checkout.session.completed event
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-
-      console.log('✅ [STRIPE WEBHOOK] Payment successful!');
-      console.log('   Session ID:', session.id);
-      console.log('   Payment Intent:', session.payment_intent);
-      console.log('   Amount:', session.amount_total, session.currency);
-
-      // Retrieve full session with customer details
-      try {
-        const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
-          expand: ['customer', 'line_items', 'shipping_details']
-        });
-
-        // Extract customer information
-        const customerInfo = {
-          name: fullSession.customer_details?.name || fullSession.shipping?.name || 'N/A',
-          email: fullSession.customer_details?.email || 'N/A',
-          address: fullSession.shipping?.address || fullSession.customer_details?.address || {}
-        };
-
-        console.log('📦 [STRIPE WEBHOOK] Customer Information:');
-        console.log('   Name:', customerInfo.name);
-        console.log('   Email:', customerInfo.email);
-        console.log('   Address:', JSON.stringify(customerInfo.address, null, 2));
-        console.log('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
-
-        // Store order in database
-        if (STORAGE_MODE === 'database') {
-          const userId = parseInt(fullSession.metadata.userId);
-          const storyId = parseInt(fullSession.metadata.storyId);
-          const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
-
-          await dbPool.query(`
-            INSERT INTO orders (
-              user_id, story_id, stripe_session_id, stripe_payment_intent_id,
-              customer_name, customer_email,
-              shipping_name, shipping_address_line1, shipping_address_line2,
-              shipping_city, shipping_state, shipping_postal_code, shipping_country,
-              amount_total, currency, payment_status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-          `, [
-            userId, storyId, fullSession.id, fullSession.payment_intent,
-            customerInfo.name, customerInfo.email,
-            fullSession.shipping?.name || customerInfo.name,
-            address.line1, address.line2,
-            address.city, address.state, address.postal_code, address.country,
-            fullSession.amount_total, fullSession.currency, fullSession.payment_status
-          ]);
-
-          console.log('💾 [STRIPE WEBHOOK] Order saved to database');
-          console.log('   User ID:', userId);
-          console.log('   Story ID:', storyId);
-
-          // Trigger background PDF generation and Gelato order (don't await - fire and forget)
-          processBookOrder(fullSession.id, userId, storyId, customerInfo, address).catch(err => {
-            console.error('❌ [BACKGROUND] Error processing book order:', err);
-            console.error('   Error stack:', err.stack);
-            console.error('   Session ID:', fullSession.id);
-            console.error('   User ID:', userId);
-            console.error('   Story ID:', storyId);
-            console.error('   CRITICAL: Customer paid but book order failed! Check database for stripe_session_id:', fullSession.id);
-          });
-
-          console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
-        } else {
-          console.warn('⚠️  [STRIPE WEBHOOK] Payment received but STORAGE_MODE is not "database" - order not processed!');
-          console.warn('   Current STORAGE_MODE:', STORAGE_MODE);
-          console.warn('   Session ID:', fullSession.id);
-          console.warn('   Amount:', fullSession.amount_total, fullSession.currency);
-          console.warn('   This payment succeeded but the customer will NOT receive their book!');
-        }
-
-      } catch (retrieveError) {
-        console.error('❌ [STRIPE WEBHOOK] Error retrieving/storing session details:', retrieveError);
-        console.error('   Error stack:', retrieveError.stack);
-        console.error('   Session ID:', session.id);
-        console.error('   This payment succeeded but order processing failed!');
-      }
-    }
-
-    res.json({ received: true });
-  } catch (err) {
-    console.error('❌ [STRIPE WEBHOOK] Error processing webhook:', err);
-    res.status(400).json({ error: 'Webhook error' });
-  }
-});
 
 // ===================================
 // BACKGROUND STORY GENERATION JOBS
