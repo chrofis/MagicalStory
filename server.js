@@ -132,7 +132,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       // Retrieve full session with customer details
       try {
         const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
-          expand: ['customer', 'line_items', 'shipping_details']
+          expand: ['customer', 'line_items']
         });
 
         // Extract customer information
