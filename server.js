@@ -3095,6 +3095,75 @@ app.get('/api/admin/stats', authenticateToken, async (req, res) => {
   }
 });
 
+// Admin Dashboard - Delete orphaned files
+app.delete('/api/admin/orphaned-files', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(400).json({ error: 'File deletion is only available in database mode' });
+    }
+
+    const { fileId } = req.body; // If fileId is 'all', delete all orphaned files
+
+    if (!fileId) {
+      return res.status(400).json({ error: 'fileId is required (use "all" to delete all orphaned files)' });
+    }
+
+    let deletedCount = 0;
+
+    if (fileId === 'all') {
+      console.log('🗑️ [ADMIN] Deleting all orphaned files...');
+
+      // Delete all files with story_id that doesn't exist in stories table
+      const result = await dbPool.query(`
+        DELETE FROM files
+        WHERE story_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM stories s WHERE s.id = files.story_id
+          )
+      `);
+
+      deletedCount = result.rowCount;
+      console.log(`✅ [ADMIN] Deleted ${deletedCount} orphaned files`);
+    } else {
+      console.log(`🗑️ [ADMIN] Deleting orphaned file: ${fileId}`);
+
+      // First verify the file is actually orphaned
+      const checkResult = await dbPool.query(`
+        SELECT f.id, f.story_id
+        FROM files f
+        WHERE f.id = $1
+          AND f.story_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM stories s WHERE s.id = f.story_id
+          )
+      `, [fileId]);
+
+      if (checkResult.rows.length === 0) {
+        return res.status(404).json({ error: 'File not found or not orphaned' });
+      }
+
+      // Delete the file
+      await dbPool.query('DELETE FROM files WHERE id = $1', [fileId]);
+      deletedCount = 1;
+      console.log(`✅ [ADMIN] Deleted orphaned file: ${fileId}`);
+    }
+
+    res.json({
+      success: true,
+      deletedCount,
+      message: `Successfully deleted ${deletedCount} orphaned file(s)`
+    });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error deleting orphaned files:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
