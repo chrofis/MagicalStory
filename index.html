@@ -7934,17 +7934,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           className="w-full rounded-lg shadow-md mb-3"
                         />
 
-                        {/* Quality Score Display */}
-                        {image.qualityScore !== null && image.qualityScore !== undefined && (
-                          <div className="bg-blue-50 border border-blue-300 rounded-lg p-2 mb-3">
-                            <p className="text-sm font-semibold text-blue-700">
-                              Quality Score: {image.qualityScore}/10
-                            </p>
-                            {image.qualityReasoning && (
-                              <p className="text-xs text-blue-600 mt-1">{image.qualityReasoning}</p>
-                            )}
-                          </div>
-                        )}
 
                         {/* Image Action Buttons */}
                         <div className="flex gap-2 mb-3">
@@ -8064,8 +8053,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           </details>
                         )}
 
-                        {/* Quality Score - Admin Only */}
-                        {currentUser && currentUser.role === 'admin' && image.qualityScore !== null && image.qualityScore !== undefined && (
+                        {/* Quality Score with Collapsible Explanation */}
+                        {image.qualityScore !== null && image.qualityScore !== undefined && (
                           <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
                             <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
                               <span>
@@ -8076,7 +8065,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 image.qualityScore >= 60 ? 'text-yellow-600' :
                                 'text-red-600'
                               }`}>
-                                {image.qualityScore}/100
+                                {(image.qualityScore / 10).toFixed(1)}/10
                               </span>
                             </summary>
                             {image.qualityReasoning && (
