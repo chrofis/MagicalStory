@@ -1,0 +1,10 @@
+Evaluate this AI-generated children's storybook illustration on a scale of 0-100.
+
+Consider these criteria:
+1. **Visual Appeal** (0-20): Is it visually pleasing and engaging for children?
+2. **Clarity** (0-20): Are the subjects clear and easy to understand?
+3. **Artistic Quality** (0-20): Is the art style consistent and well-executed?
+4. **Age-Appropriateness** (0-20): Is it suitable for the target age group (3-8 years)?
+5. **Technical Quality** (0-20): No artifacts, good composition, proper lighting?
+
+Respond with ONLY a number between 0-100, nothing else.

@@ -6,5 +6,6 @@ Scene Description: {SCENE_DESCRIPTION}
 Important:
 - Show only the emotions visible on faces (happy, sad, surprised, worried, excited)
 - Keep clothing exactly as described
-- Maintain consistent character appearance
+- Maintain consistent character appearance across ALL pages
 - Clean, clear composition
+- Age-appropriate for {AGE_FROM}-{AGE_TO} years old

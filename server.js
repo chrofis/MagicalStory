@@ -23,7 +23,23 @@ console.log('💾 Image cache initialized');
 //   - Tier 1 (8K tokens/min): 5-8 pages per batch
 //   - Tier 2+ (400K tokens/min): 0 (generate all at once)
 const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;  // 0 = no batching (generate all at once)
-console.log(`📚 Story batch size: ${STORY_BATCH_SIZE === 0 ? 'DISABLED (generate all at once)' : STORY_BATCH_SIZE + ' pages per batch'}`);
+
+// Verbose logging mode - set VERBOSE_LOGGING=true for detailed debug output
+const VERBOSE_LOGGING = process.env.VERBOSE_LOGGING === 'true';
+
+// Logging helper functions
+const log = {
+  info: (msg, ...args) => console.log(msg, ...args),
+  error: (msg, ...args) => console.error(msg, ...args),
+  warn: (msg, ...args) => console.warn(msg, ...args),
+  // Verbose logs only show when VERBOSE_LOGGING is enabled
+  verbose: (msg, ...args) => VERBOSE_LOGGING && console.log(`[VERBOSE] ${msg}`, ...args),
+  // Debug logs for development
+  debug: (msg, ...args) => VERBOSE_LOGGING && console.log(`[DEBUG] ${msg}`, ...args)
+};
+
+log.info(`📚 Story batch size: ${STORY_BATCH_SIZE === 0 ? 'DISABLED (generate all at once)' : STORY_BATCH_SIZE + ' pages per batch'}`);
+log.info(`🔊 Verbose logging: ${VERBOSE_LOGGING ? 'ENABLED' : 'DISABLED'}`);
 
 // Load prompt templates from files
 const PROMPT_TEMPLATES = {};
@@ -35,10 +51,11 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.storyTextSingle = await fs.readFile(path.join(promptsDir, 'story-text-single.txt'), 'utf-8');
     PROMPT_TEMPLATES.sceneDescriptions = await fs.readFile(path.join(promptsDir, 'scene-descriptions.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
-    console.log('📝 Prompt templates loaded from prompts/ folder');
+    PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
+    log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
-    console.error('❌ Failed to load prompt templates:', err.message);
-    console.error('   Falling back to hardcoded prompts');
+    log.error('❌ Failed to load prompt templates:', err.message);
+    log.error('   Falling back to hardcoded prompts');
   }
 }
 
@@ -4377,10 +4394,10 @@ Write the full story content for each page in this range, but maintain the exact
       title: storyTitle
     };
 
-    console.log('📖 [SERVER] resultData keys:', Object.keys(resultData));
-    console.log('📖 [SERVER] storyText exists?', !!resultData.storyText);
-    console.log('📖 [SERVER] storyText length:', resultData.storyText?.length || 0);
-    console.log('📖 [SERVER] storyText preview:', resultData.storyText?.substring(0, 200));
+    log.debug('📖 [SERVER] resultData keys:', Object.keys(resultData));
+    log.debug('📖 [SERVER] storyText exists?', !!resultData.storyText);
+    log.debug('📖 [SERVER] storyText length:', resultData.storyText?.length || 0);
+    log.verbose('📖 [SERVER] storyText preview:', resultData.storyText?.substring(0, 200));
 
     await dbPool.query(
       `UPDATE story_jobs
@@ -4622,7 +4639,7 @@ async function evaluateImageQuality(imageData) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
-      console.warn('⚠️  [QUALITY] Claude API key not configured, skipping quality evaluation');
+      log.verbose('⚠️  [QUALITY] Claude API key not configured, skipping quality evaluation');
       return null;
     }
 
@@ -4630,6 +4647,10 @@ async function evaluateImageQuality(imageData) {
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Use prompt template if available
+    const evaluationPrompt = PROMPT_TEMPLATES.imageEvaluation ||
+      'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -4654,7 +4675,7 @@ async function evaluateImageQuality(imageData) {
             },
             {
               type: 'text',
-              text: 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-10. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality (no artifacts, good composition). Respond with ONLY a number between 0-10, nothing else.'
+              text: evaluationPrompt
             }
           ]
         }]
@@ -4663,7 +4684,7 @@ async function evaluateImageQuality(imageData) {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('❌ [QUALITY] Claude API error:', error);
+      log.error('❌ [QUALITY] Claude API error:', error);
       return null;
     }
 
@@ -4671,15 +4692,16 @@ async function evaluateImageQuality(imageData) {
     const scoreText = data.content[0].text.trim();
     const score = parseFloat(scoreText);
 
-    if (isNaN(score) || score < 0 || score > 10) {
-      console.warn('⚠️  [QUALITY] Invalid score received:', scoreText);
+    // Score is now 0-100
+    if (isNaN(score) || score < 0 || score > 100) {
+      log.warn('⚠️  [QUALITY] Invalid score received:', scoreText);
       return null;
     }
 
-    console.log(`⭐ [QUALITY] Image quality score: ${score}/10`);
+    log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100`);
     return score;
   } catch (error) {
-    console.error('❌ [QUALITY] Error evaluating image quality:', error);
+    log.error('❌ [QUALITY] Error evaluating image quality:', error);
     return null;
   }
 }
@@ -4689,14 +4711,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = []) {
   const cacheKey = generateImageCacheKey(prompt, characterPhotos);
 
   if (imageCache.has(cacheKey)) {
-    console.log('💾 [IMAGE CACHE] Cache HIT - reusing previously generated image');
-    console.log('💾 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
-    console.log('💾 [IMAGE CACHE] Cache size:', imageCache.size, 'images');
+    log.verbose('💾 [IMAGE CACHE] Cache HIT - reusing previously generated image');
+    log.debug('💾 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
+    log.debug('💾 [IMAGE CACHE] Cache size:', imageCache.size, 'images');
     return imageCache.get(cacheKey);
   }
 
-  console.log('🆕 [IMAGE CACHE] Cache MISS - generating new image');
-  console.log('🆕 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
+  log.verbose('🆕 [IMAGE CACHE] Cache MISS - generating new image');
+  log.debug('🆕 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
 
   // Call Gemini API for image generation with optional character reference images
   const apiKey = process.env.GEMINI_API_KEY;
@@ -4797,7 +4819,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = []) {
         // Store in cache
         const result = { imageData: compressedImageData, score: qualityScore };
         imageCache.set(cacheKey, result);
-        console.log('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
+        log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
 
         return result;
       }
