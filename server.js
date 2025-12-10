@@ -3571,9 +3571,15 @@ app.delete('/api/admin/users/:userId', authenticateToken, async (req, res) => {
       const deletedFiles = await dbPool.query('DELETE FROM files WHERE user_id = $1 RETURNING id', [userIdToDelete]);
       console.log(`   Deleted ${deletedFiles.rows.length} files`);
 
-      // 6. Delete activity logs
-      const deletedLogs = await dbPool.query('DELETE FROM activity_log WHERE user_id = $1 RETURNING id', [userIdToDelete]);
-      console.log(`   Deleted ${deletedLogs.rows.length} activity logs`);
+      // 6. Delete activity logs (table may not exist)
+      let deletedLogsCount = 0;
+      try {
+        const deletedLogs = await dbPool.query('DELETE FROM activity_log WHERE user_id = $1 RETURNING id', [userIdToDelete]);
+        deletedLogsCount = deletedLogs.rows.length;
+        console.log(`   Deleted ${deletedLogsCount} activity logs`);
+      } catch (err) {
+        console.log(`   Activity log table not found, skipping`);
+      }
 
       // 7. Finally, delete the user
       await dbPool.query('DELETE FROM users WHERE id = $1', [userIdToDelete]);
@@ -3590,7 +3596,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, async (req, res) => {
           stories: deletedStories.rows.length,
           characters: deletedCharacters.rows.length,
           files: deletedFiles.rows.length,
-          activityLogs: deletedLogs.rows.length
+          activityLogs: deletedLogsCount
         }
       });
     } else {
