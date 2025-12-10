@@ -77,11 +77,11 @@ const TEXT_MODELS = {
     maxOutputTokens: 8192,
     description: 'Gemini 2.0 Flash - Very fast'
   },
-  'gemini-1.5-pro': {
+  'gemini-pro-latest': {
     provider: 'google',
     modelId: 'gemini-pro-latest',
-    maxOutputTokens: 8192,
-    description: 'Gemini Pro Latest - Stable, good balance'
+    maxOutputTokens: 65536,
+    description: 'Gemini Pro Latest (2.5 Pro) - High quality'
   }
 };
 
