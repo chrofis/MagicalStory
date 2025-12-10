@@ -330,14 +330,34 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           console.log('   Story ID:', storyId);
 
           // Trigger background PDF generation and Gelato order (don't await - fire and forget)
-          processBookOrder(fullSession.id, userId, storyId, customerInfo, address).catch(err => {
+          processBookOrder(fullSession.id, userId, storyId, customerInfo, address).catch(async (err) => {
             console.error('❌ [BACKGROUND] Error processing book order:', err);
             console.error('   Error stack:', err.stack);
             console.error('   Session ID:', fullSession.id);
             console.error('   User ID:', userId);
             console.error('   Story ID:', storyId);
             console.error('   CRITICAL: Customer paid but book order failed! Check database for stripe_session_id:', fullSession.id);
+
+            // Send critical admin alert
+            await email.sendAdminOrderFailureAlert(
+              fullSession.id,
+              customerInfo.email,
+              customerInfo.name,
+              err.message
+            );
           });
+
+          // Send order confirmation email to customer
+          email.sendOrderConfirmationEmail(
+            customerInfo.email,
+            customerInfo.name,
+            {
+              orderId: fullSession.id.slice(-8).toUpperCase(),
+              amount: (fullSession.amount_total / 100).toFixed(2),
+              currency: fullSession.currency.toUpperCase(),
+              shippingAddress: address
+            }
+          ).catch(err => console.error('❌ Failed to send order confirmation email:', err));
 
           console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
         } else {
@@ -4870,6 +4890,18 @@ Output Format:
 
     console.log(`✅ Job ${jobId} completed successfully`);
 
+    // Send story completion email to customer
+    try {
+      const userResult = await dbPool.query('SELECT email, username FROM users WHERE id = $1', [job.user_id]);
+      if (userResult.rows.length > 0 && userResult.rows[0].email) {
+        const user = userResult.rows[0];
+        const storyTitle = inputData.storyTitle || inputData.title || 'Your Story';
+        await email.sendStoryCompleteEmail(user.email, user.username, storyTitle);
+      }
+    } catch (emailErr) {
+      console.error('❌ Failed to send story complete email:', emailErr);
+    }
+
   } catch (error) {
     console.error(`❌ Job ${jobId} failed:`, error);
 
@@ -4879,6 +4911,26 @@ Output Format:
        WHERE id = $3`,
       ['failed', error.message, jobId]
     );
+
+    // Send failure notifications
+    try {
+      const jobResult = await dbPool.query('SELECT user_id FROM story_jobs WHERE id = $1', [jobId]);
+      if (jobResult.rows.length > 0) {
+        const userId = jobResult.rows[0].user_id;
+        const userResult = await dbPool.query('SELECT email, username FROM users WHERE id = $1', [userId]);
+        if (userResult.rows.length > 0) {
+          const user = userResult.rows[0];
+          // Notify admin
+          await email.sendAdminStoryFailureAlert(jobId, userId, user.username, user.email || 'N/A', error.message);
+          // Notify customer
+          if (user.email) {
+            await email.sendStoryFailedEmail(user.email, user.username);
+          }
+        }
+      }
+    } catch (emailErr) {
+      console.error('❌ Failed to send failure notification emails:', emailErr);
+    }
   }
 }
 
