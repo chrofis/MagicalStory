@@ -2695,7 +2695,12 @@ app.get('/api/files/:fileId', async (req, res) => {
         res.set('Content-Disposition', `inline; filename="${file.filename}"`);
       }
       // Decode Base64 to binary buffer before sending
-      const fileBuffer = Buffer.from(file.file_data, 'base64');
+      // Handle both raw base64 and data URL formats
+      let base64Data = file.file_data;
+      if (base64Data.startsWith('data:')) {
+        base64Data = base64Data.split(',')[1];
+      }
+      const fileBuffer = Buffer.from(base64Data, 'base64');
       res.send(fileBuffer);
 
     } else {
