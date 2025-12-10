@@ -41,6 +41,43 @@ const log = {
 log.info(`📚 Story batch size: ${STORY_BATCH_SIZE === 0 ? 'DISABLED (generate all at once)' : STORY_BATCH_SIZE + ' pages per batch'}`);
 log.info(`🔊 Verbose logging: ${VERBOSE_LOGGING ? 'ENABLED' : 'DISABLED'}`);
 
+// =============================================================================
+// TEXT MODEL CONFIGURATION
+// Set TEXT_MODEL env var to switch between models (default: claude-sonnet)
+// =============================================================================
+const TEXT_MODELS = {
+  'claude-sonnet': {
+    provider: 'anthropic',
+    modelId: 'claude-sonnet-4-5-20250929',
+    maxOutputTokens: 64000,
+    description: 'Claude Sonnet 4.5 - Best narrative quality'
+  },
+  'claude-haiku': {
+    provider: 'anthropic',
+    modelId: 'claude-3-5-haiku-20241022',
+    maxOutputTokens: 8192,
+    description: 'Claude Haiku 3.5 - Fast and cheap'
+  },
+  'gemini-pro': {
+    provider: 'google',
+    modelId: 'gemini-1.5-pro',
+    maxOutputTokens: 8192,
+    description: 'Gemini 1.5 Pro - Good balance'
+  },
+  'gemini-flash': {
+    provider: 'google',
+    modelId: 'gemini-2.0-flash',
+    maxOutputTokens: 8192,
+    description: 'Gemini 2.0 Flash - Very fast'
+  }
+};
+
+// Active text model (configurable via env var)
+const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
+const activeTextModel = TEXT_MODELS[TEXT_MODEL] || TEXT_MODELS['claude-sonnet'];
+
+log.info(`🤖 Text model: ${TEXT_MODEL} (${activeTextModel.description})`);
+
 // Load prompt templates from files
 const PROMPT_TEMPLATES = {};
 async function loadPromptTemplates() {
@@ -1021,8 +1058,23 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     let safeUsers;
 
     if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode - order by created_at to maintain consistent order
-      const selectQuery = 'SELECT id, username, email, role, story_quota, stories_generated, created_at FROM users ORDER BY created_at ASC';
+      // Database mode - include order counts with JOIN
+      const selectQuery = `
+        SELECT
+          u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.created_at,
+          COALESCE(order_stats.total_orders, 0) as total_orders,
+          COALESCE(order_stats.failed_orders, 0) as failed_orders
+        FROM users u
+        LEFT JOIN (
+          SELECT
+            user_id,
+            COUNT(*) as total_orders,
+            COUNT(*) FILTER (WHERE payment_status = 'paid' AND gelato_order_id IS NULL) as failed_orders
+          FROM orders
+          GROUP BY user_id
+        ) order_stats ON u.id::text = order_stats.user_id
+        ORDER BY u.created_at ASC
+      `;
       const rows = await dbQuery(selectQuery, []);
       safeUsers = rows.map(user => ({
         id: user.id,
@@ -1031,7 +1083,9 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         role: user.role,
         storyQuota: user.story_quota,
         storiesGenerated: user.stories_generated,
-        createdAt: user.created_at
+        createdAt: user.created_at,
+        totalOrders: parseInt(user.total_orders) || 0,
+        failedOrders: parseInt(user.failed_orders) || 0
       }));
     } else {
       // File mode
@@ -1039,7 +1093,9 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
       safeUsers = users.map(({ password, ...user }) => ({
         ...user,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
-        storiesGenerated: user.storiesGenerated || 0
+        storiesGenerated: user.storiesGenerated || 0,
+        totalOrders: 0,
+        failedOrders: 0
       }));
     }
 
@@ -3218,6 +3274,156 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error('❌ [ADMIN] Error fetching orders:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin - Retry failed Gelato order
+app.post('/api/admin/orders/:orderId/retry-gelato', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { orderId } = req.params;
+    console.log(`🔄 [ADMIN] Retrying Gelato order for order ID: ${orderId}`);
+
+    // Get order details
+    const orderResult = await dbPool.query(`
+      SELECT * FROM orders WHERE id = $1
+    `, [orderId]);
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = orderResult.rows[0];
+
+    // Check if order already has a Gelato order
+    if (order.gelato_order_id) {
+      return res.status(400).json({ error: 'Order already has a Gelato order ID', gelatoOrderId: order.gelato_order_id });
+    }
+
+    // Find the PDF file for this story
+    const pdfResult = await dbPool.query(`
+      SELECT id FROM files WHERE story_id = $1 AND file_type = 'story_pdf' ORDER BY created_at DESC LIMIT 1
+    `, [order.story_id]);
+
+    if (pdfResult.rows.length === 0) {
+      return res.status(400).json({ error: 'No PDF found for this story. PDF needs to be regenerated.' });
+    }
+
+    const pdfFileId = pdfResult.rows[0].id;
+    const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
+    const pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
+
+    // Get story data to determine page count
+    const storyResult = await dbPool.query(`SELECT data FROM stories WHERE id = $1`, [order.story_id]);
+    if (storyResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Story not found' });
+    }
+
+    const storyData = JSON.parse(storyResult.rows[0].data);
+    const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
+    const gelatoPageCount = storyScenes * 2;
+
+    // Get Gelato product UID
+    const productsResult = await dbPool.query(
+      'SELECT product_uid, product_name FROM gelato_products WHERE is_active = true'
+    );
+
+    let gelatoProductUid = null;
+    if (productsResult.rows.length > 0) {
+      const sortedProducts = productsResult.rows.sort((a, b) => {
+        const aMin = parseInt(a.product_uid.match(/\d+/)?.[0] || 0);
+        const bMin = parseInt(b.product_uid.match(/\d+/)?.[0] || 0);
+        return aMin - bMin;
+      });
+      gelatoProductUid = sortedProducts[0].product_uid;
+    }
+
+    if (!gelatoProductUid) {
+      gelatoProductUid = 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
+    }
+
+    const gelatoApiKey = process.env.GELATO_API_KEY;
+    if (!gelatoApiKey) {
+      return res.status(500).json({ error: 'GELATO_API_KEY not configured' });
+    }
+
+    const orderType = process.env.GELATO_ORDER_TYPE || 'order';
+
+    const gelatoOrderPayload = {
+      orderType: orderType,
+      orderReferenceId: `retry-${order.story_id}-${Date.now()}`,
+      customerReferenceId: order.user_id,
+      currency: 'CHF',
+      items: [{
+        itemReferenceId: `item-retry-${order.story_id}-${Date.now()}`,
+        productUid: gelatoProductUid,
+        pageCount: gelatoPageCount,
+        files: [{
+          type: 'default',
+          url: pdfUrl
+        }],
+        quantity: 1
+      }],
+      shipmentMethodUid: 'standard',
+      shippingAddress: {
+        firstName: (order.shipping_name || order.customer_name || '').split(' ')[0] || 'Customer',
+        lastName: (order.shipping_name || order.customer_name || '').split(' ').slice(1).join(' ') || '',
+        addressLine1: order.shipping_address_line1 || '',
+        addressLine2: order.shipping_address_line2 || '',
+        city: order.shipping_city || '',
+        postCode: order.shipping_postal_code || '',
+        state: order.shipping_state || '',
+        country: order.shipping_country || 'CH',
+        email: order.customer_email,
+        phone: ''
+      }
+    };
+
+    console.log(`📦 [ADMIN] Retry Gelato order payload: productUid=${gelatoProductUid}, pageCount=${gelatoPageCount}, pdfUrl=${pdfUrl}`);
+
+    const gelatoResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': gelatoApiKey
+      },
+      body: JSON.stringify(gelatoOrderPayload)
+    });
+
+    if (!gelatoResponse.ok) {
+      const errorText = await gelatoResponse.text();
+      console.error(`❌ [ADMIN] Gelato API error: ${gelatoResponse.status} - ${errorText}`);
+      return res.status(gelatoResponse.status).json({
+        error: 'Gelato order failed',
+        details: errorText
+      });
+    }
+
+    const gelatoOrder = await gelatoResponse.json();
+    console.log('✅ [ADMIN] Gelato order created:', gelatoOrder.orderId);
+
+    // Update order with Gelato order ID
+    await dbPool.query(`
+      UPDATE orders
+      SET gelato_order_id = $1,
+          gelato_status = 'submitted',
+          payment_status = 'completed',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+    `, [gelatoOrder.orderId, orderId]);
+
+    res.json({
+      success: true,
+      message: 'Gelato order created successfully',
+      gelatoOrderId: gelatoOrder.orderId
+    });
+
+  } catch (err) {
+    console.error('❌ [ADMIN] Error retrying Gelato order:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -771,7 +771,12 @@
         email: ''
       });
       const [emailChanged, setEmailChanged] = useState(false);
-      const [adminTab, setAdminTab] = useState('users'); // 'users' or 'products'
+      const [adminTab, setAdminTab] = useState('users'); // 'users', 'products', or 'orders'
+      const [impersonateUserId, setImpersonateUserId] = useState(null); // Admin impersonation mode
+      const [impersonateUsername, setImpersonateUsername] = useState(null);
+      const [failedOrders, setFailedOrders] = useState([]);
+      const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+      const [retryingOrderId, setRetryingOrderId] = useState(null);
       const [gelatoProducts, setGelatoProducts] = useState([]);
       const [showProductForm, setShowProductForm] = useState(false);
       const [editingProduct, setEditingProduct] = useState(null);
@@ -963,6 +968,47 @@
 
           // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        // Check for admin impersonation mode
+        const impersonateUser = urlParams.get('impersonate');
+        const impersonateStory = urlParams.get('story');
+        if (impersonateUser && impersonateStory) {
+          console.log(`🔐 [ADMIN] Impersonation mode: user=${impersonateUser}, story=${impersonateStory}`);
+          setImpersonateUserId(impersonateUser);
+
+          // Load the story via admin endpoint
+          const token = localStorage.getItem('auth_token');
+          if (token) {
+            fetch(`${API_URL}/api/admin/users/${impersonateUser}/stories/${impersonateStory}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+              .then(res => {
+                if (!res.ok) throw new Error('Failed to load story');
+                return res.json();
+              })
+              .then(fullStory => {
+                console.log('✅ [ADMIN] Loaded impersonated story:', fullStory.title);
+                setImpersonateUsername(fullStory.userId || impersonateUser);
+                setCurrentStoryId(fullStory.id);
+                setStoryType(fullStory.storyType);
+                setArtStyle(fullStory.artStyle);
+                setPages(fullStory.pages);
+                setCharacters(fullStory.characters || []);
+                setStoryOutline(fullStory.outline || '');
+                setGeneratedStory(fullStory.story || '');
+                setSceneDescriptions(fullStory.sceneDescriptions || []);
+                setSceneImages(fullStory.sceneImages || []);
+                setStoryTitle(fullStory.title || '');
+                setCoverImages(fullStory.coverImages || { frontCover: null, page0: null, backCover: null });
+                setImagePrompts(fullStory.imagePrompts || {});
+                setStep(5);
+              })
+              .catch(err => {
+                console.error('❌ [ADMIN] Error loading impersonated story:', err);
+                alert('Failed to load story in impersonation mode. Make sure you are logged in as admin.');
+              });
+          }
         }
       }, []);
 
@@ -1585,6 +1631,74 @@ Be specific and creative. Each scene description should paint a clear picture fo
             ? 'Erreur lors de la suppression de l\'utilisateur'
             : 'Error deleting user');
           return false;
+        }
+      };
+
+      // Fetch failed orders (admin only)
+      const fetchFailedOrders = async () => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        setIsLoadingOrders(true);
+        try {
+          const response = await fetch(`${API_URL}/api/admin/orders`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            // Filter only failed orders (paid but no gelato_order_id)
+            const failed = data.orders.filter(o => o.has_issue);
+            setFailedOrders(failed);
+            console.log(`📦 [ADMIN] Loaded ${failed.length} failed orders`);
+          } else {
+            console.error('Failed to fetch orders');
+            setFailedOrders([]);
+          }
+        } catch (err) {
+          console.error('Error fetching orders:', err);
+          setFailedOrders([]);
+        } finally {
+          setIsLoadingOrders(false);
+        }
+      };
+
+      // Retry sending order to Gelato (admin only)
+      const retryGelatoOrder = async (orderId) => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        setRetryingOrderId(orderId);
+        try {
+          const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/retry-gelato`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert(language === 'de'
+              ? `Gelato Bestellung erfolgreich erstellt!\nGelato Order ID: ${result.gelatoOrderId}`
+              : language === 'fr'
+              ? `Commande Gelato créée avec succès!\nGelato Order ID: ${result.gelatoOrderId}`
+              : `Gelato order created successfully!\nGelato Order ID: ${result.gelatoOrderId}`);
+            // Refresh failed orders list
+            await fetchFailedOrders();
+          } else {
+            alert(language === 'de'
+              ? `Fehler: ${result.error}\n${result.details || ''}`
+              : language === 'fr'
+              ? `Erreur: ${result.error}\n${result.details || ''}`
+              : `Error: ${result.error}\n${result.details || ''}`);
+          }
+        } catch (err) {
+          console.error('Error retrying Gelato order:', err);
+          alert(language === 'de'
+            ? 'Fehler beim Senden an Gelato'
+            : language === 'fr'
+            ? 'Erreur lors de l\'envoi à Gelato'
+            : 'Error sending to Gelato');
+        } finally {
+          setRetryingOrderId(null);
         }
       };
 
@@ -8406,6 +8520,23 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
       return (
         <div className="min-h-screen" style={{backgroundColor: '#e0f2fe'}}>
+          {/* Admin Impersonation Banner */}
+          {impersonateUserId && (
+            <div className="fixed top-0 left-0 right-0 bg-red-600 text-white py-2 px-4 z-50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-bold">ADMIN MODE:</span>
+                <span>{language === 'de' ? 'Bearbeite Geschichte für Benutzer' : language === 'fr' ? 'Modification de l\'histoire pour l\'utilisateur' : 'Editing story for user'} {impersonateUsername || impersonateUserId}</span>
+              </div>
+              <button
+                onClick={() => {
+                  window.close();
+                }}
+                className="bg-white text-red-600 px-3 py-1 rounded font-semibold hover:bg-red-100"
+              >
+                {language === 'de' ? 'Tab schliessen' : language === 'fr' ? 'Fermer l\'onglet' : 'Close Tab'}
+              </button>
+            </div>
+          )}
           {/* Authentication Modal */}
           {showAuthModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -8480,8 +8611,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto p-8 animate-fade-in">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-3xl font-bold text-yellow-700 flex items-center gap-2">
-                    <span className="text-4xl">👥</span>
-                    {language === 'de' ? 'Benutzerverwaltung' : language === 'fr' ? 'Gestion des utilisateurs' : 'User Management'}
+                    <span className="text-4xl">{adminTab === 'orders' ? '📦' : '👥'}</span>
+                    {adminTab === 'orders'
+                      ? (language === 'de' ? 'Fehlgeschlagene Bestellungen' : language === 'fr' ? 'Commandes échouées' : 'Failed Orders')
+                      : (language === 'de' ? 'Benutzerverwaltung' : language === 'fr' ? 'Gestion des utilisateurs' : 'User Management')
+                    }
                   </h2>
                   <button
                     onClick={() => setShowAdminPanel(false)}
@@ -8491,6 +8625,27 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </button>
                 </div>
 
+                {/* Admin Panel Tabs */}
+                <div className="flex gap-2 mb-6 border-b border-gray-200 pb-2">
+                  <button
+                    onClick={() => { setAdminTab('users'); fetchAllUsers(); }}
+                    className={`px-4 py-2 rounded-t-lg font-semibold ${adminTab === 'users' ? 'bg-yellow-100 text-yellow-800 border-b-2 border-yellow-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    👥 {language === 'de' ? 'Benutzer' : language === 'fr' ? 'Utilisateurs' : 'Users'}
+                  </button>
+                  <button
+                    onClick={() => { setAdminTab('orders'); fetchFailedOrders(); }}
+                    className={`px-4 py-2 rounded-t-lg font-semibold ${adminTab === 'orders' ? 'bg-red-100 text-red-800 border-b-2 border-red-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    📦 {language === 'de' ? 'Bestellungen' : language === 'fr' ? 'Commandes' : 'Orders'}
+                    {failedOrders.length > 0 && (
+                      <span className="ml-2 px-2 py-0.5 bg-red-600 text-white text-xs rounded-full">{failedOrders.length}</span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Users Tab */}
+                {adminTab === 'users' && (
                 <div className="flex gap-3 mb-4">
                     <button
                       onClick={fetchAllUsers}
@@ -8523,6 +8678,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Quota</th>
                           <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Used</th>
                           <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Remaining</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Orders</th>
                           <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
                         </tr>
                       </thead>
@@ -8556,6 +8712,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 }`}>
                                   {remaining}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-center">
+                                <span className="text-gray-700">{user.totalOrders || 0}</span>
+                                {user.failedOrders > 0 && (
+                                  <span className="ml-1 px-1 py-0.5 bg-red-100 text-red-800 rounded text-xs font-semibold">
+                                    {user.failedOrders} failed
+                                  </span>
+                                )}
                               </td>
                               <td className="px-4 py-3 text-sm text-center">
                                 <div className="flex gap-1 justify-center flex-wrap">
@@ -8610,9 +8774,24 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                         });
                                         if (response.ok) {
                                           const data = await response.json();
-                                          const storyList = data.stories.map((s, i) => `${i+1}. ${s.title} (${s.pageCount} pages, ${new Date(s.createdAt).toLocaleDateString()})`).join('\n');
-                                          alert(`Stories for ${data.username || user.username} (${data.stories.length} total):\n\n${storyList || 'No stories found'}`);
-                                          console.log('User stories:', data);
+                                          if (data.stories.length === 0) {
+                                            alert(language === 'de' ? 'Keine Geschichten gefunden' : language === 'fr' ? 'Aucune histoire trouvée' : 'No stories found');
+                                            return;
+                                          }
+                                          // Let admin choose which story to view
+                                          const storyChoice = prompt(
+                                            `${language === 'de' ? 'Geschichten von' : language === 'fr' ? 'Histoires de' : 'Stories for'} ${data.username || user.username}:\n\n` +
+                                            data.stories.map((s, i) => `${i+1}. ${s.title} (${new Date(s.createdAt).toLocaleDateString()})`).join('\n') +
+                                            `\n\n${language === 'de' ? 'Nummer eingeben zum Öffnen:' : language === 'fr' ? 'Entrez le numéro pour ouvrir:' : 'Enter number to open:'}`
+                                          );
+                                          if (storyChoice) {
+                                            const idx = parseInt(storyChoice) - 1;
+                                            if (idx >= 0 && idx < data.stories.length) {
+                                              const story = data.stories[idx];
+                                              // Open in new tab with impersonation params
+                                              window.open(`${window.location.origin}${window.location.pathname}?impersonate=${user.id}&story=${story.id}`, '_blank');
+                                            }
+                                          }
                                         } else {
                                           alert('Failed to fetch stories');
                                         }
@@ -8740,6 +8919,98 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <li>• Click ∞ to give unlimited access</li>
                   </ul>
                 </div>
+                )}
+
+                {/* Orders Tab */}
+                {adminTab === 'orders' && (
+                  <div>
+                    <div className="flex gap-3 mb-4">
+                      <button
+                        onClick={fetchFailedOrders}
+                        disabled={isLoadingOrders}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <span>🔄</span>
+                        {isLoadingOrders ? 'Loading...' : 'Refresh Orders'}
+                      </button>
+                    </div>
+
+                    {isLoadingOrders ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin text-4xl mb-2">⏳</div>
+                        <p>{language === 'de' ? 'Lade Bestellungen...' : language === 'fr' ? 'Chargement des commandes...' : 'Loading orders...'}</p>
+                      </div>
+                    ) : failedOrders.length === 0 ? (
+                      <div className="text-center py-8 bg-green-50 rounded-lg border border-green-200">
+                        <div className="text-4xl mb-2">✅</div>
+                        <p className="text-green-700 font-semibold">
+                          {language === 'de' ? 'Keine fehlgeschlagenen Bestellungen!' : language === 'fr' ? 'Aucune commande échouée!' : 'No failed orders!'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-red-100">
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Order ID</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Customer</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Shipping</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Amount</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Date</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {failedOrders.map(order => (
+                              <tr key={order.id} className="border-b hover:bg-red-50">
+                                <td className="px-4 py-3 text-sm font-mono">{order.id}</td>
+                                <td className="px-4 py-3 text-sm font-medium">{order.customer_name || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{order.customer_email || '-'}</td>
+                                <td className="px-4 py-3 text-sm">
+                                  {order.shipping_city}, {order.shipping_postal_code} {order.shipping_country}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center font-semibold">
+                                  {(order.amount_total / 100).toFixed(2)} {order.currency?.toUpperCase()}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center">
+                                  {new Date(order.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center">
+                                  <button
+                                    onClick={() => retryGelatoOrder(order.id)}
+                                    disabled={retryingOrderId === order.id}
+                                    className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 mx-auto"
+                                  >
+                                    {retryingOrderId === order.id ? (
+                                      <>
+                                        <span className="animate-spin">⏳</span>
+                                        Retrying...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Icon name="refresh-cw" size={14} />
+                                        Retry Gelato
+                                      </>
+                                    )}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="font-semibold text-yellow-900 mb-2">{language === 'de' ? 'Info:' : language === 'fr' ? 'Info:' : 'Info:'}</h3>
+                      <ul className="text-sm text-yellow-800 space-y-1">
+                        <li>• {language === 'de' ? 'Fehlgeschlagene Bestellungen: Zahlung erfolgreich, aber Gelato-Übertragung fehlgeschlagen' : language === 'fr' ? 'Commandes échouées: paiement réussi mais transfert Gelato échoué' : 'Failed orders: payment succeeded but Gelato submission failed'}</li>
+                        <li>• {language === 'de' ? 'Klicken Sie auf "Retry Gelato" um die Bestellung erneut an Gelato zu senden' : language === 'fr' ? 'Cliquez sur "Retry Gelato" pour renvoyer la commande à Gelato' : 'Click "Retry Gelato" to resend the order to Gelato'}</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -9678,6 +9949,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           >
                             <Icon name="package" size={16} />
                             <span>{language === 'de' ? 'Produkte verwalten' : language === 'fr' ? 'Gérer les produits' : 'Manage Products'}</span>
+                          </button>
+                        )}
+
+                        {/* Failed Orders (Admin only) */}
+                        {currentUser && currentUser.role === 'admin' && (
+                          <button
+                            onClick={() => {
+                              setAdminTab('orders');
+                              setShowAdminPanel(true);
+                              setShowMenu(false);
+                              fetchFailedOrders();
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
+                          >
+                            <Icon name="alert-triangle" size={16} />
+                            <span>{language === 'de' ? 'Fehlgeschlagene Bestellungen' : language === 'fr' ? 'Commandes échouées' : 'Failed Orders'}</span>
                           </button>
                         )}
 
