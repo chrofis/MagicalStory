@@ -1,0 +1,7 @@
+{TITLE_PAGE_SCENE}
+
+Style: {STYLE_DESCRIPTION}.{CHARACTER_INFO}
+
+Create this as a beautiful title page illustration for the children's book "{STORY_TITLE}".
+
+IMPORTANT: The image should include the story title "{STORY_TITLE}" integrated beautifully into the illustration. Make the title prominent and visually appealing as part of the cover art.

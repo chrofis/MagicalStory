@@ -52,6 +52,10 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.sceneDescriptions = await fs.readFile(path.join(promptsDir, 'scene-descriptions.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
+    PROMPT_TEMPLATES.frontCover = await fs.readFile(path.join(promptsDir, 'front-cover.txt'), 'utf-8');
+    PROMPT_TEMPLATES.page0WithDedication = await fs.readFile(path.join(promptsDir, 'page0-with-dedication.txt'), 'utf-8');
+    PROMPT_TEMPLATES.page0NoDedication = await fs.readFile(path.join(promptsDir, 'page0-no-dedication.txt'), 'utf-8');
+    PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
     log.error('❌ Failed to load prompt templates:', err.message);
@@ -4345,7 +4349,12 @@ Write the full story content for each page in this range, but maintain the exact
     // Generate front cover (matches step-by-step prompt format)
     try {
       console.log(`📕 [PIPELINE] Generating front cover for job ${jobId}`);
-      const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page illustration for the children's book "${storyTitle}".\n\nIMPORTANT: The image should include the story title "${storyTitle}" integrated beautifully into the illustration. Make the title prominent and visually appealing as part of the cover art.`;
+      const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+        TITLE_PAGE_SCENE: titlePageScene,
+        STYLE_DESCRIPTION: styleDescription,
+        CHARACTER_INFO: characterInfo,
+        STORY_TITLE: storyTitle
+      });
       frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
       console.log(`✅ [PIPELINE] Front cover generated successfully`);
     } catch (error) {
@@ -4357,8 +4366,18 @@ Write the full story content for each page in this range, but maintain the exact
     try {
       console.log(`📕 [PIPELINE] Generating page 0 (dedication) for job ${jobId}`);
       const page0Prompt = inputData.dedication && inputData.dedication.trim()
-        ? `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "${inputData.dedication}"\n\nDo not add any other text. Only "${inputData.dedication}" must appear. No additional words allowed.`
-        : `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as an introduction page for "${storyTitle}".\n\nIMPORTANT: This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.`;
+        ? fillTemplate(PROMPT_TEMPLATES.page0WithDedication, {
+            PAGE0_SCENE: page0Scene,
+            STYLE_DESCRIPTION: styleDescription,
+            CHARACTER_INFO: characterInfo,
+            DEDICATION: inputData.dedication
+          })
+        : fillTemplate(PROMPT_TEMPLATES.page0NoDedication, {
+            PAGE0_SCENE: page0Scene,
+            STYLE_DESCRIPTION: styleDescription,
+            CHARACTER_INFO: characterInfo,
+            STORY_TITLE: storyTitle
+          });
       page0Result = await callGeminiAPIForImage(page0Prompt, characterPhotos);
       console.log(`✅ [PIPELINE] Page 0 generated successfully`);
     } catch (error) {
@@ -4369,7 +4388,11 @@ Write the full story content for each page in this range, but maintain the exact
     // Generate back cover (matches step-by-step prompt format)
     try {
       console.log(`📕 [PIPELINE] Generating back cover for job ${jobId}`);
-      const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "magicalstory.ch" in elegant letters in the bottom left corner.\n\nDo not add any other text. Only "magicalstory.ch" must appear. No additional words allowed.`;
+      const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+        BACK_COVER_SCENE: backCoverScene,
+        STYLE_DESCRIPTION: styleDescription,
+        CHARACTER_INFO: characterInfo
+      });
       backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
       console.log(`✅ [PIPELINE] Back cover generated successfully`);
     } catch (error) {

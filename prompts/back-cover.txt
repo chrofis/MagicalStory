@@ -1,0 +1,7 @@
+{BACK_COVER_SCENE}
+
+Style: {STYLE_DESCRIPTION}.{CHARACTER_INFO}
+
+CRITICAL: Include ONLY this exact text in the image: "magicalstory.ch" in elegant letters in the bottom left corner.
+
+Do not add any other text. Only "magicalstory.ch" must appear. No additional words allowed.

@@ -1,0 +1,7 @@
+{PAGE0_SCENE}
+
+Style: {STYLE_DESCRIPTION}.{CHARACTER_INFO}
+
+CRITICAL: Include ONLY this exact text in the image: "{DEDICATION}"
+
+Do not add any other text. Only "{DEDICATION}" must appear. No additional words allowed.
