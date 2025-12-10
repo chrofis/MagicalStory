@@ -11,6 +11,7 @@ const pLimit = require('p-limit');
 const crypto = require('crypto');
 const stripe = require('stripe')(process.env.STRIPE_TEST_API_KEY);
 const sharp = require('sharp');
+const email = require('./email');
 
 // Image cache for storing generated images (hash of prompt + photos → image data)
 const imageCache = new Map();
