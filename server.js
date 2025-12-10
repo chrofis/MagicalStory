@@ -4598,10 +4598,10 @@ async function processStoryJob(jobId) {
     );
 
     // STREAMING PIPELINE: Generate story in batches, immediately generate images as pages complete
-    // Use STORY_BATCH_SIZE env var, default to 5 if not set or 0
-    const BATCH_SIZE = STORY_BATCH_SIZE > 0 ? STORY_BATCH_SIZE : 5;
+    // Use STORY_BATCH_SIZE env var: 0 = generate all at once, >0 = batch size
+    const BATCH_SIZE = STORY_BATCH_SIZE > 0 ? STORY_BATCH_SIZE : totalPages; // 0 means all pages at once
     const numBatches = Math.ceil(totalPages / BATCH_SIZE);
-    console.log(`📚 [PIPELINE] Using batch size: ${BATCH_SIZE} pages per batch`);
+    console.log(`📚 [PIPELINE] Using batch size: ${BATCH_SIZE === totalPages ? 'ALL AT ONCE' : BATCH_SIZE + ' pages per batch'}`);
 
     let fullStoryText = '';
     const allImages = [];

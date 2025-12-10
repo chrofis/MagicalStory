@@ -1,1 +1,2 @@
 - Do not automatically deploy. Ask before deploying. If anything is unclear rather ask than go ahead
+- Only deploy after asking
