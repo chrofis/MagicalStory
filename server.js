@@ -3854,38 +3854,61 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
     }
 
+    // Add page 0 (dedication/intro page)
+    if (storyData.coverImages?.page0) {
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      const page0Data = storyData.coverImages.page0.replace(/^data:image\/\w+;base64,/, '');
+      const page0Buffer = Buffer.from(page0Data, 'base64');
+      doc.image(page0Buffer, 0, 0, { width: pageSize, height: pageSize });
+    }
+
     // Add story pages (text + images alternating)
     // The generated story might be in different fields depending on how it was saved
     const generatedStoryText = storyData.generatedStory || storyData.story || storyData.text || '';
     if (!generatedStoryText) {
       throw new Error('Story text not found in story data. Available keys: ' + Object.keys(storyData).join(', '));
     }
-    const storyPages = generatedStoryText.split(/---\s*Page\s+\d+\s*---/i).slice(1).filter(p => p.trim());
+
+    // Parse pages using the same pattern as frontend: ## Seite X or ## Page X
+    const pageMatches = generatedStoryText.split(/##\s*(?:Seite|Page)\s+\d+/i);
+    const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
+
+    console.log(`📄 [BACKGROUND] Found ${storyPages.length} story pages to add to PDF`);
 
     storyPages.forEach((pageText, index) => {
       const pageNumber = index + 1;
-      const image = storyData.sceneImages.find(img => img.pageNumber === pageNumber);
+      const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+      const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-      // Text page
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      doc.fontSize(14).fillColor('#333').text(pageText.trim(), mmToPoints(20), mmToPoints(20), {
-        width: mmToPoints(100),
-        height: mmToPoints(100),
-        align: 'center',
-        valign: 'center'
+      // Text page with proper font sizing
+      const margin = 28;
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
+
+      const availableWidth = pageSize - (margin * 2);
+      const availableHeight = pageSize - (margin * 2);
+
+      // Start with font size 9 and reduce if needed
+      let fontSize = 9;
+      doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+      let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
+
+      while (textHeight > availableHeight && fontSize > 5) {
+        fontSize -= 0.5;
+        doc.fontSize(fontSize);
+        textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
+      }
+
+      doc.text(cleanText, margin, margin, {
+        width: availableWidth,
+        height: availableHeight,
+        align: 'left'
       });
 
       // Image page
       if (image && image.imageData) {
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(imageBuffer, mmToPoints(10), mmToPoints(10), {
-          width: mmToPoints(120),
-          height: mmToPoints(120),
-          fit: [mmToPoints(120), mmToPoints(120)],
-          align: 'center',
-          valign: 'center'
-        });
+        doc.image(imageBuffer, 0, 0, { width: pageSize, height: pageSize });
       }
     });
 
@@ -4155,14 +4178,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
 
   // Use template from file if available
   if (PROMPT_TEMPLATES.sceneDescriptions) {
-    // Extract only the Art Director part (before the "---" separator)
-    let template = PROMPT_TEMPLATES.sceneDescriptions;
-    const separatorIndex = template.indexOf('\n---\n');
-    if (separatorIndex > -1) {
-      template = template.substring(0, separatorIndex);
-    }
-
-    return fillTemplate(template, {
+    return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
       SCENE_SUMMARY: shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : '',
       PAGE_NUMBER: pageNumber.toString(),
       PAGE_CONTENT: pageContent,
@@ -4170,7 +4186,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     });
   }
 
-  // Fallback to hardcoded prompt
+  // Fallback to hardcoded prompt if template not loaded
   return `**ROLE:**
 You are an expert Art Director creating an illustration brief for a children's book.
 
