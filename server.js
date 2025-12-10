@@ -61,13 +61,13 @@ const TEXT_MODELS = {
   },
   'gemini-2.5-pro': {
     provider: 'google',
-    modelId: 'gemini-2.5-pro-preview-06-05',
+    modelId: 'gemini-2.5-pro',
     maxOutputTokens: 65536,
     description: 'Gemini 2.5 Pro - High quality, large output'
   },
   'gemini-2.5-flash': {
     provider: 'google',
-    modelId: 'gemini-2.5-flash-preview-05-20',
+    modelId: 'gemini-2.5-flash',
     maxOutputTokens: 65536,
     description: 'Gemini 2.5 Flash - Fast with large output'
   },
@@ -79,9 +79,9 @@ const TEXT_MODELS = {
   },
   'gemini-1.5-pro': {
     provider: 'google',
-    modelId: 'gemini-1.5-pro-latest',
+    modelId: 'gemini-pro-latest',
     maxOutputTokens: 8192,
-    description: 'Gemini 1.5 Pro - Stable, good balance'
+    description: 'Gemini Pro Latest - Stable, good balance'
   }
 };
 
