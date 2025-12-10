@@ -58,17 +58,29 @@ const TEXT_MODELS = {
     maxOutputTokens: 8192,
     description: 'Claude Haiku 3.5 - Fast and cheap'
   },
-  'gemini-pro': {
+  'gemini-2.5-pro': {
     provider: 'google',
-    modelId: 'gemini-1.5-pro',
-    maxOutputTokens: 8192,
-    description: 'Gemini 1.5 Pro - Good balance'
+    modelId: 'gemini-2.5-pro',
+    maxOutputTokens: 65536,
+    description: 'Gemini 2.5 Pro - High quality, large output'
   },
-  'gemini-flash': {
+  'gemini-2.5-flash': {
+    provider: 'google',
+    modelId: 'gemini-2.5-flash',
+    maxOutputTokens: 65536,
+    description: 'Gemini 2.5 Flash - Fast with large output'
+  },
+  'gemini-2.0-flash': {
     provider: 'google',
     modelId: 'gemini-2.0-flash',
     maxOutputTokens: 8192,
     description: 'Gemini 2.0 Flash - Very fast'
+  },
+  'gemini-1.5-pro': {
+    provider: 'google',
+    modelId: 'gemini-1.5-pro',
+    maxOutputTokens: 8192,
+    description: 'Gemini 1.5 Pro - Stable, good balance'
   }
 };
 
