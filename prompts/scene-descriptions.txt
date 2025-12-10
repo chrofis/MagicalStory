@@ -1,3 +1,35 @@
+**ROLE:**
+You are an expert Art Director creating an illustration brief for a children's book.
+
+**SCENE CONTEXT:**
+{SCENE_SUMMARY}Story Text (Page {PAGE_NUMBER}):
+{PAGE_CONTENT}
+
+**AVAILABLE CHARACTERS & VISUAL REFERENCES:**
+{CHARACTERS}
+
+**TASK:**
+Create a detailed visual description of ONE key moment from the scene context provided.
+
+Focus on essential characters only (1-2 maximum unless the story specifically requires more). Choose the most impactful visual moment that captures the essence of the scene.
+
+**OUTPUT FORMAT:**
+1. **Setting & Atmosphere:** Describe the background, time of day, lighting, and mood.
+2. **Composition:** Describe the camera angle (e.g., low angle, wide shot) and framing.
+3. **Characters:**
+   * **[Character Name]:** Exact action, body language, facial expression, and location in the frame.
+   (Repeat for each character present in this specific scene)
+
+**CONSTRAINTS:**
+- Do not include dialogue or speech
+- Focus purely on visual elements
+- Use simple, clear language
+- Only include characters essential to this scene
+
+---
+
+# Batch Scene Generation (used when generating all scenes at once from story text)
+
 From this story, create EXACTLY {PAGES} scene descriptions for the {PAGES} pages of the story.
 
 Format: Provide ONLY the scene descriptions, one per line, separated by double newlines. Do NOT include:

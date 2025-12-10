@@ -2694,13 +2694,30 @@ app.get('/api/files/:fileId', async (req, res) => {
       if (file.filename) {
         res.set('Content-Disposition', `inline; filename="${file.filename}"`);
       }
-      // Decode Base64 to binary buffer before sending
-      // Handle both raw base64 and data URL formats
-      let base64Data = file.file_data;
-      if (base64Data.startsWith('data:')) {
-        base64Data = base64Data.split(',')[1];
+
+      // file_data could be: Buffer (bytea), string (base64), or string (data URL)
+      let fileBuffer;
+      if (Buffer.isBuffer(file.file_data)) {
+        // Already a buffer - check if it's base64 encoded text
+        const str = file.file_data.toString('utf8');
+        if (str.startsWith('data:')) {
+          fileBuffer = Buffer.from(str.split(',')[1], 'base64');
+        } else if (/^[A-Za-z0-9+/=]+$/.test(str.substring(0, 100))) {
+          // Looks like base64 string stored as buffer
+          fileBuffer = Buffer.from(str, 'base64');
+        } else {
+          fileBuffer = file.file_data;
+        }
+      } else if (typeof file.file_data === 'string') {
+        if (file.file_data.startsWith('data:')) {
+          fileBuffer = Buffer.from(file.file_data.split(',')[1], 'base64');
+        } else {
+          fileBuffer = Buffer.from(file.file_data, 'base64');
+        }
+      } else {
+        fileBuffer = file.file_data;
       }
-      const fileBuffer = Buffer.from(base64Data, 'base64');
+
       res.send(fileBuffer);
 
     } else {
@@ -4136,6 +4153,24 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     return `* **${c.name}:** ${details.join(', ')}`;
   }).join('\n');
 
+  // Use template from file if available
+  if (PROMPT_TEMPLATES.sceneDescriptions) {
+    // Extract only the Art Director part (before the "---" separator)
+    let template = PROMPT_TEMPLATES.sceneDescriptions;
+    const separatorIndex = template.indexOf('\n---\n');
+    if (separatorIndex > -1) {
+      template = template.substring(0, separatorIndex);
+    }
+
+    return fillTemplate(template, {
+      SCENE_SUMMARY: shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : '',
+      PAGE_NUMBER: pageNumber.toString(),
+      PAGE_CONTENT: pageContent,
+      CHARACTERS: characterDetails
+    });
+  }
+
+  // Fallback to hardcoded prompt
   return `**ROLE:**
 You are an expert Art Director creating an illustration brief for a children's book.
 
