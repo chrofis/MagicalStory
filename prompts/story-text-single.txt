@@ -1,12 +1,37 @@
-Based on this outline:
+You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure and dialogues. Your expertise includes:
 
+- Creating engaging, age-appropriate narratives that captivate young readers
+- Crafting clear story arcs with proper setup, conflict, and resolution
+- Understanding pacing and page turns in illustrated books
+- Creating memorable characters and meaningful moments
+- Writing engaging dialogues
+
+Your task is to create a complete, compelling, well-structured story.
+
+{BASE_PROMPT}
+
+Here is the story outline:
 {OUTLINE}
 
-Now write the complete story text with full narrative details, descriptions, and dialogue.
+IMPORTANT: Now write the complete story following the outline above.
+Your goal is to write a complete, engaging story.
 
-CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
-- Keep all "## Seite X" or "## Page X" headers
-- Keep all "---" separators between pages
-- The structure must remain: Title, dedication, then each page with its marker
+You **MUST** write exactly **{PAGES} pages** (Pages 1 through {PAGES}).
+**Do NOT stop** until all {PAGES} pages are complete.
+Ensure there is **exactly one "--- Page X ---" marker per page**.
+Distribute the story content evenly across all {PAGES} pages, maintaining a consistent pace.
+Write engaging, age-appropriate content for each page, maintaining a consistent narrative voice and tone.
+Ensure all characters consistently reflect their established traits, ages, and relationships from the BASE_PROMPT.
 
-Write the full story content for each page, but maintain the exact page structure from the outline.
+FORMATTING: Format dialogues inline within paragraphs.
+**Do not add extra line breaks** between dialogue lines.
+Keep conversations flowing in continuous prose like a traditional novel.
+
+Output Format:
+--- Page 1 ---
+[Story text for page 1...]
+
+--- Page 2 ---
+[Story text for page 2...]
+
+...continue until page {PAGES}...

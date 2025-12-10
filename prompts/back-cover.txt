@@ -2,6 +2,10 @@
 
 Style: {STYLE_DESCRIPTION}.{CHARACTER_INFO}
 
+IMPORTANT:
+- Include ALL characters from the story equally - give each character similar visual prominence and attention.
+- This is a group scene showing all the characters together.
+
 CRITICAL: Include ONLY this exact text in the image: "magicalstory.ch" in elegant letters in the bottom left corner.
 
 Do not add any other text. Only "magicalstory.ch" must appear. No additional words allowed.

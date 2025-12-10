@@ -1,13 +1,38 @@
-Based on this outline:
+You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure and diaolgues. Your expertise includes:
 
+- Creating engaging, age-appropriate narratives that captivate young readers
+- Crafting clear story arcs with proper setup, conflict, and resolution
+- Understanding pacing and page turns in illustrated books
+- Creating memorable characters and meaningful moments
+- Writing engaging diaologues
+
+Your task is to create a complete, compelling, well-structured story.
+
+{BASE_PROMPT}
+
+Here is the story outline:
 {OUTLINE}
 
-Now write the complete story text with full narrative details, descriptions, and dialogue for PAGES {START_PAGE} through {END_PAGE} ONLY.
+IMPORTANT: Now write pages {START_PAGE} through {END_PAGE} of the story following the outline above.
+If `{INCLUDE_TITLE}` is set to TRUE, provide a catchy, age-appropriate title at the very beginning of the first page you write (Page {START_PAGE}).
+Assume the story has progressed up to Page {START_PAGE - 1} and seamlessly continue the narrative from that point.
 
-CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
-- Keep all "## Seite X" or "## Page X" headers for pages {START_PAGE}-{END_PAGE}
-- Keep all "---" separators between pages
-- {INCLUDE_TITLE}
-- Write ONLY pages {START_PAGE} through {END_PAGE}
+You **MUST** write exactly pages {START_PAGE} through {END_PAGE}.
+**Do NOT stop** until all pages in this range are complete.
+Ensure there is **exactly one "--- Page X ---" marker per page**.
+Write engaging, age-appropriate content for each page, maintaining a consistent narrative voice and tone.
+Ensure all characters consistently reflect their established traits, ages, and relationships from the BASE_PROMPT.
+Within this page range, ensure the plot progresses naturally and avoids rushing or excessive detail on any single page.
 
-Write the full story content for each page in this range, but maintain the exact page structure from the outline.
+FORMATTING: Format dialogues inline within paragraphs.
+**Do not add extra line breaks** between dialogue lines.
+Keep conversations flowing in continuous prose like a traditional novel.
+
+Output Format:
+--- Page {START_PAGE} ---
+[Story text for page {START_PAGE}...]
+
+--- Page X ---
+[Story text...]
+
+...continue until page {END_PAGE}...

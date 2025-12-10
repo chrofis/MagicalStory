@@ -4352,22 +4352,32 @@ async function processStoryJob(jobId) {
       console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating pages ${startPage}-${endPage}`);
 
       // Generate story text for this batch
+      const basePrompt = buildBasePrompt(inputData);
       const batchPrompt = PROMPT_TEMPLATES.storyTextBatch
         ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
+            BASE_PROMPT: basePrompt,
             OUTLINE: outline,
+            PAGES: totalPages,
             START_PAGE: startPage,
             END_PAGE: endPage,
-            INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning' : 'Start directly with the page content (no title/dedication)'
+            INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning.' : 'Start directly with the page content (no title/dedication).'
           })
-        : `Based on this outline:\n\n${outline}\n\nNow write the complete story text with full narrative details, descriptions, and dialogue for PAGES ${startPage} through ${endPage} ONLY.
+        : `${basePrompt}
 
-CRITICAL: You MUST preserve ALL page markers exactly as they appear in the outline:
-- Keep all "## Seite X" or "## Page X" headers for pages ${startPage}-${endPage}
-- Keep all "---" separators between pages
-- ${batchNum === 0 ? 'Include the title and dedication at the beginning' : 'Start directly with the page content (no title/dedication)'}
-- Write ONLY pages ${startPage} through ${endPage}
+Here is the story outline:
+${outline}
 
-Write the full story content for each page in this range, but maintain the exact page structure from the outline.`;
+IMPORTANT: Now write pages ${startPage} through ${endPage} of the story following the outline above.
+${batchNum === 0 ? 'Include the title and dedication at the beginning.' : 'Start directly with the page content (no title/dedication).'}
+
+You **MUST** write exactly pages ${startPage} through ${endPage}.
+Ensure there is **exactly one "--- Page X ---" marker per page**.
+
+Output Format:
+--- Page ${startPage} ---
+[Story text...]
+
+...continue until page ${endPage}...`;
 
       const batchText = await callClaudeAPI(batchPrompt, 16000);
       fullStoryText += batchText + '\n\n';
@@ -4622,6 +4632,77 @@ Write the full story content for each page in this range, but maintain the exact
 
 // Helper functions for story generation
 
+// Build base prompt with character/setting info for story text generation
+function buildBasePrompt(inputData) {
+  const mainCharacterIds = inputData.mainCharacters || [];
+
+  const characterSummary = (inputData.characters || []).map(char => {
+    const isMain = mainCharacterIds.includes(char.id);
+    return {
+      name: char.name,
+      isMainCharacter: isMain,
+      gender: char.gender,
+      age: char.age,
+      strengths: char.strengths,
+      weaknesses: char.weaknesses,
+      specialDetails: char.specialDetails  // Includes hobbies, hopes, fears, favorite animals
+    };
+  });
+
+  // Build relationship descriptions
+  let relationshipDescriptions = '';
+  if (inputData.relationships) {
+    const relationships = inputData.relationships;
+    const relationshipTexts = inputData.relationshipTexts || {};
+    const characters = inputData.characters || [];
+
+    const relationshipLines = Object.entries(relationships)
+      .filter(([key, type]) => type && type !== 'Not Known to')
+      .map(([key, type]) => {
+        const [char1Id, char2Id] = key.split('-').map(Number);
+        const char1 = characters.find(c => c.id === char1Id);
+        const char2 = characters.find(c => c.id === char2Id);
+        if (!char1 || !char2) return null;
+        const customText = relationshipTexts[key] || '';
+        const baseRelationship = `${char1.name} is ${type} ${char2.name}`;
+        return customText ? `${baseRelationship}. ${customText}` : baseRelationship;
+      })
+      .filter(Boolean);
+
+    if (relationshipLines.length > 0) {
+      relationshipDescriptions = `\n- **Relationships**:\n${relationshipLines.map(r => `  - ${r}`).join('\n')}`;
+    }
+  }
+
+  // Map language level to reading instructions with page length guidance
+  const languageLevelDescriptions = {
+    '1st-grade': {
+      description: 'Simple words and very short sentences for early readers',
+      pageLength: '2-4 sentences per page (approximately 30-50 words)'
+    },
+    'standard': {
+      description: 'Age-appropriate vocabulary for elementary school children',
+      pageLength: 'About 10 sentences per page (approximately 80-120 words)'
+    },
+    'advanced': {
+      description: 'More complex vocabulary and varied sentence structure for advanced readers',
+      pageLength: '15-20 sentences per page (approximately 150-250 words)'
+    }
+  };
+  const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
+  const readingLevel = `${levelInfo.description}. ${levelInfo.pageLength}`;
+
+  return `# Story Parameters
+
+- **Title**: ${inputData.title || 'Untitled'}
+- **Length**: ${inputData.pages || 15} pages
+- **Language**: ${inputData.language || 'en'}
+- **Reading Level**: ${readingLevel}
+- **Story Type**: ${inputData.storyType || 'adventure'}
+- **Story Details**: ${inputData.storyDetails || 'None'}
+- **Characters**: ${JSON.stringify(characterSummary, null, 2)}${relationshipDescriptions}`;
+}
+
 function buildStoryPrompt(inputData) {
   // Build the story generation prompt based on input data
   // Extract only essential character info (NO PHOTOS to avoid token limit)
@@ -4831,9 +4912,11 @@ async function compressImageToJPEG(pngBase64) {
  * Evaluate image quality using Claude API
  * Sends the image to Claude for quality assessment
  * @param {string} imageData - Base64 encoded image with data URI prefix
- * @returns {Promise<number>} Quality score from 0-10
+ * @param {string} originalPrompt - The prompt used to generate the image
+ * @param {string[]} referenceImages - Reference images used for generation
+ * @returns {Promise<number>} Quality score from 0-100
  */
-async function evaluateImageQuality(imageData) {
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = []) {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -4842,14 +4925,53 @@ async function evaluateImageQuality(imageData) {
       return null;
     }
 
-    // Extract base64 and mime type
+    // Extract base64 and mime type for generated image
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Use prompt template if available
-    const evaluationPrompt = PROMPT_TEMPLATES.imageEvaluation ||
-      'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
+    // Use prompt template if available, with placeholder replacement
+    const evaluationPrompt = PROMPT_TEMPLATES.imageEvaluation
+      ? fillTemplate(PROMPT_TEMPLATES.imageEvaluation, { ORIGINAL_PROMPT: originalPrompt })
+      : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
+
+    // Build content array with generated image first, then reference images
+    const content = [
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: mimeType,
+          data: base64Data
+        }
+      }
+    ];
+
+    // Add reference images if provided
+    if (referenceImages && referenceImages.length > 0) {
+      referenceImages.forEach(refImg => {
+        if (refImg && refImg.startsWith('data:image')) {
+          const refBase64 = refImg.replace(/^data:image\/\w+;base64,/, '');
+          const refMimeType = refImg.match(/^data:(image\/\w+);base64,/) ?
+            refImg.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+          content.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: refMimeType,
+              data: refBase64
+            }
+          });
+        }
+      });
+      log.verbose(`⭐ [QUALITY] Added ${referenceImages.length} reference images for evaluation`);
+    }
+
+    // Add evaluation prompt text
+    content.push({
+      type: 'text',
+      text: evaluationPrompt
+    });
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -4860,23 +4982,10 @@ async function evaluateImageQuality(imageData) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 500,
+        max_tokens: 800,
         messages: [{
           role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mimeType,
-                data: base64Data
-              }
-            },
-            {
-              type: 'text',
-              text: evaluationPrompt
-            }
-          ]
+          content: content
         }]
       })
     });
@@ -4888,16 +4997,30 @@ async function evaluateImageQuality(imageData) {
     }
 
     const data = await response.json();
-    const scoreText = data.content[0].text.trim();
-    const score = parseFloat(scoreText);
+    const responseText = data.content[0].text.trim();
 
-    // Score is now 0-100
-    if (isNaN(score) || score < 0 || score > 100) {
-      log.warn('⚠️  [QUALITY] Invalid score received:', scoreText);
+    // Parse the new format: "Score: XX/100\n\nReasoning: ..."
+    const scoreMatch = responseText.match(/Score:\s*(\d+)\/100/i);
+    if (!scoreMatch) {
+      // Fallback to old format (just a number)
+      const score = parseFloat(responseText);
+      if (!isNaN(score) && score >= 0 && score <= 100) {
+        log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100 (legacy format)`);
+        return score;
+      }
+      log.warn('⚠️  [QUALITY] Could not parse score from response:', responseText.substring(0, 100));
       return null;
     }
 
+    const score = parseInt(scoreMatch[1]);
+    const reasoningMatch = responseText.match(/Reasoning:\s*([\s\S]*)/i);
+    const reasoning = reasoningMatch ? reasoningMatch[1].trim() : '';
+
     log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100`);
+    if (reasoning) {
+      log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning.substring(0, 150)}...`);
+    }
+
     return score;
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
@@ -5011,9 +5134,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = []) {
         console.log('🗜️  [COMPRESSION] Compressing image to JPEG...');
         const compressedImageData = await compressImageToJPEG(pngImageData);
 
-        // Evaluate image quality
+        // Evaluate image quality with prompt and reference images
         console.log('⭐ [QUALITY] Evaluating image quality...');
-        const qualityScore = await evaluateImageQuality(compressedImageData);
+        const qualityScore = await evaluateImageQuality(compressedImageData, prompt, characterPhotos);
 
         // Store in cache
         const result = { imageData: compressedImageData, score: qualityScore };
