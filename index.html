@@ -1547,6 +1547,47 @@ Be specific and creative. Each scene description should paint a clear picture fo
         }
       };
 
+      // Delete user and all their data (admin only)
+      const deleteUser = async (userId, username) => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        try {
+          const response = await fetch(`${API_URL}/api/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            alert(language === 'de'
+              ? `Benutzer ${username} und alle Daten wurden gelöscht.\n\nGelöscht: ${result.deletedCounts.stories} Geschichten, ${result.deletedCounts.characters} Charaktere, ${result.deletedCounts.storyJobs} Jobs`
+              : language === 'fr'
+              ? `Utilisateur ${username} et toutes les données ont été supprimés.\n\nSupprimés: ${result.deletedCounts.stories} histoires, ${result.deletedCounts.characters} personnages, ${result.deletedCounts.storyJobs} jobs`
+              : `User ${username} and all data deleted successfully.\n\nDeleted: ${result.deletedCounts.stories} stories, ${result.deletedCounts.characters} characters, ${result.deletedCounts.storyJobs} jobs`);
+            await fetchAllUsers();
+            return true;
+          } else {
+            const error = await response.json();
+            alert(language === 'de'
+              ? `Fehler beim Löschen: ${error.error}`
+              : language === 'fr'
+              ? `Erreur lors de la suppression: ${error.error}`
+              : `Error deleting user: ${error.error}`);
+            return false;
+          }
+        } catch (err) {
+          console.error('Error deleting user:', err);
+          alert(language === 'de'
+            ? 'Fehler beim Löschen des Benutzers'
+            : language === 'fr'
+            ? 'Erreur lors de la suppression de l\'utilisateur'
+            : 'Error deleting user');
+          return false;
+        }
+      };
+
       // Orphaned Data Management Functions
       const checkOrphanedData = async () => {
         if (!authToken || !currentUser || currentUser.role !== 'admin') return;
@@ -8571,6 +8612,58 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                   >
                                     ∞
                                   </button>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const response = await fetch(`${API_URL}/api/admin/users/${user.id}/stories`, {
+                                          headers: { 'Authorization': `Bearer ${authToken}` }
+                                        });
+                                        if (response.ok) {
+                                          const data = await response.json();
+                                          const storyList = data.stories.map((s, i) => `${i+1}. ${s.title} (${s.pageCount} pages, ${new Date(s.createdAt).toLocaleDateString()})`).join('\n');
+                                          alert(`Stories for ${data.username || user.username} (${data.stories.length} total):\n\n${storyList || 'No stories found'}`);
+                                          console.log('User stories:', data);
+                                        } else {
+                                          alert('Failed to fetch stories');
+                                        }
+                                      } catch (err) {
+                                        console.error('Error:', err);
+                                        alert('Error fetching stories');
+                                      }
+                                    }}
+                                    className="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700"
+                                    title={language === 'de' ? 'Geschichten ansehen' : language === 'fr' ? 'Voir les histoires' : 'View Stories'}
+                                  >
+                                    📚
+                                  </button>
+                                  {user.role !== 'admin' && (
+                                    <button
+                                      onClick={() => {
+                                        const confirmMsg = language === 'de'
+                                          ? `WARNUNG: Dies löscht den Benutzer "${user.username}" und ALLE zugehörigen Daten (Geschichten, Charaktere, Jobs, etc.) unwiderruflich!\n\nBist du sicher?`
+                                          : language === 'fr'
+                                          ? `ATTENTION: Cela supprimera l'utilisateur "${user.username}" et TOUTES les données associées (histoires, personnages, jobs, etc.) de manière irréversible!\n\nÊtes-vous sûr?`
+                                          : `WARNING: This will permanently delete user "${user.username}" and ALL associated data (stories, characters, jobs, etc.)!\n\nAre you sure?`;
+                                        if (confirm(confirmMsg)) {
+                                          const doubleConfirmMsg = language === 'de'
+                                            ? `Letzte Warnung! Gib "${user.username}" ein um zu bestätigen:`
+                                            : language === 'fr'
+                                            ? `Dernier avertissement! Tapez "${user.username}" pour confirmer:`
+                                            : `Final warning! Type "${user.username}" to confirm:`;
+                                          const typed = prompt(doubleConfirmMsg);
+                                          if (typed === user.username) {
+                                            deleteUser(user.id, user.username);
+                                          } else if (typed !== null) {
+                                            alert(language === 'de' ? 'Benutzername stimmt nicht überein. Löschung abgebrochen.' : language === 'fr' ? 'Le nom d\'utilisateur ne correspond pas. Suppression annulée.' : 'Username did not match. Deletion cancelled.');
+                                          }
+                                        }
+                                      }}
+                                      className="bg-red-800 text-white px-2 py-1 rounded text-xs hover:bg-red-900"
+                                      title={language === 'de' ? 'Benutzer löschen' : language === 'fr' ? 'Supprimer l\'utilisateur' : 'Delete User'}
+                                    >
+                                      🗑️
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

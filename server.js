@@ -1118,6 +1118,118 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
   }
 });
 
+// Get stories for any user (admin only) - for debugging/fixing crashed stories
+app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const targetUserId = parseInt(req.params.userId);
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    console.log(`📚 [ADMIN] GET /api/admin/users/${targetUserId}/stories - Admin: ${req.user.username}`);
+    let userStories = [];
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Get user info first
+      const userResult = await dbQuery('SELECT username FROM users WHERE id = $1', [targetUserId]);
+      if (userResult.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const targetUsername = userResult[0].username;
+
+      // Get stories for target user
+      const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC';
+      const rows = await dbQuery(selectQuery, [targetUserId]);
+
+      userStories = rows.map(row => {
+        const story = JSON.parse(row.data);
+        return {
+          id: story.id,
+          title: story.title,
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          pages: story.pages,
+          language: story.language,
+          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+          pageCount: story.sceneImages?.length || 0,
+          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+        };
+      });
+
+      console.log(`📚 [ADMIN] Found ${userStories.length} stories for user ${targetUsername} (ID: ${targetUserId})`);
+      res.json({ userId: targetUserId, username: targetUsername, stories: userStories });
+    } else {
+      // File mode
+      const allStories = await readJSON(STORIES_FILE);
+      const fullStories = allStories[targetUserId] || [];
+      userStories = fullStories.map(story => ({
+        id: story.id,
+        title: story.title,
+        createdAt: story.createdAt,
+        updatedAt: story.updatedAt,
+        pages: story.pages,
+        language: story.language,
+        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+        pageCount: story.sceneImages?.length || 0,
+        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+      }));
+
+      console.log(`📚 [ADMIN] File mode: Found ${userStories.length} stories for user ${targetUserId}`);
+      res.json({ userId: targetUserId, stories: userStories });
+    }
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching user stories:', err);
+    res.status(500).json({ error: 'Failed to fetch user stories', details: err.message });
+  }
+});
+
+// Get single story for any user (admin only) - full data including images
+app.get('/api/admin/users/:userId/stories/:storyId', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const targetUserId = parseInt(req.params.userId);
+    const storyId = req.params.storyId;
+
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    console.log(`📖 [ADMIN] GET /api/admin/users/${targetUserId}/stories/${storyId} - Admin: ${req.user.username}`);
+
+    let story = null;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const selectQuery = 'SELECT data FROM stories WHERE id = $1 AND user_id = $2';
+      const rows = await dbQuery(selectQuery, [storyId, targetUserId]);
+
+      if (rows.length > 0) {
+        story = JSON.parse(rows[0].data);
+      }
+    } else {
+      const allStories = await readJSON(STORIES_FILE);
+      const userStories = allStories[targetUserId] || [];
+      story = userStories.find(s => s.id === storyId);
+    }
+
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    console.log(`📖 [ADMIN] Returning story "${story.title}" for user ${targetUserId}`);
+    res.json(story);
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching story:', err);
+    res.status(500).json({ error: 'Failed to fetch story', details: err.message });
+  }
+});
+
 // =======================
 // Gelato Products Admin Endpoints
 // =======================
