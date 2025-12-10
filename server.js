@@ -5215,8 +5215,24 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
 
   const data = await response.json();
 
+  // Log full response for debugging
   if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('No response from Gemini API');
+    console.error('❌ [GEMINI] Empty response. Full data:', JSON.stringify(data, null, 2));
+    if (data.promptFeedback) {
+      console.error('❌ [GEMINI] Prompt feedback:', JSON.stringify(data.promptFeedback));
+    }
+    throw new Error(`No response from Gemini API: ${data.promptFeedback?.blockReason || 'unknown reason'}`);
+  }
+
+  // Check if content was blocked
+  if (data.candidates[0].finishReason === 'SAFETY') {
+    console.error('❌ [GEMINI] Content blocked by safety filter');
+    throw new Error('Gemini blocked content due to safety filter');
+  }
+
+  if (!data.candidates[0].content || !data.candidates[0].content.parts) {
+    console.error('❌ [GEMINI] Missing content in response:', JSON.stringify(data.candidates[0], null, 2));
+    throw new Error('Gemini returned empty content');
   }
 
   return data.candidates[0].content.parts[0].text;
