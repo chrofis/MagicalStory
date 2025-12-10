@@ -3610,6 +3610,37 @@ app.delete('/api/admin/orphaned-files', authenticateToken, async (req, res) => {
   }
 });
 
+// Admin Dashboard - Get server configuration
+app.get('/api/admin/config', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    res.json({
+      textModel: {
+        current: TEXT_MODEL,
+        config: activeTextModel,
+        available: Object.entries(TEXT_MODELS).map(([key, model]) => ({
+          key,
+          ...model
+        }))
+      },
+      storyBatchSize: STORY_BATCH_SIZE || 5,
+      verboseLogging: VERBOSE_LOGGING,
+      storageMode: STORAGE_MODE,
+      apiKeys: {
+        anthropic: !!process.env.ANTHROPIC_API_KEY,
+        gemini: !!process.env.GEMINI_API_KEY
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching config:', err);
+    res.status(500).json({ error: 'Failed to fetch configuration' });
+  }
+});
+
 // Admin Dashboard - Get database table sizes
 app.get('/api/admin/database-size', authenticateToken, async (req, res) => {
   try {
@@ -4534,8 +4565,10 @@ async function processStoryJob(jobId) {
     );
 
     // STREAMING PIPELINE: Generate story in batches, immediately generate images as pages complete
-    const BATCH_SIZE = 5; // Generate 5 pages at a time
+    // Use STORY_BATCH_SIZE env var, default to 5 if not set or 0
+    const BATCH_SIZE = STORY_BATCH_SIZE > 0 ? STORY_BATCH_SIZE : 5;
     const numBatches = Math.ceil(totalPages / BATCH_SIZE);
+    console.log(`📚 [PIPELINE] Using batch size: ${BATCH_SIZE} pages per batch`);
 
     let fullStoryText = '';
     const allImages = [];
@@ -5025,12 +5058,39 @@ Important:
 - Age-appropriate for ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years old`;
 }
 
-async function callClaudeAPI(prompt, maxTokens = 4096) {
-  // Call Claude API for text generation
+/**
+ * Unified text model API caller
+ * Uses the configured TEXT_MODEL env var to select provider
+ * @param {string} prompt - The prompt to send
+ * @param {number} maxTokens - Maximum tokens in response
+ * @returns {Promise<string>} Generated text
+ */
+async function callTextModel(prompt, maxTokens = 4096) {
+  const model = activeTextModel;
+
+  // Cap maxTokens to model limit
+  const effectiveMaxTokens = Math.min(maxTokens, model.maxOutputTokens);
+
+  log.verbose(`🤖 [TEXT] Calling ${TEXT_MODEL} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
+
+  switch (model.provider) {
+    case 'anthropic':
+      return await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId);
+    case 'google':
+      return await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
+    default:
+      throw new Error(`Unknown provider: ${model.provider}`);
+  }
+}
+
+/**
+ * Call Anthropic Claude API
+ */
+async function callAnthropicAPI(prompt, maxTokens, modelId) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    throw new Error('Claude API key not configured');
+    throw new Error('Anthropic API key not configured (ANTHROPIC_API_KEY)');
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -5041,7 +5101,7 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
+      model: modelId,
       max_tokens: maxTokens,
       messages: [{
         role: 'user',
@@ -5052,11 +5112,54 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Claude API error: ${error}`);
+    throw new Error(`Anthropic API error (${response.status}): ${error}`);
   }
 
   const data = await response.json();
   return data.content[0].text;
+}
+
+/**
+ * Call Google Gemini API for text generation
+ */
+async function callGeminiTextAPI(prompt, maxTokens, modelId) {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: maxTokens
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini API error (${response.status}): ${error}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.candidates || data.candidates.length === 0) {
+    throw new Error('No response from Gemini API');
+  }
+
+  return data.candidates[0].content.parts[0].text;
+}
+
+// Backward compatibility alias
+async function callClaudeAPI(prompt, maxTokens = 4096) {
+  return callTextModel(prompt, maxTokens);
 }
 
 /**
