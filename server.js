@@ -2694,7 +2694,9 @@ app.get('/api/files/:fileId', async (req, res) => {
       if (file.filename) {
         res.set('Content-Disposition', `inline; filename="${file.filename}"`);
       }
-      res.send(file.file_data);
+      // Decode Base64 to binary buffer before sending
+      const fileBuffer = Buffer.from(file.file_data, 'base64');
+      res.send(fileBuffer);
 
     } else {
       // File mode - read from disk
