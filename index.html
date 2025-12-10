@@ -6102,19 +6102,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         }
       };
 
-      const addCustomStoryType = () => {
-        if (newStoryTypeName.trim()) {
-          const newType = {
-            id: `custom-${Date.now()}`,
-            name: { en: newStoryTypeName, de: newStoryTypeName, fr: newStoryTypeName },
-            emoji: newStoryTypeEmoji || '🎭'
-          };
-          setCustomStoryTypes([...customStoryTypes, newType]);
-          setNewStoryTypeName('');
-          setNewStoryTypeEmoji('🎭');
-        }
-      };
-
       const toggleMainCharacter = (charId) => {
         if (mainCharacters.includes(charId)) {
           setMainCharacters(mainCharacters.filter(id => id !== charId));
