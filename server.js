@@ -5541,11 +5541,17 @@ function buildBasePrompt(inputData) {
   const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
   const readingLevel = `${levelInfo.description}. ${levelInfo.pageLength}`;
 
+  // Add German language note if applicable
+  const language = inputData.language || 'en';
+  const languageNote = language === 'de' || language === 'German'
+    ? ' (NOTE: Always use "ss" instead of "ß" - e.g., "Strasse" not "Straße", "gross" not "groß")'
+    : '';
+
   return `# Story Parameters
 
 - **Title**: ${inputData.title || 'Untitled'}
 - **Length**: ${inputData.pages || 15} pages
-- **Language**: ${inputData.language || 'en'}
+- **Language**: ${language}${languageNote}
 - **Reading Level**: ${readingLevel}
 - **Story Type**: ${inputData.storyType || 'adventure'}
 - **Story Details**: ${inputData.storyDetails || 'None'}

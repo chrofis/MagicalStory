@@ -20,11 +20,20 @@ Your task is to create a compelling, well-structured story outline that will gui
 - **Title**: {TITLE}
 - **Target Age**: {AGE_FROM}-{AGE_TO} years
 - **Length**: {PAGES} pages
-- **Language**: {LANGUAGE}
+- **Language**: {LANGUAGE} (NOTE: If German, always use "ss" instead of "ß" - e.g., "Strasse" not "Straße", "gross" not "groß")
 - **Story Type**: {STORY_TYPE}
 - **Story Details**: {STORY_DETAILS}
 - **Dedication**: {DEDICATION}
 - **Characters**: {CHARACTERS}
+
+# IMPORTANT: Character Portrayal Guidelines
+
+When writing about characters' strengths and weaknesses:
+- NEVER mention the trait words directly (e.g., don't write "She was brave" or "He was shy")
+- SHOW the traits through actions, dialogue, and behavior instead
+- Let the reader discover the character's personality through what they DO, not what they ARE told
+- Example: Instead of "Max was curious", show Max asking lots of questions and exploring new places
+- Example: Instead of "Emma was afraid of the dark", show Emma hesitating at a dark doorway or asking for a nightlight
 
 # Part 1: Story Title
 

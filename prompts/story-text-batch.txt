@@ -8,6 +8,15 @@ You are an expert children's book writer with deep understanding of age-appropri
 
 Your task is to create a complete, compelling, well-structured story.
 
+# IMPORTANT: Character Portrayal Guidelines
+
+When writing about characters' strengths and weaknesses:
+- NEVER mention the trait words directly (e.g., don't write "She was brave" or "He was shy")
+- SHOW the traits through actions, dialogue, and behavior instead
+- Let the reader discover the character's personality through what they DO, not what they ARE told
+- Example: Instead of "Max was curious", show Max asking lots of questions and exploring new places
+- Example: Instead of "Emma was afraid of the dark", show Emma hesitating at a dark doorway or asking for a nightlight
+
 {BASE_PROMPT}
 
 Here is the story outline:
