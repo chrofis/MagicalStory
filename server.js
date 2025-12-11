@@ -4674,8 +4674,8 @@ Output Format:
           try {
             console.log(`🎨 [PAGE ${pageNum}] Generating scene description...`);
 
-            // Generate detailed scene description
-            const sceneDescription = await callClaudeAPI(scenePrompt, 768);
+            // Generate detailed scene description (2048 tokens to avoid MAX_TOKENS cutoff)
+            const sceneDescription = await callClaudeAPI(scenePrompt, 2048);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
