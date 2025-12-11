@@ -8458,7 +8458,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         alert('Error creating checkout: ' + err.message);
                       }
                     }}
-                    className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 font-semibold flex items-center justify-center gap-2"
+                    className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 font-semibold flex items-center justify-center gap-2"
                   >
                     <Icon name="shopping-cart" size={20} /> {language === 'de' ? 'Buch kaufen (CHF 36)' : language === 'fr' ? 'Acheter le livre (CHF 36)' : 'Buy Book (CHF 36)'}
                   </button>
@@ -8804,7 +8804,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 )}
 
                 {/* Orphaned Data Section */}
-                <div className="mt-8 p-6 bg-orange-50 rounded-lg border-2 border-orange-200">
+                <div className="mt-8 p-6 bg-indigo-50 rounded-lg border-2 border-indigo-200">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-orange-900 flex items-center gap-2">
                       <span>🗑️</span>
@@ -9704,7 +9704,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                   {/* Draft warning */}
                   {orderData.isDraft && (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
                       <div className="text-sm text-orange-700">
                         ⚠️ {language === 'de'
                           ? 'Um tatsächlich zu drucken, ändern Sie GELATO_ORDER_TYPE in .env von "draft" auf "order"'
@@ -9983,54 +9983,55 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {step === 0 && renderStep0()}
 
           {step > 0 && isAuthenticated && (
-            <div className="max-w-7xl mx-auto px-2 md:px-8 mt-4 md:mt-8">
-              <div className="bg-white md:rounded-2xl md:shadow-xl p-3 md:p-8 mb-4 md:mb-6">
+            <div className="max-w-7xl mx-auto px-3 md:px-8 mt-2 md:mt-8">
+              <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
                 {step === 1 && renderStep1()}
                 {step === 2 && renderStep2()}
                 {step === 3 && renderStep3()}
                 {step === 4 && renderStep4()}
                 {step === 5 && renderStep5()}
-              </div>
 
-              {step < 5 && step !== 2 && (
-                <div className={step === 4 ? "flex justify-start" : "flex justify-between"}>
-                <button
-                  onClick={() => safeSetStep(Math.max(0, step - 1))}
-                  className="bg-white text-indigo-600 hover:bg-indigo-50 border-2 border-indigo-600 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
-                >
-                  <Icon name="arrow-left" size={20} /> {t.back}
-                </button>
+                {/* Navigation buttons - inside the container */}
+                {step < 5 && step !== 2 && (
+                  <div className={`mt-6 pt-6 border-t border-gray-200 ${step === 4 ? "flex justify-start" : "flex justify-between"}`}>
+                    <button
+                      onClick={() => safeSetStep(Math.max(0, step - 1))}
+                      className="bg-transparent text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+                    >
+                      <Icon name="arrow-left" size={20} /> {t.back}
+                    </button>
 
-                {step !== 4 && (
-                  <button
-                    onClick={() => {
-                      const nextStep = Math.min(4, step + 1);
-                      console.log('🔵 Next button clicked:', {
-                        currentStep: step,
-                        nextStep,
-                        storyType,
-                        isDisabled: (step === 1 && !storyType) || (step === 2 && characters.length === 0) || (step === 3 && !areAllRelationshipsDefined())
-                      });
-                      safeSetStep(nextStep);
-                    }}
-                    disabled={
-                      (step === 1 && !storyType) ||
-                      (step === 2 && characters.length === 0) ||
-                      (step === 3 && !areAllRelationshipsDefined())
-                    }
-                    className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
-                      (step === 1 && !storyType) ||
-                      (step === 2 && characters.length === 0) ||
-                      (step === 3 && !areAllRelationshipsDefined())
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                    }`}
-                  >
-                    {t.next} <Icon name="arrow-right" size={20} />
-                  </button>
+                    {step !== 4 && (
+                      <button
+                        onClick={() => {
+                          const nextStep = Math.min(4, step + 1);
+                          console.log('🔵 Next button clicked:', {
+                            currentStep: step,
+                            nextStep,
+                            storyType,
+                            isDisabled: (step === 1 && !storyType) || (step === 2 && characters.length === 0) || (step === 3 && !areAllRelationshipsDefined())
+                          });
+                          safeSetStep(nextStep);
+                        }}
+                        disabled={
+                          (step === 1 && !storyType) ||
+                          (step === 2 && characters.length === 0) ||
+                          (step === 3 && !areAllRelationshipsDefined())
+                        }
+                        className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
+                          (step === 1 && !storyType) ||
+                          (step === 2 && characters.length === 0) ||
+                          (step === 3 && !areAllRelationshipsDefined())
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        }`}
+                      >
+                        {t.next} <Icon name="arrow-right" size={20} />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-              )}
             </div>
           )}
         </div>
