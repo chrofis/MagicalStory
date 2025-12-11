@@ -13,12 +13,26 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Libre+Baskerville:wght@400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cinzel:wght@700&family=Libre+Baskerville:wght@400&display=swap" rel="stylesheet">
+  <script>
+    // Tailwind config for style guide colors
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            title: ['Cinzel', 'serif'],
+            body: ['Libre Baskerville', 'serif'],
+          },
+        },
+      },
+    }
+  </script>
   <style>
     body {
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
     }
     .font-title {
       font-family: 'Cinzel', serif;
@@ -27,6 +41,14 @@
     .font-body {
       font-family: 'Libre Baskerville', serif;
       font-weight: 400;
+    }
+    /* Animation for adding new items */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-out;
     }
   </style>
 </head>
@@ -6290,7 +6312,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 {/* Button directly below text */}
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-8 lg:px-12 py-4 lg:py-6 rounded-2xl text-lg lg:text-2xl font-bold shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all inline-flex items-center gap-3 border-2 border-black"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 lg:px-12 py-4 lg:py-6 rounded-xl text-lg lg:text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all inline-flex items-center gap-3"
                 >
                   <Icon name="sparkles" size={28} />
                   {t.startJourney}
@@ -6363,12 +6385,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       const renderStep1 = () => (
         <div className="space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-2 mb-4">
-            <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
+            <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
               <Icon name="book-open" size={24} /> {t.chooseStoryType}
             </h2>
             {currentUser && currentUser.role === 'admin' && (
               <div className="flex gap-2 flex-wrap">
-                <label className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 cursor-pointer flex items-center gap-2">
+                <label className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 cursor-pointer flex items-center gap-2">
                   <Icon name="upload" size={20} /> {t.importConfig}
                   <input
                     type="file"
@@ -6405,8 +6427,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 }}
                 className={`p-2 rounded-lg border-2 transition-all ${
                   storyType === type.id
-                    ? 'border-purple-500 bg-purple-50 shadow-lg'
-                    : 'border-gray-200 hover:border-purple-300'
+                    ? 'border-indigo-600 bg-indigo-50 shadow-lg'
+                    : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
                 <div className="text-2xl mb-1">{type.emoji}</div>
@@ -6416,21 +6438,21 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             {/* Add Custom Type Button */}
             <button
               onClick={addCustomStoryType}
-              className="p-2 rounded-lg border-2 border-dashed border-purple-300 hover:border-purple-500 transition-all hover:bg-purple-50"
+              className="p-2 rounded-lg border-2 border-dashed border-indigo-300 hover:border-indigo-600 transition-all hover:bg-indigo-50"
             >
               <div className="text-2xl mb-1">➕</div>
-              <div className="font-semibold text-xs text-purple-600">{t.addCustomStoryType}</div>
+              <div className="font-semibold text-xs text-indigo-600">{t.addCustomStoryType}</div>
             </button>
           </div>
 
           {/* Art Style Selection - Show only after story type is selected */}
           {storyType && (
-            <div id="art-style-section" className="md:bg-gradient-to-br md:from-pink-50 md:to-purple-50 md:border-2 md:border-pink-300 md:rounded-lg md:p-4 mt-4">
+            <div id="art-style-section" className="md:bg-indigo-50 md:border-2 md:border-indigo-200 md:rounded-lg md:p-4 mt-4">
               <div className="flex items-center gap-2 mb-2">
-                <Icon name="palette" size={18} className="text-pink-600" />
-                <h2 className="text-lg md:text-xl font-bold text-gray-800 md:text-pink-700">{t.chooseArtStyle}</h2>
+                <Icon name="palette" size={18} className="text-indigo-600" />
+                <h2 className="text-lg md:text-xl font-bold text-gray-800">{t.chooseArtStyle}</h2>
               </div>
-              <p className="text-sm text-gray-600 mb-2 md:mb-3">{t.artStyleDescription}</p>
+              <p className="text-sm text-gray-500 mb-2 md:mb-3">{t.artStyleDescription}</p>
               <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
                 {artStyles.map(style => (
                   <button
@@ -6438,8 +6460,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     onClick={() => setArtStyle(style.id)}
                     className={`rounded-lg border-2 transition-all overflow-hidden flex flex-col bg-white ${
                       artStyle === style.id
-                        ? 'border-pink-500 shadow-lg ring-2 ring-pink-300'
-                        : 'border-gray-300 hover:border-pink-300'
+                        ? 'border-indigo-600 shadow-lg ring-2 ring-indigo-200'
+                        : 'border-gray-200 hover:border-indigo-300'
                     }`}
                   >
                     {/* Image at the top - Taller to show more */}
@@ -6480,7 +6502,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
         return (
           <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
+            <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
               <Icon name="users" size={24} /> {t.createCharacters}
             </h2>
 
@@ -6502,8 +6524,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 )}
 
                 {/* Existing characters */}
-                <div className="bg-white border-2 border-purple-200 rounded-lg p-3">
-                  <h3 className="text-base font-bold text-purple-700 mb-2">{t.yourCharacters}</h3>
+                <div className="bg-white border-2 border-indigo-200 rounded-lg p-3">
+                  <h3 className="text-base font-bold text-gray-800 mb-2">{t.yourCharacters}</h3>
                   <div className="grid md:grid-cols-2 gap-2">
                     {characters.map((char) => (
                       <div key={char.id} className="border border-gray-200 rounded p-2">
@@ -6511,11 +6533,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             {char.photoUrl && (
-                              <img src={char.photoUrl} alt={char.name} className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-purple-200 flex-shrink-0" />
+                              <img src={char.photoUrl} alt={char.name} className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0" />
                             )}
                             <div className="flex-1 min-w-0">
                               <h4 className="font-bold text-sm md:text-base truncate">{char.name}</h4>
-                              <p className="text-xs md:text-sm text-gray-600">
+                              <p className="text-xs md:text-sm text-gray-500">
                                 {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
                               </p>
                             </div>
@@ -6523,7 +6545,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           <div className="flex gap-1 flex-shrink-0">
                             <button
                               onClick={() => editCharacter(char)}
-                              className="bg-blue-500 text-white px-2 md:px-3 py-1 rounded text-xs hover:bg-blue-600"
+                              className="bg-indigo-600 text-white px-2 md:px-3 py-1 rounded text-xs hover:bg-indigo-700"
                             >
                               {t.editCharacter}
                             </button>
@@ -6537,17 +6559,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         </div>
                         {/* Character traits below */}
                         {char.strengths && char.strengths.length > 0 && (
-                          <p className="text-xs text-gray-700 mb-1">
+                          <p className="text-xs text-gray-800 mb-1">
                             <strong className="text-green-600">{t.strengths}:</strong> {char.strengths.join(', ')}
                           </p>
                         )}
                         {char.weaknesses && char.weaknesses.length > 0 && (
-                          <p className="text-xs text-gray-700 mb-1">
+                          <p className="text-xs text-gray-800 mb-1">
                             <strong className="text-orange-600">{t.weaknesses}:</strong> {char.weaknesses.join(', ')}
                           </p>
                         )}
                         {char.fears && char.fears.length > 0 && (
-                          <p className="text-xs text-gray-700 mb-1">
+                          <p className="text-xs text-gray-800 mb-1">
                             <strong className="text-red-600">{t.fears}:</strong> {char.fears.join(', ')}
                           </p>
                         )}
@@ -6557,8 +6579,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 </div>
 
                 {/* What would you like to do next? */}
-                <div className="md:bg-purple-50 md:border-2 md:border-purple-200 md:rounded-lg p-4">
-                  <p className="text-gray-700 mb-4 text-center font-semibold">
+                <div className="md:bg-indigo-50 md:border-2 md:border-indigo-200 md:rounded-lg p-4">
+                  <p className="text-gray-800 mb-4 text-center font-semibold">
                     {language === 'de'
                       ? 'Was möchten Sie als Nächstes tun?'
                       : language === 'fr'
@@ -6571,7 +6593,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         setShowCharacterCreated(false);
                         startNewCharacter();
                       }}
-                      className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold flex items-center justify-center gap-2 transition-colors"
+                      className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 font-semibold flex items-center justify-center gap-2 transition-colors"
                     >
                       <Icon name="user-plus" size={20} />
                       {language === 'de' ? 'Weiteren Charakter erstellen' : language === 'fr' ? 'Créer un autre personnage' : 'Create Another Character'}
@@ -6582,7 +6604,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         initializeRelationships();
                         setStep(3);
                       }}
-                      className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2 transition-colors"
+                      className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2 transition-colors"
                     >
                       <Icon name="arrow-right" size={20} />
                       {language === 'de' ? 'Weiter zu Beziehungen' : language === 'fr' ? 'Continuer vers les relations' : 'Continue to Relationships'}
@@ -6593,14 +6615,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             )}
 
             {currentCharacter && (
-              <div ref={characterFormRef} className="bg-white border-2 border-purple-200 rounded-lg p-3 space-y-3">
-                <h3 className="text-base font-bold text-purple-700">{currentCharacter.id ? t.editCharacter : t.startCreating}</h3>
+              <div ref={characterFormRef} className="bg-white border-2 border-indigo-200 rounded-lg p-3 space-y-3">
+                <h3 className="text-base font-bold text-gray-800">{currentCharacter.id ? t.editCharacter : t.startCreating}</h3>
 
                 {/* Show message when no photo uploaded yet */}
                 {!currentCharacter.photoUrl && (
-                  <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 text-center">
-                    <p className="text-sm font-semibold text-blue-700 mb-2">{t.uploadPhotoFirst}</p>
-                    <p className="text-xs text-blue-600">
+                  <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-4 text-center">
+                    <p className="text-sm font-semibold text-indigo-700 mb-2">{t.uploadPhotoFirst}</p>
+                    <p className="text-xs text-indigo-600">
                       {language === 'de'
                         ? 'Laden Sie zunächst ein Foto hoch, um mit der Charaktererstellung zu beginnen.'
                         : language === 'fr'
@@ -6625,14 +6647,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 )}
 
                 <div className="grid md:grid-cols-2 gap-3">
-                  <div className="md:border md:border-purple-300 md:rounded-lg p-2 md:bg-purple-50">
+                  <div className="md:border md:border-indigo-300 md:rounded-lg p-2 md:bg-indigo-50">
                     <label className="block text-xs font-semibold mb-2 text-center">{t.characterPhoto}</label>
                     <div className="flex flex-col items-center gap-2">
                       {currentCharacter.photoUrl && (
                         <img
                           src={currentCharacter.photoUrl}
                           alt="Character"
-                          className="w-20 h-20 rounded-full object-cover border-2 border-purple-400"
+                          className="w-20 h-20 rounded-full object-cover border-2 border-indigo-400"
                         />
                       )}
 
@@ -6667,7 +6689,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         </div>
                       )}
 
-                      <label className="cursor-pointer bg-blue-500 text-white px-3 py-1.5 rounded text-xs hover:bg-blue-600 flex items-center gap-1 font-semibold">
+                      <label className="cursor-pointer bg-indigo-600 text-white px-3 py-1.5 rounded text-xs hover:bg-indigo-700 flex items-center gap-1 font-semibold">
                         <Icon name="upload" size={14} /> {t.uploadPhoto}
                         <input
                           type="file"
@@ -6685,7 +6707,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1 ${
                             isGeneratingAvatar
                               ? 'bg-gray-400 cursor-not-allowed'
-                              : 'bg-purple-500 text-white hover:bg-purple-600'
+                              : 'bg-indigo-500 text-white hover:bg-indigo-600'
                           }`}
                         >
                           {isGeneratingAvatar ? (
@@ -6702,15 +6724,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                       {/* Show 3 avatar variants for selection */}
                       {generatedAvatars.length > 0 && (
-                        <div className="w-full mt-2 p-2 bg-white rounded border border-purple-400">
-                          <h3 className="text-xs font-bold text-purple-700 mb-2 text-center">
+                        <div className="w-full mt-2 p-2 bg-white rounded border border-indigo-400">
+                          <h3 className="text-xs font-bold text-gray-800 mb-2 text-center">
                             {language === 'de' ? 'Wähle Avatar' : language === 'fr' ? 'Choisir avatar' : 'Choose Avatar'}
                           </h3>
 
                           <div className="grid grid-cols-3 gap-1.5 mb-2">
                             {generatedAvatars.map((variant, index) => (
                               <div key={index} className="flex flex-col items-center">
-                                <div className="relative w-full aspect-square mb-1 border border-gray-300 rounded overflow-hidden hover:border-purple-500 transition-all cursor-pointer">
+                                <div className="relative w-full aspect-square mb-1 border border-gray-300 rounded overflow-hidden hover:border-indigo-600 transition-all cursor-pointer">
                                   <img
                                     src={variant.image}
                                     alt={variant.type}
@@ -6737,7 +6759,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                     }}
                                   />
                                 </div>
-                                <p className="text-[9px] font-semibold text-gray-700">{variant.type}</p>
+                                <p className="text-[9px] font-semibold text-gray-800">{variant.type}</p>
                               </div>
                             ))}
                           </div>
@@ -6753,7 +6775,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                             <button
                               onClick={() => generateAvatar(currentCharacter.photoUrl)}
                               disabled={isGeneratingAvatar}
-                              className="flex-1 bg-purple-500 text-white px-2 py-1 rounded text-[10px] hover:bg-purple-600 font-semibold disabled:bg-gray-400"
+                              className="flex-1 bg-indigo-500 text-white px-2 py-1 rounded text-[10px] hover:bg-indigo-600 font-semibold disabled:bg-gray-400"
                             >
                               <Icon name="refresh-cw" size={10} className="inline mr-0.5" />
                               {language === 'de' ? 'Neu' : language === 'fr' ? 'Nouveau' : 'New'}
@@ -6763,8 +6785,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       )}
 
                       {generatedAvatar && (
-                        <div className="w-full mt-2 p-2 bg-white rounded border border-purple-400">
-                          <h3 className="text-xs font-bold text-purple-700 mb-2 text-center">{t.avatarGenerated}</h3>
+                        <div className="w-full mt-2 p-2 bg-white rounded border border-indigo-400">
+                          <h3 className="text-xs font-bold text-gray-800 mb-2 text-center">{t.avatarGenerated}</h3>
                           <img
                             src={generatedAvatar}
                             alt="Generated Avatar"
@@ -6817,10 +6839,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           {/* Show Prompt Button - Admin only */}
                           {currentUser && currentUser.role === 'admin' && avatarPrompt && (
                             <details className="bg-gray-50 border border-gray-300 rounded-lg p-2 mb-2">
-                              <summary className="cursor-pointer text-xs font-semibold text-gray-700 hover:text-gray-900">
+                              <summary className="cursor-pointer text-xs font-semibold text-gray-800 hover:text-gray-900">
                                 {t.showPrompt}
                               </summary>
-                              <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-2 rounded border border-gray-200">
+                              <pre className="mt-2 text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-2 rounded border border-gray-200">
                                 {avatarPrompt}
                               </pre>
                             </details>
@@ -6828,11 +6850,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                           {/* Show Analyzed Traits - Admin only */}
                           {currentUser && currentUser.role === 'admin' && analyzedTraitsText && (
-                            <details className="bg-blue-50 border border-blue-300 rounded-lg p-2" open>
-                              <summary className="cursor-pointer text-xs font-semibold text-blue-700 hover:text-blue-900">
+                            <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-2" open>
+                              <summary className="cursor-pointer text-xs font-semibold text-indigo-700 hover:text-indigo-900">
                                 {language === 'de' ? 'Analysierte Eigenschaften' : language === 'fr' ? 'Traits analysés' : 'Analyzed Traits'}
                               </summary>
-                              <pre className="mt-2 text-xs text-blue-600 whitespace-pre-wrap font-mono bg-white p-2 rounded border border-blue-200">
+                              <pre className="mt-2 text-xs text-indigo-600 whitespace-pre-wrap font-mono bg-white p-2 rounded border border-indigo-200">
                                 {analyzedTraitsText}
                               </pre>
                             </details>
@@ -6955,7 +6977,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           className={`px-3 py-1 rounded-full text-sm ${
                             currentCharacter.strengths.includes(strength)
                               ? 'bg-green-500 text-white'
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                           }`}
                         >
                           {strength}
@@ -6973,7 +6995,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       />
                       <button
                         onClick={addCustomStrength}
-                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
                       >
                         <Icon name="plus" size={20} />
                       </button>
@@ -6995,7 +7017,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           className={`px-3 py-1 rounded-full text-sm ${
                             currentCharacter.weaknesses.includes(weakness)
                               ? 'bg-orange-500 text-white'
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                           }`}
                         >
                           {weakness}
@@ -7013,7 +7035,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       />
                       <button
                         onClick={addCustomWeakness}
-                        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
                       >
                         <Icon name="plus" size={20} />
                       </button>
@@ -7040,7 +7062,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   <div className="flex gap-4">
                     <button
                       onClick={cancelEditCharacter}
-                      className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 font-semibold"
+                      className="flex-1 bg-gray-300 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-400 font-semibold"
                     >
                       {t.cancel}
                     </button>
@@ -7049,7 +7071,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       disabled={!canSave}
                       className={`flex-1 px-6 py-3 rounded-lg font-semibold ${
                         canSave
-                          ? 'bg-blue-500 text-white hover:bg-blue-600'
+                          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                     >
@@ -7065,10 +7087,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
       const renderStep3 = () => (
         <div className="space-y-6">
-          <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
+          <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
             <Icon name="heart" size={24} /> {t.defineRelationships}
           </h2>
-          <p className="text-base text-gray-600">{t.defineRelationshipsDesc}</p>
+          <p className="text-base text-gray-500">{t.defineRelationshipsDesc}</p>
 
           <div className="space-y-4">
             {characters.map((char1, i) => (
@@ -7083,7 +7105,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                   return (
                     <>
-                      <div key={key1} className="bg-white md:border-2 md:border-purple-200 md:rounded-xl p-4 md:p-6 mb-4">
+                      <div key={key1} className="bg-white md:border-2 md:border-indigo-200 md:rounded-xl p-4 md:p-6 mb-4">
                       {/* Main relationship selector and description - side by side on wide screens */}
                       <div className="grid lg:grid-cols-[1fr,350px] gap-4">
                         {/* Left: Relationship Selector */}
@@ -7135,7 +7157,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         {/* Right (wide screens) / Bottom (narrow screens): Relationship Description */}
                         {relationships[key1] && relationships[key2] && (
                           <div className="lg:border-l lg:pl-4 lg:border-gray-200">
-                            <label className="block text-sm font-semibold text-gray-600 mb-1">
+                            <label className="block text-sm font-semibold text-gray-500 mb-1">
                               {language === 'de' ? 'Beziehung beschreiben' : language === 'fr' ? 'Décrire la relation' : 'Describe Relationship'}
                             </label>
                             <textarea
@@ -7166,7 +7188,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       const renderStep4 = () => (
         <div className="space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-2">
-            <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
+            <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
               <Icon name="wand-2" size={24} /> {t.storySettings}
             </h2>
             {currentUser && currentUser.role === 'admin' && (
@@ -7180,14 +7202,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       onChange={(e) => setDeveloperMode(e.target.checked)}
                       className="w-4 h-4"
                     />
-                    <span className="text-sm font-semibold text-gray-700">
+                    <span className="text-sm font-semibold text-gray-800">
                       {language === 'de' ? 'Entwicklermodus' : language === 'fr' ? 'Mode développeur' : 'Developer Mode'}
                     </span>
                   </label>
                 </div>
                 <button
                   onClick={exportConfiguration}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
                 >
                   <Icon name="save" size={20} /> {t.exportConfig}
                 </button>
@@ -7221,7 +7243,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                             <Icon name="star" size={16} className="text-yellow-500" />
                           </span>
                         </div>
-                        <div className="text-sm md:text-base text-gray-600">
+                        <div className="text-sm md:text-base text-gray-500">
                           {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
                         </div>
                       </div>
@@ -7238,7 +7260,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <select
                 value={pages}
                 onChange={(e) => setPages(parseInt(e.target.value))}
-                className="w-full px-4 py-3 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none text-base md:text-lg font-semibold"
+                className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base md:text-lg font-semibold"
               >
                 {currentUser && currentUser.role === 'admin' && (
                   <>
@@ -7264,12 +7286,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     onClick={() => setLanguageLevel(level.value)}
                     className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                       languageLevel === level.value
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-purple-300'
+                        ? 'border-indigo-600 bg-indigo-50'
+                        : 'border-gray-200 hover:border-indigo-300'
                     }`}
                   >
                     <div className="font-semibold text-base">{level.label}</div>
-                    <div className="text-sm md:text-base text-gray-600">{level.desc}</div>
+                    <div className="text-sm md:text-base text-gray-500">{level.desc}</div>
                   </button>
                 ))}
               </div>
@@ -7277,19 +7299,19 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
             {/* Additional Story Details */}
             <div>
-              <label className="block text-base font-semibold text-gray-700 mb-2">{t.storyDetails}</label>
+              <label className="block text-base font-semibold text-gray-800 mb-2">{t.storyDetails}</label>
               <textarea
                 value={storyDetails}
                 onChange={(e) => setStoryDetails(e.target.value)}
                 placeholder={t.storyDetailsPlaceholder}
-                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-base"
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-base"
                 rows="3"
               />
             </div>
 
             {/* Dedication (Widmung) - Optional */}
             <div>
-              <label className="block text-base font-semibold text-gray-700 mb-2">
+              <label className="block text-base font-semibold text-gray-800 mb-2">
                 {language === 'de' ? 'Widmung (Optional)' : language === 'fr' ? 'Dédicace (Facultatif)' : 'Dedication (Optional)'}
               </label>
               <textarea
@@ -7300,11 +7322,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   : language === 'fr'
                   ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
                   : 'e.g. "For my dear daughter Emma on her 5th birthday"'}
-                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-base"
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-base"
                 rows="2"
                 maxLength="200"
               />
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 {language === 'de'
                   ? 'Dieser Text wird auf Seite 0 Ihres Buches gedruckt. Wenn Sie nichts eingeben, wird Seite 0 nur eine Illustration ohne Text enthalten.'
                   : language === 'fr'
@@ -7317,7 +7339,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             {currentUser && currentUser.role === 'admin' && (
               <div className="border-t-2 border-gray-200 pt-6">
                 <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-lg font-semibold text-purple-700">{t.promptPreview}</h3>
+                  <h3 className="text-lg font-semibold text-gray-800">{t.promptPreview}</h3>
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
@@ -7370,7 +7392,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       className={`w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 ${
                         isGeneratingOutline || characters.length === 0 || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-purple-500 text-white hover:bg-purple-600'
+                          : 'bg-indigo-500 text-white hover:bg-indigo-600'
                       }`}
                     >
                       <Icon name="list" size={24} />
@@ -7416,7 +7438,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       className={`w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 ${
                         isGenerating || !editableOutline || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
+                          : 'bg-indigo-600 text-white hover:bg-indigo-700'
                       }`}
                     >
                       <Icon name="wand-2" size={24} />
@@ -7436,16 +7458,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
             {/* Progress indicator for multi-part generation */}
             {generationProgress.total > 0 && (
-              <div className="mt-6 bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+              <div className="mt-6 bg-indigo-50 border-2 border-indigo-200 rounded-lg p-4">
                 <div className="mb-2">
-                  <div className="w-full bg-blue-200 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-blue-500 h-full rounded-full transition-all duration-500 ease-out"
+                      className="bg-indigo-600 h-full rounded-full transition-all duration-500 ease-out"
                       style={{ width: `${(generationProgress.current / generationProgress.total) * 100}%` }}
                     ></div>
                   </div>
                 </div>
-                <p className="text-xs text-blue-600 text-center">
+                <p className="text-xs text-indigo-600 text-center">
                   {language === 'de' ? 'Geschichte wird generiert, dies kann einige Minuten dauern...' :
                    language === 'fr' ? 'Génération de l\'histoire, cela peut prendre quelques minutes...' :
                    'Generating story, this will take a few minutes...'}
@@ -7461,7 +7483,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
                   characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
                 }`}
               >
                 <Icon name="sparkles" size={20} />
@@ -7487,7 +7509,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         return (
         <div className="space-y-6">
           <div className="flex justify-between items-center flex-wrap gap-3">
-            <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
               <Icon name="book-open" size={24} /> {t.yourStory}
             </h2>
             {currentUser && currentUser.role === 'admin' && (
@@ -7501,7 +7523,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       onChange={(e) => setDeveloperMode(e.target.checked)}
                       className="w-4 h-4"
                     />
-                    <span className="text-sm font-semibold text-gray-700">
+                    <span className="text-sm font-semibold text-gray-800">
                       {language === 'de' ? 'Entwicklermodus' : language === 'fr' ? 'Mode développeur' : 'Developer Mode'}
                     </span>
                   </label>
@@ -7523,7 +7545,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {developerMode && generatedPrompt && (
             <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-700">{t.promptUsed}</h3>
+                <h3 className="text-lg font-bold text-gray-800">{t.promptUsed}</h3>
                 <button
                   onClick={() => setShowPrompt(!showPrompt)}
                   className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 flex items-center gap-2"
@@ -7534,7 +7556,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               </div>
               {showPrompt && (
                 <div className="bg-white border border-gray-300 rounded-lg p-4 mt-4">
-                  <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono">
                     {generatedPrompt}
                   </pre>
                 </div>
@@ -7549,7 +7571,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <Icon name="list" size={20} /> Story Outline
               </h3>
               <div className="bg-white border border-yellow-200 rounded-lg p-4">
-                <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">
+                <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono">
                   {storyOutline}
                 </pre>
               </div>
@@ -7558,9 +7580,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           {/* 3. Full Story Text - Developer Mode Only */}
           {developerMode && (
-            <div className="md:bg-white md:border-2 md:border-purple-200 md:rounded-xl p-4 md:p-8">
+            <div className="md:bg-white md:border-2 md:border-indigo-200 md:rounded-xl p-4 md:p-8">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-purple-700">Full Story Text</h3>
+                <h3 className="text-lg font-bold text-gray-800">Full Story Text</h3>
                 <button
                   onClick={() => {
                     if (editingStory) {
@@ -7571,7 +7593,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       setEditingStory(true);
                     }
                   }}
-                  className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 flex items-center gap-2"
+                  className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 flex items-center gap-2"
                 >
                   <Icon name={editingStory ? "save" : "edit"} size={16} />
                   {editingStory ? t.saveStory : t.editStory}
@@ -7597,7 +7619,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <>
                 <button
                   onClick={() => downloadStory('txt')}
-                  className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
+                  className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
                 >
                   <Icon name="download" size={20} /> {t.downloadTXT}
                 </button>
@@ -7616,7 +7638,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             {sceneImages.length > 0 && (
               <button
                 onClick={orderPrintedBook}
-                className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold flex items-center justify-center gap-2"
+                className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 font-semibold flex items-center justify-center gap-2"
               >
                 <Icon name="printer" size={20} /> {language === 'de' ? 'Buch drucken' : language === 'fr' ? 'Imprimer le livre' : 'Print Book'}
               </button>
@@ -7666,7 +7688,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             {currentUser && currentUser.role === 'admin' && generatedPrompt && (
               <button
                 onClick={downloadPrompt}
-                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
+                className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
               >
                 <Icon name="download" size={20} /> {t.downloadPrompt}
               </button>
@@ -7675,7 +7697,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <>
                 <button
                   onClick={exportConfiguration}
-                  className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center justify-center gap-2"
+                  className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
                 >
                   <Icon name="save" size={20} /> {t.exportConfig}
                 </button>
@@ -7729,7 +7751,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             )}
             <button
               onClick={resetAllStoryState}
-              className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold flex items-center justify-center gap-2 sm:col-span-2 lg:col-span-1"
+              className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 font-semibold flex items-center justify-center gap-2 sm:col-span-2 lg:col-span-1"
             >
               {t.createAnotherStory}
             </button>
@@ -7776,7 +7798,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg resize-none"
                       />
                     ) : (
-                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                      <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
                         {scene.description}
                       </p>
                     )}
@@ -7784,10 +7806,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     {/* Show individual prompt for this scene */}
                     {sceneDescriptionPrompts[scene.pageNumber] && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mt-3">
-                        <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                        <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                           {t.showPrompt} (Page {scene.pageNumber})
                         </summary>
-                        <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                        <pre className="mt-2 text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                           {sceneDescriptionPrompts[scene.pageNumber]}
                         </pre>
                       </details>
@@ -7800,15 +7822,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           {/* Display Cover Images with Controls */}
           {(coverImages.frontCover || coverImages.page0 || coverImages.backCover || coverImagePrompts.frontCover || coverImagePrompts.page0 || coverImagePrompts.backCover) && (
-            <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-6 mt-6">
-              <h3 className="text-xl font-bold text-purple-700 mb-4 flex items-center gap-2">
+            <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mt-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <Icon name="book" size={24} /> Cover Pages
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Front Cover / Title Page */}
                 {(coverImages.frontCover || coverImagePrompts.frontCover) && (
-                  <div className="bg-white border-2 border-purple-300 rounded-lg p-4 shadow-lg">
-                    <h4 className="text-lg font-bold text-purple-700 mb-3">Front Cover / Title Page</h4>
+                  <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                    <h4 className="text-lg font-bold text-gray-800 mb-3">Front Cover / Title Page</h4>
                     {coverImages.frontCover ? (
                       <>
                         <div className="relative mb-3">
@@ -7829,7 +7851,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               </button>
                               <button
                                 onClick={() => toggleCoverImageEdit('frontCover')}
-                                className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                                className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-1 text-sm"
                               >
                                 <Icon name="edit" size={14} /> {t.editImage}
                               </button>
@@ -7844,17 +7866,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     )}
 
                     {currentUser && currentUser.role === 'admin' && editingCoverImage === 'frontCover' && (
-                      <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
-                        <p className="text-sm font-semibold text-purple-700 mb-2">{t.editInstruction}</p>
+                      <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-3 mb-3">
+                        <p className="text-sm font-semibold text-gray-800 mb-2">{t.editInstruction}</p>
                         <textarea
                           value={coverEditInstruction}
                           onChange={(e) => setCoverEditInstruction(e.target.value)}
                           placeholder={coverImagePrompts.frontCover || "Enter prompt..."}
-                          className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
+                          className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm mb-2 h-24"
                         />
                         <button
                           onClick={() => applyCoverImageEdit('frontCover')}
-                          className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-semibold"
                         >
                           {t.applyEdit}
                         </button>
@@ -7863,18 +7885,18 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                     {currentUser && currentUser.role === 'admin' && coverImagePrompts.frontCover && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                        <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                           {t.showPrompt}
                         </summary>
-                        <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                        <pre className="mt-2 text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                           {coverImagePrompts.frontCover}
                         </pre>
                       </details>
                     )}
 
                     {currentUser && currentUser.role === 'admin' && coverImages.frontCover?.qualityScore !== null && coverImages.frontCover?.qualityScore !== undefined && (
-                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
+                      <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                           <span>
                             {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
                           </span>
@@ -7887,7 +7909,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           </span>
                         </summary>
                         {coverImages.frontCover.qualityReasoning && (
-                          <div className="mt-2 text-xs text-gray-700 bg-white p-3 rounded border border-gray-200">
+                          <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                             <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
                             <p className="whitespace-pre-wrap">{coverImages.frontCover.qualityReasoning}</p>
                           </div>
@@ -7896,14 +7918,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     )}
 
                     {currentUser && currentUser.role === 'admin' && coverImageApiCalls.frontCover && (
-                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                      <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                        <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                           {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
                         </summary>
-                        <div className="mt-2 text-xs text-gray-700">
+                        <div className="mt-2 text-xs text-gray-800">
                           <div className="mb-2"><span className="font-semibold">Model:</span> {coverImageApiCalls.frontCover.model}</div>
                           <div className="mb-2"><span className="font-semibold">Type:</span> {coverImageApiCalls.frontCover.type}</div>
-                          <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                          <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
                             {JSON.stringify(coverImageApiCalls.frontCover, null, 2)}
                           </pre>
                         </div>
@@ -7914,8 +7936,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 {/* Page 0 */}
                 {(coverImages.page0 || coverImagePrompts.page0) && (
-                  <div className="bg-white border-2 border-purple-300 rounded-lg p-4 shadow-lg">
-                    <h4 className="text-lg font-bold text-purple-700 mb-3">Page 0</h4>
+                  <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                    <h4 className="text-lg font-bold text-gray-800 mb-3">Page 0</h4>
                     {coverImages.page0 ? (
                       <>
                         <img
@@ -7934,7 +7956,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               </button>
                               <button
                                 onClick={() => toggleCoverImageEdit('page0')}
-                                className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                                className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-1 text-sm"
                               >
                                 <Icon name="edit" size={14} /> {t.editImage}
                               </button>
@@ -7949,17 +7971,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     )}
 
                     {currentUser && currentUser.role === 'admin' && editingCoverImage === 'page0' && (
-                      <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
-                        <p className="text-sm font-semibold text-purple-700 mb-2">{t.editInstruction}</p>
+                      <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-3 mb-3">
+                        <p className="text-sm font-semibold text-gray-800 mb-2">{t.editInstruction}</p>
                         <textarea
                           value={coverEditInstruction}
                           onChange={(e) => setCoverEditInstruction(e.target.value)}
                           placeholder={coverImagePrompts.page0 || "Enter prompt..."}
-                          className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
+                          className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm mb-2 h-24"
                         />
                         <button
                           onClick={() => applyCoverImageEdit('page0')}
-                          className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-semibold"
                         >
                           {t.applyEdit}
                         </button>
@@ -7968,18 +7990,18 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                     {currentUser && currentUser.role === 'admin' && coverImagePrompts.page0 && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                        <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                           {t.showPrompt}
                         </summary>
-                        <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                        <pre className="mt-2 text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                           {coverImagePrompts.page0}
                         </pre>
                       </details>
                     )}
 
                     {currentUser && currentUser.role === 'admin' && coverImages.page0?.qualityScore !== null && coverImages.page0?.qualityScore !== undefined && (
-                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
+                      <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                           <span>
                             {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
                           </span>
@@ -7992,7 +8014,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           </span>
                         </summary>
                         {coverImages.page0.qualityReasoning && (
-                          <div className="mt-2 text-xs text-gray-700 bg-white p-3 rounded border border-gray-200">
+                          <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                             <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
                             <p className="whitespace-pre-wrap">{coverImages.page0.qualityReasoning}</p>
                           </div>
@@ -8001,14 +8023,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     )}
 
                     {currentUser && currentUser.role === 'admin' && coverImageApiCalls.page0 && (
-                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                      <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                        <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                           {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
                         </summary>
-                        <div className="mt-2 text-xs text-gray-700">
+                        <div className="mt-2 text-xs text-gray-800">
                           <div className="mb-2"><span className="font-semibold">Model:</span> {coverImageApiCalls.page0.model}</div>
                           <div className="mb-2"><span className="font-semibold">Type:</span> {coverImageApiCalls.page0.type}</div>
-                          <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                          <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
                             {JSON.stringify(coverImageApiCalls.page0, null, 2)}
                           </pre>
                         </div>
@@ -8019,8 +8041,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 {/* Back Cover */}
                 {(coverImages.backCover || coverImagePrompts.backCover) && (
-                  <div className="bg-white border-2 border-purple-300 rounded-lg p-4 shadow-lg">
-                    <h4 className="text-lg font-bold text-purple-700 mb-3">Back Cover</h4>
+                  <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                    <h4 className="text-lg font-bold text-gray-800 mb-3">Back Cover</h4>
                     {coverImages.backCover ? (
                       <>
                         <img
@@ -8039,7 +8061,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               </button>
                               <button
                                 onClick={() => toggleCoverImageEdit('backCover')}
-                                className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                                className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-1 text-sm"
                               >
                                 <Icon name="edit" size={14} /> {t.editImage}
                               </button>
@@ -8054,17 +8076,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     )}
 
                     {editingCoverImage === 'backCover' && (
-                      <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
-                        <p className="text-sm font-semibold text-purple-700 mb-2">{t.editInstruction}</p>
+                      <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-3 mb-3">
+                        <p className="text-sm font-semibold text-gray-800 mb-2">{t.editInstruction}</p>
                         <textarea
                           value={coverEditInstruction}
                           onChange={(e) => setCoverEditInstruction(e.target.value)}
                           placeholder={coverImagePrompts.backCover || "Enter prompt..."}
-                          className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
+                          className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm mb-2 h-24"
                         />
                         <button
                           onClick={() => applyCoverImageEdit('backCover')}
-                          className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                          className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-semibold"
                         >
                           {t.applyEdit}
                         </button>
@@ -8073,18 +8095,18 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                     {currentUser && currentUser.role === 'admin' && coverImagePrompts.backCover && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                        <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                           {t.showPrompt}
                         </summary>
-                        <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                        <pre className="mt-2 text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                           {coverImagePrompts.backCover}
                         </pre>
                       </details>
                     )}
 
                     {currentUser && currentUser.role === 'admin' && coverImages.backCover?.qualityScore !== null && coverImages.backCover?.qualityScore !== undefined && (
-                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
+                      <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                           <span>
                             {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
                           </span>
@@ -8097,7 +8119,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           </span>
                         </summary>
                         {coverImages.backCover.qualityReasoning && (
-                          <div className="mt-2 text-xs text-gray-700 bg-white p-3 rounded border border-gray-200">
+                          <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                             <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
                             <p className="whitespace-pre-wrap">{coverImages.backCover.qualityReasoning}</p>
                           </div>
@@ -8106,14 +8128,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     )}
 
                     {currentUser && currentUser.role === 'admin' && coverImageApiCalls.backCover && (
-                      <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                        <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                      <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                        <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                           {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
                         </summary>
-                        <div className="mt-2 text-xs text-gray-700">
+                        <div className="mt-2 text-xs text-gray-800">
                           <div className="mb-2"><span className="font-semibold">Model:</span> {coverImageApiCalls.backCover.model}</div>
                           <div className="mb-2"><span className="font-semibold">Type:</span> {coverImageApiCalls.backCover.type}</div>
-                          <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                          <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
                             {JSON.stringify(coverImageApiCalls.backCover, null, 2)}
                           </pre>
                         </div>
@@ -8195,7 +8217,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 setImageEditInstruction('');
                               }
                             }}
-                            className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                            className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-1 text-sm"
                           >
                             <Icon name="edit" size={14} /> {t.editImage}
                           </button>
@@ -8203,14 +8225,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                         {/* Edit Image Interface */}
                         {editingImageIndex === index && (
-                          <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
-                            <p className="text-sm font-semibold text-purple-700 mb-2">{t.editInstruction}</p>
+                          <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-3 mb-3">
+                            <p className="text-sm font-semibold text-gray-800 mb-2">{t.editInstruction}</p>
                             <input
                               type="text"
                               value={imageEditInstruction}
                               onChange={(e) => setImageEditInstruction(e.target.value)}
                               placeholder="e.g., Make the sky darker, add more trees..."
-                              className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2"
+                              className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm mb-2"
                             />
                             <button
                               onClick={async () => {
@@ -8231,7 +8253,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                   alert(`Error editing image: ${error.message}`);
                                 }
                               }}
-                              className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                              className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-semibold"
                             >
                               {t.applyEdit}
                             </button>
@@ -8241,10 +8263,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         {/* Show Prompt */}
                         {imagePrompts[image.pageNumber] && (
                           <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
-                            <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                            <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                               {t.showPrompt}
                             </summary>
-                            <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                            <pre className="mt-2 text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                               {imagePrompts[image.pageNumber]}
                             </pre>
                           </details>
@@ -8252,11 +8274,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                         {/* Show API Call - Admin only */}
                         {currentUser && currentUser.role === 'admin' && apiCalls[image.pageNumber] && (
-                          <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
-                            <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                          <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
+                            <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                               {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
                             </summary>
-                            <div className="mt-2 text-xs text-gray-700">
+                            <div className="mt-2 text-xs text-gray-800">
                               <div className="mb-2">
                                 <span className="font-semibold">Endpoint:</span> {apiCalls[image.pageNumber].endpoint}
                               </div>
@@ -8267,7 +8289,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 <span className="font-semibold">Timestamp:</span> {new Date(apiCalls[image.pageNumber].timestamp).toLocaleString()}
                               </div>
                               <div className="mb-1 font-semibold">Payload:</div>
-                              <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                              <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
                                 {JSON.stringify(apiCalls[image.pageNumber].payload, null, 2)}
                               </pre>
                             </div>
@@ -8276,8 +8298,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                         {/* Quality Score with Collapsible Explanation */}
                         {currentUser && currentUser.role === 'admin' && image.qualityScore !== null && image.qualityScore !== undefined && (
-                          <details className="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-2">
-                            <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900 flex items-center justify-between">
+                          <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
+                            <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                               <span>
                                 {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
                               </span>
@@ -8290,7 +8312,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               </span>
                             </summary>
                             {image.qualityReasoning && (
-                              <div className="mt-2 text-xs text-gray-700 bg-white p-3 rounded border border-gray-200">
+                              <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                                 <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
                                 <p className="whitespace-pre-wrap">{image.qualityReasoning}</p>
                               </div>
@@ -8347,7 +8369,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 setImageEditInstruction('');
                               }
                             }}
-                            className="flex-1 bg-purple-500 text-white px-3 py-2 rounded-lg hover:bg-purple-600 flex items-center justify-center gap-1 text-sm"
+                            className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-1 text-sm"
                           >
                             <Icon name="edit" size={14} /> {language === 'de' ? 'Prompt bearbeiten' : language === 'fr' ? 'Modifier le prompt' : 'Edit Prompt'}
                           </button>
@@ -8355,15 +8377,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                         {/* Edit Prompt Interface for Failed Images */}
                         {editingImageIndex === index && (
-                          <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-3">
-                            <p className="text-sm font-semibold text-purple-700 mb-2">
+                          <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-3 mb-3">
+                            <p className="text-sm font-semibold text-gray-800 mb-2">
                               {language === 'de' ? 'Prompt bearbeiten und erneut versuchen:' : language === 'fr' ? 'Modifier le prompt et réessayer:' : 'Edit prompt and retry:'}
                             </p>
                             <textarea
                               value={imageEditInstruction}
                               onChange={(e) => setImageEditInstruction(e.target.value)}
                               placeholder={imagePrompts[image.pageNumber] || "Enter new prompt..."}
-                              className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm mb-2 h-24"
+                              className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm mb-2 h-24"
                             />
                             <button
                               onClick={async () => {
@@ -8387,7 +8409,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                   setSceneImages(updatedImages);
                                 }
                               }}
-                              className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                              className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-semibold"
                             >
                               {language === 'de' ? 'Mit neuem Prompt generieren' : language === 'fr' ? 'Générer avec nouveau prompt' : 'Generate with new prompt'}
                             </button>
@@ -8397,10 +8419,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         {/* Show Prompt - Even for Failed Images */}
                         {imagePrompts[image.pageNumber] && (
                           <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
-                            <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900">
+                            <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                               {language === 'de' ? 'Verwendeten Prompt anzeigen' : language === 'fr' ? 'Afficher le prompt utilisé' : 'Show Used Prompt'}
                             </summary>
-                            <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                            <pre className="mt-2 text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                               {imagePrompts[image.pageNumber]}
                             </pre>
                           </details>
@@ -8408,11 +8430,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                         {/* Show API Call - Admin only - Even for Failed Images */}
                         {currentUser && currentUser.role === 'admin' && apiCalls[image.pageNumber] && (
-                          <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                            <summary className="cursor-pointer text-sm font-semibold text-blue-700 hover:text-blue-900">
+                          <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                            <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                               {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
                             </summary>
-                            <div className="mt-2 text-xs text-gray-700">
+                            <div className="mt-2 text-xs text-gray-800">
                               <div className="mb-2">
                                 <span className="font-semibold">Endpoint:</span> {apiCalls[image.pageNumber].endpoint || 'N/A'}
                               </div>
@@ -8423,7 +8445,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 <span className="font-semibold">Timestamp:</span> {apiCalls[image.pageNumber].timestamp ? new Date(apiCalls[image.pageNumber].timestamp).toLocaleString() : 'N/A'}
                               </div>
                               <div className="mb-1 font-semibold">Payload:</div>
-                              <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
+                              <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
                                 {JSON.stringify(apiCalls[image.pageNumber].payload || {}, null, 2)}
                               </pre>
                             </div>
@@ -8440,7 +8462,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {/* Final Story: Side-by-Side Pages with Images (MOVED TO END) */}
           {sceneImages.length > 0 && generatedStory && (
             <div className="space-y-8 mt-8">
-              <h3 className="text-2xl font-bold text-purple-700 text-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-800 text-center mb-6">
                 {language === 'de' ? 'Ihre vollständige Geschichte' : language === 'fr' ? 'Votre histoire complète' : 'Your Complete Story'}
               </h3>
 
@@ -8461,7 +8483,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 return (
                   <div key={pageNumber} className="p-4 md:p-6">
-                    <h4 className="text-xl font-bold text-purple-700 mb-4 text-center">
+                    <h4 className="text-xl font-bold text-gray-800 mb-4 text-center">
                       {language === 'de' ? `Seite ${pageNumber}` : language === 'fr' ? `Page ${pageNumber}` : `Page ${pageNumber}`}
                     </h4>
 
@@ -8476,7 +8498,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               className="w-full rounded-lg shadow-md object-cover"
                             />
                             {(developerMode || (currentUser && currentUser.role === 'admin')) && image.score !== null && image.score !== undefined && (
-                              <div className="absolute top-2 right-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-3 py-1 rounded-full shadow-lg flex items-center gap-1 text-sm font-bold">
+                              <div className="absolute top-2 right-2 bg-indigo-600 text-white px-3 py-1 rounded-full shadow-lg flex items-center gap-1 text-sm font-bold">
                                 <span>⭐</span>
                                 <span>{typeof image.score === 'number' ? image.score.toFixed(1) : image.score}/10</span>
                               </div>
@@ -8519,7 +8541,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       };
 
       return (
-        <div className="min-h-screen" style={{backgroundColor: '#e0f2fe'}}>
+        <div className="min-h-screen bg-gray-50">
           {/* Admin Impersonation Banner */}
           {impersonateUserId && (
             <div className="fixed top-0 left-0 right-0 bg-red-600 text-white py-2 px-4 z-50 flex items-center justify-between">
@@ -8540,12 +8562,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {/* Authentication Modal */}
           {showAuthModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 animate-fade-in">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-8 animate-fade-in">
                 <div className="text-center mb-6">
-                  <h2 className="text-3xl font-bold text-purple-700 mb-2">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
                     {authMode === 'login' ? t.welcomeBack : t.createAccount}
                   </h2>
-                  <p className="text-gray-600">{t.loginRequired}</p>
+                  <p className="text-gray-500">{t.loginRequired}</p>
                 </div>
 
                 {authError && (
@@ -8556,38 +8578,38 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 <form onSubmit={authMode === 'login' ? handleLogin : handleRegister} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.email}</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">{t.email}</label>
                     <input
                       type="email"
                       value={authForm.username}
                       onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                       placeholder="your@email.com"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.password}</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">{t.password}</label>
                     <input
                       type="password"
                       value={authForm.password}
                       onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                       required
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+                    className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
                   >
                     {authMode === 'login' ? t.signIn : t.signUp}
                   </button>
                 </form>
 
                 <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-500">
                     {authMode === 'login' ? t.noAccount : t.haveAccount}
                     {' '}
                     <button
@@ -8595,7 +8617,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         setAuthMode(authMode === 'login' ? 'register' : 'login');
                         setAuthError('');
                       }}
-                      className="text-purple-600 font-semibold hover:text-purple-700"
+                      className="text-indigo-600 font-semibold hover:text-gray-800"
                     >
                       {authMode === 'login' ? t.signUp : t.signIn}
                     </button>
@@ -8619,7 +8641,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </h2>
                   <button
                     onClick={() => setShowAdminPanel(false)}
-                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                    className="text-gray-500 hover:text-gray-800 text-2xl font-bold"
                   >
                     ✕
                   </button>
@@ -8629,13 +8651,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <div className="flex gap-2 mb-6 border-b border-gray-200 pb-2">
                   <button
                     onClick={() => { setAdminTab('users'); fetchAllUsers(); }}
-                    className={`px-4 py-2 rounded-t-lg font-semibold ${adminTab === 'users' ? 'bg-yellow-100 text-yellow-800 border-b-2 border-yellow-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    className={`px-4 py-2 rounded-t-lg font-semibold ${adminTab === 'users' ? 'bg-yellow-100 text-yellow-800 border-b-2 border-yellow-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                   >
                     👥 {language === 'de' ? 'Benutzer' : language === 'fr' ? 'Utilisateurs' : 'Users'}
                   </button>
                   <button
                     onClick={() => { setAdminTab('orders'); fetchFailedOrders(); }}
-                    className={`px-4 py-2 rounded-t-lg font-semibold ${adminTab === 'orders' ? 'bg-red-100 text-red-800 border-b-2 border-red-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    className={`px-4 py-2 rounded-t-lg font-semibold ${adminTab === 'orders' ? 'bg-red-100 text-red-800 border-b-2 border-red-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                   >
                     📦 {language === 'de' ? 'Bestellungen' : language === 'fr' ? 'Commandes' : 'Orders'}
                     {failedOrders.length > 0 && (
@@ -8650,14 +8672,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <div className="flex gap-3 mb-4">
                     <button
                       onClick={fetchAllUsers}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
                     >
                       <span>🔄</span>
                       Refresh Users
                     </button>
                     <button
                       onClick={() => window.open('/admin-dashboard.html', '_blank')}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
                     >
                       <span>📊</span>
                       View Dashboard
@@ -8674,13 +8696,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Role</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Quota</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Used</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Remaining</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Orders</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Email</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Role</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Quota</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Used</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Remaining</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Orders</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -8715,7 +8737,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-sm text-center">
-                                <span className="text-gray-700">{user.totalOrders || 0}</span>
+                                <span className="text-gray-800">{user.totalOrders || 0}</span>
                                 {user.failedOrders > 0 && (
                                   <span className="ml-1 px-1 py-0.5 bg-red-100 text-red-800 rounded text-xs font-semibold">
                                     {user.failedOrders} failed
@@ -8744,14 +8766,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                   </button>
                                   <button
                                     onClick={() => updateUserQuota(user.id, user.storyQuota + 5)}
-                                    className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
+                                    className="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700"
                                     title="Add 5 stories"
                                   >
                                     +5
                                   </button>
                                   <button
                                     onClick={() => updateUserQuota(user.id, user.storyQuota + 10)}
-                                    className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700"
+                                    className="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700"
                                     title="Add 10 stories"
                                   >
                                     +10
@@ -8854,7 +8876,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <button
                       onClick={checkOrphanedData}
                       disabled={isCheckingOrphaned}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50"
                     >
                       <span>🔍</span>
                       {isCheckingOrphaned
@@ -8864,7 +8886,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </div>
 
                   {orphanedData === null ? (
-                    <p className="text-gray-600 text-center py-4">
+                    <p className="text-gray-500 text-center py-4">
                       {language === 'de'
                         ? 'Klicken Sie auf "Prüfen", um nach verwaisten Charakteren und Geschichten zu suchen'
                         : language === 'fr'
@@ -8876,13 +8898,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <div className="bg-white p-4 rounded-lg border border-orange-300">
                           <div className="text-3xl font-bold text-orange-600">{orphanedData.characters}</div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-gray-500">
                             {language === 'de' ? 'Verwaiste Charaktere' : language === 'fr' ? 'Personnages orphelins' : 'Orphaned Characters'}
                           </div>
                         </div>
                         <div className="bg-white p-4 rounded-lg border border-orange-300">
                           <div className="text-3xl font-bold text-orange-600">{orphanedData.stories}</div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-gray-500">
                             {language === 'de' ? 'Verwaiste Geschichten' : language === 'fr' ? 'Histoires orphelines' : 'Orphaned Stories'}
                           </div>
                         </div>
@@ -8911,9 +8933,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   )}
                 </div>
 
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h3 className="font-semibold text-blue-900 mb-2">Quick Guide:</h3>
-                  <ul className="text-sm text-blue-800 space-y-1">
+                <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <h3 className="font-semibold text-indigo-900 mb-2">Quick Guide:</h3>
+                  <ul className="text-sm text-indigo-800 space-y-1">
                     <li>• Default quota for new users: 2 stories</li>
                     <li>• Admin accounts have unlimited stories (∞)</li>
                     <li>• Click +1, +5, or +10 to add stories to a user's quota</li>
@@ -8930,7 +8952,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       <button
                         onClick={fetchFailedOrders}
                         disabled={isLoadingOrders}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50"
                       >
                         <span>🔄</span>
                         {isLoadingOrders ? 'Loading...' : 'Refresh Orders'}
@@ -8954,13 +8976,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         <table className="w-full border-collapse">
                           <thead>
                             <tr className="bg-red-100">
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Order ID</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Customer</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Shipping</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Amount</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Date</th>
-                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Order ID</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Customer</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Email</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Shipping</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Amount</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Date</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -9028,7 +9050,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </h2>
                   <button
                     onClick={() => setShowProductsPanel(false)}
-                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                    className="text-gray-500 hover:text-gray-800 text-2xl font-bold"
                   >
                     ✕
                   </button>
@@ -9038,14 +9060,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   <div className="flex gap-2">
                     <button
                       onClick={fetchGelatoProducts}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
                     >
                       <span>🔄</span>
                       Refresh
                     </button>
                     <button
                       onClick={fetchGelatoApiProducts}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
                     >
                       <span>🌐</span>
                       Fetch from Gelato API
@@ -9085,12 +9107,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-100">
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Product Name</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Size</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cover</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Pages</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Status</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Product Name</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Size</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-800">Cover</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Pages</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold text-gray-800">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -9137,7 +9159,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                     });
                                     setShowProductForm(true);
                                   }}
-                                  className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                                  className="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700"
                                   title="Edit product"
                                 >
                                   ✏️
@@ -9188,7 +9210,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       setShowProductForm(false);
                       setEditingProduct(null);
                     }}
-                    className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                    className="text-gray-500 hover:text-gray-800 text-2xl font-bold"
                   >
                     ✕
                   </button>
@@ -9196,7 +9218,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-800 mb-2">
                       Product UID <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -9210,7 +9232,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-800 mb-2">
                       Product Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -9223,7 +9245,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                    <label className="block text-sm font-semibold text-gray-800 mb-2">Description</label>
                     <input
                       type="text"
                       value={productForm.description}
@@ -9235,7 +9257,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Size</label>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">Size</label>
                       <input
                         type="text"
                         value={productForm.size}
@@ -9245,7 +9267,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Cover Type</label>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">Cover Type</label>
                       <input
                         type="text"
                         value={productForm.cover_type}
@@ -9258,7 +9280,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
                         Min Pages <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -9270,7 +9292,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
                         Max Pages <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -9284,7 +9306,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-800 mb-2">
                       Available Page Counts (JSON Array) <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -9305,7 +9327,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })}
                       className="w-5 h-5 text-yellow-600"
                     />
-                    <label htmlFor="is_active" className="text-sm font-semibold text-gray-700">
+                    <label htmlFor="is_active" className="text-sm font-semibold text-gray-800">
                       Active (available for print ordering)
                     </label>
                   </div>
@@ -9322,7 +9344,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         setShowProductForm(false);
                         setEditingProduct(null);
                       }}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
+                      className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold"
                     >
                       Cancel
                     </button>
@@ -9337,7 +9359,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
               <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto p-8 animate-fade-in">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
+                  <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
                     <Icon name="book-open" size={32} />
                     My Saved Stories
                   </h2>
@@ -9349,7 +9371,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         console.log('✅ Refreshed stories:', stories.length);
                         setSavedStories(stories);
                       }}
-                      className="text-blue-500 hover:text-blue-700 flex items-center gap-1 px-3 py-1 rounded hover:bg-blue-50"
+                      className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1 px-3 py-1 rounded hover:bg-indigo-50"
                       title="Refresh stories"
                     >
                       <Icon name="refresh-cw" size={20} />
@@ -9357,7 +9379,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </button>
                     <button
                       onClick={() => setShowSavedStories(false)}
-                      className="text-gray-500 hover:text-gray-700"
+                      className="text-gray-500 hover:text-gray-800"
                     >
                       <Icon name="x" size={24} />
                     </button>
@@ -9372,9 +9394,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {savedStories.map(story => (
-                      <div key={story.id} className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200 hover:shadow-lg transition-shadow">
+                      <div key={story.id} className="bg-white rounded-xl p-6 border-2 border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all">
                         <div className="flex justify-between items-start mb-4">
-                          <h3 className="text-lg font-bold text-purple-700 flex-1">{story.title}</h3>
+                          <h3 className="text-lg font-bold text-gray-800 flex-1">{story.title}</h3>
                           <button
                             onClick={async () => {
                               if (confirm('Delete this story?')) {
@@ -9410,16 +9432,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         )}
 
                         <div className="mb-4">
-                          <p className="text-sm text-gray-600 mb-2">
+                          <p className="text-sm text-gray-500 mb-2">
                             <strong>Type:</strong> {story.storyType}
                           </p>
-                          <p className="text-sm text-gray-600 mb-2">
+                          <p className="text-sm text-gray-500 mb-2">
                             <strong>Pages:</strong> {story.pages}
                           </p>
-                          <p className="text-sm text-gray-600 mb-2">
+                          <p className="text-sm text-gray-500 mb-2">
                             <strong>Characters:</strong> {story.characters?.length || 0}
                           </p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-500">
                             <strong>Created:</strong> {new Date(story.createdAt).toLocaleDateString()}
                           </p>
                         </div>
@@ -9466,7 +9488,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               alert(`Failed to load story: ${err.message}`);
                             }
                           }}
-                          className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 font-semibold flex items-center justify-center gap-2"
+                          className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
                         >
                           <Icon name="eye" size={18} />
                           View Story
@@ -9484,13 +9506,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 animate-fade-in">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-3xl font-bold text-purple-700 flex items-center gap-2">
+                  <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
                     <Icon name="truck" size={32} />
                     {language === 'de' ? 'Lieferadresse' : language === 'fr' ? 'Adresse de livraison' : 'Shipping Address'}
                   </h2>
                   <button
                     onClick={() => setShowShippingModal(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-500 hover:text-gray-800"
                   >
                     <Icon name="x" size={24} />
                   </button>
@@ -9499,7 +9521,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <form onSubmit={(e) => { e.preventDefault(); submitPrintOrder(); }} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      <label className="block text-sm font-semibold text-gray-800 mb-1">
                         {language === 'de' ? 'Vorname' : language === 'fr' ? 'Prénom' : 'First Name'}
                       </label>
                       <input
@@ -9507,11 +9529,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         required
                         value={shippingForm.firstName}
                         onChange={(e) => setShippingForm(prev => ({ ...prev, firstName: e.target.value }))}
-                        className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                        className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      <label className="block text-sm font-semibold text-gray-800 mb-1">
                         {language === 'de' ? 'Nachname' : language === 'fr' ? 'Nom' : 'Last Name'}
                       </label>
                       <input
@@ -9519,13 +9541,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         required
                         value={shippingForm.lastName}
                         onChange={(e) => setShippingForm(prev => ({ ...prev, lastName: e.target.value }))}
-                        className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                        className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
                       {language === 'de' ? 'Straße und Hausnummer' : language === 'fr' ? 'Adresse' : 'Address Line 1'}
                     </label>
                     <input
@@ -9533,13 +9555,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       required
                       value={shippingForm.addressLine1}
                       onChange={(e) => setShippingForm(prev => ({ ...prev, addressLine1: e.target.value }))}
-                      className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                      className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      <label className="block text-sm font-semibold text-gray-800 mb-1">
                         {language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : 'City'}
                       </label>
                       <input
@@ -9547,11 +9569,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         required
                         value={shippingForm.city}
                         onChange={(e) => setShippingForm(prev => ({ ...prev, city: e.target.value }))}
-                        className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                        className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      <label className="block text-sm font-semibold text-gray-800 mb-1">
                         {language === 'de' ? 'Postleitzahl' : language === 'fr' ? 'Code postal' : 'Postal Code'}
                       </label>
                       <input
@@ -9559,26 +9581,26 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         required
                         value={shippingForm.postCode}
                         onChange={(e) => setShippingForm(prev => ({ ...prev, postCode: e.target.value }))}
-                        className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                        className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
                       {language === 'de' ? 'Land' : language === 'fr' ? 'Pays' : 'Country'}
                     </label>
                     <input
                       type="text"
                       readOnly
                       value={language === 'de' ? 'Schweiz (CH)' : language === 'fr' ? 'Suisse (CH)' : 'Switzerland (CH)'}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
                       title={language === 'de' ? 'Versand nur in die Schweiz verfügbar' : language === 'fr' ? 'Expédition disponible uniquement en Suisse' : 'Shipping available to Switzerland only'}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">
                       {language === 'de' ? 'E-Mail' : language === 'fr' ? 'E-mail' : 'Email'}
                     </label>
                     <input
@@ -9589,7 +9611,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         setShippingForm(prev => ({ ...prev, email: e.target.value }));
                         setEmailChanged(true);
                       }}
-                      className="w-full px-4 py-2 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:outline-none"
+                      className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none"
                     />
                     {emailChanged && shippingForm.email !== currentUser?.username && (
                       <p className="text-sm text-orange-600 mt-1">
@@ -9606,13 +9628,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <button
                       type="button"
                       onClick={() => setShowShippingModal(false)}
-                      className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 font-semibold"
+                      className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg hover:bg-gray-300 font-semibold"
                     >
                       {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-semibold flex items-center justify-center gap-2"
+                      className="flex-1 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
                     >
                       <Icon name="printer" size={20} />
                       {language === 'de' ? 'Druckauftrag erstellen' : language === 'fr' ? 'Créer la commande' : 'Create Print Order'}
@@ -9628,8 +9650,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 animate-fade-in">
                 <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-purple-700 mb-2">Loading Story...</h2>
-                  <p className="text-gray-600">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">Loading Story...</h2>
+                  <p className="text-gray-500">
                     {loadingTotalBytes > 0
                       ? `${(loadingBytes / 1024 / 1024).toFixed(2)} MB / ${(loadingTotalBytes / 1024 / 1024).toFixed(2)} MB`
                       : 'Preparing download...'}
@@ -9638,14 +9660,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 {/* Progress Bar */}
                 <div className="mb-4">
-                  <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-full flex items-center justify-center text-white text-sm font-semibold transition-all duration-300"
+                      className="bg-indigo-600 h-full transition-all duration-500 ease-out"
                       style={{ width: `${loadingProgress}%` }}
-                    >
-                      {loadingProgress > 0 && `${loadingProgress}%`}
-                    </div>
+                    />
                   </div>
+                  {loadingProgress > 0 && (
+                    <p className="text-sm text-gray-500 text-center mt-2">{loadingProgress}%</p>
+                  )}
                 </div>
 
                 <p className="text-sm text-gray-500 text-center">
@@ -9660,13 +9683,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
                 <div className="text-center mb-6">
-                  <h2 className="text-3xl font-bold text-purple-700 mb-2">
+                  <h2 className="text-3xl font-bold text-gray-800 mb-2">
                     {orderData.isDraft
                       ? (language === 'de' ? '📋 Vorschau-Bestellung' : language === 'fr' ? '📋 Commande d\'aperçu' : '📋 Preview Order')
                       : (language === 'de' ? '✅ Bestellung erstellt!' : language === 'fr' ? '✅ Commande créée!' : '✅ Order Created!')
                     }
                   </h2>
-                  <p className="text-gray-600">
+                  <p className="text-gray-500">
                     {orderData.isDraft
                       ? (language === 'de' ? 'ENTWURF (wird nicht gedruckt)' : language === 'fr' ? 'BROUILLON (ne sera pas imprimé)' : 'DRAFT (will not be printed)')
                       : (language === 'de' ? 'WIRD GEDRUCKT' : language === 'fr' ? 'EN IMPRESSION' : 'PRINTING')
@@ -9676,31 +9699,31 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                 <div className="space-y-4 mb-6">
                   {/* Order ID */}
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div className="text-sm font-medium text-gray-700 mb-1">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                    <div className="text-sm font-medium text-gray-800 mb-1">
                       {language === 'de' ? 'Bestellnummer' : language === 'fr' ? 'Numéro de commande' : 'Order ID'}
                     </div>
-                    <div className="text-lg font-mono font-bold text-purple-700 select-all">
+                    <div className="text-lg font-mono font-bold text-gray-800 select-all">
                       {orderData.orderId}
                     </div>
                   </div>
 
                   {/* PDF Filename */}
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <div className="text-sm font-medium text-gray-700 mb-1">PDF</div>
+                    <div className="text-sm font-medium text-gray-800 mb-1">PDF</div>
                     <div className="text-gray-900 select-all break-all">{orderData.pdfFilename}</div>
                   </div>
 
                   {/* Dashboard Link */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="text-sm font-medium text-gray-700 mb-2">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                    <div className="text-sm font-medium text-gray-800 mb-2">
                       {language === 'de' ? 'Gelato Dashboard' : language === 'fr' ? 'Tableau de bord Gelato' : 'Gelato Dashboard'}
                     </div>
                     <a
                       href={orderData.dashboardUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 underline break-all select-all"
+                      className="text-indigo-600 hover:text-indigo-800 underline break-all select-all"
                     >
                       {orderData.dashboardUrl}
                     </a>
@@ -9709,7 +9732,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   {/* Preview URLs (if draft) */}
                   {orderData.isDraft && orderData.previewUrls && orderData.previewUrls.length > 0 && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <div className="text-sm font-medium text-gray-700 mb-2">
+                      <div className="text-sm font-medium text-gray-800 mb-2">
                         {language === 'de' ? 'Vorschau-Links' : language === 'fr' ? 'Liens d\'aperçu' : 'Preview Links'}
                       </div>
                       <div className="space-y-2">
@@ -9731,7 +9754,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   {/* Email confirmation (non-draft) */}
                   {!orderData.isDraft && orderData.email && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <div className="text-sm text-gray-700">
+                      <div className="text-sm text-gray-800">
                         {language === 'de'
                           ? `Sie erhalten eine Bestätigungs-E-Mail an ${orderData.email}`
                           : language === 'fr'
@@ -9773,7 +9796,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                   <button
                     onClick={() => setShowOrderModal(false)}
-                    className={`${currentUser && currentUser.role === 'admin' ? 'flex-1' : 'w-full'} bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-semibold`}
+                    className={`${currentUser && currentUser.role === 'admin' ? 'flex-1' : 'w-full'} bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-semibold`}
                   >
                     {language === 'de' ? 'Schließen' : language === 'fr' ? 'Fermer' : 'Close'}
                   </button>
@@ -9820,14 +9843,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           className={`w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold transition-all ${
                             canAccess
                               ? step === s
-                                ? 'bg-purple-600 text-white ring-1 ring-purple-300'
-                                : 'bg-purple-500 text-white hover:bg-purple-600 cursor-pointer'
+                                ? 'bg-indigo-600 text-white ring-1 ring-indigo-200'
+                                : 'bg-indigo-500 text-white hover:bg-indigo-600 cursor-pointer'
                               : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                           } ${canAccess && step !== s ? 'hover:scale-110' : ''}`}
                         >
                           {s}
                         </button>
-                        {s < 5 && <div className={`w-3 md:w-6 h-0.5 ${canAccess ? 'bg-purple-500' : 'bg-gray-600'}`} />}
+                        {s < 5 && <div className={`w-3 md:w-6 h-0.5 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />}
                       </React.Fragment>
                     );
                   })}
@@ -9886,7 +9909,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                             setLanguage('en');
                             setShowMenu(false);
                           }}
-                          className={`flex-1 px-3 py-2 rounded text-xs font-semibold ${language === 'en' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                          className={`flex-1 px-3 py-2 rounded text-xs font-semibold ${language === 'en' ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
                         >
                           EN
                         </button>
@@ -9895,7 +9918,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                             setLanguage('de');
                             setShowMenu(false);
                           }}
-                          className={`flex-1 px-3 py-2 rounded text-xs font-semibold ${language === 'de' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                          className={`flex-1 px-3 py-2 rounded text-xs font-semibold ${language === 'de' ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
                         >
                           DE
                         </button>
@@ -9904,7 +9927,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                             setLanguage('fr');
                             setShowMenu(false);
                           }}
-                          className={`flex-1 px-3 py-2 rounded text-xs font-semibold ${language === 'fr' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+                          className={`flex-1 px-3 py-2 rounded text-xs font-semibold ${language === 'fr' ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
                         >
                           FR
                         </button>
@@ -9992,8 +10015,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {showApiKeyPrompt && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-xl p-8 max-w-md w-full">
-                  <h2 className="text-2xl font-bold text-purple-700 mb-4">{t.apiKeyRequired}</h2>
-                  <p className="text-gray-600 mb-4">{t.apiKeyPrompt}</p>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.apiKeyRequired}</h2>
+                  <p className="text-gray-500 mb-4">{t.apiKeyPrompt}</p>
                   <input
                     type="password"
                     value={tempApiKey}
@@ -10005,13 +10028,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   <div className="flex gap-4">
                     <button
                       onClick={() => setShowApiKeyPrompt(false)}
-                      className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400"
+                      className="flex-1 bg-gray-300 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-400"
                     >
                       {t.cancel}
                     </button>
                     <button
                       onClick={saveApiKeyToStorage}
-                      className="flex-1 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600"
+                      className="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700"
                     >
                       {t.saveApiKey}
                     </button>
@@ -10036,7 +10059,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <div className={step === 4 ? "flex justify-start" : "flex justify-between"}>
                 <button
                   onClick={() => safeSetStep(Math.max(0, step - 1))}
-                  className="bg-white text-purple-600 hover:bg-purple-50 border-2 border-purple-500 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+                  className="bg-white text-indigo-600 hover:bg-indigo-50 border-2 border-indigo-600 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
                 >
                   <Icon name="arrow-left" size={20} /> {t.back}
                 </button>
@@ -10063,7 +10086,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       (step === 2 && characters.length === 0) ||
                       (step === 3 && !areAllRelationshipsDefined())
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
                     }`}
                   >
                     {t.next} <Icon name="arrow-right" size={20} />
