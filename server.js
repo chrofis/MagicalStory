@@ -2314,7 +2314,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       pageNumber,
       imageData: imageResult.imageData,
       description: sceneDesc?.description || customPrompt,
-      qualityScore: imageResult.score
+      qualityScore: imageResult.score,
+      qualityReasoning: imageResult.reasoning || null
     };
 
     if (existingIndex >= 0) {
@@ -2341,7 +2342,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       success: true,
       pageNumber,
       imageData: imageResult.imageData,
-      qualityScore: imageResult.score
+      qualityScore: imageResult.score,
+      qualityReasoning: imageResult.reasoning
     });
 
   } catch (err) {
@@ -2440,14 +2442,20 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     // Generate new cover
     const coverResult = await callGeminiAPIForImage(coverPrompt, characterPhotos);
 
-    // Update the cover in story data
+    // Update the cover in story data with new structure including quality
     storyData.coverImages = storyData.coverImages || {};
+    const coverData = {
+      imageData: coverResult.imageData,
+      qualityScore: coverResult.score,
+      qualityReasoning: coverResult.reasoning || null
+    };
+
     if (coverType === 'front') {
-      storyData.coverImages.frontCover = coverResult.imageData;
+      storyData.coverImages.frontCover = coverData;
     } else if (coverType === 'page0') {
-      storyData.coverImages.page0 = coverResult.imageData;
+      storyData.coverImages.page0 = coverData;
     } else {
-      storyData.coverImages.backCover = coverResult.imageData;
+      storyData.coverImages.backCover = coverData;
     }
 
     // Save updated story
@@ -2456,12 +2464,14 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ ${coverType} cover regenerated for story ${id}`);
+    console.log(`✅ ${coverType} cover regenerated for story ${id} (score: ${coverResult.score})`);
 
     res.json({
       success: true,
       coverType,
-      imageData: coverResult.imageData
+      imageData: coverResult.imageData,
+      qualityScore: coverResult.score,
+      qualityReasoning: coverResult.reasoning
     });
 
   } catch (err) {
@@ -5233,14 +5243,14 @@ Output Format:
               }
             }
 
-            console.log(`✅ [PAGE ${pageNum}] Image generated successfully`);
+            console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score})`);
 
             const imageData = {
               pageNumber: pageNum,
               imageData: imageResult.imageData,
               description: sceneDescription,
               qualityScore: imageResult.score,
-              qualityReasoning: null
+              qualityReasoning: imageResult.reasoning || null
             };
 
             // Save checkpoint: page image (scene description + image)
@@ -5248,7 +5258,8 @@ Output Format:
               pageNumber: pageNum,
               sceneDescription,
               imagePrompt: imagePrompt,
-              qualityScore: imageResult.score
+              qualityScore: imageResult.score,
+              qualityReasoning: imageResult.reasoning || null
             }, pageNum);
 
             return imageData;
@@ -5404,10 +5415,24 @@ Output Format:
     }
 
     const coverImages = {
-      frontCover: frontCoverResult.imageData,
-      page0: page0Result.imageData,
-      backCover: backCoverResult.imageData
+      frontCover: {
+        imageData: frontCoverResult.imageData,
+        qualityScore: frontCoverResult.score,
+        qualityReasoning: frontCoverResult.reasoning || null
+      },
+      page0: {
+        imageData: page0Result.imageData,
+        qualityScore: page0Result.score,
+        qualityReasoning: page0Result.reasoning || null
+      },
+      backCover: {
+        imageData: backCoverResult.imageData,
+        qualityScore: backCoverResult.score,
+        qualityReasoning: backCoverResult.reasoning || null
+      }
     };
+
+    console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCoverResult.score}, Page0: ${page0Result.score}, Back: ${backCoverResult.score}`);
 
     // Job complete - save result
     const resultData = {
@@ -5968,7 +5993,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning.substring(0, 150)}...`);
     }
 
-    return score;
+    // Return both score and reasoning
+    return { score, reasoning };
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
     return null;
@@ -6083,10 +6109,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = []) {
 
         // Evaluate image quality with prompt and reference images
         console.log('⭐ [QUALITY] Evaluating image quality...');
-        const qualityScore = await evaluateImageQuality(compressedImageData, prompt, characterPhotos);
+        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos);
+
+        // Extract score and reasoning from quality result
+        const score = qualityResult ? qualityResult.score : null;
+        const reasoning = qualityResult ? qualityResult.reasoning : null;
 
         // Store in cache
-        const result = { imageData: compressedImageData, score: qualityScore };
+        const result = { imageData: compressedImageData, score, reasoning };
         imageCache.set(cacheKey, result);
         log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
 
