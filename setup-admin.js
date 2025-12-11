@@ -2,7 +2,7 @@
 /**
  * Setup script to:
  * 1. Make the first user an admin
- * 2. Add default Gelato products
+ * 2. Add default print products
  */
 
 const fs = require('fs').promises;
@@ -52,8 +52,8 @@ async function setupFileMode() {
     console.log(`- ${u.username} (role: ${u.role || 'user'}, quota: ${u.storyQuota === -1 ? '∞' : u.storyQuota || 2})`);
   });
 
-  console.log('\n⚠️  NOTE: Gelato products management requires DATABASE mode.');
-  console.log('File mode does not support Gelato products table.');
+  console.log('\n⚠️  NOTE: Print products management requires DATABASE mode.');
+  console.log('File mode does not support print products table.');
   console.log('Please set DATABASE_URL environment variable to use product management.');
 }
 
@@ -92,9 +92,9 @@ async function setupDatabaseMode() {
     const productCount = parseInt(productsResult.rows[0].count);
 
     if (productCount > 0) {
-      console.log(`\n✓ Found ${productCount} Gelato products in database`);
+      console.log(`\n✓ Found ${productCount} print products in database`);
     } else {
-      console.log('\n📦 Adding default Gelato product...');
+      console.log('\n📦 Adding default print product...');
 
       // Add default product
       await pool.query(`
@@ -113,7 +113,7 @@ async function setupDatabaseMode() {
         true
       ]);
 
-      console.log('✅ Added default Gelato product (24 pages)');
+      console.log('✅ Added default print product (24 pages)');
     }
 
     // Show all users
@@ -126,7 +126,7 @@ async function setupDatabaseMode() {
 
     // Show all products
     const allProducts = await pool.query('SELECT * FROM gelato_products ORDER BY created_at ASC');
-    console.log('\n📦 Gelato Products:');
+    console.log('\n📦 Print Products:');
     allProducts.rows.forEach(p => {
       const status = p.is_active ? '✓ Active' : '✕ Inactive';
       console.log(`- ${p.product_name} (${status}, pages: ${p.min_pages}-${p.max_pages})`);
@@ -137,7 +137,7 @@ async function setupDatabaseMode() {
     console.log('1. Login to your account');
     console.log('2. Open the menu (☰) in top-right corner');
     console.log('3. Click "Manage Users" to access admin panel');
-    console.log('4. Go to "Gelato Products" tab to manage print products');
+    console.log('4. Go to "Print Products" tab to manage print products');
 
   } catch (err) {
     console.error('❌ Error:', err.message);

@@ -279,7 +279,7 @@ async function sendAdminOrderFailureAlert(sessionId, customerEmail, customerName
           <h3>Action Required:</h3>
           <ol>
             <li>Check the order in the admin dashboard</li>
-            <li>Try to manually trigger the Gelato order</li>
+            <li>Try to manually trigger the print order</li>
             <li>If not possible, contact customer and issue refund via Stripe</li>
           </ol>
 

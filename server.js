@@ -103,8 +103,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
     PROMPT_TEMPLATES.frontCover = await fs.readFile(path.join(promptsDir, 'front-cover.txt'), 'utf-8');
-    PROMPT_TEMPLATES.page0WithDedication = await fs.readFile(path.join(promptsDir, 'page0-with-dedication.txt'), 'utf-8');
-    PROMPT_TEMPLATES.page0NoDedication = await fs.readFile(path.join(promptsDir, 'page0-no-dedication.txt'), 'utf-8');
+    PROMPT_TEMPLATES.initialPageWithDedication = await fs.readFile(path.join(promptsDir, 'initial-page-with-dedication.txt'), 'utf-8');
+    PROMPT_TEMPLATES.initialPageNoDedication = await fs.readFile(path.join(promptsDir, 'initial-page-no-dedication.txt'), 'utf-8');
     PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
@@ -329,7 +329,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           console.log('   User ID:', userId);
           console.log('   Story ID:', storyId);
 
-          // Trigger background PDF generation and Gelato order (don't await - fire and forget)
+          // Trigger background PDF generation and print provider order (don't await - fire and forget)
           processBookOrder(fullSession.id, userId, storyId, customerInfo, address).catch(async (err) => {
             console.error('❌ [BACKGROUND] Error processing book order:', err);
             console.error('   Error stack:', err.stack);
@@ -1394,18 +1394,18 @@ app.get('/api/admin/users/:userId/stories/:storyId', authenticateToken, async (r
 });
 
 // =======================
-// Gelato Products Admin Endpoints
+// Print Provider Products Admin Endpoints
 // =======================
 
-// Get all Gelato products (admin only)
-app.get('/api/admin/gelato-products', authenticateToken, async (req, res) => {
+// Get all print provider products (admin only)
+app.get('/api/admin/print-products', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for Gelato products management' });
+      return res.status(503).json({ error: 'Database required for print provider products management' });
     }
 
     const selectQuery = 'SELECT * FROM gelato_products ORDER BY created_at DESC';
@@ -1413,20 +1413,20 @@ app.get('/api/admin/gelato-products', authenticateToken, async (req, res) => {
 
     res.json({ products });
   } catch (err) {
-    console.error('Error fetching Gelato products:', err);
-    res.status(500).json({ error: 'Failed to fetch Gelato products' });
+    console.error('Error fetching print provider products:', err);
+    res.status(500).json({ error: 'Failed to fetch print provider products' });
   }
 });
 
-// Create new Gelato product (admin only)
-app.post('/api/admin/gelato-products', authenticateToken, async (req, res) => {
+// Create new print provider product (admin only)
+app.post('/api/admin/print-products', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for Gelato products management' });
+      return res.status(503).json({ error: 'Database required for print provider products management' });
     }
 
     const {
@@ -1490,20 +1490,20 @@ app.post('/api/admin/gelato-products', authenticateToken, async (req, res) => {
 
     res.json({ product: newProduct, message: 'Product created successfully' });
   } catch (err) {
-    console.error('Error creating Gelato product:', err);
-    res.status(500).json({ error: 'Failed to create Gelato product' });
+    console.error('Error creating print provider product:', err);
+    res.status(500).json({ error: 'Failed to create print provider product' });
   }
 });
 
-// Update Gelato product (admin only)
-app.put('/api/admin/gelato-products/:id', authenticateToken, async (req, res) => {
+// Update print provider product (admin only)
+app.put('/api/admin/print-products/:id', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for Gelato products management' });
+      return res.status(503).json({ error: 'Database required for print provider products management' });
     }
 
     const { id } = req.params;
@@ -1568,20 +1568,20 @@ app.put('/api/admin/gelato-products/:id', authenticateToken, async (req, res) =>
 
     res.json({ product: updatedProduct, message: 'Product updated successfully' });
   } catch (err) {
-    console.error('Error updating Gelato product:', err);
-    res.status(500).json({ error: 'Failed to update Gelato product' });
+    console.error('Error updating print provider product:', err);
+    res.status(500).json({ error: 'Failed to update print provider product' });
   }
 });
 
 // Toggle product active status (admin only)
-app.put('/api/admin/gelato-products/:id/toggle', authenticateToken, async (req, res) => {
+app.put('/api/admin/print-products/:id/toggle', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for Gelato products management' });
+      return res.status(503).json({ error: 'Database required for print provider products management' });
     }
 
     const { id } = req.params;
@@ -1604,20 +1604,20 @@ app.put('/api/admin/gelato-products/:id/toggle', authenticateToken, async (req, 
 
     res.json({ product: updatedProduct, message: 'Product status updated successfully' });
   } catch (err) {
-    console.error('Error toggling Gelato product status:', err);
+    console.error('Error toggling print provider product status:', err);
     res.status(500).json({ error: 'Failed to toggle product status' });
   }
 });
 
-// Delete Gelato product (admin only)
-app.delete('/api/admin/gelato-products/:id', authenticateToken, async (req, res) => {
+// Delete print provider product (admin only)
+app.delete('/api/admin/print-products/:id', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for Gelato products management' });
+      return res.status(503).json({ error: 'Database required for print provider products management' });
     }
 
     const { id } = req.params;
@@ -1643,8 +1643,8 @@ app.delete('/api/admin/gelato-products/:id', authenticateToken, async (req, res)
 
     res.json({ message: 'Product deleted successfully' });
   } catch (err) {
-    console.error('Error deleting Gelato product:', err);
-    res.status(500).json({ error: 'Failed to delete Gelato product' });
+    console.error('Error deleting print provider product:', err);
+    res.status(500).json({ error: 'Failed to delete print provider product' });
   }
 });
 
@@ -2352,14 +2352,14 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
   }
 });
 
-// Regenerate cover image (front, page0, or back)
+// Regenerate cover image (front, initialPage, or back)
 app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, async (req, res) => {
   try {
     const { id, coverType } = req.params;
     const { customPrompt } = req.body;
 
-    if (!['front', 'page0', 'back'].includes(coverType)) {
-      return res.status(400).json({ error: 'Invalid cover type. Must be: front, page0, or back' });
+    if (!['front', 'initialPage', 'back'].includes(coverType)) {
+      return res.status(400).json({ error: 'Invalid cover type. Must be: front, initialPage, or back' });
     }
 
     console.log(`🔄 Regenerating ${coverType} cover for story ${id}`);
@@ -2414,17 +2414,17 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
           CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle
         });
-      } else if (coverType === 'page0') {
-        const page0Scene = coverScenes.page0 || 'A warm, inviting dedication/introduction page.';
+      } else if (coverType === 'initialPage') {
+        const initialPageScene = coverScenes.initialPage || 'A warm, inviting dedication/introduction page.';
         coverPrompt = storyData.dedication
-          ? fillTemplate(PROMPT_TEMPLATES.page0WithDedication, {
-              PAGE0_SCENE: page0Scene,
+          ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+              INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               DEDICATION: storyData.dedication
             })
-          : fillTemplate(PROMPT_TEMPLATES.page0NoDedication, {
-              PAGE0_SCENE: page0Scene,
+          : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+              INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle
@@ -2452,8 +2452,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
 
     if (coverType === 'front') {
       storyData.coverImages.frontCover = coverData;
-    } else if (coverType === 'page0') {
-      storyData.coverImages.page0 = coverData;
+    } else if (coverType === 'initialPage') {
+      storyData.coverImages.initialPage = coverData;
     } else {
       storyData.coverImages.backCover = coverData;
     }
@@ -2648,8 +2648,8 @@ function updatePageText(storyText, pageNumber, newText) {
   }
 }
 
-// Gelato Print API - Create photobook order
-app.post('/api/gelato/order', authenticateToken, async (req, res) => {
+// Print Provider API - Create photobook order
+app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
   try {
     let { pdfUrl, shippingAddress, orderReference, productUid, pageCount } = req.body;
 
@@ -2686,17 +2686,17 @@ app.post('/api/gelato/order', authenticateToken, async (req, res) => {
       });
     }
 
-    const gelatoApiKey = process.env.GELATO_API_KEY;
+    const printApiKey = process.env.GELATO_API_KEY;
     const orderType = process.env.GELATO_ORDER_TYPE || 'draft'; // 'draft' or 'order'
 
-    if (!gelatoApiKey || gelatoApiKey === 'your_gelato_api_key_here') {
+    if (!printApiKey || printApiKey === 'your_print_api_key_here') {
       return res.status(500).json({
-        error: 'Gelato API not configured. Please add GELATO_API_KEY to .env file',
+        error: 'Print provider API not configured. Please add GELATO_API_KEY to .env file',
         setupUrl: 'https://dashboard.gelato.com/'
       });
     }
 
-    // Prepare Gelato order payload
+    // Prepare print provider order payload
     const orderPayload = {
       orderType: orderType, // 'draft' for preview only, 'order' for actual printing
       orderReferenceId: orderReference || `magical-story-${Date.now()}`,
@@ -2731,36 +2731,36 @@ app.post('/api/gelato/order', authenticateToken, async (req, res) => {
       }
     };
 
-    // Call Gelato API
-    const gelatoResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
+    // Call print provider API
+    const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-KEY': gelatoApiKey
+        'X-API-KEY': printApiKey
       },
       body: JSON.stringify(orderPayload)
     });
 
-    const gelatoData = await gelatoResponse.json();
+    const printData = await printResponse.json();
 
-    if (!gelatoResponse.ok) {
-      console.error('Gelato API error:', gelatoData);
-      return res.status(gelatoResponse.status).json({
-        error: 'Gelato order failed',
-        details: gelatoData
+    if (!printResponse.ok) {
+      console.error('Print provider API error:', printData);
+      return res.status(printResponse.status).json({
+        error: 'Print provider order failed',
+        details: printData
       });
     }
 
-    await logActivity(req.user.id, req.user.username, 'GELATO_ORDER_CREATED', {
-      orderId: gelatoData.orderId || gelatoData.id,
+    await logActivity(req.user.id, req.user.username, 'PRINT_ORDER_CREATED', {
+      orderId: printData.orderId || printData.id,
       orderReference: orderPayload.orderReferenceId,
       orderType: orderType
     });
 
     // Extract preview URLs if available
     const previewUrls = [];
-    if (gelatoData.items && Array.isArray(gelatoData.items)) {
-      gelatoData.items.forEach(item => {
+    if (printData.items && Array.isArray(printData.items)) {
+      printData.items.forEach(item => {
         if (item.previews && Array.isArray(item.previews)) {
           item.previews.forEach(preview => {
             if (preview.url) {
@@ -2776,56 +2776,56 @@ app.post('/api/gelato/order', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      orderId: gelatoData.orderId || gelatoData.id,
+      orderId: printData.orderId || printData.id,
       orderReference: orderPayload.orderReferenceId,
       orderType: orderType,
       isDraft: orderType === 'draft',
       previewUrls: previewUrls,
-      dashboardUrl: `https://dashboard.gelato.com/checkout/${gelatoData.orderId || gelatoData.id}/product`,
-      data: gelatoData
+      dashboardUrl: `https://dashboard.gelato.com/checkout/${printData.orderId || printData.id}/product`,
+      data: printData
     });
 
   } catch (err) {
-    console.error('Error creating Gelato order:', err);
+    console.error('Error creating print provider order:', err);
     res.status(500).json({ error: 'Failed to create print order', details: err.message });
   }
 });
 
-// Gelato Product Management (Admin Only)
+// Print Provider Product Management (Admin Only)
 
-// Fetch products from Gelato API
-app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) => {
+// Fetch products from print provider API
+app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const gelatoApiKey = process.env.GELATO_API_KEY;
-    if (!gelatoApiKey || gelatoApiKey === 'your_gelato_api_key_here') {
-      return res.status(500).json({ error: 'Gelato API not configured' });
+    const printApiKey = process.env.GELATO_API_KEY;
+    if (!printApiKey || printApiKey === 'your_print_api_key_here') {
+      return res.status(500).json({ error: 'Print provider API not configured' });
     }
 
-    // Step 1: Fetch all available catalogs from Gelato
+    // Step 1: Fetch all available catalogs from print provider
     const catalogsResponse = await fetch('https://product.gelatoapis.com/v3/catalogs', {
       headers: {
-        'X-API-KEY': gelatoApiKey
+        'X-API-KEY': printApiKey
       }
     });
 
     if (!catalogsResponse.ok) {
       const errorData = await catalogsResponse.json();
-      return res.status(catalogsResponse.status).json({ error: 'Failed to fetch catalogs from Gelato', details: errorData });
+      return res.status(catalogsResponse.status).json({ error: 'Failed to fetch catalogs from print provider', details: errorData });
     }
 
     const catalogsData = await catalogsResponse.json();
-    console.log('📁 Gelato catalogs RAW response:', JSON.stringify(catalogsData).substring(0, 500));
+    console.log('📁 Print provider catalogs RAW response:', JSON.stringify(catalogsData).substring(0, 500));
 
     // Try different possible response structures
     const catalogs = catalogsData.catalogs || catalogsData.data || catalogsData.results || catalogsData || [];
     const catalogArray = Array.isArray(catalogs) ? catalogs : (catalogs.items || []);
 
-    console.log('📁 Gelato catalogs:', {
+    console.log('📁 Print provider catalogs:', {
       count: catalogArray.length,
       catalogUids: catalogArray.slice(0, 5).map(c => c?.uid || c?.id || c?.catalogUid || 'unknown'),
       firstCatalog: catalogArray[0] || null
@@ -2845,7 +2845,7 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': gelatoApiKey
+            'X-API-KEY': printApiKey
           },
           body: JSON.stringify({
             limit: 100,
@@ -2904,13 +2904,13 @@ app.get('/api/admin/gelato/fetch-products', authenticateToken, async (req, res) 
     });
 
   } catch (err) {
-    console.error('Error fetching Gelato products:', err);
+    console.error('Error fetching print provider products:', err);
     res.status(500).json({ error: 'Failed to fetch products', details: err.message });
   }
 });
 
-// Get all saved Gelato products from database
-app.get('/api/admin/gelato/products', authenticateToken, async (req, res) => {
+// Get all saved print provider products from database
+app.get('/api/admin/print-provider/products', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
@@ -2925,7 +2925,7 @@ app.get('/api/admin/gelato/products', authenticateToken, async (req, res) => {
       // File mode fallback
       const fs = require('fs').promises;
       const path = require('path');
-      const productsFile = path.join(__dirname, 'data', 'gelato_products.json');
+      const productsFile = path.join(__dirname, 'data', 'print_products.json');
 
       try {
         const data = await fs.readFile(productsFile, 'utf-8');
@@ -2942,8 +2942,8 @@ app.get('/api/admin/gelato/products', authenticateToken, async (req, res) => {
   }
 });
 
-// Save/Update Gelato product
-app.post('/api/admin/gelato/products', authenticateToken, async (req, res) => {
+// Save/Update print provider product
+app.post('/api/admin/print-provider/products', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
@@ -3002,7 +3002,7 @@ app.post('/api/admin/gelato/products', authenticateToken, async (req, res) => {
       // File mode
       const fs = require('fs').promises;
       const path = require('path');
-      const productsFile = path.join(__dirname, 'data', 'gelato_products.json');
+      const productsFile = path.join(__dirname, 'data', 'print_products.json');
 
       let products = {};
       try {
@@ -3039,7 +3039,7 @@ app.post('/api/admin/gelato/products', authenticateToken, async (req, res) => {
 });
 
 // Seed default products (Admin only)
-app.post('/api/admin/gelato/seed-products', authenticateToken, async (req, res) => {
+app.post('/api/admin/print-provider/seed-products', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
@@ -3098,13 +3098,13 @@ app.post('/api/admin/gelato/seed-products', authenticateToken, async (req, res) 
 });
 
 // Get active products for users
-// Get default Gelato product UID from environment
-app.get('/api/config/gelato-product-uid', authenticateToken, (req, res) => {
+// Get default print provider product UID from environment
+app.get('/api/config/print-product-uid', authenticateToken, (req, res) => {
   const productUid = process.env.GELATO_PHOTOBOOK_UID;
 
   if (!productUid) {
     return res.status(500).json({
-      error: 'Gelato product UID not configured',
+      error: 'Print product UID not configured',
       message: 'Please set GELATO_PHOTOBOOK_UID in environment variables'
     });
   }
@@ -3112,7 +3112,7 @@ app.get('/api/config/gelato-product-uid', authenticateToken, (req, res) => {
   res.json({ productUid });
 });
 
-app.get('/api/gelato/products', async (req, res) => {
+app.get('/api/print-provider/products', async (req, res) => {
   try {
     if (STORAGE_MODE === 'database' && dbPool) {
       const selectQuery = 'SELECT product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true ORDER BY product_name';
@@ -3123,7 +3123,7 @@ app.get('/api/gelato/products', async (req, res) => {
       // File mode
       const fs = require('fs').promises;
       const path = require('path');
-      const productsFile = path.join(__dirname, 'data', 'gelato_products.json');
+      const productsFile = path.join(__dirname, 'data', 'print_products.json');
 
       try {
         const data = await fs.readFile(productsFile, 'utf-8');
@@ -3483,13 +3483,13 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       }
     }
 
-    // PDF Page 2: Page 0 (140 x 140 mm)
+    // PDF Page 2: Initial Page (140 x 140 mm)
     doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-    if (coverImages && coverImages.page0) {
-      const page0Data = coverImages.page0.replace(/^data:image\/\w+;base64,/, '');
-      const page0Buffer = Buffer.from(page0Data, 'base64');
-      doc.image(page0Buffer, 0, 0, { width: pageSize, height: pageSize });
+    if (coverImages && coverImages.initialPage) {
+      const initialPageData = coverImages.initialPage.replace(/^data:image\/\w+;base64,/, '');
+      const initialPageBuffer = Buffer.from(initialPageData, 'base64');
+      doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
     }
 
     // Add content pages (140 x 140 mm square)
@@ -3841,15 +3841,15 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
   }
 });
 
-// Admin - Retry failed Gelato order
-app.post('/api/admin/orders/:orderId/retry-gelato', authenticateToken, async (req, res) => {
+// Admin - Retry failed print provider order
+app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     const { orderId } = req.params;
-    console.log(`🔄 [ADMIN] Retrying Gelato order for order ID: ${orderId}`);
+    console.log(`🔄 [ADMIN] Retrying print order for order ID: ${orderId}`);
 
     // Get order details
     const orderResult = await dbPool.query(`
@@ -3862,9 +3862,9 @@ app.post('/api/admin/orders/:orderId/retry-gelato', authenticateToken, async (re
 
     const order = orderResult.rows[0];
 
-    // Check if order already has a Gelato order
+    // Check if order already has a print order
     if (order.gelato_order_id) {
-      return res.status(400).json({ error: 'Order already has a Gelato order ID', gelatoOrderId: order.gelato_order_id });
+      return res.status(400).json({ error: 'Order already has a print order ID', printOrderId: order.gelato_order_id });
     }
 
     // Find the PDF file for this story
@@ -3888,43 +3888,43 @@ app.post('/api/admin/orders/:orderId/retry-gelato', authenticateToken, async (re
 
     const storyData = JSON.parse(storyResult.rows[0].data);
     const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
-    const gelatoPageCount = storyScenes * 2;
+    const printPageCount = storyScenes * 2;
 
-    // Get Gelato product UID
+    // Get print product UID
     const productsResult = await dbPool.query(
       'SELECT product_uid, product_name FROM gelato_products WHERE is_active = true'
     );
 
-    let gelatoProductUid = null;
+    let printProductUid = null;
     if (productsResult.rows.length > 0) {
       const sortedProducts = productsResult.rows.sort((a, b) => {
         const aMin = parseInt(a.product_uid.match(/\d+/)?.[0] || 0);
         const bMin = parseInt(b.product_uid.match(/\d+/)?.[0] || 0);
         return aMin - bMin;
       });
-      gelatoProductUid = sortedProducts[0].product_uid;
+      printProductUid = sortedProducts[0].product_uid;
     }
 
-    if (!gelatoProductUid) {
-      gelatoProductUid = 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
+    if (!printProductUid) {
+      printProductUid = 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
     }
 
-    const gelatoApiKey = process.env.GELATO_API_KEY;
-    if (!gelatoApiKey) {
+    const printApiKey = process.env.GELATO_API_KEY;
+    if (!printApiKey) {
       return res.status(500).json({ error: 'GELATO_API_KEY not configured' });
     }
 
     const orderType = process.env.GELATO_ORDER_TYPE || 'order';
 
-    const gelatoOrderPayload = {
+    const printOrderPayload = {
       orderType: orderType,
       orderReferenceId: `retry-${order.story_id}-${Date.now()}`,
       customerReferenceId: order.user_id,
       currency: 'CHF',
       items: [{
         itemReferenceId: `item-retry-${order.story_id}-${Date.now()}`,
-        productUid: gelatoProductUid,
-        pageCount: gelatoPageCount,
+        productUid: printProductUid,
+        pageCount: printPageCount,
         files: [{
           type: 'default',
           url: pdfUrl
@@ -3946,30 +3946,30 @@ app.post('/api/admin/orders/:orderId/retry-gelato', authenticateToken, async (re
       }
     };
 
-    console.log(`📦 [ADMIN] Retry Gelato order payload: productUid=${gelatoProductUid}, pageCount=${gelatoPageCount}, pdfUrl=${pdfUrl}`);
+    console.log(`📦 [ADMIN] Retry print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, pdfUrl=${pdfUrl}`);
 
-    const gelatoResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
+    const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-KEY': gelatoApiKey
+        'X-API-KEY': printApiKey
       },
-      body: JSON.stringify(gelatoOrderPayload)
+      body: JSON.stringify(printOrderPayload)
     });
 
-    if (!gelatoResponse.ok) {
-      const errorText = await gelatoResponse.text();
-      console.error(`❌ [ADMIN] Gelato API error: ${gelatoResponse.status} - ${errorText}`);
-      return res.status(gelatoResponse.status).json({
-        error: 'Gelato order failed',
+    if (!printResponse.ok) {
+      const errorText = await printResponse.text();
+      console.error(`❌ [ADMIN] Print provider API error: ${printResponse.status} - ${errorText}`);
+      return res.status(printResponse.status).json({
+        error: 'Print provider order failed',
         details: errorText
       });
     }
 
-    const gelatoOrder = await gelatoResponse.json();
-    console.log('✅ [ADMIN] Gelato order created:', gelatoOrder.orderId);
+    const printOrder = await printResponse.json();
+    console.log('✅ [ADMIN] Print order created:', printOrder.orderId);
 
-    // Update order with Gelato order ID
+    // Update order with print order ID
     await dbPool.query(`
       UPDATE orders
       SET gelato_order_id = $1,
@@ -3977,16 +3977,16 @@ app.post('/api/admin/orders/:orderId/retry-gelato', authenticateToken, async (re
           payment_status = 'completed',
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
-    `, [gelatoOrder.orderId, orderId]);
+    `, [printOrder.orderId, orderId]);
 
     res.json({
       success: true,
-      message: 'Gelato order created successfully',
-      gelatoOrderId: gelatoOrder.orderId
+      message: 'Print order created successfully',
+      printOrderId: printOrder.orderId
     });
 
   } catch (err) {
-    console.error('❌ [ADMIN] Error retrying Gelato order:', err);
+    console.error('❌ [ADMIN] Error retrying print order:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -4654,12 +4654,12 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
     }
 
-    // Add page 0 (dedication/intro page)
-    if (storyData.coverImages?.page0) {
+    // Add initial page (dedication/intro page)
+    if (storyData.coverImages?.initialPage) {
       doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      const page0Data = storyData.coverImages.page0.replace(/^data:image\/\w+;base64,/, '');
-      const page0Buffer = Buffer.from(page0Data, 'base64');
-      doc.image(page0Buffer, 0, 0, { width: pageSize, height: pageSize });
+      const initialPageData = storyData.coverImages.initialPage.replace(/^data:image\/\w+;base64,/, '');
+      const initialPageBuffer = Buffer.from(initialPageData, 'base64');
+      doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
     }
 
     // Add story pages (text + images alternating)
@@ -4742,21 +4742,21 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     const pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
     console.log(`✅ [BACKGROUND] PDF saved with URL: ${pdfUrl}`);
 
-    // Step 4: Create Gelato order
-    console.log('📦 [BACKGROUND] Creating Gelato order...');
+    // Step 4: Create print order
+    console.log('📦 [BACKGROUND] Creating print order...');
 
-    const gelatoApiKey = process.env.GELATO_API_KEY;
-    if (!gelatoApiKey) {
+    const printApiKey = process.env.GELATO_API_KEY;
+    if (!printApiKey) {
       throw new Error('GELATO_API_KEY not configured');
     }
 
-    // Calculate page count: each scene = 2 Gelato pages (1 text + 1 image)
+    // Calculate page count: each scene = 2 print pages (1 text + 1 image)
     const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
-    const gelatoPageCount = storyScenes * 2;
-    console.log(`📊 [BACKGROUND] Story scenes: ${storyScenes}, Gelato pages: ${gelatoPageCount}`);
+    const printPageCount = storyScenes * 2;
+    console.log(`📊 [BACKGROUND] Story scenes: ${storyScenes}, Print pages: ${printPageCount}`);
 
     // Fetch product UID from database based on page count (same logic as frontend)
-    let gelatoProductUid = null;
+    let printProductUid = null;
     try {
       const productsResult = await dbPool.query(
         'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true'
@@ -4767,17 +4767,17 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
         const matchingProduct = productsResult.rows.find(p => {
           if (p.available_page_counts) {
             const availableCounts = JSON.parse(p.available_page_counts || '[]');
-            return availableCounts.includes(gelatoPageCount);
+            return availableCounts.includes(printPageCount);
           }
           // Fallback: check min/max range
-          return gelatoPageCount >= (p.min_pages || 0) && gelatoPageCount <= (p.max_pages || 999);
+          return printPageCount >= (p.min_pages || 0) && printPageCount <= (p.max_pages || 999);
         });
 
         if (matchingProduct) {
-          gelatoProductUid = matchingProduct.product_uid;
+          printProductUid = matchingProduct.product_uid;
           console.log(`✅ [BACKGROUND] Found matching product: ${matchingProduct.product_name}`);
         } else {
-          console.warn(`⚠️ [BACKGROUND] No product matches page count ${gelatoPageCount}`);
+          console.warn(`⚠️ [BACKGROUND] No product matches page count ${printPageCount}`);
         }
       }
     } catch (err) {
@@ -4785,25 +4785,25 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     }
 
     // Fallback to environment variable or hardcoded default
-    if (!gelatoProductUid) {
-      gelatoProductUid = process.env.GELATO_PHOTOBOOK_UID || 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
-      console.log(`⚠️ [BACKGROUND] Using fallback product UID: ${gelatoProductUid}`);
+    if (!printProductUid) {
+      printProductUid = process.env.GELATO_PHOTOBOOK_UID || 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
+      console.log(`⚠️ [BACKGROUND] Using fallback product UID: ${printProductUid}`);
     }
 
     const orderType = process.env.GELATO_ORDER_TYPE || 'order'; // 'draft' or 'order'
 
-    // Use CHF currency for Gelato orders
+    // Use CHF currency for print orders
     const currency = 'CHF';
 
-    const gelatoOrderPayload = {
+    const printOrderPayload = {
       orderType: orderType,
       orderReferenceId: `story-${storyId}-${Date.now()}`,
       customerReferenceId: userId,
       currency: currency,
       items: [{
         itemReferenceId: `item-${storyId}-${Date.now()}`,
-        productUid: gelatoProductUid,
-        pageCount: gelatoPageCount,
+        productUid: printProductUid,
+        pageCount: printPageCount,
         files: [{
           type: 'default',
           url: pdfUrl
@@ -4825,26 +4825,26 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       }
     };
 
-    console.log(`📦 [BACKGROUND] Gelato order payload: productUid=${gelatoProductUid}, pageCount=${gelatoPageCount}, orderType=${orderType}`);
+    console.log(`📦 [BACKGROUND] Print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, orderType=${orderType}`);
 
-    const gelatoResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
+    const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-KEY': gelatoApiKey
+        'X-API-KEY': printApiKey
       },
-      body: JSON.stringify(gelatoOrderPayload)
+      body: JSON.stringify(printOrderPayload)
     });
 
-    if (!gelatoResponse.ok) {
-      const errorText = await gelatoResponse.text();
-      throw new Error(`Gelato API error: ${gelatoResponse.status} - ${errorText}`);
+    if (!printResponse.ok) {
+      const errorText = await printResponse.text();
+      throw new Error(`Print provider API error: ${printResponse.status} - ${errorText}`);
     }
 
-    const gelatoOrder = await gelatoResponse.json();
-    console.log('✅ [BACKGROUND] Gelato order created:', gelatoOrder.orderId);
+    const printOrder = await printResponse.json();
+    console.log('✅ [BACKGROUND] Print order created:', printOrder.orderId);
 
-    // Step 5: Update order with Gelato order ID and status
+    // Step 5: Update order with print order ID and status
     await dbPool.query(`
       UPDATE orders
       SET gelato_order_id = $1,
@@ -4852,7 +4852,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
           payment_status = 'completed',
           updated_at = CURRENT_TIMESTAMP
       WHERE stripe_session_id = $2
-    `, [gelatoOrder.orderId, sessionId]);
+    `, [printOrder.orderId, sessionId]);
 
     console.log('🎉 [BACKGROUND] Book order processing completed successfully!');
 
@@ -4894,7 +4894,7 @@ const ART_STYLES = {
 function extractCoverScenes(outline) {
   const coverScenes = {
     titlePage: '',
-    page0: '',
+    initialPage: '',
     backCover: ''
   };
 
@@ -4916,13 +4916,14 @@ function extractCoverScenes(outline) {
       continue;
     }
 
-    const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
-    if (page0Match) {
+    // Match both "Initial Page" and legacy "Page 0" for backward compatibility
+    const initialPageMatch = line.match(/(?:\*\*)?(?:Initial\s+Page|Page\s+0)(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
+    if (initialPageMatch) {
       if (currentCoverType && sceneBuffer) {
         coverScenes[currentCoverType] = sceneBuffer.trim();
       }
-      currentCoverType = 'page0';
-      sceneBuffer = page0Match[1].trim();
+      currentCoverType = 'initialPage';
+      sceneBuffer = initialPageMatch[1].trim();
       continue;
     }
 
@@ -5364,10 +5365,10 @@ Output Format:
       // Extract cover scene descriptions from outline (matches step-by-step)
       const coverScenes = extractCoverScenes(outline);
       const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-      const page0Scene = coverScenes.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+      const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
       const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
-      let frontCoverResult, page0Result, backCoverResult;
+      let frontCoverResult, initialPageResult, backCoverResult;
 
       // Generate front cover (matches step-by-step prompt format)
       try {
@@ -5387,29 +5388,29 @@ Output Format:
         throw new Error(`Front cover generation failed: ${error.message}`);
       }
 
-      // Generate page 0 (dedication page) - matches step-by-step prompt format
+      // Generate initial page (dedication page) - matches step-by-step prompt format
       try {
-        console.log(`📕 [PIPELINE] Generating page 0 (dedication) for job ${jobId}`);
-        const page0Prompt = inputData.dedication && inputData.dedication.trim()
-          ? fillTemplate(PROMPT_TEMPLATES.page0WithDedication, {
-              PAGE0_SCENE: page0Scene,
+        console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId}`);
+        const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
+          ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+              INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               DEDICATION: inputData.dedication
             })
-          : fillTemplate(PROMPT_TEMPLATES.page0NoDedication, {
-              PAGE0_SCENE: page0Scene,
+          : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+              INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle
             });
-        page0Result = await callGeminiAPIForImage(page0Prompt, characterPhotos);
-        console.log(`✅ [PIPELINE] Page 0 generated successfully`);
-        // Save checkpoint: page0 cover
-        await saveCheckpoint(jobId, 'cover', { type: 'page0', prompt: page0Prompt }, 1);
+        initialPageResult = await callGeminiAPIForImage(initialPagePrompt, characterPhotos);
+        console.log(`✅ [PIPELINE] Initial page generated successfully`);
+        // Save checkpoint: initial page cover
+        await saveCheckpoint(jobId, 'cover', { type: 'initialPage', prompt: initialPagePrompt }, 1);
       } catch (error) {
-        console.error(`❌ [PIPELINE] Failed to generate page 0 for job ${jobId}:`, error);
-        throw new Error(`Page 0 generation failed: ${error.message}`);
+        console.error(`❌ [PIPELINE] Failed to generate initial page for job ${jobId}:`, error);
+        throw new Error(`Initial page generation failed: ${error.message}`);
       }
 
       // Generate back cover (matches step-by-step prompt format)
@@ -5435,10 +5436,10 @@ Output Format:
           qualityScore: frontCoverResult.score,
           qualityReasoning: frontCoverResult.reasoning || null
         },
-        page0: {
-          imageData: page0Result.imageData,
-          qualityScore: page0Result.score,
-          qualityReasoning: page0Result.reasoning || null
+        initialPage: {
+          imageData: initialPageResult.imageData,
+          qualityScore: initialPageResult.score,
+          qualityReasoning: initialPageResult.reasoning || null
         },
         backCover: {
           imageData: backCoverResult.imageData,
@@ -5447,7 +5448,7 @@ Output Format:
         }
       };
 
-      console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCoverResult.score}, Page0: ${page0Result.score}, Back: ${backCoverResult.score}`);
+      console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCoverResult.score}, Initial: ${initialPageResult.score}, Back: ${backCoverResult.score}`);
     } else {
       console.log(`📝 [PIPELINE] Text-only mode - skipping cover image generation`);
     }
@@ -5529,6 +5530,8 @@ Output Format:
 function buildBasePrompt(inputData) {
   const mainCharacterIds = inputData.mainCharacters || [];
 
+  // For story text generation, we use BASIC character info (no strengths/weaknesses)
+  // Strengths/weaknesses are only used in outline generation to avoid repetitive trait mentions
   const characterSummary = (inputData.characters || []).map(char => {
     const isMain = mainCharacterIds.includes(char.id);
     return {
@@ -5536,8 +5539,6 @@ function buildBasePrompt(inputData) {
       isMainCharacter: isMain,
       gender: char.gender,
       age: char.age,
-      strengths: char.strengths,
-      weaknesses: char.weaknesses,
       specialDetails: char.specialDetails  // Includes hobbies, hopes, fears, favorite animals
     };
   });

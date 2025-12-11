@@ -281,12 +281,12 @@
         selectMainCharacters: 'Select Main Characters (max 2)',
         numberOfPages: 'Number of Pages',
         readingLevel: 'Reading Level',
-        firstGrade: '1st Grade',
-        firstGradeDesc: 'Simple words and short sentences',
+        firstGrade: 'Picture Book',
+        firstGradeDesc: 'Image and text on both pages',
         standard: 'Standard',
-        standardDesc: 'Age-appropriate vocabulary',
+        standardDesc: 'Text on one page, image on the other',
         advanced: 'Advanced',
-        advancedDesc: 'Complex words and sentences',
+        advancedDesc: 'Longer text, image on opposite page',
         generateStory: 'Generate Story!',
         creating: 'Creating Your Story...',
         storyReady: 'Your Story is Ready!',
@@ -428,12 +428,12 @@
         selectMainCharacters: 'Hauptfiguren auswählen (max 2)',
         numberOfPages: 'Anzahl der Seiten',
         readingLevel: 'Lesestufe',
-        firstGrade: '1. Klasse',
-        firstGradeDesc: 'Einfache Wörter und kurze Sätze',
+        firstGrade: 'Bilderbuch',
+        firstGradeDesc: 'Bild und Text auf beiden Seiten',
         standard: 'Standard',
-        standardDesc: 'Altersgerechter Wortschatz',
+        standardDesc: 'Text auf einer Seite, Bild auf der anderen',
         advanced: 'Fortgeschritten',
-        advancedDesc: 'Komplexe Wörter und Sätze',
+        advancedDesc: 'Längerer Text, Bild auf der gegenüberliegenden Seite',
         generateStory: 'Geschichte erstellen!',
         creating: 'Erstelle deine Geschichte...',
         storyReady: 'Deine Geschichte ist fertig!',
@@ -575,12 +575,12 @@
         selectMainCharacters: 'Sélectionner les personnages principaux (max 2)',
         numberOfPages: 'Nombre de pages',
         readingLevel: 'Niveau de lecture',
-        firstGrade: '1ère année',
-        firstGradeDesc: 'Mots simples et phrases courtes',
+        firstGrade: 'Livre d\'images',
+        firstGradeDesc: 'Image et texte sur les deux pages',
         standard: 'Standard',
-        standardDesc: 'Vocabulaire adapté à l\'âge',
+        standardDesc: 'Texte sur une page, image sur l\'autre',
         advanced: 'Avancé',
-        advancedDesc: 'Mots et phrases complexes',
+        advancedDesc: 'Texte plus long, image sur la page opposée',
         generateStory: 'Générer l\'histoire!',
         creating: 'Création de votre histoire...',
         storyReady: 'Votre histoire est prête!',
@@ -737,13 +737,13 @@
       const [isGeneratingImages, setIsGeneratingImages] = useState(false);
       const [coverImages, setCoverImages] = useState({
         frontCover: null,  // Also serves as title page
-        page0: null,
+        initialPage: null,
         backCover: null
       });
       const [storyTitle, setStoryTitle] = useState('');
       const [coverSceneDescriptions, setCoverSceneDescriptions] = useState({
         titlePage: '',
-        page0: '',
+        initialPage: '',
         backCover: ''
       });
       const [geminiApiKey, setGeminiApiKey] = useState('');
@@ -761,7 +761,7 @@
       const [apiCalls, setApiCalls] = useState({}); // Store full API calls for admin debugging
       const [editingImageIndex, setEditingImageIndex] = useState(null);
       const [imageEditInstruction, setImageEditInstruction] = useState('');
-      const [editingCoverImage, setEditingCoverImage] = useState(null); // 'frontCover', 'page0', 'backCover', or null
+      const [editingCoverImage, setEditingCoverImage] = useState(null); // 'frontCover', 'initialPage', 'backCover', or null
       const [coverEditInstruction, setCoverEditInstruction] = useState('');
       const [avatarPrompt, setAvatarPrompt] = useState('');
       const [showAvatarPrompt, setShowAvatarPrompt] = useState(false);
@@ -799,7 +799,7 @@
       const [failedOrders, setFailedOrders] = useState([]);
       const [isLoadingOrders, setIsLoadingOrders] = useState(false);
       const [retryingOrderId, setRetryingOrderId] = useState(null);
-      const [gelatoProducts, setGelatoProducts] = useState([]);
+      const [printProducts, setPrintProducts] = useState([]);
       const [showProductForm, setShowProductForm] = useState(false);
       const [editingProduct, setEditingProduct] = useState(null);
       const [productForm, setProductForm] = useState({
@@ -1030,7 +1030,7 @@
                 setSceneDescriptions(fullStory.sceneDescriptions || []);
                 setSceneImages(fullStory.sceneImages || []);
                 setStoryTitle(fullStory.title || '');
-                setCoverImages(fullStory.coverImages || { frontCover: null, page0: null, backCover: null });
+                setCoverImages(fullStory.coverImages || { frontCover: null, initialPage: null, backCover: null });
                 setImagePrompts(fullStory.imagePrompts || {});
                 setStep(5);
               })
@@ -1435,7 +1435,7 @@ In addition to the ${pages} story pages, provide scene descriptions for these 3 
 
 **Title Page Scene**: A captivating cover illustration that features the main characters and sets the tone for the story. This should be visually striking and focus on the protagonist(s) in a way that draws readers in.
 
-**Page 0 Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
+**Initial Page Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
 
 **Back Cover Scene**: A satisfying concluding illustration that provides closure and leaves readers with a positive feeling. This should feel like a natural ending to the visual journey.
 
@@ -1454,7 +1454,7 @@ Scene: [Short visual description]
 Title Page: [Summary of title page concept]
 Scene: [Visual description focusing on main characters]
 
-Page 0: [Summary of dedication/intro concept]
+Initial Page: [Summary of dedication/intro concept]
 Scene: [Visual description for welcoming scene]
 
 Back Cover: [Summary of back cover concept]
@@ -1676,7 +1676,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
           if (response.ok) {
             const data = await response.json();
-            // Filter only failed orders (paid but no gelato_order_id)
+            // Filter only failed orders (paid but no print order ID)
             const failed = data.orders.filter(o => o.has_issue);
             setFailedOrders(failed);
             console.log(`📦 [ADMIN] Loaded ${failed.length} failed orders`);
@@ -1692,13 +1692,13 @@ Be specific and creative. Each scene description should paint a clear picture fo
         }
       };
 
-      // Retry sending order to Gelato (admin only)
-      const retryGelatoOrder = async (orderId) => {
+      // Retry sending order to print provider (admin only)
+      const retryPrintOrder = async (orderId) => {
         if (!authToken || !currentUser || currentUser.role !== 'admin') return;
 
         setRetryingOrderId(orderId);
         try {
-          const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/retry-gelato`, {
+          const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/retry-print-order`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${authToken}` }
           });
@@ -1707,10 +1707,10 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
           if (response.ok) {
             alert(language === 'de'
-              ? `Gelato Bestellung erfolgreich erstellt!\nGelato Order ID: ${result.gelatoOrderId}`
+              ? `Druckauftrag erfolgreich erstellt!\nPrint Order ID: ${result.printOrderId}`
               : language === 'fr'
-              ? `Commande Gelato créée avec succès!\nGelato Order ID: ${result.gelatoOrderId}`
-              : `Gelato order created successfully!\nGelato Order ID: ${result.gelatoOrderId}`);
+              ? `Commande d'impression créée avec succès!\nPrint Order ID: ${result.printOrderId}`
+              : `Print order created successfully!\nPrint Order ID: ${result.printOrderId}`);
             // Refresh failed orders list
             await fetchFailedOrders();
           } else {
@@ -1721,12 +1721,12 @@ Be specific and creative. Each scene description should paint a clear picture fo
               : `Error: ${result.error}\n${result.details || ''}`);
           }
         } catch (err) {
-          console.error('Error retrying Gelato order:', err);
+          console.error('Error retrying print order:', err);
           alert(language === 'de'
-            ? 'Fehler beim Senden an Gelato'
+            ? 'Fehler beim Senden an Druckdienstleister'
             : language === 'fr'
-            ? 'Erreur lors de l\'envoi à Gelato'
-            : 'Error sending to Gelato');
+            ? 'Erreur lors de l\'envoi au fournisseur d\'impression'
+            : 'Error sending to print provider');
         } finally {
           setRetryingOrderId(null);
         }
@@ -1804,39 +1804,39 @@ Be specific and creative. Each scene description should paint a clear picture fo
         }
       };
 
-      // Gelato Products Management Functions
-      const fetchGelatoProducts = async () => {
+      // Print Products Management Functions
+      const fetchPrintProducts = async () => {
         if (!authToken || !currentUser || currentUser.role !== 'admin') return;
 
         try {
-          const response = await fetch(`${API_URL}/api/admin/gelato-products`, {
+          const response = await fetch(`${API_URL}/api/admin/print-products`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
           });
 
           if (response.ok) {
             const data = await response.json();
-            setGelatoProducts(data.products || []);
+            setPrintProducts(data.products || []);
           }
         } catch (err) {
-          console.error('Error fetching Gelato products:', err);
+          console.error('Error fetching print products:', err);
         }
       };
 
-      const fetchGelatoApiProducts = async () => {
+      const fetchProviderApiProducts = async () => {
         if (!authToken || !currentUser || currentUser.role !== 'admin') return;
 
         const confirmMsg = language === 'de'
-          ? 'Möchten Sie verfügbare Produkte von Gelato API abrufen? Dies kann einen Moment dauern.'
+          ? 'Möchten Sie verfügbare Produkte vom Druckdienstleister abrufen? Dies kann einen Moment dauern.'
           : language === 'fr'
-          ? 'Voulez-vous récupérer les produits disponibles depuis l\'API Gelato ? Cela peut prendre un moment.'
-          : 'Fetch available products from Gelato API? This may take a moment.';
+          ? 'Voulez-vous récupérer les produits disponibles depuis le fournisseur d\'impression ? Cela peut prendre un moment.'
+          : 'Fetch available products from print provider API? This may take a moment.';
 
         if (!confirm(confirmMsg)) return;
 
         try {
-          setGenerationProgress({ current: 0, total: 1, message: 'Fetching products from Gelato...' });
+          setGenerationProgress({ current: 0, total: 1, message: 'Fetching products from print provider...' });
 
-          const response = await fetch(`${API_URL}/api/admin/gelato/fetch-products`, {
+          const response = await fetch(`${API_URL}/api/admin/print-provider/fetch-products`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
           });
 
@@ -1858,7 +1858,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
                 let added = 0;
                 for (const product of data.products) {
                   try {
-                    const addResponse = await fetch(`${API_URL}/api/admin/gelato-products`, {
+                    const addResponse = await fetch(`${API_URL}/api/admin/print-products`, {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
@@ -1867,7 +1867,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
                       body: JSON.stringify({
                         product_uid: product.productUid,
                         product_name: product.name || product.productUid,
-                        description: product.description || 'Imported from Gelato API',
+                        description: product.description || 'Imported from print provider API',
                         size: product.size || '',
                         cover_type: product.coverType || '',
                         min_pages: product.minPages || 24,
@@ -1883,7 +1883,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
                   }
                 }
 
-                await fetchGelatoProducts();
+                await fetchPrintProducts();
                 const successMsg = language === 'de'
                   ? `${added} Produkte erfolgreich hinzugefügt!`
                   : language === 'fr'
@@ -1901,22 +1901,22 @@ Be specific and creative. Each scene description should paint a clear picture fo
             }
           } else {
             const error = await response.json();
-            alert(`Error: ${error.error || 'Failed to fetch from Gelato API'}`);
+            alert(`Error: ${error.error || 'Failed to fetch from print provider API'}`);
           }
         } catch (err) {
           setGenerationProgress({ current: 0, total: 0, message: '' });
-          console.error('Error fetching from Gelato API:', err);
-          alert('Error fetching from Gelato API. Please check your API key.');
+          console.error('Error fetching from print provider API:', err);
+          alert('Error fetching from print provider API. Please check your API key.');
         }
       };
 
-      const saveGelatoProduct = async () => {
+      const savePrintProduct = async () => {
         if (!authToken || !currentUser || currentUser.role !== 'admin') return;
 
         try {
           const url = editingProduct
-            ? `${API_URL}/api/admin/gelato-products/${editingProduct.id}`
-            : `${API_URL}/api/admin/gelato-products`;
+            ? `${API_URL}/api/admin/print-products/${editingProduct.id}`
+            : `${API_URL}/api/admin/print-products`;
 
           const response = await fetch(url, {
             method: editingProduct ? 'PUT' : 'POST',
@@ -1928,7 +1928,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
           });
 
           if (response.ok) {
-            await fetchGelatoProducts();
+            await fetchPrintProducts();
             setShowProductForm(false);
             setEditingProduct(null);
             setProductForm({
@@ -1953,18 +1953,18 @@ Be specific and creative. Each scene description should paint a clear picture fo
         }
       };
 
-      const deleteGelatoProduct = async (productId) => {
+      const deletePrintProduct = async (productId) => {
         if (!authToken || !currentUser || currentUser.role !== 'admin') return;
         if (!confirm('Delete this product?')) return;
 
         try {
-          const response = await fetch(`${API_URL}/api/admin/gelato-products/${productId}`, {
+          const response = await fetch(`${API_URL}/api/admin/print-products/${productId}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${authToken}` }
           });
 
           if (response.ok) {
-            await fetchGelatoProducts();
+            await fetchPrintProducts();
             alert('Product deleted successfully!');
           } else {
             alert('Failed to delete product');
@@ -1979,7 +1979,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
         if (!authToken || !currentUser || currentUser.role !== 'admin') return;
 
         try {
-          const response = await fetch(`${API_URL}/api/admin/gelato-products/${productId}`, {
+          const response = await fetch(`${API_URL}/api/admin/print-products/${productId}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -1989,7 +1989,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
           });
 
           if (response.ok) {
-            await fetchGelatoProducts();
+            await fetchPrintProducts();
           }
         } catch (err) {
           console.error('Error toggling product status:', err);
@@ -2402,7 +2402,7 @@ In addition to the ${pages} story pages, provide scene descriptions for these 3 
 
 **Title Page Scene**: A captivating cover illustration that features the main characters and sets the tone for the story. This should be visually striking and focus on the protagonist(s) in a way that draws readers in.
 
-**Page 0 Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
+**Initial Page Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
 
 **Back Cover Scene**: A satisfying concluding illustration that provides closure and leaves readers with a positive feeling. This should feel like a natural ending to the visual journey.
 
@@ -2421,7 +2421,7 @@ Scene: [Short visual description]
 Title Page: [Summary of title page concept]
 Scene: [Visual description focusing on main characters]
 
-Page 0: [Summary of dedication/intro concept]
+Initial Page: [Summary of dedication/intro concept]
 Scene: [Visual description for welcoming scene]
 
 Back Cover: [Summary of back cover concept]
@@ -2469,7 +2469,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
           const sceneDescMap = {};
           const coverScenes = {
             titlePage: '',
-            page0: '',
+            initialPage: '',
             backCover: ''
           };
 
@@ -2522,8 +2522,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
               console.log('Found Title Page scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
-            const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
-            if (page0Match) {
+            // Match both "Initial Page" and legacy "Page 0" for backward compatibility
+            const initialPageMatch = line.match(/(?:\*\*)?(?:Initial\s+Page|Page\s+0)(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
+            if (initialPageMatch) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
                 if (currentPage !== null) {
@@ -2533,11 +2534,11 @@ Be specific and creative. Each scene description should paint a clear picture fo
                 }
               }
 
-              currentCoverType = 'page0';
+              currentCoverType = 'initialPage';
               currentPage = null;
               collectingScene = true;
-              sceneBuffer = page0Match[1].trim();
-              console.log('Found Page 0 scene:', sceneBuffer.substring(0, 50) + '...');
+              sceneBuffer = initialPageMatch[1].trim();
+              console.log('Found Initial Page scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
             const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
@@ -2600,11 +2601,11 @@ Be specific and creative. Each scene description should paint a clear picture fo
           }
 
           // Warning if cover scenes are empty
-          if (!coverScenes.titlePage || !coverScenes.page0 || !coverScenes.backCover) {
+          if (!coverScenes.titlePage || !coverScenes.initialPage || !coverScenes.backCover) {
             console.warn('⚠️ WARNING: Some cover scene descriptions are empty!');
             console.warn('Missing:', {
               titlePage: !coverScenes.titlePage,
-              page0: !coverScenes.page0,
+              initialPage: !coverScenes.initialPage,
               backCover: !coverScenes.backCover
             });
           }
@@ -3234,7 +3235,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 console.log('📖 [SETTING STATE] generatedStory set to:', (result.storyText || '').substring(0, 200));
                 setSceneDescriptions(result.sceneDescriptions || []);
                 setSceneImages(result.images || []);
-                setCoverImages(result.coverImages || { frontCover: null, page0: null, backCover: null });
+                setCoverImages(result.coverImages || { frontCover: null, initialPage: null, backCover: null });
                 setImagePrompts(result.imagePrompts || {}); // Load image prompts
               }
 
@@ -3261,7 +3262,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                   sceneDescriptions: result.sceneDescriptions,
                   sceneImages: result.images,
                   imagePrompts: result.imagePrompts || {}, // Save image prompts for developer features
-                  coverImages: result.coverImages || { frontCover: null, page0: null, backCover: null },
+                  coverImages: result.coverImages || { frontCover: null, initialPage: null, backCover: null },
                   thumbnail: (result.coverImages?.frontCover?.imageData || result.coverImages?.frontCover || null),
                   createdAt: new Date().toISOString()
                 };
@@ -3361,7 +3362,7 @@ In addition to the ${pages} story pages, provide scene descriptions for these 3 
 
 **Title Page Scene**: A captivating cover illustration that features the main characters and sets the tone for the story. This should be visually striking and focus on the protagonist(s) in a way that draws readers in.
 
-**Page 0 Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
+**Initial Page Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
 
 **Back Cover Scene**: A satisfying concluding illustration that provides closure and leaves readers with a positive feeling. This should feel like a natural ending to the visual journey.
 
@@ -3380,7 +3381,7 @@ Scene: [Short visual description]
 Title Page: [Summary of title page concept]
 Scene: [Visual description focusing on main characters]
 
-Page 0: [Summary of dedication/intro concept]
+Initial Page: [Summary of dedication/intro concept]
 Scene: [Visual description for welcoming scene]
 
 Back Cover: [Summary of back cover concept]
@@ -3425,7 +3426,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
           const sceneDescMap = {};
           const coverScenes = {
             titlePage: '',
-            page0: '',
+            initialPage: '',
             backCover: ''
           };
 
@@ -3478,8 +3479,9 @@ Be specific and creative. Each scene description should paint a clear picture fo
               console.log('Found Title Page scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
-            const page0Match = line.match(/(?:\*\*)?Page\s+0(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
-            if (page0Match) {
+            // Match both "Initial Page" and legacy "Page 0" for backward compatibility
+            const initialPageMatch = line.match(/(?:\*\*)?(?:Initial\s+Page|Page\s+0)(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
+            if (initialPageMatch) {
               // Save any buffered scene before switching context
               if (collectingScene && sceneBuffer && (currentPage !== null || currentCoverType)) {
                 if (currentPage !== null) {
@@ -3489,11 +3491,11 @@ Be specific and creative. Each scene description should paint a clear picture fo
                 }
               }
 
-              currentCoverType = 'page0';
+              currentCoverType = 'initialPage';
               currentPage = null;
               collectingScene = true;
-              sceneBuffer = page0Match[1].trim();
-              console.log('Found Page 0 scene:', sceneBuffer.substring(0, 50) + '...');
+              sceneBuffer = initialPageMatch[1].trim();
+              console.log('Found Initial Page scene:', sceneBuffer.substring(0, 50) + '...');
             }
 
             const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
@@ -3556,11 +3558,11 @@ Be specific and creative. Each scene description should paint a clear picture fo
           }
 
           // Warning if cover scenes are empty
-          if (!coverScenes.titlePage || !coverScenes.page0 || !coverScenes.backCover) {
+          if (!coverScenes.titlePage || !coverScenes.initialPage || !coverScenes.backCover) {
             console.warn('⚠️ WARNING: Some cover scene descriptions are empty!');
             console.warn('Missing:', {
               titlePage: !coverScenes.titlePage,
-              page0: !coverScenes.page0,
+              initialPage: !coverScenes.initialPage,
               backCover: !coverScenes.backCover
             });
           }
@@ -3900,20 +3902,20 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
           // Use scene descriptions from outline if available, otherwise use defaults
           const titlePageScene = coverSceneDescriptions.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-          const page0Scene = coverSceneDescriptions.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+          const initialPageScene = coverSceneDescriptions.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
           const backCoverScene = coverSceneDescriptions.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
           // Define cover image prompts with scene descriptions from outline
           const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page illustration for the children's book "${storyTitle}".\n\nIMPORTANT: The image should include the story title "${storyTitle}" integrated beautifully into the illustration. Make the title prominent and visually appealing as part of the cover art.`;
-          const page0Prompt = dedication && dedication.trim()
-            ? `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "${dedication}"\n\nDo not add any other text. Only "${dedication}" must appear. No additional words allowed.`
-            : `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as an introduction page for "${storyTitle}".\n\nIMPORTANT: This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.`;
+          const initialPagePrompt = dedication && dedication.trim()
+            ? `${initialPageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "${dedication}"\n\nDo not add any other text. Only "${dedication}" must appear. No additional words allowed.`
+            : `${initialPageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as an introduction page for "${storyTitle}".\n\nIMPORTANT: This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.`;
           const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "magicalstory.ch" in elegant letters in the bottom left corner.\n\nDo not add any other text. Only "magicalstory.ch" must appear. No additional words allowed.`;
 
           // Define detailed cover scene descriptions for display
           const coverDescriptions = {
             frontCover: `**Title Page / Front Cover**\n\n${titlePageScene}`,
-            page0: `**Page 0 - Dedication/Introduction**\n\n${page0Scene}`,
+            initialPage: `**Initial Page - Dedication/Introduction**\n\n${initialPageScene}`,
             backCover: `**Back Cover**\n\n${backCoverScene}`
           };
 
@@ -4004,29 +4006,29 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
           const coverPromises = [
             generateCoverImage('frontCover', frontCoverPrompt, coverCharacterImages),
-            generateCoverImage('page0', page0Prompt, coverCharacterImages),
+            generateCoverImage('initialPage', initialPagePrompt, coverCharacterImages),
             generateCoverImage('backCover', backCoverPrompt, coverCharacterImages)
           ];
 
-          const [frontCover, page0, backCover] = await Promise.all(coverPromises);
+          const [frontCover, initialPage, backCover] = await Promise.all(coverPromises);
 
           // Store cover image prompts
           setCoverImagePrompts({
             frontCover: frontCoverPrompt,
-            page0: page0Prompt,
+            initialPage: initialPagePrompt,
             backCover: backCoverPrompt
           });
 
           // Store cover image API calls for debugging
           setCoverImageApiCalls({
             frontCover: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: frontCoverPrompt },
-            page0: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: page0Prompt },
+            initialPage: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: initialPagePrompt },
             backCover: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: backCoverPrompt }
           });
 
           setCoverImages({
             frontCover,
-            page0,
+            initialPage,
             backCover,
             descriptions: coverDescriptions
           });
@@ -4556,7 +4558,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         setStoryOutline('');
         setStoryTitle('');
         setDedication('');
-        setCoverImages({ frontCover: null, page0: null, backCover: null });
+        setCoverImages({ frontCover: null, initialPage: null, backCover: null });
         setCoverImagePrompts({});
         setCurrentStoryId(null);
       };
@@ -4830,20 +4832,20 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           // Use scene descriptions from outline if available, otherwise use defaults
           const titlePageScene = coverSceneDescriptions.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-          const page0Scene = coverSceneDescriptions.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+          const initialPageScene = coverSceneDescriptions.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
           const backCoverScene = coverSceneDescriptions.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
           // Define cover image prompts with scene descriptions from outline
           const frontCoverPrompt = `${titlePageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as a beautiful title page illustration for the children's book "${storyTitle}".\n\nIMPORTANT: The image should include the story title "${storyTitle}" integrated beautifully into the illustration. Make the title prominent and visually appealing as part of the cover art.`;
-          const page0Prompt = dedication && dedication.trim()
-            ? `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "${dedication}"\n\nDo not add any other text. Only "${dedication}" must appear. No additional words allowed.`
-            : `${page0Scene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as an introduction page for "${storyTitle}".\n\nIMPORTANT: This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.`;
+          const initialPagePrompt = dedication && dedication.trim()
+            ? `${initialPageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "${dedication}"\n\nDo not add any other text. Only "${dedication}" must appear. No additional words allowed.`
+            : `${initialPageScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCreate this as an introduction page for "${storyTitle}".\n\nIMPORTANT: This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.`;
           const backCoverPrompt = `${backCoverScene}\n\nStyle: ${styleDescription}.${characterInfo}\n\nCRITICAL: Include ONLY this exact text in the image: "magicalstory.ch" in elegant letters in the bottom left corner.\n\nDo not add any other text. Only "magicalstory.ch" must appear. No additional words allowed.`;
 
           // Define detailed cover scene descriptions for display
           const coverDescriptions = {
             frontCover: `**Title Page / Front Cover**\n\n${titlePageScene}`,
-            page0: `**Page 0 - Dedication/Introduction**\n\n${page0Scene}`,
+            initialPage: `**Initial Page - Dedication/Introduction**\n\n${initialPageScene}`,
             backCover: `**Back Cover**\n\n${backCoverScene}`
           };
 
@@ -4934,29 +4936,29 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           const coverPromises = [
             generateCoverImage('frontCover', frontCoverPrompt, coverCharacterImages),
-            generateCoverImage('page0', page0Prompt, coverCharacterImages),
+            generateCoverImage('initialPage', initialPagePrompt, coverCharacterImages),
             generateCoverImage('backCover', backCoverPrompt, coverCharacterImages)
           ];
 
-          const [frontCover, page0, backCover] = await Promise.all(coverPromises);
+          const [frontCover, initialPage, backCover] = await Promise.all(coverPromises);
 
           // Store cover image prompts
           setCoverImagePrompts({
             frontCover: frontCoverPrompt,
-            page0: page0Prompt,
+            initialPage: initialPagePrompt,
             backCover: backCoverPrompt
           });
 
           // Store cover image API calls for debugging
           setCoverImageApiCalls({
             frontCover: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: frontCoverPrompt },
-            page0: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: page0Prompt },
+            initialPage: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: initialPagePrompt },
             backCover: { type: 'image', model: 'gemini-2.0-flash-exp', prompt: backCoverPrompt }
           });
 
           setCoverImages({
             frontCover,
-            page0,
+            initialPage,
             backCover,
             descriptions: coverDescriptions
           });
@@ -5435,17 +5437,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             return;
           }
 
-          // Check minimum page count for Gelato printing
-          // Minimum 28 Gelato pages = 14 scenes * 2 (covers NOT counted by Gelato)
+          // Check minimum page count for printing
+          // Minimum 28 print pages = 14 scenes * 2 (covers NOT counted by print provider)
           const minimumScenes = 14;
-          const gelatoPages = pages * 2;
+          const printPages = pages * 2;
 
           if (pages < minimumScenes) {
             alert(language === 'de'
-              ? `Gedruckte Bücher benötigen mindestens ${minimumScenes} Szenen (${minimumScenes * 2} Gelato-Seiten). Ihre Geschichte hat ${pages} Szenen (${gelatoPages} Gelato-Seiten).\n\nBitte erstellen Sie eine neue Geschichte mit mindestens ${minimumScenes} Szenen oder laden Sie die Geschichte als PDF herunter.`
+              ? `Gedruckte Bücher benötigen mindestens ${minimumScenes} Szenen (${minimumScenes * 2} Druckseiten). Ihre Geschichte hat ${pages} Szenen (${printPages} Druckseiten).\n\nBitte erstellen Sie eine neue Geschichte mit mindestens ${minimumScenes} Szenen oder laden Sie die Geschichte als PDF herunter.`
               : language === 'fr'
-              ? `Les livres imprimés nécessitent au moins ${minimumScenes} scènes (${minimumScenes * 2} pages Gelato). Votre histoire a ${pages} scènes (${gelatoPages} pages Gelato).\n\nVeuillez créer une nouvelle histoire avec au moins ${minimumScenes} scènes ou télécharger l'histoire en PDF.`
-              : `Printed books require at least ${minimumScenes} scenes (${minimumScenes * 2} Gelato pages). Your story has ${pages} scenes (${gelatoPages} Gelato pages).\n\nPlease create a new story with at least ${minimumScenes} scenes or download the story as PDF.`);
+              ? `Les livres imprimés nécessitent au moins ${minimumScenes} scènes (${minimumScenes * 2} pages d'impression). Votre histoire a ${pages} scènes (${printPages} pages d'impression).\n\nVeuillez créer une nouvelle histoire avec au moins ${minimumScenes} scènes ou télécharger l'histoire en PDF.`
+              : `Printed books require at least ${minimumScenes} scenes (${minimumScenes * 2} print pages). Your story has ${pages} scenes (${printPages} print pages).\n\nPlease create a new story with at least ${minimumScenes} scenes or download the story as PDF.`);
             return;
           }
 
@@ -5610,21 +5612,21 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           console.log('PDF generated:', pdfData);
 
           // Step 2: Get product UID from backend (with fallback to default)
-          // IMPORTANT: Gelato only counts story content pages (not covers)
+          // IMPORTANT: Print provider only counts story content pages (not covers)
           // - Each scene = 2 pages (1 text page + 1 image page)
-          // - Covers (back, front, page 0) are NOT counted by Gelato
-          const actualPdfPages = pages * 2;  // Gelato page count (story content only)
+          // - Covers (back, front, initial page) are NOT counted by print provider
+          const actualPdfPages = pages * 2;  // Print page count (story content only)
           let productUid;
 
           try {
-            const productsResponse = await fetch(`${API_URL}/api/gelato/products`, {
+            const productsResponse = await fetch(`${API_URL}/api/print-provider/products`, {
               headers: { 'Authorization': `Bearer ${authToken}` }
             });
 
             if (productsResponse.ok) {
               const productsData = await productsResponse.json();
               const products = productsData.products || [];
-              console.log('📦 Fetched Gelato products:', products.length, products);
+              console.log('📦 Fetched print products:', products.length, products);
               console.log('📄 Story scenes:', pages, '(PDF pages:', actualPdfPages, ')');
 
               if (products.length > 0) {
@@ -5656,11 +5658,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             console.warn('Failed to fetch products, will use default:', err.message);
           }
 
-          // Fallback to default Gelato product UID from environment
+          // Fallback to default print product UID from environment
           if (!productUid) {
             // Get default product UID from backend
             try {
-              const configResponse = await fetch(`${API_URL}/api/config/gelato-product-uid`, {
+              const configResponse = await fetch(`${API_URL}/api/config/print-product-uid`, {
                 headers: { 'Authorization': `Bearer ${authToken}` }
               });
 
@@ -5677,14 +5679,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           // Final check - error if still no product UID
           if (!productUid) {
             throw new Error(language === 'de'
-              ? `Kein Gelato-Produkt konfiguriert. Bitte kontaktieren Sie den Support.`
+              ? `Kein Druckprodukt konfiguriert. Bitte kontaktieren Sie den Support.`
               : language === 'fr'
-              ? `Aucun produit Gelato configuré. Veuillez contacter le support.`
-              : `No Gelato product configured. Please contact support.`);
+              ? `Aucun produit d'impression configuré. Veuillez contacter le support.`
+              : `No print product configured. Please contact support.`);
           }
 
-          // Step 3: Create Gelato order with PDF URL
-          const gelatoResponse = await fetch('/api/gelato/order', {
+          // Step 3: Create print order with PDF URL
+          const printOrderResponse = await fetch('/api/print-provider/order', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -5699,31 +5701,31 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             })
           });
 
-          const gelatoData = await gelatoResponse.json();
+          const printOrderData = await printOrderResponse.json();
 
-          if (gelatoResponse.ok) {
+          if (printOrderResponse.ok) {
             // Show custom modal instead of alert
             setOrderData({
-              orderId: gelatoData.orderId,
-              dashboardUrl: gelatoData.dashboardUrl,
+              orderId: printOrderData.orderId,
+              dashboardUrl: printOrderData.dashboardUrl,
               pdfUrl: pdfData.fileUrl,
               pdfFilename: pdfData.filename,
-              isDraft: gelatoData.isDraft,
-              previewUrls: gelatoData.previewUrls || [],
+              isDraft: printOrderData.isDraft,
+              previewUrls: printOrderData.previewUrls || [],
               email: shippingAddress.email
             });
             setShowOrderModal(true);
           } else {
-            // PDF was generated but Gelato order failed
-            if (gelatoData.setupUrl) {
+            // PDF was generated but print order failed
+            if (printOrderData.setupUrl) {
               alert(language === 'de'
-                ? `PDF wurde erstellt, aber Gelato ist nicht konfiguriert.\n\nPDF-Link: ${pdfData.fileUrl}\n\nBitte konfigurieren Sie Gelato unter: ${gelatoData.setupUrl}`
+                ? `PDF wurde erstellt, aber der Druckdienstleister ist nicht konfiguriert.\n\nPDF-Link: ${pdfData.fileUrl}\n\nBitte konfigurieren Sie den Druckdienstleister unter: ${printOrderData.setupUrl}`
                 : language === 'fr'
-                ? `PDF créé, mais Gelato n'est pas configuré.\n\nLien PDF: ${pdfData.fileUrl}\n\nVeuillez configurer Gelato sur: ${gelatoData.setupUrl}`
-                : `PDF generated, but Gelato is not configured.\n\nPDF URL: ${pdfData.fileUrl}\n\nPlease configure Gelato at: ${gelatoData.setupUrl}`
+                ? `PDF créé, mais le fournisseur d'impression n'est pas configuré.\n\nLien PDF: ${pdfData.fileUrl}\n\nVeuillez configurer le fournisseur d'impression sur: ${printOrderData.setupUrl}`
+                : `PDF generated, but print provider is not configured.\n\nPDF URL: ${pdfData.fileUrl}\n\nPlease configure print provider at: ${printOrderData.setupUrl}`
               );
             } else {
-              throw new Error(gelatoData.error || 'Failed to create Gelato order');
+              throw new Error(printOrderData.error || 'Failed to create print order');
             }
           }
 
@@ -7247,11 +7249,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         : 'border-gray-200 hover:border-indigo-300'
                     }`}
                   >
-                    <div className="w-full h-32 md:h-40 overflow-hidden bg-gray-100">
+                    <div className="w-full bg-gray-100 p-2">
                       <img
                         src={level.image}
                         alt={level.label}
-                        className="w-full h-full object-cover"
+                        className="w-full h-auto object-contain"
                       />
                     </div>
                     <div className="p-3">
@@ -7560,7 +7562,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <Icon name="file-text" size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
               </button>
             )}
-            {/* Admin only: Print Book via Gelato */}
+            {/* Admin only: Print Book via print provider */}
             {currentUser && currentUser.role === 'admin' && sceneImages.length > 0 && (
               <button
                 onClick={orderPrintedBook}
@@ -7743,7 +7745,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           )}
 
           {/* Display Cover Images with Controls */}
-          {(coverImages.frontCover || coverImages.page0 || coverImages.backCover || coverImagePrompts.frontCover || coverImagePrompts.page0 || coverImagePrompts.backCover) && (
+          {(coverImages.frontCover || coverImages.initialPage || coverImages.backCover || coverImagePrompts.frontCover || coverImagePrompts.initialPage || coverImagePrompts.backCover) && (
             <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mt-6">
               <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <Icon name="book" size={24} /> Cover Pages
@@ -7857,13 +7859,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 )}
 
                 {/* Initial Page */}
-                {(coverImages.page0 || coverImagePrompts.page0) && (
+                {(coverImages.initialPage || coverImagePrompts.initialPage) && (
                   <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
                     <h4 className="text-lg font-bold text-gray-800 mb-3">{language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page d\'introduction' : 'Initial Page'}</h4>
-                    {coverImages.page0 ? (
+                    {coverImages.initialPage ? (
                       <>
                         <img
-                          src={getCoverImageData(coverImages.page0)}
+                          src={getCoverImageData(coverImages.initialPage)}
                           alt="Initial Page"
                           className="w-full rounded-lg shadow-md mb-3"
                         />
@@ -7871,13 +7873,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                           <>
                             <div className="flex gap-2 mb-3">
                               <button
-                                onClick={() => regenerateCoverImage('page0')}
+                                onClick={() => regenerateCoverImage('initialPage')}
                                 className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-1 text-sm font-semibold"
                               >
                                 <Icon name="refresh-cw" size={14} /> {t.regenerateImage}
                               </button>
                               <button
-                                onClick={() => toggleCoverImageEdit('page0')}
+                                onClick={() => toggleCoverImageEdit('initialPage')}
                                 className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg hover:bg-indigo-600 flex items-center justify-center gap-1 text-sm"
                               >
                                 <Icon name="edit" size={14} /> {t.editImage}
@@ -7892,17 +7894,17 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </div>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && editingCoverImage === 'page0' && (
+                    {currentUser && currentUser.role === 'admin' && editingCoverImage === 'initialPage' && (
                       <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-3 mb-3">
                         <p className="text-sm font-semibold text-gray-800 mb-2">{t.editInstruction}</p>
                         <textarea
                           value={coverEditInstruction}
                           onChange={(e) => setCoverEditInstruction(e.target.value)}
-                          placeholder={coverImagePrompts.page0 || "Enter prompt..."}
+                          placeholder={coverImagePrompts.initialPage || "Enter prompt..."}
                           className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm mb-2 h-24"
                         />
                         <button
-                          onClick={() => applyCoverImageEdit('page0')}
+                          onClick={() => applyCoverImageEdit('initialPage')}
                           className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-semibold"
                         >
                           {t.applyEdit}
@@ -7910,50 +7912,50 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </div>
                     )}
 
-                    {developerMode && coverImagePrompts.page0 && (
+                    {developerMode && coverImagePrompts.initialPage && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                           {t.showPrompt}
                         </summary>
                         <pre className="mt-2 text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                          {coverImagePrompts.page0}
+                          {coverImagePrompts.initialPage}
                         </pre>
                       </details>
                     )}
 
-                    {developerMode && coverImages.page0?.qualityScore !== null && coverImages.page0?.qualityScore !== undefined && (
+                    {developerMode && coverImages.initialPage?.qualityScore !== null && coverImages.initialPage?.qualityScore !== undefined && (
                       <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                           <span>
                             {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
                           </span>
                           <span className={`text-lg font-bold ${
-                            coverImages.page0.qualityScore >= 80 ? 'text-green-600' :
-                            coverImages.page0.qualityScore >= 60 ? 'text-yellow-600' :
+                            coverImages.initialPage.qualityScore >= 80 ? 'text-green-600' :
+                            coverImages.initialPage.qualityScore >= 60 ? 'text-yellow-600' :
                             'text-red-600'
                           }`}>
-                            {(coverImages.page0.qualityScore / 10).toFixed(1)}/10
+                            {(coverImages.initialPage.qualityScore / 10).toFixed(1)}/10
                           </span>
                         </summary>
-                        {coverImages.page0.qualityReasoning && (
+                        {coverImages.initialPage.qualityReasoning && (
                           <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                             <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                            <p className="whitespace-pre-wrap">{coverImages.page0.qualityReasoning}</p>
+                            <p className="whitespace-pre-wrap">{coverImages.initialPage.qualityReasoning}</p>
                           </div>
                         )}
                       </details>
                     )}
 
-                    {developerMode && coverImageApiCalls.page0 && (
+                    {developerMode && coverImageApiCalls.initialPage && (
                       <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                         <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                           {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
                         </summary>
                         <div className="mt-2 text-xs text-gray-800">
-                          <div className="mb-2"><span className="font-semibold">Model:</span> {coverImageApiCalls.page0.model}</div>
-                          <div className="mb-2"><span className="font-semibold">Type:</span> {coverImageApiCalls.page0.type}</div>
+                          <div className="mb-2"><span className="font-semibold">Model:</span> {coverImageApiCalls.initialPage.model}</div>
+                          <div className="mb-2"><span className="font-semibold">Type:</span> {coverImageApiCalls.initialPage.type}</div>
                           <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-96">
-                            {JSON.stringify(coverImageApiCalls.page0, null, 2)}
+                            {JSON.stringify(coverImageApiCalls.initialPage, null, 2)}
                           </pre>
                         </div>
                       </details>
@@ -8977,7 +8979,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 </td>
                                 <td className="px-4 py-3 text-sm text-center">
                                   <button
-                                    onClick={() => retryGelatoOrder(order.id)}
+                                    onClick={() => retryPrintOrder(order.id)}
                                     disabled={retryingOrderId === order.id}
                                     className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 mx-auto"
                                   >
@@ -8989,7 +8991,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                     ) : (
                                       <>
                                         <Icon name="refresh-cw" size={14} />
-                                        Retry Gelato
+                                        Retry Print
                                       </>
                                     )}
                                   </button>
@@ -9004,8 +9006,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                       <h3 className="font-semibold text-yellow-900 mb-2">{language === 'de' ? 'Info:' : language === 'fr' ? 'Info:' : 'Info:'}</h3>
                       <ul className="text-sm text-yellow-800 space-y-1">
-                        <li>• {language === 'de' ? 'Fehlgeschlagene Bestellungen: Zahlung erfolgreich, aber Gelato-Übertragung fehlgeschlagen' : language === 'fr' ? 'Commandes échouées: paiement réussi mais transfert Gelato échoué' : 'Failed orders: payment succeeded but Gelato submission failed'}</li>
-                        <li>• {language === 'de' ? 'Klicken Sie auf "Retry Gelato" um die Bestellung erneut an Gelato zu senden' : language === 'fr' ? 'Cliquez sur "Retry Gelato" pour renvoyer la commande à Gelato' : 'Click "Retry Gelato" to resend the order to Gelato'}</li>
+                        <li>• {language === 'de' ? 'Fehlgeschlagene Bestellungen: Zahlung erfolgreich, aber Druckübertragung fehlgeschlagen' : language === 'fr' ? 'Commandes échouées: paiement réussi mais transfert d\'impression échoué' : 'Failed orders: payment succeeded but print submission failed'}</li>
+                        <li>• {language === 'de' ? 'Klicken Sie auf "Retry Print" um die Bestellung erneut an den Druckdienstleister zu senden' : language === 'fr' ? 'Cliquez sur "Retry Print" pour renvoyer la commande au fournisseur d\'impression' : 'Click "Retry Print" to resend the order to the print provider'}</li>
                       </ul>
                     </div>
                   </div>
@@ -9034,18 +9036,18 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <div className="flex justify-between items-center mb-4 gap-4">
                   <div className="flex gap-2">
                     <button
-                      onClick={fetchGelatoProducts}
+                      onClick={fetchPrintProducts}
                       className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
                     >
                       <span>🔄</span>
                       Refresh
                     </button>
                     <button
-                      onClick={fetchGelatoApiProducts}
+                      onClick={fetchPrintApiProducts}
                       className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
                     >
                       <span>🌐</span>
-                      Fetch from Gelato API
+                      Fetch from Print Provider
                     </button>
                   </div>
                   <button
@@ -9071,11 +9073,11 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </button>
                 </div>
 
-                {gelatoProducts.length === 0 ? (
+                {printProducts.length === 0 ? (
                   <div className="text-center py-12 bg-gray-50 rounded-lg">
                     <div className="text-gray-300 mb-4 text-6xl">📦</div>
-                    <p className="text-gray-500 text-lg mb-2">No Gelato products configured</p>
-                    <p className="text-gray-400 text-sm">Click "Fetch from Gelato API" to import available products</p>
+                    <p className="text-gray-500 text-lg mb-2">No print products configured</p>
+                    <p className="text-gray-400 text-sm">Click "Fetch from Print Provider" to import available products</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -9091,7 +9093,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         </tr>
                       </thead>
                       <tbody>
-                        {gelatoProducts.map(product => (
+                        {printProducts.map(product => (
                           <tr key={product.id} className="border-b hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm text-center">
                               <button
@@ -9142,7 +9144,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 <button
                                   onClick={() => {
                                     if (confirm(`Delete product "${product.product_name}"?`)) {
-                                      deleteGelatoProduct(product.id);
+                                      deletePrintProduct(product.id);
                                     }
                                   }}
                                   className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
@@ -9160,12 +9162,12 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 )}
 
                 <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <h3 className="font-semibold text-yellow-900 mb-2">About Gelato Products:</h3>
+                  <h3 className="font-semibold text-yellow-900 mb-2">About Print Products:</h3>
                   <ul className="text-sm text-yellow-800 space-y-1">
-                    <li>• Click "Fetch from Gelato API" to import available photobook products</li>
+                    <li>• Click "Fetch from Print Provider" to import available photobook products</li>
                     <li>• Active products are available for print ordering</li>
-                    <li>• Page counts must match Gelato's supported values (typically 24, 28, 32, 36, 40)</li>
-                    <li>• Product UIDs come directly from Gelato's catalog</li>
+                    <li>• Page counts must match the provider's supported values (typically 24, 28, 32, 36, 40)</li>
+                    <li>• Product UIDs come directly from the print provider's catalog</li>
                   </ul>
                 </div>
               </div>
@@ -9178,7 +9180,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 animate-fade-in">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-yellow-700">
-                    {editingProduct ? 'Edit Gelato Product' : 'Add Gelato Product'}
+                    {editingProduct ? 'Edit Print Product' : 'Add Print Product'}
                   </h2>
                   <button
                     onClick={() => {
@@ -9203,7 +9205,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       placeholder="photobooks-softcover_pf_140x140-mm..."
                       className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none"
                     />
-                    <p className="text-xs text-gray-500 mt-1">From Gelato's product catalog API</p>
+                    <p className="text-xs text-gray-500 mt-1">From the print provider's product catalog API</p>
                   </div>
 
                   <div>
@@ -9309,7 +9311,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                   <div className="flex gap-3 pt-4">
                     <button
-                      onClick={saveGelatoProduct}
+                      onClick={savePrintProduct}
                       className="flex-1 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 font-semibold"
                     >
                       {editingProduct ? 'Update Product' : 'Add Product'}
@@ -9452,7 +9454,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               setSceneDescriptions(fullStory.sceneDescriptions || []);
                               setSceneImages(fullStory.sceneImages || []);
                               setStoryTitle(fullStory.title || '');
-                              setCoverImages(fullStory.coverImages || { frontCover: null, page0: null, backCover: null });
+                              setCoverImages(fullStory.coverImages || { frontCover: null, initialPage: null, backCover: null });
                               setImagePrompts(fullStory.imagePrompts || {}); // Load image prompts for developer features
                               setStep(5);
                               setShowSavedStories(false);
@@ -9692,7 +9694,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   {/* Dashboard Link */}
                   <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
                     <div className="text-sm font-medium text-gray-800 mb-2">
-                      {language === 'de' ? 'Gelato Dashboard' : language === 'fr' ? 'Tableau de bord Gelato' : 'Gelato Dashboard'}
+                      {language === 'de' ? 'Druckdienstleister Dashboard' : language === 'fr' ? 'Tableau de bord impression' : 'Print Provider Dashboard'}
                     </div>
                     <a
                       href={orderData.dashboardUrl}
@@ -9943,7 +9945,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                             onClick={() => {
                               setShowProductsPanel(true);
                               setShowMenu(false);
-                              fetchGelatoProducts();
+                              fetchPrintProducts();
                             }}
                             className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
                           >
