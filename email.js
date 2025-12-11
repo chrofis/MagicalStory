@@ -8,7 +8,19 @@ const resend = process.env.RESEND_API_KEY
   : null;
 
 const EMAIL_FROM = process.env.EMAIL_FROM || 'MagicalStory <noreply@magicalstory.ch>';
+const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO || 'info@magicalstory.ch';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@magicalstory.ch';
+
+// Common footer for all customer emails
+const EMAIL_FOOTER = `
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+  <p style="color: #666; font-size: 12px;">
+    MagicalStory - Personalized AI-Generated Children's Books<br>
+    <a href="https://www.magicalstory.ch">www.magicalstory.ch</a><br><br>
+    Questions? Reply to this email or contact us at <a href="mailto:info@magicalstory.ch">info@magicalstory.ch</a><br>
+    MagicalStory, Switzerland
+  </p>
+`;
 
 // Check if email is configured
 function isEmailConfigured() {
@@ -31,8 +43,10 @@ async function sendStoryCompleteEmail(userEmail, userName, storyTitle) {
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
+      replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: `Your magical story "${storyTitle}" is ready!`,
+      text: `Hello ${userName},\n\nGreat news! Your personalized story "${storyTitle}" has been created and is waiting for you.\n\nVisit https://www.magicalstory.ch to view your story.\n\nYou can now:\n- Preview your complete story with illustrations\n- Order a printed hardcover book\n- Download as PDF\n\nThank you for using MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #6366f1;">Your Story is Ready!</h1>
@@ -51,11 +65,7 @@ async function sendStoryCompleteEmail(userEmail, userName, storyTitle) {
             <li>Download as PDF</li>
           </ul>
           <p>Thank you for using MagicalStory!</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #666; font-size: 12px;">
-            MagicalStory - Personalized AI-Generated Children's Books<br>
-            <a href="https://www.magicalstory.ch">www.magicalstory.ch</a>
-          </p>
+          ${EMAIL_FOOTER}
         </div>
       `,
     });
@@ -85,8 +95,10 @@ async function sendStoryFailedEmail(userEmail, userName) {
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
+      replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: 'We encountered an issue with your story',
+      text: `Hello ${userName},\n\nWe're sorry, but we encountered a problem while creating your story.\n\nOur team has been notified and is looking into this. You can try creating your story again at https://www.magicalstory.ch, or contact us if the problem persists.\n\nWe apologize for any inconvenience.\n\nBest regards,\nThe MagicalStory Team\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #ef4444;">Story Generation Issue</h1>
@@ -101,6 +113,7 @@ async function sendStoryFailedEmail(userEmail, userName) {
           </p>
           <p>We apologize for any inconvenience.</p>
           <p>Best regards,<br>The MagicalStory Team</p>
+          ${EMAIL_FOOTER}
         </div>
       `,
     });
@@ -130,8 +143,10 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
+      replyTo: EMAIL_REPLY_TO,
       to: customerEmail,
       subject: `Order Confirmed - Your MagicalStory Book is Being Printed!`,
+      text: `Hello ${customerName},\n\nThank you for your order! Your personalized storybook is now being printed.\n\nOrder Details:\n- Order ID: ${orderDetails.orderId}\n- Amount: ${orderDetails.amount} ${orderDetails.currency}\n- Shipping to: ${orderDetails.shippingAddress.line1}, ${orderDetails.shippingAddress.city}, ${orderDetails.shippingAddress.postal_code}, ${orderDetails.shippingAddress.country}\n\nYou'll receive another email when your book ships with tracking information.\nEstimated delivery: 5-10 business days\n\nThank you for choosing MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #22c55e;">Order Confirmed!</h1>
@@ -153,11 +168,7 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
           <p>Estimated delivery: 5-10 business days</p>
 
           <p>Thank you for choosing MagicalStory!</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #666; font-size: 12px;">
-            MagicalStory - Personalized AI-Generated Children's Books<br>
-            <a href="https://www.magicalstory.ch">www.magicalstory.ch</a>
-          </p>
+          ${EMAIL_FOOTER}
         </div>
       `,
     });
