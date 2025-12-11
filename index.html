@@ -3091,28 +3091,40 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
       // ========================================
 
       // Background job auto-run mode: Submit job to server and poll for completion
-      const runAutoModeBackground = async () => {
+      const runAutoModeBackground = async (skipImages = false) => {
         if (!authToken) {
           alert('Please log in to use Auto-Run mode');
           return;
         }
 
         try {
-          // Show 10-minute wait message
-          const waitMessage = language === 'de'
-            ? 'Die Erstellung Ihrer Geschichte dauert ca. 10 Minuten.\n\n' +
-              'Die Geschichte wird im Hintergrund auf unseren Servern generiert.\n\n' +
-              'Sie können diese Seite schließen und später zurückkommen, um den Fortschritt zu überprüfen.\n\n' +
-              'Klicken Sie auf OK, um die Generierung zu starten.'
-            : language === 'fr'
-            ? 'La création de votre histoire prendra environ 10 minutes.\n\n' +
-              'L\'histoire sera générée en arrière-plan sur nos serveurs.\n\n' +
-              'Vous pouvez fermer cette page et revenir plus tard pour vérifier la progression.\n\n' +
-              'Cliquez sur OK pour démarrer la génération.'
-            : 'Creating your story will take approximately 10 minutes.\n\n' +
-              'The story will be generated in the background on our servers.\n\n' +
-              'You can close this page and come back later to check on progress.\n\n' +
-              'Click OK to start generation.';
+          // Show wait message - shorter for text-only
+          const waitMessage = skipImages
+            ? (language === 'de'
+              ? 'Die Erstellung des Textes dauert ca. 2-3 Minuten.\n\n' +
+                'Es werden keine Bilder generiert (Entwicklermodus).\n\n' +
+                'Klicken Sie auf OK, um die Generierung zu starten.'
+              : language === 'fr'
+              ? 'La création du texte prendra environ 2-3 minutes.\n\n' +
+                'Aucune image ne sera générée (mode développeur).\n\n' +
+                'Cliquez sur OK pour démarrer la génération.'
+              : 'Creating the text will take approximately 2-3 minutes.\n\n' +
+                'No images will be generated (developer mode).\n\n' +
+                'Click OK to start generation.')
+            : (language === 'de'
+              ? 'Die Erstellung Ihrer Geschichte dauert ca. 10 Minuten.\n\n' +
+                'Die Geschichte wird im Hintergrund auf unseren Servern generiert.\n\n' +
+                'Sie können diese Seite schließen und später zurückkommen, um den Fortschritt zu überprüfen.\n\n' +
+                'Klicken Sie auf OK, um die Generierung zu starten.'
+              : language === 'fr'
+              ? 'La création de votre histoire prendra environ 10 minutes.\n\n' +
+                'L\'histoire sera générée en arrière-plan sur nos serveurs.\n\n' +
+                'Vous pouvez fermer cette page et revenir plus tard pour vérifier la progression.\n\n' +
+                'Cliquez sur OK pour démarrer la génération.'
+              : 'Creating your story will take approximately 10 minutes.\n\n' +
+                'The story will be generated in the background on our servers.\n\n' +
+                'You can close this page and come back later to check on progress.\n\n' +
+                'Click OK to start generation.');
 
           const confirmRun = window.confirm(waitMessage);
 
@@ -3133,7 +3145,8 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             relationships,
             relationshipTexts,
             dedication,
-            artStyle
+            artStyle,
+            skipImages // Add flag to skip image generation
           };
 
           // Create the background job
@@ -7374,6 +7387,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 {language === 'de' ? 'Geschichte Generieren' : language === 'fr' ? 'Générer l\'histoire' : 'Generate Story'}
               </button>
             )}
+
+            {/* Developer Mode: Generate Text Only (no images) */}
+            {developerMode && (
+              <button
+                onClick={() => runAutoModeBackground(true)}
+                disabled={characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages}
+                className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
+                  characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-yellow-500 text-white hover:bg-yellow-600'
+                }`}
+              >
+                <Icon name="file-text" size={20} />
+                {language === 'de' ? 'Nur Text generieren (ohne Bilder)' : language === 'fr' ? 'Générer le texte uniquement (sans images)' : 'Generate Text Only (no images)'}
+              </button>
+            )}
             {userQuota && !userQuota.unlimited && userQuota.remaining <= 0 && (
               <p className="text-xs text-red-600 font-semibold text-center">
                 {language === 'de' ? 'Keine Credits mehr verfügbar. Kontaktieren Sie den Administrator für mehr Credits.' :
@@ -7412,15 +7441,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </span>
                   </label>
                 </div>
-                <label className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 cursor-pointer flex items-center gap-2 text-sm">
-                  <Icon name="upload" size={18} /> {t.uploadStory}
-                  <input
-                    type="file"
-                    accept=".txt,.md"
-                    onChange={uploadStory}
-                    className="hidden"
-                  />
-                </label>
               </div>
             )}
           </div>
@@ -7498,16 +7518,14 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {/* Admin only: TXT and PDF downloads */}
-            {currentUser && currentUser.role === 'admin' && (
-              <>
-                <button
-                  onClick={() => downloadStory('txt')}
-                  className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
-                >
-                  <Icon name="download" size={20} /> {t.downloadTXT}
-                </button>
-              </>
+            {/* Developer mode only: TXT download */}
+            {developerMode && (
+              <button
+                onClick={() => downloadStory('txt')}
+                className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
+              >
+                <Icon name="download" size={20} /> {t.downloadTXT}
+              </button>
             )}
             {/* All users: Printable PDF */}
             {sceneImages.length > 0 && (
@@ -7569,7 +7587,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <Icon name="shopping-cart" size={20} /> {language === 'de' ? 'Buch kaufen (CHF 36)' : language === 'fr' ? 'Acheter le livre (CHF 36)' : 'Buy Book (CHF 36)'}
               </button>
             )}
-            {currentUser && currentUser.role === 'admin' && generatedPrompt && (
+            {/* Developer mode only: Download Prompt */}
+            {developerMode && generatedPrompt && (
               <button
                 onClick={downloadPrompt}
                 className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
@@ -7577,28 +7596,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 <Icon name="download" size={20} /> {t.downloadPrompt}
               </button>
             )}
-            {currentUser && currentUser.role === 'admin' && (
-              <>
-                <button
-                  onClick={exportConfiguration}
-                  className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
-                >
-                  <Icon name="save" size={20} /> {t.exportConfig}
-                </button>
-                <button
-                  onClick={generateScenes}
-                  disabled={isGeneratingScenes || !generatedStory}
-                  className={`px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
-                    isGeneratingScenes || !generatedStory
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-500 text-white hover:bg-green-600'
-                  }`}
-                >
-                  <Icon name="image" size={20} /> {isGeneratingScenes ? t.creatingScenes : t.createScenes}
-                </button>
-              </>
+            {/* Developer mode only: Generate Scenes */}
+            {developerMode && (
+              <button
+                onClick={generateScenes}
+                disabled={isGeneratingScenes || !generatedStory}
+                className={`px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                  isGeneratingScenes || !generatedStory
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-500 text-white hover:bg-green-600'
+                }`}
+              >
+                <Icon name="image" size={20} /> {isGeneratingScenes ? t.creatingScenes : t.createScenes}
+              </button>
             )}
-            {currentUser && currentUser.role === 'admin' && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
+            {/* Developer mode only: Download Scenes & Generate Images */}
+            {developerMode && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
               <>
                 <button
                   onClick={downloadScenes}
@@ -7619,7 +7632,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 </button>
               </>
             )}
-            {currentUser && currentUser.role === 'admin' && sceneImages.length > 0 && (
+            {/* Developer mode only: Download All Images */}
+            {developerMode && sceneImages.length > 0 && (
               <button
                 onClick={() => {
                   sceneImages.forEach((img, i) => {
@@ -7767,7 +7781,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </div>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImagePrompts.frontCover && (
+                    {developerMode && coverImagePrompts.frontCover && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                           {t.showPrompt}
@@ -7778,7 +7792,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </details>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImages.frontCover?.qualityScore !== null && coverImages.frontCover?.qualityScore !== undefined && (
+                    {developerMode && coverImages.frontCover?.qualityScore !== null && coverImages.frontCover?.qualityScore !== undefined && (
                       <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                           <span>
@@ -7801,7 +7815,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </details>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImageApiCalls.frontCover && (
+                    {developerMode && coverImageApiCalls.frontCover && (
                       <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                         <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                           {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
@@ -7872,7 +7886,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </div>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImagePrompts.page0 && (
+                    {developerMode && coverImagePrompts.page0 && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                           {t.showPrompt}
@@ -7883,7 +7897,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </details>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImages.page0?.qualityScore !== null && coverImages.page0?.qualityScore !== undefined && (
+                    {developerMode && coverImages.page0?.qualityScore !== null && coverImages.page0?.qualityScore !== undefined && (
                       <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                           <span>
@@ -7906,7 +7920,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </details>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImageApiCalls.page0 && (
+                    {developerMode && coverImageApiCalls.page0 && (
                       <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                         <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                           {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
@@ -7977,7 +7991,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </div>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImagePrompts.backCover && (
+                    {developerMode && coverImagePrompts.backCover && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
                           {t.showPrompt}
@@ -7988,7 +8002,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </details>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImages.backCover?.qualityScore !== null && coverImages.backCover?.qualityScore !== undefined && (
+                    {developerMode && coverImages.backCover?.qualityScore !== null && coverImages.backCover?.qualityScore !== undefined && (
                       <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                           <span>
@@ -8011,7 +8025,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       </details>
                     )}
 
-                    {currentUser && currentUser.role === 'admin' && coverImageApiCalls.backCover && (
+                    {developerMode && coverImageApiCalls.backCover && (
                       <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                         <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900">
                           {language === 'de' ? 'API-Aufruf anzeigen' : language === 'fr' ? 'Afficher l\'appel API' : 'Show API Call'}
@@ -9743,7 +9757,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           )}
 
           {/* Black Navigation Bar - Simplified */}
-          <nav className="bg-black text-white px-3 py-2">
+          <nav className="bg-black text-white px-3 py-3">
             <div className="flex justify-between items-center">
               {/* Left: Title - Always visible */}
               <div className="flex-shrink-0">
@@ -9992,7 +10006,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 {step === 5 && renderStep5()}
 
                 {/* Navigation buttons - inside the container */}
-                {step < 5 && step !== 2 && (
+                {step < 5 && (
                   <div className={`mt-6 pt-6 border-t border-gray-200 ${step === 4 ? "flex justify-start" : "flex justify-between"}`}>
                     <button
                       onClick={() => safeSetStep(Math.max(0, step - 1))}

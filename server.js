@@ -5096,6 +5096,11 @@ async function processStoryJob(jobId) {
     const job = jobResult.rows[0];
     const inputData = job.input_data;
     const totalPages = inputData.pages;
+    const skipImages = inputData.skipImages === true; // Developer mode: text only
+
+    if (skipImages) {
+      console.log(`📝 [PIPELINE] Text-only mode enabled - skipping image generation`);
+    }
 
     // Extract character photos for reference images
     const characterPhotos = [];
@@ -5199,77 +5204,79 @@ Output Format:
       const batchPages = parseStoryPages(batchText);
       console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
 
-      // IMMEDIATELY start generating scene descriptions and images for these pages
-      for (const page of batchPages) {
-        const pageNum = page.pageNumber;
-        const pageContent = page.content;
-        const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
+      // IMMEDIATELY start generating scene descriptions and images for these pages (unless skipImages)
+      if (!skipImages) {
+        for (const page of batchPages) {
+          const pageNum = page.pageNumber;
+          const pageContent = page.content;
+          const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
 
-        // Generate scene description using Art Director prompt
-        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc);
+          // Generate scene description using Art Director prompt
+          const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc);
 
-        // Start scene description + image generation (don't await yet)
-        const imagePromise = limit(async () => {
-          try {
-            console.log(`🎨 [PAGE ${pageNum}] Generating scene description...`);
+          // Start scene description + image generation (don't await yet)
+          const imagePromise = limit(async () => {
+            try {
+              console.log(`🎨 [PAGE ${pageNum}] Generating scene description...`);
 
-            // Generate detailed scene description (2048 tokens to avoid MAX_TOKENS cutoff)
-            const sceneDescription = await callClaudeAPI(scenePrompt, 2048);
+              // Generate detailed scene description (2048 tokens to avoid MAX_TOKENS cutoff)
+              const sceneDescription = await callClaudeAPI(scenePrompt, 2048);
 
-            allSceneDescriptions.push({
-              pageNumber: pageNum,
-              description: sceneDescription
-            });
+              allSceneDescriptions.push({
+                pageNumber: pageNum,
+                description: sceneDescription
+              });
 
-            console.log(`📸 [PAGE ${pageNum}] Generating image...`);
+              console.log(`📸 [PAGE ${pageNum}] Generating image...`);
 
-            // Generate image from scene description
-            const imagePrompt = buildImagePrompt(sceneDescription, inputData);
-            imagePrompts[pageNum] = imagePrompt;
+              // Generate image from scene description
+              const imagePrompt = buildImagePrompt(sceneDescription, inputData);
+              imagePrompts[pageNum] = imagePrompt;
 
-            let imageResult = null;
-            let retries = 0;
+              let imageResult = null;
+              let retries = 0;
 
-            while (retries <= MAX_RETRIES && !imageResult) {
-              try {
-                imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
-              } catch (error) {
-                retries++;
-                console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
-                if (retries > MAX_RETRIES) {
-                  throw error;
+              while (retries <= MAX_RETRIES && !imageResult) {
+                try {
+                  imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
+                } catch (error) {
+                  retries++;
+                  console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
+                  if (retries > MAX_RETRIES) {
+                    throw error;
+                  }
+                  await new Promise(resolve => setTimeout(resolve, 1000 * retries));
                 }
-                await new Promise(resolve => setTimeout(resolve, 1000 * retries));
               }
+
+              console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score})`);
+
+              const imageData = {
+                pageNumber: pageNum,
+                imageData: imageResult.imageData,
+                description: sceneDescription,
+                qualityScore: imageResult.score,
+                qualityReasoning: imageResult.reasoning || null
+              };
+
+              // Save checkpoint: page image (scene description + image)
+              await saveCheckpoint(jobId, 'page_image', {
+                pageNumber: pageNum,
+                sceneDescription,
+                imagePrompt: imagePrompt,
+                qualityScore: imageResult.score,
+                qualityReasoning: imageResult.reasoning || null
+              }, pageNum);
+
+              return imageData;
+            } catch (error) {
+              console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
+              throw error;
             }
+          });
 
-            console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score})`);
-
-            const imageData = {
-              pageNumber: pageNum,
-              imageData: imageResult.imageData,
-              description: sceneDescription,
-              qualityScore: imageResult.score,
-              qualityReasoning: imageResult.reasoning || null
-            };
-
-            // Save checkpoint: page image (scene description + image)
-            await saveCheckpoint(jobId, 'page_image', {
-              pageNumber: pageNum,
-              sceneDescription,
-              imagePrompt: imagePrompt,
-              qualityScore: imageResult.score,
-              qualityReasoning: imageResult.reasoning || null
-            }, pageNum);
-
-            return imageData;
-          } catch (error) {
-            console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
-            throw error;
-          }
-        });
-
-        activeImagePromises.push(imagePromise);
+          activeImagePromises.push(imagePromise);
+        }
       }
 
       // Update progress after each batch
@@ -5283,49 +5290,42 @@ Output Format:
       );
     }
 
-    console.log(`📚 [STREAMING] All story batches submitted. Waiting for ${activeImagePromises.length} images to complete...`);
+    // Wait for images only if not skipping
+    if (!skipImages) {
+      console.log(`📚 [STREAMING] All story batches submitted. Waiting for ${activeImagePromises.length} images to complete...`);
 
-    // Wait for all images to complete
-    await dbPool.query(
-      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [50, `Generating images (0/${totalPages} complete)...`, jobId]
-    );
+      // Wait for all images to complete
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [50, `Generating images (0/${totalPages} complete)...`, jobId]
+      );
 
-    let completedCount = 0;
-    const imageResults = await Promise.all(
-      activeImagePromises.map(async (promise) => {
-        const result = await promise;
-        completedCount++;
+      let completedCount = 0;
+      const imageResults = await Promise.all(
+        activeImagePromises.map(async (promise) => {
+          const result = await promise;
+          completedCount++;
 
-        // Update progress
-        const imageProgress = 50 + Math.floor(completedCount / totalPages * 40); // 50-90%
-        await dbPool.query(
-          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [imageProgress, `Generating images (${completedCount}/${totalPages} complete)...`, jobId]
-        );
+          // Update progress
+          const imageProgress = 50 + Math.floor(completedCount / totalPages * 40); // 50-90%
+          await dbPool.query(
+            'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+            [imageProgress, `Generating images (${completedCount}/${totalPages} complete)...`, jobId]
+          );
 
-        allImages.push(result);
-        return result;
-      })
-    );
+          allImages.push(result);
+          return result;
+        })
+      );
 
-    // Sort images by page number
-    allImages.sort((a, b) => a.pageNumber - b.pageNumber);
-    allSceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
+      // Sort images by page number
+      allImages.sort((a, b) => a.pageNumber - b.pageNumber);
+      allSceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
 
-    console.log(`🚀 [STREAMING] All ${allImages.length} images generated!`);
-
-    // Step 5: Generate cover images
-    await dbPool.query(
-      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [95, 'Generating cover images...', jobId]
-    );
-
-    console.log(`📕 [PIPELINE] Generating cover images for job ${jobId}`);
-
-    // Get art style description
-    const artStyleId = inputData.artStyle || 'pixar';
-    const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+      console.log(`🚀 [STREAMING] All ${allImages.length} images generated!`);
+    } else {
+      console.log(`📝 [STREAMING] Text-only mode - skipping image wait`);
+    }
 
     // Extract title from generated story text (AI-generated title, not user input)
     let storyTitle = inputData.title || 'My Story';
@@ -5337,102 +5337,120 @@ Output Format:
       }
     }
 
-    // Build character info (matches step-by-step format)
-    let characterInfo = '';
-    if (inputData.characters && inputData.characters.length > 0) {
-      characterInfo = '\n\nThe cover MUST feature the following characters:\n';
-      inputData.characters.forEach((char, idx) => {
-        characterInfo += `Character ${idx + 1} (${char.name}): ${char.age} years old, ${char.gender}.\n`;
-      });
-    }
+    let coverImages = null;
 
-    // Extract cover scene descriptions from outline (matches step-by-step)
-    const coverScenes = extractCoverScenes(outline);
-    const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-    const page0Scene = coverScenes.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
-    const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
+    // Step 5: Generate cover images (unless skipImages)
+    if (!skipImages) {
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [95, 'Generating cover images...', jobId]
+      );
 
-    let frontCoverResult, page0Result, backCoverResult;
+      console.log(`📕 [PIPELINE] Generating cover images for job ${jobId}`);
 
-    // Generate front cover (matches step-by-step prompt format)
-    try {
-      console.log(`📕 [PIPELINE] Generating front cover for job ${jobId}`);
-      const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-        TITLE_PAGE_SCENE: titlePageScene,
-        STYLE_DESCRIPTION: styleDescription,
-        CHARACTER_INFO: characterInfo,
-        STORY_TITLE: storyTitle
-      });
-      frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
-      console.log(`✅ [PIPELINE] Front cover generated successfully`);
-      // Save checkpoint: front cover
-      await saveCheckpoint(jobId, 'cover', { type: 'front', prompt: frontCoverPrompt }, 0);
-    } catch (error) {
-      console.error(`❌ [PIPELINE] Failed to generate front cover for job ${jobId}:`, error);
-      throw new Error(`Front cover generation failed: ${error.message}`);
-    }
+      // Get art style description
+      const artStyleId = inputData.artStyle || 'pixar';
+      const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
-    // Generate page 0 (dedication page) - matches step-by-step prompt format
-    try {
-      console.log(`📕 [PIPELINE] Generating page 0 (dedication) for job ${jobId}`);
-      const page0Prompt = inputData.dedication && inputData.dedication.trim()
-        ? fillTemplate(PROMPT_TEMPLATES.page0WithDedication, {
-            PAGE0_SCENE: page0Scene,
-            STYLE_DESCRIPTION: styleDescription,
-            CHARACTER_INFO: characterInfo,
-            DEDICATION: inputData.dedication
-          })
-        : fillTemplate(PROMPT_TEMPLATES.page0NoDedication, {
-            PAGE0_SCENE: page0Scene,
-            STYLE_DESCRIPTION: styleDescription,
-            CHARACTER_INFO: characterInfo,
-            STORY_TITLE: storyTitle
-          });
-      page0Result = await callGeminiAPIForImage(page0Prompt, characterPhotos);
-      console.log(`✅ [PIPELINE] Page 0 generated successfully`);
-      // Save checkpoint: page0 cover
-      await saveCheckpoint(jobId, 'cover', { type: 'page0', prompt: page0Prompt }, 1);
-    } catch (error) {
-      console.error(`❌ [PIPELINE] Failed to generate page 0 for job ${jobId}:`, error);
-      throw new Error(`Page 0 generation failed: ${error.message}`);
-    }
-
-    // Generate back cover (matches step-by-step prompt format)
-    try {
-      console.log(`📕 [PIPELINE] Generating back cover for job ${jobId}`);
-      const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
-        BACK_COVER_SCENE: backCoverScene,
-        STYLE_DESCRIPTION: styleDescription,
-        CHARACTER_INFO: characterInfo
-      });
-      backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
-      console.log(`✅ [PIPELINE] Back cover generated successfully`);
-      // Save checkpoint: back cover
-      await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
-    } catch (error) {
-      console.error(`❌ [PIPELINE] Failed to generate back cover for job ${jobId}:`, error);
-      throw new Error(`Back cover generation failed: ${error.message}`);
-    }
-
-    const coverImages = {
-      frontCover: {
-        imageData: frontCoverResult.imageData,
-        qualityScore: frontCoverResult.score,
-        qualityReasoning: frontCoverResult.reasoning || null
-      },
-      page0: {
-        imageData: page0Result.imageData,
-        qualityScore: page0Result.score,
-        qualityReasoning: page0Result.reasoning || null
-      },
-      backCover: {
-        imageData: backCoverResult.imageData,
-        qualityScore: backCoverResult.score,
-        qualityReasoning: backCoverResult.reasoning || null
+      // Build character info (matches step-by-step format)
+      let characterInfo = '';
+      if (inputData.characters && inputData.characters.length > 0) {
+        characterInfo = '\n\nThe cover MUST feature the following characters:\n';
+        inputData.characters.forEach((char, idx) => {
+          characterInfo += `Character ${idx + 1} (${char.name}): ${char.age} years old, ${char.gender}.\n`;
+        });
       }
-    };
 
-    console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCoverResult.score}, Page0: ${page0Result.score}, Back: ${backCoverResult.score}`);
+      // Extract cover scene descriptions from outline (matches step-by-step)
+      const coverScenes = extractCoverScenes(outline);
+      const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+      const page0Scene = coverScenes.page0 || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+      const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
+
+      let frontCoverResult, page0Result, backCoverResult;
+
+      // Generate front cover (matches step-by-step prompt format)
+      try {
+        console.log(`📕 [PIPELINE] Generating front cover for job ${jobId}`);
+        const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+          TITLE_PAGE_SCENE: titlePageScene,
+          STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_INFO: characterInfo,
+          STORY_TITLE: storyTitle
+        });
+        frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
+        console.log(`✅ [PIPELINE] Front cover generated successfully`);
+        // Save checkpoint: front cover
+        await saveCheckpoint(jobId, 'cover', { type: 'front', prompt: frontCoverPrompt }, 0);
+      } catch (error) {
+        console.error(`❌ [PIPELINE] Failed to generate front cover for job ${jobId}:`, error);
+        throw new Error(`Front cover generation failed: ${error.message}`);
+      }
+
+      // Generate page 0 (dedication page) - matches step-by-step prompt format
+      try {
+        console.log(`📕 [PIPELINE] Generating page 0 (dedication) for job ${jobId}`);
+        const page0Prompt = inputData.dedication && inputData.dedication.trim()
+          ? fillTemplate(PROMPT_TEMPLATES.page0WithDedication, {
+              PAGE0_SCENE: page0Scene,
+              STYLE_DESCRIPTION: styleDescription,
+              CHARACTER_INFO: characterInfo,
+              DEDICATION: inputData.dedication
+            })
+          : fillTemplate(PROMPT_TEMPLATES.page0NoDedication, {
+              PAGE0_SCENE: page0Scene,
+              STYLE_DESCRIPTION: styleDescription,
+              CHARACTER_INFO: characterInfo,
+              STORY_TITLE: storyTitle
+            });
+        page0Result = await callGeminiAPIForImage(page0Prompt, characterPhotos);
+        console.log(`✅ [PIPELINE] Page 0 generated successfully`);
+        // Save checkpoint: page0 cover
+        await saveCheckpoint(jobId, 'cover', { type: 'page0', prompt: page0Prompt }, 1);
+      } catch (error) {
+        console.error(`❌ [PIPELINE] Failed to generate page 0 for job ${jobId}:`, error);
+        throw new Error(`Page 0 generation failed: ${error.message}`);
+      }
+
+      // Generate back cover (matches step-by-step prompt format)
+      try {
+        console.log(`📕 [PIPELINE] Generating back cover for job ${jobId}`);
+        const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+          BACK_COVER_SCENE: backCoverScene,
+          STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_INFO: characterInfo
+        });
+        backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
+        console.log(`✅ [PIPELINE] Back cover generated successfully`);
+        // Save checkpoint: back cover
+        await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
+      } catch (error) {
+        console.error(`❌ [PIPELINE] Failed to generate back cover for job ${jobId}:`, error);
+        throw new Error(`Back cover generation failed: ${error.message}`);
+      }
+
+      coverImages = {
+        frontCover: {
+          imageData: frontCoverResult.imageData,
+          qualityScore: frontCoverResult.score,
+          qualityReasoning: frontCoverResult.reasoning || null
+        },
+        page0: {
+          imageData: page0Result.imageData,
+          qualityScore: page0Result.score,
+          qualityReasoning: page0Result.reasoning || null
+        },
+        backCover: {
+          imageData: backCoverResult.imageData,
+          qualityScore: backCoverResult.score,
+          qualityReasoning: backCoverResult.reasoning || null
+        }
+      };
+
+      console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCoverResult.score}, Page0: ${page0Result.score}, Back: ${backCoverResult.score}`);
+    } else {
+      console.log(`📝 [PIPELINE] Text-only mode - skipping cover image generation`);
+    }
 
     // Job complete - save result
     const resultData = {
@@ -5442,7 +5460,8 @@ Output Format:
       images: allImages,
       coverImages,
       imagePrompts,
-      title: storyTitle
+      title: storyTitle,
+      textOnly: skipImages // Mark if this was text-only generation
     };
 
     log.debug('📖 [SERVER] resultData keys:', Object.keys(resultData));
