@@ -14,6 +14,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cinzel:wght@700&family=Libre+Baskerville:wght@400&display=swap" rel="stylesheet">
+  <!-- Preload art style images for faster display -->
+  <link rel="preload" as="image" href="images/Pixar style.jpg">
+  <link rel="preload" as="image" href="images/cartoon style.jpg">
+  <link rel="preload" as="image" href="images/anime style.jpg">
+  <link rel="preload" as="image" href="images/chibi style.jpg">
+  <link rel="preload" as="image" href="images/steampunk.jpg">
+  <link rel="preload" as="image" href="images/comic book style.jpg">
+  <link rel="preload" as="image" href="images/manga style.jpg">
   <script>
     // Tailwind config for style guide colors
     tailwind.config = {
@@ -94,7 +102,7 @@
         id: 'pixar',
         name: { en: 'Pixar 3D', de: 'Pixar 3D', fr: 'Pixar 3D' },
         emoji: '🎬',
-        image: 'images/Pixar style.png',
+        image: 'images/Pixar style.jpg',
         description: {
           en: 'Vibrant, warm Disney/Pixar style 3D animation',
           de: 'Lebendige, warme Disney/Pixar 3D-Animation',
@@ -6167,12 +6175,43 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         }
       };
 
+      // Compress image to reduce storage and network transfer size
+      const compressImage = (dataUrl, maxWidth = 400, maxHeight = 400, quality = 0.8) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+
+            // Calculate new dimensions maintaining aspect ratio
+            if (width > maxWidth || height > maxHeight) {
+              const ratio = Math.min(maxWidth / width, maxHeight / height);
+              width = Math.round(width * ratio);
+              height = Math.round(height * ratio);
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Convert to JPEG for better compression
+            const compressedUrl = canvas.toDataURL('image/jpeg', quality);
+            console.log(`📷 Image compressed: ${Math.round(dataUrl.length/1024)}KB → ${Math.round(compressedUrl.length/1024)}KB`);
+            resolve(compressedUrl);
+          };
+          img.src = dataUrl;
+        });
+      };
+
       const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
         if (file) {
           const reader = new FileReader();
           reader.onloadend = async () => {
-            const photoUrl = reader.result;
+            // Compress the image before storing
+            const photoUrl = await compressImage(reader.result);
 
             // First update the photo
             setCurrentCharacter({
@@ -6389,6 +6428,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       loop
                       muted
                       playsInline
+                      poster="images/video-poster.jpg"
                       className="w-full h-full object-cover"
                     >
                       <source src="images/Boy to pirat to book.mp4" type="video/mp4" />
@@ -7084,7 +7124,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         </div>
 
                         {/* Relationship dropdown */}
-                        <div className="flex-1 min-w-[140px]">
+                        <div className="flex-1 min-w-[140px] md:flex-none md:w-auto">
                           <select
                             value={relationships[key1] || relationshipTypes[10].value[language]}
                             onChange={(e) => {
@@ -7099,7 +7139,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 updateRelationship(char1.id, char2.id, value);
                               }
                             }}
-                            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-medium bg-indigo-50"
+                            className="w-full md:w-auto md:min-w-[180px] px-2 py-1.5 border border-gray-300 rounded text-sm font-medium bg-indigo-50"
                           >
                             <option value="__CREATE_CUSTOM__">+ {language === 'de' ? 'Eigene' : language === 'fr' ? 'Personnalisé' : 'Custom'}</option>
                             {allRelationships.map((type, idx) => (
@@ -7119,13 +7159,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                       {/* Expandable description - only show if relationship is set */}
                       {relationships[key1] && relationships[key1] !== relationshipTypes[10].value[language] && (
-                        <div className="mt-2 pt-2 border-t border-gray-100">
+                        <div className="mt-1.5 pt-1.5 border-t border-gray-100">
                           <input
                             type="text"
                             value={relationshipTexts[key1] || ''}
                             onChange={(e) => setRelationshipTexts({ ...relationshipTexts, [key1]: e.target.value })}
-                            placeholder={language === 'de' ? 'Optional: Details zur Beziehung...' : language === 'fr' ? 'Optionnel: Détails de la relation...' : 'Optional: Relationship details...'}
-                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm"
+                            placeholder={language === 'de' ? 'Details...' : language === 'fr' ? 'Détails...' : 'Details...'}
+                            className="w-full md:max-w-[300px] px-2 py-1 border border-gray-200 rounded text-xs"
                           />
                         </div>
                       )}
@@ -7225,19 +7265,19 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     value: '1st-grade',
                     label: t.firstGrade,
                     desc: t.firstGradeDesc,
-                    image: 'images/text and image on each page.png'
+                    image: 'images/text and image on each page.jpg'
                   },
                   {
                     value: 'standard',
                     label: t.standard,
                     desc: t.standardDesc,
-                    image: 'images/left page text, right page image.png'
+                    image: 'images/left page text, right page image.jpg'
                   },
                   {
                     value: 'advanced',
                     label: t.advanced,
                     desc: t.advancedDesc,
-                    image: 'images/left page text, right page image.png'
+                    image: 'images/left page text, right page image.jpg'
                   }
                 ].map(level => (
                   <button
