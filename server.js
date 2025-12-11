@@ -608,6 +608,21 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_jobs_user ON story_jobs(user_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_jobs_status ON story_jobs(status)`);
 
+    // Story job checkpoints for fault tolerance and intermediate data access
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS story_job_checkpoints (
+        id SERIAL PRIMARY KEY,
+        job_id VARCHAR(100) NOT NULL REFERENCES story_jobs(id) ON DELETE CASCADE,
+        step_name VARCHAR(50) NOT NULL,
+        step_index INT DEFAULT 0,
+        step_data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(job_id, step_name, step_index)
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_checkpoints_job ON story_job_checkpoints(job_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_checkpoints_step ON story_job_checkpoints(step_name)`);
+
     console.log('✓ Database tables initialized');
 
     // Run database migrations
@@ -661,6 +676,65 @@ async function logActivity(userId, username, action, details) {
       details
     });
     await writeJSON(LOGS_FILE, logs);
+  }
+}
+
+// =============================================================================
+// CHECKPOINT SYSTEM - Save intermediate pipeline state for fault tolerance
+// =============================================================================
+
+// Save a checkpoint for a specific step in the pipeline
+async function saveCheckpoint(jobId, stepName, stepData, stepIndex = 0) {
+  if (STORAGE_MODE !== 'database' || !dbPool) return;
+
+  try {
+    await dbPool.query(`
+      INSERT INTO story_job_checkpoints (job_id, step_name, step_index, step_data)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (job_id, step_name, step_index)
+      DO UPDATE SET step_data = $4, created_at = CURRENT_TIMESTAMP
+    `, [jobId, stepName, stepIndex, JSON.stringify(stepData)]);
+    log.verbose(`💾 Checkpoint saved: ${stepName} (index: ${stepIndex}) for job ${jobId}`);
+  } catch (err) {
+    log.error(`❌ Failed to save checkpoint ${stepName}:`, err.message);
+  }
+}
+
+// Get checkpoint for a step (returns null if not found)
+async function getCheckpoint(jobId, stepName, stepIndex = 0) {
+  if (STORAGE_MODE !== 'database' || !dbPool) return null;
+
+  try {
+    const result = await dbPool.query(`
+      SELECT step_data FROM story_job_checkpoints
+      WHERE job_id = $1 AND step_name = $2 AND step_index = $3
+    `, [jobId, stepName, stepIndex]);
+
+    if (result.rows.length > 0) {
+      return result.rows[0].step_data;
+    }
+    return null;
+  } catch (err) {
+    log.error(`❌ Failed to get checkpoint ${stepName}:`, err.message);
+    return null;
+  }
+}
+
+// Get all checkpoints for a job
+async function getAllCheckpoints(jobId) {
+  if (STORAGE_MODE !== 'database' || !dbPool) return [];
+
+  try {
+    const result = await dbPool.query(`
+      SELECT step_name, step_index, step_data, created_at
+      FROM story_job_checkpoints
+      WHERE job_id = $1
+      ORDER BY created_at ASC
+    `, [jobId]);
+    return result.rows;
+  } catch (err) {
+    log.error(`❌ Failed to get checkpoints for job ${jobId}:`, err.message);
+    return [];
   }
 }
 
@@ -2117,6 +2191,452 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete story' });
   }
 });
+
+// =============================================================================
+// STORY REGENERATION ENDPOINTS - Regenerate individual components
+// =============================================================================
+
+// Regenerate scene description for a specific page
+app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+
+    console.log(`🔄 Regenerating scene description for story ${id}, page ${pageNumber}`);
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = story.story_data;
+
+    // Find the page text
+    const pageText = getPageText(storyData.storyText, pageNumber);
+    if (!pageText) {
+      return res.status(404).json({ error: `Page ${pageNumber} not found in story` });
+    }
+
+    // Get characters from story data
+    const characters = storyData.characters || [];
+
+    // Generate new scene description
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '');
+    const newSceneDescription = await callClaudeAPI(scenePrompt, 2048);
+
+    // Update the scene description in story data
+    let sceneDescriptions = storyData.sceneDescriptions || [];
+    const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
+
+    if (existingIndex >= 0) {
+      sceneDescriptions[existingIndex].description = newSceneDescription;
+    } else {
+      sceneDescriptions.push({ pageNumber, description: newSceneDescription });
+      sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
+    }
+
+    // Save updated story
+    storyData.sceneDescriptions = sceneDescriptions;
+    await dbPool.query(
+      'UPDATE stories SET story_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [JSON.stringify(storyData), id]
+    );
+
+    console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber}`);
+
+    res.json({
+      success: true,
+      pageNumber,
+      sceneDescription: newSceneDescription
+    });
+
+  } catch (err) {
+    console.error('Error regenerating scene description:', err);
+    res.status(500).json({ error: 'Failed to regenerate scene description: ' + err.message });
+  }
+});
+
+// Regenerate image for a specific page
+app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { customPrompt } = req.body;
+    const pageNumber = parseInt(pageNum);
+
+    console.log(`🔄 Regenerating image for story ${id}, page ${pageNumber}`);
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = story.story_data;
+
+    // Get scene description
+    const sceneDescriptions = storyData.sceneDescriptions || [];
+    const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
+
+    if (!sceneDesc && !customPrompt) {
+      return res.status(400).json({ error: 'No scene description found. Please provide customPrompt.' });
+    }
+
+    // Get character photos
+    const characterPhotos = [];
+    if (storyData.characters) {
+      storyData.characters.forEach(char => {
+        if (char.photoUrl) characterPhotos.push(char.photoUrl);
+      });
+    }
+
+    // Build image prompt
+    const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData);
+
+    // Generate new image
+    const imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
+
+    // Update the image in story data
+    let images = storyData.images || [];
+    const existingIndex = images.findIndex(img => img.pageNumber === pageNumber);
+
+    const newImageData = {
+      pageNumber,
+      imageData: imageResult.imageData,
+      description: sceneDesc?.description || customPrompt,
+      qualityScore: imageResult.score
+    };
+
+    if (existingIndex >= 0) {
+      images[existingIndex] = newImageData;
+    } else {
+      images.push(newImageData);
+      images.sort((a, b) => a.pageNumber - b.pageNumber);
+    }
+
+    // Update image prompts
+    storyData.imagePrompts = storyData.imagePrompts || {};
+    storyData.imagePrompts[pageNumber] = imagePrompt;
+
+    // Save updated story
+    storyData.images = images;
+    await dbPool.query(
+      'UPDATE stories SET story_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [JSON.stringify(storyData), id]
+    );
+
+    console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score})`);
+
+    res.json({
+      success: true,
+      pageNumber,
+      imageData: imageResult.imageData,
+      qualityScore: imageResult.score
+    });
+
+  } catch (err) {
+    console.error('Error regenerating image:', err);
+    res.status(500).json({ error: 'Failed to regenerate image: ' + err.message });
+  }
+});
+
+// Regenerate cover image (front, page0, or back)
+app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, async (req, res) => {
+  try {
+    const { id, coverType } = req.params;
+    const { customPrompt } = req.body;
+
+    if (!['front', 'page0', 'back'].includes(coverType)) {
+      return res.status(400).json({ error: 'Invalid cover type. Must be: front, page0, or back' });
+    }
+
+    console.log(`🔄 Regenerating ${coverType} cover for story ${id}`);
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = story.story_data;
+
+    // Get character photos
+    const characterPhotos = [];
+    if (storyData.characters) {
+      storyData.characters.forEach(char => {
+        if (char.photoUrl) characterPhotos.push(char.photoUrl);
+      });
+    }
+
+    // Get art style
+    const artStyleId = storyData.artStyle || 'pixar';
+    const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+
+    // Build character info
+    let characterInfo = '';
+    if (storyData.characters && storyData.characters.length > 0) {
+      characterInfo = '\n\nThe cover MUST feature the following characters:\n';
+      storyData.characters.forEach((char, idx) => {
+        characterInfo += `Character ${idx + 1} (${char.name}): ${char.age} years old, ${char.gender}.\n`;
+      });
+    }
+
+    // Build cover prompt
+    let coverPrompt;
+    if (customPrompt) {
+      coverPrompt = customPrompt;
+    } else {
+      const storyTitle = storyData.title || 'My Story';
+      const coverScenes = extractCoverScenes(storyData.outline || '');
+
+      if (coverType === 'front') {
+        const titlePageScene = coverScenes.titlePage || 'A beautiful, magical title page featuring the main characters.';
+        coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+          TITLE_PAGE_SCENE: titlePageScene,
+          STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_INFO: characterInfo,
+          STORY_TITLE: storyTitle
+        });
+      } else if (coverType === 'page0') {
+        const page0Scene = coverScenes.page0 || 'A warm, inviting dedication/introduction page.';
+        coverPrompt = storyData.dedication
+          ? fillTemplate(PROMPT_TEMPLATES.page0WithDedication, {
+              PAGE0_SCENE: page0Scene,
+              STYLE_DESCRIPTION: styleDescription,
+              CHARACTER_INFO: characterInfo,
+              DEDICATION: storyData.dedication
+            })
+          : fillTemplate(PROMPT_TEMPLATES.page0NoDedication, {
+              PAGE0_SCENE: page0Scene,
+              STYLE_DESCRIPTION: styleDescription,
+              CHARACTER_INFO: characterInfo,
+              STORY_TITLE: storyTitle
+            });
+      } else {
+        const backCoverScene = coverScenes.backCover || 'A satisfying, conclusive ending scene.';
+        coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+          BACK_COVER_SCENE: backCoverScene,
+          STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_INFO: characterInfo
+        });
+      }
+    }
+
+    // Generate new cover
+    const coverResult = await callGeminiAPIForImage(coverPrompt, characterPhotos);
+
+    // Update the cover in story data
+    storyData.coverImages = storyData.coverImages || {};
+    if (coverType === 'front') {
+      storyData.coverImages.frontCover = coverResult.imageData;
+    } else if (coverType === 'page0') {
+      storyData.coverImages.page0 = coverResult.imageData;
+    } else {
+      storyData.coverImages.backCover = coverResult.imageData;
+    }
+
+    // Save updated story
+    await dbPool.query(
+      'UPDATE stories SET story_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [JSON.stringify(storyData), id]
+    );
+
+    console.log(`✅ ${coverType} cover regenerated for story ${id}`);
+
+    res.json({
+      success: true,
+      coverType,
+      imageData: coverResult.imageData
+    });
+
+  } catch (err) {
+    console.error('Error regenerating cover:', err);
+    res.status(500).json({ error: 'Failed to regenerate cover: ' + err.message });
+  }
+});
+
+// Edit page text or scene description directly
+app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { text, sceneDescription } = req.body;
+    const pageNumber = parseInt(pageNum);
+
+    if (!text && !sceneDescription) {
+      return res.status(400).json({ error: 'Provide text or sceneDescription to update' });
+    }
+
+    console.log(`📝 Editing page ${pageNumber} for story ${id}`);
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = story.story_data;
+
+    // Update page text if provided
+    if (text !== undefined) {
+      storyData.storyText = updatePageText(storyData.storyText, pageNumber, text);
+    }
+
+    // Update scene description if provided
+    if (sceneDescription !== undefined) {
+      let sceneDescriptions = storyData.sceneDescriptions || [];
+      const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
+
+      if (existingIndex >= 0) {
+        sceneDescriptions[existingIndex].description = sceneDescription;
+      } else {
+        sceneDescriptions.push({ pageNumber, description: sceneDescription });
+        sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
+      }
+      storyData.sceneDescriptions = sceneDescriptions;
+    }
+
+    // Save updated story
+    await dbPool.query(
+      'UPDATE stories SET story_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [JSON.stringify(storyData), id]
+    );
+
+    console.log(`✅ Page ${pageNumber} updated for story ${id}`);
+
+    res.json({
+      success: true,
+      pageNumber,
+      updated: { text: text !== undefined, sceneDescription: sceneDescription !== undefined }
+    });
+
+  } catch (err) {
+    console.error('Error editing page:', err);
+    res.status(500).json({ error: 'Failed to edit page: ' + err.message });
+  }
+});
+
+// Get checkpoints for a job (for debugging/admin)
+app.get('/api/jobs/:jobId/checkpoints', authenticateToken, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    // Verify user owns this job or is admin
+    const jobResult = await dbPool.query(
+      'SELECT user_id FROM story_jobs WHERE id = $1',
+      [jobId]
+    );
+
+    if (jobResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    if (jobResult.rows[0].user_id !== req.user.id && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const checkpoints = await getAllCheckpoints(jobId);
+
+    res.json({
+      jobId,
+      checkpoints: checkpoints.map(cp => ({
+        stepName: cp.step_name,
+        stepIndex: cp.step_index,
+        createdAt: cp.created_at,
+        // Don't include full step_data to avoid huge responses
+        dataKeys: Object.keys(cp.step_data || {})
+      }))
+    });
+
+  } catch (err) {
+    console.error('Error getting checkpoints:', err);
+    res.status(500).json({ error: 'Failed to get checkpoints: ' + err.message });
+  }
+});
+
+// Get specific checkpoint data
+app.get('/api/jobs/:jobId/checkpoints/:stepName', authenticateToken, async (req, res) => {
+  try {
+    const { jobId, stepName } = req.params;
+    const stepIndex = parseInt(req.query.index) || 0;
+
+    // Verify user owns this job or is admin
+    const jobResult = await dbPool.query(
+      'SELECT user_id FROM story_jobs WHERE id = $1',
+      [jobId]
+    );
+
+    if (jobResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    if (jobResult.rows[0].user_id !== req.user.id && !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const checkpoint = await getCheckpoint(jobId, stepName, stepIndex);
+
+    if (!checkpoint) {
+      return res.status(404).json({ error: 'Checkpoint not found' });
+    }
+
+    res.json({
+      jobId,
+      stepName,
+      stepIndex,
+      data: checkpoint
+    });
+
+  } catch (err) {
+    console.error('Error getting checkpoint:', err);
+    res.status(500).json({ error: 'Failed to get checkpoint: ' + err.message });
+  }
+});
+
+// Helper: Get text for a specific page from storyText
+function getPageText(storyText, pageNumber) {
+  if (!storyText) return null;
+
+  // Match page markers like "--- Page X ---" or "## Page X"
+  const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  const match = storyText.match(pageRegex);
+
+  return match ? match[1].trim() : null;
+}
+
+// Helper: Update text for a specific page in storyText
+function updatePageText(storyText, pageNumber, newText) {
+  if (!storyText) return `--- Page ${pageNumber} ---\n${newText}\n`;
+
+  const pageRegex = new RegExp(`((?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n))([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  const match = storyText.match(pageRegex);
+
+  if (match) {
+    return storyText.replace(pageRegex, `$1\n${newText}\n`);
+  } else {
+    // Page doesn't exist, append it
+    return storyText + `\n--- Page ${pageNumber} ---\n${newText}\n`;
+  }
+}
 
 // Gelato Print API - Create photobook order
 app.post('/api/gelato/order', authenticateToken, async (req, res) => {
@@ -4588,9 +5108,15 @@ async function processStoryJob(jobId) {
     const outlinePrompt = buildStoryPrompt(inputData);
     const outline = await callClaudeAPI(outlinePrompt, 8192);
 
+    // Save checkpoint: outline
+    await saveCheckpoint(jobId, 'outline', { outline });
+
     // Extract short scene descriptions from outline for better image generation
     const shortSceneDescriptions = extractShortSceneDescriptions(outline);
     console.log(`📋 [PIPELINE] Extracted ${Object.keys(shortSceneDescriptions).length} short scene descriptions from outline`);
+
+    // Save checkpoint: scene hints
+    await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions });
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -4656,6 +5182,9 @@ Output Format:
 
       console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
 
+      // Save checkpoint: story batch
+      await saveCheckpoint(jobId, 'story_batch', { batchNum, batchText, startPage, endPage }, batchNum);
+
       // Parse the pages from this batch
       const batchPages = parseStoryPages(batchText);
       console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
@@ -4706,13 +5235,23 @@ Output Format:
 
             console.log(`✅ [PAGE ${pageNum}] Image generated successfully`);
 
-            return {
+            const imageData = {
               pageNumber: pageNum,
               imageData: imageResult.imageData,
               description: sceneDescription,
               qualityScore: imageResult.score,
               qualityReasoning: null
             };
+
+            // Save checkpoint: page image (scene description + image)
+            await saveCheckpoint(jobId, 'page_image', {
+              pageNumber: pageNum,
+              sceneDescription,
+              imagePrompt: imagePrompt,
+              qualityScore: imageResult.score
+            }, pageNum);
+
+            return imageData;
           } catch (error) {
             console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
             throw error;
@@ -4815,6 +5354,8 @@ Output Format:
       });
       frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
       console.log(`✅ [PIPELINE] Front cover generated successfully`);
+      // Save checkpoint: front cover
+      await saveCheckpoint(jobId, 'cover', { type: 'front', prompt: frontCoverPrompt }, 0);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate front cover for job ${jobId}:`, error);
       throw new Error(`Front cover generation failed: ${error.message}`);
@@ -4838,6 +5379,8 @@ Output Format:
           });
       page0Result = await callGeminiAPIForImage(page0Prompt, characterPhotos);
       console.log(`✅ [PIPELINE] Page 0 generated successfully`);
+      // Save checkpoint: page0 cover
+      await saveCheckpoint(jobId, 'cover', { type: 'page0', prompt: page0Prompt }, 1);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate page 0 for job ${jobId}:`, error);
       throw new Error(`Page 0 generation failed: ${error.message}`);
@@ -4853,6 +5396,8 @@ Output Format:
       });
       backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
       console.log(`✅ [PIPELINE] Back cover generated successfully`);
+      // Save checkpoint: back cover
+      await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
     } catch (error) {
       console.error(`❌ [PIPELINE] Failed to generate back cover for job ${jobId}:`, error);
       throw new Error(`Back cover generation failed: ${error.message}`);
