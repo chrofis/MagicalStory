@@ -7217,23 +7217,47 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
             <div>
               <label className="block text-xl font-semibold mb-3">{t.readingLevel}</label>
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                  { value: '1st-grade', label: t.firstGrade, desc: t.firstGradeDesc },
-                  { value: 'standard', label: t.standard, desc: t.standardDesc },
-                  { value: 'advanced', label: t.advanced, desc: t.advancedDesc }
+                  {
+                    value: '1st-grade',
+                    label: t.firstGrade,
+                    desc: t.firstGradeDesc,
+                    image: 'images/text and image on each page.png'
+                  },
+                  {
+                    value: 'standard',
+                    label: t.standard,
+                    desc: t.standardDesc,
+                    image: 'images/left page text, right page image.png'
+                  },
+                  {
+                    value: 'advanced',
+                    label: t.advanced,
+                    desc: t.advancedDesc,
+                    image: 'images/left page text, right page image.png'
+                  }
                 ].map(level => (
                   <button
                     key={level.value}
                     onClick={() => setLanguageLevel(level.value)}
-                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                    className={`text-left rounded-lg border-2 transition-all overflow-hidden ${
                       languageLevel === level.value
-                        ? 'border-indigo-600 bg-indigo-50'
+                        ? 'border-indigo-600 ring-2 ring-indigo-200'
                         : 'border-gray-200 hover:border-indigo-300'
                     }`}
                   >
-                    <div className="font-semibold text-base">{level.label}</div>
-                    <div className="text-sm md:text-base text-gray-500">{level.desc}</div>
+                    <div className="w-full h-32 md:h-40 overflow-hidden bg-gray-100">
+                      <img
+                        src={level.image}
+                        alt={level.label}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="p-3">
+                      <div className="font-semibold text-base">{level.label}</div>
+                      <div className="text-sm text-gray-500">{level.desc}</div>
+                    </div>
                   </button>
                 ))}
               </div>
