@@ -5756,7 +5756,11 @@ async function processStoryJob(jobId) {
 
     // Step 1: Generate story outline (using Claude API)
     const outlinePrompt = buildStoryPrompt(inputData);
-    const outline = await callClaudeAPI(outlinePrompt, 8192);
+    // Calculate tokens needed: ~2000 base (plot, themes, character arcs) + ~300 per page for detailed breakdown
+    // For 30 pages: 2000 + 9000 = 11000 tokens
+    const outlineTokens = Math.min(2000 + (totalPages * 300), activeTextModel.maxOutputTokens);
+    console.log(`📋 [PIPELINE] Generating outline for ${totalPages} pages (max tokens: ${outlineTokens})`);
+    const outline = await callClaudeAPI(outlinePrompt, outlineTokens);
 
     // Save checkpoint: outline
     await saveCheckpoint(jobId, 'outline', { outline });
