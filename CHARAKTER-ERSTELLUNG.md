@@ -256,63 +256,121 @@ Jeder erstellte Charakter wird angezeigt mit:
   gender: "female",               // "male" | "female" | "other"
   age: "8",                       // String (Zahl)
 
-  // Visuelle Beschreibung (Optional)
-  photo: File | null,             // File-Objekt
-  photoUrl: "data:image/...",     // Data URL oder null
-  hairColor: "Blond",             // String oder ""
-  otherFeatures: "Blaue Augen",   // String oder ""
+  // ============================================
+  // PHYSISCHE MERKMALE (für Bildgenerierung)
+  // Diese Felder werden NUR für die Bildgenerierung verwendet
+  // ============================================
+  photo: File | null,             // File-Objekt (Original-Upload)
+  photoUrl: "data:image/...",     // Data URL oder null (für API-Referenz)
+  height: "120cm",                // Größe (optional)
+  build: "schlank",               // Körperbau (optional)
+  hairColor: "Blond",             // Haarfarbe (optional)
+  otherFeatures: "Blaue Augen",   // Weitere physische Merkmale (optional)
 
-  // Eigenschaften (Arrays)
-  strengths: [                    // Min. 3
+  // ============================================
+  // PSYCHOLOGISCHE MERKMALE (für Textgenerierung)
+  // Diese Felder werden NUR für die Story-Generierung verwendet
+  // ============================================
+  strengths: [                    // Min. 3 - Charakterstärken
     "Mutig",
     "Klug",
     "Freundlich"
   ],
-  weaknesses: [                   // Min. 2
+  weaknesses: [                   // Min. 2 - Charakterschwächen
     "Ungeduldig",
     "Tollpatschig"
   ],
-  fears: [                        // Optional
+  fears: [                        // Optional - Ängste
     "Höhenangst"
   ],
-
-  // Zusätzliche Informationen
-  specialDetails: "Liebt Hunde"   // String oder ""
+  specialDetails: "Liebt Hunde"   // Optional - Besondere Details/Hobbys
 }
 ```
 
 ---
 
-## Verwendung im Prompt
+## Verwendung der Charakterdaten
 
-### Prompt-Generierung (nur gefüllte Felder):
+### WICHTIG: Trennung von physischen und psychologischen Merkmalen
+
+Die Charakterdaten werden für zwei verschiedene Zwecke verwendet:
+
+1. **Story-Generierung (Text)** - Nutzt psychologische Merkmale
+2. **Bild-Generierung** - Nutzt physische Merkmale
+
+Diese Trennung ist wichtig, da:
+- Die KI für Textgenerierung Persönlichkeitsmerkmale braucht, um interessante Geschichten zu schreiben
+- Die KI für Bildgenerierung nur das visuelle Erscheinungsbild braucht
+
+---
+
+### Story-Prompt (psychologische Merkmale):
+
+Für die Generierung der Geschichte werden folgende Felder verwendet:
+- `name`, `gender`, `age` (Basisinformationen)
+- `strengths` (Stärken)
+- `weaknesses` (Schwächen)
+- `fears` (Ängste)
+- `specialDetails` (Besondere Details)
+
 ```javascript
-// Beispiel für einen vollständigen Charakter:
+// Beispiel Story-Prompt:
 "Sophie (MAIN CHARACTER) (female, 8 years old):
 Strengths: Mutig, Klug, Freundlich,
 Weaknesses: Ungeduldig, Tollpatschig,
 Fears: Höhenangst,
-Hair color: Blond,
-Features: Blaue Augen,
 Special Details: Liebt Hunde"
-
-// Beispiel mit minimalen Informationen:
-"Max (male, 10 years old):
-Strengths: Stark, Schnell, Hilfsbereit,
-Weaknesses: Stur, Laut"
 ```
 
+---
+
+### Bild-Prompt (physische Merkmale):
+
+Für die Generierung der Bilder werden folgende Felder verwendet:
+- `name`, `gender`, `age` (Basisinformationen)
+- `height` (Größe)
+- `build` (Körperbau)
+- `hairColor` (Haarfarbe)
+- `otherFeatures` (Weitere physische Merkmale)
+- `photoUrl` (Referenzbild für Konsistenz)
+
+```javascript
+// Beispiel Bild-Prompt (generateCharacterDescription):
+"Sophie is a 8-year-old girl, 120cm, slim build, with blonde hair, blue eyes"
+```
+
+**Hinweis:** Psychologische Merkmale (strengths, weaknesses, fears, specialDetails) werden NICHT an die Bildgenerierung übergeben, da sie für die visuelle Darstellung nicht relevant sind.
+
+---
+
 ### Smart-Filtering:
-Die neue `buildPrompt()`-Funktion fügt nur Felder hinzu, die tatsächlich Werte enthalten:
+
+Die `buildPrompt()`-Funktion für Story-Text fügt nur Felder hinzu, die tatsächlich Werte enthalten:
 ```javascript
 const details = [];
 if (char.strengths && char.strengths.length > 0) {
   details.push(`Strengths: ${char.strengths.join(', ')}`);
 }
-if (char.hairColor) {
-  details.push(`Hair color: ${char.hairColor}`);
+if (char.weaknesses && char.weaknesses.length > 0) {
+  details.push(`Weaknesses: ${char.weaknesses.join(', ')}`);
 }
-// etc.
+if (char.fears && char.fears.length > 0) {
+  details.push(`Fears: ${char.fears.join(', ')}`);
+}
+if (char.specialDetails) {
+  details.push(`Special Details: ${char.specialDetails}`);
+}
+// NICHT: hairColor, otherFeatures, height, build (diese sind für Bilder)
+```
+
+Die `generateCharacterDescription()`-Funktion für Bilder:
+```javascript
+let description = `${char.name} is a ${age}-year-old ${gender}`;
+if (char.height) description += `, ${char.height}`;
+if (char.build) description += `, ${char.build} build`;
+if (char.hairColor) description += `, with ${char.hairColor} hair`;
+if (char.otherFeatures) description += `, ${char.otherFeatures}`;
+// NICHT: strengths, weaknesses, fears, specialDetails (diese sind für Text)
 ```
 
 ---
