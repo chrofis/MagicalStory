@@ -5484,19 +5484,19 @@ Mood: [Emotional tone]
         // Front cover
         const frontCoverPrompt = `Create a cheerful children's book cover illustration for "${storyTitle}". Feature the main character(s): ${characterInfo}. Style: ${styleDescription}. Make it colorful and inviting.`;
         const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
-        coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score };
+        coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
 
         // Initial page
         const initialPrompt = inputData.dedication
           ? `Create a warm, welcoming illustration for a children's book dedication page. Include the text: "${inputData.dedication}". Style: ${styleDescription}.`
           : `Create a warm, welcoming introduction page illustration for "${storyTitle}". Style: ${styleDescription}. No text.`;
         const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos);
-        coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score };
+        coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
 
         // Back cover
         const backCoverPrompt = `Create a satisfying conclusion illustration for "${storyTitle}". Show a happy ending scene. Style: ${styleDescription}. Include "magicalstory.ch" text in corner.`;
         const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
-        coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score };
+        coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
 
         console.log(`✅ [STORYBOOK] Cover images generated`);
       } catch (error) {
