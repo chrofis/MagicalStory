@@ -1312,7 +1312,16 @@
       useEffect(() => {
         if (authToken && characters.length > 0) {
           const timeoutId = setTimeout(() => {
-            saveCharacters(characters);
+            // Pass all data explicitly to avoid stale closure issues
+            saveCharacters({
+              characters,
+              relationships,
+              relationshipTexts,
+              customRelationships,
+              customStrengths,
+              customWeaknesses,
+              customFears
+            });
           }, 1000); // Debounce for 1 second
 
           return () => clearTimeout(timeoutId);
@@ -1458,7 +1467,7 @@
 
         const storyTypeName = allStoryTypes.find(t => t.id === storyType)?.name[language] || 'adventure';
 
-        let prompt = `Create a ${pages}-page children's story about a ${storyTypeName} in ${language === 'de' ? 'German (always use "ss" instead of "ß")' : language === 'fr' ? 'French' : 'English'}.\n\n`;
+        let prompt = `Create a ${pages}-page children's story about a ${storyTypeName} in ${language === 'de' ? 'German (use ä, ö, ü, ß normally - these are correct German characters)' : language === 'fr' ? 'French' : 'English'}.\n\n`;
 
         if (storyDetails) {
           prompt += `Additional Story Requirements:\n${storyDetails}\n\n`;
@@ -1477,7 +1486,7 @@
         prompt += `- Refer to additional characters only by their role or relationship (e.g., "the grandfather", "the shopkeeper", "her teacher") - NEVER give them names like "Grandfather Steve" or "Shopkeeper Paul".\n`;
         prompt += `- Use the characters' ages and traits to inform their personality and behavior, but DO NOT explicitly state their age or characteristics in the story.\n`;
         prompt += `- SHOW the characteristics through actions and dialogue instead of stating them. For example, instead of "Sophie was brave", show Sophie doing something brave. Instead of "Max, who was 8 years old", just use "Max" and let his behavior reflect his age.\n\n`;
-        prompt += `Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German (always use "ss" instead of "ß")' : language === 'fr' ? 'French' : 'English'}.`;
+        prompt += `Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German (use ä, ö, ü, ß normally - these are correct German characters)' : language === 'fr' ? 'French' : 'English'}.`;
 
         return prompt;
       };
@@ -2289,7 +2298,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
       };
 
       // Character persistence functions
-      const saveCharacters = async (charactersToSave) => {
+      const saveCharacters = async (dataToSave) => {
         if (!authToken) return;
 
         try {
@@ -2300,13 +2309,13 @@ Be specific and creative. Each scene description should paint a clear picture fo
               'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify({
-              characters: charactersToSave,
-              relationships: relationships,
-              relationshipTexts: relationshipTexts,
-              customRelationships: customRelationships,
-              customStrengths: customStrengths,
-              customWeaknesses: customWeaknesses,
-              customFears: customFears
+              characters: dataToSave.characters,
+              relationships: dataToSave.relationships,
+              relationshipTexts: dataToSave.relationshipTexts,
+              customRelationships: dataToSave.customRelationships,
+              customStrengths: dataToSave.customStrengths,
+              customWeaknesses: dataToSave.customWeaknesses,
+              customFears: dataToSave.customFears
             })
           });
 
@@ -3053,7 +3062,7 @@ This is for a children's book illustration - wholesome, innocent, and appropriat
 - **Title**: ${storyTypeName}
 - **Target Age**: ${ageFrom}-${ageTo} years (early readers)
 - **Length**: ${pages} pages
-- **Language**: ${language === 'de' ? 'German (always use "ss" instead of "ß")' : language === 'fr' ? 'French' : 'English'}
+- **Language**: ${language === 'de' ? 'German (use ä, ö, ü, ß normally - these are correct German characters)' : language === 'fr' ? 'French' : 'English'}
 - **Story Type**: ${storyTypeName}
 ${storyDetails ? `- **Story Details**: ${storyDetails}` : ''}
 ${dedication ? `- **Dedication**: ${dedication}` : ''}
