@@ -5830,40 +5830,32 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               contents: [{
                 parts: [
                   {
-                    text: `Analyze this person in the image. Provide physical attributes and locate their face and body.
+                    text: `Analyze this image of a person. Detect bounding boxes for the face and full body, and describe physical attributes.
 
-                    PHYSICAL ATTRIBUTES:
-                    - Age (just the number, e.g. 25)
-                    - Height estimate in cm (e.g. 175)
-                    - Build (one of: slim, average, athletic, chubby, overweight)
-                    - Hair (color and style)
-                    - Clothing (what they're wearing)
-                    - Features (eye color, glasses, distinctive features)
+Return a JSON object with this exact structure:
+{
+  "attributes": {
+    "age": <number>,
+    "height_cm": <number>,
+    "build": "<slim|average|athletic|chubby|overweight>",
+    "hair": "<color and style>",
+    "clothing": "<description>",
+    "features": "<eye color, glasses, distinctive features>"
+  },
+  "detections": [
+    {"label": "face", "box_2d": [ymin, xmin, ymax, xmax]},
+    {"label": "body", "box_2d": [ymin, xmin, ymax, xmax]}
+  ]
+}
 
-                    LOCATION IN IMAGE (as percentage 0-100 of image width/height):
-                    - FaceBox: Where is the face? Give the LEFT edge %, TOP edge %, WIDTH %, HEIGHT %
-                    - BodyBox: Where is the visible body (from top of head to bottom of feet or lowest visible point)? Give LEFT edge %, TOP edge %, WIDTH %, HEIGHT %
+IMPORTANT for box_2d coordinates:
+- Use normalized coordinates from 0 to 1000
+- 0 = top/left edge, 1000 = bottom/right edge
+- Format: [ymin, xmin, ymax, xmax]
+- Face box should tightly contain the face (forehead to chin)
+- Body box should contain the entire visible person from head to lowest visible point
 
-                    IMPORTANT FOR BOUNDING BOXES:
-                    - Left edge: 0% = left side of image, 50% = middle, 100% = right side
-                    - Top edge: 0% = top of image, 50% = middle, 100% = bottom
-                    - Width/Height: percentage of image that the box spans
-                    - The face box should tightly contain just the face (forehead to chin, ear to ear)
-                    - The body box should contain the entire visible person from head to lowest visible body part
-
-                    Return EXACTLY in this format:
-                    Age: [number]
-                    Height: [number] cm
-                    Build: [word]
-                    Hair: [description]
-                    Clothing: [description]
-                    Features: [description]
-                    FaceBox: [left%],[top%],[width%],[height%]
-                    BodyBox: [left%],[top%],[width%],[height%]
-
-                    Example for a centered portrait photo:
-                    FaceBox: 30,15,40,35
-                    BodyBox: 15,10,70,85`
+Return ONLY valid JSON, no markdown or other text.`
                   },
                   {
                     inlineData: {
@@ -5885,9 +5877,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           if (data.candidates && data.candidates[0]) {
             const analysisText = data.candidates[0].content.parts[0].text;
-            console.log('Image analysis:', analysisText);
+            console.log('Image analysis raw:', analysisText);
 
-            // Parse the analysis to extract age, height, build, hair, clothing, features, and bounding boxes
+            // Initialize traits object
             const traits = {
               age: '',
               height: '',
@@ -5900,61 +5892,76 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               fullText: analysisText
             };
 
-            const ageMatch = analysisText.match(/Age:\s*(\d+)/i);
-            if (ageMatch) traits.age = ageMatch[1];
-
-            const heightMatch = analysisText.match(/Height:\s*(\d+)\s*cm/i);
-            if (heightMatch) traits.height = heightMatch[1];
-
-            const buildMatch = analysisText.match(/Build:\s*([^\n]+)/i);
-            if (buildMatch) traits.build = buildMatch[1].trim().toLowerCase();
-
-            const hairMatch = analysisText.match(/Hair:\s*([^\n]+)/i);
-            if (hairMatch) traits.hairColor = hairMatch[1].trim();
-
-            const clothingMatch = analysisText.match(/Clothing:\s*([^\n]+)/i);
-            if (clothingMatch) traits.clothing = clothingMatch[1].trim();
-
-            const featuresMatch = analysisText.match(/Features:\s*([^\n]+)/i);
-            if (featuresMatch) traits.otherFeatures = featuresMatch[1].trim();
-
-            // Parse bounding boxes with validation
-            const faceBoxMatch = analysisText.match(/FaceBox:\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
-            if (faceBoxMatch) {
-              const fb = {
-                x: parseFloat(faceBoxMatch[1]),
-                y: parseFloat(faceBoxMatch[2]),
-                width: parseFloat(faceBoxMatch[3]),
-                height: parseFloat(faceBoxMatch[4])
-              };
-              // Validate: values should be 0-100 and box should be within image
-              if (fb.x >= 0 && fb.x <= 100 && fb.y >= 0 && fb.y <= 100 &&
-                  fb.width > 0 && fb.width <= 100 && fb.height > 0 && fb.height <= 100 &&
-                  fb.x + fb.width <= 105 && fb.y + fb.height <= 105) { // Allow small overflow
-                traits.faceBox = fb;
-                console.log('📦 Face box detected:', traits.faceBox);
-              } else {
-                console.warn('⚠️ Face box values out of range, ignoring:', fb);
+            // Try to parse as JSON (new format)
+            try {
+              // Remove markdown code blocks if present
+              let jsonText = analysisText.trim();
+              if (jsonText.startsWith('```json')) {
+                jsonText = jsonText.slice(7);
+              } else if (jsonText.startsWith('```')) {
+                jsonText = jsonText.slice(3);
               }
-            }
-
-            const bodyBoxMatch = analysisText.match(/BodyBox:\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
-            if (bodyBoxMatch) {
-              const bb = {
-                x: parseFloat(bodyBoxMatch[1]),
-                y: parseFloat(bodyBoxMatch[2]),
-                width: parseFloat(bodyBoxMatch[3]),
-                height: parseFloat(bodyBoxMatch[4])
-              };
-              // Validate: values should be 0-100 and box should be within image
-              if (bb.x >= 0 && bb.x <= 100 && bb.y >= 0 && bb.y <= 100 &&
-                  bb.width > 0 && bb.width <= 100 && bb.height > 0 && bb.height <= 100 &&
-                  bb.x + bb.width <= 105 && bb.y + bb.height <= 105) { // Allow small overflow
-                traits.bodyBox = bb;
-                console.log('📦 Body box detected:', traits.bodyBox);
-              } else {
-                console.warn('⚠️ Body box values out of range, ignoring:', bb);
+              if (jsonText.endsWith('```')) {
+                jsonText = jsonText.slice(0, -3);
               }
+              jsonText = jsonText.trim();
+
+              const parsed = JSON.parse(jsonText);
+              console.log('📦 Parsed JSON:', parsed);
+
+              // Extract attributes
+              if (parsed.attributes) {
+                const attr = parsed.attributes;
+                if (attr.age) traits.age = String(attr.age);
+                if (attr.height_cm) traits.height = String(attr.height_cm);
+                if (attr.build) traits.build = attr.build.toLowerCase();
+                if (attr.hair) traits.hairColor = attr.hair;
+                if (attr.clothing) traits.clothing = attr.clothing;
+                if (attr.features) traits.otherFeatures = attr.features;
+              }
+
+              // Extract bounding boxes - format is [ymin, xmin, ymax, xmax] with values 0-1000
+              if (parsed.detections && Array.isArray(parsed.detections)) {
+                for (const detection of parsed.detections) {
+                  if (detection.box_2d && Array.isArray(detection.box_2d) && detection.box_2d.length === 4) {
+                    const [ymin, xmin, ymax, xmax] = detection.box_2d;
+
+                    // Convert from [ymin, xmin, ymax, xmax] (0-1000) to {x, y, width, height} (0-100 percentage)
+                    const box = {
+                      x: xmin / 10,      // Convert 0-1000 to 0-100
+                      y: ymin / 10,
+                      width: (xmax - xmin) / 10,
+                      height: (ymax - ymin) / 10
+                    };
+
+                    // Validate
+                    if (box.x >= 0 && box.y >= 0 && box.width > 0 && box.height > 0 &&
+                        box.x + box.width <= 100 && box.y + box.height <= 100) {
+                      if (detection.label === 'face') {
+                        traits.faceBox = box;
+                        console.log('📦 Face box:', box);
+                      } else if (detection.label === 'body') {
+                        traits.bodyBox = box;
+                        console.log('📦 Body box:', box);
+                      }
+                    } else {
+                      console.warn('⚠️ Invalid box coordinates:', detection.label, box);
+                    }
+                  }
+                }
+              }
+            } catch (jsonError) {
+              console.warn('Failed to parse as JSON, trying regex fallback:', jsonError);
+
+              // Fallback to regex parsing for old format
+              const ageMatch = analysisText.match(/age["\s:]+(\d+)/i);
+              if (ageMatch) traits.age = ageMatch[1];
+
+              const heightMatch = analysisText.match(/height[_\s]*cm["\s:]+(\d+)/i);
+              if (heightMatch) traits.height = heightMatch[1];
+
+              const buildMatch = analysisText.match(/build["\s:]+["']?(\w+)/i);
+              if (buildMatch) traits.build = buildMatch[1].trim().toLowerCase();
             }
 
             return traits;
