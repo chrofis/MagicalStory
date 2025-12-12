@@ -2912,7 +2912,7 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
       orderType: orderType, // 'draft' for preview only, 'order' for actual printing
       orderReferenceId: orderReference || `magical-story-${Date.now()}`,
       customerReferenceId: req.user.id,
-      currency: 'USD',
+      currency: 'CHF',
       items: [
         {
           itemReferenceId: `item-${Date.now()}`,
