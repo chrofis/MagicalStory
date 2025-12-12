@@ -1,7 +1,13 @@
 {INITIAL_PAGE_SCENE}
 
-Style: {STYLE_DESCRIPTION}.{CHARACTER_INFO}
+Style: {STYLE_DESCRIPTION}.
+
+**IMAGE FORMAT: Square (1:1 aspect ratio)** - This is for a children's book introduction page.
+
+{CHARACTER_INFO}
 
 Create this as an introduction page for "{STORY_TITLE}".
 
-IMPORTANT: This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.
+IMPORTANT:
+- This image should contain NO TEXT at all - create a purely visual, atmospheric illustration that sets the mood for the story.
+- The image MUST be square format (1:1 aspect ratio).

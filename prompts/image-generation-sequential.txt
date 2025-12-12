@@ -2,6 +2,8 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 
 Create a cinematic scene in {STYLE_DESCRIPTION}.
 
+**IMAGE FORMAT: Square (1:1 aspect ratio)** - This is for a children's book illustration.
+
 Scene Description: {SCENE_DESCRIPTION}
 
 {CHARACTER_INFO}
@@ -18,5 +20,6 @@ Important:
 - Keep clothing exactly as shown in previous scene unless changed in description
 - Maintain IDENTICAL character appearance - they must be recognizable
 - Clean, clear composition
+- The image MUST be square format (1:1 aspect ratio)
 
 This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.

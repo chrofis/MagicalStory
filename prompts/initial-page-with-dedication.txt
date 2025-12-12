@@ -1,6 +1,12 @@
 {INITIAL_PAGE_SCENE}
 
-Style: {STYLE_DESCRIPTION}.{CHARACTER_INFO}
+Style: {STYLE_DESCRIPTION}.
+
+**IMAGE FORMAT: Square (1:1 aspect ratio)** - This is for a children's book dedication page.
+
+{CHARACTER_INFO}
+
+The image MUST be square format (1:1 aspect ratio).
 
 CRITICAL: Include ONLY this exact text in the image: "{DEDICATION}"
 
