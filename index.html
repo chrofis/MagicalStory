@@ -6167,17 +6167,17 @@ Return ONLY valid JSON, no markdown or other text.`
               const image = sceneImages.find(img => img.pageNumber === pageNumber);
 
               htmlContent += `
-                <div style="width: 210mm; height: 297mm; display: flex; flex-direction: column; background: white; page-break-after: always; padding: 10mm; box-sizing: border-box;">
-                  <!-- Image takes ~70% of page height -->
-                  <div style="flex: 7; display: flex; justify-content: center; align-items: center; padding: 5mm;">
+                <div style="width: 210mm; height: 297mm; display: flex; flex-direction: column; background: white; page-break-after: always; padding: 8mm; box-sizing: border-box;">
+                  <!-- Image takes ~90% of page height -->
+                  <div style="flex: 9; display: flex; justify-content: center; align-items: center; padding: 3mm;">
                     ${image && image.imageData
                       ? `<img src="${image.imageData}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />`
                       : `<div style="width: 100%; height: 100%; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #9ca3af;">No image</div>`
                     }
                   </div>
-                  <!-- Text takes ~30% of page height -->
-                  <div style="flex: 3; display: flex; justify-content: center; align-items: center; padding: 10mm; background: #eef2ff; border-radius: 8px; margin-top: 5mm;">
-                    <div style="text-align: center; white-space: pre-wrap; max-width: 100%; font-size: 16pt; line-height: 1.8; color: #333;">
+                  <!-- Text takes ~10% of page height -->
+                  <div style="flex: 1; display: flex; justify-content: center; align-items: center; padding: 5mm 10mm; background: #eef2ff; border-radius: 8px; margin-top: 3mm;">
+                    <div style="text-align: center; white-space: pre-wrap; max-width: 100%; font-size: 14pt; line-height: 1.5; color: #333;">
                       ${pageText.trim()}
                     </div>
                   </div>

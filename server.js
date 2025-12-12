@@ -5557,23 +5557,26 @@ ${inputData.dedication ? `- **Dedication**: ${inputData.dedication}` : ''}
 ${characterDescriptions}
 ${relationshipDescriptions ? `- **Relationships**: \n${relationshipDescriptions}` : ''}
 
-# CRITICAL TEXT LENGTH RULES
+# TEXT LENGTH RULES
 
-This is a PICTURE BOOK. Each page has a large illustration with only a SMALL amount of text.
+This is a PICTURE BOOK. Each page has a large illustration with text below.
 
-**TEXT LIMITS PER PAGE:**
-- Maximum 3-4 SHORT sentences per page
-- Maximum 30-40 words total per page
+**TEXT GUIDELINES PER PAGE:**
+- Write 4-6 sentences per page
+- Aim for 50-70 words total per page
 - Use simple vocabulary for early readers
-- Short, punchy sentences that complement the illustration
+- Engaging sentences that tell the story and complement the illustration
 
 **GOOD EXAMPLE (Page text):**
-"Leo loved to explore new places.
-He jumped over rocks with happy faces.
-His trusty brown backpack held all he needs!"
+"Leo loved to explore new places. Today he found a hidden path in the forest!
+The trees were tall and green. Birds sang happy songs above him.
+He walked carefully, looking for adventure. His trusty brown backpack held all he needed for the journey."
 
-**BAD EXAMPLE (Too long):**
-"Leo the Lion was a curious young cub who lived in a cozy cave at the edge of the Whispering Woods. Every morning, he would wake up with the sunrise..."
+**BAD EXAMPLE (Too short):**
+"Leo walked. He saw trees."
+
+**BAD EXAMPLE (Too long - a whole paragraph):**
+"Leo the Lion was a curious young cub who lived in a cozy cave at the edge of the Whispering Woods where his family had lived for generations..."
 
 # Story Structure
 
@@ -5916,6 +5919,11 @@ async function processStoryJob(jobId) {
     if (skipImages) {
       console.log(`📝 [PIPELINE] Text-only mode enabled - skipping image generation`);
     }
+
+    // Determine image generation mode: sequential (consistent) or parallel (fast)
+    // Sequential passes previous image to next for better character consistency
+    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
+    console.log(`🖼️  [PIPELINE] Image generation mode: ${imageGenMode.toUpperCase()}`);
 
     // Extract character photos for reference images
     // Prefer body without background > body crop > face photo
