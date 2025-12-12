@@ -5325,7 +5325,10 @@ Mood: [Emotional tone]
 
     let response;
     try {
-      response = await callClaudeAPI(storybookPrompt, 16000);
+      // Use higher token limit for longer stories (30+ pages need more tokens)
+      // Each page needs ~200-300 tokens for text + scene description
+      const tokensNeeded = Math.max(16000, totalPages * 400);
+      response = await callClaudeAPI(storybookPrompt, tokensNeeded);
       console.log(`📖 [STORYBOOK] Claude API response received, length: ${response?.length || 0} chars`);
     } catch (apiError) {
       console.error(`❌ [STORYBOOK] Claude API call failed:`, apiError.message);
@@ -5699,7 +5702,10 @@ Output Format:
 
 ...continue until page ${endPage}...`;
 
-      const batchText = await callClaudeAPI(batchPrompt, 16000);
+      // Calculate tokens needed based on batch size
+      const batchPages = endPage - startPage + 1;
+      const batchTokensNeeded = Math.max(8000, batchPages * 500);
+      const batchText = await callClaudeAPI(batchPrompt, batchTokensNeeded);
       fullStoryText += batchText + '\n\n';
 
       console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
