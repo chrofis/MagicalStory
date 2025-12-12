@@ -5984,16 +5984,15 @@ Return ONLY valid JSON, no markdown or other text.`
         try {
           console.log('🐍 Analyzing photo with Python MediaPipe API...');
 
-          // Get Python API URL from config or use default
-          const pythonApiUrl = window.PHOTO_ANALYZER_URL || `${API_URL.replace(':3000', ':5000')}`;
-
-          const response = await fetchWithTimeout(`${pythonApiUrl}/analyze`, {
+          // Use the proxy endpoint through the Node.js server (works on Railway)
+          const response = await fetchWithTimeout(`${API_URL}/api/analyze-photo`, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify({
-              image: imageData
+              imageData: imageData
             })
           }, 30000); // 30 second timeout for Python processing
 
