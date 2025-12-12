@@ -22,6 +22,7 @@ CORS(app)
 # Initialize MediaPipe
 mp_face_detection = mp.solutions.face_detection
 mp_pose = mp.solutions.pose
+mp_selfie_segmentation = mp.solutions.selfie_segmentation
 
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
@@ -143,6 +144,34 @@ def detect_body_mediapipe(image):
                 }
 
     return None
+
+
+def remove_background(image):
+    """
+    Remove background from image using MediaPipe Selfie Segmentation.
+    Returns image with transparent background (RGBA).
+    """
+    with mp_selfie_segmentation.SelfieSegmentation(model_selection=1) as segmentation:
+        # Convert BGR to RGB
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        results = segmentation.process(rgb_image)
+
+        # Get segmentation mask (0-1 float values)
+        mask = results.segmentation_mask
+
+        # Create binary mask with threshold
+        binary_mask = (mask > 0.5).astype(np.uint8) * 255
+
+        # Optional: Smooth the mask edges
+        binary_mask = cv2.GaussianBlur(binary_mask, (5, 5), 0)
+
+        # Create 4-channel image (BGRA)
+        bgra = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+
+        # Apply mask to alpha channel
+        bgra[:, :, 3] = binary_mask
+
+        return bgra
 
 
 def add_padding_to_box(box, padding_percent=0.5):
@@ -272,6 +301,8 @@ def process_photo(image_data, is_base64=True):
                 _, buffer = cv2.imencode('.jpg', face_thumb, [cv2.IMWRITE_JPEG_QUALITY, 90])
                 face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
+        body_no_bg = None
+
         if body_box:
             # Create body crop
             body_img = crop_to_box(img, body_box)
@@ -281,8 +312,23 @@ def process_photo(image_data, is_base64=True):
                 if bw > 600 or bh > 800:
                     scale = min(600/bw, 800/bh)
                     body_img = cv2.resize(body_img, (int(bw*scale), int(bh*scale)))
+
+                # Create body crop with background
                 _, buffer = cv2.imencode('.jpg', body_img, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 body_crop = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+                # Create body crop WITHOUT background (transparent PNG)
+                try:
+                    print("🎭 Removing background from body crop...")
+                    body_rgba = remove_background(body_img)
+                    # Encode as PNG to preserve transparency
+                    _, buffer_png = cv2.imencode('.png', body_rgba)
+                    body_no_bg = f"data:image/png;base64,{base64.b64encode(buffer_png).decode('utf-8')}"
+                    print("✅ Background removed successfully")
+                except Exception as bg_error:
+                    print(f"⚠️ Background removal failed: {bg_error}")
+                    # Fall back to body crop with background
+                    body_no_bg = body_crop
 
         # Clean up temp files
         if os.path.exists(temp_input) and is_base64:
@@ -300,6 +346,7 @@ def process_photo(image_data, is_base64=True):
             "body_box": body_box,
             "face_thumbnail": face_thumbnail,
             "body_crop": body_crop,
+            "body_no_bg": body_no_bg,  # Body with transparent background for image generation
             "image_dimensions": {
                 "width": img_w,
                 "height": img_h

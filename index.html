@@ -6026,6 +6026,7 @@ Return ONLY valid JSON, no markdown or other text.`
               // Pre-cropped images
               faceThumbnail: data.face_thumbnail || null,
               bodyCrop: data.body_crop || null,
+              bodyNoBg: data.body_no_bg || null,  // Body with background removed (for image generation)
               // Source identifier
               source: 'python-mediapipe',
               // Raw response for debugging
@@ -7193,7 +7194,13 @@ Return ONLY valid JSON, no markdown or other text.`
                   }
                 }
 
-                // Also store body crop for image generation if needed
+                // Store body crops for image generation
+                // Prefer body with background removed (bodyNoBg) for cleaner image generation
+                let bodyNoBgUrl = null;
+                if (pythonTraits?.bodyNoBg) {
+                  bodyNoBgUrl = pythonTraits.bodyNoBg;
+                  console.log('✅ Got body crop with background removed');
+                }
                 if (pythonTraits?.bodyCrop) {
                   bodyPhotoUrl = pythonTraits.bodyCrop;
                   console.log('✅ Stored Python body crop for image generation');
@@ -7215,9 +7222,10 @@ Return ONLY valid JSON, no markdown or other text.`
                   hairColor: primaryTraits.hairColor || prev.hairColor,
                   clothing: primaryTraits.clothing || prev.clothing,
                   otherFeatures: primaryTraits.otherFeatures || prev.otherFeatures,
-                  photoUrl: finalPhotoUrl,        // Face crop - used throughout the app
+                  photoUrl: finalPhotoUrl,        // Face crop - used throughout the app for display
                   thumbnailUrl: finalPhotoUrl,    // Same as photoUrl (face)
-                  bodyPhotoUrl: bodyPhotoUrl,     // Body crop - for image generation
+                  bodyPhotoUrl: bodyPhotoUrl,     // Body crop with background
+                  bodyNoBgUrl: bodyNoBgUrl,       // Body crop WITHOUT background - for image generation
                   // Store both results for dev mode comparison
                   faceBox: primaryTraits.faceBox || null,
                   bodyBox: primaryTraits.bodyBox || null,

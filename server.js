@@ -187,14 +187,19 @@ function getCharactersInScene(sceneDescription, characters) {
 
 /**
  * Get photo URLs for specific characters
+ * Prefers body with no background > body crop > face photo
  * @param {Array} characters - Array of character objects (filtered to scene)
- * @returns {Array} Array of photo URLs
+ * @returns {Array} Array of photo URLs for image generation
  */
 function getCharacterPhotos(characters) {
   if (!characters || characters.length === 0) return [];
   return characters
-    .filter(char => char.photoUrl)
-    .map(char => char.photoUrl);
+    .map(char => {
+      // Prefer body without background for cleaner image generation
+      // Fall back to body with background, then face photo
+      return char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+    })
+    .filter(url => url); // Remove nulls
 }
 
 /**
@@ -2608,7 +2613,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const characterPhotos = [];
     if (storyData.characters) {
       storyData.characters.forEach(char => {
-        if (char.photoUrl) characterPhotos.push(char.photoUrl);
+        // Prefer body without background > body crop > face photo
+        const photoUrl = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+        if (photoUrl) characterPhotos.push(photoUrl);
       });
     }
 
@@ -5496,8 +5503,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
   console.log(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
   // For Picture Book: pages = scenes (each page has image + text)
-  // inputData.pages is the actual print page count
-  const totalPages = inputData.pages;
+  // inputData.pages is the actual print page count, which equals scene count in picture book mode
+  const sceneCount = inputData.pages;
 
   try {
     // Build character descriptions
@@ -5531,7 +5538,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       }).join('\n');
 
     const storyTypeName = inputData.storyType || 'adventure';
-    const middlePage = Math.ceil(totalPages / 2);
+    const middlePage = Math.ceil(sceneCount / 2);
     const lang = inputData.language || 'en';
 
     // Build the storybook combined prompt
@@ -5541,7 +5548,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
 - **Title**: ${storyTypeName}
 - **Target Age**: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years (early readers)
-- **Length**: ${totalPages} pages
+- **Length**: ${sceneCount} pages
 - **Language**: ${lang === 'de' ? 'German (use ä, ö, ü normally. Do not use ß, use ss instead)' : lang === 'fr' ? 'French' : 'English'}
 - **Story Type**: ${storyTypeName}
 ${inputData.storyDetails ? `- **Story Details**: ${inputData.storyDetails}` : ''}
@@ -5573,7 +5580,7 @@ His trusty brown backpack held all he needs!"
 Create a simple story arc:
 1. **Beginning** (Pages 1-2): Introduce the main character and setting
 2. **Middle** (Pages 3-${middlePage}): A small challenge or adventure
-3. **End** (Pages ${middlePage + 1}-${totalPages}): Happy resolution with a gentle lesson
+3. **End** (Pages ${middlePage + 1}-${sceneCount}): Happy resolution with a gentle lesson
 
 # Output Format
 
@@ -5609,12 +5616,12 @@ Characters: [Who is present]
 Action: [Key visual moment]
 Mood: [Emotional tone]
 
-... continue for all ${totalPages} pages ...
+... continue for all ${sceneCount} pages ...
 
 # Important
 
 - You MUST include the TITLE PAGE first, followed by PAGE 1, PAGE 2, etc.
-- Write the COMPLETE story for ALL ${totalPages} pages
+- Write the COMPLETE story for ALL ${sceneCount} pages
 - Keep text SHORT - this is a picture book!
 - Scene descriptions should be detailed enough for an illustrator
 - The story should feel complete with a satisfying ending
@@ -5626,7 +5633,7 @@ Mood: [Emotional tone]
     );
 
     // Generate the combined text + scenes in one call
-    console.log(`📖 [STORYBOOK] Calling Claude API for combined generation (${totalPages} pages)...`);
+    console.log(`📖 [STORYBOOK] Calling Claude API for combined generation (${sceneCount} scenes)...`);
     console.log(`📖 [STORYBOOK] Prompt length: ${storybookPrompt.length} chars`);
 
     let response;
@@ -5685,7 +5692,7 @@ Mood: [Emotional tone]
     console.log(`📖 [STORYBOOK] Found ${pageMatches.length} page markers`);
 
     // Extract content for each page using the markers
-    for (let i = 0; i < pageMatches.length && i < totalPages; i++) {
+    for (let i = 0; i < pageMatches.length && i < sceneCount; i++) {
       const match = pageMatches[i];
       const pageNum = parseInt(match[1], 10); // Use the actual page number from the marker
       const startIndex = match.index + match[0].length;
@@ -5753,10 +5760,10 @@ Mood: [Emotional tone]
             console.log(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score})`);
 
             // Update progress
-            const progressPercent = 30 + Math.floor((idx + 1) / totalPages * 50);
+            const progressPercent = 30 + Math.floor((idx + 1) / sceneCount * 50);
             await dbPool.query(
               'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-              [progressPercent, `Generated image ${idx + 1}/${totalPages}...`, jobId]
+              [progressPercent, `Generated image ${idx + 1}/${sceneCount}...`, jobId]
             );
 
             return {
@@ -5835,7 +5842,7 @@ Mood: [Emotional tone]
       imagePrompts: imagePrompts,
       storyType: inputData.storyType,
       storyDetails: inputData.storyDetails,
-      pages: totalPages,
+      pages: sceneCount,
       language: lang,
       languageLevel: '1st-grade',
       characters: inputData.characters,
@@ -5899,25 +5906,28 @@ async function processStoryJob(jobId) {
     // Check if this is a picture book (1st-grade) - use simplified combined flow
     const isPictureBook = inputData.languageLevel === '1st-grade';
 
-    // Calculate total scenes/pages to generate:
-    // - Picture Book: pages = scenes (each page has image + text on same page)
-    // - Standard: pages = print pages, so scenes = pages / 2 (text page + image page per scene)
-    const totalPages = isPictureBook ? inputData.pages : Math.floor(inputData.pages / 2);
-    console.log(`📚 [PIPELINE] Input pages: ${inputData.pages}, Mode: ${isPictureBook ? 'Picture Book' : 'Standard'}, Scenes to generate: ${totalPages}`);
+    // Calculate number of story scenes to generate:
+    // - Picture Book: 1 scene per page (image + text on same page)
+    // - Standard: 1 scene per 2 print pages (text page + facing image page)
+    const printPages = inputData.pages;  // Total pages when printed
+    const sceneCount = isPictureBook ? printPages : Math.floor(printPages / 2);
+    console.log(`📚 [PIPELINE] Print pages: ${printPages}, Mode: ${isPictureBook ? 'Picture Book' : 'Standard'}, Scenes to generate: ${sceneCount}`);
 
     if (skipImages) {
       console.log(`📝 [PIPELINE] Text-only mode enabled - skipping image generation`);
     }
 
     // Extract character photos for reference images
+    // Prefer body without background > body crop > face photo
     const characterPhotos = [];
     if (inputData.characters && inputData.characters.length > 0) {
       inputData.characters.forEach(char => {
-        if (char.photoUrl) {
-          characterPhotos.push(char.photoUrl);
+        const photoUrl = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+        if (photoUrl) {
+          characterPhotos.push(photoUrl);
         }
       });
-      console.log(`📸 [PIPELINE] Found ${characterPhotos.length} character photos for reference`);
+      console.log(`📸 [PIPELINE] Found ${characterPhotos.length} character photos for reference (using body crops)`);
     }
 
     // Update status to processing
@@ -5938,11 +5948,11 @@ async function processStoryJob(jobId) {
     );
 
     // Step 1: Generate story outline (using Claude API)
-    const outlinePrompt = buildStoryPrompt(inputData);
-    // Calculate tokens needed: ~2000 base (plot, themes, character arcs) + ~300 per page for detailed breakdown
-    // For 30 pages: 2000 + 9000 = 11000 tokens
-    const outlineTokens = Math.min(2000 + (totalPages * 300), activeTextModel.maxOutputTokens);
-    console.log(`📋 [PIPELINE] Generating outline for ${totalPages} pages (max tokens: ${outlineTokens})`);
+    // Pass sceneCount to ensure outline matches the number of scenes we'll generate
+    const outlinePrompt = buildStoryPrompt(inputData, sceneCount);
+    // Claude can handle up to 64,000 output tokens - use generous limit for outlines
+    const outlineTokens = 16000;
+    console.log(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens})`);
     const outline = await callClaudeAPI(outlinePrompt, outlineTokens);
 
     // Save checkpoint: outline
@@ -5969,11 +5979,11 @@ async function processStoryJob(jobId) {
       console.log(`📚 [PIPELINE] Using configured batch size: ${BATCH_SIZE} pages per batch`);
     } else {
       // Auto-calculate optimal batch size based on model token limits
-      // Standard mode uses ~500 tokens per page (more text than picture book)
-      BATCH_SIZE = calculateOptimalBatchSize(totalPages, 500, 0.8);
-      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} pages per batch (model: ${TEXT_MODEL}, max tokens: ${activeTextModel.maxOutputTokens})`);
+      // Standard mode uses ~500 tokens per scene (more text than picture book)
+      BATCH_SIZE = calculateOptimalBatchSize(sceneCount, 500, 0.8);
+      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} scenes per batch (model: ${TEXT_MODEL}, max tokens: ${activeTextModel.maxOutputTokens})`);
     }
-    const numBatches = Math.ceil(totalPages / BATCH_SIZE);
+    const numBatches = Math.ceil(sceneCount / BATCH_SIZE);
 
     let fullStoryText = '';
     const allImages = [];
@@ -5987,13 +5997,13 @@ async function processStoryJob(jobId) {
     // Track active image generation promises
     let activeImagePromises = [];
 
-    console.log(`📚 [STREAMING] Starting streaming pipeline: ${totalPages} pages in ${numBatches} batches of ${BATCH_SIZE}`);
+    console.log(`📚 [STREAMING] Starting streaming pipeline: ${sceneCount} scenes in ${numBatches} batches of ${BATCH_SIZE}`);
 
     for (let batchNum = 0; batchNum < numBatches; batchNum++) {
-      const startPage = batchNum * BATCH_SIZE + 1;
-      const endPage = Math.min((batchNum + 1) * BATCH_SIZE, totalPages);
+      const startScene = batchNum * BATCH_SIZE + 1;
+      const endScene = Math.min((batchNum + 1) * BATCH_SIZE, sceneCount);
 
-      console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating pages ${startPage}-${endPage}`);
+      console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating scenes ${startScene}-${endScene}`);
 
       // Generate story text for this batch
       const basePrompt = buildBasePrompt(inputData);
@@ -6001,9 +6011,9 @@ async function processStoryJob(jobId) {
         ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
             BASE_PROMPT: basePrompt,
             OUTLINE: outline,
-            PAGES: totalPages,
-            START_PAGE: startPage,
-            END_PAGE: endPage,
+            PAGES: sceneCount,
+            START_PAGE: startScene,
+            END_PAGE: endScene,
             INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning.' : 'Start directly with the page content (no title/dedication).'
           })
         : `${basePrompt}
@@ -6011,28 +6021,28 @@ async function processStoryJob(jobId) {
 Here is the story outline:
 ${outline}
 
-IMPORTANT: Now write pages ${startPage} through ${endPage} of the story following the outline above.
+IMPORTANT: Now write pages ${startScene} through ${endScene} of the story following the outline above.
 ${batchNum === 0 ? 'Include the title and dedication at the beginning.' : 'Start directly with the page content (no title/dedication).'}
 
-You **MUST** write exactly pages ${startPage} through ${endPage}.
+You **MUST** write exactly pages ${startScene} through ${endScene}.
 Ensure there is **exactly one "--- Page X ---" marker per page**.
 
 Output Format:
---- Page ${startPage} ---
+--- Page ${startScene} ---
 [Story text...]
 
-...continue until page ${endPage}...`;
+...continue until page ${endScene}...`;
 
       // Calculate tokens needed based on batch size (use 80% of model max as safety margin)
-      const batchPageCount = endPage - startPage + 1;
-      const batchTokensNeeded = Math.min(batchPageCount * 500, Math.floor(activeTextModel.maxOutputTokens * 0.8));
+      const batchSceneCount = endScene - startScene + 1;
+      const batchTokensNeeded = Math.min(batchSceneCount * 500, Math.floor(activeTextModel.maxOutputTokens * 0.8));
       const batchText = await callClaudeAPI(batchPrompt, batchTokensNeeded);
       fullStoryText += batchText + '\n\n';
 
       console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
 
       // Save checkpoint: story batch
-      await saveCheckpoint(jobId, 'story_batch', { batchNum, batchText, startPage, endPage }, batchNum);
+      await saveCheckpoint(jobId, 'story_batch', { batchNum, batchText, startScene, endScene }, batchNum);
 
       // Parse the pages from this batch
       const batchPages = parseStoryPages(batchText);
@@ -6120,7 +6130,7 @@ Output Format:
       // Update progress after each batch
       const storyProgress = 10 + Math.floor((batchNum + 1) / numBatches * 30); // 10-40%
       const completedImageCount = allImages.length;
-      const progressMsg = `Writing story (${endPage}/${totalPages} pages), generating images (${completedImageCount}/${totalPages})...`;
+      const progressMsg = `Writing story (${endScene}/${sceneCount} scenes), generating images (${completedImageCount}/${sceneCount})...`;
 
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -6135,7 +6145,7 @@ Output Format:
       // Wait for all images to complete
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [50, `Generating images (0/${totalPages} complete)...`, jobId]
+        [50, `Generating images (0/${sceneCount} complete)...`, jobId]
       );
 
       let completedCount = 0;
@@ -6145,10 +6155,10 @@ Output Format:
           completedCount++;
 
           // Update progress
-          const imageProgress = 50 + Math.floor(completedCount / totalPages * 40); // 50-90%
+          const imageProgress = 50 + Math.floor(completedCount / sceneCount * 40); // 50-90%
           await dbPool.query(
             'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-            [imageProgress, `Generating images (${completedCount}/${totalPages} complete)...`, jobId]
+            [imageProgress, `Generating images (${completedCount}/${sceneCount} complete)...`, jobId]
           );
 
           allImages.push(result);
@@ -6458,8 +6468,11 @@ function buildBasePrompt(inputData) {
 - **Characters**: ${JSON.stringify(characterSummary, null, 2)}${relationshipDescriptions}`;
 }
 
-function buildStoryPrompt(inputData) {
+function buildStoryPrompt(inputData, sceneCount = null) {
   // Build the story generation prompt based on input data
+  // Use sceneCount if provided (for standard mode where print pages != scenes)
+  const pageCount = sceneCount || inputData.pages || 15;
+
   // Extract only essential character info (NO PHOTOS to avoid token limit)
   const characterSummary = (inputData.characters || []).map(char => ({
     name: char.name,
@@ -6479,7 +6492,7 @@ function buildStoryPrompt(inputData) {
       TITLE: inputData.title || 'Untitled',
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8,
-      PAGES: inputData.pages || 15,
+      PAGES: pageCount,  // Use calculated page count, not raw input
       LANGUAGE: inputData.language || 'en',
       CHARACTERS: JSON.stringify(characterSummary),
       STORY_TYPE: inputData.storyType || 'adventure',
@@ -6492,7 +6505,7 @@ function buildStoryPrompt(inputData) {
   return `Create a children's story with the following parameters:
     Title: ${inputData.title || 'Untitled'}
     Age: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years
-    Length: ${inputData.pages || 15} pages
+    Length: ${pageCount} pages
     Language: ${inputData.language || 'en'}
     Characters: ${JSON.stringify(characterSummary)}
     Story Type: ${inputData.storyType || 'adventure'}
