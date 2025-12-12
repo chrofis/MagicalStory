@@ -5,7 +5,7 @@ You are an expert children's picture book author. Create a simple, heartwarming 
 - **Title**: {TITLE}
 - **Target Age**: {AGE_FROM}-{AGE_TO} years (early readers)
 - **Length**: {PAGES} pages
-- **Language**: {LANGUAGE} (NOTE: If German, always use "ss" instead of "ß")
+- **Language**: {LANGUAGE} (NOTE: If German, use "ss" instead of "ß", and use ä, ö, ü normally)
 - **Story Type**: {STORY_TYPE}
 - **Story Details**: {STORY_DETAILS}
 - **Dedication**: {DEDICATION}
@@ -31,7 +31,17 @@ Create a simple story arc:
 
 # Output Format
 
-For EACH page, provide BOTH the story text AND the scene description in this exact format:
+You MUST start with the TITLE PAGE, then provide ALL story pages. Use this exact format:
+
+---TITLE PAGE---
+TITLE: {TITLE}
+DEDICATION: {DEDICATION}
+
+SCENE:
+Setting: [Cover scene that sets the mood for the story]
+Characters: [Main character(s) featured on cover]
+Action: [An inviting cover moment]
+Mood: [Welcoming, magical, exciting, etc.]
 
 ---PAGE 1---
 TEXT:
@@ -63,6 +73,7 @@ Mood: [Emotional tone]
 
 # Important
 
+- You MUST include the TITLE PAGE first, followed by PAGE 1, PAGE 2, etc.
 - Write the COMPLETE story for ALL {PAGES} pages
 - Keep text SHORT and suitable for picture book format
 - Scene descriptions should be detailed enough for an illustrator
