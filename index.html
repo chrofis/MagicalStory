@@ -2320,7 +2320,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
               if (data.relationships && typeof data.relationships === 'object') {
                 setRelationships(data.relationships);
               }
-              if (Array.isArray(data.relationshipTexts)) {
+              if (data.relationshipTexts && typeof data.relationshipTexts === 'object' && !Array.isArray(data.relationshipTexts)) {
                 setRelationshipTexts(data.relationshipTexts);
               }
               if (Array.isArray(data.customRelationships)) {
