@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 Photo Analyzer API - Face Detection and Attribute Extraction
-Uses DeepFace for analyzing uploaded photos
+Uses MediaPipe for face/body detection, DeepFace for age/gender
 """
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from deepface import DeepFace
+import mediapipe as mp
 import cv2
 import numpy as np
 import os
@@ -17,6 +18,10 @@ import traceback
 
 app = Flask(__name__)
 CORS(app)
+
+# Initialize MediaPipe
+mp_face_detection = mp.solutions.face_detection
+mp_pose = mp.solutions.pose
 
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
@@ -51,19 +56,132 @@ def estimate_height_build(age, gender):
 
     return height, build
 
+
+def detect_face_mediapipe(image):
+    """
+    Detect face using MediaPipe Face Detection
+    Returns bounding box as percentage of image dimensions (0-100)
+    """
+    h, w = image.shape[:2]
+
+    with mp_face_detection.FaceDetection(
+        model_selection=1,  # 0 for close faces, 1 for far faces
+        min_detection_confidence=0.5
+    ) as face_detection:
+        # Convert BGR to RGB
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        results = face_detection.process(rgb_image)
+
+        if results.detections:
+            # Get the first (most confident) detection
+            detection = results.detections[0]
+            bbox = detection.location_data.relative_bounding_box
+
+            # Convert to percentage (0-100)
+            return {
+                'x': bbox.xmin * 100,
+                'y': bbox.ymin * 100,
+                'width': bbox.width * 100,
+                'height': bbox.height * 100,
+                'confidence': detection.score[0]
+            }
+
+    return None
+
+
+def detect_body_mediapipe(image):
+    """
+    Detect body using MediaPipe Pose
+    Returns bounding box as percentage of image dimensions (0-100)
+    Uses pose landmarks to calculate body bounds
+    """
+    h, w = image.shape[:2]
+
+    with mp_pose.Pose(
+        static_image_mode=True,
+        model_complexity=1,
+        min_detection_confidence=0.5
+    ) as pose:
+        # Convert BGR to RGB
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        results = pose.process(rgb_image)
+
+        if results.pose_landmarks:
+            landmarks = results.pose_landmarks.landmark
+
+            # Get all visible landmark coordinates
+            x_coords = []
+            y_coords = []
+
+            for landmark in landmarks:
+                if landmark.visibility > 0.5:  # Only use visible landmarks
+                    x_coords.append(landmark.x)
+                    y_coords.append(landmark.y)
+
+            if x_coords and y_coords:
+                # Calculate bounding box from landmarks
+                x_min = min(x_coords)
+                x_max = max(x_coords)
+                y_min = min(y_coords)
+                y_max = max(y_coords)
+
+                # Add padding (10% of body size)
+                padding_x = (x_max - x_min) * 0.1
+                padding_y = (y_max - y_min) * 0.1
+
+                x_min = max(0, x_min - padding_x)
+                x_max = min(1, x_max + padding_x)
+                y_min = max(0, y_min - padding_y)
+                y_max = min(1, y_max + padding_y)
+
+                # Convert to percentage (0-100)
+                return {
+                    'x': x_min * 100,
+                    'y': y_min * 100,
+                    'width': (x_max - x_min) * 100,
+                    'height': (y_max - y_min) * 100
+                }
+
+    return None
+
+
+def crop_to_box(image, box, output_size=None):
+    """
+    Crop image to bounding box (box is in percentage 0-100)
+    Returns cropped image
+    """
+    h, w = image.shape[:2]
+
+    x = int((box['x'] / 100) * w)
+    y = int((box['y'] / 100) * h)
+    width = int((box['width'] / 100) * w)
+    height = int((box['height'] / 100) * h)
+
+    # Ensure bounds are valid
+    x = max(0, x)
+    y = max(0, y)
+    x2 = min(w, x + width)
+    y2 = min(h, y + height)
+
+    cropped = image[y:y2, x:x2]
+
+    if output_size and cropped.size > 0:
+        cropped = cv2.resize(cropped, output_size)
+
+    return cropped
+
 def process_photo(image_data, is_base64=True):
     """
-    Process uploaded photo: detect face, crop, and extract attributes
+    Process uploaded photo: detect face/body with MediaPipe, extract age/gender with DeepFace
 
     Args:
         image_data: Base64 encoded image or file path
         is_base64: Whether image_data is base64 encoded
 
     Returns:
-        dict with success status, attributes, and cropped image
+        dict with success status, attributes, bounding boxes, and cropped images
     """
     temp_input = os.path.join(TEMP_DIR, f'input_{os.getpid()}.jpg')
-    temp_output = os.path.join(TEMP_DIR, f'crop_{os.getpid()}.jpg')
 
     try:
         # 1. DECODE AND SAVE IMAGE
@@ -74,63 +192,83 @@ def process_photo(image_data, is_base64=True):
 
             # Decode base64
             image_bytes = base64.b64decode(image_data)
-            img = Image.open(BytesIO(image_bytes))
-            img.save(temp_input)
+            img_pil = Image.open(BytesIO(image_bytes))
+            img_pil.save(temp_input)
         else:
             temp_input = image_data
 
-        # 2. RUN DEEPFACE ANALYSIS
-        # Single call detects face AND extracts age/gender
-        results = DeepFace.analyze(
-            img_path=temp_input,
-            actions=['age', 'gender'],
-            detector_backend='opencv',  # Fast. Use 'retinaface' for better accuracy
-            enforce_detection=True
-        )
-
-        # Take first face if multiple detected
-        first_face = results[0]
-
-        # 3. EXTRACT ATTRIBUTES
-        age = int(first_face['age'])
-        gender_raw = first_face['dominant_gender']  # "Man" or "Woman"
-
-        # Normalize gender
-        gender = 'male' if gender_raw.lower() in ['man', 'male'] else 'female'
-
-        # Estimate height and build based on age/gender
-        height, build = estimate_height_build(age, gender)
-
-        # 4. CROP FACE
-        region = first_face['region']
-        x, y, w, h = region['x'], region['y'], region['w'], region['h']
-
-        # Load original image
+        # Load image with OpenCV
         img = cv2.imread(temp_input)
+        if img is None:
+            raise ValueError("Failed to load image")
 
-        # Add padding (20% of face size)
-        padding_x = int(w * 0.2)
-        padding_y = int(h * 0.2)
+        img_h, img_w = img.shape[:2]
 
-        y1 = max(0, y - padding_y)
-        y2 = min(img.shape[0], y + h + padding_y)
-        x1 = max(0, x - padding_x)
-        x2 = min(img.shape[1], x + w + padding_x)
+        # 2. DETECT FACE WITH MEDIAPIPE (more accurate than DeepFace detector)
+        face_box = detect_face_mediapipe(img)
+        print(f"📦 MediaPipe face detection: {face_box}")
 
-        cropped_face = img[y1:y2, x1:x2]
+        # 3. DETECT BODY WITH MEDIAPIPE POSE
+        body_box = detect_body_mediapipe(img)
+        print(f"📦 MediaPipe body detection: {body_box}")
 
-        # Save cropped image
-        cv2.imwrite(temp_output, cropped_face)
+        # 4. GET AGE/GENDER WITH DEEPFACE
+        age = None
+        gender = None
+        try:
+            results = DeepFace.analyze(
+                img_path=temp_input,
+                actions=['age', 'gender'],
+                detector_backend='skip',  # Skip detection, we already have face box
+                enforce_detection=False
+            )
+            first_face = results[0] if results else None
+            if first_face:
+                age = int(first_face['age'])
+                gender_raw = first_face['dominant_gender']
+                gender = 'male' if gender_raw.lower() in ['man', 'male'] else 'female'
+        except Exception as df_error:
+            print(f"⚠️ DeepFace analysis failed: {df_error}")
 
-        # 5. ENCODE CROPPED IMAGE TO BASE64
-        with open(temp_output, 'rb') as f:
-            cropped_base64 = base64.b64encode(f.read()).decode('utf-8')
+        # Estimate height and build if we have age/gender
+        height, build = (None, None)
+        if age and gender:
+            height, build = estimate_height_build(age, gender)
+
+        # 5. CREATE CROPPED IMAGES
+        face_thumbnail = None
+        body_crop = None
+
+        if face_box:
+            # Create face thumbnail (square, centered on face)
+            face_img = crop_to_box(img, face_box)
+            if face_img.size > 0:
+                # Make it square
+                size = max(face_img.shape[0], face_img.shape[1])
+                square = np.zeros((size, size, 3), dtype=np.uint8)
+                y_off = (size - face_img.shape[0]) // 2
+                x_off = (size - face_img.shape[1]) // 2
+                square[y_off:y_off+face_img.shape[0], x_off:x_off+face_img.shape[1]] = face_img
+                # Resize to 150x150
+                face_thumb = cv2.resize(square, (150, 150))
+                _, buffer = cv2.imencode('.jpg', face_thumb, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+        if body_box:
+            # Create body crop
+            body_img = crop_to_box(img, body_box)
+            if body_img.size > 0:
+                # Resize if too large (max 600x800)
+                bh, bw = body_img.shape[:2]
+                if bw > 600 or bh > 800:
+                    scale = min(600/bw, 800/bh)
+                    body_img = cv2.resize(body_img, (int(bw*scale), int(bh*scale)))
+                _, buffer = cv2.imencode('.jpg', body_img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                body_crop = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
         # Clean up temp files
         if os.path.exists(temp_input) and is_base64:
             os.remove(temp_input)
-        if os.path.exists(temp_output):
-            os.remove(temp_output)
 
         return {
             "success": True,
@@ -140,12 +278,13 @@ def process_photo(image_data, is_base64=True):
                 "height": height,
                 "build": build
             },
-            "cropped_image": f"data:image/jpeg;base64,{cropped_base64}",
-            "face_region": {
-                "x": x,
-                "y": y,
-                "width": w,
-                "height": h
+            "face_box": face_box,
+            "body_box": body_box,
+            "face_thumbnail": face_thumbnail,
+            "body_crop": body_crop,
+            "image_dimensions": {
+                "width": img_w,
+                "height": img_h
             }
         }
 
@@ -153,8 +292,6 @@ def process_photo(image_data, is_base64=True):
         # Clean up on error
         if os.path.exists(temp_input) and is_base64:
             os.remove(temp_input)
-        if os.path.exists(temp_output):
-            os.remove(temp_output)
 
         return {
             "success": False,
@@ -216,14 +353,15 @@ def analyze_photo():
 
 @app.route('/test', methods=['GET'])
 def test():
-    """Test endpoint to verify DeepFace is working"""
+    """Test endpoint to verify all dependencies are working"""
     try:
-        # Just import to verify it's installed
         import deepface
         import cv2
+        import mediapipe
         return jsonify({
             "success": True,
             "deepface_version": deepface.__version__,
+            "mediapipe_version": mediapipe.__version__,
             "opencv_installed": True
         })
     except Exception as e:
