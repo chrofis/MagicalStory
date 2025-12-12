@@ -15,29 +15,36 @@ const email = require('./email');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin SDK
-// Supports: FIREBASE_SERVICE_ACCOUNT (JSON string) or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
+// Supports: FIREBASE_SERVICE_ACCOUNT_BASE64 (base64), FIREBASE_SERVICE_ACCOUNT (JSON string), or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
 let firebaseInitialized = false;
-console.log('🔥 Firebase init check - FIREBASE_SERVICE_ACCOUNT exists:', !!process.env.FIREBASE_SERVICE_ACCOUNT);
-console.log('🔥 Firebase init check - FIREBASE_SERVICE_ACCOUNT length:', process.env.FIREBASE_SERVICE_ACCOUNT ? process.env.FIREBASE_SERVICE_ACCOUNT.length : 0);
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+
+// Try base64 encoded version first (most reliable for complex JSON)
+if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
   try {
-    console.log('🔥 Parsing FIREBASE_SERVICE_ACCOUNT...');
-    console.log('🔥 First 100 chars:', process.env.FIREBASE_SERVICE_ACCOUNT.substring(0, 100));
+    const jsonString = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8');
+    const serviceAccount = JSON.parse(jsonString);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    firebaseInitialized = true;
+    console.log('🔥 Firebase Admin SDK initialized from base64 env var');
+  } catch (err) {
+    console.warn('⚠️  Firebase Admin SDK initialization from base64 failed:', err.message);
+  }
+} else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
     let serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    console.log('🔥 Parsed successfully, project_id:', serviceAccount.project_id);
     // Fix newlines in private key if they got escaped
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-      console.log('🔥 Private key processed, length:', serviceAccount.private_key.length);
     }
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
     firebaseInitialized = true;
-    console.log('🔥 Firebase Admin SDK initialized from environment variable');
+    console.log('🔥 Firebase Admin SDK initialized from JSON env var');
   } catch (err) {
     console.warn('⚠️  Firebase Admin SDK initialization failed:', err.message);
-    console.warn('⚠️  Error stack:', err.stack);
   }
 } else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
   try {
