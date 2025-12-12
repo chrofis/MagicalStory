@@ -15,9 +15,16 @@ Your Task:
    - **Crossed or misaligned eyes.**
    - **Exaggerated emotions or facial expressions, unless explicitly called for in the SCENE DESCRIPTION.**
    - **Inconsistent face or eye styles across different characters or within the same character.**
+   - **Unwanted text, watermarks, or signatures that were not requested.**
+   - **Objects or characters at incorrect scale or proportion relative to each other.**
 
-Scoring Criteria (0-100):
+Scoring Criteria (starting at 100, negative scores are possible):
+- Penalize CRITICALLY (-100 points) for text in the image that does not EXACTLY match what was specified in the prompt (missing letters, misspellings, wrong text). Text accuracy must be perfect.
 - Penalize HEAVILY (-20 to -40 points) for physical hallucinations, distorted anatomy, cross-eyes, or major artifacts.
+- Penalize HEAVILY (-20 to -40 points) for missing characters described in the user prompt or for duplicate characters.
+- Penalize HEAVILY (-20 to -40 points) for characters that do not match with the input images.
+- Penalize (-10 to -20 points) for unwanted text, watermarks, or signatures not specified in the prompt.
+- Penalize (-10 to -20 points) for incorrect scale or proportion of objects/characters.
 - Penalize for missing key elements clearly described in the USER PROMPT (e.g., specified characters, objects, actions).
 - Penalize for significant deviations in character appearance or key object design from provided REFERENCE IMAGES.
 - Penalize for exaggerated emotions not specified, or inconsistent face/eye styles.
@@ -27,4 +34,4 @@ Output strictly in the following format:
 Score: [Score]/100
 
 Reasoning:
-[Concise, actionable explanation. Clearly identify specific issues found, such as 'Character's right hand has 6 fingers,' 'The potion bottle is floating in mid-air next to the wizard,' 'Missing the red cloak specified in the prompt,' 'Character has crossed eyes,' 'Facial expression is overly dramatic for the scene description,' or 'Characters have different eye styles.']
+[Concise, actionable explanation. Clearly identify specific issues found, such as 'Character's right hand has 6 fingers,' 'The potion bottle is floating in mid-air next to the wizard,' 'Missing the red cloak specified in the prompt,' 'Character has crossed eyes,' 'Facial expression is overly dramatic for the scene description,' 'Characters have different eye styles,' 'Title text shows "MAGCAL" instead of "MAGICAL" - missing letter I,' or 'Child appears giant-sized compared to the house.']
