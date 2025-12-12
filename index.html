@@ -3427,7 +3427,14 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           return;
         }
 
+        // Prevent starting multiple jobs
+        if (isGenerating) {
+          console.log('⚠️ Job already in progress, ignoring duplicate request');
+          return;
+        }
+
         try {
+          setIsGenerating(true); // Lock to prevent multiple jobs
           // Show wait message - shorter for text-only
           const waitMessage = skipImages
             ? (language === 'de'
@@ -3505,6 +3512,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
         } catch (error) {
           console.error('Error starting background job:', error);
+          setIsGenerating(false); // Unlock so user can try again
           alert(`Failed to start background generation: ${error.message}\n\nPlease try again or use manual mode.`);
         }
       };
@@ -3569,6 +3577,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 setRawAIResponse(result.rawAIResponse || ''); // Store raw AI response for developer mode
               }
 
+              setIsGenerating(false); // Unlock generation
               alert('Story generation complete! Your story is ready.');
 
               // Auto-navigate to page 5 to view the story
@@ -3607,6 +3616,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             } else if (job.status === 'failed') {
               // Job failed
               clearInterval(pollInterval);
+              setIsGenerating(false); // Unlock so user can try again
               setGenerationProgress({ current: 0, total: 0, message: '' });
               alert(`Story generation failed: ${job.errorMessage || 'Unknown error'}\n\nPlease try again.`);
 
