@@ -17,12 +17,18 @@ const admin = require('firebase-admin');
 // Initialize Firebase Admin SDK
 // Supports: FIREBASE_SERVICE_ACCOUNT (JSON string) or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
 let firebaseInitialized = false;
+console.log('🔥 Firebase init check - FIREBASE_SERVICE_ACCOUNT exists:', !!process.env.FIREBASE_SERVICE_ACCOUNT);
+console.log('🔥 Firebase init check - FIREBASE_SERVICE_ACCOUNT length:', process.env.FIREBASE_SERVICE_ACCOUNT ? process.env.FIREBASE_SERVICE_ACCOUNT.length : 0);
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
+    console.log('🔥 Parsing FIREBASE_SERVICE_ACCOUNT...');
+    console.log('🔥 First 100 chars:', process.env.FIREBASE_SERVICE_ACCOUNT.substring(0, 100));
     let serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log('🔥 Parsed successfully, project_id:', serviceAccount.project_id);
     // Fix newlines in private key if they got escaped
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      console.log('🔥 Private key processed, length:', serviceAccount.private_key.length);
     }
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
@@ -31,6 +37,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     console.log('🔥 Firebase Admin SDK initialized from environment variable');
   } catch (err) {
     console.warn('⚠️  Firebase Admin SDK initialization failed:', err.message);
+    console.warn('⚠️  Error stack:', err.stack);
   }
 } else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
   try {
@@ -45,6 +52,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   }
 } else {
   console.warn('⚠️  FIREBASE_SERVICE_ACCOUNT not configured - Firebase auth disabled');
+  console.warn('⚠️  Available env vars with FIREBASE:', Object.keys(process.env).filter(k => k.includes('FIREBASE')));
 }
 
 // Image cache for storing generated images (hash of prompt + photos → image data)
