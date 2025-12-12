@@ -164,6 +164,40 @@ function calculateOptimalBatchSize(totalPages, tokensPerPage = 400, safetyMargin
 }
 
 /**
+ * Detect which characters are mentioned in a scene description
+ * @param {string} sceneDescription - The scene text
+ * @param {Array} characters - Array of character objects
+ * @returns {Array} Characters that appear in this scene
+ */
+function getCharactersInScene(sceneDescription, characters) {
+  if (!sceneDescription || !characters || characters.length === 0) {
+    return [];
+  }
+
+  const sceneLower = sceneDescription.toLowerCase();
+  return characters.filter(char => {
+    if (!char.name) return false;
+    // Check for character name in scene (case insensitive)
+    const nameLower = char.name.toLowerCase();
+    // Also check for first name only (e.g., "Max" from "Max Mustermann")
+    const firstName = nameLower.split(' ')[0];
+    return sceneLower.includes(nameLower) || sceneLower.includes(firstName);
+  });
+}
+
+/**
+ * Get photo URLs for specific characters
+ * @param {Array} characters - Array of character objects (filtered to scene)
+ * @returns {Array} Array of photo URLs
+ */
+function getCharacterPhotos(characters) {
+  if (!characters || characters.length === 0) return [];
+  return characters
+    .filter(char => char.photoUrl)
+    .map(char => char.photoUrl);
+}
+
+/**
  * Build a physical description of a character for image generation
  * Only includes visual attributes, not psychological traits
  * @param {Object} char - Character object
@@ -2487,19 +2521,17 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       return res.status(400).json({ error: 'No scene description found. Please provide customPrompt.' });
     }
 
-    // Get character photos
-    const characterPhotos = [];
-    if (storyData.characters) {
-      storyData.characters.forEach(char => {
-        if (char.photoUrl) characterPhotos.push(char.photoUrl);
-      });
-    }
+    // Detect which characters appear in this scene
+    const sceneText = customPrompt || sceneDesc?.description || '';
+    const sceneCharacters = getCharactersInScene(sceneText, storyData.characters || []);
+    const scenePhotos = getCharacterPhotos(sceneCharacters);
+    console.log(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}`);
 
-    // Build image prompt
-    const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData);
+    // Build image prompt with scene-specific characters
+    const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData, sceneCharacters);
 
-    // Generate new image
-    const imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
+    // Generate new image with only scene-specific character photos
+    const imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos);
 
     // Update the image in story data
     let images = storyData.images || [];
@@ -5571,10 +5603,13 @@ Mood: [Emotional tone]
         return limit(async () => {
           const pageNum = scene.pageNumber;
           try {
-            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum}...`);
+            // Detect which characters appear in this scene
+            const sceneCharacters = getCharactersInScene(scene.description, inputData.characters || []);
+            const scenePhotos = getCharacterPhotos(sceneCharacters);
+            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
-            // Build image prompt
-            const imagePrompt = buildImagePrompt(scene.description, inputData);
+            // Build image prompt with only scene-specific characters
+            const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters);
             imagePrompts[pageNum] = imagePrompt;
 
             let imageResult = null;
@@ -5582,7 +5617,8 @@ Mood: [Emotional tone]
 
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
-                imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
+                // Pass only photos of characters in this scene
+                imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos);
               } catch (error) {
                 retries++;
                 console.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -5902,10 +5938,13 @@ Output Format:
                 description: sceneDescription
               });
 
-              console.log(`📸 [PAGE ${pageNum}] Generating image...`);
+              // Detect which characters appear in this scene
+              const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
+              const scenePhotos = getCharacterPhotos(sceneCharacters);
+              console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
-              // Generate image from scene description
-              const imagePrompt = buildImagePrompt(sceneDescription, inputData);
+              // Generate image from scene description with scene-specific characters
+              const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters);
               imagePrompts[pageNum] = imagePrompt;
 
               let imageResult = null;
@@ -5913,7 +5952,8 @@ Output Format:
 
               while (retries <= MAX_RETRIES && !imageResult) {
                 try {
-                  imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
+                  // Pass only photos of characters in this scene
+                  imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos);
                 } catch (error) {
                   retries++;
                   console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -6373,19 +6413,24 @@ function parseSceneDescriptions(text, expectedCount) {
   return scenes;
 }
 
-function buildImagePrompt(sceneDescription, inputData) {
+function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null) {
   // Build image generation prompt (matches step-by-step format)
   const artStyleId = inputData.artStyle || 'pixar';
   const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
-  // Build character info for consistency
+  // Use only characters that appear in this scene (if not provided, detect from scene)
+  const charactersInScene = sceneCharacters ||
+    getCharactersInScene(sceneDescription, inputData.characters || []);
+
+  // Build character info with FULL physical descriptions
   let characterPrompts = '';
-  if (inputData.characters && inputData.characters.length > 0) {
-    characterPrompts = '\n\nCHARACTER APPEARANCE GUIDE - Maintain consistency:\n\n';
-    inputData.characters.forEach((char, idx) => {
-      characterPrompts += `[${char.name}]: ${char.age} years old, ${char.gender}.\n`;
+  if (charactersInScene.length > 0) {
+    characterPrompts = '\n\nCHARACTERS IN THIS SCENE - Use these exact appearances:\n\n';
+    charactersInScene.forEach((char) => {
+      // Use full physical description including height, build, hair, clothing
+      characterPrompts += `[${char.name}]: ${buildCharacterPhysicalDescription(char)}\n`;
     });
-    characterPrompts += '\nCRITICAL: These characters must maintain visual consistency across ALL pages.';
+    characterPrompts += '\nCRITICAL: Match these character appearances exactly. Reference images are provided.';
   }
 
   // Use template if available, otherwise fall back to hardcoded prompt
