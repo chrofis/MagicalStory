@@ -265,6 +265,7 @@ Jeder erstellte Charakter wird angezeigt mit:
   height: "120cm",                // Größe (optional)
   build: "schlank",               // Körperbau (optional)
   hairColor: "Blond",             // Haarfarbe (optional)
+  clothing: "blaues T-Shirt",     // Kleidung - extrahiert aus Foto (optional)
   otherFeatures: "Blaue Augen",   // Weitere physische Merkmale (optional)
 
   // ============================================
@@ -331,12 +332,13 @@ Für die Generierung der Bilder werden folgende Felder verwendet:
 - `height` (Größe)
 - `build` (Körperbau)
 - `hairColor` (Haarfarbe)
+- `clothing` (Kleidung - aus Foto extrahiert)
 - `otherFeatures` (Weitere physische Merkmale)
 - `photoUrl` (Referenzbild für Konsistenz)
 
 ```javascript
 // Beispiel Bild-Prompt (generateCharacterDescription):
-"Sophie is a 8-year-old girl, 120cm, slim build, with blonde hair, blue eyes"
+"Sophie is a 8-year-old girl, 120cm, slim build, with blonde hair, blue eyes. Wearing: blue t-shirt with star pattern"
 ```
 
 **Hinweis:** Psychologische Merkmale (strengths, weaknesses, fears, specialDetails) werden NICHT an die Bildgenerierung übergeben, da sie für die visuelle Darstellung nicht relevant sind.
@@ -360,7 +362,7 @@ if (char.fears && char.fears.length > 0) {
 if (char.specialDetails) {
   details.push(`Special Details: ${char.specialDetails}`);
 }
-// NICHT: hairColor, otherFeatures, height, build (diese sind für Bilder)
+// NICHT: hairColor, clothing, otherFeatures, height, build (diese sind für Bilder)
 ```
 
 Die `generateCharacterDescription()`-Funktion für Bilder:
@@ -370,6 +372,7 @@ if (char.height) description += `, ${char.height}`;
 if (char.build) description += `, ${char.build} build`;
 if (char.hairColor) description += `, with ${char.hairColor} hair`;
 if (char.otherFeatures) description += `, ${char.otherFeatures}`;
+if (char.clothing) description += `. Wearing: ${char.clothing}`;
 // NICHT: strengths, weaknesses, fears, specialDetails (diese sind für Text)
 ```
 

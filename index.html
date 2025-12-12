@@ -2795,6 +2795,10 @@ Be specific and creative. Each scene description should paint a clear picture fo
         if (character.otherFeatures) {
           description += `, ${character.otherFeatures}`;
         }
+        // Add clothing extracted from avatar image
+        if (character.clothing) {
+          description += `. Wearing: ${character.clothing}`;
+        }
 
         return description;
       };
