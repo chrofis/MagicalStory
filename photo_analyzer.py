@@ -145,6 +145,23 @@ def detect_body_mediapipe(image):
     return None
 
 
+def add_padding_to_box(box, padding_percent=0.5):
+    """
+    Add padding around a bounding box.
+    padding_percent: 0.5 means 50% extra on each side
+    Box is in percentage 0-100 format.
+    """
+    pad_x = box['width'] * padding_percent
+    pad_y = box['height'] * padding_percent
+
+    return {
+        'x': max(0, box['x'] - pad_x),
+        'y': max(0, box['y'] - pad_y),
+        'width': min(100 - max(0, box['x'] - pad_x), box['width'] + 2 * pad_x),
+        'height': min(100 - max(0, box['y'] - pad_y), box['height'] + 2 * pad_y)
+    }
+
+
 def crop_to_box(image, box, output_size=None):
     """
     Crop image to bounding box (box is in percentage 0-100)
@@ -240,18 +257,19 @@ def process_photo(image_data, is_base64=True):
         body_crop = None
 
         if face_box:
-            # Create face thumbnail (square, centered on face)
-            face_img = crop_to_box(img, face_box)
+            # Create face thumbnail with extra padding (50% on each side for more context)
+            padded_face_box = add_padding_to_box(face_box, padding_percent=0.5)
+            face_img = crop_to_box(img, padded_face_box)
             if face_img.size > 0:
-                # Make it square
+                # Make it square by padding the shorter side
                 size = max(face_img.shape[0], face_img.shape[1])
                 square = np.zeros((size, size, 3), dtype=np.uint8)
                 y_off = (size - face_img.shape[0]) // 2
                 x_off = (size - face_img.shape[1]) // 2
                 square[y_off:y_off+face_img.shape[0], x_off:x_off+face_img.shape[1]] = face_img
-                # Resize to 150x150
-                face_thumb = cv2.resize(square, (150, 150))
-                _, buffer = cv2.imencode('.jpg', face_thumb, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                # Resize to 200x200 (larger for better quality)
+                face_thumb = cv2.resize(square, (200, 200))
+                _, buffer = cv2.imencode('.jpg', face_thumb, [cv2.IMWRITE_JPEG_QUALITY, 90])
                 face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
         if body_box:

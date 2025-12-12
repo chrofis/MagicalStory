@@ -7130,61 +7130,69 @@ Return ONLY valid JSON, no markdown or other text.`
               let pythonTraits = null;
               let primaryTraits = null;
 
-              if (characterDevMode && currentUser?.role === 'admin') {
-                console.log('🔬 Dev mode: Running both Gemini and Python APIs in parallel...');
-                const bothResults = await analyzeImageWithBothAPIs(originalImage);
-                geminiTraits = bothResults.gemini;
-                pythonTraits = bothResults.python;
+              // Run BOTH APIs in parallel:
+              // - Python MediaPipe: face/body detection (bounding boxes, cropping)
+              // - Gemini: feature extraction (age, gender, hair, clothing, etc.)
+              console.log('🔄 Running Python (face detection) and Gemini (features) in parallel...');
 
-                // Use Python (MediaPipe) as primary for bounding boxes if available, Gemini for features
-                primaryTraits = {
-                  // Use Python bounding boxes (more accurate)
-                  faceBox: pythonTraits?.faceBox || geminiTraits?.faceBox || null,
-                  bodyBox: pythonTraits?.bodyBox || geminiTraits?.bodyBox || null,
-                  // Use Python for age/gender (DeepFace)
-                  age: pythonTraits?.age || geminiTraits?.age || '',
-                  gender: pythonTraits?.gender || geminiTraits?.gender || '',
-                  height: pythonTraits?.height || geminiTraits?.height || '',
-                  build: pythonTraits?.build || geminiTraits?.build || '',
-                  // Use Gemini for semantic features (hair, clothing, etc.)
-                  hairColor: geminiTraits?.hairColor || '',
-                  clothing: geminiTraits?.clothing || '',
-                  otherFeatures: geminiTraits?.otherFeatures || '',
-                  fullText: geminiTraits?.fullText || ''
-                };
-              } else {
-                // Normal mode: just use Gemini
-                geminiTraits = await analyzeImageForTraits(originalImage);
-                primaryTraits = geminiTraits;
-              }
+              const [pythonResult, geminiResult] = await Promise.allSettled([
+                analyzeImageWithPython(originalImage),
+                analyzeImageForTraits(originalImage)
+              ]);
+
+              pythonTraits = pythonResult.status === 'fulfilled' ? pythonResult.value : null;
+              geminiTraits = geminiResult.status === 'fulfilled' ? geminiResult.value : null;
+
+              console.log('🐍 Python result:', pythonTraits ? 'success' : 'failed');
+              console.log('🤖 Gemini result:', geminiTraits ? 'success' : 'failed');
+
+              // Combine results: Python for detection, Gemini for features
+              primaryTraits = {
+                // Use Python bounding boxes (more accurate for face/body detection)
+                faceBox: pythonTraits?.faceBox || null,
+                bodyBox: pythonTraits?.bodyBox || null,
+                // Use Gemini for ALL features (more detailed analysis)
+                age: geminiTraits?.age || pythonTraits?.age || '',
+                gender: geminiTraits?.gender || pythonTraits?.gender || '',
+                height: geminiTraits?.height || pythonTraits?.height || '',
+                build: geminiTraits?.build || pythonTraits?.build || '',
+                hairColor: geminiTraits?.hairColor || '',
+                clothing: geminiTraits?.clothing || '',
+                otherFeatures: geminiTraits?.otherFeatures || '',
+                fullText: geminiTraits?.fullText || '',
+                // Store pre-cropped images from Python
+                faceThumbnail: pythonTraits?.faceThumbnail || null,
+                bodyCrop: pythonTraits?.bodyCrop || null
+              };
 
               if (primaryTraits) {
-                // Create cropped versions if bounding boxes are available
+                // Use FACE crop as main character photo (more reliable for recognition)
                 let finalPhotoUrl = basicPhotoUrl;
-                let finalThumbnailUrl = basicPhotoUrl;
+                let bodyPhotoUrl = basicPhotoUrl; // Keep body crop for image generation
 
-                // Use Python pre-cropped images if available (more accurate)
+                // Use Python pre-cropped face image if available (more accurate)
                 if (pythonTraits?.faceThumbnail) {
-                  finalThumbnailUrl = pythonTraits.faceThumbnail;
-                  console.log('✅ Using Python face thumbnail');
+                  finalPhotoUrl = pythonTraits.faceThumbnail;
+                  console.log('✅ Using Python face thumbnail as main photo');
                 } else if (primaryTraits.faceBox) {
                   try {
-                    finalThumbnailUrl = await cropImageToFace(originalImage, primaryTraits.faceBox, 150);
-                    console.log('✅ Created face-centered thumbnail from Gemini box');
+                    finalPhotoUrl = await cropImageToFace(originalImage, primaryTraits.faceBox, 150);
+                    console.log('✅ Created face-centered photo from bounding box');
                   } catch (err) {
-                    console.warn('Failed to create face thumbnail, using compressed image:', err);
+                    console.warn('Failed to create face crop, using compressed image:', err);
                   }
                 }
 
+                // Also store body crop for image generation if needed
                 if (pythonTraits?.bodyCrop) {
-                  finalPhotoUrl = pythonTraits.bodyCrop;
-                  console.log('✅ Using Python body crop');
+                  bodyPhotoUrl = pythonTraits.bodyCrop;
+                  console.log('✅ Stored Python body crop for image generation');
                 } else if (primaryTraits.bodyBox) {
                   try {
-                    finalPhotoUrl = await cropImageToBody(originalImage, primaryTraits.bodyBox);
-                    console.log('✅ Created body-cropped photo from Gemini box');
+                    bodyPhotoUrl = await cropImageToBody(originalImage, primaryTraits.bodyBox);
+                    console.log('✅ Created body crop for image generation');
                   } catch (err) {
-                    console.warn('Failed to create body crop, using compressed image:', err);
+                    console.warn('Failed to create body crop:', err);
                   }
                 }
 
@@ -7197,8 +7205,9 @@ Return ONLY valid JSON, no markdown or other text.`
                   hairColor: primaryTraits.hairColor || prev.hairColor,
                   clothing: primaryTraits.clothing || prev.clothing,
                   otherFeatures: primaryTraits.otherFeatures || prev.otherFeatures,
-                  photoUrl: finalPhotoUrl,
-                  thumbnailUrl: finalThumbnailUrl,
+                  photoUrl: finalPhotoUrl,        // Face crop - used throughout the app
+                  thumbnailUrl: finalPhotoUrl,    // Same as photoUrl (face)
+                  bodyPhotoUrl: bodyPhotoUrl,     // Body crop - for image generation
                   // Store both results for dev mode comparison
                   faceBox: primaryTraits.faceBox || null,
                   bodyBox: primaryTraits.bodyBox || null,
