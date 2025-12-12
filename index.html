@@ -757,6 +757,7 @@
       const [newFear, setNewFear] = useState('');
       const [newRelationship, setNewRelationship] = useState('');
       const [relationships, setRelationships] = useState({});
+      const [isLoadingCharacters, setIsLoadingCharacters] = useState(false); // Prevent auto-save during load
       const [pages, setPages] = useState(30); // Default to 30 print pages for normal users
       const [dedication, setDedication] = useState(''); // Optional dedication text for page 0
       const [languageLevel, setLanguageLevel] = useState('standard');
@@ -1309,10 +1310,15 @@
       }, [step]);
 
       // Save characters and relationships whenever they change (with debounce)
+      // Skip saving while loading to prevent race conditions
       useEffect(() => {
-        if (authToken && characters.length > 0) {
+        if (authToken && characters.length > 0 && !isLoadingCharacters) {
           const timeoutId = setTimeout(() => {
             // Pass all data explicitly to avoid stale closure issues
+            console.log('💾 [AUTO-SAVE] Saving characters and relationships...', {
+              characterCount: characters.length,
+              relationshipCount: Object.keys(relationships).length
+            });
             saveCharacters({
               characters,
               relationships,
@@ -1326,7 +1332,7 @@
 
           return () => clearTimeout(timeoutId);
         }
-      }, [characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears, authToken]);
+      }, [characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears, authToken, isLoadingCharacters]);
 
       // Update prompt when returning to step 4 with prompt visible
       useEffect(() => {
@@ -2357,6 +2363,10 @@ Be specific and creative. Each scene description should paint a clear picture fo
       const loadCharacters = async () => {
         if (!authToken) return;
 
+        // Set loading flag to prevent auto-save from overwriting data during load
+        setIsLoadingCharacters(true);
+        console.log('👥 [LOAD] Starting character load (auto-save disabled)...');
+
         try {
           const response = await fetch(`${API_URL}/api/characters`, {
             headers: {
@@ -2367,6 +2377,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
           if (response.ok) {
             const data = await response.json();
             console.log('👥 Characters API response:', data);
+            console.log('👥 [LOAD] Relationships from server:', data.relationships);
 
             // Normalize characters - ensure all fields exist with defaults
             const normalizeCharacter = (char) => ({
@@ -2396,6 +2407,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
               setCharacters(loadedCharacters);
 
               if (data.relationships && typeof data.relationships === 'object') {
+                console.log('👥 [LOAD] Setting relationships:', Object.keys(data.relationships).length, 'relationships');
                 setRelationships(data.relationships);
               }
               if (data.relationshipTexts && typeof data.relationshipTexts === 'object' && !Array.isArray(data.relationshipTexts)) {
@@ -2425,6 +2437,13 @@ Be specific and creative. Each scene description should paint a clear picture fo
           }
         } catch (err) {
           console.error('Error loading characters:', err);
+        } finally {
+          // Re-enable auto-save after load completes
+          // Use a small delay to ensure all state updates have settled
+          setTimeout(() => {
+            setIsLoadingCharacters(false);
+            console.log('👥 [LOAD] Character load complete (auto-save re-enabled)');
+          }, 500);
         }
       };
 
