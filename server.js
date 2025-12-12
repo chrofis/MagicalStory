@@ -5387,7 +5387,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 - **Title**: ${storyTypeName}
 - **Target Age**: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years (early readers)
 - **Length**: ${totalPages} pages
-- **Language**: ${lang === 'de' ? 'German (use ä, ö, ü, ß normally - these are correct German characters)' : lang === 'fr' ? 'French' : 'English'}
+- **Language**: ${lang === 'de' ? 'German (use ä, ö, ü normally. Do not use ß, use ss instead)' : lang === 'fr' ? 'French' : 'English'}
 - **Story Type**: ${storyTypeName}
 ${inputData.storyDetails ? `- **Story Details**: ${inputData.storyDetails}` : ''}
 ${inputData.dedication ? `- **Dedication**: ${inputData.dedication}` : ''}
@@ -6281,7 +6281,7 @@ function buildBasePrompt(inputData) {
   // Add German language note if applicable
   const language = inputData.language || 'en';
   const languageNote = language === 'de' || language === 'German'
-    ? ' (use ä, ö, ü, ß normally - these are correct German characters)'
+    ? ' (use ä, ö, ü normally. Do not use ß, use ss instead)'
     : '';
 
   return `# Story Parameters

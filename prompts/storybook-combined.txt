@@ -5,7 +5,7 @@ You are an expert children's picture book author. Create a simple, heartwarming 
 - **Title**: {TITLE}
 - **Target Age**: {AGE_FROM}-{AGE_TO} years (early readers)
 - **Length**: {PAGES} pages
-- **Language**: {LANGUAGE} (NOTE: If German, use ä, ö, ü, ß normally - these are correct German characters)
+- **Language**: {LANGUAGE} (NOTE: If German, use ä, ö, ü normally. Do not use ß, use ss instead)
 - **Story Type**: {STORY_TYPE}
 - **Story Details**: {STORY_DETAILS}
 - **Dedication**: {DEDICATION}
