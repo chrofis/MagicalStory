@@ -755,7 +755,7 @@
       const [newFear, setNewFear] = useState('');
       const [newRelationship, setNewRelationship] = useState('');
       const [relationships, setRelationships] = useState({});
-      const [pages, setPages] = useState(15); // Default to 15 pages for normal users
+      const [pages, setPages] = useState(30); // Default to 30 print pages for normal users
       const [dedication, setDedication] = useState(''); // Optional dedication text for page 0
       const [languageLevel, setLanguageLevel] = useState('standard');
       const [mainCharacters, setMainCharacters] = useState([]);
@@ -917,9 +917,9 @@
       useEffect(() => {
         if (currentUser) {
           if (currentUser.role === 'admin') {
-            setPages(5); // Admin default: 5 pages
+            setPages(10); // Admin default: 10 pages for testing
           } else {
-            setPages(15); // Normal user default: 15 pages
+            setPages(30); // Normal user default: 30 print pages
           }
         }
       }, [currentUser]);
@@ -5802,16 +5802,19 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           }
 
           // Check minimum page count for printing
-          // Minimum 28 print pages = 14 scenes * 2 (covers NOT counted by print provider)
-          const minimumScenes = 14;
-          const printPages = pages * 2;
+          // Minimum 28 print pages (covers NOT counted by print provider)
+          const minimumPrintPages = 28;
+          const isPictureBook = languageLevel === '1st-grade';
+          // For Picture Book: pages = print pages (1 scene per page)
+          // For Standard: pages = print pages (already includes text + image pages)
+          const printPages = pages;
 
-          if (pages < minimumScenes) {
+          if (printPages < minimumPrintPages) {
             alert(language === 'de'
-              ? `Gedruckte Bücher benötigen mindestens ${minimumScenes} Szenen (${minimumScenes * 2} Druckseiten). Ihre Geschichte hat ${pages} Szenen (${printPages} Druckseiten).\n\nBitte erstellen Sie eine neue Geschichte mit mindestens ${minimumScenes} Szenen oder laden Sie die Geschichte als PDF herunter.`
+              ? `Gedruckte Bücher benötigen mindestens ${minimumPrintPages} Seiten. Ihre Geschichte hat ${printPages} Seiten.\n\nBitte erstellen Sie eine neue Geschichte mit mindestens ${minimumPrintPages} Seiten oder laden Sie die Geschichte als PDF herunter.`
               : language === 'fr'
-              ? `Les livres imprimés nécessitent au moins ${minimumScenes} scènes (${minimumScenes * 2} pages d'impression). Votre histoire a ${pages} scènes (${printPages} pages d'impression).\n\nVeuillez créer une nouvelle histoire avec au moins ${minimumScenes} scènes ou télécharger l'histoire en PDF.`
-              : `Printed books require at least ${minimumScenes} scenes (${minimumScenes * 2} print pages). Your story has ${pages} scenes (${printPages} print pages).\n\nPlease create a new story with at least ${minimumScenes} scenes or download the story as PDF.`);
+              ? `Les livres imprimés nécessitent au moins ${minimumPrintPages} pages. Votre histoire a ${printPages} pages.\n\nVeuillez créer une nouvelle histoire avec au moins ${minimumPrintPages} pages ou télécharger l'histoire en PDF.`
+              : `Printed books require at least ${minimumPrintPages} pages. Your story has ${printPages} pages.\n\nPlease create a new story with at least ${minimumPrintPages} pages or download the story as PDF.`);
             return;
           }
 
@@ -5977,9 +5980,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
           // Step 2: Get product UID from backend (with fallback to default)
           // IMPORTANT: Print provider only counts story content pages (not covers)
-          // - Each scene = 2 pages (1 text page + 1 image page)
+          // - pages now represents actual print pages directly
           // - Covers (back, front, initial page) are NOT counted by print provider
-          const actualPdfPages = pages * 2;  // Print page count (story content only)
+          const actualPdfPages = pages;  // Print page count (story content only)
           let productUid;
 
           try {
@@ -7627,26 +7630,6 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             </div>
 
             <div>
-              <label className="block text-xl font-semibold mb-3">
-                {t.numberOfPages}
-              </label>
-              <select
-                value={pages}
-                onChange={(e) => setPages(parseInt(e.target.value))}
-                className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base md:text-lg font-semibold"
-              >
-                {currentUser && currentUser.role === 'admin' && (
-                  <>
-                    <option value="1">1 {language === 'de' ? 'Seite (Test)' : language === 'fr' ? 'page (Test)' : 'page (Test)'}</option>
-                    <option value="5">5 {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}</option>
-                  </>
-                )}
-                <option value="15">15 {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}</option>
-                <option value="20">20 {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}</option>
-              </select>
-            </div>
-
-            <div>
               <label className="block text-xl font-semibold mb-3">{t.readingLevel}</label>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
@@ -7693,6 +7676,55 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 ))}
               </div>
             </div>
+
+            {/* Number of Pages - shown after book type is selected */}
+            {languageLevel && (
+              <div>
+                <label className="block text-xl font-semibold mb-3">
+                  {t.numberOfPages}
+                </label>
+                <select
+                  value={pages}
+                  onChange={(e) => setPages(parseInt(e.target.value))}
+                  className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base md:text-lg font-semibold"
+                >
+                  {/* Admin/Developer testing option */}
+                  {currentUser && currentUser.role === 'admin' && (
+                    <option value="10">
+                      {languageLevel === '1st-grade'
+                        ? `10 ${language === 'de' ? 'Seiten (Test)' : language === 'fr' ? 'pages (Test)' : 'pages (Test)'}`
+                        : `10 ${language === 'de' ? 'Seiten (5 Text + 5 Bilder) (Test)' : language === 'fr' ? 'pages (5 texte + 5 images) (Test)' : 'pages (5 text + 5 images) (Test)'}`
+                      }
+                    </option>
+                  )}
+                  {/* Normal user options */}
+                  <option value="30">
+                    {languageLevel === '1st-grade'
+                      ? `30 ${language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}`
+                      : `30 ${language === 'de' ? 'Seiten (15 Text + 15 Bilder)' : language === 'fr' ? 'pages (15 texte + 15 images)' : 'pages (15 text + 15 images)'}`
+                    }
+                  </option>
+                  <option value="40">
+                    {languageLevel === '1st-grade'
+                      ? `40 ${language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}`
+                      : `40 ${language === 'de' ? 'Seiten (20 Text + 20 Bilder)' : language === 'fr' ? 'pages (20 texte + 20 images)' : 'pages (20 text + 20 images)'}`
+                    }
+                  </option>
+                  <option value="50">
+                    {languageLevel === '1st-grade'
+                      ? `50 ${language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}`
+                      : `50 ${language === 'de' ? 'Seiten (25 Text + 25 Bilder)' : language === 'fr' ? 'pages (25 texte + 25 images)' : 'pages (25 text + 25 images)'}`
+                    }
+                  </option>
+                </select>
+                <p className="text-sm text-gray-500 mt-2">
+                  {languageLevel === '1st-grade'
+                    ? (language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below')
+                    : (language === 'de' ? 'Abwechselnd Textseite und Bildseite' : language === 'fr' ? 'Alternance de pages de texte et d\'images' : 'Alternating text page and image page')
+                  }
+                </p>
+              </div>
+            )}
 
             {/* Additional Story Details */}
             <div>

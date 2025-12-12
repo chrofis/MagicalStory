@@ -5189,6 +5189,8 @@ function extractShortSceneDescriptions(outline) {
 async function processStorybookJob(jobId, inputData, characterPhotos, skipImages) {
   console.log(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
+  // For Picture Book: pages = scenes (each page has image + text)
+  // inputData.pages is the actual print page count
   const totalPages = inputData.pages;
 
   try {
@@ -5572,8 +5574,16 @@ async function processStoryJob(jobId) {
 
     const job = jobResult.rows[0];
     const inputData = job.input_data;
-    const totalPages = inputData.pages;
     const skipImages = inputData.skipImages === true; // Developer mode: text only
+
+    // Check if this is a picture book (1st-grade) - use simplified combined flow
+    const isPictureBook = inputData.languageLevel === '1st-grade';
+
+    // Calculate total scenes/pages to generate:
+    // - Picture Book: pages = scenes (each page has image + text on same page)
+    // - Standard: pages = print pages, so scenes = pages / 2 (text page + image page per scene)
+    const totalPages = isPictureBook ? inputData.pages : Math.floor(inputData.pages / 2);
+    console.log(`📚 [PIPELINE] Input pages: ${inputData.pages}, Mode: ${isPictureBook ? 'Picture Book' : 'Standard'}, Scenes to generate: ${totalPages}`);
 
     if (skipImages) {
       console.log(`📝 [PIPELINE] Text-only mode enabled - skipping image generation`);
@@ -5595,9 +5605,6 @@ async function processStoryJob(jobId) {
       'UPDATE story_jobs SET status = $1, progress = $2, progress_message = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
       ['processing', 5, 'Starting story generation...', jobId]
     );
-
-    // Check if this is a picture book (1st-grade) - use simplified combined flow
-    const isPictureBook = inputData.languageLevel === '1st-grade';
 
     if (isPictureBook) {
       console.log(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
