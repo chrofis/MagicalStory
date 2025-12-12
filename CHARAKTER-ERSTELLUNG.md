@@ -305,10 +305,28 @@ Diese Trennung ist wichtig, da:
 
 ---
 
+### Gemeinsame Merkmale (für Text UND Bild):
+
+Das **Hauptcharakter-Flag** (`mainCharacters` Array) wird für BEIDE Zwecke verwendet:
+
+| Verwendung | Auswirkung |
+|------------|------------|
+| **Story-Text** | Hauptcharaktere bekommen mehr Fokus in der Geschichte |
+| **Cover-Bilder** | Hauptcharaktere werden ZENTRAL und GROSS im Bild platziert |
+| **Szenen-Bilder** | Hauptcharaktere werden als "MAIN CHARACTER" markiert |
+
+```javascript
+// mainCharacters ist ein Array von Character-IDs
+mainCharacters: [1234567890123]  // IDs der Hauptcharaktere (max. 2)
+```
+
+---
+
 ### Story-Prompt (psychologische Merkmale):
 
 Für die Generierung der Geschichte werden folgende Felder verwendet:
 - `name`, `gender`, `age` (Basisinformationen)
+- `isMainCharacter` (aus mainCharacters Array)
 - `strengths` (Stärken)
 - `weaknesses` (Schwächen)
 - `fears` (Ängste)
@@ -329,6 +347,7 @@ Special Details: Liebt Hunde"
 
 Für die Generierung der Bilder werden folgende Felder verwendet:
 - `name`, `gender`, `age` (Basisinformationen)
+- `isMainCharacter` (aus mainCharacters Array) - **für Positionierung im Bild**
 - `height` (Größe)
 - `build` (Körperbau)
 - `hairColor` (Haarfarbe)
@@ -337,8 +356,14 @@ Für die Generierung der Bilder werden folgende Felder verwendet:
 - `photoUrl` (Referenzbild für Konsistenz)
 
 ```javascript
-// Beispiel Bild-Prompt (generateCharacterDescription):
-"Sophie is a 8-year-old girl, 120cm, slim build, with blonde hair, blue eyes. Wearing: blue t-shirt with star pattern"
+// Beispiel Cover-Bild-Prompt:
+"**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**
+⭐ MAIN: Sophie is a 8-year-old girl, 120cm, slim build, with blonde hair, blue eyes. Wearing: blue t-shirt
+
+**Supporting characters (can appear in background or sides):**
+Supporting: Max is a 10-year-old boy, 135cm, athletic build, with brown hair
+
+**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**"
 ```
 
 **Hinweis:** Psychologische Merkmale (strengths, weaknesses, fears, specialDetails) werden NICHT an die Bildgenerierung übergeben, da sie für die visuelle Darstellung nicht relevant sind.

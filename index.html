@@ -4213,34 +4213,55 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
           const styleDescription = selectedStyle.prompt;
 
-          // Build character information for cover images
+          // Build character information for cover images with main character emphasis
           const coverCharacterImages = [];
           const coverCharacterImageMap = [];
           let characterInfo = '';
 
           if (characters.length > 0) {
-            characterInfo = '\n\nThe cover MUST feature the following characters:\n';
+            // Separate main characters from supporting characters
+            const mainChars = characters.filter(c => mainCharacters.includes(c.id));
+            const supportingChars = characters.filter(c => !mainCharacters.includes(c.id));
 
-            characters.forEach((char, idx) => {
+            characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
+
+            // List main characters first with emphasis
+            mainChars.forEach((char) => {
               const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
-              // Use physical description for image generation
               const physicalDesc = generateCharacterDescription(char);
-              characterInfo += `Character ${idx + 1}${imageRef}: ${physicalDesc}\n`;
+              characterInfo += `⭐ MAIN: ${physicalDesc}${imageRef}\n`;
 
-              // Collect character images
               if (char.photoUrl) {
                 coverCharacterImages.push(char.photoUrl);
-                coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length });
+                coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length, isMain: true });
               }
             });
+
+            // Then list supporting characters
+            if (supportingChars.length > 0) {
+              characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
+              supportingChars.forEach((char) => {
+                const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
+                const physicalDesc = generateCharacterDescription(char);
+                characterInfo += `Supporting: ${physicalDesc}${imageRef}\n`;
+
+                if (char.photoUrl) {
+                  coverCharacterImages.push(char.photoUrl);
+                  coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length, isMain: false });
+                }
+              });
+            }
 
             // Add image reference explanation if we have character images
             if (coverCharacterImageMap.length > 0) {
               characterInfo += '\n**CHARACTER REFERENCE IMAGES:**\n';
               coverCharacterImageMap.forEach((mapping) => {
-                characterInfo += `- Image ${mapping.imageIndex}: ${mapping.name}'s portrait (use for facial features, appearance consistency)\n`;
+                const mainLabel = mapping.isMain ? ' (MAIN - center of image)' : ' (supporting)';
+                characterInfo += `- Image ${mapping.imageIndex}: ${mapping.name}'s portrait${mainLabel}\n`;
               });
             }
+
+            characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
           }
 
           // Use scene descriptions from outline if available, otherwise use defaults
@@ -5174,34 +5195,55 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
           const styleDescription = selectedStyle.prompt;
 
-          // Build character information for cover images
+          // Build character information for cover images with main character emphasis
           const coverCharacterImages = [];
           const coverCharacterImageMap = [];
           let characterInfo = '';
 
           if (characters.length > 0) {
-            characterInfo = '\n\nThe cover MUST feature the following characters:\n';
+            // Separate main characters from supporting characters
+            const mainChars = characters.filter(c => mainCharacters.includes(c.id));
+            const supportingChars = characters.filter(c => !mainCharacters.includes(c.id));
 
-            characters.forEach((char, idx) => {
+            characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
+
+            // List main characters first with emphasis
+            mainChars.forEach((char) => {
               const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
-              // Use physical description for image generation
               const physicalDesc = generateCharacterDescription(char);
-              characterInfo += `Character ${idx + 1}${imageRef}: ${physicalDesc}\n`;
+              characterInfo += `⭐ MAIN: ${physicalDesc}${imageRef}\n`;
 
-              // Collect character images
               if (char.photoUrl) {
                 coverCharacterImages.push(char.photoUrl);
-                coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length });
+                coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length, isMain: true });
               }
             });
+
+            // Then list supporting characters
+            if (supportingChars.length > 0) {
+              characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
+              supportingChars.forEach((char) => {
+                const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
+                const physicalDesc = generateCharacterDescription(char);
+                characterInfo += `Supporting: ${physicalDesc}${imageRef}\n`;
+
+                if (char.photoUrl) {
+                  coverCharacterImages.push(char.photoUrl);
+                  coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length, isMain: false });
+                }
+              });
+            }
 
             // Add image reference explanation if we have character images
             if (coverCharacterImageMap.length > 0) {
               characterInfo += '\n**CHARACTER REFERENCE IMAGES:**\n';
               coverCharacterImageMap.forEach((mapping) => {
-                characterInfo += `- Image ${mapping.imageIndex}: ${mapping.name}'s portrait (use for facial features, appearance consistency)\n`;
+                const mainLabel = mapping.isMain ? ' (MAIN - center of image)' : ' (supporting)';
+                characterInfo += `- Image ${mapping.imageIndex}: ${mapping.name}'s portrait${mainLabel}\n`;
               });
             }
+
+            characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
           }
 
           // Use scene descriptions from outline if available, otherwise use defaults
