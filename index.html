@@ -3305,9 +3305,11 @@ TITLE: [Creative story title]
         setGenerationProgress({ current: 0, total: pages, message: 'Analyzing story pages...' });
 
         try {
-          // Split story into pages
-          const pageMatches = generatedStory.split(/---\s*Page\s+\d+\s*---/i);
-          // Remove first element if it's just intro/empty text before "--- Page 1 ---"
+          // Split story into pages - handle both formats:
+          // - Markdown format: ## Seite 1 or ## Page 1
+          // - Old format: --- Page 1 --- or --- Seite 1 ---
+          const pageMatches = generatedStory.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i);
+          // Remove first element if it's just intro/empty text before page marker
           // Don't filter out empty pages - we need to maintain the page count
           const storyPages = pageMatches.slice(1);
 
@@ -6048,7 +6050,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       const downloadPrintablePDF = async () => {
         try {
           const storyTitle = `${storyTypes.find(t => t.id === storyType)?.name[language] || 'Story'}`;
-          const pageMatches = generatedStory ? generatedStory.split(/---\s*Page\s+\d+\s*---/i) : [];
+          // Parse story pages - handle both formats:
+          // - Markdown format: ## Seite 1 or ## Page 1
+          // - Old format: --- Page 1 --- or --- Seite 1 ---
+          const pageMatches = generatedStory ? generatedStory.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i) : [];
           const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
 
           // Check if this is a Picture Book (1st-grade level)
@@ -6308,8 +6313,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             : 'Generating PDF, please wait...'
           );
 
-          // Parse story pages from generatedStory (markdown format: ## Seite 1 or ## Page 1)
-          const pageMatches = generatedStory.split(/##\s*(?:Seite|Page)\s+\d+/i);
+          // Parse story pages from generatedStory - handle both formats:
+          // - Markdown format: ## Seite 1 or ## Page 1
+          // - Old format: --- Page 1 --- or --- Seite 1 ---
+          const pageMatches = generatedStory.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i);
           const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0).map((text, index) => ({
             pageNumber: index + 1,
             text: text.trim()
@@ -8468,8 +8475,10 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
       );
 
       const renderStep5 = () => {
-        // Parse story by pages for side-by-side display
-        const pageMatches = generatedStory ? generatedStory.split(/---\s*Page\s+\d+\s*---/i) : [];
+        // Parse story by pages for side-by-side display - handle both formats:
+        // - Markdown format: ## Seite 1 or ## Page 1
+        // - Old format: --- Page 1 --- or --- Seite 1 ---
+        const pageMatches = generatedStory ? generatedStory.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i) : [];
         const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
 
         return (
