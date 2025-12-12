@@ -3641,6 +3641,10 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Missing or invalid storyPages' });
     }
 
+    // Helper function to extract image data from cover images
+    // Supports both old format (base64 string) and new format (object with imageData property)
+    const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
+
     const PDFDocument = require('pdfkit');
     const stream = require('stream');
 
@@ -3675,14 +3679,17 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
     // PDF Page 1: Back Cover + Front Cover (spread, 290.27 x 146.0 mm)
     doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-    if (coverImages && coverImages.backCover && coverImages.frontCover) {
+    const backCoverImageData = getCoverImageData(coverImages?.backCover);
+    const frontCoverImageData = getCoverImageData(coverImages?.frontCover);
+
+    if (backCoverImageData && frontCoverImageData) {
       // Add back cover on left half
-      const backCoverData = coverImages.backCover.replace(/^data:image\/\w+;base64,/, '');
+      const backCoverData = backCoverImageData.replace(/^data:image\/\w+;base64,/, '');
       const backCoverBuffer = Buffer.from(backCoverData, 'base64');
       doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
 
       // Add front cover on right half
-      const frontCoverData = coverImages.frontCover.replace(/^data:image\/\w+;base64,/, '');
+      const frontCoverData = frontCoverImageData.replace(/^data:image\/\w+;base64,/, '');
       const frontCoverBuffer = Buffer.from(frontCoverData, 'base64');
       doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
 
@@ -3704,8 +3711,9 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
     // PDF Page 2: Initial Page (140 x 140 mm)
     doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-    if (coverImages && coverImages.initialPage) {
-      const initialPageData = coverImages.initialPage.replace(/^data:image\/\w+;base64,/, '');
+    const initialPageImageData = getCoverImageData(coverImages?.initialPage);
+    if (initialPageImageData) {
+      const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
       const initialPageBuffer = Buffer.from(initialPageData, 'base64');
       doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
     }
@@ -4842,6 +4850,10 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     console.log('📄 [BACKGROUND] Generating PDF...');
     const PDFDocument = require('pdfkit');
 
+    // Helper function to extract image data from cover images
+    // Supports both old format (base64 string) and new format (object with imageData property)
+    const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
+
     const mmToPoints = (mm) => mm * 2.83465;
     const coverWidth = mmToPoints(290.27);
     const coverHeight = mmToPoints(146.0);
@@ -4864,18 +4876,22 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     // Add cover page
     doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-    if (storyData.coverImages?.backCover && storyData.coverImages?.frontCover) {
-      const backCoverBuffer = Buffer.from(storyData.coverImages.backCover.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      const frontCoverBuffer = Buffer.from(storyData.coverImages.frontCover.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+    const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+
+    if (backCoverImageData && frontCoverImageData) {
+      const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
       doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
       doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
     }
 
     // Add initial page (dedication/intro page)
-    if (storyData.coverImages?.initialPage) {
+    const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+    if (initialPageImageData) {
       doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      const initialPageData = storyData.coverImages.initialPage.replace(/^data:image\/\w+;base64,/, '');
+      const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
       const initialPageBuffer = Buffer.from(initialPageData, 'base64');
       doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
     }
