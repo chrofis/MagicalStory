@@ -5828,32 +5828,40 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               contents: [{
                 parts: [
                   {
-                    text: `Analyze this character image and provide physical attributes AND bounding boxes.
+                    text: `Analyze this person in the image. Provide physical attributes and locate their face and body.
 
-                    PART 1 - Physical Attributes:
-                    1. Age (just a number)
-                    2. Estimated Height in centimeters
-                    3. Build (slim/average/athletic/chubby/overweight/heavily overweight)
-                    4. Hair style/color
-                    5. Clothing style (describe what they're wearing: type of garment, colors, style)
-                    6. Other distinctive features (eye color, glasses, facial features, etc.)
+                    PHYSICAL ATTRIBUTES:
+                    - Age (just the number, e.g. 25)
+                    - Height estimate in cm (e.g. 175)
+                    - Build (one of: slim, average, athletic, chubby, overweight)
+                    - Hair (color and style)
+                    - Clothing (what they're wearing)
+                    - Features (eye color, glasses, distinctive features)
 
-                    PART 2 - Bounding Boxes (as percentage of image dimensions 0-100):
-                    7. Face bounding box - the rectangle containing just the face
-                    8. Body bounding box - the rectangle containing the full body (head to feet if visible, or as much as shown)
+                    LOCATION IN IMAGE (as percentage 0-100 of image width/height):
+                    - FaceBox: Where is the face? Give the LEFT edge %, TOP edge %, WIDTH %, HEIGHT %
+                    - BodyBox: Where is the visible body (from top of head to bottom of feet or lowest visible point)? Give LEFT edge %, TOP edge %, WIDTH %, HEIGHT %
 
-                    Return the response in this exact format:
+                    IMPORTANT FOR BOUNDING BOXES:
+                    - Left edge: 0% = left side of image, 50% = middle, 100% = right side
+                    - Top edge: 0% = top of image, 50% = middle, 100% = bottom
+                    - Width/Height: percentage of image that the box spans
+                    - The face box should tightly contain just the face (forehead to chin, ear to ear)
+                    - The body box should contain the entire visible person from head to lowest visible body part
+
+                    Return EXACTLY in this format:
                     Age: [number]
                     Height: [number] cm
-                    Build: [description]
+                    Build: [word]
                     Hair: [description]
                     Clothing: [description]
                     Features: [description]
-                    FaceBox: [x],[y],[width],[height]
-                    BodyBox: [x],[y],[width],[height]
+                    FaceBox: [left%],[top%],[width%],[height%]
+                    BodyBox: [left%],[top%],[width%],[height%]
 
-                    For bounding boxes, x and y are the top-left corner position as percentage (0-100), width and height are the box size as percentage.
-                    Example: FaceBox: 35,10,30,25 means face starts at 35% from left, 10% from top, spans 30% width and 25% height.`
+                    Example for a centered portrait photo:
+                    FaceBox: 30,15,40,35
+                    BodyBox: 15,10,70,85`
                   },
                   {
                     inlineData: {
@@ -5908,27 +5916,43 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             const featuresMatch = analysisText.match(/Features:\s*([^\n]+)/i);
             if (featuresMatch) traits.otherFeatures = featuresMatch[1].trim();
 
-            // Parse bounding boxes
+            // Parse bounding boxes with validation
             const faceBoxMatch = analysisText.match(/FaceBox:\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
             if (faceBoxMatch) {
-              traits.faceBox = {
+              const fb = {
                 x: parseFloat(faceBoxMatch[1]),
                 y: parseFloat(faceBoxMatch[2]),
                 width: parseFloat(faceBoxMatch[3]),
                 height: parseFloat(faceBoxMatch[4])
               };
-              console.log('📦 Face box detected:', traits.faceBox);
+              // Validate: values should be 0-100 and box should be within image
+              if (fb.x >= 0 && fb.x <= 100 && fb.y >= 0 && fb.y <= 100 &&
+                  fb.width > 0 && fb.width <= 100 && fb.height > 0 && fb.height <= 100 &&
+                  fb.x + fb.width <= 105 && fb.y + fb.height <= 105) { // Allow small overflow
+                traits.faceBox = fb;
+                console.log('📦 Face box detected:', traits.faceBox);
+              } else {
+                console.warn('⚠️ Face box values out of range, ignoring:', fb);
+              }
             }
 
             const bodyBoxMatch = analysisText.match(/BodyBox:\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
             if (bodyBoxMatch) {
-              traits.bodyBox = {
+              const bb = {
                 x: parseFloat(bodyBoxMatch[1]),
                 y: parseFloat(bodyBoxMatch[2]),
                 width: parseFloat(bodyBoxMatch[3]),
                 height: parseFloat(bodyBoxMatch[4])
               };
-              console.log('📦 Body box detected:', traits.bodyBox);
+              // Validate: values should be 0-100 and box should be within image
+              if (bb.x >= 0 && bb.x <= 100 && bb.y >= 0 && bb.y <= 100 &&
+                  bb.width > 0 && bb.width <= 100 && bb.height > 0 && bb.height <= 100 &&
+                  bb.x + bb.width <= 105 && bb.y + bb.height <= 105) { // Allow small overflow
+                traits.bodyBox = bb;
+                console.log('📦 Body box detected:', traits.bodyBox);
+              } else {
+                console.warn('⚠️ Body box values out of range, ignoring:', bb);
+              }
             }
 
             return traits;
@@ -7050,7 +7074,9 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   clothing: traits.clothing || prev.clothing,
                   otherFeatures: traits.otherFeatures || prev.otherFeatures,
                   photoUrl: finalPhotoUrl,        // Body crop for image generation
-                  thumbnailUrl: finalThumbnailUrl // Face crop for display
+                  thumbnailUrl: finalThumbnailUrl, // Face crop for display
+                  faceBox: traits.faceBox || null,  // Store for dev mode display
+                  bodyBox: traits.bodyBox || null   // Store for dev mode display
                 }));
 
                 // Store the full analyzed text for display
@@ -7618,6 +7644,21 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               </div>
                               <p className="text-[8px] text-purple-600">thumbnailUrl</p>
                             </div>
+                          </div>
+
+                          {/* Bounding Box Info */}
+                          <div className="text-[9px] bg-white p-1 rounded border border-purple-300">
+                            <p className="font-semibold text-purple-700">Bounding Boxes:</p>
+                            <p className="text-purple-600">
+                              Face: {currentCharacter.faceBox
+                                ? `x:${currentCharacter.faceBox.x}% y:${currentCharacter.faceBox.y}% w:${currentCharacter.faceBox.width}% h:${currentCharacter.faceBox.height}%`
+                                : 'Not detected'}
+                            </p>
+                            <p className="text-purple-600">
+                              Body: {currentCharacter.bodyBox
+                                ? `x:${currentCharacter.bodyBox.x}% y:${currentCharacter.bodyBox.y}% w:${currentCharacter.bodyBox.width}% h:${currentCharacter.bodyBox.height}%`
+                                : 'Not detected'}
+                            </p>
                           </div>
 
                           {/* Extracted Traits */}
