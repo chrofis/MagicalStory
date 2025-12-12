@@ -126,9 +126,10 @@ def detect_body_mediapipe(image):
                 y_min = min(y_coords)
                 y_max = max(y_coords)
 
-                # Add padding (10% of body size)
-                padding_x = (x_max - x_min) * 0.1
-                padding_y = (y_max - y_min) * 0.1
+                # Add generous padding (30% of body size) to avoid cutting off limbs/clothing
+                # Background removal will handle the extra space
+                padding_x = (x_max - x_min) * 0.3
+                padding_y = (y_max - y_min) * 0.3
 
                 x_min = max(0, x_min - padding_x)
                 x_max = min(1, x_max + padding_x)
