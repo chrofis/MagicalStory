@@ -760,6 +760,7 @@
       const [languageLevel, setLanguageLevel] = useState('standard');
       const [mainCharacters, setMainCharacters] = useState([]);
       const [generatedStory, setGeneratedStory] = useState('');
+      const [rawAIResponse, setRawAIResponse] = useState(''); // Raw unparsed AI response for developer mode
       const [isGenerating, setIsGenerating] = useState(false);
       const [savedStories, setSavedStories] = useState([]);
       const [showSavedStories, setShowSavedStories] = useState(false);
@@ -1090,6 +1091,7 @@
                 setStoryTitle(fullStory.title || '');
                 setCoverImages(fullStory.coverImages || { frontCover: null, initialPage: null, backCover: null });
                 setImagePrompts(fullStory.imagePrompts || {});
+                setRawAIResponse(fullStory.rawAIResponse || '');
                 setStep(5);
               })
               .catch(err => {
@@ -3564,6 +3566,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 setSceneImages(result.images || []);
                 setCoverImages(result.coverImages || { frontCover: null, initialPage: null, backCover: null });
                 setImagePrompts(result.imagePrompts || {}); // Load image prompts
+                setRawAIResponse(result.rawAIResponse || ''); // Store raw AI response for developer mode
               }
 
               alert('Story generation complete! Your story is ready.');
@@ -3591,6 +3594,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                   imagePrompts: result.imagePrompts || {}, // Save image prompts for developer features
                   coverImages: result.coverImages || { frontCover: null, initialPage: null, backCover: null },
                   thumbnail: (result.coverImages?.frontCover?.imageData || result.coverImages?.frontCover || null),
+                  rawAIResponse: result.rawAIResponse || '', // Save raw AI response for developer features
                   createdAt: new Date().toISOString()
                 };
 
@@ -7904,7 +7908,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {developerMode && (
             <div className="md:bg-white md:border-2 md:border-indigo-200 md:rounded-xl p-4 md:p-8">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-800">Full Story Text</h3>
+                <h3 className="text-lg font-bold text-gray-800">Full Story Text (Parsed)</h3>
                 <button
                   onClick={() => {
                     if (editingStory) {
@@ -7932,6 +7936,24 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   {generatedStory}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 4. Raw AI Response - Developer Mode Only */}
+          {developerMode && rawAIResponse && (
+            <div className="md:bg-yellow-50 md:border-2 md:border-yellow-300 md:rounded-xl p-4 md:p-6">
+              <details className="group">
+                <summary className="cursor-pointer text-lg font-bold text-yellow-800 mb-3 flex items-center gap-2 hover:text-yellow-900">
+                  <Icon name="code" size={20} />
+                  Raw AI Response (Unparsed)
+                  <span className="text-sm font-normal text-yellow-600 ml-2">Click to expand</span>
+                </summary>
+                <div className="mt-4 bg-white border border-yellow-200 rounded-lg p-4 max-h-96 overflow-auto">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono">
+                    {rawAIResponse}
+                  </pre>
+                </div>
+              </details>
             </div>
           )}
 
@@ -9959,6 +9981,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               setStoryTitle(fullStory.title || '');
                               setCoverImages(fullStory.coverImages || { frontCover: null, initialPage: null, backCover: null });
                               setImagePrompts(fullStory.imagePrompts || {}); // Load image prompts for developer features
+                              setRawAIResponse(fullStory.rawAIResponse || ''); // Load raw AI response for developer features
                               setStep(5);
                               setShowSavedStories(false);
                               setShowLoadingProgress(false);

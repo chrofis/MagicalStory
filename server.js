@@ -5234,7 +5234,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 - **Title**: ${storyTypeName}
 - **Target Age**: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years (early readers)
 - **Length**: ${totalPages} pages
-- **Language**: ${lang === 'de' ? 'German (always use "ss" instead of "ß")' : lang === 'fr' ? 'French' : 'English'}
+- **Language**: ${lang === 'de' ? 'German (use "ss" instead of "ß", and use ä, ö, ü normally)' : lang === 'fr' ? 'French' : 'English'}
 - **Story Type**: ${storyTypeName}
 ${inputData.storyDetails ? `- **Story Details**: ${inputData.storyDetails}` : ''}
 ${inputData.dedication ? `- **Dedication**: ${inputData.dedication}` : ''}
@@ -5269,9 +5269,17 @@ Create a simple story arc:
 
 # Output Format
 
-First provide the TITLE, then for EACH page provide BOTH the story text AND the scene description:
+You MUST start with the TITLE PAGE, then provide ALL story pages. Use this exact format:
 
+---TITLE PAGE---
 TITLE: [Creative story title]
+${inputData.dedication ? 'DEDICATION: [Dedication text]' : ''}
+
+SCENE:
+Setting: [Cover scene that sets the mood for the story]
+Characters: [Main character(s) featured on cover]
+Action: [An inviting cover moment]
+Mood: [Welcoming, magical, exciting, etc.]
 
 ---PAGE 1---
 TEXT:
@@ -5297,6 +5305,7 @@ Mood: [Emotional tone]
 
 # Important
 
+- You MUST include the TITLE PAGE first, followed by PAGE 1, PAGE 2, etc.
 - Write the COMPLETE story for ALL ${totalPages} pages
 - Keep text SHORT - this is a picture book!
 - Scene descriptions should be detailed enough for an illustrator
@@ -5313,7 +5322,7 @@ Mood: [Emotional tone]
     const response = await callClaudeAPI(storybookPrompt, 16000);
 
     // Save checkpoint
-    await saveCheckpoint(jobId, 'storybook_combined', { response });
+    await saveCheckpoint(jobId, 'storybook_combined', { response, rawResponse: response });
 
     // Extract title
     let storyTitle = inputData.title || 'My Picture Book';
@@ -5323,19 +5332,47 @@ Mood: [Emotional tone]
     }
     console.log(`📖 [STORYBOOK] Extracted title: ${storyTitle}`);
 
+    // Extract dedication if present
+    let dedication = inputData.dedication || '';
+    const dedicationMatch = response.match(/DEDICATION:\s*(.+)/i);
+    if (dedicationMatch) {
+      dedication = dedicationMatch[1].trim();
+    }
+
     // Parse the response to extract text and scenes
-    const pageBlocks = response.split(/---PAGE\s+\d+---/i).filter(block => block.trim());
+    // Split by page markers but keep track of what's before PAGE 1 (title/dedication info)
+    const pageSplitRegex = /---PAGE\s+(\d+)---/gi;
+    const pageMatches = [...response.matchAll(pageSplitRegex)];
 
     let fullStoryText = '';
     const allSceneDescriptions = [];
     const allImages = [];
     const imagePrompts = {};
 
-    console.log(`📖 [STORYBOOK] Parsing ${pageBlocks.length} page blocks`);
+    // Also check for TITLE PAGE section
+    let titlePageScene = null;
+    const titlePageMatch = response.match(/---TITLE PAGE---\s*([\s\S]*?)(?=---PAGE\s+\d+---|$)/i);
+    if (titlePageMatch) {
+      const titlePageBlock = titlePageMatch[1];
+      const sceneMatch = titlePageBlock.match(/SCENE:\s*([\s\S]*?)$/i);
+      if (sceneMatch) {
+        titlePageScene = {
+          pageNumber: 0,
+          description: sceneMatch[1].trim()
+        };
+        allSceneDescriptions.push(titlePageScene);
+      }
+    }
 
-    for (let i = 0; i < pageBlocks.length && i < totalPages; i++) {
-      const block = pageBlocks[i];
-      const pageNum = i + 1;
+    console.log(`📖 [STORYBOOK] Found ${pageMatches.length} page markers`);
+
+    // Extract content for each page using the markers
+    for (let i = 0; i < pageMatches.length && i < totalPages; i++) {
+      const match = pageMatches[i];
+      const pageNum = parseInt(match[1], 10); // Use the actual page number from the marker
+      const startIndex = match.index + match[0].length;
+      const endIndex = pageMatches[i + 1] ? pageMatches[i + 1].index : response.length;
+      const block = response.substring(startIndex, endIndex);
 
       // Extract TEXT section
       const textMatch = block.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|$)/i);
@@ -5480,8 +5517,10 @@ Mood: [Emotional tone]
       language: lang,
       languageLevel: '1st-grade',
       characters: inputData.characters,
-      dedication: inputData.dedication,
-      artStyle: inputData.artStyle
+      dedication: dedication,
+      artStyle: inputData.artStyle,
+      // Developer mode: raw AI response for debugging
+      rawAIResponse: response
     };
 
     // Mark job as completed
