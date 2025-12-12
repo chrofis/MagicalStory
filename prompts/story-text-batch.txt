@@ -33,9 +33,11 @@ Write engaging, age-appropriate content for each page, maintaining a consistent 
 Ensure all characters consistently reflect their established traits, ages, and relationships from the BASE_PROMPT.
 Within this page range, ensure the plot progresses naturally and avoids rushing or excessive detail on any single page.
 
-FORMATTING: Format dialogues inline within paragraphs.
-**Do not add extra line breaks** between dialogue lines.
-Keep conversations flowing in continuous prose like a traditional novel.
+FORMATTING:
+- Use proper paragraph breaks to organize the text naturally
+- Start a new paragraph for new scenes, speaker changes, or topic shifts
+- Dialogues can be on their own lines or inline, whichever flows better
+- Create readable, well-structured text like a traditional children's novel
 
 Output Format:
 --- Page {START_PAGE} ---
