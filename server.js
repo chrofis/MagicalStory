@@ -127,6 +127,38 @@ function calculateOptimalBatchSize(totalPages, tokensPerPage = 400, safetyMargin
   return batchSize;
 }
 
+/**
+ * Build a physical description of a character for image generation
+ * Only includes visual attributes, not psychological traits
+ * @param {Object} char - Character object
+ * @returns {string} Physical description string
+ */
+function buildCharacterPhysicalDescription(char) {
+  const age = parseInt(char.age) || 10;
+  const gender = char.gender || 'child';
+  const genderLabel = gender === 'male' ? 'boy' : gender === 'female' ? 'girl' : 'child';
+
+  let description = `${char.name} is a ${age}-year-old ${genderLabel}`;
+
+  if (char.height) {
+    description += `, ${char.height}`;
+  }
+  if (char.build) {
+    description += `, ${char.build} build`;
+  }
+  if (char.hairColor) {
+    description += `, with ${char.hairColor} hair`;
+  }
+  if (char.otherFeatures) {
+    description += `, ${char.otherFeatures}`;
+  }
+  if (char.clothing) {
+    description += `. Wearing: ${char.clothing}`;
+  }
+
+  return description;
+}
+
 // Load prompt templates from files
 const PROMPT_TEMPLATES = {};
 async function loadPromptTemplates() {
@@ -2516,13 +2548,29 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const artStyleId = storyData.artStyle || 'pixar';
     const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
-    // Build character info
+    // Build character info with main character emphasis
     let characterInfo = '';
     if (storyData.characters && storyData.characters.length > 0) {
-      characterInfo = '\n\nThe cover MUST feature the following characters:\n';
-      storyData.characters.forEach((char, idx) => {
-        characterInfo += `Character ${idx + 1} (${char.name}): ${char.age} years old, ${char.gender}.\n`;
+      const mainCharacterIds = storyData.mainCharacters || [];
+      const mainChars = storyData.characters.filter(c => mainCharacterIds.includes(c.id));
+      const supportingChars = storyData.characters.filter(c => !mainCharacterIds.includes(c.id));
+
+      characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
+
+      mainChars.forEach((char) => {
+        const physicalDesc = buildCharacterPhysicalDescription(char);
+        characterInfo += `⭐ MAIN: ${physicalDesc}\n`;
       });
+
+      if (supportingChars.length > 0) {
+        characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
+        supportingChars.forEach((char) => {
+          const physicalDesc = buildCharacterPhysicalDescription(char);
+          characterInfo += `Supporting: ${physicalDesc}\n`;
+        });
+      }
+
+      characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
     }
 
     // Build cover prompt
@@ -5892,13 +5940,31 @@ Output Format:
       const artStyleId = inputData.artStyle || 'pixar';
       const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
-      // Build character info (matches step-by-step format)
+      // Build character info with main character emphasis
       let characterInfo = '';
       if (inputData.characters && inputData.characters.length > 0) {
-        characterInfo = '\n\nThe cover MUST feature the following characters:\n';
-        inputData.characters.forEach((char, idx) => {
-          characterInfo += `Character ${idx + 1} (${char.name}): ${char.age} years old, ${char.gender}.\n`;
+        const mainCharacterIds = inputData.mainCharacters || [];
+        const mainChars = inputData.characters.filter(c => mainCharacterIds.includes(c.id));
+        const supportingChars = inputData.characters.filter(c => !mainCharacterIds.includes(c.id));
+
+        characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
+
+        // List main characters first
+        mainChars.forEach((char) => {
+          const physicalDesc = buildCharacterPhysicalDescription(char);
+          characterInfo += `⭐ MAIN: ${physicalDesc}\n`;
         });
+
+        // Then supporting characters
+        if (supportingChars.length > 0) {
+          characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
+          supportingChars.forEach((char) => {
+            const physicalDesc = buildCharacterPhysicalDescription(char);
+            characterInfo += `Supporting: ${physicalDesc}\n`;
+          });
+        }
+
+        characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
       }
 
       // Extract cover scene descriptions from outline (matches step-by-step)

@@ -1,10 +1,12 @@
 {TITLE_PAGE_SCENE}
 
-Style: {STYLE_DESCRIPTION}.{CHARACTER_INFO}
+Style: {STYLE_DESCRIPTION}.
+
+{CHARACTER_INFO}
 
 Create this as a beautiful title page illustration for the children's book "{STORY_TITLE}".
 
 IMPORTANT:
-- Focus on the MAIN CHARACTER(S) - they should be the central focus of the cover, prominently featured and visually striking.
-- Supporting characters may appear in the background or not at all.
+- The MAIN CHARACTER(S) must be the LARGEST figures in the image, positioned CENTRALLY and prominently featured.
+- Supporting characters may appear smaller, in the background, or at the sides.
 - The image should include the story title "{STORY_TITLE}" integrated beautifully into the illustration. Make the title prominent and visually appealing as part of the cover art.
