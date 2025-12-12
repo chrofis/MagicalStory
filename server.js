@@ -5730,8 +5730,8 @@ Output Format:
 ...continue until page ${endPage}...`;
 
       // Calculate tokens needed based on batch size (use 80% of model max as safety margin)
-      const batchPages = endPage - startPage + 1;
-      const batchTokensNeeded = Math.min(batchPages * 500, Math.floor(activeTextModel.maxOutputTokens * 0.8));
+      const batchPageCount = endPage - startPage + 1;
+      const batchTokensNeeded = Math.min(batchPageCount * 500, Math.floor(activeTextModel.maxOutputTokens * 0.8));
       const batchText = await callClaudeAPI(batchPrompt, batchTokensNeeded);
       fullStoryText += batchText + '\n\n';
 
