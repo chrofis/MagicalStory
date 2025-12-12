@@ -41,6 +41,9 @@ console.log('💾 Image cache initialized');
 //   - Tier 2+ (400K tokens/min): 0 (generate all at once)
 const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;  // 0 = no batching (generate all at once)
 
+// Image generation mode: 'parallel' (fast) or 'sequential' (consistent - passes previous image)
+const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
+
 // Verbose logging mode - set VERBOSE_LOGGING=true for detailed debug output
 const VERBOSE_LOGGING = process.env.VERBOSE_LOGGING === 'true';
 
@@ -3270,6 +3273,13 @@ app.post('/api/admin/print-provider/seed-products', authenticateToken, async (re
     console.error('Error seeding products:', err);
     res.status(500).json({ error: 'Failed to seed products', details: err.message });
   }
+});
+
+// Get general app configuration (public, no auth required)
+app.get('/api/config', (req, res) => {
+  res.json({
+    imageGenMode: IMAGE_GEN_MODE  // 'parallel' or 'sequential'
+  });
 });
 
 // Get active products for users

@@ -721,6 +721,8 @@
 
       const [language, setLanguage] = useState(detectBrowserLanguage());
       const [developerMode, setDeveloperMode] = useState(false); // false = Auto Mode, true = Developer Mode
+      const [imageGenMode, setImageGenMode] = useState(null); // null = use server default, 'parallel' or 'sequential'
+      const [serverImageGenMode, setServerImageGenMode] = useState('parallel'); // Default from server
       // Skip landing page if already logged in
       const [step, setStep] = useState(() => {
         const savedToken = localStorage.getItem('auth_token');
@@ -912,6 +914,25 @@
           window.lucide.createIcons();
         }
       }, []); // Run only once on mount - don't re-run when step changes!
+
+      // Fetch server config on mount
+      useEffect(() => {
+        const fetchConfig = async () => {
+          try {
+            const response = await fetch(`${API_URL}/api/config`);
+            if (response.ok) {
+              const config = await response.json();
+              if (config.imageGenMode) {
+                setServerImageGenMode(config.imageGenMode);
+                console.log('📋 Server config loaded:', config);
+              }
+            }
+          } catch (error) {
+            console.log('Could not fetch server config, using defaults');
+          }
+        };
+        fetchConfig();
+      }, []);
 
       // Set default page count based on user role
       useEffect(() => {
@@ -2298,7 +2319,8 @@ Be specific and creative. Each scene description should paint a clear picture fo
               strengths: char.strengths || [],
               weaknesses: char.weaknesses || [],
               fears: char.fears || [],
-              photoUrl: char.photoUrl || null
+              photoUrl: char.photoUrl || null,
+              thumbnailUrl: char.thumbnailUrl || null
             });
 
             let loadedCharacters = [];
@@ -4840,6 +4862,107 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         throw new Error('No image data found in Gemini response');
       };
 
+      // Helper function to call Gemini API with previous scene image for sequential generation
+      const callGeminiAPISequential = async (prompt, previousSceneImage, characterAvatars = [], pageNumber = null) => {
+        if (!authToken) {
+          throw new Error('Authentication required');
+        }
+
+        const parts = [{ text: prompt }];
+
+        // Add PREVIOUS scene image FIRST (most important for continuity)
+        if (previousSceneImage) {
+          const base64Data = previousSceneImage.replace(/^data:image\/\w+;base64,/, '');
+          const mimeType = previousSceneImage.match(/^data:(image\/\w+);base64,/) ?
+            previousSceneImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+          parts.push({
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          });
+        }
+
+        // Then add character avatars
+        characterAvatars.forEach(avatarUrl => {
+          const base64Data = avatarUrl.replace(/^data:image\/\w+;base64,/, '');
+          const mimeType = avatarUrl.match(/^data:(image\/\w+);base64,/) ?
+            avatarUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+          parts.push({
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          });
+        });
+
+        const apiPayload = {
+          model: 'gemini-2.5-flash-image',
+          contents: [{ parts: parts }],
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+          ]
+        };
+
+        // Log API call for admin debugging
+        if (pageNumber !== null) {
+          const apiCallLog = {
+            endpoint: `${API_URL}/api/gemini`,
+            method: 'POST',
+            mode: 'sequential',
+            hasPreviousScene: !!previousSceneImage,
+            avatarCount: characterAvatars.length,
+            timestamp: new Date().toISOString()
+          };
+          setApiCalls(prev => ({ ...prev, [pageNumber]: apiCallLog }));
+        }
+
+        console.log(`🔗 [Sequential] Generating page ${pageNumber} with ${previousSceneImage ? 'previous scene + ' : ''}${characterAvatars.length} avatar(s)`);
+
+        const response = await fetchWithTimeout(`${API_URL}/api/gemini`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify(apiPayload)
+        }, 120000); // 120 second timeout
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Gemini API Error: ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.candidates || data.candidates.length === 0) {
+          throw new Error('No response from Gemini API.');
+        }
+
+        const candidate = data.candidates[0];
+        if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+          throw new Error(`Content generation blocked: ${candidate.finishReason}.`);
+        }
+
+        if (!candidate.content || !candidate.content.parts) {
+          throw new Error('Invalid response structure from Gemini API.');
+        }
+
+        const responseParts = candidate.content.parts;
+        for (const part of responseParts) {
+          if (part.inlineData && part.inlineData.data) {
+            return `data:image/png;base64,${part.inlineData.data}`;
+          }
+        }
+
+        throw new Error('No image data found in Gemini response');
+      };
+
       // ========================================
       // HELPER FUNCTIONS - Extracted for clarity
       // ========================================
@@ -5018,17 +5141,22 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             setBaseCharacterImages(cartoons);
           }
 
-          setGenerationProgress({ current: mainCharacters.length, total: sceneDescriptions.length + mainCharacters.length, message: 'Generating images in parallel...' });
+          // Determine effective image generation mode
+          const effectiveMode = imageGenMode || serverImageGenMode || 'parallel';
+          const modeMessage = effectiveMode === 'sequential'
+            ? 'Generating images sequentially (for consistency)...'
+            : 'Generating images in parallel...';
+          setGenerationProgress({ current: mainCharacters.length, total: sceneDescriptions.length + mainCharacters.length, message: modeMessage });
 
           const prompts = {}; // Store prompts for each image
           const characterClothing = {}; // Track clothing for consistency
 
           // Only generate images for the current number of pages
           const scenesToGenerate = sceneDescriptions.slice(0, pages);
-          console.log(`Generating images for ${scenesToGenerate.length} scenes in parallel (pages: ${pages}, total scenes: ${sceneDescriptions.length})`);
+          console.log(`Generating images for ${scenesToGenerate.length} scenes in ${effectiveMode} mode (pages: ${pages}, total scenes: ${sceneDescriptions.length})`);
 
-          // Create all image generation promises at once
-          const imagePromises = scenesToGenerate.map(async (scene) => {
+          // Helper function to generate a single scene image
+          const generateSingleSceneImage = async (scene, previousSceneImage = null, useSequentialMode = false) => {
             console.log(`Generating image for page ${scene.pageNumber}, scene description exists: ${!!scene.description}`);
 
             // Identify which characters are in THIS scene
@@ -5047,8 +5175,6 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                            sceneText.includes('kitchen') || sceneText.includes('bedroom');
 
             // Build character context - ONLY for characters in this scene
-            // NOTE: We do NOT send character images to avoid Gemini's child safety blocks
-            // Instead, we use detailed text descriptions for consistency
             let characterPrompts = '';
 
             if (charactersInScene.length > 0) {
@@ -5105,14 +5231,11 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
               characterPrompts += `\nCRITICAL: These characters must maintain PERFECT visual consistency across ALL pages. Use the exact same facial features, hair style, body proportions, and identifying characteristics every single time.`;
             }
 
-            // Get short scene description from outline if available
-            const shortSceneDesc = shortSceneDescriptions[scene.pageNumber];
-
             // Get the selected art style's prompt
             const selectedStyle = artStyles.find(s => s.id === artStyle) || artStyles[0];
             const styleDescription = selectedStyle.prompt;
 
-            // Build image prompt with character consistency guide - ONLY use the detailed scene description
+            // Build image prompt with character consistency guide
             let imagePrompt = `Create a cinematic scene in ${styleDescription}.
 
 Scene Description: ${scene.description}
@@ -5121,6 +5244,16 @@ ${characterPrompts}`;
             // Add character consistency guide if available
             if (characterConsistencyGuide) {
               imagePrompt += characterConsistencyGuide;
+            }
+
+            // Add visual continuity instructions for sequential mode
+            if (useSequentialMode && previousSceneImage) {
+              imagePrompt += `\n\n**VISUAL CONTINUITY - CRITICAL:**
+The FIRST attached image shows the PREVIOUS scene from this story. You MUST maintain:
+- Exact same character appearances (faces, hair, body proportions, skin tone)
+- Same clothing and accessories unless the scene explicitly mentions a change
+- Consistent art style, lighting approach, and color palette
+- Any recurring objects or background elements should look the same`;
             }
 
             imagePrompt += `\n\nImportant:
@@ -5145,8 +5278,13 @@ ${imagePrompt}
 IMPORTANT: This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.`;
 
               let imageData;
-              if (characterAvatars.length > 0) {
-                // Send with avatar images for better consistency
+
+              if (useSequentialMode && previousSceneImage) {
+                // Sequential mode - pass previous scene image for consistency
+                console.log(`Page ${scene.pageNumber}: Generating with previous scene + ${characterAvatars.length} avatar(s) (SEQUENTIAL)...`);
+                imageData = await callGeminiAPISequential(safePrompt, previousSceneImage, characterAvatars, scene.pageNumber);
+              } else if (characterAvatars.length > 0) {
+                // Parallel mode with avatars
                 console.log(`Page ${scene.pageNumber}: Generating with ${characterAvatars.length} avatar(s) for consistency...`);
                 imageData = await callGeminiAPIWithImages(safePrompt, characterAvatars, scene.pageNumber);
               } else {
@@ -5175,17 +5313,45 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               };
             } catch (error) {
               console.error(`Error generating image for page ${scene.pageNumber}:`, error);
-              // Continue with other images even if one fails
               return {
                 pageNumber: scene.pageNumber,
                 imageData: null,
                 error: error.message
               };
             }
-          });
+          };
 
-          // Wait for all images to complete in parallel
-          const images = await Promise.all(imagePromises);
+          // Generate images based on mode
+          let images;
+
+          if (effectiveMode === 'sequential') {
+            // SEQUENTIAL MODE: Generate one at a time, passing previous image for consistency
+            console.log('🔗 Starting SEQUENTIAL image generation for better consistency...');
+            images = [];
+            let previousImage = null;
+
+            for (let i = 0; i < scenesToGenerate.length; i++) {
+              const scene = scenesToGenerate[i];
+              setGenerationProgress({
+                current: mainCharacters.length + i + 1,
+                total: sceneDescriptions.length + mainCharacters.length,
+                message: `Generating image ${i + 1} of ${scenesToGenerate.length} (sequential)...`
+              });
+
+              const result = await generateSingleSceneImage(scene, previousImage, true);
+              images.push(result);
+
+              // Pass successful image to next scene
+              if (result.imageData) {
+                previousImage = result.imageData;
+              }
+            }
+          } else {
+            // PARALLEL MODE: Generate all at once (faster but less consistent)
+            console.log('⚡ Starting PARALLEL image generation for speed...');
+            const imagePromises = scenesToGenerate.map(scene => generateSingleSceneImage(scene, null, false));
+            images = await Promise.all(imagePromises);
+          }
 
           setSceneImages(images);
           setImagePrompts(prompts); // Save the prompts
@@ -5611,21 +5777,32 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               contents: [{
                 parts: [
                   {
-                    text: `Analyze this character image and provide a concise set of physical attributes.
-                    Specifically list:
+                    text: `Analyze this character image and provide physical attributes AND bounding boxes.
+
+                    PART 1 - Physical Attributes:
                     1. Age (just a number)
                     2. Estimated Height in centimeters
                     3. Build (slim/average/athletic/chubby/overweight/heavily overweight)
                     4. Hair style/color
                     5. Clothing style (describe what they're wearing: type of garment, colors, style)
                     6. Other distinctive features (eye color, glasses, facial features, etc.)
+
+                    PART 2 - Bounding Boxes (as percentage of image dimensions 0-100):
+                    7. Face bounding box - the rectangle containing just the face
+                    8. Body bounding box - the rectangle containing the full body (head to feet if visible, or as much as shown)
+
                     Return the response in this exact format:
                     Age: [number]
                     Height: [number] cm
                     Build: [description]
                     Hair: [description]
                     Clothing: [description]
-                    Features: [description]`
+                    Features: [description]
+                    FaceBox: [x],[y],[width],[height]
+                    BodyBox: [x],[y],[width],[height]
+
+                    For bounding boxes, x and y are the top-left corner position as percentage (0-100), width and height are the box size as percentage.
+                    Example: FaceBox: 35,10,30,25 means face starts at 35% from left, 10% from top, spans 30% width and 25% height.`
                   },
                   {
                     inlineData: {
@@ -5649,7 +5826,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             const analysisText = data.candidates[0].content.parts[0].text;
             console.log('Image analysis:', analysisText);
 
-            // Parse the analysis to extract age, height, build, hair, clothing, and features
+            // Parse the analysis to extract age, height, build, hair, clothing, features, and bounding boxes
             const traits = {
               age: '',
               height: '',
@@ -5657,6 +5834,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               hairColor: '',
               clothing: '',
               otherFeatures: '',
+              faceBox: null,
+              bodyBox: null,
               fullText: analysisText
             };
 
@@ -5677,6 +5856,29 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
             const featuresMatch = analysisText.match(/Features:\s*([^\n]+)/i);
             if (featuresMatch) traits.otherFeatures = featuresMatch[1].trim();
+
+            // Parse bounding boxes
+            const faceBoxMatch = analysisText.match(/FaceBox:\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
+            if (faceBoxMatch) {
+              traits.faceBox = {
+                x: parseFloat(faceBoxMatch[1]),
+                y: parseFloat(faceBoxMatch[2]),
+                width: parseFloat(faceBoxMatch[3]),
+                height: parseFloat(faceBoxMatch[4])
+              };
+              console.log('📦 Face box detected:', traits.faceBox);
+            }
+
+            const bodyBoxMatch = analysisText.match(/BodyBox:\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
+            if (bodyBoxMatch) {
+              traits.bodyBox = {
+                x: parseFloat(bodyBoxMatch[1]),
+                y: parseFloat(bodyBoxMatch[2]),
+                width: parseFloat(bodyBoxMatch[3]),
+                height: parseFloat(bodyBoxMatch[4])
+              };
+              console.log('📦 Body box detected:', traits.bodyBox);
+            }
 
             return traits;
           }
@@ -6280,6 +6482,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               id: char.id,
               name: char.name,
               photoUrl: char.photoUrl || null,
+              thumbnailUrl: char.thumbnailUrl || null,
               gender: char.gender,
               age: char.age,
               hairColor: char.hairColor || '',
@@ -6497,6 +6700,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           name: '',
           photo: null,
           photoUrl: null,
+          thumbnailUrl: null,
           useDescription: false,
           descriptionAge: '',
           hairColor: '',
@@ -6649,36 +6853,155 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
         });
       };
 
+      // Crop image based on bounding box (percentages) and create a square thumbnail centered on face
+      const cropImageToFace = (dataUrl, faceBox, outputSize = 150) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = outputSize;
+            canvas.height = outputSize;
+            const ctx = canvas.getContext('2d');
+
+            // Convert percentage bounding box to pixels
+            const imgWidth = img.width;
+            const imgHeight = img.height;
+            const faceX = (faceBox.x / 100) * imgWidth;
+            const faceY = (faceBox.y / 100) * imgHeight;
+            const faceW = (faceBox.width / 100) * imgWidth;
+            const faceH = (faceBox.height / 100) * imgHeight;
+
+            // Calculate center of face
+            const faceCenterX = faceX + faceW / 2;
+            const faceCenterY = faceY + faceH / 2;
+
+            // Create a square crop area centered on face, with some padding
+            const cropSize = Math.max(faceW, faceH) * 1.8; // Add 80% padding around face
+            let cropX = faceCenterX - cropSize / 2;
+            let cropY = faceCenterY - cropSize / 2;
+
+            // Ensure crop stays within image bounds
+            cropX = Math.max(0, Math.min(cropX, imgWidth - cropSize));
+            cropY = Math.max(0, Math.min(cropY, imgHeight - cropSize));
+            const finalCropSize = Math.min(cropSize, imgWidth - cropX, imgHeight - cropY);
+
+            // Draw the cropped region scaled to output size
+            ctx.drawImage(img, cropX, cropY, finalCropSize, finalCropSize, 0, 0, outputSize, outputSize);
+
+            const croppedUrl = canvas.toDataURL('image/jpeg', 0.85);
+            console.log(`📷 Face thumbnail created: ${outputSize}x${outputSize}px`);
+            resolve(croppedUrl);
+          };
+          img.src = dataUrl;
+        });
+      };
+
+      // Crop image to body bounding box for storage (used in image generation)
+      const cropImageToBody = (dataUrl, bodyBox, maxWidth = 600, maxHeight = 800, quality = 0.85) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+
+            // Convert percentage bounding box to pixels
+            const imgWidth = img.width;
+            const imgHeight = img.height;
+            let cropX = (bodyBox.x / 100) * imgWidth;
+            let cropY = (bodyBox.y / 100) * imgHeight;
+            let cropW = (bodyBox.width / 100) * imgWidth;
+            let cropH = (bodyBox.height / 100) * imgHeight;
+
+            // Add small padding around body (5%)
+            const paddingX = cropW * 0.05;
+            const paddingY = cropH * 0.05;
+            cropX = Math.max(0, cropX - paddingX);
+            cropY = Math.max(0, cropY - paddingY);
+            cropW = Math.min(imgWidth - cropX, cropW + paddingX * 2);
+            cropH = Math.min(imgHeight - cropY, cropH + paddingY * 2);
+
+            // Calculate output dimensions maintaining aspect ratio
+            let outWidth = cropW;
+            let outHeight = cropH;
+            if (outWidth > maxWidth || outHeight > maxHeight) {
+              const ratio = Math.min(maxWidth / outWidth, maxHeight / outHeight);
+              outWidth = Math.round(outWidth * ratio);
+              outHeight = Math.round(outHeight * ratio);
+            }
+
+            canvas.width = outWidth;
+            canvas.height = outHeight;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outWidth, outHeight);
+
+            const croppedUrl = canvas.toDataURL('image/jpeg', quality);
+            console.log(`📷 Body crop created: ${outWidth}x${outHeight}px (from ${Math.round(cropW)}x${Math.round(cropH)}px region)`);
+            resolve(croppedUrl);
+          };
+          img.src = dataUrl;
+        });
+      };
+
       const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
         if (file) {
           const reader = new FileReader();
           reader.onloadend = async () => {
-            // Compress the image before storing
-            const photoUrl = await compressImage(reader.result);
+            const originalImage = reader.result;
 
-            // First update the photo
+            // First, create a basic compressed version for immediate display
+            const basicPhotoUrl = await compressImage(originalImage);
+
+            // Update character with basic photo immediately (so UI shows something)
             setCurrentCharacter({
               ...currentCharacter,
               photo: file,
-              photoUrl: photoUrl
+              photoUrl: basicPhotoUrl,
+              thumbnailUrl: basicPhotoUrl // Use same initially, will update after analysis
             });
             setGeneratedAvatar(null);
 
             // Only analyze and auto-fill if it's a real photo (not a ready avatar)
             if (uploadType === 'photo') {
-              const traits = await analyzeImageForTraits(photoUrl);
+              const traits = await analyzeImageForTraits(originalImage);
               if (traits) {
+                // Create cropped versions if bounding boxes are available
+                let finalPhotoUrl = basicPhotoUrl;
+                let finalThumbnailUrl = basicPhotoUrl;
+
+                // Create face-centered thumbnail if face box detected
+                if (traits.faceBox) {
+                  try {
+                    finalThumbnailUrl = await cropImageToFace(originalImage, traits.faceBox, 150);
+                    console.log('✅ Created face-centered thumbnail');
+                  } catch (err) {
+                    console.warn('Failed to create face thumbnail, using compressed image:', err);
+                  }
+                }
+
+                // Create body-cropped photo if body box detected
+                if (traits.bodyBox) {
+                  try {
+                    finalPhotoUrl = await cropImageToBody(originalImage, traits.bodyBox);
+                    console.log('✅ Created body-cropped photo for image generation');
+                  } catch (err) {
+                    console.warn('Failed to create body crop, using compressed image:', err);
+                  }
+                }
+
                 setCurrentCharacter(prev => ({
                   ...prev,
-                  gender: traits.gender || prev.gender,  // DeepFace extracts gender
+                  gender: traits.gender || prev.gender,
                   age: traits.age || prev.age,
                   height: traits.height || prev.height,
                   build: traits.build || prev.build,
                   hairColor: traits.hairColor || prev.hairColor,
                   clothing: traits.clothing || prev.clothing,
-                  otherFeatures: traits.otherFeatures || prev.otherFeatures
+                  otherFeatures: traits.otherFeatures || prev.otherFeatures,
+                  photoUrl: finalPhotoUrl,        // Body crop for image generation
+                  thumbnailUrl: finalThumbnailUrl // Face crop for display
                 }));
+
                 // Store the full analyzed text for display
                 if (traits.fullText) {
                   setAnalyzedTraitsText(traits.fullText);
@@ -7017,8 +7340,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         {/* Top row: Photo/Name on left, Buttons on right */}
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
-                            {char.photoUrl && (
-                              <img src={char.photoUrl} alt={char.name} className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0" />
+                            {(char.thumbnailUrl || char.photoUrl) && (
+                              <img src={char.thumbnailUrl || char.photoUrl} alt={char.name} className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0" />
                             )}
                             <div className="flex-1 min-w-0">
                               <h4 className="font-bold text-sm md:text-base truncate">{char.name}</h4>
@@ -7597,8 +7920,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       <div className="flex items-center justify-center gap-3 md:gap-6 max-w-[75%] mx-auto">
                         {/* Character 1 - Left side */}
                         <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                          {char1.photoUrl && (
-                            <img src={char1.photoUrl} alt={char1.name} className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover" />
+                          {(char1.thumbnailUrl || char1.photoUrl) && (
+                            <img src={char1.thumbnailUrl || char1.photoUrl} alt={char1.name} className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover" />
                           )}
                           <span className="font-semibold text-xs md:text-sm text-center max-w-[80px] truncate">{char1.name}</span>
                         </div>
@@ -7640,8 +7963,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
 
                         {/* Character 2 - Right side */}
                         <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                          {char2.photoUrl && (
-                            <img src={char2.photoUrl} alt={char2.name} className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover" />
+                          {(char2.thumbnailUrl || char2.photoUrl) && (
+                            <img src={char2.thumbnailUrl || char2.photoUrl} alt={char2.name} className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover" />
                           )}
                           <span className="font-semibold text-xs md:text-sm text-center max-w-[80px] truncate">{char2.name}</span>
                         </div>
@@ -7694,8 +8017,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      {char.photoUrl && (
-                        <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full object-cover" />
+                      {(char.thumbnailUrl || char.photoUrl) && (
+                        <img src={char.thumbnailUrl || char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full object-cover" />
                       )}
                       <div className="flex-1">
                         <div className="font-bold text-base flex items-center gap-2">
@@ -8199,6 +8522,46 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               >
                 <Icon name="image" size={20} /> {isGeneratingScenes ? t.creatingScenes : t.createScenes}
               </button>
+            )}
+            {/* Developer mode only: Image Generation Mode Toggle */}
+            {developerMode && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
+              <div className="col-span-full bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-gray-800 text-sm">
+                      {language === 'de' ? 'Bildgenerierungsmodus' : language === 'fr' ? 'Mode de génération' : 'Image Generation Mode'}
+                    </h4>
+                    <p className="text-xs text-gray-500">
+                      {(imageGenMode || serverImageGenMode) === 'sequential'
+                        ? (language === 'de' ? 'Sequentiell: Jedes Bild nutzt das vorherige als Referenz (langsamer, konsistenter)' : 'Sequential: Each image uses previous as reference (slower, more consistent)')
+                        : (language === 'de' ? 'Parallel: Alle Bilder gleichzeitig generieren (schneller)' : 'Parallel: Generate all images simultaneously (faster)')
+                      }
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setImageGenMode('parallel')}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                        (imageGenMode || serverImageGenMode) === 'parallel'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Parallel
+                    </button>
+                    <button
+                      onClick={() => setImageGenMode('sequential')}
+                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                        (imageGenMode || serverImageGenMode) === 'sequential'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Sequential
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
             {/* Developer mode only: Download Scenes & Generate Images */}
             {developerMode && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
