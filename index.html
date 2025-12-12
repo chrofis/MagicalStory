@@ -1105,7 +1105,13 @@
                 setStoryType(fullStory.storyType);
                 setArtStyle(fullStory.artStyle);
                 setPages(fullStory.pages);
+                setLanguageLevel(fullStory.languageLevel || 'standard'); // Critical for display mode (picture book vs standard)
+                setLanguage(fullStory.language || 'en');
+                setDedication(fullStory.dedication || '');
                 setCharacters(fullStory.characters || []);
+                setMainCharacters(fullStory.mainCharacters || []);
+                setRelationships(fullStory.relationships || {});
+                setRelationshipTexts(fullStory.relationshipTexts || {});
                 setStoryOutline(fullStory.outline || '');
                 setGeneratedStory(fullStory.story || '');
                 setSceneDescriptions(fullStory.sceneDescriptions || []);
@@ -3652,6 +3658,9 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                   language: result.language || language,
                   languageLevel: result.languageLevel || languageLevel,
                   characters: result.characters || characters,
+                  mainCharacters: result.mainCharacters || mainCharacters,
+                  relationships: result.relationships || relationships,
+                  relationshipTexts: result.relationshipTexts || relationshipTexts,
                   dedication: result.dedication || dedication,
                   artStyle: result.artStyle || artStyle,
                   outline: result.outline,
@@ -4464,7 +4473,13 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             storyType,
             artStyle,
             pages,
+            language,
+            languageLevel,
             characters,
+            mainCharacters,
+            relationships,
+            relationshipTexts,
+            dedication,
             outline: storyOutline,
             story: storyText,
             sceneDescriptions: scenes,
@@ -10695,7 +10710,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               setStoryType(fullStory.storyType);
                               setArtStyle(fullStory.artStyle);
                               setPages(fullStory.pages);
+                              setLanguageLevel(fullStory.languageLevel || 'standard'); // Critical for display mode (picture book vs standard)
+                              setLanguage(fullStory.language || 'en');
+                              setDedication(fullStory.dedication || '');
                               setCharacters(fullStory.characters || []);
+                              setMainCharacters(fullStory.mainCharacters || []);
+                              setRelationships(fullStory.relationships || {});
+                              setRelationshipTexts(fullStory.relationshipTexts || {});
                               setStoryOutline(fullStory.outline || '');
                               setGeneratedStory(fullStory.story || '');
                               setSceneDescriptions(fullStory.sceneDescriptions || []);
