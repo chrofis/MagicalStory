@@ -5320,8 +5320,17 @@ Mood: [Emotional tone]
     );
 
     // Generate the combined text + scenes in one call
-    console.log(`📖 [STORYBOOK] Calling Claude API for combined generation...`);
-    const response = await callClaudeAPI(storybookPrompt, 16000);
+    console.log(`📖 [STORYBOOK] Calling Claude API for combined generation (${totalPages} pages)...`);
+    console.log(`📖 [STORYBOOK] Prompt length: ${storybookPrompt.length} chars`);
+
+    let response;
+    try {
+      response = await callClaudeAPI(storybookPrompt, 16000);
+      console.log(`📖 [STORYBOOK] Claude API response received, length: ${response?.length || 0} chars`);
+    } catch (apiError) {
+      console.error(`❌ [STORYBOOK] Claude API call failed:`, apiError.message);
+      throw apiError;
+    }
 
     // Save checkpoint
     await saveCheckpoint(jobId, 'storybook_combined', { response, rawResponse: response });
