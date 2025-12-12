@@ -1,3 +1,4 @@
 - Do not automatically deploy. Ask before deploying. If anything is unclear rather ask than go ahead
 - Only deploy after asking
 - Do not deploy unless told so. Ask if there are different optiont how to implement something
+- always ask before deploying

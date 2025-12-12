@@ -8,6 +8,23 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCtdyVIpckWhIfy1_9O8qOaEnTXFuiRYaQ",
+      authDomain: "magical-story-3b745.firebaseapp.com",
+      projectId: "magical-story-3b745",
+      storageBucket: "magical-story-3b745.firebasestorage.app",
+      messagingSenderId: "69965481554",
+      appId: "1:69965481554:web:d264515ca92d2306f5018b",
+      measurementId: "G-TERDSLHHDG"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const firebaseAuth = firebase.auth();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -239,6 +256,15 @@
         signUp: 'Sign up',
         signIn: 'Sign in',
         loginRequired: 'Please login to continue',
+        continueWithGoogle: 'Continue with Google',
+        continueWithApple: 'Continue with Apple',
+        orContinueWith: 'or continue with',
+        forgotPassword: 'Forgot password?',
+        resetPassword: 'Reset Password',
+        resetPasswordDesc: 'Enter your email and we\'ll send you a reset link',
+        sendResetLink: 'Send Reset Link',
+        resetLinkSent: 'Password reset email sent! Check your inbox.',
+        backToLogin: 'Back to login',
         chooseStoryType: 'Choose Your Story Type',
         chooseArtStyle: 'Choose Your Art Style',
         artStyleDescription: 'Select the visual style for your story',
@@ -386,6 +412,15 @@
         signUp: 'Registrieren',
         signIn: 'Anmelden',
         loginRequired: 'Bitte melde dich an, um fortzufahren',
+        continueWithGoogle: 'Mit Google fortfahren',
+        continueWithApple: 'Mit Apple fortfahren',
+        orContinueWith: 'oder fortfahren mit',
+        forgotPassword: 'Passwort vergessen?',
+        resetPassword: 'Passwort zurücksetzen',
+        resetPasswordDesc: 'Gib deine E-Mail ein und wir senden dir einen Link zum Zurücksetzen',
+        sendResetLink: 'Link senden',
+        resetLinkSent: 'E-Mail zum Zurücksetzen gesendet! Überprüfe deinen Posteingang.',
+        backToLogin: 'Zurück zur Anmeldung',
         chooseStoryType: 'Wähle deinen Geschichtentyp',
         chooseArtStyle: 'Wähle deinen Kunststil',
         artStyleDescription: 'Wähle den visuellen Stil für deine Geschichte',
@@ -533,6 +568,15 @@
         signUp: 'S\'inscrire',
         signIn: 'Se connecter',
         loginRequired: 'Veuillez vous connecter pour continuer',
+        continueWithGoogle: 'Continuer avec Google',
+        continueWithApple: 'Continuer avec Apple',
+        orContinueWith: 'ou continuer avec',
+        forgotPassword: 'Mot de passe oublié ?',
+        resetPassword: 'Réinitialiser le mot de passe',
+        resetPasswordDesc: 'Entrez votre e-mail et nous vous enverrons un lien de réinitialisation',
+        sendResetLink: 'Envoyer le lien',
+        resetLinkSent: 'E-mail de réinitialisation envoyé ! Vérifiez votre boîte de réception.',
+        backToLogin: 'Retour à la connexion',
         chooseStoryType: 'Choisissez votre type d\'histoire',
         chooseArtStyle: 'Choisissez votre style artistique',
         artStyleDescription: 'Sélectionnez le style visuel pour votre histoire',
@@ -1554,11 +1598,102 @@ Be specific and creative. Each scene description should paint a clear picture fo
       const handleLogout = () => {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('current_user');
+        // Also sign out from Firebase if signed in
+        if (firebaseAuth.currentUser) {
+          firebaseAuth.signOut();
+        }
         setAuthToken(null);
         setCurrentUser(null);
         setUserQuota(null);
         setIsAuthenticated(false);
         setShowAuthModal(true);
+      };
+
+      // Firebase Auth: Handle social login result from backend
+      const handleFirebaseAuth = async (firebaseUser) => {
+        try {
+          // Get Firebase ID token
+          const idToken = await firebaseUser.getIdToken();
+
+          // Send to backend for verification and user creation/login
+          const response = await fetch(`${API_URL}/api/auth/firebase`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Firebase authentication failed');
+          }
+
+          // Save token and user info (same as regular login)
+          localStorage.setItem('auth_token', data.token);
+          localStorage.setItem('current_user', JSON.stringify(data.user));
+
+          setAuthToken(data.token);
+          setCurrentUser(data.user);
+          setIsAuthenticated(true);
+          setShowAuthModal(false);
+          setAuthForm({ username: '', password: '', email: '' });
+          setStep(1);
+        } catch (err) {
+          setAuthError(err.message);
+        }
+      };
+
+      // Google Sign-In
+      const handleGoogleSignIn = async () => {
+        setAuthError('');
+        try {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          const result = await firebaseAuth.signInWithPopup(provider);
+          await handleFirebaseAuth(result.user);
+        } catch (err) {
+          if (err.code !== 'auth/popup-closed-by-user') {
+            setAuthError(err.message);
+          }
+        }
+      };
+
+      // Apple Sign-In
+      const handleAppleSignIn = async () => {
+        setAuthError('');
+        try {
+          const provider = new firebase.auth.OAuthProvider('apple.com');
+          provider.addScope('email');
+          provider.addScope('name');
+          const result = await firebaseAuth.signInWithPopup(provider);
+          await handleFirebaseAuth(result.user);
+        } catch (err) {
+          if (err.code !== 'auth/popup-closed-by-user') {
+            setAuthError(err.message);
+          }
+        }
+      };
+
+      // Password Reset
+      const handlePasswordReset = async (e) => {
+        e?.preventDefault();
+        setAuthError('');
+
+        if (!authForm.username) {
+          setAuthError('Please enter your email address');
+          return;
+        }
+
+        try {
+          await firebaseAuth.sendPasswordResetEmail(authForm.username);
+          setAuthError('');
+          setAuthMode('resetSent');
+        } catch (err) {
+          if (err.code === 'auth/user-not-found') {
+            setAuthError('No account found with this email');
+          } else {
+            setAuthError(err.message);
+          }
+        }
       };
 
       const fetchUserQuota = async () => {
@@ -6659,17 +6794,19 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
               <div ref={characterFormRef} className="bg-white border-2 border-indigo-200 rounded-lg p-3 space-y-3">
                 <h3 className="text-base font-bold text-gray-800">{currentCharacter.id ? t.editCharacter : t.startCreating}</h3>
 
-                {/* Show message when no photo uploaded yet */}
+                {/* Show upload prompt when no photo uploaded yet */}
                 {!currentCharacter.photoUrl && (
                   <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-4 text-center">
-                    <p className="text-sm font-semibold text-indigo-700 mb-2">{t.uploadPhotoFirst}</p>
-                    <p className="text-xs text-indigo-600">
-                      {language === 'de'
-                        ? 'Laden Sie zunächst ein Foto hoch, um mit der Charaktererstellung zu beginnen.'
-                        : language === 'fr'
-                        ? 'Veuillez d\'abord télécharger une photo pour commencer la création du personnage.'
-                        : 'Please upload a photo first to begin creating your character.'}
-                    </p>
+                    <p className="text-sm font-semibold text-indigo-700 mb-3">{t.uploadPhotoFirst}</p>
+                    <label className="cursor-pointer inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-lg text-base hover:bg-indigo-700 font-semibold">
+                      <Icon name="upload" size={20} /> {t.uploadPhoto}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
                 )}
 
@@ -6687,18 +6824,16 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   </div>
                 )}
 
+                {currentCharacter.photoUrl && (
                 <div className="grid md:grid-cols-2 gap-3">
                   <div className="md:border md:border-indigo-300 md:rounded-lg p-2 md:bg-indigo-50">
                     <label className="block text-xs font-semibold mb-2 text-center">{t.characterPhoto}</label>
                     <div className="flex flex-col items-center gap-2">
-                      {currentCharacter.photoUrl && (
-                        <img
-                          src={currentCharacter.photoUrl}
-                          alt="Character"
-                          className="w-20 h-20 rounded-full object-cover border-2 border-indigo-400"
-                        />
-                      )}
-
+                      <img
+                        src={currentCharacter.photoUrl}
+                        alt="Character"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-indigo-400"
+                      />
 
                       <label className="cursor-pointer bg-indigo-600 text-white px-3 py-1.5 rounded text-xs hover:bg-indigo-700 flex items-center gap-1 font-semibold">
                         <Icon name="upload" size={14} /> {t.uploadPhoto}
@@ -6973,6 +7108,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Strengths - only show after photo is uploaded */}
                 {currentCharacter.photoUrl && (
@@ -7111,20 +7247,22 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                   if (i >= j) return null;
                   const key1 = `${char1.id}-${char2.id}`;
 
+                  const isNotKnown = !relationships[key1] || relationships[key1] === relationshipTypes[10].value[language];
+
                   return (
-                    <div key={key1} className="bg-white border border-gray-200 rounded-lg p-3 md:p-4">
-                      {/* Single row: Photo1 - Name1 - Dropdown - Name2 - Photo2 */}
-                      <div className="flex items-center gap-2 md:gap-3 flex-wrap md:flex-nowrap">
-                        {/* Character 1 */}
-                        <div className="flex items-center gap-2 min-w-0">
+                    <div key={key1} className={`rounded-lg p-3 md:p-4 ${isNotKnown ? 'bg-white border-red-500 border-[3px]' : 'bg-blue-50 border-blue-300 border-2'}`}>
+                      {/* Layout: Character photos on sides, dropdown + details in center - max 75% width on wide screens */}
+                      <div className="flex items-center justify-center gap-3 md:gap-6 max-w-[75%] mx-auto">
+                        {/* Character 1 - Left side */}
+                        <div className="flex flex-col items-center gap-1 flex-shrink-0">
                           {char1.photoUrl && (
-                            <img src={char1.photoUrl} alt={char1.name} className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover flex-shrink-0" />
+                            <img src={char1.photoUrl} alt={char1.name} className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover" />
                           )}
-                          <span className="font-semibold text-sm md:text-base truncate">{char1.name}</span>
+                          <span className="font-semibold text-xs md:text-sm text-center max-w-[80px] truncate">{char1.name}</span>
                         </div>
 
-                        {/* Relationship dropdown */}
-                        <div className="flex-1 min-w-[140px] md:flex-none md:w-auto">
+                        {/* Center: Dropdown + Details stacked - flex-1 for dynamic scaling */}
+                        <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
                           <select
                             value={relationships[key1] || relationshipTypes[10].value[language]}
                             onChange={(e) => {
@@ -7139,36 +7277,33 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                                 updateRelationship(char1.id, char2.id, value);
                               }
                             }}
-                            className="w-full md:w-auto md:min-w-[180px] px-2 py-1.5 border border-gray-300 rounded text-sm font-medium bg-indigo-50"
+                            className={`w-full max-w-[500px] px-2 py-1.5 border rounded text-sm font-medium text-center ${isNotKnown ? 'bg-white border-red-400 border-2' : 'bg-blue-100 border-blue-400'}`}
                           >
                             <option value="__CREATE_CUSTOM__">+ {language === 'de' ? 'Eigene' : language === 'fr' ? 'Personnalisé' : 'Custom'}</option>
                             {allRelationships.map((type, idx) => (
                               <option key={idx} value={type.value[language]}>{type.value[language]}</option>
                             ))}
                           </select>
-                        </div>
-
-                        {/* Character 2 */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-semibold text-sm md:text-base truncate">{char2.name}</span>
-                          {char2.photoUrl && (
-                            <img src={char2.photoUrl} alt={char2.name} className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover flex-shrink-0" />
+                          {/* Details input below dropdown */}
+                          {!isNotKnown && (
+                            <input
+                              type="text"
+                              value={relationshipTexts[key1] || ''}
+                              onChange={(e) => setRelationshipTexts({ ...relationshipTexts, [key1]: e.target.value })}
+                              placeholder={language === 'de' ? 'Details...' : language === 'fr' ? 'Détails...' : 'Details...'}
+                              className="w-full max-w-[500px] px-2 py-1 border border-blue-300 rounded text-xs text-center bg-white"
+                            />
                           )}
                         </div>
-                      </div>
 
-                      {/* Expandable description - only show if relationship is set */}
-                      {relationships[key1] && relationships[key1] !== relationshipTypes[10].value[language] && (
-                        <div className="mt-1.5 pt-1.5 border-t border-gray-100">
-                          <input
-                            type="text"
-                            value={relationshipTexts[key1] || ''}
-                            onChange={(e) => setRelationshipTexts({ ...relationshipTexts, [key1]: e.target.value })}
-                            placeholder={language === 'de' ? 'Details...' : language === 'fr' ? 'Détails...' : 'Details...'}
-                            className="w-full md:max-w-[300px] px-2 py-1 border border-gray-200 rounded text-xs"
-                          />
+                        {/* Character 2 - Right side */}
+                        <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                          {char2.photoUrl && (
+                            <img src={char2.photoUrl} alt={char2.name} className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover" />
+                          )}
+                          <span className="font-semibold text-xs md:text-sm text-center max-w-[80px] truncate">{char2.name}</span>
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
@@ -7277,7 +7412,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                     value: 'advanced',
                     label: t.advanced,
                     desc: t.advancedDesc,
-                    image: 'images/left page text, right page image.jpg'
+                    image: 'images/dense text left.jpg'
                   }
                 ].map(level => (
                   <button
@@ -8580,66 +8715,177 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
           {showAuthModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-8 animate-fade-in">
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                    {authMode === 'login' ? t.welcomeBack : t.createAccount}
-                  </h2>
-                  <p className="text-gray-500">{t.loginRequired}</p>
-                </div>
-
-                {authError && (
-                  <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
-                    {authError}
-                  </div>
-                )}
-
-                <form onSubmit={authMode === 'login' ? handleLogin : handleRegister} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1">{t.email}</label>
-                    <input
-                      type="email"
-                      value={authForm.username}
-                      onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                      placeholder="your@email.com"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1">{t.password}</label>
-                    <input
-                      type="password"
-                      value={authForm.password}
-                      onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                      required
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
-                  >
-                    {authMode === 'login' ? t.signIn : t.signUp}
-                  </button>
-                </form>
-
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-500">
-                    {authMode === 'login' ? t.noAccount : t.haveAccount}
-                    {' '}
+                {/* Password Reset Sent Confirmation */}
+                {authMode === 'resetSent' ? (
+                  <div className="text-center">
+                    <div className="text-5xl mb-4">📧</div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.resetLinkSent}</h2>
                     <button
-                      onClick={() => {
-                        setAuthMode(authMode === 'login' ? 'register' : 'login');
-                        setAuthError('');
-                      }}
-                      className="text-indigo-600 font-semibold hover:text-gray-800"
+                      onClick={() => { setAuthMode('login'); setAuthError(''); }}
+                      className="mt-4 text-indigo-600 font-semibold hover:text-gray-800"
                     >
-                      {authMode === 'login' ? t.signUp : t.signIn}
+                      {t.backToLogin}
                     </button>
-                  </p>
-                </div>
+                  </div>
+                ) : authMode === 'reset' ? (
+                  /* Password Reset Form */
+                  <>
+                    <div className="text-center mb-6">
+                      <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.resetPassword}</h2>
+                      <p className="text-gray-500">{t.resetPasswordDesc}</p>
+                    </div>
+
+                    {authError && (
+                      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
+                        {authError}
+                      </div>
+                    )}
+
+                    <form onSubmit={handlePasswordReset} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">{t.email}</label>
+                        <input
+                          type="email"
+                          value={authForm.username}
+                          onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                          placeholder="your@email.com"
+                          required
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                      >
+                        {t.sendResetLink}
+                      </button>
+                    </form>
+
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={() => { setAuthMode('login'); setAuthError(''); }}
+                        className="text-indigo-600 font-semibold hover:text-gray-800"
+                      >
+                        {t.backToLogin}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  /* Login / Register Form */
+                  <>
+                    <div className="text-center mb-6">
+                      <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                        {authMode === 'login' ? t.welcomeBack : t.createAccount}
+                      </h2>
+                      <p className="text-gray-500">{t.loginRequired}</p>
+                    </div>
+
+                    {authError && (
+                      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
+                        {authError}
+                      </div>
+                    )}
+
+                    {/* Social Login Buttons */}
+                    <div className="space-y-3 mb-4">
+                      <button
+                        type="button"
+                        onClick={handleGoogleSignIn}
+                        className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                      >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        {t.continueWithGoogle}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleAppleSignIn}
+                        className="w-full flex items-center justify-center gap-3 bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-colors"
+                      >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                        </svg>
+                        {t.continueWithApple}
+                      </button>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="relative my-6">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white text-gray-500">{t.orContinueWith}</span>
+                      </div>
+                    </div>
+
+                    <form onSubmit={authMode === 'login' ? handleLogin : handleRegister} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">{t.email}</label>
+                        <input
+                          type="email"
+                          value={authForm.username}
+                          onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                          placeholder="your@email.com"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">{t.password}</label>
+                        <input
+                          type="password"
+                          value={authForm.password}
+                          onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                          required
+                        />
+                      </div>
+
+                      {authMode === 'login' && (
+                        <div className="text-right">
+                          <button
+                            type="button"
+                            onClick={() => { setAuthMode('reset'); setAuthError(''); }}
+                            className="text-sm text-indigo-600 hover:text-indigo-800"
+                          >
+                            {t.forgotPassword}
+                          </button>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                      >
+                        {authMode === 'login' ? t.signIn : t.signUp}
+                      </button>
+                    </form>
+
+                    <div className="mt-4 text-center">
+                      <p className="text-sm text-gray-500">
+                        {authMode === 'login' ? t.noAccount : t.haveAccount}
+                        {' '}
+                        <button
+                          onClick={() => {
+                            setAuthMode(authMode === 'login' ? 'register' : 'login');
+                            setAuthError('');
+                          }}
+                          className="text-indigo-600 font-semibold hover:text-gray-800"
+                        >
+                          {authMode === 'login' ? t.signUp : t.signIn}
+                        </button>
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

@@ -12,6 +12,22 @@ const crypto = require('crypto');
 const stripe = require('stripe')(process.env.STRIPE_TEST_API_KEY);
 const sharp = require('sharp');
 const email = require('./email');
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin SDK
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('🔥 Firebase Admin SDK initialized');
+  } catch (err) {
+    console.warn('⚠️  Firebase Admin SDK initialization failed:', err.message);
+  }
+} else {
+  console.warn('⚠️  FIREBASE_SERVICE_ACCOUNT not configured - Firebase auth disabled');
+}
 
 // Image cache for storing generated images (hash of prompt + photos → image data)
 const imageCache = new Map();
@@ -922,6 +938,96 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Firebase Authentication (Google, Apple, etc.)
+app.post('/api/auth/firebase', async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ error: 'ID token required' });
+    }
+
+    // Check if Firebase Admin is initialized
+    if (!admin.apps.length) {
+      return res.status(500).json({ error: 'Firebase authentication not configured on server' });
+    }
+
+    // Verify the Firebase ID token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const { uid, email: firebaseEmail, name, picture } = decodedToken;
+
+    // Use email as username, fall back to uid if no email
+    const username = firebaseEmail || `firebase_${uid}`;
+    const displayName = name || username.split('@')[0];
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Check if user exists
+      const existingUser = await dbQuery('SELECT * FROM users WHERE username = $1', [username]);
+
+      let user;
+      if (existingUser.length > 0) {
+        // User exists - log them in
+        user = existingUser[0];
+        await logActivity(user.id, username, 'USER_LOGIN_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
+      } else {
+        // Create new user
+        const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
+        const isFirstUser = parseInt(userCount[0].count) === 0;
+        const role = isFirstUser ? 'admin' : 'user';
+        const storyQuota = isFirstUser ? 999 : 2;
+
+        // Generate a random password (user won't need it - they use Firebase)
+        const randomPassword = crypto.randomBytes(32).toString('hex');
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+        const insertQuery = `
+          INSERT INTO users (username, email, password, role, story_quota, stories_generated)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id, username, email, role, story_quota, stories_generated
+        `;
+        const result = await dbQuery(insertQuery, [username, firebaseEmail, hashedPassword, role, storyQuota, 0]);
+        user = result[0];
+
+        await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
+        console.log(`✅ New Firebase user registered: ${username} (role: ${role})`);
+      }
+
+      // Generate JWT token (same as regular login)
+      const token = jwt.sign(
+        { id: user.id, username: user.username, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      console.log(`✅ Firebase user authenticated: ${username}`);
+
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email || firebaseEmail,
+          role: user.role,
+          storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
+          storiesGenerated: user.stories_generated || 0
+        }
+      });
+    } else {
+      // File mode - not supported for Firebase auth
+      return res.status(400).json({ error: 'Firebase auth requires database mode' });
+    }
+  } catch (err) {
+    console.error('Firebase auth error:', err);
+    if (err.code === 'auth/id-token-expired') {
+      return res.status(401).json({ error: 'Token expired. Please sign in again.' });
+    }
+    if (err.code === 'auth/argument-error') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    res.status(500).json({ error: 'Firebase authentication failed' });
   }
 });
 
