@@ -7044,94 +7044,8 @@ Return ONLY valid JSON, no markdown or other text.`
         });
       };
 
-      // Crop image based on bounding box (percentages) and create a square thumbnail centered on face
-      const cropImageToFace = (dataUrl, faceBox, outputSize = 150) => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = outputSize;
-            canvas.height = outputSize;
-            const ctx = canvas.getContext('2d');
-
-            // Convert percentage bounding box to pixels
-            const imgWidth = img.width;
-            const imgHeight = img.height;
-            const faceX = (faceBox.x / 100) * imgWidth;
-            const faceY = (faceBox.y / 100) * imgHeight;
-            const faceW = (faceBox.width / 100) * imgWidth;
-            const faceH = (faceBox.height / 100) * imgHeight;
-
-            // Calculate center of face
-            const faceCenterX = faceX + faceW / 2;
-            const faceCenterY = faceY + faceH / 2;
-
-            // Create a square crop area centered on face, with some padding
-            const cropSize = Math.max(faceW, faceH) * 1.8; // Add 80% padding around face
-            let cropX = faceCenterX - cropSize / 2;
-            let cropY = faceCenterY - cropSize / 2;
-
-            // Ensure crop stays within image bounds
-            cropX = Math.max(0, Math.min(cropX, imgWidth - cropSize));
-            cropY = Math.max(0, Math.min(cropY, imgHeight - cropSize));
-            const finalCropSize = Math.min(cropSize, imgWidth - cropX, imgHeight - cropY);
-
-            // Draw the cropped region scaled to output size
-            ctx.drawImage(img, cropX, cropY, finalCropSize, finalCropSize, 0, 0, outputSize, outputSize);
-
-            const croppedUrl = canvas.toDataURL('image/jpeg', 0.85);
-            console.log(`📷 Face thumbnail created: ${outputSize}x${outputSize}px`);
-            resolve(croppedUrl);
-          };
-          img.src = dataUrl;
-        });
-      };
-
-      // Crop image to body bounding box for storage (used in image generation)
-      const cropImageToBody = (dataUrl, bodyBox, maxWidth = 600, maxHeight = 800, quality = 0.85) => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-
-            // Convert percentage bounding box to pixels
-            const imgWidth = img.width;
-            const imgHeight = img.height;
-            let cropX = (bodyBox.x / 100) * imgWidth;
-            let cropY = (bodyBox.y / 100) * imgHeight;
-            let cropW = (bodyBox.width / 100) * imgWidth;
-            let cropH = (bodyBox.height / 100) * imgHeight;
-
-            // Add small padding around body (5%)
-            const paddingX = cropW * 0.05;
-            const paddingY = cropH * 0.05;
-            cropX = Math.max(0, cropX - paddingX);
-            cropY = Math.max(0, cropY - paddingY);
-            cropW = Math.min(imgWidth - cropX, cropW + paddingX * 2);
-            cropH = Math.min(imgHeight - cropY, cropH + paddingY * 2);
-
-            // Calculate output dimensions maintaining aspect ratio
-            let outWidth = cropW;
-            let outHeight = cropH;
-            if (outWidth > maxWidth || outHeight > maxHeight) {
-              const ratio = Math.min(maxWidth / outWidth, maxHeight / outHeight);
-              outWidth = Math.round(outWidth * ratio);
-              outHeight = Math.round(outHeight * ratio);
-            }
-
-            canvas.width = outWidth;
-            canvas.height = outHeight;
-
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outWidth, outHeight);
-
-            const croppedUrl = canvas.toDataURL('image/jpeg', quality);
-            console.log(`📷 Body crop created: ${outWidth}x${outHeight}px (from ${Math.round(cropW)}x${Math.round(cropH)}px region)`);
-            resolve(croppedUrl);
-          };
-          img.src = dataUrl;
-        });
-      };
+      // Note: Cropping is now done server-side by Python MediaPipe API
+      // Face crop, body crop, and body without background are all returned by the API
 
       const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
@@ -7196,40 +7110,26 @@ Return ONLY valid JSON, no markdown or other text.`
               };
 
               if (primaryTraits) {
-                // Use FACE crop as main character photo (more reliable for recognition)
-                let finalPhotoUrl = basicPhotoUrl;
-                let bodyPhotoUrl = basicPhotoUrl; // Keep body crop for image generation
+                // Use Python pre-cropped images (no fallback to Gemini/manual cropping)
+                // Face crop = display avatar, Body crop = image generation
+                let finalPhotoUrl = pythonTraits?.faceThumbnail || basicPhotoUrl;
+                let bodyPhotoUrl = pythonTraits?.bodyCrop || basicPhotoUrl;
+                let bodyNoBgUrl = pythonTraits?.bodyNoBg || null;
 
-                // Use Python pre-cropped face image if available (more accurate)
                 if (pythonTraits?.faceThumbnail) {
-                  finalPhotoUrl = pythonTraits.faceThumbnail;
-                  console.log('✅ Using Python face thumbnail as main photo');
-                } else if (primaryTraits.faceBox) {
-                  try {
-                    finalPhotoUrl = await cropImageToFace(originalImage, primaryTraits.faceBox, 150);
-                    console.log('✅ Created face-centered photo from bounding box');
-                  } catch (err) {
-                    console.warn('Failed to create face crop, using compressed image:', err);
-                  }
+                  console.log('✅ Using Python face thumbnail as display avatar');
+                } else {
+                  console.log('⚠️ No face detected, using original image');
                 }
 
-                // Store body crops for image generation
-                // Prefer body with background removed (bodyNoBg) for cleaner image generation
-                let bodyNoBgUrl = null;
-                if (pythonTraits?.bodyNoBg) {
-                  bodyNoBgUrl = pythonTraits.bodyNoBg;
-                  console.log('✅ Got body crop with background removed');
-                }
                 if (pythonTraits?.bodyCrop) {
-                  bodyPhotoUrl = pythonTraits.bodyCrop;
-                  console.log('✅ Stored Python body crop for image generation');
-                } else if (primaryTraits.bodyBox) {
-                  try {
-                    bodyPhotoUrl = await cropImageToBody(originalImage, primaryTraits.bodyBox);
-                    console.log('✅ Created body crop for image generation');
-                  } catch (err) {
-                    console.warn('Failed to create body crop:', err);
-                  }
+                  console.log('✅ Using Python body crop for image generation');
+                } else {
+                  console.log('⚠️ No body detected, using original image');
+                }
+
+                if (bodyNoBgUrl) {
+                  console.log('✅ Got body crop with background removed');
                 }
 
                 setCurrentCharacter(prev => ({
@@ -7779,110 +7679,54 @@ Return ONLY valid JSON, no markdown or other text.`
                         <div className="w-full bg-purple-50 border-2 border-purple-400 rounded-lg p-2 space-y-2 mt-2">
                           <h4 className="text-xs font-bold text-purple-800 flex items-center gap-1">
                             <Icon name="code" size={12} />
-                            Dev Comparison {currentCharacter.devComparison ? '(Both APIs)' : '(Single API)'}
+                            Photo Analysis (Python MediaPipe)
                           </h4>
 
-                          {/* API Comparison - Side by Side */}
-                          {currentCharacter.devComparison ? (
-                            <div className="grid grid-cols-2 gap-2">
-                              {/* GEMINI Column */}
-                              <div className="bg-blue-50 border border-blue-300 rounded p-2">
-                                <h5 className="text-[10px] font-bold text-blue-800 mb-1 text-center">🤖 Gemini API</h5>
-
-                                {/* Gemini Face/Body Images */}
-                                <div className="grid grid-cols-2 gap-1 mb-2">
-                                  <div className="text-center">
-                                    <p className="text-[8px] text-blue-600">Face</p>
-                                    <div className="border border-blue-200 rounded bg-white p-0.5 h-12 flex items-center justify-center">
-                                      {currentCharacter.devComparison.gemini?.faceBox ? (
-                                        <span className="text-[7px] text-blue-500">
-                                          {Math.round(currentCharacter.devComparison.gemini.faceBox.x)}%,{Math.round(currentCharacter.devComparison.gemini.faceBox.y)}%
-                                        </span>
-                                      ) : <span className="text-[8px] text-gray-400">N/A</span>}
-                                    </div>
-                                  </div>
-                                  <div className="text-center">
-                                    <p className="text-[8px] text-blue-600">Body</p>
-                                    <div className="border border-blue-200 rounded bg-white p-0.5 h-12 flex items-center justify-center">
-                                      {currentCharacter.devComparison.gemini?.bodyBox ? (
-                                        <span className="text-[7px] text-blue-500">
-                                          {Math.round(currentCharacter.devComparison.gemini.bodyBox.x)}%,{Math.round(currentCharacter.devComparison.gemini.bodyBox.y)}%
-                                        </span>
-                                      ) : <span className="text-[8px] text-gray-400">N/A</span>}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Gemini Attributes */}
-                                <div className="text-[8px] space-y-0.5">
-                                  <p><span className="font-semibold">Age:</span> {currentCharacter.devComparison.gemini?.age || 'N/A'}</p>
-                                  <p><span className="font-semibold">Gender:</span> {currentCharacter.devComparison.gemini?.gender || 'N/A'}</p>
-                                  <p><span className="font-semibold">Height:</span> {currentCharacter.devComparison.gemini?.height || 'N/A'}</p>
-                                  <p><span className="font-semibold">Build:</span> {currentCharacter.devComparison.gemini?.build || 'N/A'}</p>
-                                  <p><span className="font-semibold">Hair:</span> {currentCharacter.devComparison.gemini?.hairColor || 'N/A'}</p>
-                                  <p><span className="font-semibold">Clothing:</span> {currentCharacter.devComparison.gemini?.clothing || 'N/A'}</p>
-                                </div>
+                          {/* Three Image Outputs - Face, Body, Body No BG */}
+                          <div className="grid grid-cols-3 gap-2">
+                            {/* Face Crop */}
+                            <div className="text-center">
+                              <p className="text-[10px] font-semibold text-green-700 mb-1">Face Crop</p>
+                              <div className="border border-green-300 rounded bg-white p-1 aspect-square flex items-center justify-center overflow-hidden">
+                                {currentCharacter.photoUrl ? (
+                                  <img src={currentCharacter.photoUrl} alt="Face" className="max-w-full max-h-full object-contain" />
+                                ) : <div className="text-[8px] text-gray-400">N/A</div>}
                               </div>
-
-                              {/* PYTHON Column */}
-                              <div className="bg-green-50 border border-green-300 rounded p-2">
-                                <h5 className="text-[10px] font-bold text-green-800 mb-1 text-center">🐍 Python (MediaPipe)</h5>
-
-                                {/* Python Face/Body Images */}
-                                <div className="grid grid-cols-2 gap-1 mb-2">
-                                  <div className="text-center">
-                                    <p className="text-[8px] text-green-600">Face</p>
-                                    <div className="border border-green-200 rounded bg-white p-0.5 h-12 flex items-center justify-center overflow-hidden">
-                                      {currentCharacter.devComparison.python?.faceThumbnail ? (
-                                        <img src={currentCharacter.devComparison.python.faceThumbnail} alt="Face" className="h-full w-auto object-contain" />
-                                      ) : currentCharacter.devComparison.python?.faceBox ? (
-                                        <span className="text-[7px] text-green-500">
-                                          {Math.round(currentCharacter.devComparison.python.faceBox.x)}%,{Math.round(currentCharacter.devComparison.python.faceBox.y)}%
-                                        </span>
-                                      ) : <span className="text-[8px] text-gray-400">N/A</span>}
-                                    </div>
-                                  </div>
-                                  <div className="text-center">
-                                    <p className="text-[8px] text-green-600">Body</p>
-                                    <div className="border border-green-200 rounded bg-white p-0.5 h-12 flex items-center justify-center overflow-hidden">
-                                      {currentCharacter.devComparison.python?.bodyCrop ? (
-                                        <img src={currentCharacter.devComparison.python.bodyCrop} alt="Body" className="h-full w-auto object-contain" />
-                                      ) : currentCharacter.devComparison.python?.bodyBox ? (
-                                        <span className="text-[7px] text-green-500">
-                                          {Math.round(currentCharacter.devComparison.python.bodyBox.x)}%,{Math.round(currentCharacter.devComparison.python.bodyBox.y)}%
-                                        </span>
-                                      ) : <span className="text-[8px] text-gray-400">N/A</span>}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Python Attributes */}
-                                <div className="text-[8px] space-y-0.5">
-                                  <p><span className="font-semibold">Age:</span> {currentCharacter.devComparison.python?.age || 'N/A'}</p>
-                                  <p><span className="font-semibold">Gender:</span> {currentCharacter.devComparison.python?.gender || 'N/A'}</p>
-                                  <p><span className="font-semibold">Height:</span> {currentCharacter.devComparison.python?.height || 'N/A'}</p>
-                                  <p><span className="font-semibold">Build:</span> {currentCharacter.devComparison.python?.build || 'N/A'}</p>
-                                  <p className="text-gray-400 italic">Hair: (use Gemini)</p>
-                                  <p className="text-gray-400 italic">Clothing: (use Gemini)</p>
-                                </div>
-                              </div>
+                              <p className="text-[8px] text-gray-500 mt-0.5">Display avatar</p>
                             </div>
-                          ) : (
-                            /* Single API mode - show current images */
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="text-center">
-                                <p className="text-[10px] font-semibold text-purple-700 mb-1">Body</p>
-                                <div className="border border-purple-300 rounded bg-white p-1">
-                                  <img src={currentCharacter.photoUrl} alt="Body" className="w-full h-auto max-h-24 object-contain mx-auto" />
-                                </div>
+
+                            {/* Body Crop */}
+                            <div className="text-center">
+                              <p className="text-[10px] font-semibold text-blue-700 mb-1">Body Crop</p>
+                              <div className="border border-blue-300 rounded bg-white p-1 aspect-square flex items-center justify-center overflow-hidden">
+                                {currentCharacter.bodyPhotoUrl ? (
+                                  <img src={currentCharacter.bodyPhotoUrl} alt="Body" className="max-w-full max-h-full object-contain" />
+                                ) : <div className="text-[8px] text-gray-400">N/A</div>}
                               </div>
-                              <div className="text-center">
-                                <p className="text-[10px] font-semibold text-purple-700 mb-1">Face</p>
-                                <div className="border border-purple-300 rounded bg-white p-1">
-                                  {currentCharacter.thumbnailUrl ? (
-                                    <img src={currentCharacter.thumbnailUrl} alt="Face" className="w-16 h-16 object-cover mx-auto rounded-full" />
-                                  ) : <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto flex items-center justify-center text-[8px] text-gray-500">N/A</div>}
-                                </div>
+                              <p className="text-[8px] text-gray-500 mt-0.5">With background</p>
+                            </div>
+
+                            {/* Body No Background */}
+                            <div className="text-center">
+                              <p className="text-[10px] font-semibold text-purple-700 mb-1">Body No BG</p>
+                              <div className="border border-purple-300 rounded bg-gray-200 p-1 aspect-square flex items-center justify-center overflow-hidden" style={{backgroundImage: 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%)', backgroundSize: '10px 10px'}}>
+                                {currentCharacter.bodyNoBgUrl ? (
+                                  <img src={currentCharacter.bodyNoBgUrl} alt="Body No BG" className="max-w-full max-h-full object-contain" />
+                                ) : <div className="text-[8px] text-gray-500 bg-white px-1 rounded">N/A</div>}
+                              </div>
+                              <p className="text-[8px] text-green-600 mt-0.5 font-semibold">Used for images</p>
+                            </div>
+                          </div>
+
+                          {/* Gemini Features */}
+                          {currentCharacter.devComparison?.gemini && (
+                            <div className="bg-blue-50 border border-blue-300 rounded p-2 mt-2">
+                              <h5 className="text-[10px] font-bold text-blue-800 mb-1">Features (from Gemini)</h5>
+                              <div className="text-[8px] grid grid-cols-2 gap-x-2 gap-y-0.5">
+                                <p><span className="font-semibold">Hair:</span> {currentCharacter.devComparison.gemini?.hairColor || 'N/A'}</p>
+                                <p><span className="font-semibold">Clothing:</span> {currentCharacter.devComparison.gemini?.clothing || 'N/A'}</p>
+                                <p><span className="font-semibold">Skin:</span> {currentCharacter.devComparison.gemini?.skinTone || 'N/A'}</p>
+                                <p><span className="font-semibold">Other:</span> {currentCharacter.devComparison.gemini?.otherFeatures || 'N/A'}</p>
                               </div>
                             </div>
                           )}
