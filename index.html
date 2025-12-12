@@ -8689,21 +8689,19 @@ Return ONLY valid JSON, no markdown or other text.`
               </div>
             )}
 
-            {/* Generate Story Button - At the very end */}
-            {(!currentUser || currentUser.role !== 'admin' || !developerMode) && (
-              <button
-                onClick={runAutoMode}
-                disabled={characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)}
-                className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
-                  characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                }`}
-              >
-                <Icon name="sparkles" size={20} />
-                {language === 'de' ? 'Geschichte Generieren' : language === 'fr' ? 'Générer l\'histoire' : 'Generate Story'}
-              </button>
-            )}
+            {/* Generate Story Button - Always visible (works for both normal users and developer mode) */}
+            <button
+              onClick={runAutoMode}
+              disabled={characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)}
+              className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
+                characters.length === 0 || isGenerating || isGeneratingOutline || isGeneratingScenes || isGeneratingImages || (userQuota && !userQuota.unlimited && userQuota.remaining <= 0)
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+            >
+              <Icon name="sparkles" size={20} />
+              {language === 'de' ? 'Geschichte Generieren' : language === 'fr' ? 'Générer l\'histoire' : 'Generate Story'}
+            </button>
 
             {/* Developer Mode: Generate Text Only (no images) */}
             {developerMode && (

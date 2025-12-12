@@ -6057,7 +6057,9 @@ Output Format:
       console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
 
       // IMMEDIATELY start generating scene descriptions and images for these pages (unless skipImages)
-      if (!skipImages) {
+      // In PARALLEL mode: queue all images immediately for concurrent generation
+      // In SEQUENTIAL mode: just collect page data, generate images later one at a time
+      if (!skipImages && imageGenMode === 'parallel') {
         for (const page of batchPages) {
           const pageNum = page.pageNumber;
           const pageContent = page.content;
@@ -6093,8 +6095,8 @@ Output Format:
 
               while (retries <= MAX_RETRIES && !imageResult) {
                 try {
-                  // Pass only photos of characters in this scene
-                  imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos);
+                  // Pass only photos of characters in this scene (no previous image in parallel mode)
+                  imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos, null);
                 } catch (error) {
                   retries++;
                   console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -6148,37 +6150,142 @@ Output Format:
 
     // Wait for images only if not skipping
     if (!skipImages) {
-      console.log(`📚 [STREAMING] All story batches submitted. Waiting for ${activeImagePromises.length} images to complete...`);
+      if (imageGenMode === 'parallel') {
+        // PARALLEL MODE: Wait for all concurrent image promises
+        console.log(`📚 [STREAMING] All story batches submitted. Waiting for ${activeImagePromises.length} images to complete (PARALLEL MODE)...`);
 
-      // Wait for all images to complete
-      await dbPool.query(
-        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [50, `Generating images (0/${sceneCount} complete)...`, jobId]
-      );
+        // Wait for all images to complete
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [50, `Generating images (0/${sceneCount} complete)...`, jobId]
+        );
 
-      let completedCount = 0;
-      const imageResults = await Promise.all(
-        activeImagePromises.map(async (promise) => {
-          const result = await promise;
-          completedCount++;
+        let completedCount = 0;
+        const imageResults = await Promise.all(
+          activeImagePromises.map(async (promise) => {
+            const result = await promise;
+            completedCount++;
 
-          // Update progress
-          const imageProgress = 50 + Math.floor(completedCount / sceneCount * 40); // 50-90%
-          await dbPool.query(
-            'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-            [imageProgress, `Generating images (${completedCount}/${sceneCount} complete)...`, jobId]
-          );
+            // Update progress
+            const imageProgress = 50 + Math.floor(completedCount / sceneCount * 40); // 50-90%
+            await dbPool.query(
+              'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+              [imageProgress, `Generating images (${completedCount}/${sceneCount} complete)...`, jobId]
+            );
 
-          allImages.push(result);
-          return result;
-        })
-      );
+            allImages.push(result);
+            return result;
+          })
+        );
 
-      // Sort images by page number
-      allImages.sort((a, b) => a.pageNumber - b.pageNumber);
-      allSceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
+        // Sort images by page number
+        allImages.sort((a, b) => a.pageNumber - b.pageNumber);
+        allSceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
 
-      console.log(`🚀 [STREAMING] All ${allImages.length} images generated!`);
+        console.log(`🚀 [STREAMING] All ${allImages.length} images generated (PARALLEL MODE)!`);
+      } else {
+        // SEQUENTIAL MODE: Generate images one at a time, passing previous image to next
+        console.log(`📚 [STREAMING] All story batches complete. Starting SEQUENTIAL image generation...`);
+
+        // Parse all pages from the full story text
+        const allPages = parseStoryPages(fullStoryText);
+        console.log(`📄 [SEQUENTIAL] Found ${allPages.length} pages to generate images for`);
+
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [50, `Generating images sequentially (0/${allPages.length} complete)...`, jobId]
+        );
+
+        let previousImage = null;
+
+        for (let i = 0; i < allPages.length; i++) {
+          const page = allPages[i];
+          const pageNum = page.pageNumber;
+          const pageContent = page.content;
+          const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
+
+          console.log(`🔗 [SEQUENTIAL ${i + 1}/${allPages.length}] Processing page ${pageNum}...`);
+
+          try {
+            // Generate scene description using Art Director prompt
+            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc);
+
+            console.log(`🎨 [PAGE ${pageNum}] Generating scene description...`);
+            const sceneDescription = await callClaudeAPI(scenePrompt, 2048);
+
+            allSceneDescriptions.push({
+              pageNumber: pageNum,
+              description: sceneDescription
+            });
+
+            // Detect which characters appear in this scene
+            const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
+            const scenePhotos = getCharacterPhotos(sceneCharacters);
+            console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
+
+            // Generate image from scene description with scene-specific characters
+            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters);
+            imagePrompts[pageNum] = imagePrompt;
+
+            let imageResult = null;
+            let retries = 0;
+
+            while (retries <= MAX_RETRIES && !imageResult) {
+              try {
+                // Pass previous image for visual continuity (SEQUENTIAL MODE)
+                imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos, previousImage);
+              } catch (error) {
+                retries++;
+                console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
+                if (retries > MAX_RETRIES) {
+                  throw error;
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+              }
+            }
+
+            console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score})`);
+
+            // Store this image as the previous image for the next iteration
+            previousImage = imageResult.imageData;
+
+            const imageData = {
+              pageNumber: pageNum,
+              imageData: imageResult.imageData,
+              description: sceneDescription,
+              qualityScore: imageResult.score,
+              qualityReasoning: imageResult.reasoning || null
+            };
+
+            // Save checkpoint: page image (scene description + image)
+            await saveCheckpoint(jobId, 'page_image', {
+              pageNumber: pageNum,
+              sceneDescription,
+              imagePrompt: imagePrompt,
+              qualityScore: imageResult.score,
+              qualityReasoning: imageResult.reasoning || null
+            }, pageNum);
+
+            allImages.push(imageData);
+
+            // Update progress
+            const imageProgress = 50 + Math.floor((i + 1) / allPages.length * 40); // 50-90%
+            await dbPool.query(
+              'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+              [imageProgress, `Generating images sequentially (${i + 1}/${allPages.length} complete)...`, jobId]
+            );
+          } catch (error) {
+            console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
+            throw error;
+          }
+        }
+
+        // Sort images by page number (should already be in order, but ensure consistency)
+        allImages.sort((a, b) => a.pageNumber - b.pageNumber);
+        allSceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
+
+        console.log(`🚀 [STREAMING] All ${allImages.length} images generated (SEQUENTIAL MODE)!`);
+      }
     } else {
       console.log(`📝 [STREAMING] Text-only mode - skipping image wait`);
     }
@@ -6730,7 +6837,7 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
  * Generate cache key for image generation
  * Creates a hash from prompt + character photo hashes
  */
-function generateImageCacheKey(prompt, characterPhotos = []) {
+function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = null) {
   // Hash each photo and sort them for consistency
   const photoHashes = characterPhotos
     .filter(p => p && p.startsWith('data:image'))
@@ -6741,8 +6848,8 @@ function generateImageCacheKey(prompt, characterPhotos = []) {
     .sort()
     .join('|');
 
-  // Combine prompt + photo hashes
-  const combined = `${prompt}|${photoHashes}`;
+  // Combine prompt + photo hashes + sequential marker (to distinguish sequential vs parallel cache)
+  const combined = `${prompt}|${photoHashes}|${sequentialMarker || ''}`;
   return crypto.createHash('sha256').update(combined).digest('hex');
 }
 
@@ -6902,9 +7009,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
   }
 }
 
-async function callGeminiAPIForImage(prompt, characterPhotos = []) {
-  // Check cache first
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos);
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null) {
+  // Check cache first (include previousImage presence in cache key for sequential mode)
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
   if (imageCache.has(cacheKey)) {
     log.verbose('💾 [IMAGE CACHE] Cache HIT - reusing previously generated image');
@@ -6923,8 +7030,23 @@ async function callGeminiAPIForImage(prompt, characterPhotos = []) {
     throw new Error('Gemini API key not configured');
   }
 
-  // Build parts array with prompt + character reference images
+  // Build parts array with prompt + reference images
   const parts = [{ text: prompt }];
+
+  // For sequential mode: Add PREVIOUS scene image FIRST (most important for continuity)
+  if (previousImage && previousImage.startsWith('data:image')) {
+    const base64Data = previousImage.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = previousImage.match(/^data:(image\/\w+);base64,/) ?
+      previousImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+    parts.push({
+      inlineData: {
+        mimeType: mimeType,
+        data: base64Data
+      }
+    });
+    console.log(`🖼️  [IMAGE GEN] Added previous scene image for visual continuity (SEQUENTIAL MODE)`);
+  }
 
   // Add character photos as reference images
   if (characterPhotos && characterPhotos.length > 0) {
