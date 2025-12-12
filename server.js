@@ -122,6 +122,7 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.initialPageWithDedication = await fs.readFile(path.join(promptsDir, 'initial-page-with-dedication.txt'), 'utf-8');
     PROMPT_TEMPLATES.initialPageNoDedication = await fs.readFile(path.join(promptsDir, 'initial-page-no-dedication.txt'), 'utf-8');
     PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
+    PROMPT_TEMPLATES.storybookCombined = await fs.readFile(path.join(promptsDir, 'storybook-combined.txt'), 'utf-8');
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
     log.error('❌ Failed to load prompt templates:', err.message);
@@ -5184,6 +5185,336 @@ function extractShortSceneDescriptions(outline) {
   return descriptions;
 }
 
+// Process picture book (storybook) job - simplified flow with combined text+scene generation
+async function processStorybookJob(jobId, inputData, characterPhotos, skipImages) {
+  console.log(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
+
+  const totalPages = inputData.pages;
+
+  try {
+    // Build character descriptions
+    const characterDescriptions = (inputData.characters || []).map(char => {
+      const isMain = (inputData.mainCharacters || []).includes(char.id) ? ' (MAIN CHARACTER)' : '';
+      let desc = `${char.name}${isMain} (${char.gender}, ${char.age} years old)`;
+      const details = [];
+      if (char.strengths && char.strengths.length > 0) {
+        details.push(`Strengths: ${char.strengths.join(', ')}`);
+      }
+      if (char.weaknesses && char.weaknesses.length > 0) {
+        details.push(`Weaknesses: ${char.weaknesses.join(', ')}`);
+      }
+      if (char.specialDetails) {
+        details.push(`Details: ${char.specialDetails}`);
+      }
+      if (details.length > 0) {
+        desc += `: ${details.join(', ')}`;
+      }
+      return desc;
+    }).join('\n');
+
+    // Build relationship descriptions
+    const relationshipDescriptions = Object.entries(inputData.relationships || {})
+      .filter(([key, type]) => type !== 'Not Known to' && type !== 'kennt nicht' && type !== 'ne connaît pas')
+      .map(([key, type]) => {
+        const [char1Id, char2Id] = key.split('-').map(Number);
+        const char1 = (inputData.characters || []).find(c => c.id === char1Id);
+        const char2 = (inputData.characters || []).find(c => c.id === char2Id);
+        return `${char1?.name} is ${type} ${char2?.name}`;
+      }).join('\n');
+
+    const storyTypeName = inputData.storyType || 'adventure';
+    const middlePage = Math.ceil(totalPages / 2);
+    const lang = inputData.language || 'en';
+
+    // Build the storybook combined prompt
+    const storybookPrompt = `You are an expert children's picture book author. Create a simple, heartwarming story with SHORT text and vivid scene descriptions for illustrations.
+
+# Story Parameters
+
+- **Title**: ${storyTypeName}
+- **Target Age**: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years (early readers)
+- **Length**: ${totalPages} pages
+- **Language**: ${lang === 'de' ? 'German (always use "ss" instead of "ß")' : lang === 'fr' ? 'French' : 'English'}
+- **Story Type**: ${storyTypeName}
+${inputData.storyDetails ? `- **Story Details**: ${inputData.storyDetails}` : ''}
+${inputData.dedication ? `- **Dedication**: ${inputData.dedication}` : ''}
+- **Characters**:
+${characterDescriptions}
+${relationshipDescriptions ? `- **Relationships**: \n${relationshipDescriptions}` : ''}
+
+# CRITICAL TEXT LENGTH RULES
+
+This is a PICTURE BOOK. Each page has a large illustration with only a SMALL amount of text.
+
+**TEXT LIMITS PER PAGE:**
+- Maximum 3-4 SHORT sentences per page
+- Maximum 30-40 words total per page
+- Use simple vocabulary for early readers
+- Short, punchy sentences that complement the illustration
+
+**GOOD EXAMPLE (Page text):**
+"Leo loved to explore new places.
+He jumped over rocks with happy faces.
+His trusty brown backpack held all he needs!"
+
+**BAD EXAMPLE (Too long):**
+"Leo the Lion was a curious young cub who lived in a cozy cave at the edge of the Whispering Woods. Every morning, he would wake up with the sunrise..."
+
+# Story Structure
+
+Create a simple story arc:
+1. **Beginning** (Pages 1-2): Introduce the main character and setting
+2. **Middle** (Pages 3-${middlePage}): A small challenge or adventure
+3. **End** (Pages ${middlePage + 1}-${totalPages}): Happy resolution with a gentle lesson
+
+# Output Format
+
+First provide the TITLE, then for EACH page provide BOTH the story text AND the scene description:
+
+TITLE: [Creative story title]
+
+---PAGE 1---
+TEXT:
+[Short story text - 3-4 sentences max, 30-40 words]
+
+SCENE:
+Setting: [Location, time of day, atmosphere]
+Characters: [Who is in this scene]
+Action: [What is happening - the key visual moment]
+Mood: [Emotional tone]
+
+---PAGE 2---
+TEXT:
+[Short story text]
+
+SCENE:
+Setting: [Description]
+Characters: [Who is present]
+Action: [Key visual moment]
+Mood: [Emotional tone]
+
+... continue for all ${totalPages} pages ...
+
+# Important
+
+- Write the COMPLETE story for ALL ${totalPages} pages
+- Keep text SHORT - this is a picture book!
+- Scene descriptions should be detailed enough for an illustrator
+- The story should feel complete with a satisfying ending
+- Write entirely in ${lang === 'de' ? 'German' : lang === 'fr' ? 'French' : 'English'}`;
+
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [10, 'Generating picture book story and scenes...', jobId]
+    );
+
+    // Generate the combined text + scenes in one call
+    console.log(`📖 [STORYBOOK] Calling Claude API for combined generation...`);
+    const response = await callClaudeAPI(storybookPrompt, 16000);
+
+    // Save checkpoint
+    await saveCheckpoint(jobId, 'storybook_combined', { response });
+
+    // Extract title
+    let storyTitle = inputData.title || 'My Picture Book';
+    const titleMatch = response.match(/TITLE:\s*(.+)/i);
+    if (titleMatch) {
+      storyTitle = titleMatch[1].trim();
+    }
+    console.log(`📖 [STORYBOOK] Extracted title: ${storyTitle}`);
+
+    // Parse the response to extract text and scenes
+    const pageBlocks = response.split(/---PAGE\s+\d+---/i).filter(block => block.trim());
+
+    let fullStoryText = '';
+    const allSceneDescriptions = [];
+    const allImages = [];
+    const imagePrompts = {};
+
+    console.log(`📖 [STORYBOOK] Parsing ${pageBlocks.length} page blocks`);
+
+    for (let i = 0; i < pageBlocks.length && i < totalPages; i++) {
+      const block = pageBlocks[i];
+      const pageNum = i + 1;
+
+      // Extract TEXT section
+      const textMatch = block.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|$)/i);
+      const pageText = textMatch ? textMatch[1].trim() : '';
+
+      // Extract SCENE section
+      const sceneMatch = block.match(/SCENE:\s*([\s\S]*?)$/i);
+      const sceneDesc = sceneMatch ? sceneMatch[1].trim() : '';
+
+      // Build story text with page markers
+      fullStoryText += `--- Page ${pageNum} ---\n${pageText}\n\n`;
+
+      // Build scene description
+      allSceneDescriptions.push({
+        pageNumber: pageNum,
+        description: sceneDesc
+      });
+
+      console.log(`📖 [STORYBOOK] Page ${pageNum}: ${pageText.substring(0, 50)}...`);
+    }
+
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [30, 'Story text complete. Generating images...', jobId]
+    );
+
+    // Generate images if not skipped
+    if (!skipImages) {
+      const limit = pLimit(5);
+      const MAX_RETRIES = 2;
+
+      const imagePromises = allSceneDescriptions.map((scene, idx) => {
+        return limit(async () => {
+          const pageNum = scene.pageNumber;
+          try {
+            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum}...`);
+
+            // Build image prompt
+            const imagePrompt = buildImagePrompt(scene.description, inputData);
+            imagePrompts[pageNum] = imagePrompt;
+
+            let imageResult = null;
+            let retries = 0;
+
+            while (retries <= MAX_RETRIES && !imageResult) {
+              try {
+                imageResult = await callGeminiAPIForImage(imagePrompt, characterPhotos);
+              } catch (error) {
+                retries++;
+                console.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
+                if (retries > MAX_RETRIES) throw error;
+                await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+              }
+            }
+
+            console.log(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score})`);
+
+            // Update progress
+            const progressPercent = 30 + Math.floor((idx + 1) / totalPages * 50);
+            await dbPool.query(
+              'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+              [progressPercent, `Generated image ${idx + 1}/${totalPages}...`, jobId]
+            );
+
+            return {
+              pageNumber: pageNum,
+              imageData: imageResult.imageData,
+              description: scene.description,
+              qualityScore: imageResult.score,
+              qualityReasoning: imageResult.reasoning || null
+            };
+          } catch (error) {
+            console.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
+            return {
+              pageNumber: pageNum,
+              imageData: null,
+              description: scene.description,
+              error: error.message
+            };
+          }
+        });
+      });
+
+      const imageResults = await Promise.all(imagePromises);
+      imageResults.forEach(img => {
+        if (img) allImages.push(img);
+      });
+
+      // Sort images by page number
+      allImages.sort((a, b) => a.pageNumber - b.pageNumber);
+    }
+
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [85, 'Generating cover images...', jobId]
+    );
+
+    // Generate cover images (simplified for picture book)
+    let coverImages = { frontCover: null, initialPage: null, backCover: null };
+
+    if (!skipImages) {
+      try {
+        const artStyleId = inputData.artStyle || 'pixar';
+        const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+        const characterInfo = (inputData.characters || []).map(c => `${c.name} (${c.age} years old)`).join(', ');
+
+        // Front cover
+        const frontCoverPrompt = `Create a cheerful children's book cover illustration for "${storyTitle}". Feature the main character(s): ${characterInfo}. Style: ${styleDescription}. Make it colorful and inviting.`;
+        const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
+        coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score };
+
+        // Initial page
+        const initialPrompt = inputData.dedication
+          ? `Create a warm, welcoming illustration for a children's book dedication page. Include the text: "${inputData.dedication}". Style: ${styleDescription}.`
+          : `Create a warm, welcoming introduction page illustration for "${storyTitle}". Style: ${styleDescription}. No text.`;
+        const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos);
+        coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score };
+
+        // Back cover
+        const backCoverPrompt = `Create a satisfying conclusion illustration for "${storyTitle}". Show a happy ending scene. Style: ${styleDescription}. Include "magicalstory.ch" text in corner.`;
+        const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
+        coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score };
+
+        console.log(`✅ [STORYBOOK] Cover images generated`);
+      } catch (error) {
+        console.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
+      }
+    }
+
+    // Prepare result data
+    const resultData = {
+      title: storyTitle,
+      storyText: fullStoryText,
+      outline: '', // No outline for picture book mode
+      sceneDescriptions: allSceneDescriptions,
+      images: allImages,
+      coverImages: coverImages,
+      imagePrompts: imagePrompts,
+      storyType: inputData.storyType,
+      storyDetails: inputData.storyDetails,
+      pages: totalPages,
+      language: lang,
+      languageLevel: '1st-grade',
+      characters: inputData.characters,
+      dedication: inputData.dedication,
+      artStyle: inputData.artStyle
+    };
+
+    // Mark job as completed
+    await dbPool.query(
+      `UPDATE story_jobs SET
+        status = 'completed',
+        progress = 100,
+        progress_message = 'Picture book complete!',
+        result_data = $1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2`,
+      [JSON.stringify(resultData), jobId]
+    );
+
+    console.log(`✅ [STORYBOOK] Job ${jobId} completed successfully`);
+    return resultData;
+
+  } catch (error) {
+    console.error(`❌ [STORYBOOK] Job ${jobId} failed:`, error);
+
+    await dbPool.query(
+      `UPDATE story_jobs SET
+        status = 'failed',
+        error_message = $1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2`,
+      [error.message, jobId]
+    );
+
+    throw error;
+  }
+}
+
 // Background worker function to process a story generation job
 // NEW STREAMING ARCHITECTURE: Generate images as story batches complete
 async function processStoryJob(jobId) {
@@ -5223,7 +5554,21 @@ async function processStoryJob(jobId) {
     // Update status to processing
     await dbPool.query(
       'UPDATE story_jobs SET status = $1, progress = $2, progress_message = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
-      ['processing', 5, 'Step 1: Generating story outline...', jobId]
+      ['processing', 5, 'Starting story generation...', jobId]
+    );
+
+    // Check if this is a picture book (1st-grade) - use simplified combined flow
+    const isPictureBook = inputData.languageLevel === '1st-grade';
+
+    if (isPictureBook) {
+      console.log(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
+      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages);
+    }
+
+    // Standard flow for normal stories
+    await dbPool.query(
+      'UPDATE story_jobs SET progress_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      ['Step 1: Generating story outline...', jobId]
     );
 
     // Step 1: Generate story outline (using Claude API)
