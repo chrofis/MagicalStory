@@ -8526,6 +8526,48 @@ Return ONLY valid JSON, no markdown or other text.`
               </p>
             </div>
 
+            {/* Developer mode only: Image Generation Mode Toggle */}
+            {developerMode && (
+              <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                      <Icon name="image" size={18} className="text-amber-600" />
+                      {language === 'de' ? 'Bildgenerierungsmodus' : language === 'fr' ? 'Mode de génération d\'images' : 'Image Generation Mode'}
+                    </h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {(imageGenMode || serverImageGenMode) === 'sequential'
+                        ? (language === 'de' ? 'Sequentiell: Jedes Bild nutzt das vorherige als Referenz (langsamer, aber konsistentere Charaktere)' : language === 'fr' ? 'Séquentiel: Chaque image utilise la précédente comme référence (plus lent, personnages plus cohérents)' : 'Sequential: Each image uses previous as reference (slower, but more consistent characters)')
+                        : (language === 'de' ? 'Parallel: Alle Bilder gleichzeitig generieren (schneller, aber weniger konsistent)' : language === 'fr' ? 'Parallèle: Générer toutes les images simultanément (plus rapide, moins cohérent)' : 'Parallel: Generate all images simultaneously (faster, but less consistent)')
+                      }
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setImageGenMode('parallel')}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        (imageGenMode || serverImageGenMode) === 'parallel'
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      ⚡ Parallel
+                    </button>
+                    <button
+                      onClick={() => setImageGenMode('sequential')}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        (imageGenMode || serverImageGenMode) === 'sequential'
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      🔗 Sequential
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Two-stage generation: Outline first, then story - Only show in Developer Mode */}
             {developerMode && (
               <>
@@ -8878,46 +8920,6 @@ Return ONLY valid JSON, no markdown or other text.`
               >
                 <Icon name="image" size={20} /> {isGeneratingScenes ? t.creatingScenes : t.createScenes}
               </button>
-            )}
-            {/* Developer mode only: Image Generation Mode Toggle */}
-            {developerMode && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
-              <div className="col-span-full bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold text-gray-800 text-sm">
-                      {language === 'de' ? 'Bildgenerierungsmodus' : language === 'fr' ? 'Mode de génération' : 'Image Generation Mode'}
-                    </h4>
-                    <p className="text-xs text-gray-500">
-                      {(imageGenMode || serverImageGenMode) === 'sequential'
-                        ? (language === 'de' ? 'Sequentiell: Jedes Bild nutzt das vorherige als Referenz (langsamer, konsistenter)' : 'Sequential: Each image uses previous as reference (slower, more consistent)')
-                        : (language === 'de' ? 'Parallel: Alle Bilder gleichzeitig generieren (schneller)' : 'Parallel: Generate all images simultaneously (faster)')
-                      }
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setImageGenMode('parallel')}
-                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                        (imageGenMode || serverImageGenMode) === 'parallel'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      Parallel
-                    </button>
-                    <button
-                      onClick={() => setImageGenMode('sequential')}
-                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                        (imageGenMode || serverImageGenMode) === 'sequential'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      Sequential
-                    </button>
-                  </div>
-                </div>
-              </div>
             )}
             {/* Developer mode only: Download Scenes & Generate Images */}
             {developerMode && Array.isArray(sceneDescriptions) && sceneDescriptions.length > 0 && (
