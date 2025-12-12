@@ -3718,55 +3718,74 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
     }
 
-    // Add content pages (140 x 140 mm square)
+    // Add content pages (140 x 140 mm square) - Combined layout: image on top (~68%), text below (~32%)
     storyPages.forEach((page, index) => {
       const pageNumber = index + 1;
+      const margin = mmToPoints(5);  // 5mm margin around page
 
-      // Add text page (square format)
-      const margin = 28;
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-      // Calculate available space
-      const availableWidth = pageSize - (margin * 2);
-      const availableHeight = pageSize - (margin * 2);
+      // Layout: Image takes top 68%, text takes bottom 32%
+      const imageHeight = pageSize * 0.68;
+      const textAreaHeight = pageSize * 0.32;
+      const textAreaY = imageHeight;
 
-      // Start with smaller font size to ensure text fits
-      let fontSize = 9;  // Reduced from 11 to 9
+      // Add image at top if available
+      const sceneImage = sceneImages.find(img => img.pageNumber === pageNumber);
+      if (sceneImage && sceneImage.imageData) {
+        try {
+          const base64Data = sceneImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+          const imageBuffer = Buffer.from(base64Data, 'base64');
+
+          // Image fills top portion with small margins
+          doc.image(imageBuffer, margin, margin, {
+            fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+            align: 'center',
+            valign: 'center'
+          });
+        } catch (imgErr) {
+          console.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+        }
+      }
+
+      // Add text in bottom portion
+      const textMargin = mmToPoints(8);  // 8mm margin for text area
+      const availableTextWidth = pageSize - (textMargin * 2);
+      const availableTextHeight = textAreaHeight - (textMargin * 1.5);
+
+      // Start with font size and reduce if needed
+      let fontSize = 8;
       let textHeight;
-      let fontReduced = false;
 
-      // Measure text height and reduce font if needed
       doc.fontSize(fontSize).font('Helvetica');
       textHeight = doc.heightOfString(page.text, {
-        width: availableWidth,
+        width: availableTextWidth,
         align: 'left'
       });
 
-      // If text doesn't fit, reduce font size to minimum 5pt
-      while (textHeight > availableHeight && fontSize > 5) {
+      // Reduce font size if text doesn't fit (minimum 5pt)
+      while (textHeight > availableTextHeight && fontSize > 5) {
         fontSize -= 0.5;
         doc.fontSize(fontSize);
         textHeight = doc.heightOfString(page.text, {
-          width: availableWidth,
+          width: availableTextWidth,
           align: 'left'
         });
-        fontReduced = true;
       }
 
-      // If text still doesn't fit even at 5pt, truncate it
+      // Truncate if still too long
       let textToRender = page.text;
-      if (textHeight > availableHeight) {
-        console.error(`⚠️  Page ${pageNumber}: Text too long even at ${fontSize}pt, truncating...`);
-        // Truncate text to fit
+      if (textHeight > availableTextHeight) {
+        console.warn(`⚠️  Page ${pageNumber}: Text too long even at ${fontSize}pt, truncating...`);
         const words = page.text.split(' ');
         textToRender = '';
         for (let i = 0; i < words.length; i++) {
           const testText = textToRender + (textToRender ? ' ' : '') + words[i];
           const testHeight = doc.heightOfString(testText, {
-            width: availableWidth,
+            width: availableTextWidth,
             align: 'left'
           });
-          if (testHeight <= availableHeight) {
+          if (testHeight <= availableTextHeight) {
             textToRender = testText;
           } else {
             break;
@@ -3775,47 +3794,18 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         textToRender += '...';
       }
 
-      // Log warning if font was reduced
-      if (fontReduced) {
-        console.warn(`⚠️  Page ${pageNumber}: Text too long, reduced font to ${fontSize}pt`);
-      }
-
-      // Calculate vertical position to center text
+      // Render text in bottom area (vertically centered within text area)
       textHeight = doc.heightOfString(textToRender, {
-        width: availableWidth,
+        width: availableTextWidth,
         align: 'left'
       });
-      const yPosition = margin + (availableHeight - textHeight) / 2;
+      const textY = textAreaY + (availableTextHeight - textHeight) / 2;
 
-      // Render text (left-aligned, vertically centered)
-      doc.fillColor('#333333')  // Dark gray instead of pure black to reduce ink
-         .text(textToRender, margin, yPosition, {
-           width: availableWidth,
+      doc.fillColor('#333333')
+         .text(textToRender, textMargin, textY, {
+           width: availableTextWidth,
            align: 'left'
          });
-
-      // Add image page if available (square format)
-      const sceneImage = sceneImages.find(img => img.pageNumber === pageNumber);
-      if (sceneImage && sceneImage.imageData) {
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-
-        // Extract base64 data
-        const base64Data = sceneImage.imageData.replace(/^data:image\/\w+;base64,/, '');
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-
-        // Add image to fill page with small margin
-        try {
-          const margin = mmToPoints(5);  // 5mm margin
-          doc.image(imageBuffer, margin, margin, {
-            fit: [pageSize - (margin * 2), pageSize - (margin * 2)],
-            align: 'center',
-            valign: 'center'
-          });
-        } catch (imgErr) {
-          console.error('Error adding image to PDF:', imgErr);
-          // Continue without image if there's an error
-        }
-      }
     });
 
     // Finalize PDF
@@ -4909,41 +4899,75 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
 
     console.log(`📄 [BACKGROUND] Found ${storyPages.length} story pages to add to PDF`);
 
+    // Combined layout: image on top (~68%), text below (~32%)
     storyPages.forEach((pageText, index) => {
       const pageNumber = index + 1;
       const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
       const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+      const margin = mmToPoints(5);  // 5mm margin around page
 
-      // Text page with proper font sizing
-      const margin = 28;
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-      const availableWidth = pageSize - (margin * 2);
-      const availableHeight = pageSize - (margin * 2);
+      // Layout: Image takes top 68%, text takes bottom 32%
+      const imageHeight = pageSize * 0.68;
+      const textAreaHeight = pageSize * 0.32;
+      const textAreaY = imageHeight;
 
-      // Start with font size 9 and reduce if needed
-      let fontSize = 9;
+      // Add image at top if available
+      if (image && image.imageData) {
+        try {
+          const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          doc.image(imageBuffer, margin, margin, {
+            fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+            align: 'center',
+            valign: 'center'
+          });
+        } catch (imgErr) {
+          console.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+        }
+      }
+
+      // Add text in bottom portion
+      const textMargin = mmToPoints(8);  // 8mm margin for text area
+      const availableTextWidth = pageSize - (textMargin * 2);
+      const availableTextHeight = textAreaHeight - (textMargin * 1.5);
+
+      // Start with font size and reduce if needed
+      let fontSize = 8;
       doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-      let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
+      let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'left' });
 
-      while (textHeight > availableHeight && fontSize > 5) {
+      while (textHeight > availableTextHeight && fontSize > 5) {
         fontSize -= 0.5;
         doc.fontSize(fontSize);
-        textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
+        textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'left' });
       }
 
-      doc.text(cleanText, margin, margin, {
-        width: availableWidth,
-        height: availableHeight,
+      // Truncate if still too long
+      let textToRender = cleanText;
+      if (textHeight > availableTextHeight) {
+        const words = cleanText.split(' ');
+        textToRender = '';
+        for (let i = 0; i < words.length; i++) {
+          const testText = textToRender + (textToRender ? ' ' : '') + words[i];
+          const testHeight = doc.heightOfString(testText, { width: availableTextWidth, align: 'left' });
+          if (testHeight <= availableTextHeight) {
+            textToRender = testText;
+          } else {
+            break;
+          }
+        }
+        textToRender += '...';
+      }
+
+      // Render text in bottom area (vertically centered)
+      textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'left' });
+      const textY = textAreaY + (availableTextHeight - textHeight) / 2;
+
+      doc.text(textToRender, textMargin, textY, {
+        width: availableTextWidth,
         align: 'left'
       });
-
-      // Image page
-      if (image && image.imageData) {
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-        const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(imageBuffer, 0, 0, { width: pageSize, height: pageSize });
-      }
     });
 
     doc.end();
@@ -4984,9 +5008,9 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       throw new Error('GELATO_API_KEY not configured');
     }
 
-    // Calculate page count: each scene = 2 print pages (1 text + 1 image)
+    // Calculate page count: combined layout = 1 page per scene + initial page
     const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
-    const printPageCount = storyScenes * 2;
+    const printPageCount = storyScenes + 1;  // +1 for initial page (cover is separate)
     console.log(`📊 [BACKGROUND] Story scenes: ${storyScenes}, Print pages: ${printPageCount}`);
 
     // Fetch product UID from database based on page count (same logic as frontend)
