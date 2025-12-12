@@ -15,15 +15,33 @@ const email = require('./email');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin SDK
+// Supports: FIREBASE_SERVICE_ACCOUNT (JSON string) or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
+let firebaseInitialized = false;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    let serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    // Fix newlines in private key if they got escaped
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
-    console.log('🔥 Firebase Admin SDK initialized');
+    firebaseInitialized = true;
+    console.log('🔥 Firebase Admin SDK initialized from environment variable');
   } catch (err) {
     console.warn('⚠️  Firebase Admin SDK initialization failed:', err.message);
+  }
+} else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+  try {
+    const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    firebaseInitialized = true;
+    console.log('🔥 Firebase Admin SDK initialized from file:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+  } catch (err) {
+    console.warn('⚠️  Firebase Admin SDK initialization from file failed:', err.message);
   }
 } else {
   console.warn('⚠️  FIREBASE_SERVICE_ACCOUNT not configured - Firebase auth disabled');

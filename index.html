@@ -1639,6 +1639,11 @@ Be specific and creative. Each scene description should paint a clear picture fo
         setShowAuthModal(true);
       };
 
+      // Detect if running on mobile device (especially iOS Safari where popups don't work well)
+      const isMobileDevice = () => {
+        return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      };
+
       // Firebase Auth: Handle social login result from backend
       const handleFirebaseAuth = async (firebaseUser) => {
         try {
@@ -1673,13 +1678,37 @@ Be specific and creative. Each scene description should paint a clear picture fo
         }
       };
 
+      // Handle redirect result on page load (for mobile sign-in)
+      React.useEffect(() => {
+        const handleRedirectResult = async () => {
+          try {
+            const result = await firebaseAuth.getRedirectResult();
+            if (result && result.user) {
+              await handleFirebaseAuth(result.user);
+            }
+          } catch (err) {
+            if (err.code !== 'auth/popup-closed-by-user') {
+              console.error('Redirect auth error:', err);
+              setAuthError(err.message);
+            }
+          }
+        };
+        handleRedirectResult();
+      }, []);
+
       // Google Sign-In
       const handleGoogleSignIn = async () => {
         setAuthError('');
         try {
           const provider = new firebase.auth.GoogleAuthProvider();
-          const result = await firebaseAuth.signInWithPopup(provider);
-          await handleFirebaseAuth(result.user);
+          if (isMobileDevice()) {
+            // Use redirect for mobile (more reliable on iOS Safari)
+            await firebaseAuth.signInWithRedirect(provider);
+          } else {
+            // Use popup for desktop
+            const result = await firebaseAuth.signInWithPopup(provider);
+            await handleFirebaseAuth(result.user);
+          }
         } catch (err) {
           if (err.code !== 'auth/popup-closed-by-user') {
             setAuthError(err.message);
@@ -1694,8 +1723,14 @@ Be specific and creative. Each scene description should paint a clear picture fo
           const provider = new firebase.auth.OAuthProvider('apple.com');
           provider.addScope('email');
           provider.addScope('name');
-          const result = await firebaseAuth.signInWithPopup(provider);
-          await handleFirebaseAuth(result.user);
+          if (isMobileDevice()) {
+            // Use redirect for mobile (more reliable on iOS Safari)
+            await firebaseAuth.signInWithRedirect(provider);
+          } else {
+            // Use popup for desktop
+            const result = await firebaseAuth.signInWithPopup(provider);
+            await handleFirebaseAuth(result.user);
+          }
         } catch (err) {
           if (err.code !== 'auth/popup-closed-by-user') {
             setAuthError(err.message);
