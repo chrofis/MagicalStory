@@ -4846,7 +4846,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         }
       };
 
-      // Regenerate a cover image with existing prompt
+      // Regenerate a cover image with existing prompt and character avatars
       const regenerateCoverImage = async (coverType) => {
         const confirmMsg = language === 'de' ? `${coverType} neu generieren?` :
                           language === 'fr' ? `Régénérer ${coverType}?` :
@@ -4854,8 +4854,37 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         if (confirm(confirmMsg)) {
           try {
             const prompt = coverImagePrompts[coverType];
-            const newImage = await callGeminiAPI(prompt);
-            setCoverImages({...coverImages, [coverType]: newImage});
+
+            // Collect avatar images from main characters (covers show main characters)
+            const coverCharacterAvatars = characters
+              .filter(char => mainCharacters.includes(char.id) && char.photoUrl)
+              .map(char => char.photoUrl);
+
+            let newImageData;
+            if (coverCharacterAvatars.length > 0) {
+              // Send with avatar images for better consistency
+              console.log(`Regenerating ${coverType} with ${coverCharacterAvatars.length} avatar(s)...`);
+              newImageData = await callGeminiAPIWithImages(prompt, coverCharacterAvatars);
+            } else {
+              // Text-only if no avatars available
+              console.log(`Regenerating ${coverType} with text-only prompt...`);
+              newImageData = await callGeminiAPI(prompt);
+            }
+
+            // Analyze quality for admin
+            let qualityAnalysis = null;
+            if (currentUser && currentUser.role === 'admin' && newImageData) {
+              qualityAnalysis = await analyzeImageQuality(newImageData, prompt, coverCharacterAvatars);
+            }
+
+            setCoverImages({
+              ...coverImages,
+              [coverType]: {
+                imageData: newImageData,
+                qualityScore: qualityAnalysis?.score || null,
+                qualityReasoning: qualityAnalysis?.reasoning || null
+              }
+            });
           } catch (error) {
             alert(`Error: ${error.message}`);
           }
@@ -8599,14 +8628,51 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               if (scene) {
                                 const confirmed = confirm(`Regenerate image for page ${image.pageNumber}?`);
                                 if (confirmed) {
-                                  // Regenerate this specific image
+                                  // Regenerate this specific image with character avatars
                                   (async () => {
                                     try {
                                       const imagePrompt = imagePrompts[image.pageNumber];
                                       if (imagePrompt) {
-                                        const newImageData = await callGeminiAPI(imagePrompt);
+                                        // Find characters in this scene (same logic as generateSceneImages)
+                                        const charactersInScene = characters.filter(char =>
+                                          scene.description.toLowerCase().includes(char.name.toLowerCase())
+                                        );
+
+                                        // Collect avatar images for characters in this scene
+                                        const characterAvatars = charactersInScene
+                                          .filter(char => char.photoUrl)
+                                          .map(char => char.photoUrl);
+
+                                        const safePrompt = `CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
+
+${imagePrompt}
+
+IMPORTANT: This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.`;
+
+                                        let newImageData;
+                                        if (characterAvatars.length > 0) {
+                                          // Send with avatar images for better consistency
+                                          console.log(`Regenerating page ${image.pageNumber} with ${characterAvatars.length} avatar(s)...`);
+                                          newImageData = await callGeminiAPIWithImages(safePrompt, characterAvatars, image.pageNumber);
+                                        } else {
+                                          // Text-only if no avatars available
+                                          console.log(`Regenerating page ${image.pageNumber} with text-only prompt...`);
+                                          newImageData = await callGeminiAPIWithLogging(safePrompt, null, image.pageNumber);
+                                        }
+
+                                        // Analyze quality for admin
+                                        let qualityAnalysis = null;
+                                        if (currentUser && currentUser.role === 'admin' && newImageData) {
+                                          qualityAnalysis = await analyzeImageQuality(newImageData, imagePrompt, characterAvatars);
+                                        }
+
                                         const updatedImages = [...sceneImages];
-                                        updatedImages[index] = { ...image, imageData: newImageData };
+                                        updatedImages[index] = {
+                                          ...image,
+                                          imageData: newImageData,
+                                          qualityScore: qualityAnalysis?.score || null,
+                                          qualityReasoning: qualityAnalysis?.reasoning || null
+                                        };
                                         setSceneImages(updatedImages);
                                       }
                                     } catch (error) {

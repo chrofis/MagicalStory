@@ -107,6 +107,26 @@ const activeTextModel = TEXT_MODELS[TEXT_MODEL] || TEXT_MODELS['claude-sonnet'];
 
 log.info(`🤖 Text model: ${TEXT_MODEL} (${activeTextModel.description})`);
 
+/**
+ * Calculate optimal batch size based on model token limits
+ * @param {number} totalPages - Total number of pages to generate
+ * @param {number} tokensPerPage - Estimated tokens needed per page (default: 400 for storybook, 500 for standard)
+ * @param {number} safetyMargin - Safety margin to avoid hitting limits (default: 0.8 = use 80% of max)
+ * @returns {number} Optimal batch size (number of pages per API call)
+ */
+function calculateOptimalBatchSize(totalPages, tokensPerPage = 400, safetyMargin = 0.8) {
+  const maxTokens = activeTextModel.maxOutputTokens;
+  const safeMaxTokens = Math.floor(maxTokens * safetyMargin);
+  const optimalBatchSize = Math.floor(safeMaxTokens / tokensPerPage);
+
+  // Ensure at least 1 page per batch, and don't exceed total pages
+  const batchSize = Math.max(1, Math.min(optimalBatchSize, totalPages));
+
+  log.verbose(`📊 [BATCH CALC] Model max: ${maxTokens}, safe max: ${safeMaxTokens}, tokens/page: ${tokensPerPage}, optimal batch: ${batchSize} pages`);
+
+  return batchSize;
+}
+
 // Load prompt templates from files
 const PROMPT_TEMPLATES = {};
 async function loadPromptTemplates() {
@@ -5325,10 +5345,8 @@ Mood: [Emotional tone]
 
     let response;
     try {
-      // Use higher token limit for longer stories (30+ pages need more tokens)
-      // Each page needs ~200-300 tokens for text + scene description
-      const tokensNeeded = Math.max(16000, totalPages * 400);
-      response = await callClaudeAPI(storybookPrompt, tokensNeeded);
+      // Picture book mode generates all pages at once (short text per page)
+      response = await callClaudeAPI(storybookPrompt, 16000);
       console.log(`📖 [STORYBOOK] Claude API response received, length: ${response?.length || 0} chars`);
     } catch (apiError) {
       console.error(`❌ [STORYBOOK] Claude API call failed:`, apiError.message);
@@ -5649,10 +5667,19 @@ async function processStoryJob(jobId) {
     );
 
     // STREAMING PIPELINE: Generate story in batches, immediately generate images as pages complete
-    // Use STORY_BATCH_SIZE env var: 0 = generate all at once, >0 = batch size
-    const BATCH_SIZE = STORY_BATCH_SIZE > 0 ? STORY_BATCH_SIZE : totalPages; // 0 means all pages at once
+    // Use STORY_BATCH_SIZE env var: 0 = auto-calculate based on model limits, >0 = fixed batch size
+    let BATCH_SIZE;
+    if (STORY_BATCH_SIZE > 0) {
+      // Use configured batch size
+      BATCH_SIZE = STORY_BATCH_SIZE;
+      console.log(`📚 [PIPELINE] Using configured batch size: ${BATCH_SIZE} pages per batch`);
+    } else {
+      // Auto-calculate optimal batch size based on model token limits
+      // Standard mode uses ~500 tokens per page (more text than picture book)
+      BATCH_SIZE = calculateOptimalBatchSize(totalPages, 500, 0.8);
+      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} pages per batch (model: ${TEXT_MODEL}, max tokens: ${activeTextModel.maxOutputTokens})`);
+    }
     const numBatches = Math.ceil(totalPages / BATCH_SIZE);
-    console.log(`📚 [PIPELINE] Using batch size: ${BATCH_SIZE === totalPages ? 'ALL AT ONCE' : BATCH_SIZE + ' pages per batch'}`);
 
     let fullStoryText = '';
     const allImages = [];
@@ -5702,9 +5729,9 @@ Output Format:
 
 ...continue until page ${endPage}...`;
 
-      // Calculate tokens needed based on batch size
+      // Calculate tokens needed based on batch size (use 80% of model max as safety margin)
       const batchPages = endPage - startPage + 1;
-      const batchTokensNeeded = Math.max(8000, batchPages * 500);
+      const batchTokensNeeded = Math.min(batchPages * 500, Math.floor(activeTextModel.maxOutputTokens * 0.8));
       const batchText = await callClaudeAPI(batchPrompt, batchTokensNeeded);
       fullStoryText += batchText + '\n\n';
 
