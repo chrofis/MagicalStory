@@ -550,6 +550,7 @@ const LOGS_FILE = path.join(__dirname, 'data', 'logs.json');
 const CONFIG_FILE = path.join(__dirname, 'data', 'config.json');
 const CHARACTERS_FILE = path.join(__dirname, 'data', 'characters.json');
 const STORIES_FILE = path.join(__dirname, 'data', 'stories.json');
+const STORY_DRAFTS_FILE = path.join(__dirname, 'data', 'story_drafts.json');
 
 // Initialize data directory and files
 async function initializeDataFiles() {
@@ -597,6 +598,13 @@ async function initializeDataFiles() {
     await fs.access(STORIES_FILE);
   } catch {
     await fs.writeFile(STORIES_FILE, JSON.stringify({}, null, 2));
+  }
+
+  // Initialize story_drafts.json
+  try {
+    await fs.access(STORY_DRAFTS_FILE);
+  } catch {
+    await fs.writeFile(STORY_DRAFTS_FILE, JSON.stringify({}, null, 2));
   }
 }
 
@@ -674,6 +682,15 @@ async function initializeDatabase() {
       )
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
+
+    // Story drafts table - stores unsaved story settings (step 1 & 4 data)
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS story_drafts (
+        user_id VARCHAR(255) PRIMARY KEY,
+        data TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS files (
@@ -2181,6 +2198,102 @@ app.post('/api/characters', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error saving characters:', err);
     res.status(500).json({ error: 'Failed to save characters' });
+  }
+});
+
+// Story draft endpoints - persist story settings before generation
+// This saves step 1 (storyType, artStyle) and step 4 (storyDetails, dedication, pageCount, languageLevel, mainCharacters) data
+app.get('/api/story-draft', authenticateToken, async (req, res) => {
+  try {
+    let draftData = {
+      storyType: '',
+      artStyle: 'pixar',
+      storyDetails: '',
+      dedication: '',
+      pageCount: 24,
+      languageLevel: 'standard',
+      mainCharacters: []
+    };
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const selectQuery = 'SELECT data FROM story_drafts WHERE user_id = $1';
+      const rows = await dbQuery(selectQuery, [req.user.id]);
+
+      if (rows.length > 0) {
+        const data = JSON.parse(rows[0].data);
+        draftData = { ...draftData, ...data };
+      }
+    } else {
+      // File mode
+      const allDrafts = await readJSON(STORY_DRAFTS_FILE);
+      const data = allDrafts[req.user.id];
+
+      if (data) {
+        draftData = { ...draftData, ...data };
+      }
+    }
+
+    res.json(draftData);
+  } catch (err) {
+    console.error('Error fetching story draft:', err);
+    res.status(500).json({ error: 'Failed to fetch story draft' });
+  }
+});
+
+app.post('/api/story-draft', authenticateToken, async (req, res) => {
+  try {
+    const { storyType, artStyle, storyDetails, dedication, pageCount, languageLevel, mainCharacters } = req.body;
+
+    const draftData = {
+      storyType: storyType || '',
+      artStyle: artStyle || 'pixar',
+      storyDetails: storyDetails || '',
+      dedication: dedication || '',
+      pageCount: pageCount || 24,
+      languageLevel: languageLevel || 'standard',
+      mainCharacters: mainCharacters || [],
+      updatedAt: new Date().toISOString()
+    };
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      // Upsert - insert or update on conflict
+      const upsertQuery = `
+        INSERT INTO story_drafts (user_id, data, updated_at)
+        VALUES ($1, $2, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id) DO UPDATE SET data = $2, updated_at = CURRENT_TIMESTAMP
+      `;
+      await dbQuery(upsertQuery, [req.user.id, JSON.stringify(draftData)]);
+    } else {
+      // File mode
+      const allDrafts = await readJSON(STORY_DRAFTS_FILE);
+      allDrafts[req.user.id] = draftData;
+      await writeJSON(STORY_DRAFTS_FILE, allDrafts);
+    }
+
+    console.log(`📝 [DRAFT] Saved story draft for user ${req.user.username}`);
+    res.json({ message: 'Story draft saved successfully' });
+  } catch (err) {
+    console.error('Error saving story draft:', err);
+    res.status(500).json({ error: 'Failed to save story draft' });
+  }
+});
+
+// Clear story draft (called after successful story generation)
+app.delete('/api/story-draft', authenticateToken, async (req, res) => {
+  try {
+    if (STORAGE_MODE === 'database' && dbPool) {
+      await dbQuery('DELETE FROM story_drafts WHERE user_id = $1', [req.user.id]);
+    } else {
+      const allDrafts = await readJSON(STORY_DRAFTS_FILE);
+      delete allDrafts[req.user.id];
+      await writeJSON(STORY_DRAFTS_FILE, allDrafts);
+    }
+
+    console.log(`🗑️ [DRAFT] Cleared story draft for user ${req.user.username}`);
+    res.json({ message: 'Story draft cleared' });
+  } catch (err) {
+    console.error('Error clearing story draft:', err);
+    res.status(500).json({ error: 'Failed to clear story draft' });
   }
 });
 

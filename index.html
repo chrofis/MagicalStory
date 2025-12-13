@@ -1037,11 +1037,12 @@
         };
       }, [currentUser]);
 
-      // Load characters when user logs in (stories loaded on-demand when opening "My Stories")
+      // Load characters and story draft when user logs in (stories loaded on-demand when opening "My Stories")
       useEffect(() => {
         if (authToken && isAuthenticated) {
-          console.log('🔄 Loading user data (characters, quota)...');
+          console.log('🔄 Loading user data (characters, story draft, quota)...');
           loadCharacters();
+          loadStoryDraft();
           fetchUserQuota();
         }
       }, [authToken, isAuthenticated]);
@@ -1372,6 +1373,38 @@
           console.log('💾 [AUTO-SAVE] Skipped - character being edited');
         }
       }, [characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears, authToken, isLoadingCharacters, characterBackup]);
+
+      // Auto-save story draft settings (step 1 & 4) whenever they change
+      useEffect(() => {
+        // Don't save if not authenticated or still loading draft
+        if (!authToken || isLoadingDraft) return;
+
+        // Only save if we have meaningful data (at least storyType or storyDetails)
+        if (!storyType && !storyDetails && !dedication) return;
+
+        const timeoutId = setTimeout(() => {
+          console.log('📝 [AUTO-SAVE DRAFT] Saving story settings...', {
+            storyType,
+            artStyle,
+            storyDetails: storyDetails?.substring(0, 50) + '...',
+            dedication: dedication?.substring(0, 30) + '...',
+            pageCount,
+            languageLevel,
+            mainCharactersCount: mainCharacters.length
+          });
+          saveStoryDraft({
+            storyType,
+            artStyle,
+            storyDetails,
+            dedication,
+            pageCount,
+            languageLevel,
+            mainCharacters
+          });
+        }, 1500); // Debounce for 1.5 seconds
+
+        return () => clearTimeout(timeoutId);
+      }, [storyType, artStyle, storyDetails, dedication, pageCount, languageLevel, mainCharacters, authToken, isLoadingDraft]);
 
       // Update prompt when returning to step 4 with prompt visible
       useEffect(() => {
@@ -2600,6 +2633,79 @@ Be specific and creative. Each scene description should paint a clear picture fo
       // Helper function for backward compatibility with cover images
       // Old stories have cover images as strings, new ones have objects with imageData, qualityScore, qualityReasoning
       const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
+
+      // Story draft persistence functions - saves step 1 & 4 settings before generation
+      const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+
+      const saveStoryDraft = async (draftData) => {
+        if (!authToken) return;
+
+        try {
+          await fetch(`${API_URL}/api/story-draft`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(draftData)
+          });
+          console.log('📝 [DRAFT] Story draft saved');
+        } catch (err) {
+          console.error('Error saving story draft:', err);
+        }
+      };
+
+      const loadStoryDraft = async () => {
+        if (!authToken) return;
+
+        setIsLoadingDraft(true);
+        try {
+          const response = await fetch(`${API_URL}/api/story-draft`, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log('📝 [DRAFT] Loaded story draft:', data);
+
+            // Only restore if there's actual data (not just defaults)
+            if (data.storyType) setStoryType(data.storyType);
+            if (data.artStyle) setArtStyle(data.artStyle);
+            if (data.storyDetails) setStoryDetails(data.storyDetails);
+            if (data.dedication) setDedication(data.dedication);
+            if (data.pageCount) setPageCount(data.pageCount);
+            if (data.languageLevel) setLanguageLevel(data.languageLevel);
+            if (data.mainCharacters && data.mainCharacters.length > 0) {
+              setMainCharacters(data.mainCharacters);
+            }
+          }
+        } catch (err) {
+          console.error('Error loading story draft:', err);
+        } finally {
+          setTimeout(() => {
+            setIsLoadingDraft(false);
+            console.log('📝 [DRAFT] Draft load complete');
+          }, 300);
+        }
+      };
+
+      const clearStoryDraft = async () => {
+        if (!authToken) return;
+
+        try {
+          await fetch(`${API_URL}/api/story-draft`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+          console.log('🗑️ [DRAFT] Story draft cleared');
+        } catch (err) {
+          console.error('Error clearing story draft:', err);
+        }
+      };
 
       // Story persistence functions
       const saveStory = async (storyData) => {
@@ -3909,6 +4015,8 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 const savedId = await saveStory(storyToSave);
                 if (savedId) {
                   setCurrentStoryId(savedId);
+                  // Clear draft after successful story save
+                  clearStoryDraft();
                 }
               }
 
@@ -4728,6 +4836,8 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             // Reload saved stories
             const updatedStories = await loadStories();
             setSavedStories(updatedStories);
+            // Clear draft after successful story save
+            clearStoryDraft();
           }
 
           setGenerationProgress({ current: 4, total: 4, message: 'Complete! Story and images ready!' });
