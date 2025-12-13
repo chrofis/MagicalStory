@@ -41,18 +41,20 @@ Create a simple story arc:
 
 You MUST provide the TITLE PAGE, INITIAL PAGE, all story pages, and BACK COVER. Use this exact format:
 
+**IMPORTANT: All SCENE descriptions must be VISUAL ONLY. Do NOT include any text instructions in scenes (no title text, no dedication text, no website text). Text will be added separately to the images.**
+
 ---TITLE PAGE---
 TITLE: [Creative story title]
 DEDICATION: {DEDICATION}
 
-SCENE:
+SCENE: (visual only - do NOT mention title text)
 Setting: [Cover scene that sets the mood for the story]
 Characters: [Main character(s) featured on cover - should be prominent and inviting]
 Action: [An inviting cover moment that draws readers in]
 Mood: [Welcoming, magical, exciting, etc.]
 
 ---INITIAL PAGE---
-SCENE:
+SCENE: (visual only - do NOT mention dedication text)
 Setting: [A warm, inviting scene that welcomes readers into the story world]
 Characters: [Main character(s) in a friendly, approachable pose]
 Action: [A gentle moment that sets the mood before the story begins]
@@ -81,7 +83,7 @@ Mood: [Emotional tone]
 ... continue for all {PAGES} pages ...
 
 ---BACK COVER---
-SCENE:
+SCENE: (visual only - do NOT mention "magicalstory.ch" or any text)
 Setting: [A satisfying concluding scene that provides closure]
 Characters: [Main character(s) in a happy, resolved state]
 Action: [A peaceful ending moment - could echo the beginning or show growth]

@@ -100,13 +100,15 @@ For EACH of the {PAGES} story pages, provide:
 
 # Part 4: Cover Scene Descriptions
 
-In addition to the {PAGES} story pages, provide scene descriptions for these 3 cover elements:
+In addition to the {PAGES} story pages, provide scene descriptions for these 3 cover elements.
 
-**Title Page Scene**: A captivating cover illustration that features the main characters and sets the tone for the story. This should be visually striking and focus on the protagonist(s) in a way that draws readers in.
+**IMPORTANT: Scene descriptions must be VISUAL ONLY. Do NOT include any text instructions (no title text, no dedication text, no website text). Text will be added separately.**
 
-**Initial Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers.
+**Title Page Scene**: A captivating cover illustration that features the main characters and sets the tone for the story. This should be visually striking and focus on the protagonist(s) in a way that draws readers in. Describe only the visual scene - characters, setting, mood, composition. Do NOT mention the title or any text.
 
-**Back Cover Scene**: A satisfying concluding illustration that provides closure and leaves readers with a positive feeling. This should feel like a natural ending to the visual journey.
+**Initial Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers. Describe only the visual elements - do NOT mention dedication text or any text.
+
+**Back Cover Scene**: A satisfying concluding illustration that provides closure and leaves readers with a positive feeling. This should feel like a natural ending to the visual journey. Describe only the visual scene - do NOT mention "magicalstory.ch" or any text.
 
 ---
 
