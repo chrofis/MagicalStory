@@ -1,7 +1,5 @@
 Create a **cinematic scene** in {STYLE_DESCRIPTION}. Use professional photography/cinematography techniques, focusing on lighting, composition, and depth of field to create a visually striking image.
 
-**IMAGE FORMAT: Square (1:1 aspect ratio)** - This is for a children's book illustration.
-
 Scene Description: {SCENE_DESCRIPTION}
 {CHARACTER_PROMPTS}
 
@@ -12,4 +10,3 @@ Important:
 - Capture the emotion and narrative of the scene vividly.
 - **No text, watermarks, or extraneous elements** should be present in the image.
 - Do not add objects or details not explicitly mentioned in the scene description or character prompts.
-- The image MUST be square format (1:1 aspect ratio).

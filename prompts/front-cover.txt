@@ -2,8 +2,6 @@
 
 Style: {STYLE_DESCRIPTION}.
 
-**IMAGE FORMAT: Square (1:1 aspect ratio)** - This is for a children's book cover.
-
 {CHARACTER_INFO}
 
 Create this as a beautiful title page illustration for the children's book "{STORY_TITLE}".
@@ -12,4 +10,3 @@ IMPORTANT:
 - The MAIN CHARACTER(S) must be the LARGEST figures in the image, positioned CENTRALLY and prominently featured.
 - Supporting characters may appear smaller, in the background, or at the sides.
 - The image should include the story title "{STORY_TITLE}" integrated beautifully into the illustration. Make the title prominent and visually appealing as part of the cover art.
-- The image MUST be square format (1:1 aspect ratio).

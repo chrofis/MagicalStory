@@ -7120,11 +7120,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const requestBody = {
     contents: [{
       parts: parts
-    }]
+    }],
+    generationConfig: {
+      aspectRatio: "1:1"
+    }
   };
 
   console.log('🖼️  [IMAGE GEN] Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
-  console.log('🖼️  [IMAGE GEN] Model: gemini-2.5-flash-image');
+  console.log('🖼️  [IMAGE GEN] Model: gemini-2.5-flash-image, Aspect Ratio: 1:1');
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
