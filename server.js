@@ -5729,69 +5729,102 @@ Mood: [Emotional tone]
 
     // Generate images if not skipped
     if (!skipImages) {
-      const limit = pLimit(5);
+      const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
+      console.log(`🖼️  [STORYBOOK] Image generation mode: ${imageGenMode.toUpperCase()}`);
+
       const MAX_RETRIES = 2;
 
-      const imagePromises = allSceneDescriptions.map((scene, idx) => {
-        return limit(async () => {
-          const pageNum = scene.pageNumber;
-          try {
-            // Detect which characters appear in this scene
-            const sceneCharacters = getCharactersInScene(scene.description, inputData.characters || []);
-            const scenePhotos = getCharacterPhotos(sceneCharacters);
-            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
+      // Helper function to generate a single image
+      const generateImage = async (scene, idx, previousImage = null) => {
+        const pageNum = scene.pageNumber;
+        try {
+          // Detect which characters appear in this scene
+          const sceneCharacters = getCharactersInScene(scene.description, inputData.characters || []);
+          const scenePhotos = getCharacterPhotos(sceneCharacters);
+          console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
-            // Build image prompt with only scene-specific characters
-            const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters);
-            imagePrompts[pageNum] = imagePrompt;
+          // Build image prompt with only scene-specific characters
+          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters);
+          imagePrompts[pageNum] = imagePrompt;
 
-            let imageResult = null;
-            let retries = 0;
+          let imageResult = null;
+          let retries = 0;
 
-            while (retries <= MAX_RETRIES && !imageResult) {
-              try {
-                // Pass only photos of characters in this scene
-                imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos);
-              } catch (error) {
-                retries++;
-                console.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
-                if (retries > MAX_RETRIES) throw error;
-                await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-              }
+          while (retries <= MAX_RETRIES && !imageResult) {
+            try {
+              // Pass only photos of characters in this scene
+              // In sequential mode, also pass previous image for consistency
+              imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos, previousImage);
+            } catch (error) {
+              retries++;
+              console.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
+              if (retries > MAX_RETRIES) throw error;
+              await new Promise(resolve => setTimeout(resolve, 1000 * retries));
             }
-
-            console.log(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score})`);
-
-            // Update progress
-            const progressPercent = 30 + Math.floor((idx + 1) / sceneCount * 50);
-            await dbPool.query(
-              'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-              [progressPercent, `Generated image ${idx + 1}/${sceneCount}...`, jobId]
-            );
-
-            return {
-              pageNumber: pageNum,
-              imageData: imageResult.imageData,
-              description: scene.description,
-              qualityScore: imageResult.score,
-              qualityReasoning: imageResult.reasoning || null
-            };
-          } catch (error) {
-            console.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
-            return {
-              pageNumber: pageNum,
-              imageData: null,
-              description: scene.description,
-              error: error.message
-            };
           }
-        });
-      });
 
-      const imageResults = await Promise.all(imagePromises);
-      imageResults.forEach(img => {
-        if (img) allImages.push(img);
-      });
+          console.log(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score})`);
+
+          // Update progress
+          const progressPercent = 30 + Math.floor((idx + 1) / sceneCount * 50);
+          await dbPool.query(
+            'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+            [progressPercent, `Generated image ${idx + 1}/${sceneCount}...`, jobId]
+          );
+
+          return {
+            pageNumber: pageNum,
+            imageData: imageResult.imageData,
+            description: scene.description,
+            qualityScore: imageResult.score,
+            qualityReasoning: imageResult.reasoning || null
+          };
+        } catch (error) {
+          console.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
+          return {
+            pageNumber: pageNum,
+            imageData: null,
+            description: scene.description,
+            error: error.message
+          };
+        }
+      };
+
+      if (imageGenMode === 'sequential') {
+        // SEQUENTIAL MODE: Generate images one at a time, passing previous for consistency
+        console.log(`🔗 [STORYBOOK] Starting SEQUENTIAL image generation for ${allSceneDescriptions.length} scenes...`);
+        let previousImage = null;
+
+        for (let i = 0; i < allSceneDescriptions.length; i++) {
+          const scene = allSceneDescriptions[i];
+          console.log(`🔗 [STORYBOOK SEQUENTIAL ${i + 1}/${allSceneDescriptions.length}] Processing page ${scene.pageNumber}...`);
+
+          const result = await generateImage(scene, i, previousImage);
+          allImages.push(result);
+
+          // Use this image as reference for next image
+          if (result.imageData) {
+            previousImage = result.imageData;
+          }
+        }
+
+        console.log(`🚀 [STORYBOOK] All ${allImages.length} images generated (SEQUENTIAL MODE)!`);
+      } else {
+        // PARALLEL MODE: Generate all images concurrently (max 5 at a time)
+        console.log(`⚡ [STORYBOOK] Starting PARALLEL image generation for ${allSceneDescriptions.length} scenes...`);
+        const limit = pLimit(5);
+
+        const imagePromises = allSceneDescriptions.map((scene, idx) => {
+          return limit(() => generateImage(scene, idx, null));
+        });
+
+        const imageResults = await Promise.all(imagePromises);
+        imageResults.forEach(img => {
+          if (img) allImages.push(img);
+        });
+
+        console.log(`🚀 [STORYBOOK] All ${allImages.length} images generated (PARALLEL MODE)!`);
+      }
 
       // Sort images by page number
       allImages.sort((a, b) => a.pageNumber - b.pageNumber);
@@ -5805,6 +5838,9 @@ Mood: [Emotional tone]
     // Generate cover images (simplified for picture book)
     let coverImages = { frontCover: null, initialPage: null, backCover: null };
 
+    // Store cover prompts for dev mode display
+    const coverPrompts = {};
+
     if (!skipImages) {
       try {
         const artStyleId = inputData.artStyle || 'pixar';
@@ -5813,6 +5849,7 @@ Mood: [Emotional tone]
 
         // Front cover
         const frontCoverPrompt = `Create a cheerful children's book cover illustration for "${storyTitle}". Feature the main character(s): ${characterInfo}. Style: ${styleDescription}. Make it colorful and inviting.`;
+        coverPrompts.frontCover = frontCoverPrompt;
         const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
         coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
 
@@ -5820,11 +5857,13 @@ Mood: [Emotional tone]
         const initialPrompt = inputData.dedication
           ? `Create a warm, welcoming illustration for a children's book dedication page. Include the text: "${inputData.dedication}". Style: ${styleDescription}.`
           : `Create a warm, welcoming introduction page illustration for "${storyTitle}". Style: ${styleDescription}. No text.`;
+        coverPrompts.initialPage = initialPrompt;
         const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos);
         coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
 
         // Back cover
         const backCoverPrompt = `Create a satisfying conclusion illustration for "${storyTitle}". Show a happy ending scene. Style: ${styleDescription}. Include "magicalstory.ch" text in corner.`;
+        coverPrompts.backCover = backCoverPrompt;
         const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
         coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
 
@@ -5843,6 +5882,7 @@ Mood: [Emotional tone]
       images: allImages,
       coverImages: coverImages,
       imagePrompts: imagePrompts,
+      coverPrompts: coverPrompts,  // Cover image prompts for dev mode
       storyType: inputData.storyType,
       storyDetails: inputData.storyDetails,
       pages: sceneCount,
@@ -5987,9 +6027,10 @@ async function processStoryJob(jobId) {
       console.log(`📚 [PIPELINE] Using configured batch size: ${BATCH_SIZE} pages per batch`);
     } else {
       // Auto-calculate optimal batch size based on model token limits
-      // Standard mode uses ~500 tokens per scene (more text than picture book)
-      BATCH_SIZE = calculateOptimalBatchSize(sceneCount, 500, 0.8);
-      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} scenes per batch (model: ${TEXT_MODEL}, max tokens: ${activeTextModel.maxOutputTokens})`);
+      // Picture book uses ~500 tokens per scene, Standard uses ~1000 tokens per scene
+      const tokensPerScene = isPictureBook ? 500 : 1000;
+      BATCH_SIZE = calculateOptimalBatchSize(sceneCount, tokensPerScene, 0.8);
+      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} scenes per batch (model: ${TEXT_MODEL}, ${tokensPerScene} tokens/scene, max tokens: ${activeTextModel.maxOutputTokens})`);
     }
     const numBatches = Math.ceil(sceneCount / BATCH_SIZE);
 
@@ -6041,9 +6082,13 @@ Output Format:
 
 ...continue until page ${endScene}...`;
 
-      // Calculate tokens needed based on batch size (use 80% of model max as safety margin)
+      // Calculate tokens needed based on batch size
+      // Standard mode needs ~800-1000 tokens per page (longer text than picture book)
+      // Use generous estimate to avoid truncation
       const batchSceneCount = endScene - startScene + 1;
-      const batchTokensNeeded = Math.min(batchSceneCount * 500, Math.floor(activeTextModel.maxOutputTokens * 0.8));
+      const tokensPerPage = isPictureBook ? 500 : 1000; // Picture book = shorter, Standard = longer
+      const batchTokensNeeded = Math.min(batchSceneCount * tokensPerPage, Math.floor(activeTextModel.maxOutputTokens * 0.8));
+      console.log(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} tokens for ${batchSceneCount} pages (${tokensPerPage} tokens/page)`);
       const batchText = await callClaudeAPI(batchPrompt, batchTokensNeeded);
       fullStoryText += batchText + '\n\n';
 
@@ -6301,6 +6346,7 @@ Output Format:
     }
 
     let coverImages = null;
+    const coverPrompts = {};  // Store cover prompts for dev mode
 
     // Step 5: Generate cover images (unless skipImages)
     if (!skipImages) {
@@ -6359,6 +6405,7 @@ Output Format:
           CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle
         });
+        coverPrompts.frontCover = frontCoverPrompt;
         frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
         console.log(`✅ [PIPELINE] Front cover generated successfully`);
         // Save checkpoint: front cover
@@ -6384,6 +6431,7 @@ Output Format:
               CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle
             });
+        coverPrompts.initialPage = initialPagePrompt;
         initialPageResult = await callGeminiAPIForImage(initialPagePrompt, characterPhotos);
         console.log(`✅ [PIPELINE] Initial page generated successfully`);
         // Save checkpoint: initial page cover
@@ -6401,6 +6449,7 @@ Output Format:
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo
         });
+        coverPrompts.backCover = backCoverPrompt;
         backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
         console.log(`✅ [PIPELINE] Back cover generated successfully`);
         // Save checkpoint: back cover
@@ -6441,6 +6490,7 @@ Output Format:
       images: allImages,
       coverImages,
       imagePrompts,
+      coverPrompts,  // Cover image prompts for dev mode
       title: storyTitle,
       textOnly: skipImages // Mark if this was text-only generation
     };

@@ -1125,6 +1125,7 @@
                 setStoryTitle(fullStory.title || '');
                 setCoverImages(fullStory.coverImages || { frontCover: null, initialPage: null, backCover: null });
                 setImagePrompts(fullStory.imagePrompts || {});
+                setCoverImagePrompts(fullStory.coverImagePrompts || {});
                 setRawAIResponse(fullStory.rawAIResponse || '');
                 setStep(5);
               })
@@ -1242,44 +1243,52 @@
             return relValue;
           };
 
-          // Translate current character being edited
-          if (currentCharacter) {
-            setCurrentCharacter(prev => ({
+          // Translate current character being edited (use functional update to avoid stale closure)
+          setCurrentCharacter(prev => {
+            if (!prev) return prev;
+            return {
               ...prev,
               strengths: translateArray(prev.strengths || [], prevLang, language, defaultStrengths),
               weaknesses: translateArray(prev.weaknesses || [], prevLang, language, defaultWeaknesses),
               fears: translateArray(prev.fears || [], prevLang, language, fearOptions)
-            }));
-          }
+            };
+          });
 
-          // Translate character backup if exists
-          if (characterBackup) {
-            setCharacterBackup(prev => ({
+          // Translate character backup if exists (use functional update)
+          setCharacterBackup(prev => {
+            if (!prev) return prev;
+            return {
               ...prev,
               strengths: translateArray(prev.strengths || [], prevLang, language, defaultStrengths),
               weaknesses: translateArray(prev.weaknesses || [], prevLang, language, defaultWeaknesses),
               fears: translateArray(prev.fears || [], prevLang, language, fearOptions)
-            }));
-          }
+            };
+          });
 
-          // Translate all existing characters
-          if (characters.length > 0) {
-            setCharacters(prevChars => prevChars.map(char => ({
+          // Translate all existing characters (use functional update)
+          setCharacters(prevChars => {
+            if (!prevChars || prevChars.length === 0) return prevChars;
+            return prevChars.map(char => ({
               ...char,
               strengths: translateArray(char.strengths || [], prevLang, language, defaultStrengths),
               weaknesses: translateArray(char.weaknesses || [], prevLang, language, defaultWeaknesses),
               fears: translateArray(char.fears || [], prevLang, language, fearOptions)
-            })));
-          }
+            }));
+          });
 
-          // Translate relationships
-          if (Object.keys(relationships).length > 0) {
+          // Translate relationships (use functional update to avoid stale closure - CRITICAL)
+          setRelationships(prevRelationships => {
+            if (!prevRelationships || Object.keys(prevRelationships).length === 0) {
+              console.log('🌐 [TRANSLATE] No relationships to translate');
+              return prevRelationships;
+            }
+            console.log('🌐 [TRANSLATE] Translating', Object.keys(prevRelationships).length, 'relationships');
             const translatedRelationships = {};
-            for (const [key, value] of Object.entries(relationships)) {
+            for (const [key, value] of Object.entries(prevRelationships)) {
               translatedRelationships[key] = translateRelationship(value);
             }
-            setRelationships(translatedRelationships);
-          }
+            return translatedRelationships;
+          });
         }
 
         // Update previous language ref
@@ -1310,14 +1319,20 @@
       }, [step]);
 
       // Save characters and relationships whenever they change (with debounce)
-      // Skip saving while loading to prevent race conditions
+      // Skip saving while loading OR while editing a character to prevent race conditions
       useEffect(() => {
-        if (authToken && characters.length > 0 && !isLoadingCharacters) {
+        // Don't save if:
+        // - No auth token
+        // - No characters (nothing to save)
+        // - Currently loading characters from server
+        // - Currently editing a character (characterBackup exists = character temporarily removed from array)
+        if (authToken && characters.length > 0 && !isLoadingCharacters && !characterBackup) {
           const timeoutId = setTimeout(() => {
             // Pass all data explicitly to avoid stale closure issues
             console.log('💾 [AUTO-SAVE] Saving characters and relationships...', {
               characterCount: characters.length,
-              relationshipCount: Object.keys(relationships).length
+              relationshipCount: Object.keys(relationships).length,
+              relationshipKeys: Object.keys(relationships)
             });
             saveCharacters({
               characters,
@@ -1331,8 +1346,10 @@
           }, 1000); // Debounce for 1 second
 
           return () => clearTimeout(timeoutId);
+        } else if (characterBackup) {
+          console.log('💾 [AUTO-SAVE] Skipped - character being edited');
         }
-      }, [characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears, authToken, isLoadingCharacters]);
+      }, [characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears, authToken, isLoadingCharacters, characterBackup]);
 
       // Update prompt when returning to step 4 with prompt visible
       useEffect(() => {
@@ -3582,7 +3599,8 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             relationshipTexts,
             dedication,
             artStyle,
-            skipImages // Add flag to skip image generation
+            skipImages, // Add flag to skip image generation
+            imageGenMode: imageGenMode || undefined // Send user's choice (parallel/sequential)
           };
 
           // Create the background job
@@ -3673,6 +3691,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 setSceneImages(result.images || []);
                 setCoverImages(result.coverImages || { frontCover: null, initialPage: null, backCover: null });
                 setImagePrompts(result.imagePrompts || {}); // Load image prompts
+                setCoverImagePrompts(result.coverPrompts || {}); // Load cover image prompts for dev mode
                 setRawAIResponse(result.rawAIResponse || ''); // Store raw AI response for developer mode
               }
 
@@ -3703,6 +3722,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                   sceneDescriptions: result.sceneDescriptions,
                   sceneImages: result.images,
                   imagePrompts: result.imagePrompts || {}, // Save image prompts for developer features
+                  coverImagePrompts: result.coverPrompts || {}, // Save cover image prompts for developer features
                   coverImages: result.coverImages || { frontCover: null, initialPage: null, backCover: null },
                   thumbnail: (result.coverImages?.frontCover?.imageData || result.coverImages?.frontCover || null),
                   rawAIResponse: result.rawAIResponse || '', // Save raw AI response for developer features
@@ -6984,14 +7004,17 @@ Return ONLY valid JSON, no markdown or other text.`
           setCharacters(characters.filter(c => c.id !== charId));
           // Remove from main characters if present
           setMainCharacters(mainCharacters.filter(id => id !== charId));
-          // Remove relationships involving this character
-          const newRelationships = {};
-          Object.keys(relationships).forEach(key => {
-            if (!key.includes(charId.toString())) {
-              newRelationships[key] = relationships[key];
-            }
+          // Remove relationships involving this character (use functional update)
+          setRelationships(prev => {
+            const newRelationships = {};
+            Object.keys(prev).forEach(key => {
+              if (!key.includes(charId.toString())) {
+                newRelationships[key] = prev[key];
+              }
+            });
+            console.log('🗑️ [DELETE] Removed relationships for character', charId, '- remaining:', Object.keys(newRelationships).length);
+            return newRelationships;
           });
-          setRelationships(newRelationships);
         }
       };
 
@@ -7231,29 +7254,33 @@ Return ONLY valid JSON, no markdown or other text.`
       };
 
       const initializeRelationships = () => {
-        const newRelationships = {};
-        characters.forEach(char1 => {
-          characters.forEach(char2 => {
-            if (char1.id !== char2.id) {
-              const key = `${char1.id}-${char2.id}`;
-              if (!relationships[key]) {
-                newRelationships[key] = relationshipTypes[10].value[language];
-              } else {
-                newRelationships[key] = relationships[key];
+        // Use functional update to avoid stale closure issues
+        setRelationships(prevRelationships => {
+          const newRelationships = { ...prevRelationships };
+          characters.forEach(char1 => {
+            characters.forEach(char2 => {
+              if (char1.id !== char2.id) {
+                const key = `${char1.id}-${char2.id}`;
+                if (!prevRelationships[key]) {
+                  newRelationships[key] = relationshipTypes[10].value[language];
+                }
+                // If relationship already exists, keep it (already in newRelationships from spread)
               }
-            }
+            });
           });
+          console.log('🔗 [INIT] Initialized relationships:', Object.keys(newRelationships).length);
+          return newRelationships;
         });
-        setRelationships({ ...relationships, ...newRelationships });
       };
 
       const updateRelationship = (char1Id, char2Id, type) => {
         const inverse = getInverseRelationship(type);
-        setRelationships({
-          ...relationships,
+        // Use functional update to avoid stale closure issues
+        setRelationships(prev => ({
+          ...prev,
           [`${char1Id}-${char2Id}`]: type,
           [`${char2Id}-${char1Id}`]: inverse
-        });
+        }));
       };
 
       const areAllRelationshipsDefined = () => {
@@ -10833,6 +10860,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                               setStoryTitle(fullStory.title || '');
                               setCoverImages(fullStory.coverImages || { frontCover: null, initialPage: null, backCover: null });
                               setImagePrompts(fullStory.imagePrompts || {}); // Load image prompts for developer features
+                              setCoverImagePrompts(fullStory.coverImagePrompts || {}); // Load cover image prompts for developer features
                               setRawAIResponse(fullStory.rawAIResponse || ''); // Load raw AI response for developer features
                               setStep(5);
                               setShowSavedStories(false);
