@@ -7090,8 +7090,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       previousImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
     parts.push({
-      inlineData: {
-        mimeType: mimeType,
+      inline_data: {
+        mime_type: mimeType,
         data: base64Data
       }
     });
@@ -7107,8 +7107,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
         parts.push({
-          inlineData: {
-            mimeType: mimeType,
+          inline_data: {
+            mime_type: mimeType,
             data: base64Data
           }
         });
@@ -7122,7 +7122,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       parts: parts
     }],
     generationConfig: {
-      aspectRatio: "1:1"
+      aspectRatio: "1:1",
+      temperature: 0.5,
+      numberOfImages: 1
     }
   };
 
