@@ -6432,11 +6432,12 @@ Output Format:
 ...continue until page ${endScene}...`;
 
       // Calculate tokens needed based on batch size
-      // Standard mode needs ~800-1000 tokens per page (longer text than picture book)
-      // Use generous estimate to avoid truncation
+      // Use generous token allocation - we have models with 64000+ output capacity
+      // Standard mode needs more tokens per page for detailed storytelling
       const batchSceneCount = endScene - startScene + 1;
-      const tokensPerPage = isPictureBook ? 500 : 1000; // Picture book = shorter, Standard = longer
-      const batchTokensNeeded = Math.min(batchSceneCount * tokensPerPage, Math.floor(activeTextModel.maxOutputTokens * 0.8));
+      const tokensPerPage = isPictureBook ? 2000 : 5000; // Generous allocation to avoid truncation
+      const maxSafeTokens = Math.floor(activeTextModel.maxOutputTokens * 0.8); // 80% of model max
+      const batchTokensNeeded = Math.min(batchSceneCount * tokensPerPage, maxSafeTokens);
       console.log(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} tokens for ${batchSceneCount} pages (${tokensPerPage} tokens/page) - STREAMING`);
       const batchText = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
       fullStoryText += batchText + '\n\n';
