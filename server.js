@@ -6162,6 +6162,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
         // Front cover - use same template as standard mode
+        // Detect which characters appear in the front cover scene
+        const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
+        const frontCoverPhotos = getCharacterPhotos(frontCoverCharacters);
+        console.log(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
+
         const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
@@ -6169,10 +6174,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           STORY_TITLE: storyTitle
         });
         coverPrompts.frontCover = frontCoverPrompt;
-        const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
+        const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos);
         coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
 
         // Initial page - use same templates as standard mode
+        // Detect which characters appear in the initial page scene
+        const initialPageCharacters = getCharactersInScene(initialPageScene, inputData.characters || []);
+        const initialPagePhotos = getCharacterPhotos(initialPageCharacters);
+        console.log(`📕 [STORYBOOK] Initial page: ${initialPageCharacters.length} characters (${initialPageCharacters.map(c => c.name).join(', ') || 'none'})`);
+
         const initialPrompt = inputData.dedication && inputData.dedication.trim()
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
@@ -6187,17 +6197,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               STORY_TITLE: storyTitle
             });
         coverPrompts.initialPage = initialPrompt;
-        const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos);
+        const initialResult = await callGeminiAPIForImage(initialPrompt, initialPagePhotos);
         coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
 
         // Back cover - use same template as standard mode
+        // Detect which characters appear in the back cover scene
+        const backCoverCharacters = getCharactersInScene(backCoverScene, inputData.characters || []);
+        const backCoverPhotos = getCharacterPhotos(backCoverCharacters);
+        console.log(`📕 [STORYBOOK] Back cover: ${backCoverCharacters.length} characters (${backCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
+
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo
         });
         coverPrompts.backCover = backCoverPrompt;
-        const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
+        const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, backCoverPhotos);
         coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
 
         console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
@@ -6785,8 +6800,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       let frontCoverResult, initialPageResult, backCoverResult;
 
       // Generate front cover (matches step-by-step prompt format)
+      // Detect which characters appear in the front cover scene
+      const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
+      const frontCoverPhotos = getCharacterPhotos(frontCoverCharacters);
+
       try {
-        console.log(`📕 [PIPELINE] Generating front cover for job ${jobId}`);
+        console.log(`📕 [PIPELINE] Generating front cover for job ${jobId} (${frontCoverCharacters.length} characters: ${frontCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
         const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
@@ -6794,7 +6813,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           STORY_TITLE: storyTitle
         });
         coverPrompts.frontCover = frontCoverPrompt;
-        frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
+        frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos);
         console.log(`✅ [PIPELINE] Front cover generated successfully`);
         // Save checkpoint: front cover
         await saveCheckpoint(jobId, 'cover', { type: 'front', prompt: frontCoverPrompt }, 0);
@@ -6804,8 +6823,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       }
 
       // Generate initial page (dedication page) - matches step-by-step prompt format
+      // Detect which characters appear in the initial page scene
+      const initialPageCharacters = getCharactersInScene(initialPageScene, inputData.characters || []);
+      const initialPagePhotos = getCharacterPhotos(initialPageCharacters);
+
       try {
-        console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId}`);
+        console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId} (${initialPageCharacters.length} characters: ${initialPageCharacters.map(c => c.name).join(', ') || 'none'})`);
         const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
@@ -6820,7 +6843,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               STORY_TITLE: storyTitle
             });
         coverPrompts.initialPage = initialPagePrompt;
-        initialPageResult = await callGeminiAPIForImage(initialPagePrompt, characterPhotos);
+        initialPageResult = await callGeminiAPIForImage(initialPagePrompt, initialPagePhotos);
         console.log(`✅ [PIPELINE] Initial page generated successfully`);
         // Save checkpoint: initial page cover
         await saveCheckpoint(jobId, 'cover', { type: 'initialPage', prompt: initialPagePrompt }, 1);
@@ -6830,15 +6853,19 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       }
 
       // Generate back cover (matches step-by-step prompt format)
+      // Detect which characters appear in the back cover scene
+      const backCoverCharacters = getCharactersInScene(backCoverScene, inputData.characters || []);
+      const backCoverPhotos = getCharacterPhotos(backCoverCharacters);
+
       try {
-        console.log(`📕 [PIPELINE] Generating back cover for job ${jobId}`);
+        console.log(`📕 [PIPELINE] Generating back cover for job ${jobId} (${backCoverCharacters.length} characters: ${backCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo
         });
         coverPrompts.backCover = backCoverPrompt;
-        backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
+        backCoverResult = await callGeminiAPIForImage(backCoverPrompt, backCoverPhotos);
         console.log(`✅ [PIPELINE] Back cover generated successfully`);
         // Save checkpoint: back cover
         await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
@@ -7282,6 +7309,43 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
   const decoder = new TextDecoder();
   let fullText = '';
   let buffer = '';
+  let stopReason = null;
+
+  // Helper function to process SSE lines
+  const processLine = (line) => {
+    if (line.startsWith('data: ')) {
+      const data = line.slice(6);  // Remove 'data: ' prefix
+
+      if (data === '[DONE]') return;
+
+      try {
+        const event = JSON.parse(data);
+
+        // Handle content_block_delta events (these contain the text)
+        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+          const textChunk = event.delta.text;
+          fullText += textChunk;
+
+          // Call the onChunk callback
+          if (onChunk) {
+            onChunk(textChunk, fullText);
+          }
+        }
+
+        // Capture stop_reason from message_delta
+        if (event.type === 'message_delta' && event.delta?.stop_reason) {
+          stopReason = event.delta.stop_reason;
+        }
+
+        // Log when streaming completes
+        if (event.type === 'message_stop') {
+          console.log(`🌊 [STREAM] Streaming complete, received ${fullText.length} chars, stop_reason: ${stopReason}`);
+        }
+      } catch (parseError) {
+        // Skip non-JSON lines (like empty lines)
+      }
+    }
+  };
 
   try {
     while (true) {
@@ -7296,37 +7360,33 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
       buffer = lines.pop() || '';  // Keep incomplete line in buffer
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);  // Remove 'data: ' prefix
+        processLine(line);
+      }
+    }
 
-          if (data === '[DONE]') continue;
+    // Process any remaining buffer content after stream ends
+    if (buffer.trim()) {
+      const remainingLines = buffer.split('\n');
+      for (const line of remainingLines) {
+        processLine(line);
+      }
+    }
 
-          try {
-            const event = JSON.parse(data);
-
-            // Handle content_block_delta events (these contain the text)
-            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-              const textChunk = event.delta.text;
-              fullText += textChunk;
-
-              // Call the onChunk callback
-              if (onChunk) {
-                onChunk(textChunk, fullText);
-              }
-            }
-
-            // Log when streaming completes
-            if (event.type === 'message_stop') {
-              console.log(`🌊 [STREAM] Streaming complete, received ${fullText.length} chars`);
-            }
-          } catch (parseError) {
-            // Skip non-JSON lines (like empty lines)
-          }
-        }
+    // Flush the decoder to get any remaining bytes
+    const remaining = decoder.decode();
+    if (remaining) {
+      const finalLines = remaining.split('\n');
+      for (const line of finalLines) {
+        processLine(line);
       }
     }
   } finally {
     reader.releaseLock();
+  }
+
+  // Warn if response was truncated due to max_tokens
+  if (stopReason === 'max_tokens') {
+    console.warn(`⚠️ [STREAM] Response was TRUNCATED due to max_tokens limit (${maxTokens})! Text may be incomplete.`);
   }
 
   return fullText;
