@@ -7121,10 +7121,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     contents: [{
       parts: parts
     }],
-    generationConfig: {
-      aspectRatio: "1:1",
+    generation_config: {
+      aspect_ratio: "1:1",
       temperature: 0.5,
-      numberOfImages: 1
+      number_of_images: 1
     }
   };
 
