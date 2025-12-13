@@ -3966,19 +3966,53 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       });
     } else {
       // STANDARD/ADVANCED LAYOUT: Separate pages for text and image
+      // Margins: reduced top/bottom for more text space, keep left/right for binding
+      const marginTopBottom = 15;  // ~5mm
+      const marginLeftRight = 28;  // ~10mm
+
+      const availableWidth = pageSize - (marginLeftRight * 2);
+      const availableHeight = pageSize - (marginTopBottom * 2);
+
+      // PRE-CHECK: Verify all pages fit before generating PDF
+      // If any page would be truncated, abort with error
+      const truncatedPages = [];
+      storyPages.forEach((page, index) => {
+        const pageNumber = index + 1;
+        let fontSize = 9;
+        doc.fontSize(fontSize).font('Helvetica');
+        let textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
+
+        while (textHeight > availableHeight && fontSize > 5) {
+          fontSize -= 0.5;
+          doc.fontSize(fontSize);
+          textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
+        }
+
+        if (textHeight > availableHeight) {
+          truncatedPages.push(pageNumber);
+          console.error(`❌ Page ${pageNumber}: Text too long even at minimum font size - would be truncated`);
+        }
+      });
+
+      // Abort if any pages would be truncated
+      if (truncatedPages.length > 0) {
+        console.error(`❌ [PDF] Aborting: ${truncatedPages.length} pages have text too long for print`);
+        return res.status(400).json({
+          error: 'Text too long for print',
+          message: `Pages ${truncatedPages.join(', ')} have too much text and would be truncated. Please shorten the text before printing.`,
+          truncatedPages
+        });
+      }
+
+      // All pages fit - proceed with PDF generation
       storyPages.forEach((page, index) => {
         const pageNumber = index + 1;
 
         // Add text page (square format)
-        const margin = 28;
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
-
-        const availableWidth = pageSize - (margin * 2);
-        const availableHeight = pageSize - (margin * 2);
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: marginTopBottom, bottom: marginTopBottom, left: marginLeftRight, right: marginLeftRight } });
 
         let fontSize = 9;
         let textHeight;
-        let fontReduced = false;
 
         doc.fontSize(fontSize).font('Helvetica');
         textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
@@ -3987,34 +4021,12 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
-          fontReduced = true;
         }
 
-        let textToRender = page.text;
-        if (textHeight > availableHeight) {
-          console.error(`⚠️  Page ${pageNumber}: Text too long even at ${fontSize}pt, truncating...`);
-          const words = page.text.split(' ');
-          textToRender = '';
-          for (let i = 0; i < words.length; i++) {
-            const testText = textToRender + (textToRender ? ' ' : '') + words[i];
-            const testHeight = doc.heightOfString(testText, { width: availableWidth, align: 'left' });
-            if (testHeight <= availableHeight) {
-              textToRender = testText;
-            } else {
-              break;
-            }
-          }
-          textToRender += '...';
-        }
+        textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
+        const yPosition = marginTopBottom + (availableHeight - textHeight) / 2;
 
-        if (fontReduced) {
-          console.warn(`⚠️  Page ${pageNumber}: Text too long, reduced font to ${fontSize}pt`);
-        }
-
-        textHeight = doc.heightOfString(textToRender, { width: availableWidth, align: 'left' });
-        const yPosition = margin + (availableHeight - textHeight) / 2;
-
-        doc.fillColor('#333333').text(textToRender, margin, yPosition, { width: availableWidth, align: 'left' });
+        doc.fillColor('#333333').text(page.text, marginLeftRight, yPosition, { width: availableWidth, align: 'left' });
 
         // Add image page if available (square format)
         const sceneImage = sceneImages.find(img => img.pageNumber === pageNumber);
