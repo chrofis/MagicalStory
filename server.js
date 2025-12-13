@@ -6310,6 +6310,10 @@ async function processStoryJob(jobId) {
     // Check if this is a picture book (1st-grade) - use simplified combined flow
     const isPictureBook = inputData.languageLevel === '1st-grade';
 
+    // Get language for scene descriptions
+    const lang = inputData.language || 'en';
+    const langText = lang === 'de' ? 'German' : lang === 'fr' ? 'French' : 'English';
+
     // Calculate number of story scenes to generate:
     // - Picture Book: 1 scene per page (image + text on same page)
     // - Standard: 1 scene per 2 print pages (text page + facing image page)
