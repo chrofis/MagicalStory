@@ -3776,6 +3776,49 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
               message: job.progressMessage || 'Processing...'
             });
 
+            // PROGRESSIVE DISPLAY: Show partial results as pages complete
+            if (job.partialPages && job.partialPages.length > 0 && job.status === 'processing') {
+              console.log(`📖 [PARTIAL] Received ${job.partialPages.length} completed pages`);
+
+              // Build partial story text from completed pages
+              const partialStoryText = job.partialPages
+                .sort((a, b) => a.pageNumber - b.pageNumber)
+                .map(page => `--- Page ${page.pageNumber} ---\n${page.text}`)
+                .join('\n\n');
+
+              // Build partial scene images array
+              const partialImages = job.partialPages
+                .sort((a, b) => a.pageNumber - b.pageNumber)
+                .map(page => ({
+                  pageNumber: page.pageNumber,
+                  imageData: page.imageData,
+                  description: page.description,
+                  qualityScore: page.qualityScore
+                }));
+
+              // Build partial scene descriptions
+              const partialDescriptions = job.partialPages
+                .sort((a, b) => a.pageNumber - b.pageNumber)
+                .map(page => ({
+                  pageNumber: page.pageNumber,
+                  description: page.description
+                }));
+
+              // Update state with partial results
+              if (partialStoryText) {
+                setGeneratedStory(partialStoryText);
+              }
+              if (partialImages.length > 0) {
+                setSceneImages(partialImages);
+                setSceneDescriptions(partialDescriptions);
+              }
+
+              // Navigate to step 5 to show progress (only once)
+              if (step !== 5) {
+                setStep(5);
+              }
+            }
+
             if (job.status === 'completed' && !completedAlertShown) {
               // Job completed successfully - mark alert as shown first to prevent duplicates
               completedAlertShown = true;
@@ -3869,9 +3912,9 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           }
         };
 
-        // Check immediately, then every 10 seconds
+        // Check immediately, then every 3 seconds (faster for progressive display)
         await checkStatus();
-        pollInterval = setInterval(checkStatus, 10000); // Poll every 10 seconds
+        pollInterval = setInterval(checkStatus, 3000); // Poll every 3 seconds for live updates
       };
 
       // Auto-Run Mode: Execute all steps automatically (CLIENT-SIDE - LEGACY)

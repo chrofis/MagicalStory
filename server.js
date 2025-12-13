@@ -5668,8 +5668,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Rate limiter for parallel image generation during streaming
     const streamLimit = pLimit(3);  // Limit concurrent image generation during streaming
 
+    // Track completed pages for partial results (text -> sceneText mapping)
+    const pageTexts = {};
+
     // Helper function to generate image for a scene (used during streaming)
-    const generateImageForScene = async (pageNum, sceneDesc) => {
+    const generateImageForScene = async (pageNum, sceneDesc, pageText = null) => {
       try {
         const sceneCharacters = getCharactersInScene(sceneDesc, inputData.characters || []);
         const scenePhotos = getCharacterPhotos(sceneCharacters);
@@ -5694,19 +5697,27 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         console.log(`✅ [STREAM-IMG] Page ${pageNum} image generated (score: ${imageResult.score})`);
 
-        return {
+        const pageData = {
           pageNumber: pageNum,
           imageData: imageResult.imageData,
           description: sceneDesc,
+          text: pageText || pageTexts[pageNum] || '',
           qualityScore: imageResult.score,
           qualityReasoning: imageResult.reasoning || null
         };
+
+        // Save partial result checkpoint for progressive display
+        await saveCheckpoint(jobId, 'partial_page', pageData, pageNum);
+        console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
+
+        return pageData;
       } catch (error) {
         console.error(`❌ [STREAM-IMG] Failed to generate image for page ${pageNum}:`, error.message);
         return {
           pageNumber: pageNum,
           imageData: null,
           description: sceneDesc,
+          text: pageText || pageTexts[pageNum] || '',
           error: error.message
         };
       }
@@ -5719,17 +5730,21 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
     const sceneParser = new ProgressiveSceneParser((completedScene) => {
       // Called when a scene is detected as complete during streaming
-      const { pageNumber, sceneDescription } = completedScene;
+      const { pageNumber, text, sceneDescription } = completedScene;
 
       if (completedSceneNumbers.has(pageNumber)) return;  // Already processed
       completedSceneNumbers.add(pageNumber);
       scenesEmittedCount++;
 
+      // Store the page text for later use
+      pageTexts[pageNumber] = text;
+
       console.log(`🌊 [STREAM] Scene ${pageNumber} complete during streaming (${scenesEmittedCount}/${sceneCount})`);
 
       // Start image generation immediately for this scene (only in parallel mode)
+      // Pass the page text so it can be saved with the partial result
       if (shouldStreamImages && sceneDescription) {
-        const imagePromise = streamLimit(() => generateImageForScene(pageNumber, sceneDescription));
+        const imagePromise = streamLimit(() => generateImageForScene(pageNumber, sceneDescription, text));
         streamingImagePromises.push(imagePromise);
       }
     });
@@ -7713,6 +7728,20 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
       }
 
       const job = result.rows[0];
+
+      // Fetch partial results (completed pages) if job is still processing
+      let partialPages = [];
+      if (job.status === 'processing') {
+        const partialResult = await dbPool.query(
+          `SELECT step_index, step_data
+           FROM story_job_checkpoints
+           WHERE job_id = $1 AND step_name = 'partial_page'
+           ORDER BY step_index ASC`,
+          [jobId]
+        );
+        partialPages = partialResult.rows.map(row => row.step_data);
+      }
+
       res.json({
         jobId: job.id,
         status: job.status,
@@ -7721,7 +7750,8 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
         resultData: job.result_data,
         errorMessage: job.error_message,
         createdAt: job.created_at,
-        completedAt: job.completed_at
+        completedAt: job.completed_at,
+        partialPages: partialPages  // Array of completed pages with text + image
       });
     } else {
       return res.status(503).json({ error: 'Background jobs require database mode' });
