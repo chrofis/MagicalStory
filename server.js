@@ -5540,95 +5540,23 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const storyTypeName = inputData.storyType || 'adventure';
     const middlePage = Math.ceil(sceneCount / 2);
     const lang = inputData.language || 'en';
+    const langText = lang === 'de' ? 'German (use ä, ö, ü normally. Do not use ß, use ss instead)' : lang === 'fr' ? 'French' : 'English';
 
-    // Build the storybook combined prompt
-    const storybookPrompt = `You are an expert children's picture book author. Create a simple, heartwarming story with SHORT text and vivid scene descriptions for illustrations.
-
-# Story Parameters
-
-- **Title**: ${storyTypeName}
-- **Target Age**: ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years (early readers)
-- **Length**: ${sceneCount} pages
-- **Language**: ${lang === 'de' ? 'German (use ä, ö, ü normally. Do not use ß, use ss instead)' : lang === 'fr' ? 'French' : 'English'}
-- **Story Type**: ${storyTypeName}
-${inputData.storyDetails ? `- **Story Details**: ${inputData.storyDetails}` : ''}
-${inputData.dedication ? `- **Dedication**: ${inputData.dedication}` : ''}
-- **Characters**:
-${characterDescriptions}
-${relationshipDescriptions ? `- **Relationships**: \n${relationshipDescriptions}` : ''}
-
-# TEXT LENGTH RULES
-
-This is a PICTURE BOOK. Each page has a large illustration with text below.
-
-**TEXT GUIDELINES PER PAGE:**
-- Write 4-6 sentences per page
-- Aim for 50-70 words total per page
-- Use simple vocabulary for early readers
-- Engaging sentences that tell the story and complement the illustration
-
-**GOOD EXAMPLE (Page text):**
-"Leo loved to explore new places. Today he found a hidden path in the forest!
-The trees were tall and green. Birds sang happy songs above him.
-He walked carefully, looking for adventure. His trusty brown backpack held all he needed for the journey."
-
-**BAD EXAMPLE (Too short):**
-"Leo walked. He saw trees."
-
-**BAD EXAMPLE (Too long - a whole paragraph):**
-"Leo the Lion was a curious young cub who lived in a cozy cave at the edge of the Whispering Woods where his family had lived for generations..."
-
-# Story Structure
-
-Create a simple story arc:
-1. **Beginning** (Pages 1-2): Introduce the main character and setting
-2. **Middle** (Pages 3-${middlePage}): A small challenge or adventure
-3. **End** (Pages ${middlePage + 1}-${sceneCount}): Happy resolution with a gentle lesson
-
-# Output Format
-
-You MUST start with the TITLE PAGE, then provide ALL story pages. Use this exact format:
-
----TITLE PAGE---
-TITLE: [Creative story title]
-${inputData.dedication ? 'DEDICATION: [Dedication text]' : ''}
-
-SCENE:
-Setting: [Cover scene that sets the mood for the story]
-Characters: [Main character(s) featured on cover]
-Action: [An inviting cover moment]
-Mood: [Welcoming, magical, exciting, etc.]
-
----PAGE 1---
-TEXT:
-[Short story text - 3-4 sentences max, 30-40 words]
-
-SCENE:
-Setting: [Location, time of day, atmosphere]
-Characters: [Who is in this scene]
-Action: [What is happening - the key visual moment]
-Mood: [Emotional tone]
-
----PAGE 2---
-TEXT:
-[Short story text]
-
-SCENE:
-Setting: [Description]
-Characters: [Who is present]
-Action: [Key visual moment]
-Mood: [Emotional tone]
-
-... continue for all ${sceneCount} pages ...
-
-# Important
-
-- You MUST include the TITLE PAGE first, followed by PAGE 1, PAGE 2, etc.
-- Write the COMPLETE story for ALL ${sceneCount} pages
-- Keep text SHORT - this is a picture book!
-- Scene descriptions should be detailed enough for an illustrator
-- The story should feel complete with a satisfying ending
-- Write entirely in ${lang === 'de' ? 'German' : lang === 'fr' ? 'French' : 'English'}`;
+    // Build the storybook combined prompt using template file
+    const storybookPrompt = fillTemplate(PROMPT_TEMPLATES.storybookCombined, {
+      TITLE: storyTypeName,
+      AGE_FROM: inputData.ageFrom || 3,
+      AGE_TO: inputData.ageTo || 8,
+      PAGES: sceneCount,
+      LANGUAGE: langText,
+      STORY_TYPE: storyTypeName,
+      STORY_DETAILS: inputData.storyDetails || '',
+      DEDICATION: inputData.dedication || '',
+      CHARACTERS: characterDescriptions,
+      RELATIONSHIPS: relationshipDescriptions || '',
+      MIDDLE_PAGE: middlePage,
+      MIDDLE_PAGE_PLUS_1: middlePage + 1
+    });
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -5673,41 +5601,74 @@ Mood: [Emotional tone]
     const pageMatches = [...response.matchAll(pageSplitRegex)];
 
     let fullStoryText = '';
-    const allSceneDescriptions = [];
+    const allSceneDescriptions = [];  // Only story pages (1, 2, 3...), NOT cover pages
     const allImages = [];
     const imagePrompts = {};
 
-    // Also check for TITLE PAGE section
-    let titlePageScene = null;
-    const titlePageMatch = response.match(/---TITLE PAGE---\s*([\s\S]*?)(?=---PAGE\s+\d+---|$)/i);
+    // Extract COVER SCENES from response (Title Page, Initial Page, Back Cover)
+    // These are used for cover image generation, NOT added to allSceneDescriptions
+    const coverScenes = {
+      titlePage: '',
+      initialPage: '',
+      backCover: ''
+    };
+
+    // Extract TITLE PAGE scene (for front cover)
+    const titlePageMatch = response.match(/---TITLE PAGE---\s*([\s\S]*?)(?=---(?:INITIAL PAGE|PAGE\s+\d+)---|$)/i);
     if (titlePageMatch) {
       const titlePageBlock = titlePageMatch[1];
-      const sceneMatch = titlePageBlock.match(/SCENE:\s*([\s\S]*?)$/i);
+      const sceneMatch = titlePageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
       if (sceneMatch) {
-        titlePageScene = {
-          pageNumber: 0,
-          description: sceneMatch[1].trim()
-        };
-        allSceneDescriptions.push(titlePageScene);
+        coverScenes.titlePage = sceneMatch[1].trim();
+        console.log(`📖 [STORYBOOK] Extracted Title Page scene: ${coverScenes.titlePage.substring(0, 100)}...`);
+      }
+    }
+
+    // Extract INITIAL PAGE scene (for dedication/intro page)
+    const initialPageMatch = response.match(/---INITIAL PAGE---\s*([\s\S]*?)(?=---PAGE\s+\d+---|$)/i);
+    if (initialPageMatch) {
+      const initialPageBlock = initialPageMatch[1];
+      const sceneMatch = initialPageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+      if (sceneMatch) {
+        coverScenes.initialPage = sceneMatch[1].trim();
+        console.log(`📖 [STORYBOOK] Extracted Initial Page scene: ${coverScenes.initialPage.substring(0, 100)}...`);
+      }
+    }
+
+    // Extract BACK COVER scene
+    const backCoverMatch = response.match(/---BACK COVER---\s*([\s\S]*?)$/i);
+    if (backCoverMatch) {
+      const backCoverBlock = backCoverMatch[1];
+      const sceneMatch = backCoverBlock.match(/SCENE:\s*([\s\S]*?)$/i);
+      if (sceneMatch) {
+        coverScenes.backCover = sceneMatch[1].trim();
+        console.log(`📖 [STORYBOOK] Extracted Back Cover scene: ${coverScenes.backCover.substring(0, 100)}...`);
       }
     }
 
     console.log(`📖 [STORYBOOK] Found ${pageMatches.length} page markers`);
+
+    // Find where BACK COVER starts (to not include it in last page)
+    const backCoverStart = response.search(/---BACK COVER---/i);
 
     // Extract content for each page using the markers
     for (let i = 0; i < pageMatches.length && i < sceneCount; i++) {
       const match = pageMatches[i];
       const pageNum = parseInt(match[1], 10); // Use the actual page number from the marker
       const startIndex = match.index + match[0].length;
-      const endIndex = pageMatches[i + 1] ? pageMatches[i + 1].index : response.length;
+      // End at next page, or BACK COVER, or end of response
+      let endIndex = pageMatches[i + 1] ? pageMatches[i + 1].index : response.length;
+      if (backCoverStart > 0 && endIndex > backCoverStart) {
+        endIndex = backCoverStart;
+      }
       const block = response.substring(startIndex, endIndex);
 
       // Extract TEXT section
       const textMatch = block.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|$)/i);
       const pageText = textMatch ? textMatch[1].trim() : '';
 
-      // Extract SCENE section
-      const sceneMatch = block.match(/SCENE:\s*([\s\S]*?)$/i);
+      // Extract SCENE section (stop at any --- marker or end)
+      const sceneMatch = block.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
       const sceneDesc = sceneMatch ? sceneMatch[1].trim() : '';
 
       // Build story text with page markers
@@ -5835,7 +5796,7 @@ Mood: [Emotional tone]
       [85, 'Generating cover images...', jobId]
     );
 
-    // Generate cover images (simplified for picture book)
+    // Generate cover images using AI-generated cover scenes
     let coverImages = { frontCover: null, initialPage: null, backCover: null };
 
     // Store cover prompts for dev mode display
@@ -5845,29 +5806,86 @@ Mood: [Emotional tone]
       try {
         const artStyleId = inputData.artStyle || 'pixar';
         const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
-        const characterInfo = (inputData.characters || []).map(c => `${c.name} (${c.age} years old)`).join(', ');
 
-        // Front cover
-        const frontCoverPrompt = `Create a cheerful children's book cover illustration for "${storyTitle}". Feature the main character(s): ${characterInfo}. Style: ${styleDescription}. Make it colorful and inviting.`;
+        // Build character info for cover prompts
+        let characterInfo = '';
+        const mainCharIds = inputData.mainCharacters || [];
+        const mainChars = (inputData.characters || []).filter(c => mainCharIds.includes(c.id));
+        const otherChars = (inputData.characters || []).filter(c => !mainCharIds.includes(c.id));
+
+        if (mainChars.length > 0) {
+          characterInfo = mainChars.map(c => `${c.name} (${c.age} years old, MAIN CHARACTER)`).join(', ');
+          if (otherChars.length > 0) {
+            characterInfo += ', ' + otherChars.map(c => `${c.name} (${c.age} years old)`).join(', ');
+          }
+        } else {
+          characterInfo = (inputData.characters || []).map(c => `${c.name} (${c.age} years old)`).join(', ');
+        }
+
+        // Use AI-generated title page scene (or fallback)
+        const titlePageScene = coverScenes.titlePage || `A beautiful, magical cover scene featuring the main characters. Decorative elements that reflect the story's theme.`;
+
+        // Front cover - use AI-generated scene description
+        const frontCoverPrompt = `Create a children's book FRONT COVER illustration for "${storyTitle}".
+
+SCENE FROM STORY:
+${titlePageScene}
+
+CHARACTERS: ${characterInfo}
+STYLE: ${styleDescription}
+
+Make the main character(s) prominent and the scene inviting. This is a cover that should draw readers in.`;
         coverPrompts.frontCover = frontCoverPrompt;
         const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
         coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
 
-        // Initial page
+        // Use AI-generated initial page scene (or fallback)
+        const initialPageScene = coverScenes.initialPage || `A warm, inviting scene that welcomes readers into the story world.`;
+
+        // Initial page - use AI-generated scene description
         const initialPrompt = inputData.dedication
-          ? `Create a warm, welcoming illustration for a children's book dedication page. Include the text: "${inputData.dedication}". Style: ${styleDescription}.`
-          : `Create a warm, welcoming introduction page illustration for "${storyTitle}". Style: ${styleDescription}. No text.`;
+          ? `Create a children's book DEDICATION PAGE illustration for "${storyTitle}".
+
+SCENE FROM STORY:
+${initialPageScene}
+
+DEDICATION TEXT: "${inputData.dedication}"
+
+CHARACTERS: ${characterInfo}
+STYLE: ${styleDescription}
+
+Create a warm, welcoming scene with space for the dedication text.`
+          : `Create a children's book INTRODUCTION PAGE illustration for "${storyTitle}".
+
+SCENE FROM STORY:
+${initialPageScene}
+
+CHARACTERS: ${characterInfo}
+STYLE: ${styleDescription}
+
+Create a warm, welcoming scene that invites readers into the story.`;
         coverPrompts.initialPage = initialPrompt;
         const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos);
         coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
 
-        // Back cover
-        const backCoverPrompt = `Create a satisfying conclusion illustration for "${storyTitle}". Show a happy ending scene. Style: ${styleDescription}. Include "magicalstory.ch" text in corner.`;
+        // Use AI-generated back cover scene (or fallback)
+        const backCoverScene = coverScenes.backCover || `A satisfying, peaceful ending scene showing the characters in a happy, resolved state.`;
+
+        // Back cover - use AI-generated scene description
+        const backCoverPrompt = `Create a children's book BACK COVER illustration for "${storyTitle}".
+
+SCENE FROM STORY:
+${backCoverScene}
+
+CHARACTERS: ${characterInfo}
+STYLE: ${styleDescription}
+
+Show a satisfying conclusion that provides closure. Include small "magicalstory.ch" text in a corner.`;
         coverPrompts.backCover = backCoverPrompt;
         const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
         coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
 
-        console.log(`✅ [STORYBOOK] Cover images generated`);
+        console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
       } catch (error) {
         console.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
       }

@@ -12,50 +12,65 @@ You are an expert children's picture book author. Create a simple, heartwarming 
 - **Characters**: {CHARACTERS}
 - **Relationships**: {RELATIONSHIPS}
 
-# CRITICAL TEXT LENGTH RULES
+# TEXT LENGTH RULES
 
-This is a PICTURE BOOK. Each page has a large illustration with only a SMALL amount of text.
+This is a PICTURE BOOK. Each page has a large illustration with text below.
 
-**TEXT LIMITS PER PAGE:**
-- Maximum 3-4 SHORT sentences per page
-- Maximum 30-40 words total per page
+**TEXT GUIDELINES PER PAGE:**
+- Write 4-6 sentences per page
+- Aim for 50-70 words total per page
 - Use simple vocabulary for early readers
-- Short, punchy sentences that complement the illustration
+- Engaging sentences that tell the story and complement the illustration
+
+**GOOD EXAMPLE (Page text):**
+"Leo loved to explore new places. Today he found a hidden path in the forest!
+The trees were tall and green. Birds sang happy songs above him.
+He walked carefully, looking for adventure. His trusty brown backpack held all he needed for the journey."
+
+**BAD EXAMPLE (Too short):**
+"Leo walked. He saw trees."
 
 # Story Structure
 
 Create a simple story arc:
 1. **Beginning** (Pages 1-2): Introduce the main character and setting
-2. **Middle** (Pages 3-{PAGES-3}): A small challenge or adventure
-3. **End** (Pages -3 -{PAGES}): Happy resolution with a gentle lesson
+2. **Middle** (Pages 3-{MIDDLE_PAGE}): A small challenge or adventure
+3. **End** (Pages {MIDDLE_PAGE_PLUS_1}-{PAGES}): Happy resolution with a gentle lesson
 
 # Output Format
 
-You MUST start with the TITLE PAGE, then provide ALL story pages. Use this exact format:
+You MUST provide the TITLE PAGE, INITIAL PAGE, all story pages, and BACK COVER. Use this exact format:
 
 ---TITLE PAGE---
-TITLE: {TITLE}
+TITLE: [Creative story title]
 DEDICATION: {DEDICATION}
 
 SCENE:
 Setting: [Cover scene that sets the mood for the story]
-Characters: [Main character(s) featured on cover]
-Action: [An inviting cover moment]
+Characters: [Main character(s) featured on cover - should be prominent and inviting]
+Action: [An inviting cover moment that draws readers in]
 Mood: [Welcoming, magical, exciting, etc.]
+
+---INITIAL PAGE---
+SCENE:
+Setting: [A warm, inviting scene that welcomes readers into the story world]
+Characters: [Main character(s) in a friendly, approachable pose]
+Action: [A gentle moment that sets the mood before the story begins]
+Mood: [Warm, welcoming, cozy]
 
 ---PAGE 1---
 TEXT:
-[Short story text - 3-4 sentences max, 30-40 words]
+[Story text - 4-6 sentences, 50-70 words]
 
 SCENE:
 Setting: [Location, time of day, atmosphere]
 Characters: [Who is in this scene]
 Action: [What is happening - the key visual moment]
-Mood: [Emotional tone - happy, curious, excited, etc.]
+Mood: [Emotional tone]
 
 ---PAGE 2---
 TEXT:
-[Short story text]
+[Story text]
 
 SCENE:
 Setting: [Description]
@@ -65,6 +80,13 @@ Mood: [Emotional tone]
 
 ... continue for all {PAGES} pages ...
 
+---BACK COVER---
+SCENE:
+Setting: [A satisfying concluding scene that provides closure]
+Characters: [Main character(s) in a happy, resolved state]
+Action: [A peaceful ending moment - could echo the beginning or show growth]
+Mood: [Happy, content, peaceful, hopeful]
+
 # Character Guidelines
 
 - Show character traits through simple actions, not descriptions
@@ -73,9 +95,9 @@ Mood: [Emotional tone]
 
 # Important
 
-- You MUST include the TITLE PAGE first, followed by PAGE 1, PAGE 2, etc.
+- You MUST include ALL sections: TITLE PAGE, INITIAL PAGE, PAGE 1 through PAGE {PAGES}, and BACK COVER
 - Write the COMPLETE story for ALL {PAGES} pages
-- Keep text SHORT and suitable for picture book format
+- Keep text engaging but suitable for picture book format (50-70 words per page)
 - Scene descriptions should be detailed enough for an illustrator
 - The story should feel complete with a satisfying ending
 - Write entirely in {LANGUAGE}
