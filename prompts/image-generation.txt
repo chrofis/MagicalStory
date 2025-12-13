@@ -3,10 +3,16 @@ Create a **cinematic scene** in {STYLE_DESCRIPTION}. Use professional photograph
 Scene Description: {SCENE_DESCRIPTION}
 {CHARACTER_PROMPTS}
 
+**STYLE TRANSFORMATION - CRITICAL:**
+- Reference images show REAL PHOTOGRAPHS of people
+- Transform these people into the requested art style ({STYLE_DESCRIPTION})
+- Characters must be RECOGNIZABLE as the same person (same hair color, face shape, age, gender, distinguishing features)
+- But rendered in the artistic style - NOT photo-realistic copies
+- ALL characters must have the SAME consistent art style
+
 Important:
-- **Crucially, maintain absolute consistency** in character appearance, strictly adhering to input images/descriptions and all provided character details (facial features, build, etc.).
-- Keep clothing **exactly** as described, with no alterations.
-- Focus on a **clear, uncluttered composition** that highlights the main subjects and action.
-- Capture the emotion and narrative of the scene vividly.
-- **No text, watermarks, or extraneous elements** should be present in the image.
-- Do not add objects or details not explicitly mentioned in the scene description or character prompts.
+- Keep clothing as described, adapted to the art style
+- Focus on a **clear, uncluttered composition** that highlights the main subjects and action
+- Capture the emotion and narrative of the scene vividly
+- **No text, watermarks, or extraneous elements** should be present in the image
+- Do not add objects or details not explicitly mentioned in the scene description or character prompts

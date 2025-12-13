@@ -6,17 +6,24 @@ Scene Description: {SCENE_DESCRIPTION}
 
 {CHARACTER_INFO}
 
-**VISUAL CONTINUITY - CRITICAL:**
-The FIRST attached image shows the PREVIOUS scene from this story. You MUST maintain:
-- Exact same character appearances (faces, hair, body proportions, skin tone)
+**STYLE TRANSFORMATION - CRITICAL:**
+- Reference images show REAL PHOTOGRAPHS of people
+- Transform these people into the requested art style ({STYLE_DESCRIPTION})
+- Characters must be RECOGNIZABLE as the same person (same hair color, face shape, age, gender, distinguishing features)
+- But rendered in the artistic style - NOT photo-realistic copies
+- ALL characters must have the SAME consistent art style
+
+**VISUAL CONTINUITY:**
+The FIRST attached image shows the PREVIOUS scene from this story. Maintain:
+- Same character appearances as in the previous scene (they are already transformed to the art style)
 - Same clothing and accessories unless the scene explicitly mentions a change
 - Consistent art style, lighting approach, and color palette
 - Any recurring objects or background elements should look the same
 
 Important:
-- Show only the emotions visible on faces (happy, sad, surprised, worried, excited)
-- Keep clothing exactly as shown in previous scene unless changed in description
-- Maintain IDENTICAL character appearance - they must be recognizable
+- Show appropriate emotions on faces (happy, sad, surprised, worried, excited)
+- Keep clothing consistent with previous scene unless changed in description
+- Characters must be recognizable throughout the story
 - Clean, clear composition
 
 This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.
