@@ -3568,7 +3568,11 @@ app.get('/api/files/:fileId', async (req, res) => {
 
       res.set('Content-Type', file.mime_type);
       if (file.filename) {
-        res.set('Content-Disposition', `inline; filename="${file.filename}"`);
+        // Sanitize filename for Content-Disposition header (remove/replace non-ASCII chars)
+        const safeFilename = file.filename.replace(/[^\x20-\x7E]/g, '_');
+        // Use RFC 5987 encoding for proper Unicode support
+        const encodedFilename = encodeURIComponent(file.filename).replace(/'/g, '%27');
+        res.set('Content-Disposition', `inline; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`);
       }
 
       // file_data could be: Buffer (bytea), string (base64), or string (data URL)
@@ -3615,7 +3619,11 @@ app.get('/api/files/:fileId', async (req, res) => {
 
       res.set('Content-Type', fileMetadata.mimeType);
       if (fileMetadata.filename) {
-        res.set('Content-Disposition', `inline; filename="${fileMetadata.filename}"`);
+        // Sanitize filename for Content-Disposition header (remove/replace non-ASCII chars)
+        const safeFilename = fileMetadata.filename.replace(/[^\x20-\x7E]/g, '_');
+        // Use RFC 5987 encoding for proper Unicode support
+        const encodedFilename = encodeURIComponent(fileMetadata.filename).replace(/'/g, '%27');
+        res.set('Content-Disposition', `inline; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`);
       }
       res.send(fileBuffer);
     }
