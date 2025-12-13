@@ -350,22 +350,50 @@ def process_photo(image_data, is_base64=True):
         body_crop = None
         body_no_bg = None
 
-        # Face thumbnail (from original image)
+        # Face thumbnail (from background-removed image for transparent background)
         if face_box:
             # Create face thumbnail with extra padding (50% on each side for more context)
             padded_face_box = add_padding_to_box(face_box, padding_percent=0.5)
-            face_img = crop_to_box(img, padded_face_box)
-            if face_img.size > 0:
-                # Make it square by padding the shorter side
-                size = max(face_img.shape[0], face_img.shape[1])
-                square = np.zeros((size, size, 3), dtype=np.uint8)
-                y_off = (size - face_img.shape[0]) // 2
-                x_off = (size - face_img.shape[1]) // 2
-                square[y_off:y_off+face_img.shape[0], x_off:x_off+face_img.shape[1]] = face_img
-                # Resize to 200x200 (larger for better quality)
-                face_thumb = cv2.resize(square, (200, 200))
-                _, buffer = cv2.imencode('.jpg', face_thumb, [cv2.IMWRITE_JPEG_QUALITY, 90])
-                face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+            # Use background-removed image if available, otherwise fall back to original
+            if full_img_rgba is not None:
+                face_img = crop_to_box(full_img_rgba, padded_face_box)
+                if face_img.size > 0:
+                    # Make it square with soft warm peach background (complements app's indigo theme)
+                    # Color: #FFF0E6 (soft peach/cream) in BGRA format
+                    size = max(face_img.shape[0], face_img.shape[1])
+                    # Create square with warm peach background (BGRA: B=230, G=240, R=255, A=255)
+                    square = np.full((size, size, 4), [230, 240, 255, 255], dtype=np.uint8)
+                    y_off = (size - face_img.shape[0]) // 2
+                    x_off = (size - face_img.shape[1]) // 2
+
+                    # Composite face onto background (handle alpha blending)
+                    face_region = square[y_off:y_off+face_img.shape[0], x_off:x_off+face_img.shape[1]]
+                    alpha = face_img[:, :, 3:4] / 255.0  # Normalize alpha to 0-1
+                    # Blend: result = foreground * alpha + background * (1 - alpha)
+                    face_region[:, :, :3] = (face_img[:, :, :3] * alpha + face_region[:, :, :3] * (1 - alpha)).astype(np.uint8)
+                    face_region[:, :, 3] = 255  # Fully opaque result
+
+                    # Resize to 200x200 (larger for better quality)
+                    face_thumb = cv2.resize(square, (200, 200))
+                    # Convert to BGR for JPEG (no need for alpha anymore)
+                    face_thumb_bgr = cv2.cvtColor(face_thumb, cv2.COLOR_BGRA2BGR)
+                    _, buffer = cv2.imencode('.jpg', face_thumb_bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                    face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+                    print("✅ Face thumbnail created with warm peach background (#FFF0E6)")
+            else:
+                # Fallback: use original image (with background)
+                face_img = crop_to_box(img, padded_face_box)
+                if face_img.size > 0:
+                    size = max(face_img.shape[0], face_img.shape[1])
+                    square = np.zeros((size, size, 3), dtype=np.uint8)
+                    y_off = (size - face_img.shape[0]) // 2
+                    x_off = (size - face_img.shape[1]) // 2
+                    square[y_off:y_off+face_img.shape[0], x_off:x_off+face_img.shape[1]] = face_img
+                    face_thumb = cv2.resize(square, (200, 200))
+                    _, buffer = cv2.imencode('.jpg', face_thumb, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                    face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+                    print("⚠️ Face thumbnail created with background (fallback)")
 
         # Body crop (with and without background)
         if body_box:
