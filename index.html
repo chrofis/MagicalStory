@@ -7155,27 +7155,36 @@ Return ONLY valid JSON, no markdown or other text.`
                   console.log('✅ Got body crop with background removed');
                 }
 
-                setCurrentCharacter(prev => ({
-                  ...prev,
-                  gender: primaryTraits.gender || prev.gender,
-                  age: primaryTraits.age || prev.age,
-                  height: primaryTraits.height || prev.height,
-                  build: primaryTraits.build || prev.build,
-                  hairColor: primaryTraits.hairColor || prev.hairColor,
-                  clothing: primaryTraits.clothing || prev.clothing,
-                  otherFeatures: primaryTraits.otherFeatures || prev.otherFeatures,
-                  photoUrl: finalPhotoUrl,        // Face crop - used throughout the app for display
-                  thumbnailUrl: finalPhotoUrl,    // Same as photoUrl (face)
-                  bodyPhotoUrl: bodyPhotoUrl,     // Body crop with background
-                  bodyNoBgUrl: bodyNoBgUrl,       // Body crop WITHOUT background - for image generation
-                  // Store both results for dev mode comparison
-                  faceBox: primaryTraits.faceBox || null,
-                  bodyBox: primaryTraits.bodyBox || null,
-                  devComparison: characterDevMode ? {
-                    gemini: geminiTraits,
-                    python: pythonTraits
-                  } : null
-                }));
+                setCurrentCharacter(prev => {
+                  // Gender priority: user setting > name detection > image detection
+                  // Only use image-detected gender if current gender is 'other' or empty
+                  const shouldUseImageGender = !prev.gender || prev.gender === 'other';
+                  const newGender = shouldUseImageGender
+                    ? (primaryTraits.gender || prev.gender)
+                    : prev.gender;
+
+                  return {
+                    ...prev,
+                    gender: newGender,
+                    age: primaryTraits.age || prev.age,
+                    height: primaryTraits.height || prev.height,
+                    build: primaryTraits.build || prev.build,
+                    hairColor: primaryTraits.hairColor || prev.hairColor,
+                    clothing: primaryTraits.clothing || prev.clothing,
+                    otherFeatures: primaryTraits.otherFeatures || prev.otherFeatures,
+                    photoUrl: finalPhotoUrl,        // Face crop - used throughout the app for display
+                    thumbnailUrl: finalPhotoUrl,    // Same as photoUrl (face)
+                    bodyPhotoUrl: bodyPhotoUrl,     // Body crop with background
+                    bodyNoBgUrl: bodyNoBgUrl,       // Body crop WITHOUT background - for image generation
+                    // Store both results for dev mode comparison
+                    faceBox: primaryTraits.faceBox || null,
+                    bodyBox: primaryTraits.bodyBox || null,
+                    devComparison: characterDevMode ? {
+                      gemini: geminiTraits,
+                      python: pythonTraits
+                    } : null
+                  };
+                });
 
                 // Store the full analyzed text for display
                 if (primaryTraits.fullText) {
@@ -7189,12 +7198,25 @@ Return ONLY valid JSON, no markdown or other text.`
       };
 
       const handleNameChange = (name) => {
-        const detectedGender = detectGender(name);
-        setCurrentCharacter({
-          ...currentCharacter,
-          name,
-          gender: detectedGender
-        });
+        // Gender priority: user setting > name detection > image detection
+        // Only auto-detect from name if gender is not already set (is 'other' or empty)
+        const currentGender = currentCharacter.gender;
+        const shouldAutoDetect = !currentGender || currentGender === 'other';
+
+        if (shouldAutoDetect) {
+          const detectedGender = detectGender(name);
+          setCurrentCharacter({
+            ...currentCharacter,
+            name,
+            gender: detectedGender
+          });
+        } else {
+          // Keep existing gender (user or image-detected)
+          setCurrentCharacter({
+            ...currentCharacter,
+            name
+          });
+        }
       };
 
       const toggleArrayItem = (field, item) => {

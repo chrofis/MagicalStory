@@ -150,7 +150,7 @@ def detect_body_mediapipe(image):
 def remove_background(image):
     """
     Remove background from image using MediaPipe Selfie Segmentation.
-    Returns image with transparent background (RGBA).
+    Returns tuple: (image with transparent background (RGBA), binary mask)
     """
     with mp_selfie_segmentation.SelfieSegmentation(model_selection=1) as segmentation:
         # Convert BGR to RGB
@@ -172,7 +172,48 @@ def remove_background(image):
         # Apply mask to alpha channel
         bgra[:, :, 3] = binary_mask
 
-        return bgra
+        return bgra, binary_mask
+
+
+def get_body_bounds_from_mask(mask, padding_percent=0.05):
+    """
+    Find bounding box of non-zero pixels in mask.
+    Returns bounding box as percentage of image dimensions (0-100).
+
+    Args:
+        mask: Binary mask (0 = background, 255 = person)
+        padding_percent: Extra padding around the detected bounds (0.05 = 5%)
+
+    Returns:
+        dict with x, y, width, height in percentage (0-100) or None if no person found
+    """
+    h, w = mask.shape[:2]
+
+    # Find non-zero pixels (the person)
+    non_zero = cv2.findNonZero(mask)
+
+    if non_zero is None:
+        return None
+
+    # Get bounding rectangle
+    x, y, bw, bh = cv2.boundingRect(non_zero)
+
+    # Add small padding (the mask already follows body contour, so minimal padding needed)
+    pad_x = int(bw * padding_percent)
+    pad_y = int(bh * padding_percent)
+
+    x = max(0, x - pad_x)
+    y = max(0, y - pad_y)
+    bw = min(w - x, bw + 2 * pad_x)
+    bh = min(h - y, bh + 2 * pad_y)
+
+    # Convert to percentage (0-100)
+    return {
+        'x': (x / w) * 100,
+        'y': (y / h) * 100,
+        'width': (bw / w) * 100,
+        'height': (bh / h) * 100
+    }
 
 
 def add_padding_to_box(box, padding_percent=0.5):
@@ -219,7 +260,11 @@ def crop_to_box(image, box, output_size=None):
 
 def process_photo(image_data, is_base64=True):
     """
-    Process uploaded photo: detect face/body with MediaPipe, extract age/gender with DeepFace
+    Process uploaded photo using BACKGROUND-FIRST approach:
+    1. Remove background first (get accurate body mask)
+    2. Find body bounds from mask (more accurate than pose landmarks)
+    3. Detect face with MediaPipe
+    4. Extract age/gender with DeepFace
 
     Args:
         image_data: Base64 encoded image or file path
@@ -251,15 +296,33 @@ def process_photo(image_data, is_base64=True):
 
         img_h, img_w = img.shape[:2]
 
-        # 2. DETECT FACE WITH MEDIAPIPE (more accurate than DeepFace detector)
+        # 2. REMOVE BACKGROUND FIRST (this gives us accurate body segmentation)
+        print("🎭 Step 1: Removing background from full image...")
+        full_img_rgba = None
+        body_mask = None
+        try:
+            full_img_rgba, body_mask = remove_background(img)
+            print("✅ Background removed successfully")
+        except Exception as bg_error:
+            print(f"⚠️ Background removal failed: {bg_error}")
+
+        # 3. GET BODY BOUNDS FROM MASK (more accurate than pose landmarks)
+        body_box = None
+        if body_mask is not None:
+            body_box = get_body_bounds_from_mask(body_mask, padding_percent=0.05)
+            print(f"📦 Body bounds from mask: {body_box}")
+
+        # Fallback to pose detection if mask-based detection failed
+        if body_box is None:
+            print("⚠️ Mask-based body detection failed, falling back to pose landmarks...")
+            body_box = detect_body_mediapipe(img)
+            print(f"📦 MediaPipe pose body detection: {body_box}")
+
+        # 4. DETECT FACE WITH MEDIAPIPE
         face_box = detect_face_mediapipe(img)
         print(f"📦 MediaPipe face detection: {face_box}")
 
-        # 3. DETECT BODY WITH MEDIAPIPE POSE
-        body_box = detect_body_mediapipe(img)
-        print(f"📦 MediaPipe body detection: {body_box}")
-
-        # 4. GET AGE/GENDER WITH DEEPFACE
+        # 5. GET AGE/GENDER WITH DEEPFACE
         age = None
         gender = None
         try:
@@ -282,10 +345,12 @@ def process_photo(image_data, is_base64=True):
         if age and gender:
             height, build = estimate_height_build(age, gender)
 
-        # 5. CREATE CROPPED IMAGES
+        # 6. CREATE CROPPED IMAGES
         face_thumbnail = None
         body_crop = None
+        body_no_bg = None
 
+        # Face thumbnail (from original image)
         if face_box:
             # Create face thumbnail with extra padding (50% on each side for more context)
             padded_face_box = add_padding_to_box(face_box, padding_percent=0.5)
@@ -302,34 +367,48 @@ def process_photo(image_data, is_base64=True):
                 _, buffer = cv2.imencode('.jpg', face_thumb, [cv2.IMWRITE_JPEG_QUALITY, 90])
                 face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
-        body_no_bg = None
-
+        # Body crop (with and without background)
         if body_box:
-            # Create body crop
+            # Create body crop WITH background (for display)
             body_img = crop_to_box(img, body_box)
             if body_img.size > 0:
                 # Resize if too large (max 600x800)
                 bh, bw = body_img.shape[:2]
                 if bw > 600 or bh > 800:
                     scale = min(600/bw, 800/bh)
-                    body_img = cv2.resize(body_img, (int(bw*scale), int(bh*scale)))
+                    new_size = (int(bw*scale), int(bh*scale))
+                    body_img = cv2.resize(body_img, new_size)
 
-                # Create body crop with background
+                # Encode body crop with background
                 _, buffer = cv2.imencode('.jpg', body_img, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 body_crop = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
-                # Create body crop WITHOUT background (transparent PNG)
-                try:
-                    print("🎭 Removing background from body crop...")
-                    body_rgba = remove_background(body_img)
+            # Create body crop WITHOUT background (from pre-segmented full image)
+            if full_img_rgba is not None:
+                body_img_rgba = crop_to_box(full_img_rgba, body_box)
+                if body_img_rgba.size > 0:
+                    # Resize if too large
+                    bh, bw = body_img_rgba.shape[:2]
+                    if bw > 600 or bh > 800:
+                        scale = min(600/bw, 800/bh)
+                        body_img_rgba = cv2.resize(body_img_rgba, (int(bw*scale), int(bh*scale)))
+
                     # Encode as PNG to preserve transparency
+                    _, buffer_png = cv2.imencode('.png', body_img_rgba)
+                    body_no_bg = f"data:image/png;base64,{base64.b64encode(buffer_png).decode('utf-8')}"
+                    print("✅ Body crop with transparent background created")
+
+            # Fallback: if we don't have pre-segmented image, segment the crop
+            if body_no_bg is None and body_img is not None and body_img.size > 0:
+                try:
+                    print("🎭 Fallback: Removing background from body crop...")
+                    body_rgba, _ = remove_background(body_img)
                     _, buffer_png = cv2.imencode('.png', body_rgba)
                     body_no_bg = f"data:image/png;base64,{base64.b64encode(buffer_png).decode('utf-8')}"
-                    print("✅ Background removed successfully")
+                    print("✅ Background removed from crop")
                 except Exception as bg_error:
-                    print(f"⚠️ Background removal failed: {bg_error}")
-                    # Fall back to body crop with background
-                    body_no_bg = body_crop
+                    print(f"⚠️ Fallback background removal failed: {bg_error}")
+                    body_no_bg = body_crop  # Use version with background
 
         # Clean up temp files
         if os.path.exists(temp_input) and is_base64:
