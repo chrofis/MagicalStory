@@ -24,6 +24,10 @@
     };
     firebase.initializeApp(firebaseConfig);
     const firebaseAuth = firebase.auth();
+    // Set persistence to LOCAL (uses localStorage, more reliable on iOS Safari than IndexedDB)
+    firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(err => {
+      console.warn('Firebase persistence error:', err);
+    });
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -1723,20 +1727,33 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
       // Handle redirect result on page load (for mobile sign-in)
       React.useEffect(() => {
-        const handleRedirectResult = async () => {
+        const handleRedirectResult = async (retryCount = 0) => {
           try {
             const result = await firebaseAuth.getRedirectResult();
             if (result && result.user) {
+              console.log('📱 Redirect auth successful');
               await handleFirebaseAuth(result.user);
             }
           } catch (err) {
+            // Retry on IndexedDB errors (common on iOS Safari)
+            if (err.message?.includes('IndexedDB') || err.message?.includes('Indexed Database')) {
+              if (retryCount < 3) {
+                console.warn(`📱 Redirect auth IndexedDB error, retrying (${retryCount + 1}/3)...`);
+                setTimeout(() => handleRedirectResult(retryCount + 1), 1000);
+                return;
+              }
+              console.error('📱 Redirect auth failed after retries - IndexedDB issues');
+              setAuthError('Login failed due to browser storage issues. Please try again or use a different browser.');
+              return;
+            }
             if (err.code !== 'auth/popup-closed-by-user') {
               console.error('Redirect auth error:', err);
               setAuthError(err.message);
             }
           }
         };
-        handleRedirectResult();
+        // Small delay to let IndexedDB initialize on iOS
+        setTimeout(() => handleRedirectResult(), 500);
       }, []);
 
       // Google Sign-In
