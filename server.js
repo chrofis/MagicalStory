@@ -5804,19 +5804,31 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const artStyleId = inputData.artStyle || 'pixar';
         const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
-        // Build character info for cover prompts
+        // Build character info with main character emphasis (matching server pipeline format)
         let characterInfo = '';
-        const mainCharIds = inputData.mainCharacters || [];
-        const mainChars = (inputData.characters || []).filter(c => mainCharIds.includes(c.id));
-        const otherChars = (inputData.characters || []).filter(c => !mainCharIds.includes(c.id));
+        if (inputData.characters && inputData.characters.length > 0) {
+          const mainCharIds = inputData.mainCharacters || [];
+          const mainChars = (inputData.characters || []).filter(c => mainCharIds.includes(c.id));
+          const supportingChars = (inputData.characters || []).filter(c => !mainCharIds.includes(c.id));
 
-        if (mainChars.length > 0) {
-          characterInfo = mainChars.map(c => `${c.name} (${c.age} years old, MAIN CHARACTER)`).join(', ');
-          if (otherChars.length > 0) {
-            characterInfo += ', ' + otherChars.map(c => `${c.name} (${c.age} years old)`).join(', ');
+          characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
+
+          // List main characters first with full physical description
+          mainChars.forEach((char) => {
+            const physicalDesc = buildCharacterPhysicalDescription(char);
+            characterInfo += `⭐ MAIN: ${physicalDesc}\n`;
+          });
+
+          // Then supporting characters
+          if (supportingChars.length > 0) {
+            characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
+            supportingChars.forEach((char) => {
+              const physicalDesc = buildCharacterPhysicalDescription(char);
+              characterInfo += `Supporting: ${physicalDesc}\n`;
+            });
           }
-        } else {
-          characterInfo = (inputData.characters || []).map(c => `${c.name} (${c.age} years old)`).join(', ');
+
+          characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
         }
 
         // Use AI-generated title page scene (or fallback)
