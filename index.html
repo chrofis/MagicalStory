@@ -3793,6 +3793,12 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
               message: job.progressMessage || 'Processing...'
             });
 
+            // Navigate to step 5 early to show progress (when job starts processing)
+            if (job.status === 'processing' && job.progress >= 10 && step !== 5) {
+              console.log(`📖 [PROGRESS] Job is processing (${job.progress}%), navigating to results view`);
+              setStep(5);
+            }
+
             // PROGRESSIVE DISPLAY: Show partial results as pages complete
             if (job.partialPages && job.partialPages.length > 0 && job.status === 'processing') {
               console.log(`📖 [PARTIAL] Received ${job.partialPages.length} completed pages`);
@@ -3828,11 +3834,6 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
               if (partialImages.length > 0) {
                 setSceneImages(partialImages);
                 setSceneDescriptions(partialDescriptions);
-              }
-
-              // Navigate to step 5 to show progress (only once)
-              if (step !== 5) {
-                setStep(5);
               }
             }
 
