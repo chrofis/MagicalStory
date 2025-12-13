@@ -6431,8 +6431,57 @@ Output Format:
       await saveCheckpoint(jobId, 'story_batch', { batchNum, batchText, startScene, endScene }, batchNum);
 
       // Parse the pages from this batch
-      const batchPages = parseStoryPages(batchText);
+      let batchPages = parseStoryPages(batchText);
       console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
+
+      // VALIDATION: Check if all expected pages were generated
+      const expectedPageCount = endScene - startScene + 1;
+      const parsedPageNumbers = batchPages.map(p => p.pageNumber);
+      const missingPages = [];
+      for (let p = startScene; p <= endScene; p++) {
+        if (!parsedPageNumbers.includes(p)) {
+          missingPages.push(p);
+        }
+      }
+
+      // RETRY: If pages are missing, request them explicitly
+      if (missingPages.length > 0) {
+        console.log(`⚠️ [BATCH ${batchNum + 1}] Missing pages: ${missingPages.join(', ')}. Retrying for missing pages...`);
+
+        for (const missingPageNum of missingPages) {
+          const retryPrompt = `${basePrompt}
+
+Here is the story outline:
+${outline}
+
+CRITICAL: You MUST write ONLY page ${missingPageNum} of the story. This page was missing from the previous generation.
+
+Look at what you already wrote for context:
+${batchText}
+
+Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
+
+--- Page ${missingPageNum} ---
+[Write the story text for page ${missingPageNum} here, following the outline and maintaining continuity with other pages]`;
+
+          console.log(`🔄 [RETRY] Generating missing page ${missingPageNum}...`);
+          const retryText = await callTextModelStreaming(retryPrompt, 1500);
+
+          // Parse the retry response
+          const retryPages = parseStoryPages(retryText);
+          if (retryPages.length > 0) {
+            console.log(`✅ [RETRY] Successfully generated page ${missingPageNum}`);
+            batchPages.push(...retryPages);
+            fullStoryText += retryText + '\n\n';
+          } else {
+            console.log(`❌ [RETRY] Failed to parse page ${missingPageNum} from retry response`);
+          }
+        }
+
+        // Sort pages by page number after adding retried pages
+        batchPages.sort((a, b) => a.pageNumber - b.pageNumber);
+        console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] After retry: ${batchPages.length} pages`);
+      }
 
       // IMMEDIATELY start generating scene descriptions and images for these pages (unless skipImages)
       // In PARALLEL mode: queue all images immediately for concurrent generation
