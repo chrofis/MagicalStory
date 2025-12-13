@@ -1,0 +1,27 @@
+Créez une **scène cinématographique** dans le style {STYLE_DESCRIPTION}. Utilisez des techniques professionnelles de photographie/cinématographie, en vous concentrant sur l'éclairage, la composition et la profondeur de champ pour créer une image visuellement frappante.
+
+Description de la scène: {SCENE_DESCRIPTION}
+{CHARACTER_PROMPTS}
+
+**TRANSFORMATION DE STYLE - CRITIQUE:**
+- Les images de référence montrent de VRAIES PHOTOGRAPHIES de personnes
+- Transformez ces personnes dans le style artistique demandé ({STYLE_DESCRIPTION})
+- Les personnages doivent être RECONNAISSABLES comme la même personne (même couleur de cheveux, forme du visage, âge, genre, caractéristiques distinctives)
+- Mais rendus dans le style artistique - PAS de copies photo-réalistes
+- TOUS les personnages doivent avoir le MÊME style artistique cohérent
+
+**VÊTEMENTS & APPARENCE:**
+- Les VISAGES, CHEVEUX et PROPORTIONS CORPORELLES des personnages doivent correspondre exactement aux images de référence
+- Les vêtements doivent être APPROPRIÉS AU CONTEXTE DE LA SCÈNE:
+  - Scènes d'hiver/neige → vêtements chauds (manteaux, bottes, bonnets)
+  - Scènes de plage/été → vêtements légers (shorts, robes, sandales)
+  - Événements formels → tenue habillée
+  - Scènes de coucher → pyjamas
+- Maintenez des PRÉFÉRENCES DE COULEUR cohérentes lors de l'adaptation des vêtements (si le personnage porte du bleu dans la référence, utilisez des tons bleus)
+- Les accessoires distinctifs (lunettes, chapeau préféré, collier) doivent rester cohérents à travers les scènes
+
+Important:
+- Concentrez-vous sur une **composition claire et épurée** qui met en valeur les sujets principaux et l'action
+- Capturez l'émotion et le récit de la scène de manière vivante
+- **Aucun texte, filigrane ou élément superflu** ne doit être présent dans l'image
+- N'ajoutez pas d'objets ou de détails non explicitement mentionnés dans la description de la scène ou les descriptions des personnages

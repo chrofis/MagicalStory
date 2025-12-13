@@ -244,6 +244,11 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.storyTextSingle = await fs.readFile(path.join(promptsDir, 'story-text-single.txt'), 'utf-8');
     PROMPT_TEMPLATES.sceneDescriptions = await fs.readFile(path.join(promptsDir, 'scene-descriptions.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
+    PROMPT_TEMPLATES.imageGenerationDe = await fs.readFile(path.join(promptsDir, 'image-generation-de.txt'), 'utf-8');
+    PROMPT_TEMPLATES.imageGenerationFr = await fs.readFile(path.join(promptsDir, 'image-generation-fr.txt'), 'utf-8');
+    PROMPT_TEMPLATES.imageGenerationSequential = await fs.readFile(path.join(promptsDir, 'image-generation-sequential.txt'), 'utf-8');
+    PROMPT_TEMPLATES.imageGenerationSequentialDe = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-de.txt'), 'utf-8');
+    PROMPT_TEMPLATES.imageGenerationSequentialFr = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-fr.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
     PROMPT_TEMPLATES.frontCover = await fs.readFile(path.join(promptsDir, 'front-cover.txt'), 'utf-8');
     PROMPT_TEMPLATES.initialPageWithDedication = await fs.readFile(path.join(promptsDir, 'initial-page-with-dedication.txt'), 'utf-8');
@@ -2397,6 +2402,19 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
       if (!result.rowCount || result.rowCount === 0) {
         console.log(`⚠️  Story ${id} not found for user ${req.user.id}`);
         return res.status(404).json({ error: 'Story not found or you do not have permission to delete it' });
+      }
+
+      // Also delete the associated story_job (story.id = job.id)
+      try {
+        const deleteJobResult = await dbPool.query(
+          'DELETE FROM story_jobs WHERE id = $1 AND user_id = $2',
+          [id, req.user.id]
+        );
+        if (deleteJobResult.rowCount > 0) {
+          console.log(`🗑️  Also deleted story_job ${id}`);
+        }
+      } catch (jobErr) {
+        console.warn(`⚠️  Could not delete story_job ${id}:`, jobErr.message);
       }
 
       console.log(`✅ Successfully deleted story ${id}`);
@@ -5560,17 +5578,101 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       [10, 'Generating picture book story and scenes...', jobId]
     );
 
-    // Generate the combined text + scenes in one call
-    console.log(`📖 [STORYBOOK] Calling Claude API for combined generation (${sceneCount} scenes)...`);
+    // STREAMING APPROACH: Generate text with streaming, start image generation as scenes complete
+    console.log(`📖 [STORYBOOK] Calling Claude API with STREAMING for combined generation (${sceneCount} scenes)...`);
     console.log(`📖 [STORYBOOK] Prompt length: ${storybookPrompt.length} chars`);
+
+    let fullStoryText = '';
+    const allSceneDescriptions = [];  // Only story pages (1, 2, 3...), NOT cover pages
+    const allImages = [];
+    const imagePrompts = {};
+
+    // Track image generation promises (started during streaming)
+    const streamingImagePromises = [];
+    const completedSceneNumbers = new Set();
+    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
+    const MAX_RETRIES = 2;
+
+    // Rate limiter for parallel image generation during streaming
+    const streamLimit = pLimit(3);  // Limit concurrent image generation during streaming
+
+    // Helper function to generate image for a scene (used during streaming)
+    const generateImageForScene = async (pageNum, sceneDesc) => {
+      try {
+        const sceneCharacters = getCharactersInScene(sceneDesc, inputData.characters || []);
+        const scenePhotos = getCharacterPhotos(sceneCharacters);
+        console.log(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} characters)...`);
+
+        const imagePrompt = buildImagePrompt(sceneDesc, inputData, sceneCharacters, false);
+        imagePrompts[pageNum] = imagePrompt;
+
+        let imageResult = null;
+        let retries = 0;
+
+        while (retries <= MAX_RETRIES && !imageResult) {
+          try {
+            imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos, null);
+          } catch (error) {
+            retries++;
+            console.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
+            if (retries > MAX_RETRIES) throw error;
+            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          }
+        }
+
+        console.log(`✅ [STREAM-IMG] Page ${pageNum} image generated (score: ${imageResult.score})`);
+
+        return {
+          pageNumber: pageNum,
+          imageData: imageResult.imageData,
+          description: sceneDesc,
+          qualityScore: imageResult.score,
+          qualityReasoning: imageResult.reasoning || null
+        };
+      } catch (error) {
+        console.error(`❌ [STREAM-IMG] Failed to generate image for page ${pageNum}:`, error.message);
+        return {
+          pageNumber: pageNum,
+          imageData: null,
+          description: sceneDesc,
+          error: error.message
+        };
+      }
+    };
+
+    // Set up progressive scene parser to start image generation during streaming
+    // Only use for parallel mode (sequential mode needs to wait for all text first)
+    const shouldStreamImages = !skipImages && imageGenMode === 'parallel';
+    let scenesEmittedCount = 0;
+
+    const sceneParser = new ProgressiveSceneParser((completedScene) => {
+      // Called when a scene is detected as complete during streaming
+      const { pageNumber, sceneDescription } = completedScene;
+
+      if (completedSceneNumbers.has(pageNumber)) return;  // Already processed
+      completedSceneNumbers.add(pageNumber);
+      scenesEmittedCount++;
+
+      console.log(`🌊 [STREAM] Scene ${pageNumber} complete during streaming (${scenesEmittedCount}/${sceneCount})`);
+
+      // Start image generation immediately for this scene (only in parallel mode)
+      if (shouldStreamImages && sceneDescription) {
+        const imagePromise = streamLimit(() => generateImageForScene(pageNumber, sceneDescription));
+        streamingImagePromises.push(imagePromise);
+      }
+    });
 
     let response;
     try {
-      // Picture book mode generates all pages at once (short text per page)
-      response = await callClaudeAPI(storybookPrompt, 16000);
-      console.log(`📖 [STORYBOOK] Claude API response received, length: ${response?.length || 0} chars`);
+      // Use streaming API call
+      response = await callTextModelStreaming(storybookPrompt, 16000, (chunk, fullText) => {
+        // Process each chunk to detect complete scenes
+        sceneParser.processChunk(chunk, fullText);
+      });
+      console.log(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
+      console.log(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} images started`);
     } catch (apiError) {
-      console.error(`❌ [STORYBOOK] Claude API call failed:`, apiError.message);
+      console.error(`❌ [STORYBOOK] Claude API streaming call failed:`, apiError.message);
       throw apiError;
     }
 
@@ -5596,11 +5698,6 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Split by page markers but keep track of what's before PAGE 1 (title/dedication info)
     const pageSplitRegex = /---PAGE\s+(\d+)---/gi;
     const pageMatches = [...response.matchAll(pageSplitRegex)];
-
-    let fullStoryText = '';
-    const allSceneDescriptions = [];  // Only story pages (1, 2, 3...), NOT cover pages
-    const allImages = [];
-    const imagePrompts = {};
 
     // Extract COVER SCENES from response (Title Page, Initial Page, Back Cover)
     // These are used for cover image generation, NOT added to allSceneDescriptions
@@ -5671,7 +5768,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       // Build story text with page markers
       fullStoryText += `--- Page ${pageNum} ---\n${pageText}\n\n`;
 
-      // Build scene description
+      // Build scene description (for scenes not already processed during streaming)
       allSceneDescriptions.push({
         pageNumber: pageNum,
         description: sceneDesc
@@ -5682,7 +5779,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [30, 'Story text complete. Generating images...', jobId]
+      [30, `Story text complete. ${streamingImagePromises.length} images already generating...`, jobId]
     );
 
     // Generate images if not skipped
@@ -5693,7 +5790,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       const MAX_RETRIES = 2;
 
       // Helper function to generate a single image
-      const generateImage = async (scene, idx, previousImage = null) => {
+      const generateImage = async (scene, idx, previousImage = null, isSequential = false) => {
         const pageNum = scene.pageNumber;
         try {
           // Detect which characters appear in this scene
@@ -5702,7 +5799,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
           // Build image prompt with only scene-specific characters
-          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters);
+          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters, isSequential);
           imagePrompts[pageNum] = imagePrompt;
 
           let imageResult = null;
@@ -5757,7 +5854,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const scene = allSceneDescriptions[i];
           console.log(`🔗 [STORYBOOK SEQUENTIAL ${i + 1}/${allSceneDescriptions.length}] Processing page ${scene.pageNumber}...`);
 
-          const result = await generateImage(scene, i, previousImage);
+          const result = await generateImage(scene, i, previousImage, true); // isSequential = true
           allImages.push(result);
 
           // Use this image as reference for next image
@@ -6296,7 +6393,7 @@ Output Format:
             console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
             // Generate image from scene description with scene-specific characters
-            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters);
+            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, true); // isSequential = true
             imagePrompts[pageNum] = imagePrompt;
 
             let imageResult = null;
@@ -6741,10 +6838,11 @@ function parseSceneDescriptions(text, expectedCount) {
   return scenes;
 }
 
-function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null) {
+function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false) {
   // Build image generation prompt (matches step-by-step format)
   const artStyleId = inputData.artStyle || 'pixar';
   const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+  const language = (inputData.language || 'en').toLowerCase();
 
   // Use only characters that appear in this scene (if not provided, detect from scene)
   const charactersInScene = sceneCharacters ||
@@ -6761,12 +6859,36 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null) {
     characterPrompts += '\nCRITICAL: Match these character appearances exactly. Reference images are provided.';
   }
 
+  // Select the correct template based on language and sequential mode
+  let template = null;
+  if (isSequential) {
+    // Sequential mode templates (with visual continuity instructions)
+    if (language === 'de' && PROMPT_TEMPLATES.imageGenerationSequentialDe) {
+      template = PROMPT_TEMPLATES.imageGenerationSequentialDe;
+    } else if (language === 'fr' && PROMPT_TEMPLATES.imageGenerationSequentialFr) {
+      template = PROMPT_TEMPLATES.imageGenerationSequentialFr;
+    } else if (PROMPT_TEMPLATES.imageGenerationSequential) {
+      template = PROMPT_TEMPLATES.imageGenerationSequential;
+    }
+  } else {
+    // Parallel mode templates
+    if (language === 'de' && PROMPT_TEMPLATES.imageGenerationDe) {
+      template = PROMPT_TEMPLATES.imageGenerationDe;
+    } else if (language === 'fr' && PROMPT_TEMPLATES.imageGenerationFr) {
+      template = PROMPT_TEMPLATES.imageGenerationFr;
+    } else if (PROMPT_TEMPLATES.imageGeneration) {
+      template = PROMPT_TEMPLATES.imageGeneration;
+    }
+  }
+
   // Use template if available, otherwise fall back to hardcoded prompt
-  if (PROMPT_TEMPLATES.imageGeneration) {
-    return fillTemplate(PROMPT_TEMPLATES.imageGeneration, {
+  if (template) {
+    console.log(`📝 [IMAGE PROMPT] Using ${isSequential ? 'sequential' : 'parallel'} template for language: ${language}`);
+    return fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: sceneDescription,
       CHARACTER_PROMPTS: characterPrompts,
+      CHARACTER_INFO: characterPrompts, // Sequential template uses CHARACTER_INFO
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
@@ -6848,6 +6970,210 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
 
   const data = await response.json();
   return data.content[0].text;
+}
+
+/**
+ * Call Anthropic Claude API with streaming
+ * Streams text as it's generated, calling onChunk for each piece
+ * @param {string} prompt - The prompt to send
+ * @param {number} maxTokens - Maximum tokens to generate
+ * @param {string} modelId - The model ID to use
+ * @param {function} onChunk - Callback function called with each text chunk: (chunk: string, fullText: string) => void
+ * @returns {Promise<string>} The complete generated text
+ */
+async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Anthropic API key not configured (ANTHROPIC_API_KEY)');
+  }
+
+  console.log(`🌊 [STREAM] Starting streaming request to Anthropic (${maxTokens} max tokens)...`);
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: modelId,
+      max_tokens: maxTokens,
+      stream: true,  // Enable streaming
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Anthropic API error (${response.status}): ${error}`);
+  }
+
+  // Process the Server-Sent Events stream
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // Decode the chunk and add to buffer
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE events from buffer
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';  // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);  // Remove 'data: ' prefix
+
+          if (data === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(data);
+
+            // Handle content_block_delta events (these contain the text)
+            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+              const textChunk = event.delta.text;
+              fullText += textChunk;
+
+              // Call the onChunk callback
+              if (onChunk) {
+                onChunk(textChunk, fullText);
+              }
+            }
+
+            // Log when streaming completes
+            if (event.type === 'message_stop') {
+              console.log(`🌊 [STREAM] Streaming complete, received ${fullText.length} chars`);
+            }
+          } catch (parseError) {
+            // Skip non-JSON lines (like empty lines)
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return fullText;
+}
+
+/**
+ * Call text model with streaming support
+ * @param {string} prompt - The prompt to send
+ * @param {number} maxTokens - Maximum tokens to generate
+ * @param {function} onChunk - Callback for each text chunk: (chunk: string, fullText: string) => void
+ * @returns {Promise<string>} The complete generated text
+ */
+async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null) {
+  const model = activeTextModel;
+
+  // Cap maxTokens to model limit
+  const effectiveMaxTokens = Math.min(maxTokens, model.maxOutputTokens);
+
+  log.verbose(`🤖 [TEXT-STREAM] Calling ${TEXT_MODEL} (${model.modelId}) with max ${effectiveMaxTokens} tokens (streaming)`);
+
+  switch (model.provider) {
+    case 'anthropic':
+      return await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
+    case 'google':
+      // Fallback to non-streaming for Gemini (streaming implementation can be added later)
+      console.log(`⚠️ [TEXT-STREAM] Gemini streaming not implemented, falling back to non-streaming`);
+      return await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
+    default:
+      throw new Error(`Unknown provider: ${model.provider}`);
+  }
+}
+
+/**
+ * Progressive scene parser for streaming story generation
+ * Detects complete scenes as text streams in and triggers callbacks
+ */
+class ProgressiveSceneParser {
+  constructor(onSceneComplete) {
+    this.onSceneComplete = onSceneComplete;
+    this.fullText = '';
+    this.completedScenes = new Set();
+    this.scenePattern = /---PAGE\s+(\d+)---\s*([\s\S]*?)(?=---PAGE\s+\d+---|---BACK COVER---|$)/gi;
+  }
+
+  /**
+   * Process new text chunk and emit any newly completed scenes
+   * @param {string} chunk - New text chunk
+   * @param {string} fullText - Complete text so far
+   */
+  processChunk(chunk, fullText) {
+    this.fullText = fullText;
+
+    // Find all complete scenes in the current text
+    const matches = [...fullText.matchAll(this.scenePattern)];
+
+    for (const match of matches) {
+      const pageNum = parseInt(match[1], 10);
+      const content = match[2];
+
+      // Only emit if this scene hasn't been emitted yet and appears complete
+      // A scene is complete if there's another scene after it or we've seen ---BACK COVER---
+      const hasNextScene = fullText.includes(`---PAGE ${pageNum + 1}---`);
+      const hasBackCover = fullText.includes('---BACK COVER---');
+      const isComplete = hasNextScene || hasBackCover;
+
+      if (isComplete && !this.completedScenes.has(pageNum)) {
+        this.completedScenes.add(pageNum);
+
+        // Extract TEXT and SCENE from the page content
+        const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|$)/i);
+        const sceneMatch = content.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+
+        const pageText = textMatch ? textMatch[1].trim() : '';
+        const sceneDesc = sceneMatch ? sceneMatch[1].trim() : '';
+
+        console.log(`🌊 [STREAM-PARSE] Scene ${pageNum} complete, emitting...`);
+
+        if (this.onSceneComplete) {
+          this.onSceneComplete({
+            pageNumber: pageNum,
+            text: pageText,
+            sceneDescription: sceneDesc
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Get all parsed scenes (for final processing)
+   */
+  getAllScenes() {
+    const scenes = [];
+    const matches = [...this.fullText.matchAll(this.scenePattern)];
+
+    for (const match of matches) {
+      const pageNum = parseInt(match[1], 10);
+      const content = match[2];
+
+      const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|$)/i);
+      const sceneMatch = content.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+
+      scenes.push({
+        pageNumber: pageNum,
+        text: textMatch ? textMatch[1].trim() : '',
+        sceneDescription: sceneMatch ? sceneMatch[1].trim() : ''
+      });
+    }
+
+    return scenes.sort((a, b) => a.pageNumber - b.pageNumber);
+  }
 }
 
 /**

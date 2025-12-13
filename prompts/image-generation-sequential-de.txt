@@ -1,0 +1,47 @@
+KINDERBUCH-ILLUSTRATION - Sichere, familienfreundliche Inhalte.
+
+Erstelle eine filmische Szene im Stil {STYLE_DESCRIPTION}.
+
+Szenenbeschreibung: {SCENE_DESCRIPTION}
+
+{CHARACTER_INFO}
+
+**STILTRANSFORMATION - KRITISCH:**
+- Die Referenzbilder zeigen ECHTE FOTOGRAFIEN von Personen
+- Transformiere diese Personen in den gewünschten Kunststil ({STYLE_DESCRIPTION})
+- Die Charaktere müssen als dieselbe Person ERKENNBAR sein (gleiche Haarfarbe, Gesichtsform, Alter, Geschlecht, unterscheidende Merkmale)
+- Aber im künstlerischen Stil gerendert - KEINE fotorealistischen Kopien
+- ALLE Charaktere müssen den GLEICHEN konsistenten Kunststil haben
+
+**KLEIDUNG & ERSCHEINUNG:**
+- GESICHTER, HAARE und KÖRPERPROPORTIONEN der Charaktere müssen exakt mit den Referenzbildern übereinstimmen
+- Kleidung sollte dem SZENENKONTEXT ANGEMESSEN sein:
+  - Winter-/Schneeszenen → warme Kleidung (Mäntel, Stiefel, Mützen)
+  - Strand-/Sommerszenen → leichte Kleidung (Shorts, Kleider, Sandalen)
+  - Formelle Anlässe → elegante Kleidung
+  - Schlafenszeit-Szenen → Schlafanzüge
+- Behalte konsistente FARBPRÄFERENZEN bei der Anpassung der Kleidung bei (wenn der Charakter im Referenzbild Blau trägt, verwende Blautöne)
+- Charakteristische Accessoires (Brille, Lieblingshut, Halskette) sollten über alle Szenen hinweg konsistent bleiben
+
+**VISUELLE KONTINUITÄT - WAS KOPIEREN vs. WAS ÄNDERN:**
+
+Vom VORHERIGEN Szenenbild (erstes angehängtes Bild), EXAKT KOPIEREN:
+- Requisiten und Objekte (Landkarten, Lampen, Skier, Spielzeug, Bücher, Fahrzeuge)
+- Möbel und Raumdetails
+- Hintergrundelemente und Setting
+- Kleidungsstil und Farben (ausser der Szenenkontext erfordert eine Änderung)
+- Kunststil, Beleuchtungsansatz und Farbpalette
+
+Vom VORHERIGEN Szenenbild, NICHT KOPIEREN:
+- Charakter-POSEN - müssen NEU sein und zur aktuellen Szenenbeschreibung passen
+- Charakter-POSITIONEN im Bild - gemäss aktueller Szene anordnen
+- Gesichtsausdrücke - müssen zur Emotion der aktuellen Szene passen
+
+KRITISCH: Charaktere müssen ERKENNBAR sein (gleiches Gesicht, Haare, Körper) aber in FRISCHEN POSEN, die zur Handlung der neuen Szene passen. Niemals Charakter-Posen vom vorherigen Bild kopieren.
+
+Wichtig:
+- Zeige angemessene Emotionen in den Gesichtern (fröhlich, traurig, überrascht, besorgt, aufgeregt)
+- Charaktere müssen durchgehend in der Geschichte erkennbar sein
+- Klare, aufgeräumte Komposition
+
+Dies ist eine kindgerechte Bilderbuch-Illustration. Alle Inhalte sind unschuldig und altersgerecht.
