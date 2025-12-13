@@ -4522,8 +4522,21 @@ app.get('/api/admin/stats', authenticateToken, async (req, res) => {
     // Get counts for all main entities
     const userCountResult = await dbPool.query('SELECT COUNT(*) as count FROM users');
     const storyCountResult = await dbPool.query('SELECT COUNT(*) as count FROM stories');
-    const characterCountResult = await dbPool.query('SELECT COUNT(*) as count FROM characters');
     const fileCountResult = await dbPool.query('SELECT COUNT(*) as count FROM files');
+
+    // Count individual characters (each row contains a JSON array of characters)
+    const characterDataResult = await dbPool.query('SELECT data FROM characters');
+    let totalCharacters = 0;
+    for (const row of characterDataResult.rows) {
+      try {
+        const charData = JSON.parse(row.data);
+        if (charData.characters && Array.isArray(charData.characters)) {
+          totalCharacters += charData.characters.length;
+        }
+      } catch (err) {
+        console.warn('⚠️ Skipping malformed character data');
+      }
+    }
 
     // Get orphaned files (files with story_id that doesn't exist in stories table)
     const orphanedFilesResult = await dbPool.query(`
@@ -4586,7 +4599,7 @@ app.get('/api/admin/stats', authenticateToken, async (req, res) => {
         embeddedImagesSizeMB: (totalSceneImagesSize / 1024 / 1024).toFixed(2)
       },
       characters: {
-        total: parseInt(characterCountResult.rows[0].count)
+        total: totalCharacters
       },
       files: {
         total: parseInt(fileCountResult.rows[0].count),
@@ -6478,18 +6491,21 @@ Output Format:
                 pageNumber: pageNum,
                 imageData: imageResult.imageData,
                 description: sceneDescription,
+                text: pageContent,  // Include page text for progressive display
                 qualityScore: imageResult.score,
                 qualityReasoning: imageResult.reasoning || null
               };
 
-              // Save checkpoint: page image (scene description + image)
-              await saveCheckpoint(jobId, 'page_image', {
+              // Save partial result checkpoint for progressive display
+              await saveCheckpoint(jobId, 'partial_page', {
                 pageNumber: pageNum,
-                sceneDescription,
-                imagePrompt: imagePrompt,
+                imageData: imageResult.imageData,
+                description: sceneDescription,
+                text: pageContent,
                 qualityScore: imageResult.score,
                 qualityReasoning: imageResult.reasoning || null
               }, pageNum);
+              console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
 
               return imageData;
             } catch (error) {
@@ -6618,18 +6634,21 @@ Output Format:
               pageNumber: pageNum,
               imageData: imageResult.imageData,
               description: sceneDescription,
+              text: pageContent,  // Include page text for progressive display
               qualityScore: imageResult.score,
               qualityReasoning: imageResult.reasoning || null
             };
 
-            // Save checkpoint: page image (scene description + image)
-            await saveCheckpoint(jobId, 'page_image', {
+            // Save partial result checkpoint for progressive display
+            await saveCheckpoint(jobId, 'partial_page', {
               pageNumber: pageNum,
-              sceneDescription,
-              imagePrompt: imagePrompt,
+              imageData: imageResult.imageData,
+              description: sceneDescription,
+              text: pageContent,
               qualityScore: imageResult.score,
               qualityReasoning: imageResult.reasoning || null
             }, pageNum);
+            console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
 
             allImages.push(imageData);
 
