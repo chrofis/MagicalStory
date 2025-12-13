@@ -6143,65 +6143,46 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
         }
 
-        // Use AI-generated title page scene (or fallback)
-        const titlePageScene = coverScenes.titlePage || `A beautiful, magical cover scene featuring the main characters. Decorative elements that reflect the story's theme.`;
+        // Use AI-generated cover scenes (or fallbacks)
+        const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+        const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+        const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
-        // Front cover - use AI-generated scene description
-        const frontCoverPrompt = `Create a children's book FRONT COVER illustration for "${storyTitle}".
-
-SCENE FROM STORY:
-${titlePageScene}
-
-CHARACTERS: ${characterInfo}
-STYLE: ${styleDescription}
-
-Make the main character(s) prominent and the scene inviting. This is a cover that should draw readers in.`;
+        // Front cover - use same template as standard mode
+        const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+          TITLE_PAGE_SCENE: titlePageScene,
+          STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_INFO: characterInfo,
+          STORY_TITLE: storyTitle
+        });
         coverPrompts.frontCover = frontCoverPrompt;
         const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, characterPhotos);
         coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
 
-        // Use AI-generated initial page scene (or fallback)
-        const initialPageScene = coverScenes.initialPage || `A warm, inviting scene that welcomes readers into the story world.`;
-
-        // Initial page - use AI-generated scene description
-        const initialPrompt = inputData.dedication
-          ? `Create a children's book DEDICATION PAGE illustration for "${storyTitle}".
-
-SCENE FROM STORY:
-${initialPageScene}
-
-DEDICATION TEXT: "${inputData.dedication}"
-
-CHARACTERS: ${characterInfo}
-STYLE: ${styleDescription}
-
-Create a warm, welcoming scene with space for the dedication text.`
-          : `Create a children's book INTRODUCTION PAGE illustration for "${storyTitle}".
-
-SCENE FROM STORY:
-${initialPageScene}
-
-CHARACTERS: ${characterInfo}
-STYLE: ${styleDescription}
-
-Create a warm, welcoming scene that invites readers into the story.`;
+        // Initial page - use same templates as standard mode
+        const initialPrompt = inputData.dedication && inputData.dedication.trim()
+          ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+              INITIAL_PAGE_SCENE: initialPageScene,
+              STYLE_DESCRIPTION: styleDescription,
+              CHARACTER_INFO: characterInfo,
+              DEDICATION: inputData.dedication
+            })
+          : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+              INITIAL_PAGE_SCENE: initialPageScene,
+              STYLE_DESCRIPTION: styleDescription,
+              CHARACTER_INFO: characterInfo,
+              STORY_TITLE: storyTitle
+            });
         coverPrompts.initialPage = initialPrompt;
         const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos);
         coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
 
-        // Use AI-generated back cover scene (or fallback)
-        const backCoverScene = coverScenes.backCover || `A satisfying, peaceful ending scene showing the characters in a happy, resolved state.`;
-
-        // Back cover - use AI-generated scene description
-        const backCoverPrompt = `Create a children's book BACK COVER illustration for "${storyTitle}".
-
-SCENE FROM STORY:
-${backCoverScene}
-
-CHARACTERS: ${characterInfo}
-STYLE: ${styleDescription}
-
-Show a satisfying conclusion that provides closure. Include small "magicalstory.ch" text in a corner.`;
+        // Back cover - use same template as standard mode
+        const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+          BACK_COVER_SCENE: backCoverScene,
+          STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_INFO: characterInfo
+        });
         coverPrompts.backCover = backCoverPrompt;
         const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos);
         coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
