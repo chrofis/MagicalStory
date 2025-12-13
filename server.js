@@ -6178,11 +6178,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos, null, 'cover');
         coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
 
-        // Initial page - use same templates as standard mode
-        // Detect which characters appear in the initial page scene
-        const initialPageCharacters = getCharactersInScene(initialPageScene, inputData.characters || []);
-        const initialPagePhotos = getCharacterPhotos(initialPageCharacters);
-        console.log(`📕 [STORYBOOK] Initial page: ${initialPageCharacters.length} characters (${initialPageCharacters.map(c => c.name).join(', ') || 'none'})`);
+        // Initial page - use ALL characters (main character centered, all others around)
+        // Pass ALL character photos since this is a group scene introducing everyone
+        console.log(`📕 [STORYBOOK] Initial page: ALL ${characterPhotos.length} characters (group scene with main character centered)`);
 
         const initialPrompt = inputData.dedication && inputData.dedication.trim()
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
@@ -6198,14 +6196,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               STORY_TITLE: storyTitle
             });
         coverPrompts.initialPage = initialPrompt;
-        const initialResult = await callGeminiAPIForImage(initialPrompt, initialPagePhotos, null, 'cover');
+        const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos, null, 'cover');
         coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
 
-        // Back cover - use same template as standard mode
-        // Detect which characters appear in the back cover scene
-        const backCoverCharacters = getCharactersInScene(backCoverScene, inputData.characters || []);
-        const backCoverPhotos = getCharacterPhotos(backCoverCharacters);
-        console.log(`📕 [STORYBOOK] Back cover: ${backCoverCharacters.length} characters (${backCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
+        // Back cover - use ALL characters with EQUAL prominence (no focus on main character)
+        // Pass ALL character photos since this is a group scene with everyone equal
+        console.log(`📕 [STORYBOOK] Back cover: ALL ${characterPhotos.length} characters (equal prominence group scene)`);
 
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
@@ -6213,7 +6209,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           CHARACTER_INFO: characterInfo
         });
         coverPrompts.backCover = backCoverPrompt;
-        const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, backCoverPhotos, null, 'cover');
+        const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos, null, 'cover');
         coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
 
         console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
@@ -6824,13 +6820,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         throw new Error(`Front cover generation failed: ${error.message}`);
       }
 
-      // Generate initial page (dedication page) - matches step-by-step prompt format
-      // Detect which characters appear in the initial page scene
-      const initialPageCharacters = getCharactersInScene(initialPageScene, inputData.characters || []);
-      const initialPagePhotos = getCharacterPhotos(initialPageCharacters);
-
+      // Generate initial page (dedication page) - use ALL characters (main character centered)
+      // Pass ALL character photos since this is a group scene introducing everyone
       try {
-        console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId} (${initialPageCharacters.length} characters: ${initialPageCharacters.map(c => c.name).join(', ') || 'none'})`);
+        console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId} - ALL ${characterPhotos.length} characters (group scene with main character centered)`);
         const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
@@ -6845,7 +6838,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               STORY_TITLE: storyTitle
             });
         coverPrompts.initialPage = initialPagePrompt;
-        initialPageResult = await callGeminiAPIForImage(initialPagePrompt, initialPagePhotos, null, 'cover');
+        initialPageResult = await callGeminiAPIForImage(initialPagePrompt, characterPhotos, null, 'cover');
         console.log(`✅ [PIPELINE] Initial page generated successfully`);
         // Save checkpoint: initial page cover
         await saveCheckpoint(jobId, 'cover', { type: 'initialPage', prompt: initialPagePrompt }, 1);
@@ -6854,20 +6847,17 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         throw new Error(`Initial page generation failed: ${error.message}`);
       }
 
-      // Generate back cover (matches step-by-step prompt format)
-      // Detect which characters appear in the back cover scene
-      const backCoverCharacters = getCharactersInScene(backCoverScene, inputData.characters || []);
-      const backCoverPhotos = getCharacterPhotos(backCoverCharacters);
-
+      // Generate back cover - use ALL characters with EQUAL prominence (no focus on main)
+      // Pass ALL character photos since this is a group scene with everyone equal
       try {
-        console.log(`📕 [PIPELINE] Generating back cover for job ${jobId} (${backCoverCharacters.length} characters: ${backCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
+        console.log(`📕 [PIPELINE] Generating back cover for job ${jobId} - ALL ${characterPhotos.length} characters (equal prominence group scene)`);
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo
         });
         coverPrompts.backCover = backCoverPrompt;
-        backCoverResult = await callGeminiAPIForImage(backCoverPrompt, backCoverPhotos, null, 'cover');
+        backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos, null, 'cover');
         console.log(`✅ [PIPELINE] Back cover generated successfully`);
         // Save checkpoint: back cover
         await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
