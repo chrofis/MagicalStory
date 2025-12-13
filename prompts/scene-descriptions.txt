@@ -31,3 +31,4 @@ Create a detailed visual description of ONE key moment from the scene context pr
 - Use simple, clear language
 - Every character in the scene MUST be named explicitly
 - Fewer characters = better illustration quality
+- **OUTPUT LANGUAGE: Write the entire scene description in {LANGUAGE}**

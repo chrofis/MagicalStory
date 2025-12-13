@@ -9065,7 +9065,8 @@ Return ONLY valid JSON, no markdown or other text.`
             {sceneImages.length > 0 && (
               <button
                 onClick={downloadPrintablePDF}
-                className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center justify-center gap-2"
+                disabled={isGenerating}
+                className={`bg-green-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'}`}
               >
                 <Icon name="file-text" size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
               </button>
@@ -9074,7 +9075,8 @@ Return ONLY valid JSON, no markdown or other text.`
             {currentUser && currentUser.role === 'admin' && sceneImages.length > 0 && (
               <button
                 onClick={orderPrintedBook}
-                className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 font-semibold flex items-center justify-center gap-2"
+                disabled={isGenerating}
+                className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}
               >
                 <Icon name="printer" size={20} /> {language === 'de' ? 'Buch drucken' : language === 'fr' ? 'Imprimer le livre' : 'Print Book'}
               </button>
@@ -9082,6 +9084,7 @@ Return ONLY valid JSON, no markdown or other text.`
             {/* Buy Book via Stripe */}
             {sceneImages.length > 0 && currentStoryId && (
               <button
+                disabled={isGenerating}
                 onClick={async () => {
                   try {
                     console.log('💳 [STRIPE] Initiating checkout for story:', currentStoryId);
@@ -9116,7 +9119,7 @@ Return ONLY valid JSON, no markdown or other text.`
                     alert('Error creating checkout: ' + err.message);
                   }
                 }}
-                className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 font-semibold flex items-center justify-center gap-2"
+                className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}
               >
                 <Icon name="shopping-cart" size={20} /> {language === 'de' ? 'Buch kaufen (CHF 36)' : language === 'fr' ? 'Acheter le livre (CHF 36)' : 'Buy Book (CHF 36)'}
               </button>
@@ -9183,7 +9186,8 @@ Return ONLY valid JSON, no markdown or other text.`
             )}
             <button
               onClick={resetAllStoryState}
-              className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 font-semibold flex items-center justify-center gap-2 sm:col-span-2 lg:col-span-1"
+              disabled={isGenerating}
+              className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 sm:col-span-2 lg:col-span-1 ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}
             >
               {t.createAnotherStory}
             </button>
@@ -10051,13 +10055,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 {/* Download PDF */}
                 <button
                   onClick={downloadPrintablePDF}
-                  className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center justify-center gap-2"
+                  disabled={isGenerating}
+                  className={`bg-green-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'}`}
                 >
                   <Icon name="file-text" size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
                 </button>
                 {/* Buy Book */}
                 {currentStoryId && (
                   <button
+                    disabled={isGenerating}
                     onClick={async () => {
                       try {
                         const response = await fetch(`${API_URL}/api/stripe/create-checkout-session`, {
@@ -10078,7 +10084,7 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                         alert('Error creating checkout: ' + err.message);
                       }
                     }}
-                    className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 font-semibold flex items-center justify-center gap-2"
+                    className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'}`}
                   >
                     <Icon name="shopping-cart" size={20} /> {language === 'de' ? 'Buch kaufen (CHF 36)' : language === 'fr' ? 'Acheter le livre (CHF 36)' : 'Buy Book (CHF 36)'}
                   </button>
@@ -10086,7 +10092,8 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                 {/* Create Another Story */}
                 <button
                   onClick={resetAllStoryState}
-                  className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 font-semibold flex items-center justify-center gap-2"
+                  disabled={isGenerating}
+                  className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}
                 >
                   <Icon name="plus" size={20} /> {t.createAnotherStory}
                 </button>

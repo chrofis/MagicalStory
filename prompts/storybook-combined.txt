@@ -23,12 +23,14 @@ This is a PICTURE BOOK. Each page has a large illustration with text below.
 - Engaging sentences that tell the story and complement the illustration
 
 **GOOD EXAMPLE (Page text):**
-"Leo loved to explore new places. Today he found a hidden path in the forest!
-The trees were tall and green. Birds sang happy songs above him.
-He walked carefully, looking for adventure. His trusty brown backpack held all he needed for the journey."
+"Leo loved to explore new places. Today he found a hidden path in the forest! The trees were tall and green. Birds sang happy songs above him. He walked carefully, looking for adventure. His trusty brown backpack held all he needed for the journey."
 
 **BAD EXAMPLE (Too short):**
 "Leo walked. He saw trees."
+
+**FORMATTING RULE:**
+- Write text as a CONTINUOUS PARAGRAPH - do NOT add line breaks after each sentence
+- Only use a line break if there's a natural pause or scene shift within the page
 
 # Story Structure
 

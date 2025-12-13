@@ -2592,8 +2592,11 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Get characters from story data
     const characters = storyData.characters || [];
 
+    // Get language from story data
+    const language = storyData.language || 'English';
+
     // Generate new scene description
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '');
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language);
     const newSceneDescription = await callClaudeAPI(scenePrompt, 2048);
 
     // Update the scene description in story data
@@ -5599,7 +5602,7 @@ function extractCoverScenes(outline) {
 }
 
 // Helper function to build Art Director scene description prompt (matches frontend)
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '') {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English') {
   const characterDetails = characters.map(c => {
     const details = [];
     if (c.age) details.push(`Age ${c.age}`);
@@ -5617,7 +5620,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       SCENE_SUMMARY: shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : '',
       PAGE_NUMBER: pageNumber.toString(),
       PAGE_CONTENT: pageContent,
-      CHARACTERS: characterDetails
+      CHARACTERS: characterDetails,
+      LANGUAGE: language
     });
   }
 
@@ -6503,8 +6507,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           const pageContent = page.content;
           const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
 
-          // Generate scene description using Art Director prompt
-          const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc);
+          // Generate scene description using Art Director prompt (in story language)
+          const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText);
 
           // Start scene description + image generation (don't await yet)
           const imagePromise = limit(async () => {
@@ -6648,8 +6652,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           console.log(`🔗 [SEQUENTIAL ${i + 1}/${allPages.length}] Processing page ${pageNum}...`);
 
           try {
-            // Generate scene description using Art Director prompt
-            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc);
+            // Generate scene description using Art Director prompt (in story language)
+            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText);
 
             console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
             const sceneDescription = await callTextModelStreaming(scenePrompt, 2048);
