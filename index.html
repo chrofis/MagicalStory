@@ -1776,20 +1776,25 @@ Be specific and creative. Each scene description should paint a clear picture fo
       }, [isAuthenticated, authToken]);
 
       // Google Sign-In
+      // NOTE: signInWithRedirect does NOT work on Safari 16.1+ due to third-party storage blocking
+      // Use signInWithPopup for all browsers - it works better on modern iOS Safari
       const handleGoogleSignIn = async () => {
         setAuthError('');
         try {
           const provider = new firebase.auth.GoogleAuthProvider();
-          if (isMobileDevice()) {
-            // Use redirect for mobile (more reliable on iOS Safari)
-            await firebaseAuth.signInWithRedirect(provider);
-          } else {
-            // Use popup for desktop
-            const result = await firebaseAuth.signInWithPopup(provider);
-            await handleFirebaseAuth(result.user);
-          }
+          // Always use popup - redirect is broken on Safari/iOS due to cross-origin storage blocking
+          // See: https://firebase.google.com/docs/auth/web/redirect-best-practices
+          const result = await firebaseAuth.signInWithPopup(provider);
+          await handleFirebaseAuth(result.user);
         } catch (err) {
-          if (err.code !== 'auth/popup-closed-by-user') {
+          console.error('📱 Google Sign-In error:', err.code, err.message);
+          if (err.code === 'auth/popup-blocked') {
+            setAuthError('Popup was blocked. Please allow popups for this site and try again.');
+          } else if (err.code === 'auth/popup-closed-by-user') {
+            // User closed popup, not an error to show
+          } else if (err.code === 'auth/cancelled-popup-request') {
+            // Multiple popup requests, ignore
+          } else {
             setAuthError(err.message);
           }
         }
@@ -1802,16 +1807,18 @@ Be specific and creative. Each scene description should paint a clear picture fo
           const provider = new firebase.auth.OAuthProvider('apple.com');
           provider.addScope('email');
           provider.addScope('name');
-          if (isMobileDevice()) {
-            // Use redirect for mobile (more reliable on iOS Safari)
-            await firebaseAuth.signInWithRedirect(provider);
-          } else {
-            // Use popup for desktop
-            const result = await firebaseAuth.signInWithPopup(provider);
-            await handleFirebaseAuth(result.user);
-          }
+          // Always use popup - redirect is broken on Safari/iOS
+          const result = await firebaseAuth.signInWithPopup(provider);
+          await handleFirebaseAuth(result.user);
         } catch (err) {
-          if (err.code !== 'auth/popup-closed-by-user') {
+          console.error('📱 Apple Sign-In error:', err.code, err.message);
+          if (err.code === 'auth/popup-blocked') {
+            setAuthError('Popup was blocked. Please allow popups for this site and try again.');
+          } else if (err.code === 'auth/popup-closed-by-user') {
+            // User closed popup, not an error to show
+          } else if (err.code === 'auth/cancelled-popup-request') {
+            // Multiple popup requests, ignore
+          } else {
             setAuthError(err.message);
           }
         }
