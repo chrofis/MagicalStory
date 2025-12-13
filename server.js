@@ -6820,8 +6820,8 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
   }
 
   // Calculate timeout based on expected tokens (larger requests need more time)
-  // Base: 60 seconds + 2 seconds per 1000 tokens (25000 tokens = ~110 seconds)
-  const timeoutMs = Math.max(120000, 60000 + Math.ceil(maxTokens / 1000) * 2000);
+  // Minimum 5 minutes, + 3 seconds per 1000 tokens for very large requests
+  const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
