@@ -3746,19 +3746,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       const frontCoverBuffer = Buffer.from(frontCoverData, 'base64');
       doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
 
-      // Add title text overlay on front cover (right half)
-      if (storyTitle) {
-        const titleX = coverWidth / 2 + 20;
-        const titleY = 40;
-        const titleWidth = (coverWidth / 2) - 40;
-
-        doc.fontSize(24)
-          .fillColor('white')
-          .text(storyTitle, titleX, titleY, {
-            width: titleWidth,
-            align: 'center'
-          });
-      }
+      // Note: Title is already part of the cover image, no overlay needed
     }
 
     // PDF Page 2: Initial Page (140 x 140 mm)
@@ -3773,16 +3761,16 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 
     // Add content pages based on layout type
     if (isPictureBook) {
-      // PICTURE BOOK LAYOUT: Combined image on top (~68%), text below (~32%)
+      // PICTURE BOOK LAYOUT: Combined image on top (~90%), text below (~10%)
       storyPages.forEach((page, index) => {
         const pageNumber = index + 1;
         const margin = mmToPoints(5);  // 5mm margin around page
 
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-        // Layout: Image takes top 68%, text takes bottom 32%
-        const imageHeight = pageSize * 0.68;
-        const textAreaHeight = pageSize * 0.32;
+        // Layout: Image takes top 90%, text takes bottom 10%
+        const imageHeight = pageSize * 0.90;
+        const textAreaHeight = pageSize * 0.10;
         const textAreaY = imageHeight;
 
         // Add image at top if available
@@ -3802,31 +3790,31 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
           }
         }
 
-        // Add text in bottom portion
-        const textMargin = mmToPoints(8);
+        // Add text in bottom portion (small area for Picture Book)
+        const textMargin = mmToPoints(3);  // Smaller margin for compact text area
         const availableTextWidth = pageSize - (textMargin * 2);
-        const availableTextHeight = textAreaHeight - (textMargin * 1.5);
+        const availableTextHeight = textAreaHeight - (textMargin);
 
-        let fontSize = 8;
+        let fontSize = 6;  // Start smaller for compact area
         let textHeight;
 
         doc.fontSize(fontSize).font('Helvetica');
-        textHeight = doc.heightOfString(page.text, { width: availableTextWidth, align: 'left' });
+        textHeight = doc.heightOfString(page.text, { width: availableTextWidth, align: 'center' });
 
-        while (textHeight > availableTextHeight && fontSize > 5) {
+        while (textHeight > availableTextHeight && fontSize > 4) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(page.text, { width: availableTextWidth, align: 'left' });
+          textHeight = doc.heightOfString(page.text, { width: availableTextWidth, align: 'center' });
         }
 
         let textToRender = page.text;
         if (textHeight > availableTextHeight) {
-          console.warn(`⚠️  Page ${pageNumber}: Text too long even at ${fontSize}pt, truncating...`);
+          // Truncate text to fit
           const words = page.text.split(' ');
           textToRender = '';
           for (let i = 0; i < words.length; i++) {
             const testText = textToRender + (textToRender ? ' ' : '') + words[i];
-            const testHeight = doc.heightOfString(testText, { width: availableTextWidth, align: 'left' });
+            const testHeight = doc.heightOfString(testText, { width: availableTextWidth, align: 'center' });
             if (testHeight <= availableTextHeight) {
               textToRender = testText;
             } else {
@@ -3836,10 +3824,10 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
           textToRender += '...';
         }
 
-        textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'left' });
+        textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'center' });
         const textY = textAreaY + (availableTextHeight - textHeight) / 2;
 
-        doc.fillColor('#333333').text(textToRender, textMargin, textY, { width: availableTextWidth, align: 'left' });
+        doc.fillColor('#333333').text(textToRender, textMargin, textY, { width: availableTextWidth, align: 'center' });
       });
     } else {
       // STANDARD/ADVANCED LAYOUT: Separate pages for text and image
@@ -5014,7 +5002,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
 
     // Add content pages based on layout type
     if (isPictureBook) {
-      // PICTURE BOOK LAYOUT: Combined image on top (~68%), text below (~32%)
+      // PICTURE BOOK LAYOUT: Combined image on top (~90%), text below (~10%)
       storyPages.forEach((pageText, index) => {
         const pageNumber = index + 1;
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
@@ -5023,8 +5011,8 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
 
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-        const imageHeight = pageSize * 0.68;
-        const textAreaHeight = pageSize * 0.32;
+        const imageHeight = pageSize * 0.90;
+        const textAreaHeight = pageSize * 0.10;
         const textAreaY = imageHeight;
 
         if (image && image.imageData) {
@@ -5040,18 +5028,19 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
           }
         }
 
-        const textMargin = mmToPoints(8);
+        // Add text in bottom portion (small area for Picture Book)
+        const textMargin = mmToPoints(3);  // Smaller margin for compact text area
         const availableTextWidth = pageSize - (textMargin * 2);
-        const availableTextHeight = textAreaHeight - (textMargin * 1.5);
+        const availableTextHeight = textAreaHeight - (textMargin);
 
-        let fontSize = 8;
+        let fontSize = 6;  // Start smaller for compact area
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'left' });
+        let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center' });
 
-        while (textHeight > availableTextHeight && fontSize > 5) {
+        while (textHeight > availableTextHeight && fontSize > 4) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'left' });
+          textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center' });
         }
 
         let textToRender = cleanText;
@@ -5060,7 +5049,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
           textToRender = '';
           for (let i = 0; i < words.length; i++) {
             const testText = textToRender + (textToRender ? ' ' : '') + words[i];
-            const testHeight = doc.heightOfString(testText, { width: availableTextWidth, align: 'left' });
+            const testHeight = doc.heightOfString(testText, { width: availableTextWidth, align: 'center' });
             if (testHeight <= availableTextHeight) {
               textToRender = testText;
             } else {
@@ -5070,10 +5059,10 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
           textToRender += '...';
         }
 
-        textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'left' });
+        textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'center' });
         const textY = textAreaY + (availableTextHeight - textHeight) / 2;
 
-        doc.text(textToRender, textMargin, textY, { width: availableTextWidth, align: 'left' });
+        doc.text(textToRender, textMargin, textY, { width: availableTextWidth, align: 'center' });
       });
     } else {
       // STANDARD/ADVANCED LAYOUT: Separate pages for text and image

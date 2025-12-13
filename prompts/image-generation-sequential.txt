@@ -23,11 +23,21 @@ Scene Description: {SCENE_DESCRIPTION}
 - Maintain consistent COLOR PREFERENCES when adapting clothing (if character wears blue in reference, use blue tones)
 - Signature accessories (glasses, favorite hat, necklace) should remain consistent across scenes
 
-**VISUAL CONTINUITY:**
-The FIRST attached image shows the PREVIOUS scene from this story. Maintain:
-- Same character appearances as in the previous scene (they are already transformed to the art style)
-- Consistent art style, lighting approach, and color palette
-- Any recurring objects or background elements should look the same
+**VISUAL CONTINUITY - WHAT TO COPY vs. WHAT TO CHANGE:**
+
+From the PREVIOUS scene image (first attached image), COPY EXACTLY:
+- Props and objects (maps, lamps, skis, toys, books, vehicles)
+- Furniture and room details
+- Background elements and setting
+- Clothing style and colors (unless scene context requires change)
+- Art style, lighting approach, and color palette
+
+From the PREVIOUS scene image, DO NOT COPY:
+- Character POSES - must be NEW and match the current scene description
+- Character POSITIONS in frame - arrange according to current scene
+- Facial expressions - must match current scene's emotion
+
+CRITICAL: Characters must be RECOGNIZABLE (same face, hair, body) but in FRESH POSES appropriate to the new scene's action. Never copy-paste character poses from the previous image.
 
 Important:
 - Show appropriate emotions on faces (happy, sad, surprised, worried, excited)
