@@ -3795,7 +3795,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         const availableTextWidth = pageSize - (textMargin * 2);
         const availableTextHeight = textAreaHeight - (textMargin);
 
-        let fontSize = 6;  // Start smaller for compact area
+        let fontSize = 10;  // Start with 10pt, auto-reduce if needed
         let textHeight;
 
         doc.fontSize(fontSize).font('Helvetica');
@@ -5033,7 +5033,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
         const availableTextWidth = pageSize - (textMargin * 2);
         const availableTextHeight = textAreaHeight - (textMargin);
 
-        let fontSize = 6;  // Start smaller for compact area
+        let fontSize = 10;  // Start with 10pt, auto-reduce if needed
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
         let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center' });
 
