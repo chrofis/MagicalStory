@@ -237,6 +237,19 @@
       { value: { en: 'Not Known to', de: 'Nicht bekannt mit', fr: 'Pas connu de' }, inverse: { en: 'Not Known to', de: 'Nicht bekannt mit', fr: 'Pas connu de' } }
     ];
 
+    // Helper to get "Not Known to" relationship (avoid magic number)
+    const getNotKnownRelationship = (lang) => {
+      const notKnown = relationshipTypes.find(r => r.value.en === 'Not Known to');
+      return notKnown ? notKnown.value[lang] : 'Not Known to';
+    };
+
+    // Check if a relationship value means "Not Known to" in any language
+    const isNotKnownRelationship = (value) => {
+      const notKnown = relationshipTypes.find(r => r.value.en === 'Not Known to');
+      if (!notKnown) return false;
+      return value === notKnown.value.en || value === notKnown.value.de || value === notKnown.value.fr;
+    };
+
     const translations = {
       en: {
         title: 'Magical Story',
@@ -837,7 +850,7 @@
       const [characterDevMode, setCharacterDevMode] = useState(false); // Developer mode for character creation (admin only)
       const [sceneDescriptionPrompts, setSceneDescriptionPrompts] = useState({}); // Map of pageNumber -> prompt
       const [showSceneDescriptionPrompt, setShowSceneDescriptionPrompt] = useState(false);
-      const [relationshipTexts, setRelationshipTexts] = useState({}); // Custom text for each relationship
+      const [relationshipTexts, setRelationshipTexts] = useState({}); // Custom user-written text for each relationship (NOT translated on language change - user content)
       const [coverImagePrompts, setCoverImagePrompts] = useState({}); // Store prompts for cover images
       const [coverImageApiCalls, setCoverImageApiCalls] = useState({}); // Store API calls for cover images
       const [storyOutlinePrompt, setStoryOutlinePrompt] = useState(''); // Store outline generation prompt
@@ -1297,6 +1310,9 @@
           });
         }
 
+        // Save language preference to localStorage
+        localStorage.setItem('magicalstory_language', language);
+
         // Update previous language ref
         prevLanguageRef.current = language;
       }, [language]);
@@ -1465,7 +1481,8 @@
             const [char1Id, _] = key.split('-').map(Number);
             const char1Index = characters.findIndex(c => c.id === char1Id);
             const char2Index = characters.findIndex(c => c.id === parseInt(key.split('-')[1]));
-            return type !== 'Not Known to' && char1Index < char2Index;
+            // Use helper to check all languages (not just English)
+            return !isNotKnownRelationship(type) && char1Index < char2Index;
           })
           .map(([key, type]) => {
             const [char1Id, char2Id] = key.split('-').map(Number);
@@ -7443,7 +7460,7 @@ Return ONLY valid JSON, no markdown or other text.`
               if (char1.id !== char2.id) {
                 const key = `${char1.id}-${char2.id}`;
                 if (!prevRelationships[key]) {
-                  newRelationships[key] = relationshipTypes[10].value[language];
+                  newRelationships[key] = getNotKnownRelationship(language);
                 }
                 // If relationship already exists, keep it (already in newRelationships from spread)
               }
@@ -8363,7 +8380,7 @@ Return ONLY valid JSON, no markdown or other text.`
                   if (i >= j) return null;
                   const key1 = `${char1.id}-${char2.id}`;
 
-                  const isNotKnown = !relationships[key1] || relationships[key1] === relationshipTypes[10].value[language];
+                  const isNotKnown = !relationships[key1] || isNotKnownRelationship(relationships[key1]);
 
                   return (
                     <div key={key1} className={`rounded-lg p-3 md:p-4 ${isNotKnown ? 'bg-white border-red-500 border-[3px]' : 'bg-blue-50 border-blue-300 border-2'}`}>
@@ -8380,7 +8397,7 @@ Return ONLY valid JSON, no markdown or other text.`
                         {/* Center: Dropdown + Details stacked - flex-1 for dynamic scaling */}
                         <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
                           <select
-                            value={relationships[key1] || relationshipTypes[10].value[language]}
+                            value={relationships[key1] || getNotKnownRelationship(language)}
                             onChange={(e) => {
                               const value = e.target.value;
                               if (value === '__CREATE_CUSTOM__') {

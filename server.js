@@ -6226,8 +6226,8 @@ async function processStoryJob(jobId) {
     const outlinePrompt = buildStoryPrompt(inputData, sceneCount);
     // Claude can handle up to 64,000 output tokens - use generous limit for outlines
     const outlineTokens = 16000;
-    console.log(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens})`);
-    const outline = await callClaudeAPI(outlinePrompt, outlineTokens);
+    console.log(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
+    const outline = await callTextModelStreaming(outlinePrompt, outlineTokens);
 
     // Save checkpoint: outline
     await saveCheckpoint(jobId, 'outline', { outline });
@@ -6314,8 +6314,8 @@ Output Format:
       const batchSceneCount = endScene - startScene + 1;
       const tokensPerPage = isPictureBook ? 500 : 1000; // Picture book = shorter, Standard = longer
       const batchTokensNeeded = Math.min(batchSceneCount * tokensPerPage, Math.floor(activeTextModel.maxOutputTokens * 0.8));
-      console.log(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} tokens for ${batchSceneCount} pages (${tokensPerPage} tokens/page)`);
-      const batchText = await callClaudeAPI(batchPrompt, batchTokensNeeded);
+      console.log(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} tokens for ${batchSceneCount} pages (${tokensPerPage} tokens/page) - STREAMING`);
+      const batchText = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
       fullStoryText += batchText + '\n\n';
 
       console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
@@ -6342,10 +6342,10 @@ Output Format:
           // Start scene description + image generation (don't await yet)
           const imagePromise = limit(async () => {
             try {
-              console.log(`🎨 [PAGE ${pageNum}] Generating scene description...`);
+              console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
 
               // Generate detailed scene description (2048 tokens to avoid MAX_TOKENS cutoff)
-              const sceneDescription = await callClaudeAPI(scenePrompt, 2048);
+              const sceneDescription = await callTextModelStreaming(scenePrompt, 2048);
 
               allSceneDescriptions.push({
                 pageNumber: pageNum,
@@ -6481,8 +6481,8 @@ Output Format:
             // Generate scene description using Art Director prompt
             const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc);
 
-            console.log(`🎨 [PAGE ${pageNum}] Generating scene description...`);
-            const sceneDescription = await callClaudeAPI(scenePrompt, 2048);
+            console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
+            const sceneDescription = await callTextModelStreaming(scenePrompt, 2048);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
