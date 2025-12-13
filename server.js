@@ -6819,6 +6819,10 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
     throw new Error('Anthropic API key not configured (ANTHROPIC_API_KEY)');
   }
 
+  // Calculate timeout based on expected tokens (larger requests need more time)
+  // Base: 60 seconds + 2 seconds per 1000 tokens (25000 tokens = ~110 seconds)
+  const timeoutMs = Math.max(120000, 60000 + Math.ceil(maxTokens / 1000) * 2000);
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -6833,7 +6837,8 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
         role: 'user',
         content: prompt
       }]
-    })
+    }),
+    signal: AbortSignal.timeout(timeoutMs)  // Dynamic timeout based on token count
   });
 
   if (!response.ok) {
