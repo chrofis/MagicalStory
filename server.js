@@ -7120,12 +7120,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const requestBody = {
     contents: [{
       parts: parts
-    }],
-    generation_config: {
-      aspect_ratio: "1:1",
-      temperature: 0.5,
-      number_of_images: 1
-    }
+    }]
   };
 
   console.log('🖼️  [IMAGE GEN] Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
