@@ -1,9 +1,19 @@
+Create a dedication page illustration for a children's book.
+
 {INITIAL_PAGE_SCENE}
 
 Style: {STYLE_DESCRIPTION}.
 
 {CHARACTER_INFO}
 
-CRITICAL: Include ONLY this exact text in the image: "{DEDICATION}"
+**STYLE TRANSFORMATION:**
+- Reference images show REAL PHOTOGRAPHS of people
+- Transform these people into the requested art style
+- Characters must be RECOGNIZABLE but in the artistic style
+- ALL characters must have the SAME consistent art style
 
-Do not add any other text. Only "{DEDICATION}" must appear. No additional words allowed.
+**TEXT REQUIREMENT - CRITICAL:**
+The image MUST include this exact dedication text: "{DEDICATION}"
+- Make the dedication text elegant and readable
+- Position it prominently in the image
+- Do NOT add any other text - ONLY the dedication text above

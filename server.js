@@ -216,7 +216,7 @@ function buildCharacterPhysicalDescription(char) {
   let description = `${char.name} is a ${age}-year-old ${genderLabel}`;
 
   if (char.height) {
-    description += `, ${char.height}`;
+    description += `, ${char.height} cm tall`;
   }
   if (char.build) {
     description += `, ${char.build} build`;

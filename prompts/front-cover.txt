@@ -1,12 +1,25 @@
+Create a front cover illustration for a children's book.
+
 {TITLE_PAGE_SCENE}
 
 Style: {STYLE_DESCRIPTION}.
 
 {CHARACTER_INFO}
 
-Create this as a beautiful title page illustration for the children's book "{STORY_TITLE}".
+**STYLE TRANSFORMATION:**
+- Reference images show REAL PHOTOGRAPHS of people
+- Transform these people into the requested art style
+- Characters must be RECOGNIZABLE but in the artistic style
+- ALL characters must have the SAME consistent art style
 
 IMPORTANT:
 - The MAIN CHARACTER(S) must be the LARGEST figures in the image, positioned CENTRALLY and prominently featured.
 - Supporting characters may appear smaller, in the background, or at the sides.
-- The image should include the story title "{STORY_TITLE}" integrated beautifully into the illustration. Make the title prominent and visually appealing as part of the cover art.
+
+**TEXT REQUIREMENT - CRITICAL:**
+The image MUST include this exact title text: "{STORY_TITLE}"
+- Make the title PROMINENT and highly visible
+- Integrate the title beautifully into the illustration
+- Use an attractive, readable font style that fits the art style
+- Position the title where it is clearly legible (typically top or center)
+- The title is the ONLY text that should appear in the image

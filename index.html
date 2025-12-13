@@ -1756,6 +1756,25 @@ Be specific and creative. Each scene description should paint a clear picture fo
         setTimeout(() => handleRedirectResult(), 500);
       }, []);
 
+      // Firebase Auth State Listener - catches sign-in even if getRedirectResult fails
+      // This is the recommended approach for signInWithRedirect
+      React.useEffect(() => {
+        const unsubscribe = firebaseAuth.onAuthStateChanged(async (firebaseUser) => {
+          // Only process if we have a Firebase user but NOT already authenticated in our app
+          if (firebaseUser && !isAuthenticated && !authToken) {
+            console.log('📱 Firebase onAuthStateChanged: User detected, completing login...');
+            try {
+              await handleFirebaseAuth(firebaseUser);
+            } catch (err) {
+              console.error('📱 onAuthStateChanged auth error:', err);
+            }
+          }
+        });
+
+        // Cleanup listener on unmount
+        return () => unsubscribe();
+      }, [isAuthenticated, authToken]);
+
       // Google Sign-In
       const handleGoogleSignIn = async () => {
         setAuthError('');
@@ -2915,7 +2934,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
 
         // Add physical attributes if available
         if (character.height) {
-          description += `, ${character.height}`;
+          description += `, ${character.height} cm tall`;
         }
         if (character.build) {
           description += `, ${character.build} build`;
@@ -4205,7 +4224,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
                 // Build comprehensive physical description
                 let physicalDesc = '';
-                if (char.height) physicalDesc += `Height: ${char.height}, `;
+                if (char.height) physicalDesc += `Height: ${char.height} cm, `;
                 if (char.build) physicalDesc += `Build: ${char.build}, `;
                 if (char.otherFeatures) physicalDesc += char.otherFeatures;
                 if (!physicalDesc) physicalDesc = '3D character';
@@ -7173,19 +7192,19 @@ Return ONLY valid JSON, no markdown or other text.`
                 }
 
                 setCurrentCharacter(prev => {
-                  // Gender priority: user setting > name detection > image detection
-                  // Only use image-detected gender if current gender is 'other' or empty
+                  // Priority: user setting > image detection
+                  // Only use image-detected values if user hasn't set them
                   const shouldUseImageGender = !prev.gender || prev.gender === 'other';
-                  const newGender = shouldUseImageGender
-                    ? (primaryTraits.gender || prev.gender)
-                    : prev.gender;
+                  const shouldUseImageAge = !prev.age || prev.age === '';
+                  const shouldUseImageHeight = !prev.height || prev.height === '';
+                  const shouldUseImageBuild = !prev.build || prev.build === '';
 
                   return {
                     ...prev,
-                    gender: newGender,
-                    age: primaryTraits.age || prev.age,
-                    height: primaryTraits.height || prev.height,
-                    build: primaryTraits.build || prev.build,
+                    gender: shouldUseImageGender ? (primaryTraits.gender || prev.gender) : prev.gender,
+                    age: shouldUseImageAge ? (primaryTraits.age || prev.age) : prev.age,
+                    height: shouldUseImageHeight ? (primaryTraits.height || prev.height) : prev.height,
+                    build: shouldUseImageBuild ? (primaryTraits.build || prev.build) : prev.build,
                     hairColor: primaryTraits.hairColor || prev.hairColor,
                     clothing: primaryTraits.clothing || prev.clothing,
                     otherFeatures: primaryTraits.otherFeatures || prev.otherFeatures,
