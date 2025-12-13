@@ -6376,8 +6376,8 @@ async function processStoryJob(jobId) {
       console.log(`📚 [PIPELINE] Using configured batch size: ${BATCH_SIZE} pages per batch`);
     } else {
       // Auto-calculate optimal batch size based on model token limits
-      // Picture book uses ~500 tokens per scene, Standard uses ~1000 tokens per scene
-      const tokensPerScene = isPictureBook ? 500 : 1000;
+      // Use same token estimates as actual generation to avoid truncation
+      const tokensPerScene = isPictureBook ? 2000 : 5000;
       BATCH_SIZE = calculateOptimalBatchSize(sceneCount, tokensPerScene, 0.8);
       console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} scenes per batch (model: ${TEXT_MODEL}, ${tokensPerScene} tokens/scene, max tokens: ${activeTextModel.maxOutputTokens})`);
     }

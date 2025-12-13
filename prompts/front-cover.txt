@@ -12,9 +12,12 @@ Style: {STYLE_DESCRIPTION}.
 - Characters must be RECOGNIZABLE but in the artistic style
 - ALL characters must have the SAME consistent art style
 
-IMPORTANT:
-- The MAIN CHARACTER(S) must be the LARGEST figures in the image, positioned CENTRALLY and prominently featured.
-- Supporting characters may appear smaller, in the background, or at the sides.
+**CHARACTER COMPOSITION - CRITICAL:**
+- The MAIN CHARACTER must be the STAR of this image - LARGE, CENTRAL, and prominently featured
+- Include MINIMAL other characters (ideally 0-2 supporting characters only)
+- If supporting characters appear, they should be SMALLER, in the background, or partially visible
+- This is the MAIN CHARACTER'S spotlight moment - they should dominate the image
+- The main character should take up at least 40-50% of the image area
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact title text: "{STORY_TITLE}"

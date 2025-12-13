@@ -12,6 +12,13 @@ Style: {STYLE_DESCRIPTION}.
 - Characters must be RECOGNIZABLE but in the artistic style
 - ALL characters must have the SAME consistent art style
 
+**CHARACTER COMPOSITION - CRITICAL:**
+- Include ALL characters from the story in this image
+- The MAIN CHARACTER should be positioned in the CENTER of the group
+- All other characters should be arranged AROUND the main character
+- Everyone should be clearly visible and recognizable
+- This is a GROUP scene that introduces all the story's characters together
+
 IMPORTANT:
 - This image should contain NO TEXT at all
 - Create a purely visual, atmospheric illustration that sets the mood for the story
