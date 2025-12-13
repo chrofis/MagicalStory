@@ -9258,7 +9258,8 @@ Return ONLY valid JSON, no markdown or other text.`
               <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                 <Icon name="book" size={24} /> Cover Pages
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* First row: Front Cover and Initial Page */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Front Cover */}
                 {(coverImages.frontCover || coverImagePrompts.frontCover) && (
                   <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
@@ -9313,6 +9314,17 @@ Return ONLY valid JSON, no markdown or other text.`
                           {t.applyEdit}
                         </button>
                       </div>
+                    )}
+
+                    {developerMode && coverSceneDescriptions.titlePage && (
+                      <details className="bg-green-50 border border-green-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
+                          {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                        </summary>
+                        <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                          {coverSceneDescriptions.titlePage}
+                        </pre>
+                      </details>
                     )}
 
                     {developerMode && coverImagePrompts.frontCover && (
@@ -9420,6 +9432,17 @@ Return ONLY valid JSON, no markdown or other text.`
                       </div>
                     )}
 
+                    {developerMode && coverSceneDescriptions.initialPage && (
+                      <details className="bg-green-50 border border-green-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
+                          {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                        </summary>
+                        <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                          {coverSceneDescriptions.initialPage}
+                        </pre>
+                      </details>
+                    )}
+
                     {developerMode && coverImagePrompts.initialPage && (
                       <details className="bg-gray-50 border border-gray-300 rounded-lg p-3 mb-2">
                         <summary className="cursor-pointer text-sm font-semibold text-gray-800 hover:text-gray-900">
@@ -9470,7 +9493,10 @@ Return ONLY valid JSON, no markdown or other text.`
                     )}
                   </div>
                 )}
+              </div>
 
+              {/* Second row: Back Cover */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                 {/* Back Cover */}
                 {(coverImages.backCover || coverImagePrompts.backCover) && (
                   <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
@@ -9523,6 +9549,17 @@ Return ONLY valid JSON, no markdown or other text.`
                           {t.applyEdit}
                         </button>
                       </div>
+                    )}
+
+                    {developerMode && coverSceneDescriptions.backCover && (
+                      <details className="bg-green-50 border border-green-300 rounded-lg p-3 mb-2">
+                        <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
+                          {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                        </summary>
+                        <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                          {coverSceneDescriptions.backCover}
+                        </pre>
+                      </details>
                     )}
 
                     {developerMode && coverImagePrompts.backCover && (
