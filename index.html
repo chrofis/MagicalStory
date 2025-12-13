@@ -780,6 +780,8 @@
       const [adminUsers, setAdminUsers] = useState([]);
       const [orphanedData, setOrphanedData] = useState(null);
       const [isCheckingOrphaned, setIsCheckingOrphaned] = useState(false);
+      const [orphanedJobs, setOrphanedJobs] = useState(null);
+      const [isCheckingOrphanedJobs, setIsCheckingOrphanedJobs] = useState(false);
       const [apiKey, setApiKey] = useState('');
       const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false);
       const [tempApiKey, setTempApiKey] = useState('');
@@ -2095,6 +2097,77 @@ Be specific and creative. Each scene description should paint a clear picture fo
           alert('Error deleting orphaned data');
         } finally {
           setIsCheckingOrphaned(false);
+        }
+      };
+
+      // Orphaned story_jobs functions
+      const checkOrphanedJobs = async () => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        setIsCheckingOrphanedJobs(true);
+        try {
+          const response = await fetch(`${API_URL}/api/admin/cleanup-orphaned-jobs`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ action: 'check' })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setOrphanedJobs(data);
+          } else {
+            console.error('Failed to check orphaned jobs');
+            setOrphanedJobs(null);
+          }
+        } catch (err) {
+          console.error('Error checking orphaned jobs:', err);
+          setOrphanedJobs(null);
+        } finally {
+          setIsCheckingOrphanedJobs(false);
+        }
+      };
+
+      const deleteOrphanedJobs = async () => {
+        if (!authToken || !currentUser || currentUser.role !== 'admin') return;
+
+        const confirmMsg = language === 'de'
+          ? 'Möchten Sie wirklich alle verwaisten Jobs löschen?'
+          : language === 'fr'
+          ? 'Voulez-vous vraiment supprimer tous les jobs orphelins ?'
+          : 'Are you sure you want to delete all orphaned jobs?';
+
+        if (!confirm(confirmMsg)) return;
+
+        setIsCheckingOrphanedJobs(true);
+        try {
+          const response = await fetch(`${API_URL}/api/admin/cleanup-orphaned-jobs`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ action: 'delete' })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            alert(language === 'de'
+              ? `${data.deleted} verwaiste Jobs gelöscht`
+              : language === 'fr'
+              ? `${data.deleted} jobs orphelins supprimés`
+              : `Deleted ${data.deleted} orphaned jobs`);
+            await checkOrphanedJobs();
+          } else {
+            alert('Failed to delete orphaned jobs');
+          }
+        } catch (err) {
+          console.error('Error deleting orphaned jobs:', err);
+          alert('Error deleting orphaned jobs');
+        } finally {
+          setIsCheckingOrphanedJobs(false);
         }
       };
 
@@ -10367,6 +10440,83 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
                       {orphanedData.characters === 0 && orphanedData.stories === 0 && (
                         <div className="text-center text-green-600 font-semibold py-2">
                           ✅ {language === 'de' ? 'Keine verwaisten Daten gefunden!' : language === 'fr' ? 'Aucune donnée orpheline trouvée !' : 'No orphaned data found!'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Orphaned Story Jobs */}
+                <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-purple-900">
+                      {language === 'de' ? 'Verwaiste Story-Jobs' : language === 'fr' ? 'Jobs orphelins' : 'Orphaned Story Jobs'}
+                    </h3>
+                    <button
+                      onClick={checkOrphanedJobs}
+                      disabled={isCheckingOrphanedJobs}
+                      className="bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 text-sm disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <span>🔍</span>
+                      {isCheckingOrphanedJobs
+                        ? (language === 'de' ? 'Prüfe...' : language === 'fr' ? 'Vérification...' : 'Checking...')
+                        : (language === 'de' ? 'Prüfen' : language === 'fr' ? 'Vérifier' : 'Check')}
+                    </button>
+                  </div>
+
+                  {orphanedJobs === null ? (
+                    <p className="text-gray-500 text-center py-4">
+                      {language === 'de'
+                        ? 'Klicken Sie auf "Prüfen", um nach verwaisten Jobs zu suchen'
+                        : language === 'fr'
+                        ? 'Cliquez sur "Vérifier" pour rechercher les jobs orphelins'
+                        : 'Click "Check" to scan for orphaned story jobs (jobs without matching stories)'}
+                    </p>
+                  ) : (
+                    <div>
+                      <div className="bg-white p-4 rounded-lg border border-purple-300 mb-4">
+                        <div className="text-3xl font-bold text-purple-600">{orphanedJobs.count}</div>
+                        <div className="text-sm text-gray-500">
+                          {language === 'de' ? 'Verwaiste Jobs' : language === 'fr' ? 'Jobs orphelins' : 'Orphaned Jobs'}
+                        </div>
+                      </div>
+
+                      {orphanedJobs.count > 0 && (
+                        <>
+                          <div className="max-h-40 overflow-y-auto mb-4 text-xs bg-white rounded border p-2">
+                            {orphanedJobs.jobs.slice(0, 10).map((job, idx) => (
+                              <div key={idx} className="py-1 border-b border-gray-100 last:border-0">
+                                <span className="font-mono text-gray-600">{job.id.substring(0, 8)}...</span>
+                                <span className="ml-2 text-gray-500">{job.username || 'Unknown'}</span>
+                                <span className={`ml-2 px-1 rounded text-white ${
+                                  job.status === 'completed' ? 'bg-green-500' :
+                                  job.status === 'failed' ? 'bg-red-500' :
+                                  job.status === 'processing' ? 'bg-blue-500' : 'bg-gray-500'
+                                }`}>{job.status}</span>
+                                <span className="ml-2 text-gray-400">{new Date(job.createdAt).toLocaleDateString()}</span>
+                              </div>
+                            ))}
+                            {orphanedJobs.count > 10 && (
+                              <div className="text-center text-gray-400 pt-2">...and {orphanedJobs.count - 10} more</div>
+                            )}
+                          </div>
+                          <button
+                            onClick={deleteOrphanedJobs}
+                            disabled={isCheckingOrphanedJobs}
+                            className="w-full bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 font-semibold disabled:opacity-50"
+                          >
+                            {language === 'de'
+                              ? 'Alle verwaisten Jobs löschen'
+                              : language === 'fr'
+                              ? 'Supprimer tous les jobs orphelins'
+                              : 'Delete All Orphaned Jobs'}
+                          </button>
+                        </>
+                      )}
+
+                      {orphanedJobs.count === 0 && (
+                        <div className="text-center text-green-600 font-semibold py-2">
+                          ✅ {language === 'de' ? 'Keine verwaisten Jobs gefunden!' : language === 'fr' ? 'Aucun job orphelin trouvé !' : 'No orphaned jobs found!'}
                         </div>
                       )}
                     </div>

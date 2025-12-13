@@ -4106,6 +4106,78 @@ app.post('/api/admin/cleanup-orphaned-data', authenticateToken, async (req, res)
   }
 });
 
+// Cleanup orphaned story_jobs (jobs without matching stories)
+app.post('/api/admin/cleanup-orphaned-jobs', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(400).json({ error: 'This operation is only available in database mode' });
+    }
+
+    console.log('🔍 Checking for orphaned story_jobs...');
+
+    // Find orphaned jobs (jobs without matching stories)
+    const orphanedJobsResult = await dbPool.query(`
+      SELECT sj.id, sj.user_id, sj.status, sj.created_at, sj.updated_at,
+             sj.progress, sj.progress_message, u.username
+      FROM story_jobs sj
+      LEFT JOIN users u ON sj.user_id = u.id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM stories s WHERE s.id = sj.id
+      )
+      ORDER BY sj.created_at DESC
+      LIMIT 100
+    `);
+
+    const orphanedJobs = orphanedJobsResult.rows;
+    console.log(`Found ${orphanedJobs.length} orphaned story_jobs`);
+
+    const { action } = req.body;
+    if (action === 'delete') {
+      console.log('🗑️  Deleting orphaned story_jobs...');
+
+      const deleteResult = await dbPool.query(`
+        DELETE FROM story_jobs
+        WHERE NOT EXISTS (
+          SELECT 1 FROM stories s WHERE s.id = story_jobs.id
+        )
+      `);
+
+      console.log(`✓ Deleted ${deleteResult.rowCount} orphaned story_jobs`);
+
+      res.json({
+        success: true,
+        action: 'deleted',
+        deleted: deleteResult.rowCount
+      });
+    } else {
+      // Return list of orphaned jobs
+      res.json({
+        success: true,
+        action: 'check',
+        count: orphanedJobs.length,
+        jobs: orphanedJobs.map(j => ({
+          id: j.id,
+          userId: j.user_id,
+          username: j.username,
+          status: j.status,
+          progress: j.progress,
+          progressMessage: j.progress_message,
+          createdAt: j.created_at,
+          updatedAt: j.updated_at
+        })),
+        message: 'Use action=delete to remove orphaned jobs'
+      });
+    }
+  } catch (err) {
+    console.error('Error cleaning orphaned jobs:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get all orders (admin only) - for tracking fulfillment and catching failures
 app.get('/api/admin/orders', authenticateToken, async (req, res) => {
   try {
@@ -5784,12 +5856,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
     // Generate images if not skipped
     if (!skipImages) {
-      const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
+      // Note: imageGenMode and MAX_RETRIES already defined above for streaming
       console.log(`🖼️  [STORYBOOK] Image generation mode: ${imageGenMode.toUpperCase()}`);
 
-      const MAX_RETRIES = 2;
-
-      // Helper function to generate a single image
+      // Helper function to generate a single image (used for sequential mode)
       const generateImage = async (scene, idx, previousImage = null, isSequential = false) => {
         const pageNum = scene.pageNumber;
         try {
@@ -5865,20 +5935,37 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         console.log(`🚀 [STORYBOOK] All ${allImages.length} images generated (SEQUENTIAL MODE)!`);
       } else {
-        // PARALLEL MODE: Generate all images concurrently (max 5 at a time)
-        console.log(`⚡ [STORYBOOK] Starting PARALLEL image generation for ${allSceneDescriptions.length} scenes...`);
-        const limit = pLimit(5);
+        // PARALLEL MODE: Wait for streaming images first, then generate any missing scenes
+        console.log(`⚡ [STORYBOOK] Waiting for ${streamingImagePromises.length} images started during streaming...`);
 
-        const imagePromises = allSceneDescriptions.map((scene, idx) => {
-          return limit(() => generateImage(scene, idx, null));
-        });
+        // Wait for all images that were started during streaming
+        if (streamingImagePromises.length > 0) {
+          const streamingResults = await Promise.all(streamingImagePromises);
+          streamingResults.forEach(img => {
+            if (img) allImages.push(img);
+          });
+          console.log(`✅ [STORYBOOK] ${allImages.length} streaming images complete`);
+        }
 
-        const imageResults = await Promise.all(imagePromises);
-        imageResults.forEach(img => {
-          if (img) allImages.push(img);
-        });
+        // Find any scenes that weren't processed during streaming (last scene might be missed)
+        const processedPages = new Set(allImages.map(img => img.pageNumber));
+        const missingScenes = allSceneDescriptions.filter(scene => !processedPages.has(scene.pageNumber));
 
-        console.log(`🚀 [STORYBOOK] All ${allImages.length} images generated (PARALLEL MODE)!`);
+        if (missingScenes.length > 0) {
+          console.log(`⚡ [STORYBOOK] Generating ${missingScenes.length} remaining images...`);
+          const limit = pLimit(5);
+
+          const remainingPromises = missingScenes.map((scene) => {
+            return limit(() => generateImageForScene(scene.pageNumber, scene.description));
+          });
+
+          const remainingResults = await Promise.all(remainingPromises);
+          remainingResults.forEach(img => {
+            if (img) allImages.push(img);
+          });
+        }
+
+        console.log(`🚀 [STORYBOOK] All ${allImages.length} images generated (PARALLEL MODE with streaming)!`);
       }
 
       // Sort images by page number
