@@ -6372,10 +6372,11 @@ async function processStoryJob(jobId) {
       console.log(`📚 [PIPELINE] Using configured batch size: ${BATCH_SIZE} pages per batch`);
     } else {
       // Auto-calculate optimal batch size based on model token limits
-      // Use same token estimates as actual generation to avoid truncation
+      // Calculate batch size for progressive display - use conservative estimate
+      // Each batch gets full model capacity, so batch size just affects how often we show progress
       const tokensPerScene = isPictureBook ? 2000 : 5000;
-      BATCH_SIZE = calculateOptimalBatchSize(sceneCount, tokensPerScene, 0.8);
-      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} scenes per batch (model: ${TEXT_MODEL}, ${tokensPerScene} tokens/scene, max tokens: ${activeTextModel.maxOutputTokens})`);
+      BATCH_SIZE = calculateOptimalBatchSize(sceneCount, tokensPerScene, 1.0); // Full capacity
+      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} scenes per batch (model: ${TEXT_MODEL}, max tokens: ${activeTextModel.maxOutputTokens})`);
     }
     const numBatches = Math.ceil(sceneCount / BATCH_SIZE);
 
@@ -6427,14 +6428,11 @@ Output Format:
 
 ...continue until page ${endScene}...`;
 
-      // Calculate tokens needed based on batch size
-      // Use generous token allocation - we have models with 64000+ output capacity
-      // Standard mode needs more tokens per page for detailed storytelling
+      // Use the full model capacity - no artificial limits
+      // Claude stops naturally when done (end_turn), we only pay for tokens actually used
       const batchSceneCount = endScene - startScene + 1;
-      const tokensPerPage = isPictureBook ? 2000 : 5000; // Generous allocation to avoid truncation
-      const maxSafeTokens = Math.floor(activeTextModel.maxOutputTokens * 0.8); // 80% of model max
-      const batchTokensNeeded = Math.min(batchSceneCount * tokensPerPage, maxSafeTokens);
-      console.log(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} tokens for ${batchSceneCount} pages (${tokensPerPage} tokens/page) - STREAMING`);
+      const batchTokensNeeded = activeTextModel.maxOutputTokens; // Use full capacity (64000)
+      console.log(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} max tokens for ${batchSceneCount} pages - STREAMING`);
       const batchText = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
       fullStoryText += batchText + '\n\n';
 
