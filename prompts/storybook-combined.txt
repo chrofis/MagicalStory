@@ -93,6 +93,13 @@ Mood: [Happy, content, peaceful, hopeful]
 - Keep interactions simple and positive
 - Focus on 1-2 characters per page for clear illustrations
 
+**CHARACTER RULES - CRITICAL:**
+- ALWAYS refer to characters BY THEIR EXACT NAME in scene descriptions
+- NEVER use generic terms like "the family", "everyone", "the group", "the children", "the parents"
+- If the story mentions a group doing something, pick 1-2 key characters to focus on in the scene
+- Every character in a scene description MUST be named explicitly
+- Fewer characters = better illustration quality
+
 # Important
 
 - You MUST include ALL sections: TITLE PAGE, INITIAL PAGE, PAGE 1 through PAGE {PAGES}, and BACK COVER
