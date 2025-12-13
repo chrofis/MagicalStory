@@ -10,8 +10,17 @@ Scene Description: {SCENE_DESCRIPTION}
 - But rendered in the artistic style - NOT photo-realistic copies
 - ALL characters must have the SAME consistent art style
 
+**CLOTHING & APPEARANCE:**
+- Character FACES, HAIR, and BODY PROPORTIONS must match reference images exactly
+- Clothing should be APPROPRIATE TO THE SCENE CONTEXT:
+  - Winter/snow scenes → warm clothing (coats, boots, hats)
+  - Beach/summer scenes → light clothing (shorts, dresses, sandals)
+  - Formal events → dressy attire
+  - Bedtime scenes → pajamas
+- Maintain consistent COLOR PREFERENCES when adapting clothing (if character wears blue in reference, use blue tones)
+- Signature accessories (glasses, favorite hat, necklace) should remain consistent across scenes
+
 Important:
-- Keep clothing as described, adapted to the art style
 - Focus on a **clear, uncluttered composition** that highlights the main subjects and action
 - Capture the emotion and narrative of the scene vividly
 - **No text, watermarks, or extraneous elements** should be present in the image
