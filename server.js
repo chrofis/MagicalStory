@@ -2202,7 +2202,7 @@ app.post('/api/characters', authenticateToken, async (req, res) => {
 });
 
 // Story draft endpoints - persist story settings before generation
-// This saves step 1 (storyType, artStyle) and step 4 (storyDetails, dedication, pageCount, languageLevel, mainCharacters) data
+// This saves step 1 (storyType, artStyle) and step 4 (storyDetails, dedication, pages, languageLevel, mainCharacters) data
 app.get('/api/story-draft', authenticateToken, async (req, res) => {
   try {
     let draftData = {
@@ -2210,7 +2210,7 @@ app.get('/api/story-draft', authenticateToken, async (req, res) => {
       artStyle: 'pixar',
       storyDetails: '',
       dedication: '',
-      pageCount: 24,
+      pages: 30,
       languageLevel: 'standard',
       mainCharacters: []
     };
@@ -2242,14 +2242,14 @@ app.get('/api/story-draft', authenticateToken, async (req, res) => {
 
 app.post('/api/story-draft', authenticateToken, async (req, res) => {
   try {
-    const { storyType, artStyle, storyDetails, dedication, pageCount, languageLevel, mainCharacters } = req.body;
+    const { storyType, artStyle, storyDetails, dedication, pages, languageLevel, mainCharacters } = req.body;
 
     const draftData = {
       storyType: storyType || '',
       artStyle: artStyle || 'pixar',
       storyDetails: storyDetails || '',
       dedication: dedication || '',
-      pageCount: pageCount || 24,
+      pages: pages || 30,
       languageLevel: languageLevel || 'standard',
       mainCharacters: mainCharacters || [],
       updatedAt: new Date().toISOString()

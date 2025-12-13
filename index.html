@@ -1388,7 +1388,7 @@
             artStyle,
             storyDetails: storyDetails?.substring(0, 50) + '...',
             dedication: dedication?.substring(0, 30) + '...',
-            pageCount,
+            pages,
             languageLevel,
             mainCharactersCount: mainCharacters.length
           });
@@ -1397,14 +1397,14 @@
             artStyle,
             storyDetails,
             dedication,
-            pageCount,
+            pages,
             languageLevel,
             mainCharacters
           });
         }, 1500); // Debounce for 1.5 seconds
 
         return () => clearTimeout(timeoutId);
-      }, [storyType, artStyle, storyDetails, dedication, pageCount, languageLevel, mainCharacters, authToken, isLoadingDraft]);
+      }, [storyType, artStyle, storyDetails, dedication, pages, languageLevel, mainCharacters, authToken, isLoadingDraft]);
 
       // Update prompt when returning to step 4 with prompt visible
       useEffect(() => {
@@ -2675,7 +2675,7 @@ Be specific and creative. Each scene description should paint a clear picture fo
             if (data.artStyle) setArtStyle(data.artStyle);
             if (data.storyDetails) setStoryDetails(data.storyDetails);
             if (data.dedication) setDedication(data.dedication);
-            if (data.pageCount) setPageCount(data.pageCount);
+            if (data.pages) setPages(data.pages);
             if (data.languageLevel) setLanguageLevel(data.languageLevel);
             if (data.mainCharacters && data.mainCharacters.length > 0) {
               setMainCharacters(data.mainCharacters);
