@@ -250,6 +250,7 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.imageGenerationSequentialDe = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-de.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGenerationSequentialFr = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-fr.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
+    PROMPT_TEMPLATES.coverImageEvaluation = await fs.readFile(path.join(promptsDir, 'cover-image-evaluation.txt'), 'utf-8');
     PROMPT_TEMPLATES.frontCover = await fs.readFile(path.join(promptsDir, 'front-cover.txt'), 'utf-8');
     PROMPT_TEMPLATES.initialPageWithDedication = await fs.readFile(path.join(promptsDir, 'initial-page-with-dedication.txt'), 'utf-8');
     PROMPT_TEMPLATES.initialPageNoDedication = await fs.readFile(path.join(promptsDir, 'initial-page-no-dedication.txt'), 'utf-8');
@@ -2820,8 +2821,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       }
     }
 
-    // Generate new cover
-    const coverResult = await callGeminiAPIForImage(coverPrompt, characterPhotos);
+    // Generate new cover (use 'cover' evaluation for text-focused quality check)
+    const coverResult = await callGeminiAPIForImage(coverPrompt, characterPhotos, null, 'cover');
 
     // Update the cover in story data with new structure including quality
     storyData.coverImages = storyData.coverImages || {};
@@ -6174,7 +6175,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           STORY_TITLE: storyTitle
         });
         coverPrompts.frontCover = frontCoverPrompt;
-        const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos);
+        const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos, null, 'cover');
         coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
 
         // Initial page - use same templates as standard mode
@@ -6197,7 +6198,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               STORY_TITLE: storyTitle
             });
         coverPrompts.initialPage = initialPrompt;
-        const initialResult = await callGeminiAPIForImage(initialPrompt, initialPagePhotos);
+        const initialResult = await callGeminiAPIForImage(initialPrompt, initialPagePhotos, null, 'cover');
         coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
 
         // Back cover - use same template as standard mode
@@ -6212,7 +6213,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           CHARACTER_INFO: characterInfo
         });
         coverPrompts.backCover = backCoverPrompt;
-        const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, backCoverPhotos);
+        const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, backCoverPhotos, null, 'cover');
         coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
 
         console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
@@ -6813,7 +6814,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           STORY_TITLE: storyTitle
         });
         coverPrompts.frontCover = frontCoverPrompt;
-        frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos);
+        frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos, null, 'cover');
         console.log(`✅ [PIPELINE] Front cover generated successfully`);
         // Save checkpoint: front cover
         await saveCheckpoint(jobId, 'cover', { type: 'front', prompt: frontCoverPrompt }, 0);
@@ -6843,7 +6844,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               STORY_TITLE: storyTitle
             });
         coverPrompts.initialPage = initialPagePrompt;
-        initialPageResult = await callGeminiAPIForImage(initialPagePrompt, initialPagePhotos);
+        initialPageResult = await callGeminiAPIForImage(initialPagePrompt, initialPagePhotos, null, 'cover');
         console.log(`✅ [PIPELINE] Initial page generated successfully`);
         // Save checkpoint: initial page cover
         await saveCheckpoint(jobId, 'cover', { type: 'initialPage', prompt: initialPagePrompt }, 1);
@@ -6865,7 +6866,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           CHARACTER_INFO: characterInfo
         });
         coverPrompts.backCover = backCoverPrompt;
-        backCoverResult = await callGeminiAPIForImage(backCoverPrompt, backCoverPhotos);
+        backCoverResult = await callGeminiAPIForImage(backCoverPrompt, backCoverPhotos, null, 'cover');
         console.log(`✅ [PIPELINE] Back cover generated successfully`);
         // Save checkpoint: back cover
         await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
@@ -7626,9 +7627,10 @@ async function compressImageToJPEG(pngBase64) {
  * @param {string} imageData - Base64 encoded image with data URI prefix
  * @param {string} originalPrompt - The prompt used to generate the image
  * @param {string[]} referenceImages - Reference images used for generation
+ * @param {string} evaluationType - Type of evaluation: 'scene' (default) or 'cover' (text-focused)
  * @returns {Promise<number>} Quality score from 0-100
  */
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = []) {
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene') {
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -7642,9 +7644,22 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Use prompt template if available, with placeholder replacement
-    const evaluationPrompt = PROMPT_TEMPLATES.imageEvaluation
-      ? fillTemplate(PROMPT_TEMPLATES.imageEvaluation, { ORIGINAL_PROMPT: originalPrompt })
+    // Select evaluation prompt based on type
+    // Cover images use text-focused evaluation (automatic 0 for text errors)
+    // Scene images use standard character/style evaluation
+    let evaluationTemplate;
+    if (evaluationType === 'cover' && PROMPT_TEMPLATES.coverImageEvaluation) {
+      evaluationTemplate = PROMPT_TEMPLATES.coverImageEvaluation;
+      log.verbose('⭐ [QUALITY] Using COVER evaluation (text-focused)');
+    } else if (PROMPT_TEMPLATES.imageEvaluation) {
+      evaluationTemplate = PROMPT_TEMPLATES.imageEvaluation;
+      log.verbose('⭐ [QUALITY] Using SCENE evaluation (standard)');
+    } else {
+      evaluationTemplate = null;
+    }
+
+    const evaluationPrompt = evaluationTemplate
+      ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: originalPrompt })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
 
     // Build content array with generated image first, then reference images
@@ -7741,7 +7756,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
   }
 }
 
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene') {
   // Check cache first (include previousImage presence in cache key for sequential mode)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
@@ -7870,8 +7885,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const compressedImageData = await compressImageToJPEG(pngImageData);
 
         // Evaluate image quality with prompt and reference images
-        console.log('⭐ [QUALITY] Evaluating image quality...');
-        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos);
+        console.log(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...`);
+        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType);
 
         // Extract score and reasoning from quality result
         const score = qualityResult ? qualityResult.score : null;
