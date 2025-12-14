@@ -7073,6 +7073,18 @@ async function processStoryJob(jobId) {
 
       // Generate story text for this batch
       const basePrompt = buildBasePrompt(inputData);
+
+      // Get reading level for this language level
+      const languageLevelDescriptions = {
+        '1st-grade': { description: 'Simple words and very short sentences for early readers', pageLength: '2-3 sentences per page (approximately 20-35 words)' },
+        'standard': { description: 'Age-appropriate vocabulary for elementary school children', pageLength: '6-8 sentences per page (approximately 50-80 words)' },
+        'advanced': { description: 'More complex vocabulary and varied sentence structure for advanced readers', pageLength: '10-14 sentences per page (approximately 100-170 words)' }
+      };
+      const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
+      const readingLevel = `${levelInfo.description}. ${levelInfo.pageLength}`;
+
+      console.log(`📝 [BATCH ${batchNum + 1}] Reading level: ${inputData.languageLevel || 'standard'} - ${readingLevel}`);
+
       const batchPrompt = PROMPT_TEMPLATES.storyTextBatch
         ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
             BASE_PROMPT: basePrompt,
@@ -7080,6 +7092,7 @@ async function processStoryJob(jobId) {
             PAGES: sceneCount,
             START_PAGE: startScene,
             END_PAGE: endScene,
+            READING_LEVEL: readingLevel,
             INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning.' : 'Start directly with the page content (no title/dedication).'
           })
         : `${basePrompt}

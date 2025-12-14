@@ -20,10 +20,17 @@ Your task is to create a compelling, well-structured story outline that will gui
 - **Target Age**: {AGE_FROM}-{AGE_TO} years
 - **Length**: {PAGES} pages
 - **Language**: {LANGUAGE} (NOTE: If German, use ä, ö, ü normally. Do not use ß, use ss instead)
+- **Reading Level**: {READING_LEVEL}
 - **Story Type**: {STORY_TYPE}
 - **Story Details**: {STORY_DETAILS}
 - **Dedication**: {DEDICATION}
 - **Characters**: {CHARACTERS}
+
+# TEXT LENGTH RULES - CRITICAL
+
+**{READING_LEVEL}**
+
+You MUST follow these text length guidelines strictly. Each page's story text must match the reading level specified above. The scene descriptions will be separate from the text, so plan accordingly.
 
 # IMPORTANT: Character Portrayal Guidelines
 

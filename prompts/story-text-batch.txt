@@ -8,6 +8,12 @@ You are an expert children's book writer with deep understanding of age-appropri
 
 Your task is to create a complete, compelling, well-structured story.
 
+# TEXT LENGTH RULES - CRITICAL
+
+**{READING_LEVEL}**
+
+You MUST strictly follow these text length guidelines for EVERY page. Do NOT exceed the word count specified above. This is essential for the final book layout.
+
 # IMPORTANT: Character Portrayal Guidelines
 
 When writing about characters' strengths and weaknesses:
