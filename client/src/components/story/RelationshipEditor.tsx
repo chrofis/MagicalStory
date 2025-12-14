@@ -71,14 +71,14 @@ export function RelationshipEditor({
             return (
               <div
                 key={key}
-                className={`rounded-lg p-3 md:p-4 ${
+                className={`rounded-lg p-2 md:p-3 inline-flex w-auto mx-auto ${
                   isNotKnown
                     ? 'bg-white border-red-500 border-[3px]'
                     : 'bg-blue-50 border-blue-300 border-2'
                 }`}
               >
                 {/* Layout: Character photos on sides, dropdown + details in center */}
-                <div className="flex items-center justify-center gap-2 sm:gap-4 md:gap-6 lg:gap-8">
+                <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-4">
                   {/* Character 1 - Left side */}
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
                     {(char1.thumbnailUrl || char1.photoUrl) && (
