@@ -8,22 +8,33 @@ interface CharacterResponse {
   age: string;
   height?: string;
   build?: string;
+  // Snake_case (new format)
   hair_color?: string;
   other_features?: string;
-  clothing?: string;
   special_details?: string;
-  strengths: string[];
-  flaws?: string[];
-  challenges?: string[];
-  // Legacy fields
-  weaknesses?: string[];
-  fears?: string[];
   photo_url?: string;
   thumbnail_url?: string;
   body_photo_url?: string;
   body_no_bg_url?: string;
   face_box?: { x: number; y: number; width: number; height: number };
   body_box?: { x: number; y: number; width: number; height: number };
+  // CamelCase (old format from database)
+  hairColor?: string;
+  otherFeatures?: string;
+  specialDetails?: string;
+  photoUrl?: string;
+  thumbnailUrl?: string;
+  bodyPhotoUrl?: string;
+  bodyNoBgUrl?: string;
+  faceBox?: { x: number; y: number; width: number; height: number };
+  bodyBox?: { x: number; y: number; width: number; height: number };
+  // Common fields
+  clothing?: string;
+  strengths: string[];
+  flaws?: string[];
+  challenges?: string[];
+  weaknesses?: string[];
+  fears?: string[];
 }
 
 function mapCharacterFromApi(char: CharacterResponse): Character {
@@ -34,22 +45,24 @@ function mapCharacterFromApi(char: CharacterResponse): Character {
     age: char.age,
     height: char.height,
     build: char.build,
-    hairColor: char.hair_color,
-    otherFeatures: char.other_features,
+    // Try snake_case first, fall back to camelCase (old format)
+    hairColor: char.hair_color || char.hairColor,
+    otherFeatures: char.other_features || char.otherFeatures,
     clothing: char.clothing,
-    specialDetails: char.special_details,
+    specialDetails: char.special_details || char.specialDetails,
     strengths: char.strengths || [],
     flaws: char.flaws || char.weaknesses || [],
     challenges: char.challenges || char.fears || [],
     // Legacy fields for backward compatibility
     weaknesses: char.weaknesses || char.flaws || [],
     fears: char.fears || char.challenges || [],
-    photoUrl: char.photo_url,
-    thumbnailUrl: char.thumbnail_url,
-    bodyPhotoUrl: char.body_photo_url,
-    bodyNoBgUrl: char.body_no_bg_url,
-    faceBox: char.face_box,
-    bodyBox: char.body_box,
+    // Try snake_case first, fall back to camelCase (old format)
+    photoUrl: char.photo_url || char.photoUrl,
+    thumbnailUrl: char.thumbnail_url || char.thumbnailUrl,
+    bodyPhotoUrl: char.body_photo_url || char.bodyPhotoUrl,
+    bodyNoBgUrl: char.body_no_bg_url || char.bodyNoBgUrl,
+    faceBox: char.face_box || char.faceBox,
+    bodyBox: char.body_box || char.bodyBox,
   };
 }
 
