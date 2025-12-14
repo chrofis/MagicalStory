@@ -85,8 +85,6 @@ export default function MyStories() {
     }
   };
 
-  console.log('[MyStories] Render - isLoading:', isLoading, 'stories.length:', stories.length, 'isAuthenticated:', isAuthenticated);
-
   if (!isAuthenticated) {
     return <LoadingSpinner fullScreen />;
   }
