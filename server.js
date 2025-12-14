@@ -2913,6 +2913,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       success: true,
       coverType: normalizedCoverType,
       imageData: coverResult.imageData,
+      description: sceneDescription,
+      prompt: coverPrompt,
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning
     });
@@ -3746,12 +3748,16 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
 
 Return a JSON object with this exact structure:
 {
+  "age": "<estimated age as a number, e.g. 8, 25, 45>",
+  "gender": "<male, female, or other>",
+  "height": "<estimated height description, e.g. 'tall', 'average', 'short', or specific like '170cm' if visible>",
+  "build": "<body type, e.g. 'slim', 'average', 'athletic', 'stocky'>",
   "hair": "<color and style, e.g. 'brown curly hair', 'blonde straight hair'>",
   "clothing": "<description of visible clothing, e.g. 'blue t-shirt with jeans'>",
   "features": "<eye color, glasses, facial hair, distinctive features>"
 }
 
-Be concise but descriptive. Return ONLY valid JSON, no markdown or other text.`
+Be concise but descriptive. For age, give your best estimate as a number. Return ONLY valid JSON, no markdown or other text.`
                   },
                   {
                     inlineData: {
@@ -3833,9 +3839,23 @@ Be concise but descriptive. Return ONLY valid JSON, no markdown or other text.`
         });
       }
 
-      // Merge Gemini traits into attributes
+      // Merge Gemini traits into attributes (only fill if not already set)
       if (geminiTraits) {
         analyzerData.attributes = analyzerData.attributes || {};
+        // Age, gender, height, build - only fill if blank
+        if (geminiTraits.age && !analyzerData.attributes.age) {
+          analyzerData.attributes.age = String(geminiTraits.age);
+        }
+        if (geminiTraits.gender && !analyzerData.attributes.gender) {
+          analyzerData.attributes.gender = geminiTraits.gender.toLowerCase();
+        }
+        if (geminiTraits.height && !analyzerData.attributes.height) {
+          analyzerData.attributes.height = geminiTraits.height;
+        }
+        if (geminiTraits.build && !analyzerData.attributes.build) {
+          analyzerData.attributes.build = geminiTraits.build;
+        }
+        // Hair, clothing, features - always set from Gemini (more accurate)
         if (geminiTraits.hair) {
           analyzerData.attributes.hair_color = geminiTraits.hair;
         }

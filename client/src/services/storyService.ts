@@ -188,11 +188,29 @@ export const storyService = {
     return { imageData: response.image_data };
   },
 
-  async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial'): Promise<{ imageData: string }> {
-    const response = await api.post<{ imageData: string }>(
+  async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial'): Promise<{
+    imageData: string;
+    description?: string;
+    prompt?: string;
+    qualityScore?: number;
+    qualityReasoning?: string;
+  }> {
+    const response = await api.post<{
+      imageData: string;
+      description?: string;
+      prompt?: string;
+      qualityScore?: number;
+      qualityReasoning?: string;
+    }>(
       `/api/stories/${storyId}/regenerate/cover/${coverType}`
     );
-    return { imageData: response.imageData };
+    return {
+      imageData: response.imageData,
+      description: response.description,
+      prompt: response.prompt,
+      qualityScore: response.qualityScore,
+      qualityReasoning: response.qualityReasoning
+    };
   },
 
   async updatePage(storyId: string, pageNum: number, data: {

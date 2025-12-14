@@ -1159,12 +1159,18 @@ export default function StoryWizard() {
                 try {
                   log.info('Regenerating cover:', coverType);
                   setIsGenerating(true);
-                  const { imageData } = await storyService.regenerateCover(storyId, coverType);
-                  // Update the cover images
+                  const result = await storyService.regenerateCover(storyId, coverType);
+                  // Update the cover images with all metadata
                   setCoverImages(prev => {
                     if (!prev) return prev;
                     const key = coverType === 'front' ? 'frontCover' : coverType === 'back' ? 'backCover' : 'initialPage';
-                    return { ...prev, [key]: { imageData } };
+                    return { ...prev, [key]: {
+                      imageData: result.imageData,
+                      description: result.description,
+                      prompt: result.prompt,
+                      qualityScore: result.qualityScore,
+                      qualityReasoning: result.qualityReasoning
+                    } };
                   });
                   log.info('Cover regenerated successfully');
                 } catch (error) {

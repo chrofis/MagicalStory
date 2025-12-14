@@ -17,11 +17,21 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
     }
   };
 
+  // Description text for the photo upload step
+  const descriptionText = language === 'de'
+    ? 'Deine Geschichte wird basierend auf den hochgeladenen Fotos erstellt. Verwende Fotos mit nur einer Person, idealerweise Ganzkörperaufnahmen, da auch die Kleidung in die Geschichte übernommen wird.'
+    : language === 'fr'
+    ? 'Votre histoire sera générée à partir des photos téléchargées. Utilisez des photos d\'une seule personne, idéalement en pied, car les vêtements seront également intégrés dans l\'histoire.'
+    : 'Your story will be generated based on the photos you upload. Use photos of a single person, ideally full body shots, as clothing will also be copied into the story.';
+
   return (
     <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-4">
-      <p className="text-sm font-semibold text-indigo-700 mb-4 text-center">{t.uploadPhotoFirst}</p>
+      {/* Description of this step */}
+      <p className="text-sm text-gray-700 mb-4 text-center">
+        {descriptionText}
+      </p>
 
-      {/* Upload button - prominent, first */}
+      {/* Upload button - prominent */}
       <div className="text-center mb-5">
         <label className="cursor-pointer inline-flex items-center justify-center gap-3 bg-indigo-600 text-white px-10 py-4 rounded-xl text-xl hover:bg-indigo-700 font-bold shadow-lg transition-colors">
           <Upload size={28} /> {t.uploadPhoto}
@@ -46,7 +56,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-green-400 mb-1"
               />
               <span className="text-xs text-green-600 font-medium">
-                ✓ {language === 'de' ? 'Ganzkörper' : language === 'fr' ? 'Corps entier' : 'Full body'}
+                {language === 'de' ? 'Ganzkörper' : language === 'fr' ? 'Corps entier' : 'Full body'}
               </span>
             </div>
             {/* Good example 2: Upper body */}
@@ -57,7 +67,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-green-400 mb-1"
               />
               <span className="text-xs text-green-600 font-medium">
-                ✓ {language === 'de' ? 'Oberkörper' : language === 'fr' ? 'Buste' : 'Upper body'}
+                {language === 'de' ? 'Oberkörper' : language === 'fr' ? 'Buste' : 'Upper body'}
               </span>
             </div>
             {/* Bad example 1: Close up or blurry */}
@@ -68,7 +78,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
-                ✗ {language === 'de' ? 'Nahaufnahme/Unscharf' : language === 'fr' ? 'Gros plan/Flou' : 'Close-up/Blurry'}
+                {language === 'de' ? 'Zu nah / Unscharf' : language === 'fr' ? 'Trop proche / Flou' : 'Too close / Blurry'}
               </span>
             </div>
             {/* Bad example 2: Sunglasses, hat, helmet */}
@@ -79,10 +89,10 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
-                ✗ {language === 'de' ? 'Brille/Hut/Helm' : language === 'fr' ? 'Lunettes/Chapeau' : 'Glasses/Hat/Helmet'}
+                {language === 'de' ? 'Brille / Hut / Helm' : language === 'fr' ? 'Lunettes / Chapeau' : 'Glasses / Hat / Helmet'}
               </span>
             </div>
-            {/* Bad example 3: Crowded/multiple people */}
+            {/* Bad example 3: Multiple people */}
             <div className="text-center">
               <img
                 src="/images/One person not many.jpg"
@@ -90,7 +100,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
               />
               <span className="text-xs text-red-600 font-medium">
-                ✗ {language === 'de' ? 'Eine Person, nicht viele' : language === 'fr' ? 'Une personne, pas plusieurs' : 'One person, not many'}
+                {language === 'de' ? 'Nur eine Person' : language === 'fr' ? 'Une seule personne' : 'Only one person'}
               </span>
             </div>
           </div>
