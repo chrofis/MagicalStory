@@ -386,6 +386,36 @@ export default function StoryWizard() {
     setShowCharacterCreated(false);
   };
 
+  // Resize image to reduce upload size (max 1500px on longest side)
+  const resizeImage = (dataUrl: string, maxSize: number = 1500): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        // Only resize if larger than maxSize
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          } else {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85)); // JPEG at 85% quality
+      };
+      img.onerror = () => resolve(dataUrl); // Fallback to original if error
+      img.src = dataUrl;
+    });
+  };
+
   const handlePhotoSelect = async (file: File) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -400,8 +430,12 @@ export default function StoryWizard() {
 
       // Run photo analysis in BACKGROUND (non-blocking)
       try {
-        log.info('Starting background photo analysis...');
-        const analysis = await characterService.analyzePhoto(originalPhotoUrl);
+        // Resize image before sending to server (reduces upload time significantly)
+        const resizedPhoto = await resizeImage(originalPhotoUrl);
+        const originalSize = Math.round(originalPhotoUrl.length / 1024);
+        const resizedSize = Math.round(resizedPhoto.length / 1024);
+        log.info(`Starting background photo analysis... (${originalSize}KB -> ${resizedSize}KB)`);
+        const analysis = await characterService.analyzePhoto(resizedPhoto);
 
         if (analysis.success) {
           // Update character with analyzed data (user may have already entered name)
