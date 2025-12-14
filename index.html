@@ -5457,8 +5457,9 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
         setGeneratedStory('');
         setGeneratedPrompt('');
         setShowPrompt(false);
-        setCharacters([]);
-        setRelationships({});
+        // DO NOT clear characters and relationships - they persist across stories
+        // setCharacters([]);
+        // setRelationships({});
         setStoryType('');
         setMainCharacters([]);
         setSceneDescriptions([]);
@@ -5535,7 +5536,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           }
 
           // Determine effective image generation mode
-          const effectiveMode = imageGenMode || serverImageGenMode || 'parallel';
+          const effectiveMode = imageGenMode || serverImageGenMode || 'sequential';
           const modeMessage = effectiveMode === 'sequential'
             ? 'Generating images sequentially (for consistency)...'
             : 'Generating images in parallel...';

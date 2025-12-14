@@ -75,7 +75,10 @@ console.log('💾 Image cache initialized');
 const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;  // 0 = no batching (generate all at once)
 
 // Image generation mode: 'parallel' (fast) or 'sequential' (consistent - passes previous image)
-const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
+const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'sequential';
+
+// Image quality threshold - regenerate if score below this value (1-10 scale)
+const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 5;
 
 // Verbose logging mode - set VERBOSE_LOGGING=true for detailed debug output
 const VERBOSE_LOGGING = process.env.VERBOSE_LOGGING === 'true';
@@ -5805,7 +5808,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Track image generation promises (started during streaming)
     const streamingImagePromises = [];
     const completedSceneNumbers = new Set();
-    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
+    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'sequential';
     const MAX_RETRIES = 2;
 
     // Rate limiter for parallel image generation during streaming
@@ -6327,7 +6330,7 @@ async function processStoryJob(jobId) {
 
     // Determine image generation mode: sequential (consistent) or parallel (fast)
     // Sequential passes previous image to next for better character consistency
-    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
+    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'sequential';
     console.log(`🖼️  [PIPELINE] Image generation mode: ${imageGenMode.toUpperCase()}`);
 
     // Extract character photos for reference images
@@ -6554,7 +6557,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               while (retries <= MAX_RETRIES && !imageResult) {
                 try {
                   // Pass only photos of characters in this scene (no previous image in parallel mode)
-                  imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos, null);
+                  // Use quality retry to regenerate if score is below threshold
+                  imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos, null);
                 } catch (error) {
                   retries++;
                   console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -6565,7 +6569,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 }
               }
 
-              console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score})`);
+              console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
               const imageData = {
                 pageNumber: pageNum,
@@ -6573,7 +6577,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 description: sceneDescription,
                 text: pageContent,  // Include page text for progressive display
                 qualityScore: imageResult.score,
-                qualityReasoning: imageResult.reasoning || null
+                qualityReasoning: imageResult.reasoning || null,
+                wasRegenerated: imageResult.wasRegenerated || false,
+                originalImage: imageResult.originalImage || null,
+                originalScore: imageResult.originalScore || null,
+                originalReasoning: imageResult.originalReasoning || null
               };
 
               // Save partial result checkpoint for progressive display
@@ -6583,7 +6591,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 description: sceneDescription,
                 text: pageContent,
                 qualityScore: imageResult.score,
-                qualityReasoning: imageResult.reasoning || null
+                qualityReasoning: imageResult.reasoning || null,
+                wasRegenerated: imageResult.wasRegenerated || false,
+                originalImage: imageResult.originalImage || null,
+                originalScore: imageResult.originalScore || null,
+                originalReasoning: imageResult.originalReasoning || null
               }, pageNum);
               console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
 
@@ -6694,7 +6706,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 // Pass previous image for visual continuity (SEQUENTIAL MODE)
-                imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos, previousImage);
+                // Use quality retry to regenerate if score is below threshold
+                imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos, previousImage);
               } catch (error) {
                 retries++;
                 console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -6705,7 +6718,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               }
             }
 
-            console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score})`);
+            console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
             // Store this image as the previous image for the next iteration
             previousImage = imageResult.imageData;
@@ -6716,7 +6729,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               description: sceneDescription,
               text: pageContent,  // Include page text for progressive display
               qualityScore: imageResult.score,
-              qualityReasoning: imageResult.reasoning || null
+              qualityReasoning: imageResult.reasoning || null,
+              wasRegenerated: imageResult.wasRegenerated || false,
+              originalImage: imageResult.originalImage || null,
+              originalScore: imageResult.originalScore || null,
+              originalReasoning: imageResult.originalReasoning || null
             };
 
             // Save partial result checkpoint for progressive display
@@ -6726,7 +6743,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               description: sceneDescription,
               text: pageContent,
               qualityScore: imageResult.score,
-              qualityReasoning: imageResult.reasoning || null
+              qualityReasoning: imageResult.reasoning || null,
+              wasRegenerated: imageResult.wasRegenerated || false,
+              originalImage: imageResult.originalImage || null,
+              originalScore: imageResult.originalScore || null,
+              originalReasoning: imageResult.originalReasoning || null
             }, pageNum);
             console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
 
@@ -7915,6 +7936,76 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   console.error('❌ [IMAGE GEN] No image data found in any part');
   throw new Error('No image data in response - check logs for API response structure');
+}
+
+/**
+ * Generate image with automatic retry if quality score is below threshold
+ * @param {string} prompt - The image generation prompt
+ * @param {string[]} characterPhotos - Character reference photos
+ * @param {string|null} previousImage - Previous image for sequential mode
+ * @param {string} evaluationType - Type of evaluation ('scene' or 'cover')
+ * @returns {Promise<{imageData, score, reasoning, wasRegenerated, originalImage, originalScore, originalReasoning}>}
+ */
+async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene') {
+  // Generate first image
+  console.log(`🎨 [QUALITY RETRY] Generating image (threshold: ${IMAGE_QUALITY_THRESHOLD})...`);
+  const firstResult = await callGeminiAPIForImage(prompt, characterPhotos, previousImage, evaluationType);
+
+  const firstScore = firstResult.score || 0;
+  console.log(`⭐ [QUALITY RETRY] First image score: ${firstScore}/10`);
+
+  // If score meets threshold, return immediately
+  if (firstScore >= IMAGE_QUALITY_THRESHOLD) {
+    console.log(`✅ [QUALITY RETRY] Score ${firstScore} >= ${IMAGE_QUALITY_THRESHOLD}, keeping first image`);
+    return {
+      imageData: firstResult.imageData,
+      score: firstResult.score,
+      reasoning: firstResult.reasoning,
+      wasRegenerated: false,
+      originalImage: null,
+      originalScore: null,
+      originalReasoning: null
+    };
+  }
+
+  // Score below threshold - regenerate
+  console.log(`🔄 [QUALITY RETRY] Score ${firstScore} < ${IMAGE_QUALITY_THRESHOLD}, regenerating...`);
+
+  // Clear cache for this prompt to force new generation
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
+  imageCache.delete(cacheKey);
+
+  // Generate second image
+  const secondResult = await callGeminiAPIForImage(prompt, characterPhotos, previousImage, evaluationType);
+  const secondScore = secondResult.score || 0;
+  console.log(`⭐ [QUALITY RETRY] Second image score: ${secondScore}/10`);
+
+  // Return the better image
+  if (secondScore > firstScore) {
+    console.log(`✅ [QUALITY RETRY] Using second image (score ${secondScore} > ${firstScore})`);
+    return {
+      imageData: secondResult.imageData,
+      score: secondResult.score,
+      reasoning: secondResult.reasoning,
+      wasRegenerated: true,
+      originalImage: firstResult.imageData,
+      originalScore: firstResult.score,
+      originalReasoning: firstResult.reasoning
+    };
+  } else {
+    console.log(`✅ [QUALITY RETRY] Keeping first image (score ${firstScore} >= ${secondScore})`);
+    // Put the first result back in cache since it's the better one
+    imageCache.set(cacheKey, firstResult);
+    return {
+      imageData: firstResult.imageData,
+      score: firstResult.score,
+      reasoning: firstResult.reasoning,
+      wasRegenerated: true,  // Still mark as regenerated for dev info
+      originalImage: secondResult.imageData,  // Second (worse) attempt becomes "original"
+      originalScore: secondResult.score,
+      originalReasoning: secondResult.reasoning
+    };
+  }
 }
 
 // Create a new story generation job
