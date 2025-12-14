@@ -3759,12 +3759,13 @@ Be concise but descriptive. Return ONLY valid JSON, no markdown or other text.`
     };
 
     // Helper function for Python analysis
+    // Note: First run may download AI models (~500MB), so allow longer timeout
     const analyzePython = async () => {
       const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageData }),
-        signal: AbortSignal.timeout(30000) // 30 second timeout
+        signal: AbortSignal.timeout(120000) // 2 minute timeout (allows for model download on first run)
       });
       return analyzerResponse.json();
     };
