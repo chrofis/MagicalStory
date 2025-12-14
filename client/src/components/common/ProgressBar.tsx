@@ -15,10 +15,10 @@ const sizeClasses = {
 };
 
 const variantClasses = {
-  default: 'bg-purple-600',
+  default: 'bg-indigo-600',
   success: 'bg-green-500',
   warning: 'bg-yellow-500',
-  gradient: 'bg-gradient-to-r from-purple-600 to-pink-600',
+  gradient: 'bg-gradient-to-r from-indigo-500 to-indigo-600',
 };
 
 export function ProgressBar({
