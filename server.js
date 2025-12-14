@@ -4821,7 +4821,15 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
 
     const storyData = JSON.parse(storyResult.rows[0].data);
     const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
-    const printPageCount = storyScenes * 2;
+    const isPictureBook = storyData.languageLevel === '1st-grade';
+
+    // Calculate interior pages (covers not counted)
+    let interiorPages = isPictureBook ? storyScenes : storyScenes * 2;
+
+    // Round up to valid Gelato page count
+    const validPageCounts = [20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80];
+    const printPageCount = validPageCounts.find(count => count >= interiorPages) || validPageCounts[validPageCounts.length - 1];
+    console.log(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, layout=${isPictureBook ? 'Picture Book' : 'Standard'}, interior=${interiorPages}, printPageCount=${printPageCount}`);
 
     // Get print product UID
     const productsResult = await dbPool.query(
@@ -5765,15 +5773,16 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       });
     }
 
-    // Calculate actual pages in PDF and add blank pages to reach valid Gelato page count
-    // Pages so far: front cover (1) + initial page (0-1) + back cover (1) + story pages
-    let actualPdfPages = 2; // front + back covers
-    if (initialPageImageData) actualPdfPages += 1; // initial page
+    // Calculate actual INTERIOR pages for Gelato page count
+    // Note: Covers (front, back, initial) are NOT counted - they are printed separately
+    // Gelato page count = interior story pages only
+    let actualPdfPages;
     if (isPictureBook) {
-      actualPdfPages += storyPages.length; // 1 page per scene
+      actualPdfPages = storyPages.length; // 1 page per scene
     } else {
-      actualPdfPages += storyPages.length * 2; // text + image pages
+      actualPdfPages = storyPages.length * 2; // text + image pages
     }
+    console.log(`📄 [BACKGROUND] Story has ${storyPages.length} scenes, layout=${isPictureBook ? 'Picture Book (1 page/scene)' : 'Standard (2 pages/scene)'}, interior pages=${actualPdfPages}`);
 
     // Calculate target page count for Gelato (must be valid count)
     const validPageCounts = [20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80];
