@@ -21,7 +21,9 @@ export function TraitSelector({
 }: TraitSelectorProps) {
   const { t, language } = useLanguage();
   const [customTrait, setCustomTrait] = useState('');
-  const [customTraits, setCustomTraits] = useState<string[]>([]);
+
+  // Track custom traits added via the input field
+  const [localCustomTraits, setLocalCustomTraits] = useState<string[]>([]);
 
   const toggleTrait = (trait: string) => {
     if (selectedTraits.includes(trait)) {
@@ -34,13 +36,17 @@ export function TraitSelector({
   const addCustomTrait = () => {
     if (customTrait.trim() && !selectedTraits.includes(customTrait.trim())) {
       const newTrait = customTrait.trim();
-      setCustomTraits([...customTraits, newTrait]);
+      setLocalCustomTraits([...localCustomTraits, newTrait]);
       onSelect([...selectedTraits, newTrait]);
       setCustomTrait('');
     }
   };
 
-  const allTraits = [...traits, ...customTraits];
+  // Include: default traits + locally added custom traits + any selected traits not in defaults
+  // This ensures custom traits from saved data are visible and can be removed
+  const customTraitsFromSelected = selectedTraits.filter(trait => !traits.includes(trait));
+  const allCustomTraits = [...new Set([...localCustomTraits, ...customTraitsFromSelected])];
+  const allTraits = [...traits, ...allCustomTraits];
 
   return (
     <div>
