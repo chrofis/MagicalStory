@@ -122,8 +122,8 @@ export function CharacterForm({
   // Step 2: Traits and characteristics
   return (
     <div className="space-y-6">
-      {/* Header with photo and basic info */}
-      <div className="flex items-start gap-4">
+      {/* Header with photo and name */}
+      <div className="flex items-center gap-4">
         {/* Photo */}
         <div className="flex-shrink-0">
           {character.photoUrl && (
@@ -134,69 +134,110 @@ export function CharacterForm({
             />
           )}
         </div>
+        {/* Name */}
+        <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
+      </div>
 
-        {/* Name and basic attributes */}
-        <div className="flex-1">
-          <h3 className="text-2xl font-bold text-gray-800 mb-2">{character.name}</h3>
+      {/* Extracted Features - Editable */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h4 className="text-sm font-semibold text-gray-600 mb-3">
+          {language === 'de' ? 'Erkannte Eigenschaften (bearbeitbar)' : language === 'fr' ? 'Caractéristiques détectées (modifiables)' : 'Detected Features (editable)'}
+        </h4>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Gender */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">{t.gender}</label>
+            <select
+              value={character.gender}
+              onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="male">{t.male}</option>
+              <option value="female">{t.female}</option>
+              <option value="other">{t.other}</option>
+            </select>
+          </div>
 
-          {/* Extracted attributes in a clean row */}
-          <div className="flex flex-wrap gap-3 text-sm text-gray-600">
-            {/* Gender */}
-            <div className="flex items-center gap-1">
-              <span className="font-semibold">{t.gender}:</span>
-              <select
-                value={character.gender}
-                onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
-                className="px-2 py-1 border border-gray-300 rounded text-sm bg-white"
-              >
-                <option value="male">{t.male}</option>
-                <option value="female">{t.female}</option>
-                <option value="other">{t.other}</option>
-              </select>
-            </div>
+          {/* Age */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">{t.age}</label>
+            <input
+              type="number"
+              value={character.age}
+              onChange={(e) => updateField('age', e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+              min="1"
+              max="120"
+            />
+          </div>
 
-            {/* Age */}
-            <div className="flex items-center gap-1">
-              <span className="font-semibold">{t.age}:</span>
-              <input
-                type="number"
-                value={character.age}
-                onChange={(e) => updateField('age', e.target.value)}
-                className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                min="1"
-                max="120"
-              />
-            </div>
+          {/* Height */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">
+              {language === 'de' ? 'Grösse (cm)' : language === 'fr' ? 'Taille (cm)' : 'Height (cm)'}
+            </label>
+            <input
+              type="number"
+              value={character.height || ''}
+              onChange={(e) => updateField('height', e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+              placeholder="cm"
+              min="50"
+              max="250"
+            />
+          </div>
 
-            {/* Height (optional) */}
-            {character.height && (
-              <div className="flex items-center gap-1">
-                <span className="font-semibold">
-                  {language === 'de' ? 'Grösse' : language === 'fr' ? 'Taille' : 'Height'}:
-                </span>
-                <span>{character.height}</span>
-              </div>
-            )}
+          {/* Build */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">
+              {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
+            </label>
+            <select
+              value={character.build || ''}
+              onChange={(e) => updateField('build', e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="">{language === 'de' ? 'Wählen...' : language === 'fr' ? 'Choisir...' : 'Select...'}</option>
+              <option value="slim">{language === 'de' ? 'Schlank' : language === 'fr' ? 'Mince' : 'Slim'}</option>
+              <option value="average">{language === 'de' ? 'Durchschnittlich' : language === 'fr' ? 'Moyenne' : 'Average'}</option>
+              <option value="athletic">{language === 'de' ? 'Athletisch' : language === 'fr' ? 'Athlétique' : 'Athletic'}</option>
+              <option value="chubby">{language === 'de' ? 'Mollig' : language === 'fr' ? 'Potelé' : 'Chubby'}</option>
+            </select>
+          </div>
 
-            {/* Hair color (optional) */}
-            {character.hairColor && (
-              <div className="flex items-center gap-1">
-                <span className="font-semibold">{t.hairColor}:</span>
-                <span>{character.hairColor}</span>
-              </div>
-            )}
+          {/* Hair Color */}
+          <div className="col-span-2">
+            <label className="block text-xs font-semibold text-gray-500 mb-1">{t.hairColor}</label>
+            <input
+              type="text"
+              value={character.hairColor || ''}
+              onChange={(e) => updateField('hairColor', e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+              placeholder={language === 'de' ? 'z.B. braun, blond' : language === 'fr' ? 'ex. brun, blond' : 'e.g. brown, blonde'}
+            />
+          </div>
+
+          {/* Other Features */}
+          <div className="col-span-2">
+            <label className="block text-xs font-semibold text-gray-500 mb-1">{t.otherFeatures}</label>
+            <input
+              type="text"
+              value={character.otherFeatures || ''}
+              onChange={(e) => updateField('otherFeatures', e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+              placeholder={language === 'de' ? 'Brille, Bart, etc.' : language === 'fr' ? 'Lunettes, barbe, etc.' : 'Glasses, beard, etc.'}
+            />
           </div>
         </div>
       </div>
 
-      {/* Trait Selectors - clean layout without blue boxes */}
+      {/* Trait Selectors - all indigo color */}
       <TraitSelector
         label={t.strengths}
         traits={localizedStrengths}
         selectedTraits={character.strengths || []}
         onSelect={(traits) => updateField('strengths', traits)}
         minRequired={3}
-        color="green"
       />
 
       <TraitSelector
@@ -205,7 +246,6 @@ export function CharacterForm({
         selectedTraits={character.flaws || []}
         onSelect={(traits) => updateField('flaws', traits)}
         minRequired={2}
-        color="orange"
       />
 
       <TraitSelector
@@ -213,7 +253,6 @@ export function CharacterForm({
         traits={localizedChallenges}
         selectedTraits={character.challenges || []}
         onSelect={(traits) => updateField('challenges', traits)}
-        color="purple"
       />
 
       {/* Special Details */}

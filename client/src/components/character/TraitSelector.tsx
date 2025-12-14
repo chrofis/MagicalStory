@@ -8,28 +8,8 @@ interface TraitSelectorProps {
   selectedTraits: string[];
   onSelect: (traits: string[]) => void;
   minRequired?: number;
-  color?: 'green' | 'orange' | 'purple' | 'blue';
   allowCustom?: boolean;
 }
-
-const colorStyles = {
-  green: {
-    selected: 'bg-green-500 text-white',
-    label: 'text-green-700',
-  },
-  orange: {
-    selected: 'bg-orange-500 text-white',
-    label: 'text-orange-700',
-  },
-  purple: {
-    selected: 'bg-purple-500 text-white',
-    label: 'text-purple-700',
-  },
-  blue: {
-    selected: 'bg-indigo-500 text-white',
-    label: 'text-indigo-700',
-  },
-};
 
 export function TraitSelector({
   label,
@@ -37,13 +17,11 @@ export function TraitSelector({
   selectedTraits,
   onSelect,
   minRequired = 0,
-  color = 'green',
   allowCustom = true,
 }: TraitSelectorProps) {
   const { t, language } = useLanguage();
   const [customTrait, setCustomTrait] = useState('');
   const [customTraits, setCustomTraits] = useState<string[]>([]);
-  const styles = colorStyles[color];
 
   const toggleTrait = (trait: string) => {
     if (selectedTraits.includes(trait)) {
@@ -67,7 +45,7 @@ export function TraitSelector({
   return (
     <div>
       {/* Label */}
-      <label className={`block text-lg font-semibold mb-2 ${styles.label}`}>
+      <label className="block text-lg font-semibold mb-2 text-indigo-700">
         {label}
         {minRequired > 0 && (
           <span className="text-sm font-normal text-gray-500 ml-2">
@@ -89,7 +67,7 @@ export function TraitSelector({
             onClick={() => toggleTrait(trait)}
             className={`px-3 py-1 rounded-full text-sm transition-colors ${
               selectedTraits.includes(trait)
-                ? styles.selected
+                ? 'bg-indigo-500 text-white'
                 : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
           >
