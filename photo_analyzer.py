@@ -352,8 +352,8 @@ def process_photo(image_data, is_base64=True):
 
         # Face thumbnail (from background-removed image for transparent background)
         if face_box:
-            # Add 10% padding around face for more natural look
-            face_box_padded = add_padding_to_box(face_box, padding_percent=0.10)
+            # Add 15% padding around face for more natural look
+            face_box_padded = add_padding_to_box(face_box, padding_percent=0.15)
 
             # Use background-removed image if available, otherwise fall back to original
             if full_img_rgba is not None:
