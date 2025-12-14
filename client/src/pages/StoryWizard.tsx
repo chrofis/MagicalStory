@@ -854,30 +854,40 @@ export default function StoryWizard() {
 
           {/* Navigation buttons - inside the container */}
           {step < 5 && !currentCharacter && (
-            <div className={`mt-6 pt-6 border-t border-gray-200 ${step === 4 ? "space-y-4" : "flex justify-between"}`}>
-              <button
-                onClick={goBack}
-                className="bg-transparent text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
-              >
-                <ArrowLeft size={20} /> {t.back}
-              </button>
-
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              {/* Steps 1-3: Back and Next buttons side by side */}
               {step !== 4 && (
-                <button
-                  onClick={goNext}
-                  disabled={!canGoNext()}
-                  className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
-                    !canGoNext()
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                  }`}
-                >
-                  {t.next} <ArrowRight size={20} />
-                </button>
+                <div className="flex justify-between">
+                  <button
+                    onClick={goBack}
+                    className="bg-transparent text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+                  >
+                    <ArrowLeft size={20} /> {t.back}
+                  </button>
+                  <button
+                    onClick={goNext}
+                    disabled={!canGoNext()}
+                    className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
+                      !canGoNext()
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
+                  >
+                    {t.next} <ArrowRight size={20} />
+                  </button>
+                </div>
               )}
 
+              {/* Step 4: Back button and Generate buttons stacked */}
               {step === 4 && (
-                <>
+                <div className="space-y-4">
+                  <button
+                    onClick={goBack}
+                    className="bg-transparent text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+                  >
+                    <ArrowLeft size={20} /> {t.back}
+                  </button>
+
                   <button
                     onClick={() => generateStory(false)}
                     disabled={!canGoNext()}
@@ -905,7 +915,7 @@ export default function StoryWizard() {
                       {language === 'de' ? 'Nur Text generieren (ohne Bilder)' : language === 'fr' ? 'Générer le texte uniquement (sans images)' : 'Generate Text Only (no images)'}
                     </button>
                   )}
-                </>
+                </div>
               )}
             </div>
           )}

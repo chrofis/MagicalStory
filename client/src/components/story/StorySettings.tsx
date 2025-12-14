@@ -220,7 +220,7 @@ export function StorySettings({
         </div>
 
         {/* Developer Mode Options */}
-        {developerMode && onImageGenModeChange && (
+        {developerMode && (
           <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
             <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
               🛠️ {language === 'de' ? 'Entwickler-Optionen' : language === 'fr' ? 'Options développeur' : 'Developer Options'}
@@ -233,7 +233,7 @@ export function StorySettings({
               </label>
               <div className="flex gap-2">
                 <button
-                  onClick={() => onImageGenModeChange(null)}
+                  onClick={() => onImageGenModeChange?.(null)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium ${
                     imageGenMode === null
                       ? 'bg-yellow-500 text-white'
@@ -243,7 +243,7 @@ export function StorySettings({
                   {language === 'de' ? 'Server-Standard' : language === 'fr' ? 'Par défaut serveur' : 'Server Default'}
                 </button>
                 <button
-                  onClick={() => onImageGenModeChange('parallel')}
+                  onClick={() => onImageGenModeChange?.('parallel')}
                   className={`px-3 py-2 rounded-lg text-sm font-medium ${
                     imageGenMode === 'parallel'
                       ? 'bg-yellow-500 text-white'
@@ -253,7 +253,7 @@ export function StorySettings({
                   {language === 'de' ? 'Parallel (schnell)' : language === 'fr' ? 'Parallèle (rapide)' : 'Parallel (fast)'}
                 </button>
                 <button
-                  onClick={() => onImageGenModeChange('sequential')}
+                  onClick={() => onImageGenModeChange?.('sequential')}
                   className={`px-3 py-2 rounded-lg text-sm font-medium ${
                     imageGenMode === 'sequential'
                       ? 'bg-yellow-500 text-white'
