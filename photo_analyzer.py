@@ -352,11 +352,12 @@ def process_photo(image_data, is_base64=True):
 
         # Face thumbnail (from background-removed image for transparent background)
         if face_box:
-            # No padding - use exact face bounding box (background is removed anyway)
+            # Add 10% padding around face for more natural look
+            face_box_padded = add_padding_to_box(face_box, padding_percent=0.10)
 
             # Use background-removed image if available, otherwise fall back to original
             if full_img_rgba is not None:
-                face_img = crop_to_box(full_img_rgba, face_box)
+                face_img = crop_to_box(full_img_rgba, face_box_padded)
                 if face_img.size > 0:
                     # Make it square with soft warm peach background (complements app's indigo theme)
                     # Color: #FFF0E6 (soft peach/cream) in BGRA format
@@ -382,7 +383,7 @@ def process_photo(image_data, is_base64=True):
                     print("✅ Face thumbnail created with warm peach background (#FFF0E6)")
             else:
                 # Fallback: use original image (with background)
-                face_img = crop_to_box(img, face_box)
+                face_img = crop_to_box(img, face_box_padded)
                 if face_img.size > 0:
                     size = max(face_img.shape[0], face_img.shape[1])
                     square = np.zeros((size, size, 3), dtype=np.uint8)

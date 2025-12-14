@@ -344,14 +344,29 @@ export default function StoryWizard() {
             bodyNoBgUrl,
             faceBox: analysis.faceBox,
             bodyBox: analysis.bodyBox,
-            // Only update attributes if they were detected and user hasn't changed defaults
-            gender: analysis.attributes?.gender ? (analysis.attributes.gender as 'male' | 'female' | 'other') : prev.gender,
-            age: analysis.attributes?.age ? String(analysis.attributes.age) : prev.age,
-            height: analysis.attributes?.height ? String(analysis.attributes.height) : prev.height,
-            build: analysis.attributes?.build || prev.build,
-            hairColor: analysis.attributes?.hairColor || prev.hairColor,
-            clothing: analysis.attributes?.clothing || prev.clothing,
-            otherFeatures: analysis.attributes?.otherFeatures || prev.otherFeatures,
+            // Only update attributes if user hasn't already filled them in
+            // Check for empty/default values before overwriting
+            gender: (!prev.gender || prev.gender === 'other') && analysis.attributes?.gender
+              ? (analysis.attributes.gender as 'male' | 'female' | 'other')
+              : prev.gender,
+            age: (!prev.age || prev.age === '8') && analysis.attributes?.age
+              ? String(analysis.attributes.age)
+              : prev.age,
+            height: !prev.height && analysis.attributes?.height
+              ? String(analysis.attributes.height)
+              : prev.height,
+            build: !prev.build && analysis.attributes?.build
+              ? analysis.attributes.build
+              : prev.build,
+            hairColor: !prev.hairColor && analysis.attributes?.hairColor
+              ? analysis.attributes.hairColor
+              : prev.hairColor,
+            clothing: !prev.clothing && analysis.attributes?.clothing
+              ? analysis.attributes.clothing
+              : prev.clothing,
+            otherFeatures: !prev.otherFeatures && analysis.attributes?.otherFeatures
+              ? analysis.attributes.otherFeatures
+              : prev.otherFeatures,
           } : null);
         } else {
           log.warn('Photo analysis returned no data, keeping original photo');
