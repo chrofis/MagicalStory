@@ -4548,6 +4548,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 
     // Store PDF in database
     if (STORAGE_MODE === 'database' && dbPool) {
+      console.log(`📄 [PDF SAVE] Saving PDF with story_id: ${storyId}, file_id: ${fileId}`);
       const insertQuery = 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
 
       await dbQuery(insertQuery, [
@@ -4560,6 +4561,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         fileSize,
         filename
       ]);
+      console.log(`📄 [PDF SAVE] PDF saved successfully`);
     } else {
       // File mode
       const fs = require('fs').promises;
