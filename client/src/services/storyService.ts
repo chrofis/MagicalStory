@@ -254,18 +254,19 @@ export const storyService = {
       progress: number;
       progressMessage: string;
       resultData?: {
-        storyId: string;
-        title: string;
-        outline: string;
-        story: string;
-        sceneDescriptions: SceneDescription[];
-        sceneImages: SceneImage[];
+        storyId?: string;
+        title?: string;
+        outline?: string;
+        storyText?: string; // Server uses storyText
+        sceneDescriptions?: SceneDescription[];
+        sceneImages?: SceneImage[];
         coverImages?: CoverImages;
       };
       errorMessage?: string;
     }>(`/api/jobs/${jobId}/status`);
 
     // Map server response to client format
+    const resultData = response.resultData;
     return {
       status: response.status as 'pending' | 'processing' | 'completed' | 'failed',
       progress: {
@@ -273,7 +274,15 @@ export const storyService = {
         total: 100,
         message: response.progressMessage || '',
       },
-      result: response.resultData,
+      result: resultData ? {
+        storyId: resultData.storyId || '',
+        title: resultData.title || '',
+        outline: resultData.outline || '',
+        story: resultData.storyText || '', // Map storyText -> story
+        sceneDescriptions: resultData.sceneDescriptions || [],
+        sceneImages: resultData.sceneImages || [],
+        coverImages: resultData.coverImages,
+      } : undefined,
       error: response.errorMessage,
     };
   },
