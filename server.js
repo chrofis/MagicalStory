@@ -2861,13 +2861,26 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       }
     }
 
+    // Get the scene description for this cover type
+    const coverScenes = extractCoverScenes(storyData.outline || '');
+    let sceneDescription;
+    if (coverType === 'front') {
+      sceneDescription = coverScenes.titlePage || 'A beautiful, magical title page featuring the main characters.';
+    } else if (coverType === 'initialPage') {
+      sceneDescription = coverScenes.initialPage || 'A warm, inviting dedication/introduction page.';
+    } else {
+      sceneDescription = coverScenes.backCover || 'A satisfying, conclusive ending scene.';
+    }
+
     // Generate new cover (use 'cover' evaluation for text-focused quality check)
     const coverResult = await callGeminiAPIForImage(coverPrompt, characterPhotos, null, 'cover');
 
-    // Update the cover in story data with new structure including quality
+    // Update the cover in story data with new structure including quality, description, and prompt
     storyData.coverImages = storyData.coverImages || {};
     const coverData = {
       imageData: coverResult.imageData,
+      description: sceneDescription,
+      prompt: coverPrompt,
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning || null
     };
@@ -6258,6 +6271,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           pageNumber: pageNum,
           imageData: imageResult.imageData,
           description: sceneDesc,
+          prompt: imagePrompt,
           text: pageText || pageTexts[pageNum] || '',
           qualityScore: imageResult.score,
           qualityReasoning: imageResult.reasoning || null,
@@ -6478,6 +6492,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             pageNumber: pageNum,
             imageData: imageResult.imageData,
             description: scene.description,
+            prompt: imagePrompt,
             qualityScore: imageResult.score,
             qualityReasoning: imageResult.reasoning || null,
             wasRegenerated: imageResult.wasRegenerated || false,
@@ -6491,6 +6506,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             pageNumber: pageNum,
             imageData: null,
             description: scene.description,
+            prompt: null,
             error: error.message
           };
         }
@@ -6615,7 +6631,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         });
         coverPrompts.frontCover = frontCoverPrompt;
         const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos, null, 'cover');
-        coverImages.frontCover = { imageData: frontCoverResult.imageData, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
+        coverImages.frontCover = { imageData: frontCoverResult.imageData, description: titlePageScene, prompt: frontCoverPrompt, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
 
         // Initial page - use ALL characters (main character centered, all others around)
         // Pass ALL character photos since this is a group scene introducing everyone
@@ -6636,7 +6652,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             });
         coverPrompts.initialPage = initialPrompt;
         const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos, null, 'cover');
-        coverImages.initialPage = { imageData: initialResult.imageData, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
+        coverImages.initialPage = { imageData: initialResult.imageData, description: initialPageScene, prompt: initialPrompt, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
 
         // Back cover - use ALL characters with EQUAL prominence (no focus on main character)
         // Pass ALL character photos since this is a group scene with everyone equal
@@ -6649,7 +6665,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         });
         coverPrompts.backCover = backCoverPrompt;
         const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos, null, 'cover');
-        coverImages.backCover = { imageData: backCoverResult.imageData, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
+        coverImages.backCover = { imageData: backCoverResult.imageData, description: backCoverScene, prompt: backCoverPrompt, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
 
         console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
       } catch (error) {
@@ -7198,6 +7214,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               pageNumber: pageNum,
               imageData: imageResult.imageData,
               description: sceneDescription,
+              prompt: imagePrompt,
               text: pageContent,  // Include page text for progressive display
               qualityScore: imageResult.score,
               qualityReasoning: imageResult.reasoning || null,
@@ -7212,6 +7229,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               pageNumber: pageNum,
               imageData: imageResult.imageData,
               description: sceneDescription,
+              prompt: imagePrompt,
               text: pageContent,
               qualityScore: imageResult.score,
               qualityReasoning: imageResult.reasoning || null,
@@ -7379,16 +7397,22 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       coverImages = {
         frontCover: {
           imageData: frontCoverResult.imageData,
+          description: titlePageScene,
+          prompt: coverPrompts.frontCover,
           qualityScore: frontCoverResult.score,
           qualityReasoning: frontCoverResult.reasoning || null
         },
         initialPage: {
           imageData: initialPageResult.imageData,
+          description: initialPageScene,
+          prompt: coverPrompts.initialPage,
           qualityScore: initialPageResult.score,
           qualityReasoning: initialPageResult.reasoning || null
         },
         backCover: {
           imageData: backCoverResult.imageData,
+          description: backCoverScene,
+          prompt: coverPrompts.backCover,
           qualityScore: backCoverResult.score,
           qualityReasoning: backCoverResult.reasoning || null
         }
