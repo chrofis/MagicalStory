@@ -37,7 +37,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
       {/* Photo examples - smaller on desktop */}
       {showExamples && (
         <div className="max-w-xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             {/* Good example 1: Full body */}
             <div className="text-center">
               <img
@@ -80,6 +80,17 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
               />
               <span className="text-xs text-red-600 font-medium">
                 ✗ {language === 'de' ? 'Brille/Hut/Helm' : language === 'fr' ? 'Lunettes/Chapeau' : 'Glasses/Hat/Helmet'}
+              </span>
+            </div>
+            {/* Bad example 3: Crowded/multiple people */}
+            <div className="text-center">
+              <img
+                src="/images/One person not many.jpg"
+                alt="One person only example"
+                className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
+              />
+              <span className="text-xs text-red-600 font-medium">
+                ✗ {language === 'de' ? 'Eine Person, nicht viele' : language === 'fr' ? 'Une personne, pas plusieurs' : 'One person, not many'}
               </span>
             </div>
           </div>

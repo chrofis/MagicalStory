@@ -4013,7 +4013,7 @@ app.delete('/api/files/:fileId', authenticateToken, async (req, res) => {
 app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
   try {
     const storyId = req.params.id;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     console.log(`📄 [PDF GET] Generating PDF for story: ${storyId}`);
 

@@ -22,6 +22,29 @@ const EMAIL_FOOTER = `
   </p>
 `;
 
+/**
+ * Get a proper greeting name from userName
+ * Prefers first name, falls back to username, avoids using email addresses
+ */
+function getGreetingName(userName) {
+  if (!userName) return 'there';
+
+  // If it looks like an email address, don't use it
+  if (userName.includes('@')) {
+    // Try to extract name from email (e.g., "john.doe@..." -> "John")
+    const localPart = userName.split('@')[0];
+    // If local part is reasonable (letters only, not too long), capitalize and use it
+    if (/^[a-zA-Z]+$/.test(localPart) && localPart.length <= 20) {
+      return localPart.charAt(0).toUpperCase() + localPart.slice(1).toLowerCase();
+    }
+    return 'there';
+  }
+
+  // Use first word if it's a full name
+  const firstName = userName.split(' ')[0];
+  return firstName || 'there';
+}
+
 // Check if email is configured
 function isEmailConfigured() {
   return !!resend;
@@ -40,17 +63,19 @@ async function sendStoryCompleteEmail(userEmail, userName, storyTitle) {
     return null;
   }
 
+  const greeting = getGreetingName(userName);
+
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: `Your magical story "${storyTitle}" is ready!`,
-      text: `Hello ${userName},\n\nGreat news! Your personalized story "${storyTitle}" has been created and is waiting for you.\n\nVisit https://www.magicalstory.ch to view your story.\n\nYou can now:\n- Preview your complete story with illustrations\n- Order a printed hardcover book\n- Download as PDF\n\nThank you for using MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
+      text: `Hello ${greeting},\n\nGreat news! Your personalized story "${storyTitle}" has been created and is waiting for you.\n\nVisit https://www.magicalstory.ch to view your story.\n\nYou can now:\n- Preview your complete story with illustrations\n- Order a printed hardcover book\n- Download as PDF\n\nThank you for using MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #6366f1;">Your Story is Ready!</h1>
-          <p>Hello ${userName},</p>
+          <p>Hello ${greeting},</p>
           <p>Great news! Your personalized story <strong>"${storyTitle}"</strong> has been created and is waiting for you.</p>
           <p>
             <a href="https://www.magicalstory.ch"
@@ -92,17 +117,19 @@ async function sendStoryFailedEmail(userEmail, userName) {
     return null;
   }
 
+  const greeting = getGreetingName(userName);
+
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: 'We encountered an issue with your story',
-      text: `Hello ${userName},\n\nWe're sorry, but we encountered a problem while creating your story.\n\nOur team has been notified and is looking into this. You can try creating your story again at https://www.magicalstory.ch, or contact us if the problem persists.\n\nWe apologize for any inconvenience.\n\nBest regards,\nThe MagicalStory Team\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
+      text: `Hello ${greeting},\n\nWe're sorry, but we encountered a problem while creating your story.\n\nOur team has been notified and is looking into this. You can try creating your story again at https://www.magicalstory.ch, or contact us if the problem persists.\n\nWe apologize for any inconvenience.\n\nBest regards,\nThe MagicalStory Team\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #ef4444;">Story Generation Issue</h1>
-          <p>Hello ${userName},</p>
+          <p>Hello ${greeting},</p>
           <p>We're sorry, but we encountered a problem while creating your story.</p>
           <p>Our team has been notified and is looking into this. You can try creating your story again, or contact us if the problem persists.</p>
           <p>
@@ -140,17 +167,19 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
     return null;
   }
 
+  const greeting = getGreetingName(customerName);
+
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: customerEmail,
       subject: `Order Confirmed - Your MagicalStory Book is Being Printed!`,
-      text: `Hello ${customerName},\n\nThank you for your order! Your personalized storybook is now being printed.\n\nOrder Details:\n- Order ID: ${orderDetails.orderId}\n- Amount: ${orderDetails.amount} ${orderDetails.currency}\n- Shipping to: ${orderDetails.shippingAddress.line1}, ${orderDetails.shippingAddress.city}, ${orderDetails.shippingAddress.postal_code}, ${orderDetails.shippingAddress.country}\n\nYou'll receive another email when your book ships with tracking information.\nEstimated delivery: 5-10 business days\n\nThank you for choosing MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
+      text: `Hello ${greeting},\n\nThank you for your order! Your personalized storybook is now being printed.\n\nOrder Details:\n- Order ID: ${orderDetails.orderId}\n- Amount: ${orderDetails.amount} ${orderDetails.currency}\n- Shipping to: ${orderDetails.shippingAddress.line1}, ${orderDetails.shippingAddress.city}, ${orderDetails.shippingAddress.postal_code}, ${orderDetails.shippingAddress.country}\n\nYou'll receive another email when your book ships with tracking information.\nEstimated delivery: 5-10 business days\n\nThank you for choosing MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #22c55e;">Order Confirmed!</h1>
-          <p>Hello ${customerName},</p>
+          <p>Hello ${greeting},</p>
           <p>Thank you for your order! Your personalized storybook is now being printed.</p>
 
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">

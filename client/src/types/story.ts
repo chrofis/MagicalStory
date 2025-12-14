@@ -28,6 +28,7 @@ export interface SceneImage {
   imageData: string;
   score?: number;
   description?: string;
+  prompt?: string;  // The actual prompt sent to image generation API
   qualityScore?: number;
   qualityReasoning?: string;
   // Regeneration info (for dev mode)
@@ -39,6 +40,8 @@ export interface SceneImage {
 
 export interface CoverImageData {
   imageData?: string;
+  description?: string;  // Scene description for the cover
+  prompt?: string;       // The actual prompt sent to image generation API
   qualityScore?: number;
   qualityReasoning?: string;
 }

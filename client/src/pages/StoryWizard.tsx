@@ -15,7 +15,7 @@ import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/ch
 import type { LanguageLevel, SceneDescription, SceneImage, Language, CoverImages } from '@/types/story';
 
 // Services & Helpers
-import { characterService, storyService } from '@/services';
+import { characterService, storyService, authService } from '@/services';
 import { storyTypes } from '@/constants/storyTypes';
 import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship } from '@/constants/relationships';
 import { createLogger } from '@/services/logger';
@@ -906,28 +906,31 @@ export default function StoryWizard() {
               } : undefined}
               onPrintBook={storyId ? async () => {
                 // Developer mode: direct print without payment
-                const address = prompt(
-                  language === 'de'
-                    ? 'Lieferadresse eingeben (Format: Vorname, Nachname, Strasse, PLZ, Ort, Land, Email):'
-                    : language === 'fr'
-                    ? 'Entrez l\'adresse de livraison (Format: Prénom, Nom, Rue, CP, Ville, Pays, Email):'
-                    : 'Enter shipping address (Format: FirstName, LastName, Street, PostCode, City, Country, Email):'
-                );
-                if (!address) return;
+                // First try to load shipping address from database
+                let shippingAddress = await authService.getShippingAddress();
 
-                const parts = address.split(',').map(p => p.trim());
-                if (parts.length < 7) {
-                  alert(language === 'de'
-                    ? 'Ungültiges Adressformat'
-                    : language === 'fr'
-                    ? 'Format d\'adresse invalide'
-                    : 'Invalid address format');
-                  return;
-                }
+                if (!shippingAddress) {
+                  // No saved address, ask user to enter one
+                  const address = prompt(
+                    language === 'de'
+                      ? 'Keine Adresse gespeichert. Bitte eingeben (Format: Vorname, Nachname, Strasse, PLZ, Ort, Land, Email):'
+                      : language === 'fr'
+                      ? 'Aucune adresse enregistrée. Veuillez entrer (Format: Prénom, Nom, Rue, CP, Ville, Pays, Email):'
+                      : 'No saved address. Please enter (Format: FirstName, LastName, Street, PostCode, City, Country, Email):'
+                  );
+                  if (!address) return;
 
-                try {
-                  log.info('Creating print order for story:', storyId);
-                  const result = await storyService.createPrintOrder(storyId, {
+                  const parts = address.split(',').map(p => p.trim());
+                  if (parts.length < 7) {
+                    alert(language === 'de'
+                      ? 'Ungültiges Adressformat'
+                      : language === 'fr'
+                      ? 'Format d\'adresse invalide'
+                      : 'Invalid address format');
+                    return;
+                  }
+
+                  shippingAddress = {
                     firstName: parts[0],
                     lastName: parts[1],
                     addressLine1: parts[2],
@@ -935,6 +938,29 @@ export default function StoryWizard() {
                     city: parts[4],
                     country: parts[5],
                     email: parts[6],
+                  };
+                }
+
+                // Confirm the address
+                const addressSummary = `${shippingAddress.firstName} ${shippingAddress.lastName}\n${shippingAddress.addressLine1}\n${shippingAddress.postCode} ${shippingAddress.city}\n${shippingAddress.country}`;
+                const confirmMsg = language === 'de'
+                  ? `Druckauftrag an folgende Adresse senden?\n\n${addressSummary}`
+                  : language === 'fr'
+                  ? `Envoyer la commande à cette adresse?\n\n${addressSummary}`
+                  : `Send print order to this address?\n\n${addressSummary}`;
+
+                if (!confirm(confirmMsg)) return;
+
+                try {
+                  log.info('Creating print order for story:', storyId);
+                  const result = await storyService.createPrintOrder(storyId, {
+                    firstName: shippingAddress.firstName,
+                    lastName: shippingAddress.lastName,
+                    addressLine1: shippingAddress.addressLine1,
+                    city: shippingAddress.city,
+                    postCode: shippingAddress.postCode,
+                    country: shippingAddress.country,
+                    email: shippingAddress.email || '',
                   });
                   alert(language === 'de'
                     ? `Druckauftrag erstellt! Order ID: ${result.orderId}`

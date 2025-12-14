@@ -84,30 +84,39 @@ export const authService = {
   },
 
   async getShippingAddress(): Promise<{
-    name: string;
-    address1: string;
-    address2?: string;
+    firstName: string;
+    lastName: string;
+    addressLine1: string;
     city: string;
-    state?: string;
-    postcode: string;
+    postCode: string;
     country: string;
+    email?: string;
   } | null> {
     try {
-      const response = await api.get<{ address: unknown }>('/api/user/shipping-address');
-      return response.address as ReturnType<typeof authService.getShippingAddress> extends Promise<infer T> ? T : never;
+      // Server returns the address directly, not wrapped in { address: ... }
+      const response = await api.get<{
+        firstName: string;
+        lastName: string;
+        addressLine1: string;
+        city: string;
+        postCode: string;
+        country: string;
+        email?: string;
+      } | null>('/api/user/shipping-address');
+      return response;
     } catch {
       return null;
     }
   },
 
   async updateShippingAddress(address: {
-    name: string;
-    address1: string;
-    address2?: string;
+    firstName: string;
+    lastName: string;
+    addressLine1: string;
     city: string;
-    state?: string;
-    postcode: string;
+    postCode: string;
     country: string;
+    email?: string;
   }): Promise<void> {
     await api.put('/api/user/shipping-address', address);
   },

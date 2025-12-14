@@ -1,6 +1,6 @@
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import type { SceneImage, SceneDescription, CoverImages } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 
 interface StoryDisplayProps {
@@ -17,6 +17,9 @@ interface StoryDisplayProps {
   onCreateAnother?: () => void;
   onDownloadTxt?: () => void;
   onRegenerateImage?: (pageNumber: number) => Promise<void>;
+  onRegenerateCover?: (coverType: 'front' | 'back' | 'initial') => Promise<void>;
+  onEditImage?: (pageNumber: number) => void;
+  onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   storyId?: string | null;
   developerMode?: boolean;
 }
@@ -35,6 +38,9 @@ export function StoryDisplay({
   onCreateAnother,
   onDownloadTxt,
   onRegenerateImage,
+  onRegenerateCover,
+  onEditImage,
+  onEditCover,
   storyId,
   developerMode = false,
 }: StoryDisplayProps) {
@@ -52,10 +58,17 @@ export function StoryDisplay({
   const hasImages = sceneImages.length > 0;
 
   // Helper to get cover image data (handles both string and object formats)
-  const getCoverImageData = (img: string | { imageData?: string } | null | undefined): string | null => {
+  const getCoverImageData = (img: string | CoverImageData | null | undefined): string | null => {
     if (!img) return null;
     if (typeof img === 'string') return img;
     return img.imageData || null;
+  };
+
+  // Helper to get full cover image object
+  const getCoverImageObject = (img: string | CoverImageData | null | undefined): CoverImageData | null => {
+    if (!img) return null;
+    if (typeof img === 'string') return { imageData: img };
+    return img;
   };
 
   // Helper to get scene description for a page
@@ -150,46 +163,178 @@ export function StoryDisplay({
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Front Cover */}
-            {getCoverImageData(coverImages.frontCover) && (
-              <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
-                <h4 className="text-lg font-bold text-gray-800 mb-3">
-                  {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
-                </h4>
-                <img
-                  src={getCoverImageData(coverImages.frontCover)!}
-                  alt="Front Cover"
-                  className="w-full rounded-lg shadow-md"
-                />
-              </div>
-            )}
+            {getCoverImageData(coverImages.frontCover) && (() => {
+              const coverObj = getCoverImageObject(coverImages.frontCover);
+              return (
+                <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                  <h4 className="text-lg font-bold text-gray-800 mb-3">
+                    {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
+                  </h4>
+                  <img
+                    src={getCoverImageData(coverImages.frontCover)!}
+                    alt="Front Cover"
+                    className="w-full rounded-lg shadow-md"
+                  />
+                  {developerMode && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex gap-2">
+                        {onRegenerateCover && (
+                          <button onClick={() => onRegenerateCover('front')} disabled={isGenerating}
+                            className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}>
+                            <RefreshCw size={14} /> {language === 'de' ? 'Neu' : 'Regen'}
+                          </button>
+                        )}
+                        {onEditCover && (
+                          <button onClick={() => onEditCover('front')} disabled={isGenerating}
+                            className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'}`}>
+                            <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                          </button>
+                        )}
+                      </div>
+                      {coverObj?.description && (
+                        <details className="bg-green-50 border border-green-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-green-800">{language === 'de' ? 'Szenenbeschreibung' : 'Scene Description'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
+                        </details>
+                      )}
+                      {coverObj?.prompt && (
+                        <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-blue-800">{language === 'de' ? 'API-Prompt' : 'API Prompt'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
+                        </details>
+                      )}
+                      {coverObj?.qualityScore !== undefined && (
+                        <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
+                            <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
+                            <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {(coverObj.qualityScore / 10).toFixed(1)}/10
+                            </span>
+                          </summary>
+                          {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Initial Page */}
-            {getCoverImageData(coverImages.initialPage) && (
-              <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
-                <h4 className="text-lg font-bold text-gray-800 mb-3">
-                  {language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page d\'introduction' : 'Initial Page'}
-                </h4>
-                <img
-                  src={getCoverImageData(coverImages.initialPage)!}
-                  alt="Initial Page"
-                  className="w-full rounded-lg shadow-md"
-                />
-              </div>
-            )}
+            {getCoverImageData(coverImages.initialPage) && (() => {
+              const coverObj = getCoverImageObject(coverImages.initialPage);
+              return (
+                <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                  <h4 className="text-lg font-bold text-gray-800 mb-3">
+                    {language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page d\'introduction' : 'Initial Page'}
+                  </h4>
+                  <img
+                    src={getCoverImageData(coverImages.initialPage)!}
+                    alt="Initial Page"
+                    className="w-full rounded-lg shadow-md"
+                  />
+                  {developerMode && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex gap-2">
+                        {onRegenerateCover && (
+                          <button onClick={() => onRegenerateCover('initial')} disabled={isGenerating}
+                            className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}>
+                            <RefreshCw size={14} /> {language === 'de' ? 'Neu' : 'Regen'}
+                          </button>
+                        )}
+                        {onEditCover && (
+                          <button onClick={() => onEditCover('initial')} disabled={isGenerating}
+                            className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'}`}>
+                            <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                          </button>
+                        )}
+                      </div>
+                      {coverObj?.description && (
+                        <details className="bg-green-50 border border-green-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-green-800">{language === 'de' ? 'Szenenbeschreibung' : 'Scene Description'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
+                        </details>
+                      )}
+                      {coverObj?.prompt && (
+                        <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-blue-800">{language === 'de' ? 'API-Prompt' : 'API Prompt'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
+                        </details>
+                      )}
+                      {coverObj?.qualityScore !== undefined && (
+                        <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
+                            <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
+                            <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {(coverObj.qualityScore / 10).toFixed(1)}/10
+                            </span>
+                          </summary>
+                          {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Back Cover */}
-            {getCoverImageData(coverImages.backCover) && (
-              <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
-                <h4 className="text-lg font-bold text-gray-800 mb-3">
-                  {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
-                </h4>
-                <img
-                  src={getCoverImageData(coverImages.backCover)!}
-                  alt="Back Cover"
-                  className="w-full rounded-lg shadow-md"
-                />
-              </div>
-            )}
+            {getCoverImageData(coverImages.backCover) && (() => {
+              const coverObj = getCoverImageObject(coverImages.backCover);
+              return (
+                <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                  <h4 className="text-lg font-bold text-gray-800 mb-3">
+                    {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
+                  </h4>
+                  <img
+                    src={getCoverImageData(coverImages.backCover)!}
+                    alt="Back Cover"
+                    className="w-full rounded-lg shadow-md"
+                  />
+                  {developerMode && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex gap-2">
+                        {onRegenerateCover && (
+                          <button onClick={() => onRegenerateCover('back')} disabled={isGenerating}
+                            className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}>
+                            <RefreshCw size={14} /> {language === 'de' ? 'Neu' : 'Regen'}
+                          </button>
+                        )}
+                        {onEditCover && (
+                          <button onClick={() => onEditCover('back')} disabled={isGenerating}
+                            className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'}`}>
+                            <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                          </button>
+                        )}
+                      </div>
+                      {coverObj?.description && (
+                        <details className="bg-green-50 border border-green-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-green-800">{language === 'de' ? 'Szenenbeschreibung' : 'Scene Description'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
+                        </details>
+                      )}
+                      {coverObj?.prompt && (
+                        <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-blue-800">{language === 'de' ? 'API-Prompt' : 'API Prompt'}</summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
+                        </details>
+                      )}
+                      {coverObj?.qualityScore !== undefined && (
+                        <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
+                            <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
+                            <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {(coverObj.qualityScore / 10).toFixed(1)}/10
+                            </span>
+                          </summary>
+                          {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -225,18 +370,31 @@ export function StoryDisplay({
                         {/* Developer Mode Features */}
                         {developerMode && (
                           <div className="mt-3 space-y-2">
-                            {/* Regenerate Image Button */}
-                            {onRegenerateImage && (
-                              <button
-                                onClick={() => onRegenerateImage(pageNumber)}
-                                disabled={isGenerating}
-                                className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                }`}
-                              >
-                                <RefreshCw size={14} /> {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
-                              </button>
-                            )}
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                              {onRegenerateImage && (
+                                <button
+                                  onClick={() => onRegenerateImage(pageNumber)}
+                                  disabled={isGenerating}
+                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  }`}
+                                >
+                                  <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
+                                </button>
+                              )}
+                              {onEditImage && (
+                                <button
+                                  onClick={() => onEditImage(pageNumber)}
+                                  disabled={isGenerating}
+                                  className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                                  }`}
+                                >
+                                  <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                                </button>
+                              )}
+                            </div>
 
                             {/* Scene Description */}
                             {getSceneDescription(pageNumber) && (
@@ -246,6 +404,18 @@ export function StoryDisplay({
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                                   {getSceneDescription(pageNumber)}
+                                </pre>
+                              </details>
+                            )}
+
+                            {/* API Prompt */}
+                            {image.prompt && (
+                              <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
+                                  {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                                </summary>
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                                  {image.prompt}
                                 </pre>
                               </details>
                             )}
@@ -340,18 +510,31 @@ export function StoryDisplay({
                         {/* Developer Mode Features */}
                         {developerMode && (
                           <div className="mt-3 space-y-2">
-                            {/* Regenerate Image Button */}
-                            {onRegenerateImage && (
-                              <button
-                                onClick={() => onRegenerateImage(pageNumber)}
-                                disabled={isGenerating}
-                                className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                }`}
-                              >
-                                <RefreshCw size={14} /> {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
-                              </button>
-                            )}
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                              {onRegenerateImage && (
+                                <button
+                                  onClick={() => onRegenerateImage(pageNumber)}
+                                  disabled={isGenerating}
+                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  }`}
+                                >
+                                  <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
+                                </button>
+                              )}
+                              {onEditImage && (
+                                <button
+                                  onClick={() => onEditImage(pageNumber)}
+                                  disabled={isGenerating}
+                                  className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                                  }`}
+                                >
+                                  <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                                </button>
+                              )}
+                            </div>
 
                             {/* Scene Description */}
                             {getSceneDescription(pageNumber) && (
@@ -361,6 +544,18 @@ export function StoryDisplay({
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                                   {getSceneDescription(pageNumber)}
+                                </pre>
+                              </details>
+                            )}
+
+                            {/* API Prompt */}
+                            {image.prompt && (
+                              <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
+                                  {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                                </summary>
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                                  {image.prompt}
                                 </pre>
                               </details>
                             )}
