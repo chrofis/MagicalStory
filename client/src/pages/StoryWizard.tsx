@@ -31,9 +31,15 @@ export default function StoryWizard() {
   const { isAuthenticated } = useAuth();
   const { showSuccess, showInfo } = useToast();
 
-  // Wizard state
-  const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
+  // Wizard state - start at step 5 with loading if we have a storyId in URL
+  const [step, setStep] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('storyId') ? 5 : 1;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return !!params.get('storyId');
+  });
   const [developerMode, setDeveloperMode] = useState(false);
   const [imageGenMode, setImageGenMode] = useState<'parallel' | 'sequential' | null>(null); // null = server default
 
@@ -1092,11 +1098,12 @@ export default function StoryWizard() {
                     : `Print order created! Order ID: ${result.orderId}`);
                 } catch (error) {
                   log.error('Print order failed:', error);
+                  const errorMsg = error instanceof Error ? error.message : String(error);
                   alert(language === 'de'
-                    ? 'Druckauftrag fehlgeschlagen'
+                    ? `Druckauftrag fehlgeschlagen:\n${errorMsg}`
                     : language === 'fr'
-                    ? 'Échec de la commande d\'impression'
-                    : 'Print order failed');
+                    ? `Échec de la commande d'impression:\n${errorMsg}`
+                    : `Print order failed:\n${errorMsg}`);
                 }
               } : undefined}
               onCreateAnother={() => {

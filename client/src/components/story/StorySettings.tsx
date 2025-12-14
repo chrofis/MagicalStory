@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Wand2, Star } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
@@ -37,6 +38,17 @@ export function StorySettings({
   onImageGenModeChange,
 }: StorySettingsProps) {
   const { t, language } = useLanguage();
+
+  // Available page options based on developer mode
+  const availablePageOptions = developerMode ? [10, 30, 40, 50] : [30, 40, 50];
+
+  // If current pages value is not in available options, reset to default (30)
+  useEffect(() => {
+    const validOptions = developerMode ? [10, 30, 40, 50] : [30, 40, 50];
+    if (!validOptions.includes(pages)) {
+      onPagesChange(30);
+    }
+  }, [pages, developerMode, onPagesChange]);
 
   const readingLevels = [
     {
@@ -163,14 +175,11 @@ export function StorySettings({
               onChange={(e) => onPagesChange(parseInt(e.target.value))}
               className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base md:text-lg font-semibold"
             >
-              {/* Developer mode testing option */}
-              {developerMode && (
-                <option value="10">{getPageLabel(10, true)}</option>
-              )}
-              {/* Normal user options */}
-              <option value="30">{getPageLabel(30)}</option>
-              <option value="40">{getPageLabel(40)}</option>
-              <option value="50">{getPageLabel(50)}</option>
+              {availablePageOptions.map((pageOption) => (
+                <option key={pageOption} value={pageOption}>
+                  {getPageLabel(pageOption, pageOption === 10)}
+                </option>
+              ))}
             </select>
             <p className="text-sm text-gray-500 mt-2">
               {languageLevel === '1st-grade'

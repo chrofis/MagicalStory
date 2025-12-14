@@ -91,7 +91,7 @@ export function GenerationProgress({
     de: {
       title: 'Geschichte wird erstellt!',
       timeInfo: 'Dies dauert normalerweise etwa 10 Minuten.',
-      emailInfo: 'Du erhältst eine E-Mail wenn fertig.',
+      emailInfo: 'Du erhältst eine E-Mail wenn die Geschichte bereit ist.',
       noEmailInfo: 'Du kannst diese Seite schließen und später zurückkommen.',
     },
     fr: {

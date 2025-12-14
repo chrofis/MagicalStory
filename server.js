@@ -80,8 +80,8 @@ const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;  // 0 = no
 // Image generation mode: 'parallel' (fast) or 'sequential' (consistent - passes previous image)
 const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'sequential';
 
-// Image quality threshold - regenerate if score below this value (1-10 scale)
-const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 5;
+// Image quality threshold - regenerate if score below this value (0-100 scale)
+const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
 
 // Verbose logging mode - set VERBOSE_LOGGING=true for detailed debug output
 const VERBOSE_LOGGING = process.env.VERBOSE_LOGGING === 'true';
@@ -2613,7 +2613,9 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     }
 
     const story = storyResult.rows[0];
-    const storyData = story.story_data;
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
 
     // Find the page text
     const pageText = getPageText(storyData.storyText, pageNumber);
@@ -2645,7 +2647,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Save updated story
     storyData.sceneDescriptions = sceneDescriptions;
     await dbPool.query(
-      'UPDATE stories SET story_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE stories SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
@@ -2683,7 +2685,9 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     }
 
     const story = storyResult.rows[0];
-    const storyData = story.story_data;
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
 
     // Get scene description
     const sceneDescriptions = storyData.sceneDescriptions || [];
@@ -2707,8 +2711,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos);
 
     // Update the image in story data
-    let images = storyData.images || [];
-    const existingIndex = images.findIndex(img => img.pageNumber === pageNumber);
+    let sceneImages = storyData.sceneImages || [];
+    const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
 
     const newImageData = {
       pageNumber,
@@ -2723,10 +2727,10 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     };
 
     if (existingIndex >= 0) {
-      images[existingIndex] = newImageData;
+      sceneImages[existingIndex] = newImageData;
     } else {
-      images.push(newImageData);
-      images.sort((a, b) => a.pageNumber - b.pageNumber);
+      sceneImages.push(newImageData);
+      sceneImages.sort((a, b) => a.pageNumber - b.pageNumber);
     }
 
     // Update image prompts
@@ -2734,9 +2738,9 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     storyData.imagePrompts[pageNumber] = imagePrompt;
 
     // Save updated story
-    storyData.images = images;
+    storyData.sceneImages = sceneImages;
     await dbPool.query(
-      'UPDATE stories SET story_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE stories SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
@@ -2779,7 +2783,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     }
 
     const story = storyResult.rows[0];
-    const storyData = story.story_data;
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
 
     // Get character photos
     const characterPhotos = [];
@@ -2895,7 +2901,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
 
     // Save updated story
     await dbPool.query(
-      'UPDATE stories SET story_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE stories SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
@@ -2939,7 +2945,9 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
     }
 
     const story = storyResult.rows[0];
-    const storyData = story.story_data;
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
 
     // Update page text if provided
     if (text !== undefined) {
@@ -2962,7 +2970,7 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
 
     // Save updated story
     await dbPool.query(
-      'UPDATE stories SET story_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE stories SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
@@ -4165,13 +4173,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
       }
     }
 
-    // Add title on front cover
-    if (storyData.title) {
-      doc.fillColor('white').font('Helvetica-Bold').fontSize(24);
-      const titleX = backCoverWidth + 20;
-      const titleY = coverHeight - 50;
-      doc.text(storyData.title, titleX, titleY, { width: frontCoverWidth - 40, align: 'center' });
-    }
+    // Title is already part of the AI-generated cover image, no need to add text overlay
 
     // Add initial page if exists
     const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
@@ -4357,9 +4359,9 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-        // Layout: Image takes top 90%, text takes bottom 10%
-        const imageHeight = pageSize * 0.90;
-        const textAreaHeight = pageSize * 0.10;
+        // Layout: Image takes top 85%, text takes bottom 15%
+        const imageHeight = pageSize * 0.85;
+        const textAreaHeight = pageSize * 0.15;
         const textAreaY = imageHeight;
 
         // Add image at top if available
@@ -5708,8 +5710,8 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
 
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-        const imageHeight = pageSize * 0.90;
-        const textAreaHeight = pageSize * 0.10;
+        const imageHeight = pageSize * 0.85;
+        const textAreaHeight = pageSize * 0.15;
         const textAreaY = imageHeight;
 
         if (image && image.imageData) {
@@ -6071,9 +6073,10 @@ const ART_STYLES = {
   cartoon: '2D cartoon style, bold outlines, vibrant flat colors, classic animation look',
   anime: 'anime style, Japanese animation, expressive eyes, dynamic poses, cel-shaded',
   chibi: 'chibi style, super deformed, cute, big head, small body, kawaii, adorable',
-  steampunk: 'steampunk style, Victorian era, gears, brass, copper, goggles, mechanical details, vintage technology',
+  steampunk: 'steampunk anime style, Victorian era, gears, brass, copper, goggles, mechanical details, vintage technology, anime influenced',
   comic: 'comic book style, bold ink lines, halftone dots, dynamic action, speech bubbles aesthetic, superhero comic art',
-  manga: 'manga style, Japanese comic art, detailed linework, screentones, dramatic shading, expressive characters'
+  manga: 'manga style, Japanese comic art, detailed linework, screentones, dramatic shading, expressive characters',
+  watercolor: 'watercolor painting style, soft edges, flowing colors, delicate washes, artistic brushstrokes, dreamy atmosphere, traditional watercolor illustration'
 };
 
 // Helper function to extract cover scene descriptions from outline
@@ -6790,7 +6793,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       storyText: fullStoryText,
       outline: '', // No outline for picture book mode
       sceneDescriptions: allSceneDescriptions,
-      images: allImages,
+      sceneImages: allImages,
       coverImages: coverImages,
       imagePrompts: imagePrompts,
       coverPrompts: coverPrompts,  // Cover image prompts for dev mode
@@ -7539,7 +7542,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       outline,
       storyText: fullStoryText,
       sceneDescriptions: allSceneDescriptions,
-      images: allImages,
+      sceneImages: allImages,
       coverImages,
       imagePrompts,
       coverPrompts,  // Cover image prompts for dev mode
@@ -8646,15 +8649,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene') {
   // Generate first image
-  console.log(`🎨 [QUALITY RETRY] Generating image (threshold: ${IMAGE_QUALITY_THRESHOLD})...`);
+  console.log(`🎨 [QUALITY RETRY] Generating image (threshold: ${IMAGE_QUALITY_THRESHOLD}%)...`);
   const firstResult = await callGeminiAPIForImage(prompt, characterPhotos, previousImage, evaluationType);
 
   const firstScore = firstResult.score || 0;
-  console.log(`⭐ [QUALITY RETRY] First image score: ${firstScore}/10`);
+  console.log(`⭐ [QUALITY RETRY] First image score: ${firstScore}%`);
 
   // If score meets threshold, return immediately
   if (firstScore >= IMAGE_QUALITY_THRESHOLD) {
-    console.log(`✅ [QUALITY RETRY] Score ${firstScore} >= ${IMAGE_QUALITY_THRESHOLD}, keeping first image`);
+    console.log(`✅ [QUALITY RETRY] Score ${firstScore}% >= ${IMAGE_QUALITY_THRESHOLD}%, keeping first image`);
     return {
       imageData: firstResult.imageData,
       score: firstResult.score,
@@ -8667,7 +8670,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   }
 
   // Score below threshold - regenerate
-  console.log(`🔄 [QUALITY RETRY] Score ${firstScore} < ${IMAGE_QUALITY_THRESHOLD}, regenerating...`);
+  console.log(`🔄 [QUALITY RETRY] Score ${firstScore}% < ${IMAGE_QUALITY_THRESHOLD}%, regenerating...`);
 
   // Clear cache for this prompt to force new generation
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
@@ -8676,11 +8679,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   // Generate second image
   const secondResult = await callGeminiAPIForImage(prompt, characterPhotos, previousImage, evaluationType);
   const secondScore = secondResult.score || 0;
-  console.log(`⭐ [QUALITY RETRY] Second image score: ${secondScore}/10`);
+  console.log(`⭐ [QUALITY RETRY] Second image score: ${secondScore}%`);
 
   // Return the better image
   if (secondScore > firstScore) {
-    console.log(`✅ [QUALITY RETRY] Using second image (score ${secondScore} > ${firstScore})`);
+    console.log(`✅ [QUALITY RETRY] Using second image (score ${secondScore}% > ${firstScore}%)`);
     return {
       imageData: secondResult.imageData,
       score: secondResult.score,
@@ -8691,7 +8694,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       originalReasoning: firstResult.reasoning
     };
   } else {
-    console.log(`✅ [QUALITY RETRY] Keeping first image (score ${firstScore} >= ${secondScore})`);
+    console.log(`✅ [QUALITY RETRY] Keeping first image (score ${firstScore}% >= ${secondScore}%)`);
     // Put the first result back in cache since it's the better one
     imageCache.set(cacheKey, firstResult);
     return {

@@ -71,7 +71,7 @@ export function RelationshipEditor({
             return (
               <div
                 key={key}
-                className={`rounded-lg p-2 md:p-3 inline-flex w-auto mx-auto ${
+                className={`rounded-lg p-2 md:p-3 inline-flex w-auto lg:w-3/4 mx-auto ${
                   isNotKnown
                     ? 'bg-white border-red-500 border-[3px]'
                     : 'bg-blue-50 border-blue-300 border-2'

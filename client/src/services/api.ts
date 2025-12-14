@@ -38,8 +38,17 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || error.message || `HTTP ${response.status}`);
+      const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+      // Include details from server if available (e.g., print provider errors)
+      let errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;
+      if (errorData.details) {
+        // Extract meaningful info from details
+        const details = errorData.details;
+        if (details.message) errorMessage += `: ${details.message}`;
+        else if (details.error) errorMessage += `: ${details.error}`;
+        else if (typeof details === 'string') errorMessage += `: ${details}`;
+      }
+      throw new Error(errorMessage);
     }
 
     // Handle empty responses

@@ -208,7 +208,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
                             <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
                             <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                              {(coverObj.qualityScore / 10).toFixed(1)}/10
+                              {Math.round(coverObj.qualityScore)}%
                             </span>
                           </summary>
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
@@ -266,7 +266,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
                             <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
                             <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                              {(coverObj.qualityScore / 10).toFixed(1)}/10
+                              {Math.round(coverObj.qualityScore)}%
                             </span>
                           </summary>
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
@@ -324,7 +324,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
                             <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
                             <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                              {(coverObj.qualityScore / 10).toFixed(1)}/10
+                              {Math.round(coverObj.qualityScore)}%
                             </span>
                           </summary>
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
@@ -430,7 +430,7 @@ export function StoryDisplay({
                                     image.qualityScore >= 50 ? 'text-yellow-600' :
                                     'text-red-600'
                                   }`}>
-                                    {(image.qualityScore / 10).toFixed(1)}/10
+                                    {Math.round(image.qualityScore)}%
                                   </span>
                                 </summary>
                                 {image.qualityReasoning && (
@@ -448,7 +448,7 @@ export function StoryDisplay({
                                 <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
                                   <span>🔄 {language === 'de' ? 'Bild regeneriert' : language === 'fr' ? 'Image régénérée' : 'Image Regenerated'}</span>
                                   {image.originalScore !== undefined && (
-                                    <span className="text-red-600">Original: {(image.originalScore / 10).toFixed(1)}/10</span>
+                                    <span className="text-red-600">Original: {Math.round(image.originalScore)}%</span>
                                   )}
                                 </summary>
                                 <div className="mt-2">
@@ -570,7 +570,7 @@ export function StoryDisplay({
                                     image.qualityScore >= 50 ? 'text-yellow-600' :
                                     'text-red-600'
                                   }`}>
-                                    {(image.qualityScore / 10).toFixed(1)}/10
+                                    {Math.round(image.qualityScore)}%
                                   </span>
                                 </summary>
                                 {image.qualityReasoning && (
@@ -588,7 +588,7 @@ export function StoryDisplay({
                                 <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
                                   <span>🔄 {language === 'de' ? 'Bild regeneriert' : language === 'fr' ? 'Image régénérée' : 'Image Regenerated'}</span>
                                   {image.originalScore !== undefined && (
-                                    <span className="text-red-600">Original: {(image.originalScore / 10).toFixed(1)}/10</span>
+                                    <span className="text-red-600">Original: {Math.round(image.originalScore)}%</span>
                                   )}
                                 </summary>
                                 <div className="mt-2">
