@@ -52,6 +52,7 @@ export default function StoryWizard() {
   const [customRelationships, setCustomRelationships] = useState<string[]>([]);
   const relationshipsInitialized = useRef<string | null>(null);
   const dataLoadedFromApi = useRef(false);
+  const relationshipsDirty = useRef(false); // Track if relationships were modified
 
   // Step 4: Story Settings - load from localStorage
   const [mainCharacters, setMainCharacters] = useState<number[]>(() => {
@@ -471,6 +472,7 @@ export default function StoryWizard() {
     const forwardKey = `${char1Id}-${char2Id}`;
     const inverseKey = `${char2Id}-${char1Id}`;
     log.debug('Updating relationship:', forwardKey, '=', value, ', inverse:', inverseKey, '=', inverse);
+    relationshipsDirty.current = true; // Mark as modified
     setRelationships(prev => ({
       ...prev,
       [forwardKey]: value,
@@ -479,6 +481,7 @@ export default function StoryWizard() {
   };
 
   const addCustomRelationship = (relationship: string) => {
+    relationshipsDirty.current = true; // Mark as modified
     setCustomRelationships(prev => [...prev, relationship]);
   };
 
@@ -540,9 +543,13 @@ export default function StoryWizard() {
     return false;
   };
 
-  // Save all character data including relationships
+  // Save all character data including relationships (only if modified)
   const saveAllCharacterData = async () => {
     if (characters.length === 0) return;
+    if (!relationshipsDirty.current) {
+      log.debug('Relationships not modified, skipping save');
+      return;
+    }
     try {
       await characterService.saveCharacterData({
         characters,
@@ -553,6 +560,7 @@ export default function StoryWizard() {
         customWeaknesses: [],
         customFears: [],
       });
+      relationshipsDirty.current = false; // Reset dirty flag after save
       log.debug('Character data auto-saved');
     } catch (error) {
       log.error('Failed to auto-save character data:', error);
@@ -801,7 +809,7 @@ export default function StoryWizard() {
             relationships={relationships}
             relationshipTexts={relationshipTexts}
             onRelationshipChange={updateRelationship}
-            onRelationshipTextChange={(key, text) => setRelationshipTexts(prev => ({ ...prev, [key]: text }))}
+            onRelationshipTextChange={(key, text) => { relationshipsDirty.current = true; setRelationshipTexts(prev => ({ ...prev, [key]: text })); }}
             customRelationships={customRelationships}
             onAddCustomRelationship={addCustomRelationship}
           />
