@@ -12,7 +12,7 @@ import { GenerationProgress, StoryDisplay } from '@/components/generation';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
-import type { LanguageLevel, SceneDescription, SceneImage, Language } from '@/types/story';
+import type { LanguageLevel, SceneDescription, SceneImage, Language, CoverImages } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService } from '@/services';
@@ -93,7 +93,7 @@ export default function StoryWizard() {
   const [, setStoryOutline] = useState(''); // Outline stored for potential later use
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
-  const [coverImages, setCoverImages] = useState<{ frontCover: string | null; initialPage: string | null; backCover: string | null }>({ frontCover: null, initialPage: null, backCover: null });
+  const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
   const [storyId, setStoryId] = useState<string | null>(null);
   const [, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
 
@@ -594,9 +594,10 @@ export default function StoryWizard() {
   const generateStory = async (skipImages = false) => {
     setIsGenerating(true);
     setStep(5);
+    // Use 0-100 scale to match server progress
     setGenerationProgress({
-      current: 1,
-      total: skipImages ? 3 : 5,
+      current: 5,
+      total: 100,
       message: language === 'de' ? 'Starte Generierung...' : language === 'fr' ? 'Démarrage de la génération...' : 'Starting generation...'
     });
 
@@ -631,6 +632,7 @@ export default function StoryWizard() {
         log.debug('Job status:', status);
 
         if (status.progress) {
+          // Server progress is already in { current, total, message } format
           setGenerationProgress(status.progress);
         }
 
@@ -651,8 +653,8 @@ export default function StoryWizard() {
       }
 
       setGenerationProgress({
-        current: skipImages ? 3 : 5,
-        total: skipImages ? 3 : 5,
+        current: 100,
+        total: 100,
         message: language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé!' : 'Complete!'
       });
     } catch (error) {

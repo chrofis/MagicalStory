@@ -51,6 +51,13 @@ export function StoryDisplay({
   const storyPages = parseStoryPages(story);
   const hasImages = sceneImages.length > 0;
 
+  // Helper to get cover image data (handles both string and object formats)
+  const getCoverImageData = (img: string | { imageData?: string } | null | undefined): string | null => {
+    if (!img) return null;
+    if (typeof img === 'string') return img;
+    return img.imageData || null;
+  };
+
   // Helper to get scene description for a page
   const getSceneDescription = (pageNumber: number): string | undefined => {
     // First check sceneDescriptions array
@@ -136,20 +143,20 @@ export function StoryDisplay({
       </div>
 
       {/* Cover Images Display */}
-      {coverImages && (coverImages.frontCover || coverImages.initialPage || coverImages.backCover) && (
+      {coverImages && (getCoverImageData(coverImages.frontCover) || getCoverImageData(coverImages.initialPage) || getCoverImageData(coverImages.backCover)) && (
         <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mt-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <BookOpen size={24} /> {language === 'de' ? 'Buchcover' : language === 'fr' ? 'Couvertures' : 'Book Covers'}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Front Cover */}
-            {coverImages.frontCover && (
+            {getCoverImageData(coverImages.frontCover) && (
               <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
                 <h4 className="text-lg font-bold text-gray-800 mb-3">
                   {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
                 </h4>
                 <img
-                  src={typeof coverImages.frontCover === 'string' ? coverImages.frontCover : coverImages.frontCover}
+                  src={getCoverImageData(coverImages.frontCover)!}
                   alt="Front Cover"
                   className="w-full rounded-lg shadow-md"
                 />
@@ -157,13 +164,13 @@ export function StoryDisplay({
             )}
 
             {/* Initial Page */}
-            {coverImages.initialPage && (
+            {getCoverImageData(coverImages.initialPage) && (
               <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
                 <h4 className="text-lg font-bold text-gray-800 mb-3">
                   {language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page d\'introduction' : 'Initial Page'}
                 </h4>
                 <img
-                  src={typeof coverImages.initialPage === 'string' ? coverImages.initialPage : coverImages.initialPage}
+                  src={getCoverImageData(coverImages.initialPage)!}
                   alt="Initial Page"
                   className="w-full rounded-lg shadow-md"
                 />
@@ -171,13 +178,13 @@ export function StoryDisplay({
             )}
 
             {/* Back Cover */}
-            {coverImages.backCover && (
+            {getCoverImageData(coverImages.backCover) && (
               <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
                 <h4 className="text-lg font-bold text-gray-800 mb-3">
                   {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
                 </h4>
                 <img
-                  src={typeof coverImages.backCover === 'string' ? coverImages.backCover : coverImages.backCover}
+                  src={getCoverImageData(coverImages.backCover)!}
                   alt="Back Cover"
                   className="w-full rounded-lg shadow-md"
                 />

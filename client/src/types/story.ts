@@ -37,10 +37,16 @@ export interface SceneImage {
   originalReasoning?: string;
 }
 
+export interface CoverImageData {
+  imageData?: string;
+  qualityScore?: number;
+  qualityReasoning?: string;
+}
+
 export interface CoverImages {
-  frontCover: string | null;
-  initialPage: string | null;
-  backCover: string | null;
+  frontCover: string | CoverImageData | null;
+  initialPage: string | CoverImageData | null;
+  backCover: string | CoverImageData | null;
 }
 
 export interface SavedStory {

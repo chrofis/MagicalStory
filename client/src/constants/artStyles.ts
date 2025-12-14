@@ -53,13 +53,13 @@ export const artStyles: ArtStyle[] = [
     id: 'steampunk',
     name: { en: 'Steampunk', de: 'Steampunk', fr: 'Steampunk' },
     emoji: '⚙️',
-    image: '/images/steampunk.jpg',
+    image: '/images/steampunk style.jpg',
     description: {
       en: 'Victorian-era inspired with gears and brass',
       de: 'Von der viktorianischen Ära inspiriert mit Zahnrädern und Messing',
       fr: "Inspiré de l'ère victorienne avec engrenages et laiton",
     },
-    prompt: 'steampunk style, Victorian era, gears, brass, copper, goggles, mechanical details, vintage technology',
+    prompt: 'steampunk anime style, Victorian era, gears, brass, copper, goggles, mechanical details, vintage technology, anime influenced',
   },
   {
     id: 'comic',
@@ -84,5 +84,17 @@ export const artStyles: ArtStyle[] = [
       fr: 'Style manga japonais, noir et blanc avec trames',
     },
     prompt: 'manga style, Japanese comic art, detailed linework, screentones, dramatic shading, expressive characters',
+  },
+  {
+    id: 'watercolor',
+    name: { en: 'Watercolor', de: 'Aquarell', fr: 'Aquarelle' },
+    emoji: '🎨',
+    image: '/images/water color style.jpg',
+    description: {
+      en: 'Soft watercolor painting with flowing colors',
+      de: 'Sanfte Aquarellmalerei mit fließenden Farben',
+      fr: 'Peinture aquarelle douce aux couleurs fluides',
+    },
+    prompt: 'watercolor painting style, soft edges, flowing colors, delicate washes, artistic brushstrokes, dreamy atmosphere, traditional watercolor illustration',
   },
 ];
