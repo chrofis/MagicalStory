@@ -16,6 +16,8 @@ interface StorySettingsProps {
   storyDetails: string;
   onStoryDetailsChange: (details: string) => void;
   developerMode?: boolean;
+  imageGenMode?: 'parallel' | 'sequential' | null;
+  onImageGenModeChange?: (mode: 'parallel' | 'sequential' | null) => void;
 }
 
 export function StorySettings({
@@ -31,6 +33,8 @@ export function StorySettings({
   storyDetails,
   onStoryDetailsChange,
   developerMode = false,
+  imageGenMode,
+  onImageGenModeChange,
 }: StorySettingsProps) {
   const { t, language } = useLanguage();
 
@@ -214,6 +218,61 @@ export function StorySettings({
               : 'This text will be printed on page 0 of your book. If you leave it empty, page 0 will contain only an illustration with no text.'}
           </p>
         </div>
+
+        {/* Developer Mode Options */}
+        {developerMode && onImageGenModeChange && (
+          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
+            <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
+              🛠️ {language === 'de' ? 'Entwickler-Optionen' : language === 'fr' ? 'Options développeur' : 'Developer Options'}
+            </h3>
+
+            {/* Image Generation Mode */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                {language === 'de' ? 'Bildgenerierungsmodus' : language === 'fr' ? 'Mode de génération d\'images' : 'Image Generation Mode'}
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onImageGenModeChange(null)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                    imageGenMode === null
+                      ? 'bg-yellow-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {language === 'de' ? 'Server-Standard' : language === 'fr' ? 'Par défaut serveur' : 'Server Default'}
+                </button>
+                <button
+                  onClick={() => onImageGenModeChange('parallel')}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                    imageGenMode === 'parallel'
+                      ? 'bg-yellow-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {language === 'de' ? 'Parallel (schnell)' : language === 'fr' ? 'Parallèle (rapide)' : 'Parallel (fast)'}
+                </button>
+                <button
+                  onClick={() => onImageGenModeChange('sequential')}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                    imageGenMode === 'sequential'
+                      ? 'bg-yellow-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {language === 'de' ? 'Sequenziell (konsistent)' : language === 'fr' ? 'Séquentiel (cohérent)' : 'Sequential (consistent)'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {language === 'de'
+                  ? 'Parallel = alle Bilder gleichzeitig. Sequenziell = jedes Bild basiert auf dem vorherigen.'
+                  : language === 'fr'
+                  ? 'Parallèle = toutes les images simultanément. Séquentiel = chaque image basée sur la précédente.'
+                  : 'Parallel = all images at once. Sequential = each image based on previous one.'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

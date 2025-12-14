@@ -17,8 +17,11 @@ export interface Character {
   clothing?: string;
   specialDetails?: string;
   strengths: string[];
-  weaknesses: string[];
-  fears: string[];
+  flaws: string[];
+  challenges: string[];
+  // Legacy fields (for backward compatibility)
+  weaknesses?: string[];
+  fears?: string[];
   photoUrl?: string;
   thumbnailUrl?: string;  // Smaller cropped face photo for lists
   bodyPhotoUrl?: string;

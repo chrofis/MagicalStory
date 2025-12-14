@@ -13,8 +13,11 @@ interface CharacterResponse {
   clothing?: string;
   special_details?: string;
   strengths: string[];
-  weaknesses: string[];
-  fears: string[];
+  flaws?: string[];
+  challenges?: string[];
+  // Legacy fields
+  weaknesses?: string[];
+  fears?: string[];
   photo_url?: string;
   thumbnail_url?: string;
   body_photo_url?: string;
@@ -36,9 +39,13 @@ function mapCharacterFromApi(char: CharacterResponse): Character {
     clothing: char.clothing,
     specialDetails: char.special_details,
     strengths: char.strengths || [],
-    weaknesses: char.weaknesses || [],
-    fears: char.fears || [],
+    flaws: char.flaws || char.weaknesses || [],
+    challenges: char.challenges || char.fears || [],
+    // Legacy fields for backward compatibility
+    weaknesses: char.weaknesses || char.flaws || [],
+    fears: char.fears || char.challenges || [],
     photoUrl: char.photo_url,
+    thumbnailUrl: char.thumbnail_url,
     bodyPhotoUrl: char.body_photo_url,
     bodyNoBgUrl: char.body_no_bg_url,
     faceBox: char.face_box,
@@ -59,9 +66,13 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     clothing: char.clothing,
     special_details: char.specialDetails,
     strengths: char.strengths,
-    weaknesses: char.weaknesses,
-    fears: char.fears,
+    flaws: char.flaws,
+    challenges: char.challenges,
+    // Legacy fields for backward compatibility
+    weaknesses: char.flaws || char.weaknesses,
+    fears: char.challenges || char.fears,
     photo_url: char.photoUrl,
+    thumbnail_url: char.thumbnailUrl,
     body_photo_url: char.bodyPhotoUrl,
     body_no_bg_url: char.bodyNoBgUrl,
     face_box: char.faceBox,

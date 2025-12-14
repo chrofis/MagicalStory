@@ -197,6 +197,90 @@ export const storyService = {
     });
     return response.content;
   },
+
+  // Job-based story generation
+  async createStoryJob(data: {
+    storyType: string;
+    storyTypeName: string;
+    artStyle: string;
+    language: Language;
+    languageLevel: LanguageLevel;
+    pages: number;
+    dedication?: string;
+    storyDetails?: string;
+    characters: Character[];
+    mainCharacters: number[];
+    relationships: RelationshipMap;
+    relationshipTexts: RelationshipTextMap;
+    skipImages?: boolean;
+    imageGenMode?: 'parallel' | 'sequential' | null;
+  }): Promise<{ jobId: string }> {
+    const response = await api.post<{ jobId: string; message: string }>('/api/jobs/create-story', {
+      storyType: data.storyType,
+      storyTypeName: data.storyTypeName,
+      artStyle: data.artStyle,
+      language: data.language,
+      languageLevel: data.languageLevel,
+      pages: data.pages,
+      dedication: data.dedication,
+      storyDetails: data.storyDetails,
+      characters: data.characters,
+      mainCharacters: data.mainCharacters,
+      relationships: data.relationships,
+      relationshipTexts: data.relationshipTexts,
+      skipImages: data.skipImages,
+      imageGenMode: data.imageGenMode,
+    });
+    return { jobId: response.jobId };
+  },
+
+  async getJobStatus(jobId: string): Promise<{
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    progress?: { current: number; total: number; message: string };
+    result?: {
+      storyId: string;
+      title: string;
+      outline: string;
+      story: string;
+      sceneDescriptions: SceneDescription[];
+      sceneImages: SceneImage[];
+      coverImages?: CoverImages;
+    };
+    error?: string;
+  }> {
+    const response = await api.get<{
+      status: string;
+      progress?: { current: number; total: number; message: string };
+      result?: {
+        storyId: string;
+        title: string;
+        outline: string;
+        story: string;
+        sceneDescriptions: SceneDescription[];
+        sceneImages: SceneImage[];
+        coverImages?: CoverImages;
+      };
+      error?: string;
+    }>(`/api/jobs/${jobId}`);
+    return {
+      status: response.status as 'pending' | 'processing' | 'completed' | 'failed',
+      progress: response.progress,
+      result: response.result,
+      error: response.error,
+    };
+  },
+
+  // PDF generation
+  async generatePdf(storyId: string): Promise<Blob> {
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(`/api/stories/${storyId}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF');
+    }
+    return response.blob();
+  },
 };
 
 export default storyService;

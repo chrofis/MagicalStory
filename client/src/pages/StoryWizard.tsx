@@ -15,7 +15,8 @@ import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/ch
 import type { LanguageLevel, SceneDescription, SceneImage, Language } from '@/types/story';
 
 // Services & Helpers
-import { characterService } from '@/services';
+import { characterService, storyService } from '@/services';
+import { storyTypes } from '@/constants/storyTypes';
 import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship } from '@/constants/relationships';
 
 export default function StoryWizard() {
@@ -27,6 +28,7 @@ export default function StoryWizard() {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [developerMode, setDeveloperMode] = useState(false);
+  const [imageGenMode, setImageGenMode] = useState<'parallel' | 'sequential' | null>(null); // null = server default
 
   // Step 1: Story Type & Art Style
   const [storyType, setStoryType] = useState('');
@@ -37,6 +39,7 @@ export default function StoryWizard() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
+  const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits'>('photo');
 
   // Step 3: Relationships - loaded from API with characters
   const [relationships, setRelationships] = useState<RelationshipMap>({});
@@ -82,8 +85,11 @@ export default function StoryWizard() {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
+  const [, setStoryOutline] = useState(''); // Outline stored for potential later use
   const [, setSceneDescriptions] = useState<SceneDescription[]>([]);
-  const [sceneImages] = useState<SceneImage[]>([]);
+  const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
+  const [storyId, setStoryId] = useState<string | null>(null);
+  const [, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -253,9 +259,10 @@ export default function StoryWizard() {
       gender: 'other',
       age: '8',
       strengths: [],
-      weaknesses: [],
-      fears: [],
+      flaws: [],
+      challenges: [],
     });
+    setCharacterStep('photo');
     setShowCharacterCreated(false);
   };
 
@@ -296,14 +303,17 @@ export default function StoryWizard() {
             hairColor: analysis.attributes?.hairColor || prev.hairColor,
             clothing: analysis.attributes?.clothing || prev.clothing,
           } : null);
+          setCharacterStep('name'); // Move to name entry after photo analysis
         } else {
           // Fallback: use original photo without cropping
           console.warn('Photo analysis failed, using original photo');
           setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
+          setCharacterStep('name'); // Still move to name entry
         }
       } catch (error) {
         console.error('Photo analysis error:', error);
         setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
+        setCharacterStep('name'); // Still move to name entry on error
       } finally {
         setIsLoading(false);
       }
@@ -352,6 +362,7 @@ export default function StoryWizard() {
 
   const editCharacter = (char: Character) => {
     setCurrentCharacter({ ...char });
+    setCharacterStep('traits'); // Go directly to traits when editing
     setShowCharacterCreated(false);
   };
 
@@ -503,40 +514,87 @@ export default function StoryWizard() {
   };
 
   // Generate story
-  const generateStory = async () => {
+  // Get story type name for display
+  const getStoryTypeName = () => {
+    // Check custom types first
+    const customType = customStoryTypes.find(t => t.id === storyType);
+    if (customType) return customType.name[language as keyof typeof customType.name];
+    // Check built-in types
+    const builtInType = storyTypes.find(t => t.id === storyType);
+    if (builtInType) return builtInType.name[language as keyof typeof builtInType.name];
+    return storyType;
+  };
+
+  const generateStory = async (skipImages = false) => {
     setIsGenerating(true);
     setStep(5);
-    setGenerationProgress({ current: 1, total: 4, message: language === 'de' ? 'Erstelle Gliederung...' : language === 'fr' ? 'Creation du plan...' : 'Generating outline...' });
+    setGenerationProgress({
+      current: 1,
+      total: skipImages ? 3 : 5,
+      message: language === 'de' ? 'Starte Generierung...' : language === 'fr' ? 'Démarrage de la génération...' : 'Starting generation...'
+    });
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setGenerationProgress({ current: 2, total: 4, message: language === 'de' ? 'Schreibe Geschichte...' : language === 'fr' ? 'Ecriture de l\'histoire...' : 'Writing story...' });
+      // Create the story generation job
+      const { jobId: newJobId } = await storyService.createStoryJob({
+        storyType,
+        storyTypeName: getStoryTypeName(),
+        artStyle,
+        language: language as Language,
+        languageLevel,
+        pages,
+        dedication,
+        storyDetails,
+        characters,
+        mainCharacters,
+        relationships,
+        relationshipTexts,
+        skipImages,
+        imageGenMode,
+      });
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setGenerationProgress({ current: 3, total: 4, message: language === 'de' ? 'Erstelle Szenen...' : language === 'fr' ? 'Creation des scenes...' : 'Creating scenes...' });
+      setJobId(newJobId);
+      console.log('Story job created:', newJobId);
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Poll for job status
+      let completed = false;
+      while (!completed) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
 
-      const mainChar = characters.find(c => mainCharacters.includes(c.id));
-      setStoryTitle(mainChar ? `${mainChar.name}'s Adventure` : 'My Magical Story');
-      setGeneratedStory(`--- Page 1 ---
-Once upon a time, ${mainChar?.name || 'our hero'} set off on a magical adventure.
+        const status = await storyService.getJobStatus(newJobId);
+        console.log('Job status:', status);
 
---- Page 2 ---
-The journey was full of wonder and excitement.
+        if (status.progress) {
+          setGenerationProgress(status.progress);
+        }
 
---- Page 3 ---
-And they all lived happily ever after.`);
+        if (status.status === 'completed' && status.result) {
+          // Job completed successfully
+          setStoryId(status.result.storyId);
+          setStoryTitle(status.result.title);
+          setStoryOutline(status.result.outline);
+          setGeneratedStory(status.result.story);
+          setSceneDescriptions(status.result.sceneDescriptions || []);
+          setSceneImages(status.result.sceneImages || []);
+          completed = true;
+          console.log('Story generation completed!');
+        } else if (status.status === 'failed') {
+          throw new Error(status.error || 'Story generation failed');
+        }
+      }
 
-      setSceneDescriptions([
-        { pageNumber: 1, description: 'A magical forest at dawn with golden sunlight filtering through the trees' },
-        { pageNumber: 2, description: 'The hero discovering a hidden treasure in a mysterious cave' },
-        { pageNumber: 3, description: 'A joyful celebration with friends under a rainbow' },
-      ]);
-
-      setGenerationProgress({ current: 4, total: 4, message: language === 'de' ? 'Fertig!' : language === 'fr' ? 'Termine!' : 'Complete!' });
+      setGenerationProgress({
+        current: skipImages ? 3 : 5,
+        total: skipImages ? 3 : 5,
+        message: language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé!' : 'Complete!'
+      });
     } catch (error) {
       console.error('Generation failed:', error);
+      alert(language === 'de'
+        ? `Generierung fehlgeschlagen: ${error}`
+        : language === 'fr'
+        ? `Échec de la génération: ${error}`
+        : `Generation failed: ${error}`);
     } finally {
       setTimeout(() => setIsGenerating(false), 500);
     }
@@ -574,13 +632,19 @@ And they all lived happily ever after.`);
 
       case 2:
         if (currentCharacter) {
-          if (!currentCharacter.photoUrl) {
+          // Step 2a: Photo upload
+          if (characterStep === 'photo') {
             return (
               <div className="space-y-6">
                 <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
                   <Users size={24} /> {t.createCharacters}
                 </h2>
                 <PhotoUpload onPhotoSelect={handlePhotoSelect} />
+                {isLoading && (
+                  <div className="text-center py-4">
+                    <LoadingSpinner message={language === 'de' ? 'Foto wird analysiert...' : language === 'fr' ? 'Analyse de la photo...' : 'Analyzing photo...'} />
+                  </div>
+                )}
                 <button
                   onClick={() => setCurrentCharacter(null)}
                   className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
@@ -590,6 +654,29 @@ And they all lived happily ever after.`);
               </div>
             );
           }
+
+          // Step 2b: Name entry only
+          if (characterStep === 'name') {
+            return (
+              <div className="space-y-6">
+                <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                  <Users size={24} /> {t.createCharacters}
+                </h2>
+                <CharacterForm
+                  character={currentCharacter}
+                  onChange={setCurrentCharacter}
+                  onSave={saveCharacter}
+                  onCancel={() => setCurrentCharacter(null)}
+                  onPhotoChange={handlePhotoSelect}
+                  onContinueToTraits={() => setCharacterStep('traits')}
+                  isLoading={isLoading}
+                  step="name"
+                />
+              </div>
+            );
+          }
+
+          // Step 2c: Traits and characteristics
           return (
             <div className="space-y-6">
               <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -602,6 +689,7 @@ And they all lived happily ever after.`);
                 onCancel={() => setCurrentCharacter(null)}
                 onPhotoChange={handlePhotoSelect}
                 isLoading={isLoading}
+                step="traits"
               />
             </div>
           );
@@ -668,6 +756,8 @@ And they all lived happily ever after.`);
             storyDetails={storyDetails}
             onStoryDetailsChange={setStoryDetails}
             developerMode={developerMode}
+            imageGenMode={imageGenMode}
+            onImageGenModeChange={setImageGenMode}
           />
         );
 
@@ -690,6 +780,24 @@ And they all lived happily ever after.`);
                 a.click();
                 URL.revokeObjectURL(url);
               }}
+              onDownloadPdf={storyId ? async () => {
+                try {
+                  const blob = await storyService.generatePdf(storyId);
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${storyTitle}.pdf`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch (error) {
+                  console.error('PDF download failed:', error);
+                  alert(language === 'de'
+                    ? 'PDF-Download fehlgeschlagen'
+                    : language === 'fr'
+                    ? 'Échec du téléchargement PDF'
+                    : 'PDF download failed');
+                }
+              } : undefined}
               onCreateAnother={() => {
                 // Reset story state but keep characters
                 setGeneratedStory('');
@@ -707,7 +815,7 @@ And they all lived happily ever after.`);
             <p className="text-gray-600 mb-6">
               {language === 'de' ? 'Bereit, deine Geschichte zu erstellen!' : language === 'fr' ? 'Prêt à créer votre histoire!' : 'Ready to create your story!'}
             </p>
-            <Button onClick={generateStory} size="lg" icon={Sparkles}>
+            <Button onClick={() => generateStory(false)} size="lg" icon={Sparkles}>
               {t.generateStory}
             </Button>
           </div>
@@ -771,7 +879,7 @@ And they all lived happily ever after.`);
               {step === 4 && (
                 <>
                   <button
-                    onClick={generateStory}
+                    onClick={() => generateStory(false)}
                     disabled={!canGoNext()}
                     className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
                       !canGoNext()
@@ -785,7 +893,7 @@ And they all lived happily ever after.`);
                   {/* Developer Mode: Generate Text Only (no images) */}
                   {developerMode && (
                     <button
-                      onClick={generateStory}
+                      onClick={() => generateStory(true)}
                       disabled={!canGoNext()}
                       className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
                         !canGoNext()

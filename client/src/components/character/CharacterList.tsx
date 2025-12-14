@@ -93,14 +93,14 @@ export function CharacterList({
                   <strong className="text-green-600">{t.strengths}:</strong> {char.strengths.join(', ')}
                 </p>
               )}
-              {char.weaknesses && char.weaknesses.length > 0 && (
+              {char.flaws && char.flaws.length > 0 && (
                 <p className="text-xs text-gray-800 mb-1">
-                  <strong className="text-orange-600">{t.weaknesses}:</strong> {char.weaknesses.join(', ')}
+                  <strong className="text-orange-600">{language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : 'Flaws'}:</strong> {char.flaws.join(', ')}
                 </p>
               )}
-              {char.fears && char.fears.length > 0 && (
+              {char.challenges && char.challenges.length > 0 && (
                 <p className="text-xs text-gray-800 mb-1">
-                  <strong className="text-red-600">{t.fears}:</strong> {char.fears.join(', ')}
+                  <strong className="text-purple-600">{language === 'de' ? 'Herausforderungen' : language === 'fr' ? 'Défis' : 'Challenges'}:</strong> {char.challenges.join(', ')}
                 </p>
               )}
             </div>

@@ -8,31 +8,26 @@ interface TraitSelectorProps {
   selectedTraits: string[];
   onSelect: (traits: string[]) => void;
   minRequired?: number;
-  variant?: 'success' | 'warning' | 'danger';
+  color?: 'green' | 'orange' | 'purple' | 'blue';
   allowCustom?: boolean;
 }
 
-const variantStyles = {
-  success: {
-    bg: 'bg-indigo-100',
-    selected: 'bg-indigo-600 text-white',
-    hover: 'hover:bg-indigo-200',
-    text: 'text-indigo-700',
-    border: 'border-indigo-300',
+const colorStyles = {
+  green: {
+    selected: 'bg-green-500 text-white',
+    label: 'text-green-700',
   },
-  warning: {
-    bg: 'bg-indigo-100',
-    selected: 'bg-indigo-600 text-white',
-    hover: 'hover:bg-indigo-200',
-    text: 'text-indigo-700',
-    border: 'border-indigo-300',
+  orange: {
+    selected: 'bg-orange-500 text-white',
+    label: 'text-orange-700',
   },
-  danger: {
-    bg: 'bg-indigo-100',
-    selected: 'bg-indigo-600 text-white',
-    hover: 'hover:bg-indigo-200',
-    text: 'text-indigo-700',
-    border: 'border-indigo-300',
+  purple: {
+    selected: 'bg-purple-500 text-white',
+    label: 'text-purple-700',
+  },
+  blue: {
+    selected: 'bg-indigo-500 text-white',
+    label: 'text-indigo-700',
   },
 };
 
@@ -42,13 +37,13 @@ export function TraitSelector({
   selectedTraits,
   onSelect,
   minRequired = 0,
-  variant = 'success',
+  color = 'green',
   allowCustom = true,
 }: TraitSelectorProps) {
   const { t, language } = useLanguage();
   const [customTrait, setCustomTrait] = useState('');
   const [customTraits, setCustomTraits] = useState<string[]>([]);
-  const styles = variantStyles[variant];
+  const styles = colorStyles[color];
 
   const toggleTrait = (trait: string) => {
     if (selectedTraits.includes(trait)) {
@@ -70,30 +65,32 @@ export function TraitSelector({
   const allTraits = [...traits, ...customTraits];
 
   return (
-    <div className={`border ${styles.border} rounded-lg p-3 ${styles.bg.replace('100', '50')}`}>
-      <label className={`block text-sm font-semibold mb-2 ${styles.text}`}>
-        {label}{' '}
+    <div>
+      {/* Label */}
+      <label className={`block text-lg font-semibold mb-2 ${styles.label}`}>
+        {label}
         {minRequired > 0 && (
-          <span className="text-xs font-normal">
+          <span className="text-sm font-normal text-gray-500 ml-2">
             ({t.selectAtLeast} {minRequired})
           </span>
         )}
         {selectedTraits.length > 0 && (
-          <span className="ml-2 text-xs">
-            ({t.selected}: {selectedTraits.length})
+          <span className="text-sm font-normal text-gray-500 ml-2">
+            - {t.selected}: {selectedTraits.length}
           </span>
         )}
       </label>
 
-      <div className="flex flex-wrap gap-1.5">
+      {/* Trait pills */}
+      <div className="flex flex-wrap gap-2 mb-3">
         {allTraits.map((trait) => (
           <button
             key={trait}
             onClick={() => toggleTrait(trait)}
-            className={`px-2 py-1 rounded text-xs transition-colors ${
+            className={`px-3 py-1 rounded-full text-sm transition-colors ${
               selectedTraits.includes(trait)
                 ? styles.selected
-                : `${styles.bg} ${styles.hover} text-gray-700`
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
           >
             {trait}
@@ -103,7 +100,7 @@ export function TraitSelector({
 
       {/* Custom trait input */}
       {allowCustom && (
-        <div className="flex gap-2 mt-2">
+        <div className="flex gap-2">
           <input
             type="text"
             value={customTrait}
@@ -111,24 +108,23 @@ export function TraitSelector({
             onKeyDown={(e) => e.key === 'Enter' && addCustomTrait()}
             placeholder={
               language === 'de'
-                ? 'Eigene hinzufugen...'
+                ? 'Eigene hinzufügen...'
                 : language === 'fr'
-                ? 'Ajouter personnalise...'
+                ? 'Ajouter personnalisé...'
                 : 'Add custom...'
             }
-            className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
           />
           <button
             onClick={addCustomTrait}
             disabled={!customTrait.trim()}
-            className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 ${
+            className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-1 transition-colors ${
               customTrait.trim()
-                ? `${styles.selected.split(' ')[0]} text-white hover:opacity-90`
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <Plus size={12} />
-            {language === 'de' ? 'Hinzufugen' : language === 'fr' ? 'Ajouter' : 'Add'}
+            <Plus size={16} />
           </button>
         </div>
       )}
