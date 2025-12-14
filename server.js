@@ -3120,7 +3120,7 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
       // Check if PDF file exists in files table (database mode only)
       if (STORAGE_MODE === 'database' && dbPool) {
         const pdfFileResult = await dbQuery(
-          "SELECT id FROM files WHERE story_id = $1 AND file_type = 'pdf' ORDER BY created_at DESC LIMIT 1",
+          "SELECT id FROM files WHERE story_id = $1 AND file_type = 'story_pdf' ORDER BY created_at DESC LIMIT 1",
           [storyId]
         );
 
