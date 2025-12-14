@@ -53,7 +53,8 @@ interface StoryDetailsServer {
   relationships: RelationshipMap;
   relationshipTexts: RelationshipTextMap;
   outline?: string;
-  storyText?: string;
+  storyText?: string; // New stories use this
+  story?: string; // Old stories use this
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];
   coverImages?: CoverImages;
@@ -101,6 +102,8 @@ export const storyService = {
     try {
       // Server returns story directly, not wrapped in { story: ... }
       const s = await api.get<StoryDetailsServer>(`/api/stories/${id}`);
+      // Handle both old format (story) and new format (storyText)
+      const storyContent = s.storyText || s.story || '';
       return {
         id: s.id,
         title: s.title,
@@ -115,7 +118,7 @@ export const storyService = {
         relationships: s.relationships,
         relationshipTexts: s.relationshipTexts,
         outline: s.outline,
-        story: s.storyText,
+        story: storyContent,
         sceneDescriptions: s.sceneDescriptions,
         sceneImages: s.sceneImages,
         coverImages: s.coverImages,
