@@ -127,7 +127,7 @@ export function CharacterForm({
       {/* Header with photo and name */}
       <div className="flex items-center gap-4">
         {/* Photo with change option */}
-        <div className="flex-shrink-0 relative group">
+        <label className="flex-shrink-0 relative group cursor-pointer">
           {character.photoUrl && (
             <img
               src={character.photoUrl}
@@ -135,16 +135,21 @@ export function CharacterForm({
               className="w-20 h-20 rounded-full object-cover border-2 border-indigo-400"
             />
           )}
-          <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+          {/* Hover overlay for desktop */}
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
             <Upload size={20} className="text-white" />
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </label>
-        </div>
+          </div>
+          {/* Always visible badge for mobile/discoverability */}
+          <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white rounded-full p-1.5 shadow-lg border-2 border-white">
+            <Upload size={12} />
+          </div>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </label>
         {/* Name */}
         <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
       </div>
