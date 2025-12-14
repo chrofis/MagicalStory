@@ -271,22 +271,26 @@ export default function StoryWizard() {
     reader.onload = async (e) => {
       const originalPhotoUrl = e.target?.result as string;
 
-      try {
-        setIsLoading(true);
+      // IMMEDIATELY show name entry with original photo - don't block on analysis
+      setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
+      setCharacterStep('name');
 
-        // Analyze photo with Python MediaPipe API
+      // Run photo analysis in BACKGROUND (non-blocking)
+      try {
+        console.log('Starting background photo analysis...');
         const analysis = await characterService.analyzePhoto(originalPhotoUrl);
 
         if (analysis.success) {
-          // Use cropped images from Python API
+          // Update character with analyzed data (user may have already entered name)
           const photoUrl = analysis.faceThumbnail || originalPhotoUrl;
           const bodyPhotoUrl = analysis.bodyCrop || originalPhotoUrl;
           const bodyNoBgUrl = analysis.bodyNoBg || undefined;
 
-          console.log('Photo analysis successful:', {
+          console.log('Photo analysis complete:', {
             hasFaceThumbnail: !!analysis.faceThumbnail,
             hasBodyCrop: !!analysis.bodyCrop,
             hasBodyNoBg: !!analysis.bodyNoBg,
+            attributes: analysis.attributes,
           });
 
           setCurrentCharacter(prev => prev ? {
@@ -296,26 +300,20 @@ export default function StoryWizard() {
             bodyNoBgUrl,
             faceBox: analysis.faceBox,
             bodyBox: analysis.bodyBox,
-            gender: (analysis.attributes?.gender as 'male' | 'female' | 'other') || prev.gender,
-            age: analysis.attributes?.age || prev.age,
-            height: analysis.attributes?.height || prev.height,
+            // Only update attributes if they were detected and user hasn't changed defaults
+            gender: analysis.attributes?.gender ? (analysis.attributes.gender as 'male' | 'female' | 'other') : prev.gender,
+            age: analysis.attributes?.age ? String(analysis.attributes.age) : prev.age,
+            height: analysis.attributes?.height ? String(analysis.attributes.height) : prev.height,
             build: analysis.attributes?.build || prev.build,
             hairColor: analysis.attributes?.hairColor || prev.hairColor,
             clothing: analysis.attributes?.clothing || prev.clothing,
           } : null);
-          setCharacterStep('name'); // Move to name entry after photo analysis
         } else {
-          // Fallback: use original photo without cropping
-          console.warn('Photo analysis failed, using original photo');
-          setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
-          setCharacterStep('name'); // Still move to name entry
+          console.warn('Photo analysis returned no data, keeping original photo');
         }
       } catch (error) {
-        console.error('Photo analysis error:', error);
-        setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
-        setCharacterStep('name'); // Still move to name entry on error
-      } finally {
-        setIsLoading(false);
+        console.error('Background photo analysis error:', error);
+        // Keep original photo - user can still proceed
       }
     };
     reader.readAsDataURL(file);
@@ -640,11 +638,6 @@ export default function StoryWizard() {
                   <Users size={24} /> {t.createCharacters}
                 </h2>
                 <PhotoUpload onPhotoSelect={handlePhotoSelect} />
-                {isLoading && (
-                  <div className="text-center py-4">
-                    <LoadingSpinner message={language === 'de' ? 'Foto wird analysiert...' : language === 'fr' ? 'Analyse de la photo...' : 'Analyzing photo...'} />
-                  </div>
-                )}
                 <button
                   onClick={() => setCurrentCharacter(null)}
                   className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
