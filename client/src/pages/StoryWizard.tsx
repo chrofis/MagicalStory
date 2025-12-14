@@ -1100,10 +1100,39 @@ export default function StoryWizard() {
                 }
               } : undefined}
               onCreateAnother={() => {
-                // Reset story state but keep characters
+                // Reset story state but keep characters and relationships
+                log.info('Creating new story - resetting settings');
+
+                // Clear story ID and URL parameter
+                setStoryId(null);
+                setJobId(null);
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete('storyId');
+                setSearchParams(newParams, { replace: true });
+
+                // Reset generated content
                 setGeneratedStory('');
                 setStoryTitle('');
                 setSceneDescriptions([]);
+                setSceneImages([]);
+                setCoverImages({ frontCover: null, initialPage: null, backCover: null });
+
+                // Reset story settings to defaults
+                setStoryType('');
+                setArtStyle('pixar');
+                setLanguageLevel('standard');
+                setPages(30);
+                setDedication('');
+                setStoryDetails('');
+
+                // Clear localStorage for story settings
+                localStorage.removeItem('story_language_level');
+                localStorage.removeItem('story_pages');
+                localStorage.removeItem('story_dedication');
+                localStorage.removeItem('story_details');
+                localStorage.removeItem('story_main_characters');
+
+                // Go back to step 1
                 setStep(1);
               }}
               onRegenerateCover={storyId ? async (coverType: 'front' | 'back' | 'initial') => {

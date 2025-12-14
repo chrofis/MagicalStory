@@ -3090,30 +3090,46 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
 
     // If storyId provided, look up story to get pdfUrl and pageCount
     if (storyId && !pdfUrl) {
-      let story = null;
+      let storyData = null;
       if (STORAGE_MODE === 'database' && dbPool) {
-        const rows = await dbQuery('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [storyId, req.user.id]);
+        const rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [storyId, req.user.id]);
         if (rows.length > 0) {
-          story = rows[0];
+          // Parse JSON data from database
+          storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
         }
       } else {
         const allStories = await readJSON(STORIES_FILE);
         const userStories = allStories[req.user.id] || [];
-        story = userStories.find(s => s.id === storyId);
+        storyData = userStories.find(s => s.id === storyId);
       }
 
-      if (!story) {
+      if (!storyData) {
         return res.status(404).json({ error: 'Story not found' });
       }
 
-      // Get PDF URL from story
-      pdfUrl = story.pdf_url || story.pdfUrl;
-      if (!pdfUrl) {
-        return res.status(400).json({ error: 'Story does not have a PDF. Please generate the PDF first.' });
+      // Check if PDF file exists in files table (database mode only)
+      if (STORAGE_MODE === 'database' && dbPool) {
+        const pdfFileResult = await dbQuery(
+          "SELECT id FROM files WHERE story_id = $1 AND file_type = 'pdf' ORDER BY created_at DESC LIMIT 1",
+          [storyId]
+        );
+
+        if (pdfFileResult.length > 0) {
+          const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
+          pdfUrl = `${baseUrl}/api/files/${pdfFileResult[0].id}`;
+        } else {
+          return res.status(400).json({ error: 'Story does not have a PDF. Please download the PDF first to generate it.' });
+        }
+      } else {
+        // File mode - check for pdfUrl in story data
+        pdfUrl = storyData.pdfUrl;
+        if (!pdfUrl) {
+          return res.status(400).json({ error: 'Story does not have a PDF. Please download the PDF first to generate it.' });
+        }
       }
 
-      // Get page count from story
-      pageCount = story.pages || story.page_count || 30;
+      // Get page count from story data
+      pageCount = storyData.pages || storyData.sceneImages?.length || 30;
     }
 
     // Default productUid for hardcover photobook if not provided
