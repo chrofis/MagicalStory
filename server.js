@@ -4395,11 +4395,13 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         const availableTextWidth = pageSize - (textMargin * 2);
         const availableTextHeight = textAreaHeight - (textMargin);
 
-        let fontSize = 10;  // Start with 10pt, auto-reduce if needed
+        const startFontSize = 10;  // Start with 10pt, auto-reduce if needed
+        let fontSize = startFontSize;
         let textHeight;
 
         doc.fontSize(fontSize).font('Helvetica');
         textHeight = doc.heightOfString(page.text, { width: availableTextWidth, align: 'center' });
+        const initialHeight = textHeight;
 
         while (textHeight > availableTextHeight && fontSize > 4) {
           fontSize -= 0.5;
@@ -4407,9 +4409,14 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
           textHeight = doc.heightOfString(page.text, { width: availableTextWidth, align: 'center' });
         }
 
+        if (fontSize < startFontSize) {
+          console.log(`📄 [PDF-PictureBook] Page ${index + 1}: Font reduced ${startFontSize}pt → ${fontSize}pt (text: ${page.text.length} chars, height: ${Math.round(initialHeight)} → ${Math.round(textHeight)}, available: ${Math.round(availableTextHeight)})`);
+        }
+
         let textToRender = page.text;
         if (textHeight > availableTextHeight) {
           // Truncate text to fit
+          console.warn(`⚠️ [PDF-PictureBook] Page ${index + 1}: Text still too long at ${fontSize}pt, truncating...`);
           const words = page.text.split(' ');
           textToRender = '';
           for (let i = 0; i < words.length; i++) {
@@ -4476,16 +4483,22 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         // Add text page (square format)
         doc.addPage({ size: [pageSize, pageSize], margins: { top: marginTopBottom, bottom: marginTopBottom, left: marginLeftRight, right: marginLeftRight } });
 
-        let fontSize = 9;
+        const startFontSize = 9;
+        let fontSize = startFontSize;
         let textHeight;
 
         doc.fontSize(fontSize).font('Helvetica');
         textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
+        const initialHeight = textHeight;
 
         while (textHeight > availableHeight && fontSize > 5) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
+        }
+
+        if (fontSize < startFontSize) {
+          console.log(`📄 [PDF] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (text: ${page.text.length} chars, height: ${Math.round(initialHeight)} → ${Math.round(textHeight)}, available: ${Math.round(availableHeight)})`);
         }
 
         textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
@@ -8503,13 +8516,36 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const reasoningMatch = responseText.match(/Reasoning:\s*([\s\S]*)/i);
     const reasoning = reasoningMatch ? reasoningMatch[1].trim() : '';
 
+    // Parse cover-specific fields (text error detection)
+    const textErrorOnlyMatch = responseText.match(/Text_Error_Only:\s*(YES|NO)/i);
+    const expectedTextMatch = responseText.match(/Expected_Text:\s*([^\n]+)/i);
+    const actualTextMatch = responseText.match(/Actual_Text:\s*([^\n]+)/i);
+    const textIssueMatch = responseText.match(/Text_Issue:\s*(NONE|MISSPELLED|WRONG_WORDS|MISSING|ILLEGIBLE|PARTIAL)/i);
+
+    const textErrorOnly = textErrorOnlyMatch ? textErrorOnlyMatch[1].toUpperCase() === 'YES' : false;
+    const expectedText = expectedTextMatch ? expectedTextMatch[1].trim() : null;
+    const actualText = actualTextMatch ? actualTextMatch[1].trim() : null;
+    const textIssue = textIssueMatch ? textIssueMatch[1].toUpperCase() : null;
+
     log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100`);
+    if (textIssue && textIssue !== 'NONE') {
+      log.verbose(`⭐ [QUALITY] Text issue detected: ${textIssue}`);
+      log.verbose(`⭐ [QUALITY] Expected: "${expectedText}" | Actual: "${actualText}"`);
+      log.verbose(`⭐ [QUALITY] Text error only: ${textErrorOnly}`);
+    }
     if (reasoning) {
       log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning.substring(0, 150)}...`);
     }
 
-    // Return both score and reasoning
-    return { score, reasoning };
+    // Return score, reasoning, and text-specific info for covers
+    return {
+      score,
+      reasoning,
+      textErrorOnly,
+      expectedText,
+      actualText,
+      textIssue
+    };
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
     return null;
@@ -8674,6 +8710,99 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 }
 
 /**
+ * Edit text in a cover image using Gemini's image editing capabilities
+ * @param {string} imageData - The original image data (base64)
+ * @param {string} actualText - The text currently in the image
+ * @param {string} expectedText - The correct text that should be in the image
+ * @param {string[]} characterPhotos - Character reference photos (optional)
+ * @returns {Promise<{imageData: string}|null>}
+ */
+async function editCoverImageText(imageData, actualText, expectedText, characterPhotos = []) {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key not configured');
+    }
+
+    console.log(`✏️  [TEXT EDIT] Editing cover image text...`);
+    console.log(`✏️  [TEXT EDIT] Replacing "${actualText}" with "${expectedText}"`);
+
+    // Extract base64 and mime type from the image
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Build the editing prompt
+    const editPrompt = `Edit this children's storybook cover image to fix the text.
+
+CURRENT TEXT IN IMAGE: "${actualText}"
+CORRECT TEXT SHOULD BE: "${expectedText}"
+
+Instructions:
+1. Find and replace the incorrect text "${actualText}" with the correct text "${expectedText}"
+2. Keep the EXACT same artistic style, colors, and font style as the original
+3. Maintain the same text position and size
+4. Do NOT change anything else in the image - only fix the text
+5. The text should be clearly legible and properly spelled
+6. Preserve all character appearances, backgrounds, and decorative elements
+
+IMPORTANT: Only change the text, nothing else. The result should look like the original image but with the correct spelling.`;
+
+    // Build parts array with the image and prompt
+    const parts = [
+      {
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      },
+      { text: editPrompt }
+    ];
+
+    // Use Gemini 2.0 Flash for image editing (supports image generation/editing)
+    const modelId = 'gemini-2.0-flash-exp-image-generation';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseModalities: ['image', 'text'],
+          temperature: 0.4
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('❌ [TEXT EDIT] Gemini API error:', error);
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Extract the edited image from the response
+    if (data.candidates && data.candidates[0]?.content?.parts) {
+      for (const part of data.candidates[0].content.parts) {
+        if (part.inline_data && part.inline_data.data) {
+          const editedImageData = `data:${part.inline_data.mime_type || 'image/png'};base64,${part.inline_data.data}`;
+          console.log(`✅ [TEXT EDIT] Successfully edited cover image text`);
+          return { imageData: editedImageData };
+        }
+      }
+    }
+
+    console.warn('⚠️  [TEXT EDIT] No edited image in response');
+    return null;
+  } catch (error) {
+    console.error('❌ [TEXT EDIT] Error editing cover image text:', error);
+    throw error;
+  }
+}
+
+/**
  * Generate image with automatic retry if quality score is below threshold
  * @param {string} prompt - The image generation prompt
  * @param {string[]} characterPhotos - Character reference photos
@@ -8703,8 +8832,49 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     };
   }
 
-  // Score below threshold - regenerate
-  console.log(`🔄 [QUALITY RETRY] Score ${firstScore}% < ${IMAGE_QUALITY_THRESHOLD}%, regenerating...`);
+  // Score below threshold - check if it's a text-only error for covers
+  console.log(`🔄 [QUALITY RETRY] Score ${firstScore}% < ${IMAGE_QUALITY_THRESHOLD}%`);
+
+  // For cover images with text-only errors, try to edit the text instead of regenerating
+  if (evaluationType === 'cover' && firstResult.textErrorOnly && firstResult.expectedText && firstResult.actualText) {
+    console.log(`✏️  [QUALITY RETRY] Text-only error detected, attempting text edit...`);
+    console.log(`✏️  [QUALITY RETRY] Expected: "${firstResult.expectedText}"`);
+    console.log(`✏️  [QUALITY RETRY] Actual: "${firstResult.actualText}"`);
+
+    try {
+      const editedResult = await editCoverImageText(
+        firstResult.imageData,
+        firstResult.actualText,
+        firstResult.expectedText,
+        characterPhotos
+      );
+
+      if (editedResult && editedResult.imageData) {
+        // Evaluate the edited image
+        const editedQuality = await evaluateImageQuality(editedResult.imageData, prompt, characterPhotos, 'cover');
+        const editedScore = editedQuality?.score || 0;
+        console.log(`⭐ [QUALITY RETRY] Edited image score: ${editedScore}%`);
+
+        if (editedScore > firstScore) {
+          console.log(`✅ [QUALITY RETRY] Using edited image (score ${editedScore}% > ${firstScore}%)`);
+          return {
+            imageData: editedResult.imageData,
+            score: editedScore,
+            reasoning: editedQuality?.reasoning || 'Text edited',
+            wasRegenerated: true,
+            wasTextEdited: true,
+            originalImage: firstResult.imageData,
+            originalScore: firstResult.score,
+            originalReasoning: firstResult.reasoning
+          };
+        }
+      }
+    } catch (editError) {
+      console.log(`⚠️  [QUALITY RETRY] Text edit failed: ${editError.message}, falling back to regeneration`);
+    }
+  }
+
+  console.log(`🔄 [QUALITY RETRY] Regenerating entire image...`);
 
   // Clear cache for this prompt to force new generation
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
