@@ -830,6 +830,7 @@ export default function StoryWizard() {
               languageLevel={languageLevel}
               isGenerating={isGenerating}
               developerMode={developerMode}
+              storyId={storyId}
               onDownloadTxt={() => {
                 const blob = new Blob([generatedStory], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
@@ -855,6 +856,68 @@ export default function StoryWizard() {
                     : language === 'fr'
                     ? 'Échec du téléchargement PDF'
                     : 'PDF download failed');
+                }
+              } : undefined}
+              onBuyBook={storyId ? async () => {
+                try {
+                  log.info('Creating checkout session for story:', storyId);
+                  const { url } = await storyService.createCheckoutSession(storyId);
+                  if (url) {
+                    window.location.href = url;
+                  }
+                } catch (error) {
+                  log.error('Checkout failed:', error);
+                  alert(language === 'de'
+                    ? 'Checkout fehlgeschlagen. Bitte versuche es erneut.'
+                    : language === 'fr'
+                    ? 'Échec du paiement. Veuillez réessayer.'
+                    : 'Checkout failed. Please try again.');
+                }
+              } : undefined}
+              onPrintBook={storyId ? async () => {
+                // Developer mode: direct print without payment
+                const address = prompt(
+                  language === 'de'
+                    ? 'Lieferadresse eingeben (Format: Vorname, Nachname, Strasse, PLZ, Ort, Land, Email):'
+                    : language === 'fr'
+                    ? 'Entrez l\'adresse de livraison (Format: Prénom, Nom, Rue, CP, Ville, Pays, Email):'
+                    : 'Enter shipping address (Format: FirstName, LastName, Street, PostCode, City, Country, Email):'
+                );
+                if (!address) return;
+
+                const parts = address.split(',').map(p => p.trim());
+                if (parts.length < 7) {
+                  alert(language === 'de'
+                    ? 'Ungültiges Adressformat'
+                    : language === 'fr'
+                    ? 'Format d\'adresse invalide'
+                    : 'Invalid address format');
+                  return;
+                }
+
+                try {
+                  log.info('Creating print order for story:', storyId);
+                  const result = await storyService.createPrintOrder(storyId, {
+                    firstName: parts[0],
+                    lastName: parts[1],
+                    addressLine1: parts[2],
+                    postCode: parts[3],
+                    city: parts[4],
+                    country: parts[5],
+                    email: parts[6],
+                  });
+                  alert(language === 'de'
+                    ? `Druckauftrag erstellt! Order ID: ${result.orderId}`
+                    : language === 'fr'
+                    ? `Commande d'impression créée! ID: ${result.orderId}`
+                    : `Print order created! Order ID: ${result.orderId}`);
+                } catch (error) {
+                  log.error('Print order failed:', error);
+                  alert(language === 'de'
+                    ? 'Druckauftrag fehlgeschlagen'
+                    : language === 'fr'
+                    ? 'Échec de la commande d\'impression'
+                    : 'Print order failed');
                 }
               } : undefined}
               onCreateAnother={() => {

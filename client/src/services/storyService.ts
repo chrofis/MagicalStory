@@ -324,6 +324,32 @@ export const storyService = {
     }
     return response.blob();
   },
+
+  // Stripe checkout for book purchase
+  async createCheckoutSession(storyId: string): Promise<{ url: string }> {
+    const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', {
+      storyId,
+    });
+    return response;
+  },
+
+  // Direct print order (developer/admin mode - bypasses payment)
+  async createPrintOrder(storyId: string, shippingAddress: {
+    firstName: string;
+    lastName: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    postCode: string;
+    country: string;
+    email: string;
+  }): Promise<{ orderId: string; message: string }> {
+    const response = await api.post<{ orderId: string; message: string }>('/api/print-provider/order', {
+      storyId,
+      shippingAddress,
+    });
+    return response;
+  },
 };
 
 export default storyService;

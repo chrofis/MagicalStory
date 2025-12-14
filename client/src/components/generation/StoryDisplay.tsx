@@ -11,6 +11,7 @@ interface StoryDisplayProps {
   isGenerating?: boolean;
   onDownloadPdf?: () => void;
   onBuyBook?: () => void;
+  onPrintBook?: () => void;
   onCreateAnother?: () => void;
   onDownloadTxt?: () => void;
   storyId?: string | null;
@@ -25,6 +26,7 @@ export function StoryDisplay({
   isGenerating = false,
   onDownloadPdf,
   onBuyBook,
+  onPrintBook,
   onCreateAnother,
   onDownloadTxt,
   storyId,
@@ -87,6 +89,19 @@ export function StoryDisplay({
             }`}
           >
             <ShoppingCart size={20} /> {language === 'de' ? 'Buch kaufen (CHF 36)' : language === 'fr' ? 'Acheter le livre (CHF 36)' : 'Buy Book (CHF 36)'}
+          </button>
+        )}
+
+        {/* Print Book - Developer mode only (bypasses payment) */}
+        {developerMode && hasImages && storyId && onPrintBook && (
+          <button
+            onClick={onPrintBook}
+            disabled={isGenerating}
+            className={`bg-yellow-500 text-black px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-yellow-600'
+            }`}
+          >
+            <BookOpen size={20} /> {language === 'de' ? 'Buch drucken (DEV)' : language === 'fr' ? 'Imprimer livre (DEV)' : 'Print Book (DEV)'}
           </button>
         )}
 
