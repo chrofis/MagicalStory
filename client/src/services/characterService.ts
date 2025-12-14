@@ -167,6 +167,7 @@ export const characterService = {
       build?: string;
       hairColor?: string;
       clothing?: string;
+      otherFeatures?: string;
     };
   }> {
     try {
@@ -184,6 +185,7 @@ export const characterService = {
           build?: string;
           hair_color?: string;
           clothing?: string;
+          other_features?: string;
         };
         error?: string;
         fallback?: boolean;
@@ -203,6 +205,7 @@ export const characterService = {
           build: response.attributes.build,
           hairColor: response.attributes.hair_color,
           clothing: response.attributes.clothing,
+          otherFeatures: response.attributes.other_features,
         } : undefined,
       };
     } catch (error) {

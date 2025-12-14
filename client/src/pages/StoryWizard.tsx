@@ -838,8 +838,8 @@ export default function StoryWizard() {
         onDeveloperModeChange={setDeveloperMode}
       />
 
-      {/* Main content */}
-      <div className="max-w-7xl mx-auto px-3 md:px-8 mt-2 md:mt-8 flex-1">
+      {/* Main content - full width */}
+      <div className="px-3 md:px-8 mt-2 md:mt-8 flex-1">
         <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
           {isLoading && !isGenerating ? (
             <div className="py-12">

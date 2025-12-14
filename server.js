@@ -3612,29 +3612,105 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
     const imageType = imageData.substring(0, 30);
     console.log(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}...`);
 
-    // Call Python photo analyzer service
-    // Use 127.0.0.1 instead of localhost to avoid IPv6 issues
+    // Run Python analysis and Gemini trait extraction in parallel
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
     console.log(`📸 [PHOTO] Calling Python service at: ${photoAnalyzerUrl}/analyze`);
+    console.log(`📸 [PHOTO] Calling Gemini for visual trait extraction...`);
 
-    try {
-      const startTime = Date.now();
+    const startTime = Date.now();
+
+    // Helper function for Gemini trait extraction
+    const extractTraitsWithGemini = async () => {
+      try {
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        if (!geminiApiKey) {
+          console.log('📸 [GEMINI] No API key, skipping trait extraction');
+          return null;
+        }
+
+        const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+        const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+          imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  {
+                    text: `Analyze this image of a person and describe their physical attributes.
+
+Return a JSON object with this exact structure:
+{
+  "hair": "<color and style, e.g. 'brown curly hair', 'blonde straight hair'>",
+  "clothing": "<description of visible clothing, e.g. 'blue t-shirt with jeans'>",
+  "features": "<eye color, glasses, facial hair, distinctive features>"
+}
+
+Be concise but descriptive. Return ONLY valid JSON, no markdown or other text.`
+                  },
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64Data,
+                    },
+                  },
+                ],
+              }]
+            }),
+            signal: AbortSignal.timeout(15000) // 15 second timeout
+          }
+        );
+
+        if (!response.ok) {
+          console.error('📸 [GEMINI] API error:', response.status);
+          return null;
+        }
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+          const text = data.candidates[0].content.parts[0].text;
+          // Extract JSON from response (may have markdown wrapping)
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const traits = JSON.parse(jsonMatch[0]);
+            console.log('📸 [GEMINI] Extracted traits:', traits);
+            return traits;
+          }
+        }
+        return null;
+      } catch (err) {
+        console.error('📸 [GEMINI] Trait extraction error:', err.message);
+        return null;
+      }
+    };
+
+    // Helper function for Python analysis
+    const analyzePython = async () => {
       const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageData }),
         signal: AbortSignal.timeout(30000) // 30 second timeout
       });
+      return analyzerResponse.json();
+    };
 
-      const analyzerData = await analyzerResponse.json();
+    try {
+      // Run both in parallel
+      const [analyzerData, geminiTraits] = await Promise.all([
+        analyzePython(),
+        extractTraitsWithGemini()
+      ]);
+
       const duration = Date.now() - startTime;
 
       // VERBOSE LOGGING
-      console.log(`📸 [PHOTO] Python response in ${duration}ms:`, {
-        status: analyzerResponse.status,
-        success: analyzerData.success,
+      console.log(`📸 [PHOTO] Analysis complete in ${duration}ms:`, {
+        pythonSuccess: analyzerData.success,
         hasError: !!analyzerData.error,
         error: analyzerData.error || null,
         hasFaceThumbnail: !!analyzerData.faceThumbnail || !!analyzerData.face_thumbnail,
@@ -3642,13 +3718,13 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         hasBodyNoBg: !!analyzerData.bodyNoBg || !!analyzerData.body_no_bg,
         hasFaceBox: !!analyzerData.faceBox || !!analyzerData.face_box,
         hasBodyBox: !!analyzerData.bodyBox || !!analyzerData.body_box,
-        attributes: analyzerData.attributes || null,
-        imageDimensions: analyzerData.image_dimensions || null,
+        pythonAttributes: analyzerData.attributes || null,
+        geminiTraits: geminiTraits || null,
         traceback: analyzerData.traceback ? analyzerData.traceback.substring(0, 500) : null
       });
 
-      if (!analyzerResponse.ok || !analyzerData.success) {
-        console.error('📸 [PHOTO] Analysis failed:', analyzerData.error, analyzerData.traceback);
+      if (!analyzerData.success) {
+        console.error('📸 [PHOTO] Python analysis failed:', analyzerData.error, analyzerData.traceback);
         return res.status(500).json({
           error: 'Photo analysis failed',
           details: analyzerData.error || 'Unknown error',
@@ -3656,17 +3732,32 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         });
       }
 
+      // Merge Gemini traits into attributes
+      if (geminiTraits) {
+        analyzerData.attributes = analyzerData.attributes || {};
+        if (geminiTraits.hair) {
+          analyzerData.attributes.hair_color = geminiTraits.hair;
+        }
+        if (geminiTraits.clothing) {
+          analyzerData.attributes.clothing = geminiTraits.clothing;
+        }
+        if (geminiTraits.features) {
+          analyzerData.attributes.other_features = geminiTraits.features;
+        }
+      }
+
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
         age: analyzerData.attributes?.age,
         gender: analyzerData.attributes?.gender,
-        hasFace: !!analyzerData.face_thumbnail,
-        hasBody: !!analyzerData.body_crop
+        hasFace: !!analyzerData.face_thumbnail || !!analyzerData.faceThumbnail,
+        hasBody: !!analyzerData.body_crop || !!analyzerData.bodyCrop,
+        hasGeminiTraits: !!geminiTraits
       });
 
       res.json(analyzerData);
 
     } catch (fetchErr) {
-      console.error('Python photo analyzer service unavailable:', fetchErr.message);
+      console.error('Photo analyzer service error:', fetchErr.message);
 
       // Return a helpful error when Python service is down
       if (fetchErr.cause?.code === 'ECONNREFUSED') {
