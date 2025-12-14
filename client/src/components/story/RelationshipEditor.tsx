@@ -77,28 +77,28 @@ export function RelationshipEditor({
                     : 'bg-blue-50 border-blue-300 border-2'
                 }`}
               >
-                {/* Layout: Character photos on sides, dropdown + details in center - max 75% width on wide screens */}
-                <div className="flex items-center justify-center gap-3 md:gap-6 max-w-[75%] mx-auto">
+                {/* Layout: Character photos on sides, dropdown + details in center */}
+                <div className="flex items-center justify-center gap-2 sm:gap-4 md:gap-6 lg:gap-8">
                   {/* Character 1 - Left side */}
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
                     {(char1.thumbnailUrl || char1.photoUrl) && (
                       <img
                         src={char1.thumbnailUrl || char1.photoUrl}
                         alt={char1.name}
-                        className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover"
+                        className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full object-cover"
                       />
                     )}
-                    <span className="font-semibold text-xs md:text-sm text-center max-w-[80px] truncate">
+                    <span className="font-semibold text-xs md:text-sm text-center max-w-[60px] sm:max-w-[80px] md:max-w-[100px] truncate">
                       {char1.name}
                     </span>
                   </div>
 
-                  {/* Center: Dropdown + Details stacked - flex-1 for dynamic scaling */}
-                  <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                  {/* Center: Dropdown + Details stacked - grows to fill available space */}
+                  <div className="flex-1 flex flex-col items-center gap-1 min-w-0 max-w-[200px] sm:max-w-[300px] md:max-w-[400px] lg:max-w-[600px] xl:max-w-[800px]">
                     <select
                       value={currentRelationship || getNotKnownRelationship(lang)}
                       onChange={(e) => handleSelectChange(char1.id, char2.id, e.target.value)}
-                      className={`w-full max-w-[500px] px-2 py-1.5 border rounded text-sm font-medium text-center ${
+                      className={`w-full px-2 py-1.5 md:px-3 md:py-2 border rounded text-sm md:text-base font-medium text-center ${
                         isNotKnown
                           ? 'bg-white border-red-400 border-2'
                           : 'bg-blue-100 border-blue-400'
@@ -121,7 +121,7 @@ export function RelationshipEditor({
                         value={relationshipTexts[key] || ''}
                         onChange={(e) => onRelationshipTextChange(key, e.target.value)}
                         placeholder={lang === 'de' ? 'Details...' : lang === 'fr' ? 'Détails...' : 'Details...'}
-                        className="w-full max-w-[500px] px-2 py-1 border border-blue-300 rounded text-xs text-center bg-white"
+                        className="w-full px-2 py-1 md:px-3 md:py-1.5 border border-blue-300 rounded text-xs md:text-sm text-center bg-white"
                       />
                     )}
                   </div>
@@ -132,10 +132,10 @@ export function RelationshipEditor({
                       <img
                         src={char2.thumbnailUrl || char2.photoUrl}
                         alt={char2.name}
-                        className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover"
+                        className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full object-cover"
                       />
                     )}
-                    <span className="font-semibold text-xs md:text-sm text-center max-w-[80px] truncate">
+                    <span className="font-semibold text-xs md:text-sm text-center max-w-[60px] sm:max-w-[80px] md:max-w-[100px] truncate">
                       {char2.name}
                     </span>
                   </div>
