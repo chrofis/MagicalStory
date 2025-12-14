@@ -5,6 +5,9 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { storyService } from '@/services';
 import { LoadingSpinner, Navigation } from '@/components/common';
+import { createLogger } from '@/services/logger';
+
+const log = createLogger('MyStories');
 
 interface StoryListItem {
   id: string;
@@ -33,12 +36,14 @@ export default function MyStories() {
   }, [isAuthenticated, navigate]);
 
   const loadStories = async () => {
+    log.debug('Loading stories...');
     try {
       setIsLoading(true);
       const data = await storyService.getStories();
+      log.info('Loaded stories:', data.length);
       setStories(data as unknown as StoryListItem[]);
     } catch (error) {
-      console.error('Failed to load stories:', error);
+      log.error('Failed to load stories:', error);
     } finally {
       setIsLoading(false);
     }
@@ -57,18 +62,30 @@ export default function MyStories() {
       await storyService.deleteStory(id);
       setStories(stories.filter(s => s.id !== id));
     } catch (error) {
-      console.error('Failed to delete story:', error);
+      log.error('Failed to delete story:', error);
+      alert(language === 'de'
+        ? 'Geschichte konnte nicht gelöscht werden. Bitte versuche es erneut.'
+        : language === 'fr'
+        ? 'Impossible de supprimer l\'histoire. Veuillez réessayer.'
+        : 'Failed to delete story. Please try again.');
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : 'en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  const formatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : 'en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return '';
+    }
   };
+
+  console.log('[MyStories] Render - isLoading:', isLoading, 'stories.length:', stories.length, 'isAuthenticated:', isAuthenticated);
 
   if (!isAuthenticated) {
     return <LoadingSpinner fullScreen />;

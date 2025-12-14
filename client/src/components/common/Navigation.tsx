@@ -84,16 +84,6 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
           </div>
         )}
 
-        {/* Quota Display (when on landing page) */}
-        {currentStep === 0 && isAuthenticated && user && !isUnlimited && remaining !== null && (
-          <div className={`px-3 py-1 rounded text-xs font-semibold ${
-            remaining === 0 ? 'bg-red-600 text-white' :
-            remaining === 1 ? 'bg-yellow-600 text-white' :
-            'bg-green-600 text-white'
-          }`}>
-            {remaining} / {total} stories
-          </div>
-        )}
 
         {/* Developer Mode Toggle - Admin only */}
         {isAuthenticated && user?.role === 'admin' && onDeveloperModeChange && (

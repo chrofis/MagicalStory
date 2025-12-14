@@ -14,12 +14,35 @@ interface AuthModalProps {
 
 type AuthMode = 'login' | 'register' | 'reset' | 'resetSent';
 
+const errorMessages = {
+  en: {
+    loginFailed: 'Login failed',
+    registrationFailed: 'Registration failed',
+    googleSignInFailed: 'Google sign-in failed',
+    passwordResetFailed: 'Password reset failed',
+  },
+  de: {
+    loginFailed: 'Anmeldung fehlgeschlagen',
+    registrationFailed: 'Registrierung fehlgeschlagen',
+    googleSignInFailed: 'Google-Anmeldung fehlgeschlagen',
+    passwordResetFailed: 'Passwort-Zurücksetzung fehlgeschlagen',
+  },
+  fr: {
+    loginFailed: 'Échec de la connexion',
+    registrationFailed: 'Échec de l\'inscription',
+    googleSignInFailed: 'Échec de la connexion Google',
+    passwordResetFailed: 'Échec de la réinitialisation du mot de passe',
+  },
+};
+
 export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { login, register, loginWithGoogle, resetPassword } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const errors = errorMessages[language as keyof typeof errorMessages] || errorMessages.en;
 
   if (!isOpen) return null;
 
@@ -37,7 +60,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       await login(email, password);
       handleLoginSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : errors.loginFailed);
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +74,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       // After registration, login automatically happens in register()
       handleLoginSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      setError(err instanceof Error ? err.message : errors.registrationFailed);
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +87,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       await loginWithGoogle();
       handleLoginSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed');
+      setError(err instanceof Error ? err.message : errors.googleSignInFailed);
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +100,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       await resetPassword(email);
       setMode('resetSent');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Password reset failed');
+      setError(err instanceof Error ? err.message : errors.passwordResetFailed);
     } finally {
       setIsLoading(false);
     }

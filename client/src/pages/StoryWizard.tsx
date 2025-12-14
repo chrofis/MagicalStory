@@ -360,7 +360,11 @@ export default function StoryWizard() {
       setShowCharacterCreated(true);
     } catch (error) {
       log.error('Failed to save character:', error);
-      alert('Failed to save character. Please try again.');
+      alert(language === 'de'
+        ? 'Charakter konnte nicht gespeichert werden. Bitte versuche es erneut.'
+        : language === 'fr'
+        ? 'Échec de l\'enregistrement du personnage. Veuillez réessayer.'
+        : 'Failed to save character. Please try again.');
     } finally {
       setIsLoading(false);
     }

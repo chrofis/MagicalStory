@@ -82,10 +82,12 @@ export const storyService = {
 
   // Story CRUD
   async getStories(): Promise<StoryListItem[]> {
+    console.log('[storyService] getStories: fetching...');
     // Server returns array directly, not { stories: [...] }
     const response = await api.get<StoryListItemServer[]>('/api/stories');
+    console.log('[storyService] getStories: raw response:', response);
     // Map server format to client format
-    return (response || []).map(s => ({
+    const mapped = (response || []).map(s => ({
       id: s.id,
       title: s.title,
       story_type: '', // Not returned in list view
@@ -95,6 +97,8 @@ export const storyService = {
       created_at: s.createdAt,
       thumbnail: s.thumbnail,
     }));
+    console.log('[storyService] getStories: mapped:', mapped);
+    return mapped;
   },
 
   async getStory(id: string): Promise<SavedStory | null> {
