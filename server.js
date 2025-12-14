@@ -5924,7 +5924,7 @@ function extractShortSceneDescriptions(outline) {
 }
 
 // Process picture book (storybook) job - simplified flow with combined text+scene generation
-async function processStorybookJob(jobId, inputData, characterPhotos, skipImages) {
+async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, userId) {
   console.log(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
   // For Picture Book: pages = scenes (each page has image + text)
@@ -6461,6 +6461,46 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       rawAIResponse: response
     };
 
+    // Save story to stories table so it appears in My Stories
+    const storyId = jobId; // Use jobId as storyId for consistency
+    const storyData = {
+      id: storyId,
+      title: storyTitle,
+      storyType: inputData.storyType || 'picture-book',
+      artStyle: inputData.artStyle || 'pixar',
+      language: lang,
+      languageLevel: '1st-grade',
+      pages: sceneCount,
+      dedication: dedication,
+      characters: inputData.characters || [],
+      mainCharacters: inputData.mainCharacters || [],
+      relationships: inputData.relationships || {},
+      relationshipTexts: inputData.relationshipTexts || {},
+      outline: '',
+      storyText: fullStoryText,
+      sceneDescriptions: allSceneDescriptions,
+      sceneImages: allImages,
+      coverImages: coverImages,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Insert into stories table
+    await dbPool.query(
+      'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
+      [storyId, userId, JSON.stringify(storyData)]
+    );
+    console.log(`📚 [STORYBOOK] Story ${storyId} saved to stories table`);
+
+    // Increment user's stories_generated counter
+    await dbPool.query(
+      'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = $1',
+      [userId]
+    );
+
+    // Add storyId to resultData so client can navigate to it
+    resultData.storyId = storyId;
+
     // Mark job as completed
     await dbPool.query(
       `UPDATE story_jobs SET
@@ -6556,7 +6596,7 @@ async function processStoryJob(jobId) {
 
     if (isPictureBook) {
       console.log(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages);
+      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, job.user_id);
     }
 
     // Standard flow for normal stories
@@ -7158,6 +7198,46 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     log.debug('📖 [SERVER] storyText exists?', !!resultData.storyText);
     log.debug('📖 [SERVER] storyText length:', resultData.storyText?.length || 0);
     log.verbose('📖 [SERVER] storyText preview:', resultData.storyText?.substring(0, 200));
+
+    // Save story to stories table so it appears in My Stories
+    const storyId = jobId; // Use jobId as storyId for consistency
+    const storyData = {
+      id: storyId,
+      title: storyTitle,
+      storyType: inputData.storyType || '',
+      artStyle: inputData.artStyle || 'pixar',
+      language: inputData.language || 'en',
+      languageLevel: inputData.languageLevel || '1st-grade',
+      pages: inputData.pages || sceneCount,
+      dedication: inputData.dedication || '',
+      characters: inputData.characters || [],
+      mainCharacters: inputData.mainCharacters || [],
+      relationships: inputData.relationships || {},
+      relationshipTexts: inputData.relationshipTexts || {},
+      outline: outline,
+      storyText: fullStoryText,
+      sceneDescriptions: allSceneDescriptions,
+      sceneImages: allImages,
+      coverImages: coverImages,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Insert into stories table
+    await dbPool.query(
+      'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
+      [storyId, job.user_id, JSON.stringify(storyData)]
+    );
+    console.log(`📚 Story ${storyId} saved to stories table`);
+
+    // Increment user's stories_generated counter
+    await dbPool.query(
+      'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = $1',
+      [job.user_id]
+    );
+
+    // Add storyId to resultData so client can navigate to it
+    resultData.storyId = storyId;
 
     await dbPool.query(
       `UPDATE story_jobs
