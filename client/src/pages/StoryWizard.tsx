@@ -983,6 +983,44 @@ export default function StoryWizard() {
                 setSceneDescriptions([]);
                 setStep(1);
               }}
+              onRegenerateCover={storyId ? async (coverType: 'front' | 'back' | 'initial') => {
+                try {
+                  log.info('Regenerating cover:', coverType);
+                  setIsGenerating(true);
+                  const { imageData } = await storyService.regenerateCover(storyId, coverType);
+                  // Update the cover images
+                  setCoverImages(prev => {
+                    if (!prev) return prev;
+                    const key = coverType === 'front' ? 'frontCover' : coverType === 'back' ? 'backCover' : 'initialPage';
+                    return { ...prev, [key]: { imageData } };
+                  });
+                  log.info('Cover regenerated successfully');
+                } catch (error) {
+                  log.error('Cover regeneration failed:', error);
+                  alert(language === 'de'
+                    ? 'Cover-Generierung fehlgeschlagen'
+                    : language === 'fr'
+                    ? 'Échec de la régénération de la couverture'
+                    : 'Cover regeneration failed');
+                } finally {
+                  setIsGenerating(false);
+                }
+              } : undefined}
+              onEditImage={(pageNumber: number) => {
+                alert(language === 'de'
+                  ? `Bildbearbeitung für Seite ${pageNumber} kommt bald`
+                  : language === 'fr'
+                  ? `Édition d'image pour la page ${pageNumber} à venir`
+                  : `Image editing for page ${pageNumber} coming soon`);
+              }}
+              onEditCover={(coverType: 'front' | 'back' | 'initial') => {
+                const coverName = coverType === 'front' ? 'Titelseite' : coverType === 'back' ? 'Rückseite' : 'Einleitungsseite';
+                alert(language === 'de'
+                  ? `Bearbeitung für ${coverName} kommt bald`
+                  : language === 'fr'
+                  ? `Édition de la couverture ${coverType} à venir`
+                  : `Cover editing for ${coverType} coming soon`);
+              }}
             />
           );
         }
