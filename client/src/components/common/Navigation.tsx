@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, LogOut, BookOpen, Settings, Users, Code } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -18,6 +18,24 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   const { t, language, setLanguage } = useLanguage();
   const { isAuthenticated, user, logout } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
 
   const handleLogout = () => {
     logout();
@@ -94,7 +112,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
         )}
 
         {/* Right: Menu Button */}
-        <div className="relative">
+        <div className="relative" ref={menuRef}>
           <button
             onClick={() => setShowMenu(!showMenu)}
             className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-gray-700 flex items-center gap-2"

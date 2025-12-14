@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { User, AuthState } from '@/types/user';
 import logger from '@/services/logger';
+import { signInWithGoogle, getIdToken, firebaseSignOut, onFirebaseAuthStateChanged, type FirebaseUser } from '@/services/firebase';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>;
@@ -108,11 +109,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await login(username, password);
   }, [login]);
 
-  const loginWithGoogle = useCallback(async () => {
-    // Firebase Google auth implementation
-    // This will be implemented when Firebase is properly set up
-    throw new Error('Google login not yet implemented');
+  // Handle Firebase user authentication with our backend
+  const handleFirebaseAuth = useCallback(async (firebaseUser: FirebaseUser) => {
+    const idToken = await getIdToken(firebaseUser);
+
+    const response = await fetch(`${API_URL}/api/auth/firebase`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Firebase authentication failed');
+    }
+
+    const data = await response.json();
+    const user: User = {
+      id: data.user.id,
+      username: data.user.username,
+      email: data.user.email,
+      role: data.user.role,
+      storyQuota: data.user.story_quota,
+      storiesGenerated: data.user.stories_generated,
+    };
+
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('current_user', JSON.stringify(user));
+
+    setState({
+      isAuthenticated: true,
+      user,
+      token: data.token,
+    });
+
+    logger.configure({ isAdmin: user.role === 'admin' });
+    logger.success(`Logged in with Google as ${user.username}`);
   }, []);
+
+  const loginWithGoogle = useCallback(async () => {
+    const firebaseUser = await signInWithGoogle();
+    await handleFirebaseAuth(firebaseUser);
+  }, [handleFirebaseAuth]);
 
   const resetPassword = useCallback(async (email: string) => {
     const response = await fetch(`${API_URL}/api/auth/reset-password`, {
@@ -131,6 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.info('Logging out...');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('current_user');
+    // Also sign out from Firebase
+    firebaseSignOut().catch(err => {
+      console.warn('Firebase sign out error:', err);
+    });
     setState({
       isAuthenticated: false,
       user: null,
@@ -139,6 +181,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Reset logger to non-admin mode
     logger.configure({ isAdmin: false });
   }, []);
+
+  // Firebase Auth State Listener - catches sign-in even if popup handling fails
+  useEffect(() => {
+    const unsubscribe = onFirebaseAuthStateChanged(async (firebaseUser) => {
+      // Only process if we have a Firebase user but NOT already authenticated in our app
+      if (firebaseUser && !state.isAuthenticated && !state.token) {
+        logger.info('Firebase auth state changed: User detected, completing login...');
+        try {
+          await handleFirebaseAuth(firebaseUser);
+        } catch (err) {
+          console.error('Firebase auth state change error:', err);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [state.isAuthenticated, state.token, handleFirebaseAuth]);
 
   const updateQuota = useCallback((quota: { storyQuota: number; storiesGenerated: number }) => {
     setState(prev => {
