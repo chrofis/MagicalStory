@@ -28,9 +28,11 @@ This is a PICTURE BOOK. Each page has a large illustration with text below.
 **BAD EXAMPLE (Too short):**
 "Leo walked. He saw trees."
 
-**FORMATTING RULE:**
-- Write text as a CONTINUOUS PARAGRAPH - do NOT add line breaks after each sentence
-- Only use a line break if there's a natural pause or scene shift within the page
+**FORMATTING RULE - CRITICAL:**
+- Write ALL sentences as ONE CONTINUOUS PARAGRAPH with NO line breaks
+- Do NOT put each sentence on its own line
+- The entire page text should be a single flowing paragraph
+- NEVER add line breaks between sentences
 
 # Story Structure
 

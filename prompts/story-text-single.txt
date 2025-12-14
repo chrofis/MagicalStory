@@ -24,10 +24,12 @@ Write engaging, age-appropriate content for each page, maintaining a consistent 
 Ensure all characters consistently reflect their established traits, ages, and relationships from the BASE_PROMPT.
 
 FORMATTING:
-- Use proper paragraph breaks to organize the text naturally
-- Start a new paragraph for new scenes, speaker changes, or topic shifts
-- Dialogues can be on their own lines or inline, whichever flows better
-- Create readable, well-structured text like a traditional children's novel
+- AVOID excessive line breaks - write in flowing paragraphs
+- Each paragraph should have at least 4-5 sentences before starting a new paragraph
+- Only start a new paragraph for major scene changes or significant shifts in action
+- Do NOT put each sentence on its own line
+- Dialogues should flow inline with the narrative, not on separate lines
+- Create dense, readable paragraphs like a traditional children's novel
 
 Output Format:
 --- Page 1 ---

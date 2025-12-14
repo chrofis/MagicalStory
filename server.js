@@ -7070,15 +7070,15 @@ function buildBasePrompt(inputData) {
   const languageLevelDescriptions = {
     '1st-grade': {
       description: 'Simple words and very short sentences for early readers',
-      pageLength: '2-4 sentences per page (approximately 30-50 words)'
+      pageLength: '2-3 sentences per page (approximately 20-35 words)'
     },
     'standard': {
       description: 'Age-appropriate vocabulary for elementary school children',
-      pageLength: 'About 10 sentences per page (approximately 80-120 words)'
+      pageLength: '6-8 sentences per page (approximately 50-80 words)'
     },
     'advanced': {
       description: 'More complex vocabulary and varied sentence structure for advanced readers',
-      pageLength: '15-20 sentences per page (approximately 150-250 words)'
+      pageLength: '10-14 sentences per page (approximately 100-170 words)'
     }
   };
   const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
