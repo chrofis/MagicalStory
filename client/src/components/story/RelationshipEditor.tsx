@@ -94,7 +94,7 @@ export function RelationshipEditor({
                   </div>
 
                   {/* Center: Dropdown + Details stacked - grows to fill available space */}
-                  <div className="flex-1 flex flex-col items-center gap-1 min-w-0 max-w-[200px] sm:max-w-[300px] md:max-w-[400px] lg:max-w-[600px] xl:max-w-[800px]">
+                  <div className="flex-1 flex flex-col items-center gap-1 min-w-0 max-w-[200px] sm:max-w-[350px] md:max-w-[500px] lg:max-w-[780px] xl:max-w-[1040px]">
                     <select
                       value={currentRelationship || getNotKnownRelationship(lang)}
                       onChange={(e) => handleSelectChange(char1.id, char2.id, e.target.value)}
