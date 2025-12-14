@@ -71,14 +71,14 @@ export function RelationshipEditor({
             return (
               <div
                 key={key}
-                className={`rounded-lg p-2 md:p-3 inline-flex w-auto lg:w-3/4 mx-auto ${
+                className={`rounded-lg p-3 md:p-4 w-full lg:w-3/4 mx-auto ${
                   isNotKnown
                     ? 'bg-white border-red-500 border-[3px]'
                     : 'bg-blue-50 border-blue-300 border-2'
                 }`}
               >
-                {/* Layout: Character photos on sides, dropdown + details in center */}
-                <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-4">
+                {/* Layout: Character photos on sides, dropdown fills center */}
+                <div className="flex items-center gap-3 md:gap-4 w-full">
                   {/* Character 1 - Left side */}
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
                     {(char1.thumbnailUrl || char1.photoUrl) && (
@@ -93,12 +93,12 @@ export function RelationshipEditor({
                     </span>
                   </div>
 
-                  {/* Center: Dropdown + Details stacked - 50% width on large screens */}
-                  <div className="flex-1 flex flex-col items-center gap-1 min-w-0 max-w-[200px] sm:max-w-[300px] md:max-w-[400px] lg:max-w-[50%] xl:max-w-[50%]">
+                  {/* Center: Dropdown + Details - fills all available space */}
+                  <div className="flex-1 flex flex-col items-center gap-1">
                     <select
                       value={currentRelationship || getNotKnownRelationship(lang)}
                       onChange={(e) => handleSelectChange(char1.id, char2.id, e.target.value)}
-                      className={`w-full px-2 py-1.5 md:px-3 md:py-2 border rounded text-sm md:text-base font-medium text-center ${
+                      className={`w-full px-3 py-2 md:px-4 md:py-2.5 border rounded text-sm md:text-base font-medium text-center ${
                         isNotKnown
                           ? 'bg-white border-red-400 border-2'
                           : 'bg-blue-100 border-blue-400'
@@ -121,7 +121,7 @@ export function RelationshipEditor({
                         value={relationshipTexts[key] || ''}
                         onChange={(e) => onRelationshipTextChange(key, e.target.value)}
                         placeholder={lang === 'de' ? 'Details...' : lang === 'fr' ? 'Détails...' : 'Details...'}
-                        className="w-full px-2 py-1 md:px-3 md:py-1.5 border border-blue-300 rounded text-xs md:text-sm text-center bg-white"
+                        className="w-full px-3 py-1.5 md:px-4 md:py-2 border border-blue-300 rounded text-xs md:text-sm text-center bg-white"
                       />
                     )}
                   </div>
