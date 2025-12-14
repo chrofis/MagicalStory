@@ -14,9 +14,12 @@ If ANY of these occur, the image MUST receive a score of 0:
 - Title text is MISSPELLED (even one letter wrong)
 - Title text is MISSING when it was requested
 - Title text shows DIFFERENT WORDS than requested
-- Dedication text is WRONG or MISSPELLED
-- Text is ILLEGIBLE or UNREADABLE
-- EXTRA unwanted text appears that wasn't requested
+- Dedication text is WRONG or MISSPELLED (if dedication was requested)
+- REQUESTED text is ILLEGIBLE or UNREADABLE
+
+**NOT an automatic failure (just deduct points):**
+- Extra decorative text, watermarks, or incidental text in the background
+- Minor artistic text elements that don't interfere with the main title
 
 **THE 5 CRITERIA (in order of importance):**
 
@@ -65,12 +68,18 @@ COMPOSITION ISSUES:
 - Poor text placement: -10 points
 - Cluttered or unbalanced: -5 points
 
+EXTRA TEXT (not automatic fail):
+- Unwanted background text/watermarks: -5 to -15 points
+- Decorative text that doesn't interfere: -5 points
+- As long as REQUESTED text is correct, extra text is just a deduction
+
 **REMEMBER:**
-- TEXT ERRORS = AUTOMATIC 0 SCORE
+- REQUESTED TEXT ERRORS = AUTOMATIC 0 SCORE
 - "The Magic Adventure" spelled as "The Majic Adventure" = 0
 - "For my darling Emma" spelled as "For my darling Ema" = 0
 - Title requested but missing from image = 0
-- Random text appearing that wasn't requested = 0
+- Extra background text/decorations = DEDUCT 5-15 points (NOT automatic 0)
+- Focus on the REQUESTED title and dedication text being correct
 
 Output strictly in this format:
 Score: [Score]/100
