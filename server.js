@@ -7620,11 +7620,16 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
     // Send story completion email to customer
     try {
-      const userResult = await dbPool.query('SELECT email, username FROM users WHERE id = $1', [job.user_id]);
+      const userResult = await dbPool.query(
+        'SELECT email, username, shipping_first_name FROM users WHERE id = $1',
+        [job.user_id]
+      );
       if (userResult.rows.length > 0 && userResult.rows[0].email) {
         const user = userResult.rows[0];
         const storyTitle = inputData.storyTitle || inputData.title || 'Your Story';
-        await email.sendStoryCompleteEmail(user.email, user.username, storyTitle);
+        // Use shipping_first_name if available, otherwise fall back to username
+        const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
+        await email.sendStoryCompleteEmail(user.email, firstName, storyTitle, storyId);
       }
     } catch (emailErr) {
       console.error('❌ Failed to send story complete email:', emailErr);
@@ -7645,14 +7650,18 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       const jobResult = await dbPool.query('SELECT user_id FROM story_jobs WHERE id = $1', [jobId]);
       if (jobResult.rows.length > 0) {
         const userId = jobResult.rows[0].user_id;
-        const userResult = await dbPool.query('SELECT email, username FROM users WHERE id = $1', [userId]);
+        const userResult = await dbPool.query(
+          'SELECT email, username, shipping_first_name FROM users WHERE id = $1',
+          [userId]
+        );
         if (userResult.rows.length > 0) {
           const user = userResult.rows[0];
           // Notify admin
           await email.sendAdminStoryFailureAlert(jobId, userId, user.username, user.email || 'N/A', error.message);
           // Notify customer
           if (user.email) {
-            await email.sendStoryFailedEmail(user.email, user.username);
+            const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
+            await email.sendStoryFailedEmail(user.email, firstName);
           }
         }
       }

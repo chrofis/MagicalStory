@@ -22,29 +22,6 @@ const EMAIL_FOOTER = `
   </p>
 `;
 
-/**
- * Get a proper greeting name from userName
- * Prefers first name, falls back to username, avoids using email addresses
- */
-function getGreetingName(userName) {
-  if (!userName) return 'there';
-
-  // If it looks like an email address, don't use it
-  if (userName.includes('@')) {
-    // Try to extract name from email (e.g., "john.doe@..." -> "John")
-    const localPart = userName.split('@')[0];
-    // If local part is reasonable (letters only, not too long), capitalize and use it
-    if (/^[a-zA-Z]+$/.test(localPart) && localPart.length <= 20) {
-      return localPart.charAt(0).toUpperCase() + localPart.slice(1).toLowerCase();
-    }
-    return 'there';
-  }
-
-  // Use first word if it's a full name
-  const firstName = userName.split(' ')[0];
-  return firstName || 'there';
-}
-
 // Check if email is configured
 function isEmailConfigured() {
   return !!resend;
@@ -56,14 +33,24 @@ function isEmailConfigured() {
 
 /**
  * Send story completion notification to customer
+ * @param {string} userEmail - Customer email address
+ * @param {string} firstName - Customer's first name (from shipping info or username)
+ * @param {string} storyTitle - Title of the completed story
+ * @param {string} storyId - ID of the story for direct link
  */
-async function sendStoryCompleteEmail(userEmail, userName, storyTitle) {
+async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId) {
   if (!resend) {
     console.log('📧 Email not configured - skipping story complete notification');
     return null;
   }
 
-  const greeting = getGreetingName(userName);
+  // Use first name directly, fallback to 'there' if empty
+  const greeting = firstName || 'there';
+
+  // Build direct story URL
+  const storyUrl = storyId
+    ? `https://www.magicalstory.ch/story/${storyId}`
+    : 'https://www.magicalstory.ch';
 
   try {
     const { data, error } = await resend.emails.send({
@@ -71,14 +58,14 @@ async function sendStoryCompleteEmail(userEmail, userName, storyTitle) {
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: `Your magical story "${storyTitle}" is ready!`,
-      text: `Hello ${greeting},\n\nGreat news! Your personalized story "${storyTitle}" has been created and is waiting for you.\n\nVisit https://www.magicalstory.ch to view your story.\n\nYou can now:\n- Preview your complete story with illustrations\n- Order a printed hardcover book\n- Download as PDF\n\nThank you for using MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
+      text: `Hello ${greeting},\n\nGreat news! Your personalized story "${storyTitle}" has been created and is waiting for you.\n\nView your story: ${storyUrl}\n\nYou can now:\n- Preview your complete story with illustrations\n- Order a printed hardcover book\n- Download as PDF\n\nThank you for using MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #6366f1;">Your Story is Ready!</h1>
           <p>Hello ${greeting},</p>
           <p>Great news! Your personalized story <strong>"${storyTitle}"</strong> has been created and is waiting for you.</p>
           <p>
-            <a href="https://www.magicalstory.ch"
+            <a href="${storyUrl}"
                style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
               View Your Story
             </a>
@@ -110,14 +97,16 @@ async function sendStoryCompleteEmail(userEmail, userName, storyTitle) {
 
 /**
  * Send story generation failure notification to customer
+ * @param {string} userEmail - Customer email address
+ * @param {string} firstName - Customer's first name
  */
-async function sendStoryFailedEmail(userEmail, userName) {
+async function sendStoryFailedEmail(userEmail, firstName) {
   if (!resend) {
     console.log('📧 Email not configured - skipping story failed notification');
     return null;
   }
 
-  const greeting = getGreetingName(userName);
+  const greeting = firstName || 'there';
 
   try {
     const { data, error } = await resend.emails.send({
