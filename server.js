@@ -4271,6 +4271,27 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
 
     console.log(`📄 [PDF GET] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 
+    // Save PDF to database so it can be used for print orders
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const fileId = `file-pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const filename = `${storyData.title || 'story'}.pdf`;
+      console.log(`📄 [PDF GET] Saving PDF to database with story_id: ${storyId}, file_id: ${fileId}`);
+
+      try {
+        // Delete any existing PDFs for this story first (keep only latest)
+        await dbQuery("DELETE FROM files WHERE story_id = $1 AND file_type = 'story_pdf'", [storyId]);
+
+        await dbQuery(
+          'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+          [fileId, userId, 'story_pdf', storyId, 'application/pdf', pdfBuffer, pdfBuffer.length, filename]
+        );
+        console.log(`📄 [PDF GET] PDF saved to database successfully`);
+      } catch (saveErr) {
+        console.error(`📄 [PDF GET] Failed to save PDF to database:`, saveErr.message);
+        // Continue - still send PDF to user even if save fails
+      }
+    }
+
     res.setHeader('Content-Type', 'application/pdf');
     // Sanitize filename: remove special chars, replace dashes/spaces, keep ASCII only
     const safeFilename = (storyData.title || 'story')
@@ -7779,6 +7800,24 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   // Use sceneCount if provided (for standard mode where print pages != scenes)
   const pageCount = sceneCount || inputData.pages || 15;
 
+  // Map language level to reading instructions with page length guidance
+  const languageLevelDescriptions = {
+    '1st-grade': {
+      description: 'Simple words and very short sentences for early readers',
+      pageLength: '2-3 sentences per page (approximately 20-35 words)'
+    },
+    'standard': {
+      description: 'Age-appropriate vocabulary for elementary school children',
+      pageLength: '6-8 sentences per page (approximately 50-80 words)'
+    },
+    'advanced': {
+      description: 'More complex vocabulary and varied sentence structure for advanced readers',
+      pageLength: '10-14 sentences per page (approximately 100-170 words)'
+    }
+  };
+  const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
+  const readingLevel = `${levelInfo.description}. ${levelInfo.pageLength}`;
+
   // Extract only essential character info (NO PHOTOS to avoid token limit)
   const characterSummary = (inputData.characters || []).map(char => ({
     name: char.name,
@@ -7792,19 +7831,28 @@ function buildStoryPrompt(inputData, sceneCount = null) {
     // Explicitly exclude photoUrl and other large fields
   }));
 
+  // Log the prompt parameters for debugging
+  console.log(`📝 [PROMPT] Building outline prompt:`);
+  console.log(`   - Language Level: ${inputData.languageLevel || 'standard'}`);
+  console.log(`   - Reading Level: ${readingLevel}`);
+  console.log(`   - Pages: ${pageCount}`);
+
   // Use template if available, otherwise fall back to hardcoded prompt
   if (PROMPT_TEMPLATES.outline) {
-    return fillTemplate(PROMPT_TEMPLATES.outline, {
+    const prompt = fillTemplate(PROMPT_TEMPLATES.outline, {
       TITLE: inputData.title || 'Untitled',
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8,
       PAGES: pageCount,  // Use calculated page count, not raw input
       LANGUAGE: inputData.language || 'en',
+      READING_LEVEL: readingLevel,
       CHARACTERS: JSON.stringify(characterSummary),
       STORY_TYPE: inputData.storyType || 'adventure',
       STORY_DETAILS: inputData.storyDetails || 'None',
       DEDICATION: inputData.dedication || 'None'
     });
+    console.log(`📝 [PROMPT] Outline prompt length: ${prompt.length} chars`);
+    return prompt;
   }
 
   // Fallback to hardcoded prompt
