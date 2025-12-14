@@ -275,9 +275,12 @@ export default function StoryWizard() {
     reader.onload = async (e) => {
       const originalPhotoUrl = e.target?.result as string;
 
-      // IMMEDIATELY show name entry with original photo - don't block on analysis
+      // IMMEDIATELY update photo - don't block on analysis
       setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
-      setCharacterStep('name');
+      // Only go to name step if not already in traits step (editing existing character)
+      if (characterStep !== 'traits') {
+        setCharacterStep('name');
+      }
 
       // Run photo analysis in BACKGROUND (non-blocking)
       try {
@@ -669,6 +672,7 @@ export default function StoryWizard() {
                   onContinueToTraits={() => setCharacterStep('traits')}
                   isLoading={isLoading}
                   step="name"
+                  developerMode={developerMode}
                 />
               </div>
             );
@@ -688,6 +692,7 @@ export default function StoryWizard() {
                 onPhotoChange={handlePhotoSelect}
                 isLoading={isLoading}
                 step="traits"
+                developerMode={developerMode}
               />
             </div>
           );

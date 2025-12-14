@@ -3754,7 +3754,18 @@ Be concise but descriptive. Return ONLY valid JSON, no markdown or other text.`
         hasGeminiTraits: !!geminiTraits
       });
 
-      res.json(analyzerData);
+      // Convert snake_case to camelCase for frontend compatibility
+      const response = {
+        success: analyzerData.success,
+        faceThumbnail: analyzerData.face_thumbnail || analyzerData.faceThumbnail,
+        bodyCrop: analyzerData.body_crop || analyzerData.bodyCrop,
+        bodyNoBg: analyzerData.body_no_bg || analyzerData.bodyNoBg,
+        faceBox: analyzerData.face_box || analyzerData.faceBox,
+        bodyBox: analyzerData.body_box || analyzerData.bodyBox,
+        attributes: analyzerData.attributes
+      };
+
+      res.json(response);
 
     } catch (fetchErr) {
       console.error('Photo analyzer service error:', fetchErr.message);

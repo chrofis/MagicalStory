@@ -27,6 +27,7 @@ export function CharacterForm({
   onContinueToTraits,
   isLoading,
   step,
+  developerMode,
 }: CharacterFormProps) {
   const { t, language } = useLanguage();
 
@@ -125,8 +126,8 @@ export function CharacterForm({
     <div className="space-y-6">
       {/* Header with photo and name */}
       <div className="flex items-center gap-4">
-        {/* Photo */}
-        <div className="flex-shrink-0">
+        {/* Photo with change option */}
+        <div className="flex-shrink-0 relative group">
           {character.photoUrl && (
             <img
               src={character.photoUrl}
@@ -134,10 +135,36 @@ export function CharacterForm({
               className="w-20 h-20 rounded-full object-cover border-2 border-indigo-400"
             />
           )}
+          <label className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+            <Upload size={20} className="text-white" />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </label>
         </div>
         {/* Name */}
         <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
       </div>
+
+      {/* Developer Mode: Show body crop with transparent background */}
+      {developerMode && character.bodyNoBgUrl && (
+        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-yellow-700 mb-2">
+            🛠️ Developer Mode: Body Crop (No Background)
+          </h4>
+          <div className="flex justify-center">
+            <img
+              src={character.bodyNoBgUrl}
+              alt={`${character.name} body crop`}
+              className="max-h-48 object-contain rounded border border-gray-300"
+              style={{ background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 20px 20px' }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Extracted Features - Editable */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
