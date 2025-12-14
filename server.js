@@ -9,7 +9,10 @@ const path = require('path');
 const { Pool } = require('pg');
 const pLimit = require('p-limit');
 const crypto = require('crypto');
-const stripe = require('stripe')(process.env.STRIPE_TEST_API_KEY);
+// Initialize Stripe only if API key is provided (optional for local dev)
+const stripe = process.env.STRIPE_TEST_API_KEY
+  ? require('stripe')(process.env.STRIPE_TEST_API_KEY)
+  : null;
 const sharp = require('sharp');
 const email = require('./email');
 const admin = require('firebase-admin');
@@ -539,14 +542,27 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
-// Serve static files (HTML, CSS, JS, images)
-app.use(express.static(__dirname));
+// Serve static files
+// Priority: 1. Built React app (dist/), 2. Images folder, 3. Legacy HTML files
+const distPath = path.join(__dirname, 'dist');
+const hasDistFolder = require('fs').existsSync(distPath);
+
+if (hasDistFolder) {
+  // Serve the built React app from dist/
+  app.use(express.static(distPath));
+  console.log('📦 Serving built React app from dist/');
+} else {
+  // Fallback to legacy: serve files from project root (index.html with Babel)
+  app.use(express.static(__dirname));
+  console.log('📦 Serving legacy HTML files (no dist/ folder found)');
+}
+
+// Always serve images folder
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-// Serve index.html for root path
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+// SPA fallback - serve index.html for client-side routing (only if dist exists)
+// Must be placed AFTER API routes are defined
+// This is handled at the end of the file
 
 // File paths for simple file-based storage
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
@@ -8168,6 +8184,23 @@ async function initialize() {
     await initializeDataFiles();
   }
 }
+
+// SPA fallback - serve index.html for client-side routing
+// This must be the LAST route, after all API routes
+app.get('*', (req, res, next) => {
+  // Skip API routes
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+
+  // If dist folder exists, serve the built React app
+  if (hasDistFolder) {
+    res.sendFile(path.join(distPath, 'index.html'));
+  } else {
+    // Fallback to legacy index.html
+    res.sendFile(path.join(__dirname, 'index.html'));
+  }
+});
 
 initialize().then(() => {
   app.listen(PORT, () => {
