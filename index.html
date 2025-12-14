@@ -3790,39 +3790,6 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 
         try {
           setIsGenerating(true); // Lock to prevent multiple jobs
-          // Show wait message - shorter for text-only
-          const waitMessage = skipImages
-            ? (language === 'de'
-              ? 'Die Erstellung des Textes dauert ca. 2-3 Minuten.\n\n' +
-                'Es werden keine Bilder generiert (Entwicklermodus).\n\n' +
-                'Klicken Sie auf OK, um die Generierung zu starten.'
-              : language === 'fr'
-              ? 'La création du texte prendra environ 2-3 minutes.\n\n' +
-                'Aucune image ne sera générée (mode développeur).\n\n' +
-                'Cliquez sur OK pour démarrer la génération.'
-              : 'Creating the text will take approximately 2-3 minutes.\n\n' +
-                'No images will be generated (developer mode).\n\n' +
-                'Click OK to start generation.')
-            : (language === 'de'
-              ? 'Die Erstellung Ihrer Geschichte dauert ca. 10 Minuten.\n\n' +
-                'Die Geschichte wird im Hintergrund auf unseren Servern generiert.\n\n' +
-                'Sie können diese Seite schließen und später zurückkommen, um den Fortschritt zu überprüfen.\n\n' +
-                'Klicken Sie auf OK, um die Generierung zu starten.'
-              : language === 'fr'
-              ? 'La création de votre histoire prendra environ 10 minutes.\n\n' +
-                'L\'histoire sera générée en arrière-plan sur nos serveurs.\n\n' +
-                'Vous pouvez fermer cette page et revenir plus tard pour vérifier la progression.\n\n' +
-                'Cliquez sur OK pour démarrer la génération.'
-              : 'Creating your story will take approximately 10 minutes.\n\n' +
-                'The story will be generated in the background on our servers.\n\n' +
-                'You can close this page and come back later to check on progress.\n\n' +
-                'Click OK to start generation.');
-
-          const confirmRun = window.confirm(waitMessage);
-
-          if (!confirmRun) {
-            return;
-          }
 
           // Collect all input data
           const inputData = {
@@ -3860,8 +3827,36 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
           const { jobId, message } = await response.json();
 
           console.log(`✅ Story job created: ${jobId}`);
-          // Don't show alert - user already confirmed in previous dialog
-          // alert(message);
+
+          // Show informational message (no cancel - generation already started)
+          const infoMessage = skipImages
+            ? (language === 'de'
+              ? 'Ihre Geschichte wird jetzt erstellt!\n\n' +
+                'Die Texterstellung dauert ca. 2-3 Minuten.\n\n' +
+                'Es werden keine Bilder generiert (Entwicklermodus).'
+              : language === 'fr'
+              ? 'Votre histoire est en cours de création!\n\n' +
+                'La création du texte prendra environ 2-3 minutes.\n\n' +
+                'Aucune image ne sera générée (mode développeur).'
+              : 'Your story is now being created!\n\n' +
+                'Text creation will take approximately 2-3 minutes.\n\n' +
+                'No images will be generated (developer mode).')
+            : (language === 'de'
+              ? 'Ihre Geschichte wird jetzt erstellt!\n\n' +
+                'Die Erstellung dauert ca. 10 Minuten.\n\n' +
+                'Die Geschichte wird im Hintergrund auf unseren Servern generiert.\n\n' +
+                'Sie können diese Seite schliessen und später zurückkommen.'
+              : language === 'fr'
+              ? 'Votre histoire est en cours de création!\n\n' +
+                'La création prendra environ 10 minutes.\n\n' +
+                'L\'histoire est générée en arrière-plan sur nos serveurs.\n\n' +
+                'Vous pouvez fermer cette page et revenir plus tard.'
+              : 'Your story is now being created!\n\n' +
+                'Creation will take approximately 10 minutes.\n\n' +
+                'The story is being generated in the background on our servers.\n\n' +
+                'You can close this page and come back later.');
+
+          alert(infoMessage);
 
           // Start polling for job status
           pollJobStatus(jobId);
