@@ -4262,7 +4262,14 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     console.log(`📄 [PDF GET] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${storyData.title || 'story'}.pdf"`);
+    // Sanitize filename: remove special chars, replace dashes/spaces, keep ASCII only
+    const safeFilename = (storyData.title || 'story')
+      .replace(/[–—]/g, '-')  // Replace en-dash and em-dash with hyphen
+      .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/[^a-zA-Z0-9\s\-_.]/g, '')  // Remove non-ASCII chars
+      .replace(/\s+/g, '_')  // Replace spaces with underscores
+      .substring(0, 100);  // Limit length
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}.pdf"`);
     res.send(pdfBuffer);
 
   } catch (err) {
