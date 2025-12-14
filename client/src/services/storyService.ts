@@ -350,6 +350,50 @@ export const storyService = {
     });
     return response;
   },
+
+  // Check order status after Stripe payment
+  async getOrderStatus(sessionId: string): Promise<{
+    status: string;
+    order?: {
+      customer_name: string;
+      customer_email: string;
+      shipping_name: string;
+      shipping_address_line1: string;
+      shipping_city: string;
+      shipping_postal_code: string;
+      shipping_country: string;
+      amount_total: number;
+      currency: string;
+    };
+    session?: {
+      id: string;
+      payment_status: string;
+      amount_total: number;
+      currency: string;
+    };
+  }> {
+    const response = await api.get<{
+      status: string;
+      order?: {
+        customer_name: string;
+        customer_email: string;
+        shipping_name: string;
+        shipping_address_line1: string;
+        shipping_city: string;
+        shipping_postal_code: string;
+        shipping_country: string;
+        amount_total: number;
+        currency: string;
+      };
+      session?: {
+        id: string;
+        payment_status: string;
+        amount_total: number;
+        currency: string;
+      };
+    }>(`/api/stripe/order-status/${sessionId}`);
+    return response;
+  },
 };
 
 export default storyService;

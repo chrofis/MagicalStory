@@ -5,6 +5,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { StoryProvider } from './context/StoryContext';
+import { ToastProvider } from './context/ToastContext';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')!).render(
       <LanguageProvider>
         <AuthProvider>
           <StoryProvider>
-            <App />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </StoryProvider>
         </AuthProvider>
       </LanguageProvider>
