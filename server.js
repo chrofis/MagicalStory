@@ -6133,6 +6133,28 @@ const ART_STYLES = {
   watercolor: 'watercolor painting style, soft edges, flowing colors, delicate washes, artistic brushstrokes, dreamy atmosphere, traditional watercolor illustration'
 };
 
+// Language level definitions - controls text length per page
+const LANGUAGE_LEVELS = {
+  '1st-grade': {
+    description: 'Simple words and very short sentences for early readers',
+    pageLength: '2-3 sentences per page (approximately 20-35 words)'
+  },
+  'standard': {
+    description: 'Age-appropriate vocabulary for elementary school children',
+    pageLength: 'approximately 120-150 words per page'
+  },
+  'advanced': {
+    description: 'More complex vocabulary and varied sentence structure for advanced readers',
+    pageLength: 'approximately 250-300 words per page'
+  }
+};
+
+// Helper function to get reading level text for prompts
+function getReadingLevel(languageLevel) {
+  const levelInfo = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
+  return `${levelInfo.description}. ${levelInfo.pageLength}`;
+}
+
 // Helper function to extract cover scene descriptions from outline
 function extractCoverScenes(outline) {
   const coverScenes = {
@@ -7073,15 +7095,7 @@ async function processStoryJob(jobId) {
 
       // Generate story text for this batch
       const basePrompt = buildBasePrompt(inputData);
-
-      // Get reading level for this language level
-      const languageLevelDescriptions = {
-        '1st-grade': { description: 'Simple words and very short sentences for early readers', pageLength: '2-3 sentences per page (approximately 20-35 words)' },
-        'standard': { description: 'Age-appropriate vocabulary for elementary school children', pageLength: 'approximately 120-150 words per page' },
-        'advanced': { description: 'More complex vocabulary and varied sentence structure for advanced readers', pageLength: 'approximately 250-300 words per page' }
-      };
-      const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
-      const readingLevel = `${levelInfo.description}. ${levelInfo.pageLength}`;
+      const readingLevel = getReadingLevel(inputData.languageLevel);
 
       console.log(`📝 [BATCH ${batchNum + 1}] Reading level: ${inputData.languageLevel || 'standard'} - ${readingLevel}`);
 
@@ -7773,23 +7787,7 @@ function buildBasePrompt(inputData) {
     }
   }
 
-  // Map language level to reading instructions with page length guidance
-  const languageLevelDescriptions = {
-    '1st-grade': {
-      description: 'Simple words and very short sentences for early readers',
-      pageLength: '2-3 sentences per page (approximately 20-35 words)'
-    },
-    'standard': {
-      description: 'Age-appropriate vocabulary for elementary school children',
-      pageLength: 'approximately 120-150 words per page'
-    },
-    'advanced': {
-      description: 'More complex vocabulary and varied sentence structure for advanced readers',
-      pageLength: 'approximately 250-300 words per page'
-    }
-  };
-  const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
-  const readingLevel = `${levelInfo.description}. ${levelInfo.pageLength}`;
+  const readingLevel = getReadingLevel(inputData.languageLevel);
 
   // Add German language note if applicable
   const language = inputData.language || 'en';
@@ -7812,24 +7810,7 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   // Build the story generation prompt based on input data
   // Use sceneCount if provided (for standard mode where print pages != scenes)
   const pageCount = sceneCount || inputData.pages || 15;
-
-  // Map language level to reading instructions with page length guidance
-  const languageLevelDescriptions = {
-    '1st-grade': {
-      description: 'Simple words and very short sentences for early readers',
-      pageLength: '2-3 sentences per page (approximately 20-35 words)'
-    },
-    'standard': {
-      description: 'Age-appropriate vocabulary for elementary school children',
-      pageLength: 'approximately 120-150 words per page'
-    },
-    'advanced': {
-      description: 'More complex vocabulary and varied sentence structure for advanced readers',
-      pageLength: 'approximately 250-300 words per page'
-    }
-  };
-  const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
-  const readingLevel = `${levelInfo.description}. ${levelInfo.pageLength}`;
+  const readingLevel = getReadingLevel(inputData.languageLevel);
 
   // Extract only essential character info (NO PHOTOS to avoid token limit)
   const characterSummary = (inputData.characters || []).map(char => ({
