@@ -15,6 +15,7 @@ interface CharacterFormProps {
   onContinueToTraits?: () => void;
   isLoading?: boolean;
   step: 'name' | 'traits';
+  developerMode?: boolean;
 }
 
 export function CharacterForm({

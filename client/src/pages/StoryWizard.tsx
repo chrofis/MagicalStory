@@ -311,6 +311,7 @@ export default function StoryWizard() {
             build: analysis.attributes?.build || prev.build,
             hairColor: analysis.attributes?.hairColor || prev.hairColor,
             clothing: analysis.attributes?.clothing || prev.clothing,
+            otherFeatures: analysis.attributes?.otherFeatures || prev.otherFeatures,
           } : null);
         } else {
           log.warn('Photo analysis returned no data, keeping original photo');
