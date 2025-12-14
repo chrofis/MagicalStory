@@ -14,6 +14,7 @@ interface CharacterFormProps {
   onPhotoChange: (file: File) => void;
   onContinueToTraits?: () => void;
   isLoading?: boolean;
+  isAnalyzingPhoto?: boolean;
   step: 'name' | 'traits';
   developerMode?: boolean;
 }
@@ -26,6 +27,7 @@ export function CharacterForm({
   onPhotoChange,
   onContinueToTraits,
   isLoading,
+  isAnalyzingPhoto,
   step,
   developerMode,
 }: CharacterFormProps) {
@@ -60,14 +62,27 @@ export function CharacterForm({
   if (step === 'name') {
     return (
       <div className="space-y-6">
-        {/* Photo display */}
+        {/* Photo display - show spinner while analyzing */}
         <div className="flex flex-col items-center gap-4">
-          {character.photoUrl && (
+          {isAnalyzingPhoto ? (
+            <div className="w-32 h-32 rounded-full bg-indigo-100 border-4 border-indigo-400 shadow-lg flex items-center justify-center">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-indigo-600 font-medium">
+                  {language === 'de' ? 'Analysiere...' : language === 'fr' ? 'Analyse...' : 'Analyzing...'}
+                </span>
+              </div>
+            </div>
+          ) : character.photoUrl ? (
             <img
               src={character.photoUrl}
               alt="Character"
               className="w-32 h-32 rounded-full object-cover border-4 border-indigo-400 shadow-lg"
             />
+          ) : (
+            <div className="w-32 h-32 rounded-full bg-gray-200 border-4 border-gray-300 flex items-center justify-center">
+              <Upload size={32} className="text-gray-400" />
+            </div>
           )}
 
           <label className="cursor-pointer bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-300 flex items-center gap-2 font-semibold transition-colors">
@@ -126,14 +141,22 @@ export function CharacterForm({
     <div className="space-y-6">
       {/* Header with photo and name */}
       <div className="flex items-center gap-4">
-        {/* Photo with change option */}
+        {/* Photo with change option - show spinner while analyzing */}
         <label className="flex-shrink-0 relative group cursor-pointer">
-          {character.photoUrl && (
+          {isAnalyzingPhoto ? (
+            <div className="w-20 h-20 rounded-full bg-indigo-100 border-2 border-indigo-400 flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : character.photoUrl ? (
             <img
               src={character.photoUrl}
               alt={character.name}
               className="w-20 h-20 rounded-full object-cover border-2 border-indigo-400"
             />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
+              <Upload size={24} className="text-gray-400" />
+            </div>
           )}
           {/* Hover overlay for desktop */}
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">

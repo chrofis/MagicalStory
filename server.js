@@ -5706,7 +5706,10 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
             }
           }
           textToRender += '...';
-          console.warn(`⚠️ [PDF] Picture book text truncated on page ${index + 1} - original: ${cleanText.length} chars, truncated: ${textToRender.length} chars`);
+          // Text truncation is not allowed - throw error to stop print process
+          const errorMsg = `Text too long on page ${index + 1}. Original: ${cleanText.length} chars, max that fits: ${textToRender.length - 3} chars. Please shorten the story text for this page.`;
+          console.error(`❌ [PDF] ${errorMsg}`);
+          throw new Error(errorMsg);
         }
 
         textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'center', lineGap });
@@ -5755,7 +5758,10 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
             }
           }
           textToRender += '...';
-          console.warn(`⚠️ [PDF] Text truncated on page ${pageNumber} - original: ${cleanText.length} chars, truncated: ${textToRender.length} chars`);
+          // Text truncation is not allowed - throw error to stop print process
+          const errorMsg = `Text too long on page ${pageNumber}. Original: ${cleanText.length} chars, max that fits: ${textToRender.length - 3} chars. Please shorten the story text for this page.`;
+          console.error(`❌ [PDF] ${errorMsg}`);
+          throw new Error(errorMsg);
         }
 
         textHeight = doc.heightOfString(textToRender, { width: availableWidth, align: 'left', lineGap });
@@ -5961,6 +5967,43 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       `, [sessionId]);
     } catch (updateError) {
       console.error('❌ [BACKGROUND] Failed to update order status:', updateError);
+    }
+
+    // Send failure notification email to customer
+    try {
+      const { sendEmail } = require('./email.js');
+      await sendEmail({
+        to: customerInfo.email,
+        subject: 'Book Order Failed - MagicalStory',
+        text: `Dear ${customerInfo.name},
+
+Unfortunately, your book order could not be processed.
+
+Error: ${error.message}
+
+Please contact us at support@magicalstory.ch for assistance.
+
+We apologize for the inconvenience.
+
+Best regards,
+The MagicalStory Team`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #dc2626;">Book Order Failed</h2>
+            <p>Dear ${customerInfo.name},</p>
+            <p>Unfortunately, your book order could not be processed.</p>
+            <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <strong>Error:</strong> ${error.message}
+            </div>
+            <p>Please contact us at <a href="mailto:support@magicalstory.ch">support@magicalstory.ch</a> for assistance.</p>
+            <p>We apologize for the inconvenience.</p>
+            <p>Best regards,<br>The MagicalStory Team</p>
+          </div>
+        `
+      });
+      console.log(`📧 [BACKGROUND] Failure notification sent to ${customerInfo.email}`);
+    } catch (emailError) {
+      console.error('❌ [BACKGROUND] Failed to send failure email:', emailError);
     }
 
     throw error;

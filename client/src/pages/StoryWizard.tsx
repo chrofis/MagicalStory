@@ -47,6 +47,7 @@ export default function StoryWizard() {
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
   const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits'>('photo');
+  const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
 
   // Step 3: Relationships - loaded from API with characters
   const [relationships, setRelationships] = useState<RelationshipMap>({});
@@ -421,24 +422,24 @@ export default function StoryWizard() {
     reader.onload = async (e) => {
       const originalPhotoUrl = e.target?.result as string;
 
-      // IMMEDIATELY update photo - don't block on analysis
-      setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
+      // Start analyzing - don't show photo yet
+      setIsAnalyzingPhoto(true);
       // Only go to name step if not already in traits step (editing existing character)
       if (characterStep !== 'traits') {
         setCharacterStep('name');
       }
 
-      // Run photo analysis in BACKGROUND (non-blocking)
+      // Run photo analysis
       try {
         // Resize image before sending to server (reduces upload time significantly)
         const resizedPhoto = await resizeImage(originalPhotoUrl);
         const originalSize = Math.round(originalPhotoUrl.length / 1024);
         const resizedSize = Math.round(resizedPhoto.length / 1024);
-        log.info(`Starting background photo analysis... (${originalSize}KB -> ${resizedSize}KB)`);
+        log.info(`Starting photo analysis... (${originalSize}KB -> ${resizedSize}KB)`);
         const analysis = await characterService.analyzePhoto(resizedPhoto);
 
         if (analysis.success) {
-          // Update character with analyzed data (user may have already entered name)
+          // Update character with analyzed data
           const photoUrl = analysis.faceThumbnail || originalPhotoUrl;
           const bodyPhotoUrl = analysis.bodyCrop || originalPhotoUrl;
           const bodyNoBgUrl = analysis.bodyNoBg || undefined;
@@ -458,7 +459,6 @@ export default function StoryWizard() {
             faceBox: analysis.faceBox,
             bodyBox: analysis.bodyBox,
             // Only update attributes if user hasn't already filled them in
-            // Check for empty/default values before overwriting
             gender: (!prev.gender || prev.gender === 'other') && analysis.attributes?.gender
               ? (analysis.attributes.gender as 'male' | 'female' | 'other')
               : prev.gender,
@@ -482,11 +482,16 @@ export default function StoryWizard() {
               : prev.otherFeatures,
           } : null);
         } else {
-          log.warn('Photo analysis returned no data, keeping original photo');
+          log.warn('Photo analysis returned no data, using original photo');
+          // Fallback to original photo
+          setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
         }
       } catch (error) {
-        log.error('Background photo analysis error:', error);
-        // Keep original photo - user can still proceed
+        log.error('Photo analysis error:', error);
+        // Fallback to original photo on error
+        setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
+      } finally {
+        setIsAnalyzingPhoto(false);
       }
     };
     reader.readAsDataURL(file);
@@ -850,6 +855,7 @@ export default function StoryWizard() {
                   onPhotoChange={handlePhotoSelect}
                   onContinueToTraits={() => setCharacterStep('traits')}
                   isLoading={isLoading}
+                  isAnalyzingPhoto={isAnalyzingPhoto}
                   step="name"
                   developerMode={developerMode}
                 />
@@ -870,6 +876,7 @@ export default function StoryWizard() {
                 onCancel={() => setCurrentCharacter(null)}
                 onPhotoChange={handlePhotoSelect}
                 isLoading={isLoading}
+                isAnalyzingPhoto={isAnalyzingPhoto}
                 step="traits"
                 developerMode={developerMode}
               />
