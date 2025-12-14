@@ -2674,7 +2674,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData, sceneCharacters);
 
     // Generate new image with only scene-specific character photos
-    const imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos);
+    // Use quality retry to regenerate if score is below threshold
+    const imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos);
 
     // Update the image in story data
     let images = storyData.images || [];
@@ -2685,7 +2686,11 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       imageData: imageResult.imageData,
       description: sceneDesc?.description || customPrompt,
       qualityScore: imageResult.score,
-      qualityReasoning: imageResult.reasoning || null
+      qualityReasoning: imageResult.reasoning || null,
+      wasRegenerated: imageResult.wasRegenerated || false,
+      originalImage: imageResult.originalImage || null,
+      originalScore: imageResult.originalScore || null,
+      originalReasoning: imageResult.originalReasoning || null
     };
 
     if (existingIndex >= 0) {
@@ -5832,7 +5837,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         while (retries <= MAX_RETRIES && !imageResult) {
           try {
-            imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos, null);
+            // Use quality retry to regenerate if score is below threshold
+            imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos, null);
           } catch (error) {
             retries++;
             console.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -5841,7 +5847,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           }
         }
 
-        console.log(`✅ [STREAM-IMG] Page ${pageNum} image generated (score: ${imageResult.score})`);
+        console.log(`✅ [STREAM-IMG] Page ${pageNum} image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
         const pageData = {
           pageNumber: pageNum,
@@ -5849,7 +5855,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           description: sceneDesc,
           text: pageText || pageTexts[pageNum] || '',
           qualityScore: imageResult.score,
-          qualityReasoning: imageResult.reasoning || null
+          qualityReasoning: imageResult.reasoning || null,
+          wasRegenerated: imageResult.wasRegenerated || false,
+          originalImage: imageResult.originalImage || null,
+          originalScore: imageResult.originalScore || null,
+          originalReasoning: imageResult.originalReasoning || null
         };
 
         // Save partial result checkpoint for progressive display
@@ -6040,7 +6050,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             try {
               // Pass only photos of characters in this scene
               // In sequential mode, also pass previous image for consistency
-              imageResult = await callGeminiAPIForImage(imagePrompt, scenePhotos, previousImage);
+              // Use quality retry to regenerate if score is below threshold
+              imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos, previousImage);
             } catch (error) {
               retries++;
               console.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -6049,7 +6060,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             }
           }
 
-          console.log(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score})`);
+          console.log(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
           // Update progress
           const progressPercent = 30 + Math.floor((idx + 1) / sceneCount * 50);
@@ -6063,7 +6074,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             imageData: imageResult.imageData,
             description: scene.description,
             qualityScore: imageResult.score,
-            qualityReasoning: imageResult.reasoning || null
+            qualityReasoning: imageResult.reasoning || null,
+            wasRegenerated: imageResult.wasRegenerated || false,
+            originalImage: imageResult.originalImage || null,
+            originalScore: imageResult.originalScore || null,
+            originalReasoning: imageResult.originalReasoning || null
           };
         } catch (error) {
           console.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
@@ -6467,6 +6482,13 @@ Output Format:
       // Parse the pages from this batch
       let batchPages = parseStoryPages(batchText);
       console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
+
+      // Filter to only include pages in the expected range (Claude sometimes generates extra)
+      const unfilteredCount = batchPages.length;
+      batchPages = batchPages.filter(p => p.pageNumber >= startScene && p.pageNumber <= endScene);
+      if (batchPages.length < unfilteredCount) {
+        console.log(`⚠️ [BATCH ${batchNum + 1}] Filtered out ${unfilteredCount - batchPages.length} pages outside range ${startScene}-${endScene}`);
+      }
 
       // VALIDATION: Check if all expected pages were generated
       const expectedPageCount = endScene - startScene + 1;
