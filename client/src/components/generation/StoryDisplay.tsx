@@ -1,6 +1,6 @@
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import type { SceneImage, SceneDescription } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 
 interface StoryDisplayProps {
@@ -8,6 +8,7 @@ interface StoryDisplayProps {
   story: string;
   sceneImages: SceneImage[];
   sceneDescriptions?: SceneDescription[];
+  coverImages?: CoverImages;
   languageLevel?: LanguageLevel;
   isGenerating?: boolean;
   onDownloadPdf?: () => void;
@@ -25,6 +26,7 @@ export function StoryDisplay({
   story,
   sceneImages,
   sceneDescriptions = [],
+  coverImages,
   languageLevel = 'standard',
   isGenerating = false,
   onDownloadPdf,
@@ -132,6 +134,58 @@ export function StoryDisplay({
           </button>
         )}
       </div>
+
+      {/* Cover Images Display */}
+      {coverImages && (coverImages.frontCover || coverImages.initialPage || coverImages.backCover) && (
+        <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mt-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <BookOpen size={24} /> {language === 'de' ? 'Buchcover' : language === 'fr' ? 'Couvertures' : 'Book Covers'}
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Front Cover */}
+            {coverImages.frontCover && (
+              <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                <h4 className="text-lg font-bold text-gray-800 mb-3">
+                  {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
+                </h4>
+                <img
+                  src={typeof coverImages.frontCover === 'string' ? coverImages.frontCover : coverImages.frontCover}
+                  alt="Front Cover"
+                  className="w-full rounded-lg shadow-md"
+                />
+              </div>
+            )}
+
+            {/* Initial Page */}
+            {coverImages.initialPage && (
+              <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                <h4 className="text-lg font-bold text-gray-800 mb-3">
+                  {language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page d\'introduction' : 'Initial Page'}
+                </h4>
+                <img
+                  src={typeof coverImages.initialPage === 'string' ? coverImages.initialPage : coverImages.initialPage}
+                  alt="Initial Page"
+                  className="w-full rounded-lg shadow-md"
+                />
+              </div>
+            )}
+
+            {/* Back Cover */}
+            {coverImages.backCover && (
+              <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
+                <h4 className="text-lg font-bold text-gray-800 mb-3">
+                  {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
+                </h4>
+                <img
+                  src={typeof coverImages.backCover === 'string' ? coverImages.backCover : coverImages.backCover}
+                  alt="Back Cover"
+                  className="w-full rounded-lg shadow-md"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Story Pages with Images */}
       {hasImages && story && (

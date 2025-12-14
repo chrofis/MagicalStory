@@ -93,6 +93,7 @@ export default function StoryWizard() {
   const [, setStoryOutline] = useState(''); // Outline stored for potential later use
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
+  const [coverImages, setCoverImages] = useState<{ frontCover: string | null; initialPage: string | null; backCover: string | null }>({ frontCover: null, initialPage: null, backCover: null });
   const [storyId, setStoryId] = useState<string | null>(null);
   const [, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
 
@@ -124,6 +125,7 @@ export default function StoryWizard() {
           setGeneratedStory(story.story || '');
           setSceneImages(story.sceneImages || []);
           setSceneDescriptions(story.sceneDescriptions || []);
+          setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
           setLanguageLevel(story.languageLevel || 'standard');
           // Set to step 5 to show the story
           setStep(5);
@@ -640,6 +642,7 @@ export default function StoryWizard() {
           setGeneratedStory(status.result.story);
           setSceneDescriptions(status.result.sceneDescriptions || []);
           setSceneImages(status.result.sceneImages || []);
+          setCoverImages(status.result.coverImages || { frontCover: null, initialPage: null, backCover: null });
           completed = true;
           log.success('Story generation completed!');
         } else if (status.status === 'failed') {
@@ -830,6 +833,7 @@ export default function StoryWizard() {
               story={generatedStory}
               sceneImages={sceneImages}
               sceneDescriptions={sceneDescriptions}
+              coverImages={coverImages}
               languageLevel={languageLevel}
               isGenerating={isGenerating}
               developerMode={developerMode}

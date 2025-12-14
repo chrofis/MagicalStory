@@ -5421,11 +5421,14 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       throw new Error('Story text not found in story data. Available keys: ' + Object.keys(storyData).join(', '));
     }
 
-    // Parse pages using the same pattern as frontend: ## Seite X or ## Page X
-    const pageMatches = generatedStoryText.split(/##\s*(?:Seite|Page)\s+\d+/i);
+    // Parse pages using same pattern as frontend: ## Seite X, ## Page X, or --- Page X ---
+    const pageMatches = generatedStoryText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
     const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
 
     console.log(`📄 [BACKGROUND] Found ${storyPages.length} story pages to add to PDF`);
+    if (storyPages.length === 0) {
+      console.log(`📄 [BACKGROUND] Story text preview (first 500 chars): ${generatedStoryText.substring(0, 500)}`);
+    }
 
     // Add content pages based on layout type
     if (isPictureBook) {
@@ -5554,10 +5557,33 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       });
     }
 
+    // Calculate actual pages in PDF and add blank pages to reach valid Gelato page count
+    // Pages so far: front cover (1) + initial page (0-1) + back cover (1) + story pages
+    let actualPdfPages = 2; // front + back covers
+    if (initialPageImageData) actualPdfPages += 1; // initial page
+    if (isPictureBook) {
+      actualPdfPages += storyPages.length; // 1 page per scene
+    } else {
+      actualPdfPages += storyPages.length * 2; // text + image pages
+    }
+
+    // Calculate target page count for Gelato (must be valid count)
+    const validPageCounts = [20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80];
+    const targetPageCount = validPageCounts.find(count => count >= actualPdfPages) || validPageCounts[validPageCounts.length - 1];
+
+    // Add blank pages to reach target count
+    const blankPagesToAdd = targetPageCount - actualPdfPages;
+    console.log(`📄 [BACKGROUND] PDF has ${actualPdfPages} content pages, adding ${blankPagesToAdd} blank pages to reach ${targetPageCount}`);
+
+    for (let i = 0; i < blankPagesToAdd; i++) {
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      // Blank page - just white
+    }
+
     doc.end();
     const pdfBuffer = await pdfPromise;
     const pdfBase64 = pdfBuffer.toString('base64');
-    console.log(`✅ [BACKGROUND] PDF generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`✅ [BACKGROUND] PDF generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${targetPageCount} total pages`);
 
     // Step 3.5: Save PDF to database and get public URL
     console.log('💾 [BACKGROUND] Saving PDF to database...');
@@ -5592,12 +5618,9 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       throw new Error('GELATO_API_KEY not configured');
     }
 
-    // Calculate page count based on layout type
-    // Picture Book: 1 page per scene (combined layout) + initial page
-    // Standard: 2 pages per scene (text + image) + initial page
-    const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
-    const printPageCount = isPictureBook ? (storyScenes + 1) : (storyScenes * 2 + 1);
-    console.log(`📊 [BACKGROUND] Story scenes: ${storyScenes}, Print pages: ${printPageCount}, Layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
+    // Use the same targetPageCount calculated during PDF generation (already added blank pages)
+    const printPageCount = targetPageCount;
+    console.log(`📊 [BACKGROUND] Using PDF page count for Gelato: ${printPageCount}`);
 
     // Fetch product UID from database based on page count (same logic as frontend)
     let printProductUid = null;
