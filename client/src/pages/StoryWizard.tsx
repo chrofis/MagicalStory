@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ArrowLeft, ArrowRight, Sparkles, Users } from 'lucide-react';
@@ -25,6 +25,7 @@ const log = createLogger('StoryWizard');
 
 export default function StoryWizard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
   const { isAuthenticated } = useAuth();
 
@@ -101,6 +102,42 @@ export default function StoryWizard() {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
+
+  // Load saved story from URL parameter
+  useEffect(() => {
+    const loadSavedStory = async () => {
+      const urlStoryId = searchParams.get('storyId');
+      if (!urlStoryId || !isAuthenticated) return;
+
+      log.info('Loading saved story:', urlStoryId);
+      setIsLoading(true);
+
+      try {
+        const story = await storyService.getStory(urlStoryId);
+        if (story) {
+          log.info('Loaded story:', story.title);
+          // Populate story data
+          setStoryId(story.id);
+          setStoryTitle(story.title || '');
+          setStoryType(story.storyType || '');
+          setArtStyle(story.artStyle || 'pixar');
+          setGeneratedStory(story.story || '');
+          setSceneImages(story.sceneImages || []);
+          // Set to step 5 to show the story
+          setStep(5);
+          setIsGenerating(false);
+        } else {
+          log.error('Story not found:', urlStoryId);
+        }
+      } catch (error) {
+        log.error('Failed to load story:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSavedStory();
+  }, [searchParams, isAuthenticated]);
 
   // Auto-select main characters based on age
   const autoSelectMainCharacters = (charactersList: Character[]) => {
