@@ -8024,6 +8024,12 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
           }
         }
 
+        // Handle error events from Claude API
+        if (event.type === 'error') {
+          console.error(`❌ [STREAM] API error event:`, event.error);
+          throw new Error(`Claude API stream error: ${event.error?.message || JSON.stringify(event.error)}`);
+        }
+
         // Capture stop_reason from message_delta
         if (event.type === 'message_delta' && event.delta?.stop_reason) {
           stopReason = event.delta.stop_reason;
@@ -8034,7 +8040,10 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
           console.log(`🌊 [STREAM] Streaming complete, received ${fullText.length} chars, stop_reason: ${stopReason}`);
         }
       } catch (parseError) {
-        // Skip non-JSON lines (like empty lines)
+        // Log parse errors for debugging (but don't fail on empty lines)
+        if (data && data !== '[DONE]') {
+          console.warn(`⚠️ [STREAM] Failed to parse SSE data: ${data.substring(0, 100)}`);
+        }
       }
     }
   };
@@ -8079,6 +8088,11 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
   // Warn if response was truncated due to max_tokens
   if (stopReason === 'max_tokens') {
     console.warn(`⚠️ [STREAM] Response was TRUNCATED due to max_tokens limit (${maxTokens})! Text may be incomplete.`);
+  }
+
+  // Warn if response is empty (possible API issue)
+  if (fullText.length === 0) {
+    console.error(`❌ [STREAM] Response is EMPTY! stopReason: ${stopReason}, maxTokens: ${maxTokens}`);
   }
 
   return fullText;
