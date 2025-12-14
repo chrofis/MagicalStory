@@ -2647,7 +2647,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Save updated story
     storyData.sceneDescriptions = sceneDescriptions;
     await dbPool.query(
-      'UPDATE stories SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE stories SET data = $1 WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
@@ -2740,7 +2740,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     // Save updated story
     storyData.sceneImages = sceneImages;
     await dbPool.query(
-      'UPDATE stories SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE stories SET data = $1 WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
@@ -2903,7 +2903,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
 
     // Save updated story
     await dbPool.query(
-      'UPDATE stories SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE stories SET data = $1 WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
@@ -2972,7 +2972,7 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
 
     // Save updated story
     await dbPool.query(
-      'UPDATE stories SET data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE stories SET data = $1 WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
