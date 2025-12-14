@@ -491,7 +491,7 @@ export function StoryDisplay({
 
                     {/* Text below */}
                     <div className="w-full bg-indigo-50 rounded-lg p-6 border-2 border-indigo-200">
-                      <p className="text-gray-800 leading-relaxed whitespace-pre-wrap font-serif text-xl text-center">
+                      <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl text-center">
                         {pageText.trim()}
                       </p>
                     </div>
@@ -632,7 +632,7 @@ export function StoryDisplay({
                     {/* Text on the right */}
                     <div className="flex items-center">
                       <div className="prose max-w-none">
-                        <p className="text-gray-800 leading-relaxed whitespace-pre-wrap font-serif text-xl">
+                        <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl">
                           {pageText.trim()}
                         </p>
                       </div>

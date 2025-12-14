@@ -5679,23 +5679,26 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
         const availableTextWidth = pageSize - (textMargin * 2);
         const availableTextHeight = textAreaHeight - (textMargin);
 
+        const lineGap = -2; // Tighter line spacing (40-50% less gap)
         let fontSize = 10;  // Start with 10pt, auto-reduce if needed
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center' });
+        let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center', lineGap });
 
+        // Auto-reduce font size if text doesn't fit
         while (textHeight > availableTextHeight && fontSize > 4) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center' });
+          textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center', lineGap });
         }
 
         let textToRender = cleanText;
+        // If still doesn't fit at minimum font size, truncate with ellipsis
         if (textHeight > availableTextHeight) {
           const words = cleanText.split(' ');
           textToRender = '';
           for (let i = 0; i < words.length; i++) {
             const testText = textToRender + (textToRender ? ' ' : '') + words[i];
-            const testHeight = doc.heightOfString(testText, { width: availableTextWidth, align: 'center' });
+            const testHeight = doc.heightOfString(testText + '...', { width: availableTextWidth, align: 'center', lineGap });
             if (testHeight <= availableTextHeight) {
               textToRender = testText;
             } else {
@@ -5703,12 +5706,13 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
             }
           }
           textToRender += '...';
+          console.warn(`⚠️ [PDF] Picture book text truncated on page ${index + 1} - original: ${cleanText.length} chars, truncated: ${textToRender.length} chars`);
         }
 
-        textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'center' });
+        textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'center', lineGap });
         const textY = textAreaY + (availableTextHeight - textHeight) / 2;
 
-        doc.text(textToRender, textMargin, textY, { width: availableTextWidth, align: 'center' });
+        doc.text(textToRender, textMargin, textY, { width: availableTextWidth, align: 'center', lineGap });
       });
     } else {
       // STANDARD/ADVANCED LAYOUT: Separate pages for text and image
@@ -5724,23 +5728,26 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
         const availableWidth = pageSize - (margin * 2);
         const availableHeight = pageSize - (margin * 2);
 
+        const lineGap = -2; // Tighter line spacing (40-50% less gap)
         let fontSize = 9;
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
+        let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
 
+        // Auto-reduce font size if text doesn't fit
         while (textHeight > availableHeight && fontSize > 5) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
+          textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
         }
 
         let textToRender = cleanText;
+        // If still doesn't fit at minimum font size, truncate with ellipsis
         if (textHeight > availableHeight) {
           const words = cleanText.split(' ');
           textToRender = '';
           for (let i = 0; i < words.length; i++) {
             const testText = textToRender + (textToRender ? ' ' : '') + words[i];
-            const testHeight = doc.heightOfString(testText, { width: availableWidth, align: 'left' });
+            const testHeight = doc.heightOfString(testText + '...', { width: availableWidth, align: 'left', lineGap });
             if (testHeight <= availableHeight) {
               textToRender = testText;
             } else {
@@ -5748,12 +5755,13 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
             }
           }
           textToRender += '...';
+          console.warn(`⚠️ [PDF] Text truncated on page ${pageNumber} - original: ${cleanText.length} chars, truncated: ${textToRender.length} chars`);
         }
 
-        textHeight = doc.heightOfString(textToRender, { width: availableWidth, align: 'left' });
+        textHeight = doc.heightOfString(textToRender, { width: availableWidth, align: 'left', lineGap });
         const yPosition = margin + (availableHeight - textHeight) / 2;
 
-        doc.text(textToRender, margin, yPosition, { width: availableWidth, align: 'left' });
+        doc.text(textToRender, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
 
         // Add image page if available
         if (image && image.imageData) {
