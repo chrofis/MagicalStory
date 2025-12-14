@@ -4479,14 +4479,16 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
                 if (!physicalDesc) physicalDesc = '3D character';
 
                 // Track if this character has a reference image
-                const hasImage = char.photoUrl ? true : false;
+                // Use same priority as server: bodyNoBgUrl > bodyPhotoUrl > photoUrl
+                const charPhoto = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+                const hasImage = charPhoto ? true : false;
                 const imageRef = hasImage ? ` [Reference Image ${characterImages.length + 1}]` : '';
 
                 characterPrompts += `Character ${idx + 1} (${char.name})${imageRef}: Age ${char.age}, ${physicalDesc.trim()}. Wearing: ${characterClothing[char.name]}. Eyes must be correctly aligned, not cross-eyed, with a natural gaze.\n`;
 
-                // Use avatar (photoUrl) for better character consistency
-                if (char.photoUrl) {
-                  characterImages.push(char.photoUrl);
+                // Use avatar for better character consistency
+                if (charPhoto) {
+                  characterImages.push(charPhoto);
                   characterImageMap.push({ name: char.name, imageIndex: characterImages.length });
                 }
               });
@@ -4633,13 +4635,15 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
 
             // List main characters first with emphasis
+            // Use same priority as server: bodyNoBgUrl > bodyPhotoUrl > photoUrl
             mainChars.forEach((char) => {
-              const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
+              const charPhoto = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+              const imageRef = charPhoto ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
               const physicalDesc = generateCharacterDescription(char);
               characterInfo += `⭐ MAIN: ${physicalDesc}${imageRef}\n`;
 
-              if (char.photoUrl) {
-                coverCharacterImages.push(char.photoUrl);
+              if (charPhoto) {
+                coverCharacterImages.push(charPhoto);
                 coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length, isMain: true });
               }
             });
@@ -4648,12 +4652,13 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             if (supportingChars.length > 0) {
               characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
               supportingChars.forEach((char) => {
-                const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
+                const charPhoto = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+                const imageRef = charPhoto ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
                 const physicalDesc = generateCharacterDescription(char);
                 characterInfo += `Supporting: ${physicalDesc}${imageRef}\n`;
 
-                if (char.photoUrl) {
-                  coverCharacterImages.push(char.photoUrl);
+                if (charPhoto) {
+                  coverCharacterImages.push(charPhoto);
                   coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length, isMain: false });
                 }
               });
@@ -5395,9 +5400,10 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
             const prompt = coverImagePrompts[coverType];
 
             // Collect avatar images from ALL characters with photos (same as original cover generation)
+            // Use same priority as server: bodyNoBgUrl > bodyPhotoUrl > photoUrl
             const coverCharacterAvatars = characters
-              .filter(char => char.photoUrl)
-              .map(char => char.photoUrl);
+              .map(char => char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl)
+              .filter(url => url);
 
             let newImageData;
             if (coverCharacterAvatars.length > 0) {
@@ -5661,9 +5667,10 @@ The FIRST attached image shows the PREVIOUS scene from this story. You MUST main
 
             try {
               // Collect avatar images for characters in this scene
+              // Use same priority as server: bodyNoBgUrl > bodyPhotoUrl > photoUrl
               const characterAvatars = charactersInScene
-                .filter(char => char.photoUrl)
-                .map(char => char.photoUrl);
+                .map(char => char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl)
+                .filter(url => url);
 
               const safePrompt = `CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 
@@ -5768,13 +5775,15 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
 
             // List main characters first with emphasis
+            // Use same priority as server: bodyNoBgUrl > bodyPhotoUrl > photoUrl
             mainChars.forEach((char) => {
-              const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
+              const charPhoto = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+              const imageRef = charPhoto ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
               const physicalDesc = generateCharacterDescription(char);
               characterInfo += `⭐ MAIN: ${physicalDesc}${imageRef}\n`;
 
-              if (char.photoUrl) {
-                coverCharacterImages.push(char.photoUrl);
+              if (charPhoto) {
+                coverCharacterImages.push(charPhoto);
                 coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length, isMain: true });
               }
             });
@@ -5783,12 +5792,13 @@ IMPORTANT: This is a wholesome children's storybook illustration. All content is
             if (supportingChars.length > 0) {
               characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
               supportingChars.forEach((char) => {
-                const imageRef = char.photoUrl ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
+                const charPhoto = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+                const imageRef = charPhoto ? ` [Reference Image ${coverCharacterImages.length + 1}]` : '';
                 const physicalDesc = generateCharacterDescription(char);
                 characterInfo += `Supporting: ${physicalDesc}${imageRef}\n`;
 
-                if (char.photoUrl) {
-                  coverCharacterImages.push(char.photoUrl);
+                if (charPhoto) {
+                  coverCharacterImages.push(charPhoto);
                   coverCharacterImageMap.push({ name: char.name, imageIndex: coverCharacterImages.length, isMain: false });
                 }
               });
@@ -9608,9 +9618,10 @@ Return ONLY valid JSON, no markdown or other text.`
                                         );
 
                                         // Collect avatar images for characters in this scene
+                                        // Use same priority as server: bodyNoBgUrl > bodyPhotoUrl > photoUrl
                                         const characterAvatars = charactersInScene
-                                          .filter(char => char.photoUrl)
-                                          .map(char => char.photoUrl);
+                                          .map(char => char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl)
+                                          .filter(url => url);
 
                                         const safePrompt = `CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 
