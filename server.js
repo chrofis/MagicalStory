@@ -6256,19 +6256,23 @@ function extractShortSceneDescriptions(outline) {
   const lines = outline.split('\n');
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Look for "Scene:" lines after "Page X:" lines
-    const pageMatch = line.match(/^Page\s+(\d+):/i);
+    const line = lines[i].trim();
+    // Look for "Page X:" lines (with or without markdown bold)
+    const pageMatch = line.match(/^\*{0,2}Page\s+(\d+):\*{0,2}/i);
     if (pageMatch) {
       const pageNum = parseInt(pageMatch[1]);
       // Look for Scene: in the next few lines
-      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-        if (lines[j].startsWith('Scene:')) {
-          descriptions[pageNum] = lines[j].substring(6).trim();
+      for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+        const sceneLine = lines[j].trim();
+        // Match various Scene formats: "Scene:", "**Scene:**", "Scene Description:", etc.
+        const sceneMatch = sceneLine.match(/^\*{0,2}Scene(?:\s+Description)?:\*{0,2}\s*(.*)/i);
+        if (sceneMatch) {
+          descriptions[pageNum] = sceneMatch[1].trim();
+          console.log(`📋 [SCENE-EXTRACT] Page ${pageNum}: ${descriptions[pageNum].substring(0, 60)}...`);
           break;
         }
         // Stop if we hit another Page: marker
-        if (lines[j].match(/^Page\s+\d+:/i)) break;
+        if (sceneLine.match(/^\*{0,2}Page\s+\d+:/i)) break;
       }
     }
   }
@@ -8366,10 +8370,10 @@ async function compressImageToJPEG(pngBase64) {
  */
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene') {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      log.verbose('⚠️  [QUALITY] Claude API key not configured, skipping quality evaluation');
+      log.verbose('⚠️  [QUALITY] Gemini API key not configured, skipping quality evaluation');
       return null;
     }
 
@@ -8396,13 +8400,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       ? fillTemplate(evaluationTemplate, { ORIGINAL_PROMPT: originalPrompt })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
 
-    // Build content array with generated image first, then reference images
-    const content = [
+    // Build content array for Gemini format
+    const parts = [
       {
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: mimeType,
+        inline_data: {
+          mime_type: mimeType,
           data: base64Data
         }
       }
@@ -8415,11 +8417,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           const refBase64 = refImg.replace(/^data:image\/\w+;base64,/, '');
           const refMimeType = refImg.match(/^data:(image\/\w+);base64,/) ?
             refImg.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
-          content.push({
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: refMimeType,
+          parts.push({
+            inline_data: {
+              mime_type: refMimeType,
               data: refBase64
             }
           });
@@ -8429,36 +8429,38 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     // Add evaluation prompt text
-    content.push({
-      type: 'text',
-      text: evaluationPrompt
-    });
+    parts.push({ text: evaluationPrompt });
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Use Gemini Flash for fast quality evaluation
+    const modelId = 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 800,
-        messages: [{
-          role: 'user',
-          content: content
-        }]
+        contents: [{ parts }],
+        generationConfig: {
+          maxOutputTokens: 800,
+          temperature: 0.3
+        }
       })
     });
 
     if (!response.ok) {
       const error = await response.text();
-      log.error('❌ [QUALITY] Claude API error:', error);
+      log.error('❌ [QUALITY] Gemini API error:', error);
       return null;
     }
 
     const data = await response.json();
-    const responseText = data.content[0].text.trim();
+
+    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+      log.warn('⚠️  [QUALITY] No text response from Gemini');
+      return null;
+    }
+
+    const responseText = data.candidates[0].content.parts[0].text.trim();
 
     // Parse the new format: "Score: XX/100\n\nReasoning: ..."
     const scoreMatch = responseText.match(/Score:\s*(\d+)\/100/i);
