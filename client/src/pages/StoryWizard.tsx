@@ -1093,11 +1093,22 @@ export default function StoryWizard() {
                     country: shippingAddress.country,
                     email: shippingAddress.email || '',
                   });
-                  alert(language === 'de'
-                    ? `Druckauftrag erstellt! Order ID: ${result.orderId}`
+                  // Show success message with option to open Gelato dashboard
+                  const successMsg = language === 'de'
+                    ? `✅ Druckauftrag erfolgreich erstellt!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Entwurf - muss in Gelato bestätigt werden)' : ''}\n\nMöchten Sie das Gelato Dashboard öffnen, um den Auftrag zu verfolgen?`
                     : language === 'fr'
-                    ? `Commande d'impression créée! ID: ${result.orderId}`
-                    : `Print order created! Order ID: ${result.orderId}`);
+                    ? `✅ Commande d'impression créée avec succès!\n\nID de commande: ${result.orderId}\n${result.isDraft ? '(Brouillon - doit être confirmé dans Gelato)' : ''}\n\nVoulez-vous ouvrir le tableau de bord Gelato pour suivre la commande?`
+                    : `✅ Print order created successfully!\n\nOrder ID: ${result.orderId}\n${result.isDraft ? '(Draft - must be confirmed in Gelato)' : ''}\n\nWould you like to open the Gelato dashboard to track your order?`;
+
+                  if (result.dashboardUrl && confirm(successMsg)) {
+                    window.open(result.dashboardUrl, '_blank');
+                  } else if (!result.dashboardUrl) {
+                    alert(language === 'de'
+                      ? `✅ Druckauftrag erstellt!\n\nOrder ID: ${result.orderId}`
+                      : language === 'fr'
+                      ? `✅ Commande créée!\n\nID: ${result.orderId}`
+                      : `✅ Print order created!\n\nOrder ID: ${result.orderId}`);
+                  }
                 } catch (error) {
                   log.error('Print order failed:', error);
                   const errorMsg = error instanceof Error ? error.message : String(error);

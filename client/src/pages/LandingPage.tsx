@@ -39,11 +39,11 @@ export default function LandingPage() {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 px-4 lg:px-8 py-6 lg:py-8 relative">
-        {/* Decorative Sparkles - Hidden on mobile */}
-        <div className="hidden lg:block absolute bottom-10 right-20 text-3xl opacity-50 animate-pulse">✨</div>
+        {/* Decorative Sparkles - Hidden on mobile, positioned away from button */}
+        <div className="hidden lg:block absolute top-16 right-20 text-3xl opacity-50 animate-pulse">✨</div>
         <div className="hidden lg:block absolute top-10 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1s'}}>✨</div>
-        <div className="hidden lg:block absolute bottom-24 left-1/4 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1.5s'}}>✨</div>
-        <div className="hidden lg:block absolute bottom-1/3 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '2s'}}>✨</div>
+        <div className="hidden lg:block absolute top-1/3 left-16 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1.5s'}}>✨</div>
+        <div className="hidden lg:block absolute bottom-20 right-1/4 text-3xl opacity-50 animate-pulse" style={{animationDelay: '2s'}}>✨</div>
 
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 w-full relative z-10 flex-1 items-center">
           {/* Left Side - Text and Button */}

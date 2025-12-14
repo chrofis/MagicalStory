@@ -4221,16 +4221,44 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     // Add story pages
     if (isPictureBook) {
       // Picture Book: combined image + text on same page
+      const margin = mmToPoints(5);
+      const imageHeight = pageSize * 0.85;
+      const textAreaHeight = pageSize * 0.15;
+      const textWidth = pageSize - (margin * 2);
+      const maxTextHeight = textAreaHeight - 10;
+      const startFontSize = 10;
+      const minFontSize = 4;
+
+      // First pass: Calculate minimum font size needed across all pages
+      let globalFontSize = startFontSize;
+      storyPages.forEach((pageText) => {
+        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+        let fontSize = startFontSize;
+        doc.fontSize(fontSize).font('Helvetica');
+        let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center' });
+
+        while (textHeight > maxTextHeight && fontSize > minFontSize) {
+          fontSize -= 0.5;
+          doc.fontSize(fontSize);
+          textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center' });
+        }
+
+        if (fontSize < globalFontSize) {
+          globalFontSize = fontSize;
+        }
+      });
+
+      if (globalFontSize < startFontSize) {
+        console.log(`📄 [PDF GET PictureBook] Using consistent font size ${globalFontSize}pt for all pages (reduced from ${startFontSize}pt)`);
+      }
+
+      // Second pass: Render all pages with consistent font size
       storyPages.forEach((pageText, index) => {
         const pageNumber = index + 1;
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-        const margin = mmToPoints(5);
 
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-
-        const imageHeight = pageSize * 0.85;
-        const textAreaHeight = pageSize * 0.15;
 
         if (image && image.imageData) {
           try {
@@ -4245,26 +4273,9 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
           }
         }
 
-        // Add text at bottom with auto-sizing
+        // Add text at bottom with consistent font size
         const textY = imageHeight + 5;
-        const textWidth = pageSize - (margin * 2);
-        const maxTextHeight = textAreaHeight - 10;
-
-        const startFontSize = 10;
-        let fontSize = startFontSize;
-        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center' });
-
-        while (textHeight > maxTextHeight && fontSize > 4) {
-          fontSize -= 0.5;
-          doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center' });
-        }
-
-        if (fontSize < startFontSize) {
-          console.log(`📄 [PDF GET PictureBook] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (${cleanText.length} chars)`);
-        }
-
+        doc.fontSize(globalFontSize).font('Helvetica').fillColor('#333');
         doc.text(cleanText, margin, textY, {
           width: textWidth,
           height: maxTextHeight,
@@ -4274,33 +4285,44 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
       });
     } else {
       // Standard: separate text and image pages
-      storyPages.forEach((pageText, index) => {
-        const pageNumber = index + 1;
-        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+      const margin = 28;
+      const availableWidth = pageSize - (margin * 2);
+      const availableHeight = pageSize - (margin * 2);
+      const startFontSize = 9;
+      const minFontSize = 5;
+
+      // First pass: Calculate minimum font size needed across all pages
+      let globalFontSize = startFontSize;
+      storyPages.forEach((pageText) => {
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-        const margin = 28;
-        const availableWidth = pageSize - (margin * 2);
-        const availableHeight = pageSize - (margin * 2);
-
-        // Text page
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
-
-        // Auto-reduce font size if text doesn't fit
-        const startFontSize = 9;
         let fontSize = startFontSize;
-        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        doc.fontSize(fontSize).font('Helvetica');
         let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
 
-        while (textHeight > availableHeight && fontSize > 5) {
+        while (textHeight > availableHeight && fontSize > minFontSize) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
         }
 
-        if (fontSize < startFontSize) {
-          console.log(`📄 [PDF GET] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (${cleanText.length} chars)`);
+        if (fontSize < globalFontSize) {
+          globalFontSize = fontSize;
         }
+      });
 
+      if (globalFontSize < startFontSize) {
+        console.log(`📄 [PDF GET] Using consistent font size ${globalFontSize}pt for all pages (reduced from ${startFontSize}pt)`);
+      }
+
+      // Second pass: Render all pages with consistent font size
+      storyPages.forEach((pageText, index) => {
+        const pageNumber = index + 1;
+        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+
+        // Text page
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
+        doc.fontSize(globalFontSize).font('Helvetica').fillColor('#333');
         doc.text(cleanText, margin, margin, { width: availableWidth, align: 'left' });
 
         // Image page
@@ -5178,44 +5200,89 @@ app.get('/api/admin/stats', authenticateToken, async (req, res) => {
       }
     }
 
+    // Get database size
+    let databaseSize = 'N/A';
+    try {
+      const dbSizeResult = await dbPool.query(`
+        SELECT pg_size_pretty(pg_database_size(current_database())) as total_size
+      `);
+      databaseSize = dbSizeResult.rows[0].total_size;
+    } catch (dbSizeErr) {
+      console.warn('⚠️ Could not get database size:', dbSizeErr.message);
+    }
+
+    // Return flat structure matching client interface
     const stats = {
-      users: {
-        total: parseInt(userCountResult.rows[0].count)
-      },
-      stories: {
-        total: parseInt(storyCountResult.rows[0].count),
-        embeddedImagesCount: embeddedImagesCount,
-        embeddedImagesSizeMB: (totalSceneImagesSize / 1024 / 1024).toFixed(2)
-      },
-      characters: {
-        total: totalCharacters
-      },
-      files: {
-        total: parseInt(fileCountResult.rows[0].count),
-        images: parseInt(imageFilesResult.rows[0].count),
-        orphaned: orphanedFilesResult.rows.length,
-        orphanedSizeMB: (parseInt(orphanedSizeResult.rows[0].total_size) / 1024 / 1024).toFixed(2)
-      },
-      orphanedFiles: orphanedFilesResult.rows.map(f => ({
-        id: f.id,
-        storyId: f.story_id,
-        fileType: f.file_type,
-        fileSizeKB: (f.file_size / 1024).toFixed(2),
-        filename: f.filename,
-        createdAt: f.created_at
-      })),
-      totalImages: embeddedImagesCount + parseInt(imageFilesResult.rows[0].count)
+      totalUsers: parseInt(userCountResult.rows[0].count),
+      totalStories: parseInt(storyCountResult.rows[0].count),
+      totalCharacters: totalCharacters,
+      totalImages: embeddedImagesCount + parseInt(imageFilesResult.rows[0].count),
+      orphanedFiles: orphanedFilesResult.rows.length,
+      databaseSize: databaseSize
     };
 
-    console.log(`✅ [ADMIN] Stats: ${stats.users.total} users, ${stats.stories.total} stories, ${stats.characters.total} characters, ${stats.totalImages} total images, ${stats.files.orphaned} orphaned files`);
+    console.log(`✅ [ADMIN] Stats: ${stats.totalUsers} users, ${stats.totalStories} stories, ${stats.totalCharacters} characters, ${stats.totalImages} total images, ${stats.orphanedFiles} orphaned files, DB size: ${stats.databaseSize}`);
 
-    res.json({
-      success: true,
-      stats,
-      timestamp: new Date().toISOString()
-    });
+    res.json(stats);
   } catch (err) {
     console.error('❌ [ADMIN] Error fetching stats:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin Dashboard - Clean orphaned files (matches client adminService)
+app.post('/api/admin/cleanup-orphaned', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(400).json({ error: 'File cleanup is only available in database mode' });
+    }
+
+    console.log('🗑️ [ADMIN] Cleaning all orphaned files...');
+
+    // Delete all files with story_id that doesn't exist in stories table
+    const result = await dbPool.query(`
+      DELETE FROM files
+      WHERE story_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM stories s WHERE s.id = story_id
+        )
+    `);
+
+    const cleaned = result.rowCount || 0;
+    console.log(`✅ [ADMIN] Cleaned ${cleaned} orphaned files`);
+
+    res.json({ cleaned });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error cleaning orphaned files:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin Dashboard - Clear cache
+app.post('/api/admin/clear-cache', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    console.log('🧹 [ADMIN] Clearing all caches...');
+
+    // Clear image cache
+    if (typeof imageCache !== 'undefined' && imageCache.clear) {
+      imageCache.clear();
+      console.log('✅ [ADMIN] Image cache cleared');
+    }
+
+    // Clear any other caches as needed
+    // Add more cache clearing logic here if needed
+
+    res.json({ success: true, message: 'Cache cleared successfully' });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error clearing cache:', err);
     res.status(500).json({ error: err.message });
   }
 });

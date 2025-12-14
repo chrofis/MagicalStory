@@ -343,8 +343,8 @@ export const storyService = {
     postCode: string;
     country: string;
     email: string;
-  }): Promise<{ orderId: string; message: string }> {
-    const response = await api.post<{ orderId: string; message: string }>('/api/print-provider/order', {
+  }): Promise<{ orderId: string; message: string; dashboardUrl?: string; isDraft?: boolean }> {
+    const response = await api.post<{ orderId: string; message: string; dashboardUrl?: string; isDraft?: boolean }>('/api/print-provider/order', {
       storyId,
       shippingAddress,
     });
