@@ -7672,6 +7672,53 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
 }
 
 /**
+ * Crop image slightly to change aspect ratio
+ * Used in sequential mode to prevent AI from copying too much from the reference image
+ * Crops 8% from the bottom to force regeneration while preserving most context
+ * @param {string} imageBase64 - Base64 encoded image (with data URI prefix)
+ * @returns {Promise<string>} Cropped base64 encoded image with data URI prefix
+ */
+async function cropImageForSequential(imageBase64) {
+  try {
+    // Remove data URI prefix if present
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Get image metadata to know dimensions
+    const metadata = await sharp(imageBuffer).metadata();
+    const { width, height } = metadata;
+
+    if (!width || !height) {
+      console.log('⚠️ [CROP] Could not get image dimensions, returning original');
+      return imageBase64;
+    }
+
+    // Crop 8% from the bottom - enough to change aspect ratio but preserve context
+    const cropAmount = Math.floor(height * 0.08);
+    const newHeight = height - cropAmount;
+
+    console.log(`✂️ [CROP] Cropping reference image: ${width}x${height} → ${width}x${newHeight} (removed ${cropAmount}px from bottom)`);
+
+    // Crop the image
+    const croppedBuffer = await sharp(imageBuffer)
+      .extract({ left: 0, top: 0, width: width, height: newHeight })
+      .png()
+      .toBuffer();
+
+    // Convert back to base64 with data URI prefix
+    const croppedBase64 = `data:image/png;base64,${croppedBuffer.toString('base64')}`;
+
+    return croppedBase64;
+  } catch (err) {
+    console.error('❌ [CROP] Error cropping image:', err.message);
+    // Return original image if cropping fails
+    return imageBase64;
+  }
+}
+
+/**
  * Compress PNG image to JPEG format
  * Converts base64 PNG to JPEG with compression to reduce file size
  * @param {string} pngBase64 - Base64 encoded PNG image (with or without data URI prefix)
@@ -7866,10 +7913,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const parts = [{ text: prompt }];
 
   // For sequential mode: Add PREVIOUS scene image FIRST (most important for continuity)
+  // Crop the image slightly to change aspect ratio - this forces AI to regenerate
+  // rather than copying too much from the reference image
   if (previousImage && previousImage.startsWith('data:image')) {
-    const base64Data = previousImage.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = previousImage.match(/^data:(image\/\w+);base64,/) ?
-      previousImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+    // Crop 8% from bottom to change aspect ratio
+    const croppedImage = await cropImageForSequential(previousImage);
+
+    const base64Data = croppedImage.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
+      croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
     parts.push({
       inline_data: {
@@ -7877,7 +7929,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         data: base64Data
       }
     });
-    console.log(`🖼️  [IMAGE GEN] Added previous scene image for visual continuity (SEQUENTIAL MODE)`);
+    console.log(`🖼️  [IMAGE GEN] Added cropped previous scene image for visual continuity (SEQUENTIAL MODE)`);
   }
 
   // Add character photos as reference images
