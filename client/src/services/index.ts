@@ -6,3 +6,4 @@ export { adminService } from './adminService';
 export { photoService } from './photoService';
 export type { DashboardStats, AdminUser } from './adminService';
 export type { PhotoAnalysisResult } from './photoService';
+export type { CharacterData } from './characterService';

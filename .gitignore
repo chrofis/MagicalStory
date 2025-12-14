@@ -1,6 +1,3 @@
-# Original React component (keeping HTML version only)
-*.tsx
-
 # Node modules (if any)
 node_modules/
 

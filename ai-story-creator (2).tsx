@@ -1,0 +1,1387 @@
+import React, { useState } from 'react';
+import { BookOpen, Users, Heart, ArrowRight, ArrowLeft, Plus, Trash2, Wand2, Download, Upload, Check, Save, FolderOpen, Star } from 'lucide-react';
+
+const storyTypes = [
+  { id: 'pirate', name: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de Pirates' }, emoji: '🏴‍☠️' },
+  { id: 'cowboy', name: { en: 'Wild West', de: 'Wilder Westen', fr: 'Far West' }, emoji: '🤠' },
+  { id: 'fireman', name: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier Courageux' }, emoji: '🚒' },
+  { id: 'unicorn', name: { en: 'Magical Unicorn', de: 'Magisches Einhorn', fr: 'Licorne Magique' }, emoji: '🦄' },
+  { id: 'ninja', name: { en: 'Secret Ninja', de: 'Geheimer Ninja', fr: 'Ninja Secret' }, emoji: '🥷' },
+  { id: 'space', name: { en: 'Space Explorer', de: 'Weltraum-Entdecker', fr: 'Explorateur Spatial' }, emoji: '🚀' },
+  { id: 'dinosaur', name: { en: 'Dinosaur World', de: 'Dinosaurier-Welt', fr: 'Monde des Dinosaures' }, emoji: '🦖' },
+  { id: 'princess', name: { en: 'Princess Story', de: 'Prinzessinnen-Geschichte', fr: 'Histoire de Princesse' }, emoji: '👑' },
+  { id: 'knight', name: { en: 'Knight Adventure', de: 'Ritter-Abenteuer', fr: 'Aventure de Chevalier' }, emoji: '⚔️' },
+  { id: 'detective', name: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère de Détective' }, emoji: '🔍' }
+];
+
+const defaultStrengths = {
+  en: ['Brave', 'Smart', 'Kind', 'Strong', 'Fast', 'Creative', 'Funny', 'Leader', 'Helpful', 'Patient', 'Honest', 'Loyal', 'Curious', 'Determined', 'Caring', 'Confident', 'Cheerful', 'Generous', 'Clever', 'Adventurous', 'Resourceful', 'Protective', 'Imaginative', 'Hardworking', 'Trustworthy'],
+  de: ['Mutig', 'Klug', 'Freundlich', 'Stark', 'Schnell', 'Kreativ', 'Lustig', 'Führungspersönlichkeit', 'Hilfsbereit', 'Geduldig', 'Ehrlich', 'Treu', 'Neugierig', 'Entschlossen', 'Fürsorglich', 'Selbstbewusst', 'Fröhlich', 'Großzügig', 'Schlau', 'Abenteuerlustig', 'Einfallsreich', 'Beschützend', 'Fantasievoll', 'Fleißig', 'Vertrauenswürdig'],
+  fr: ['Courageux', 'Intelligent', 'Gentil', 'Fort', 'Rapide', 'Créatif', 'Drôle', 'Leader', 'Serviable', 'Patient', 'Honnête', 'Loyal', 'Curieux', 'Déterminé', 'Attentionné', 'Confiant', 'Joyeux', 'Généreux', 'Astucieux', 'Aventureux', 'Débrouillard', 'Protecteur', 'Imaginatif', 'Travailleur', 'Digne de confiance']
+};
+
+const defaultWeaknesses = {
+  en: ['Shy', 'Clumsy', 'Impatient', 'Forgetful', 'Messy', 'Talkative', 'Stubborn', 'Lazy', 'Greedy', 'Jealous', 'Anxious', 'Distracted', 'Reckless', 'Bossy', 'Easily scared', 'Too trusting', 'Perfectionist', 'Indecisive', 'Secretive', 'Boastful', 'Quick-tempered', 'Careless', 'Overly cautious', 'Selfish'],
+  de: ['Schüchtern', 'Tollpatschig', 'Ungeduldig', 'Vergesslich', 'Unordentlich', 'Gesprächig', 'Stur', 'Faul', 'Gierig', 'Eifersüchtig', 'Ängstlich', 'Abgelenkt', 'Leichtsinnig', 'Herrschsüchtig', 'Leicht ängstlich', 'Zu vertrauensvoll', 'Perfektionist', 'Unentschlossen', 'Verschlossen', 'Prahlerisch', 'Jähzornig', 'Nachlässig', 'Übervorsichtig', 'Egoistisch'],
+  fr: ['Timide', 'Maladroit', 'Impatient', 'Distrait', 'Désordonné', 'Bavard', 'Têtu', 'Paresseux', 'Avide', 'Jaloux', 'Anxieux', 'Distrait', 'Imprudent', 'Autoritaire', 'Facilement effrayé', 'Trop confiant', 'Perfectionniste', 'Indécis', 'Secret', 'Vantard', 'Colérique', 'Négligent', 'Trop prudent', 'Égoïste']
+};
+
+const fearOptions = {
+  en: ['Fear of heights', 'Fear of spiders', 'Fear of the dark', 'Fear of being alone', 'Fear of loud noises'],
+  de: ['Höhenangst', 'Angst vor Spinnen', 'Angst vor der Dunkelheit', 'Angst allein zu sein', 'Angst vor lauten Geräuschen'],
+  fr: ['Peur du vide', 'Peur des araignées', 'Peur du noir', 'Peur d\'être seul', 'Peur des bruits forts']
+};
+
+const relationshipTypes = [
+  { value: { en: 'Best Friends with', de: 'Beste Freunde mit', fr: 'Meilleurs amis avec' }, inverse: { en: 'Best Friends with', de: 'Beste Freunde mit', fr: 'Meilleurs amis avec' } },
+  { value: { en: 'Friends with', de: 'Freunde mit', fr: 'Amis avec' }, inverse: { en: 'Friends with', de: 'Freunde mit', fr: 'Amis avec' } },
+  { value: { en: 'Married to', de: 'Verheiratet mit', fr: 'Marié(e) à' }, inverse: { en: 'Married to', de: 'Verheiratet mit', fr: 'Marié(e) à' } },
+  { value: { en: 'In a relationship with', de: 'In einer Beziehung mit', fr: 'En relation avec' }, inverse: { en: 'In a relationship with', de: 'In einer Beziehung mit', fr: 'En relation avec' } },
+  { value: { en: 'Older Sibling of', de: 'Älteres Geschwister von', fr: 'Frère/Sœur aîné(e) de' }, inverse: { en: 'Younger Sibling of', de: 'Jüngeres Geschwister von', fr: 'Frère/Sœur cadet(te) de' } },
+  { value: { en: 'Younger Sibling of', de: 'Jüngeres Geschwister von', fr: 'Frère/Sœur cadet(te) de' }, inverse: { en: 'Older Sibling of', de: 'Älteres Geschwister von', fr: 'Frère/Sœur aîné(e) de' } },
+  { value: { en: 'Parent of', de: 'Elternteil von', fr: 'Parent de' }, inverse: { en: 'Child of', de: 'Kind von', fr: 'Enfant de' } },
+  { value: { en: 'Child of', de: 'Kind von', fr: 'Enfant de' }, inverse: { en: 'Parent of', de: 'Elternteil von', fr: 'Parent de' } },
+  { value: { en: 'Rivals with', de: 'Rivalen mit', fr: 'Rivaux avec' }, inverse: { en: 'Rivals with', de: 'Rivalen mit', fr: 'Rivaux avec' } },
+  { value: { en: 'Neighbors with', de: 'Nachbarn mit', fr: 'Voisins avec' }, inverse: { en: 'Neighbors with', de: 'Nachbarn mit', fr: 'Voisins avec' } },
+  { value: { en: 'Not Known to', de: 'Nicht bekannt mit', fr: 'Pas connu de' }, inverse: { en: 'Not Known to', de: 'Nicht bekannt mit', fr: 'Pas connu de' } }
+];
+
+const translations = {
+  en: {
+    title: 'AI Story Creator',
+    subtitle: 'Create magical stories with AI!',
+    selectLanguage: 'Choose your language',
+    chooseStoryType: 'Choose Your Story Type',
+    createCharacters: 'Create Your Characters',
+    characterCreated: 'Character Created!',
+    createAnother: 'Create Another Character',
+    continueToRelationships: 'Continue to Relationships',
+    yourCharacters: 'Your Characters:',
+    startCreating: 'Start Creating Character',
+    characterName: 'Character Name',
+    characterPhoto: 'Character Photo (Optional)',
+    uploadPhoto: 'Upload Photo',
+    orDescribe: 'OR describe the character',
+    characterAge: 'Age',
+    hairColor: 'Hair Color',
+    otherFeatures: 'Other Features',
+    descriptionPlaceholder: 'e.g., Blue eyes, wears glasses, has freckles',
+    gender: 'Gender',
+    male: 'Male',
+    female: 'Female',
+    other: 'Unknown',
+    age: 'Age',
+    strengths: 'Strengths',
+    weaknesses: 'Weaknesses',
+    selectAtLeast: 'Select at least',
+    selected: 'Selected',
+    addCustomStrengths: 'Add custom strengths',
+    addCustomWeaknesses: 'Add custom weaknesses',
+    addCustomFears: 'Add custom fears',
+    specialDetails: 'Favorite Animal, Hopes and Other Details (Optional)',
+    specialDetailsPlaceholder: 'e.g., Loves dogs, dreams of flying, always wears a red hat',
+    fears: 'Fears',
+    addCustomRelationship: 'Add custom relationship',
+    cancel: 'Cancel',
+    saveCharacter: 'Save Character',
+    editCharacter: 'Edit',
+    defineRelationships: 'Define Character Relationships',
+    defineRelationshipsDesc: 'Define how each character relates to the others.',
+    is: 'is',
+    reverseRelationship: 'Reverse relationship:',
+    storySettings: 'Story Settings',
+    selectMainCharacters: 'Select Main Characters (max 2)',
+    numberOfPages: 'Number of Pages',
+    readingLevel: 'Reading Level',
+    firstGrade: '1st Grade',
+    firstGradeDesc: 'Simple words and short sentences',
+    standard: 'Standard',
+    standardDesc: 'Age-appropriate vocabulary',
+    advanced: 'Advanced',
+    advancedDesc: 'Complex words and sentences',
+    generateStory: 'Generate Story!',
+    creating: 'Creating Your Story...',
+    storyReady: 'Your Story is Ready!',
+    downloadTXT: 'Download as TXT',
+    downloadPDF: 'Download as PDF',
+    createAnotherStory: 'Create Another Story',
+    back: 'Back',
+    next: 'Next',
+    exportConfig: 'Export Configuration',
+    importConfig: 'Import Configuration',
+    charactersCreated: "You've created {count} character{s} so far.",
+    mainCharacter: 'Main Character'
+  },
+  de: {
+    title: 'KI-Geschichten-Creator',
+    subtitle: 'Erstelle magische Geschichten mit KI!',
+    selectLanguage: 'Wähle deine Sprache',
+    chooseStoryType: 'Wähle deinen Geschichtentyp',
+    createCharacters: 'Erstelle deine Charaktere',
+    characterCreated: 'Charakter erstellt!',
+    createAnother: 'Weiteren Charakter erstellen',
+    continueToRelationships: 'Weiter zu Beziehungen',
+    yourCharacters: 'Deine Charaktere:',
+    startCreating: 'Charakter erstellen beginnen',
+    characterName: 'Charaktername',
+    characterPhoto: 'Charakterfoto (Optional)',
+    uploadPhoto: 'Foto hochladen',
+    orDescribe: 'ODER Figur beschreiben',
+    characterAge: 'Alter',
+    hairColor: 'Haarfarbe',
+    otherFeatures: 'Sonstige Merkmale',
+    descriptionPlaceholder: 'z.B. Blaue Augen, trägt Brille, hat Sommersprossen',
+    gender: 'Geschlecht',
+    male: 'Männlich',
+    female: 'Weiblich',
+    other: 'Unbekannt',
+    age: 'Alter',
+    strengths: 'Stärken',
+    weaknesses: 'Schwächen',
+    selectAtLeast: 'Wähle mindestens',
+    selected: 'Ausgewählt',
+    addCustomStrengths: 'Eigene Stärken hinzufügen',
+    addCustomWeaknesses: 'Eigene Schwächen hinzufügen',
+    addCustomFears: 'Eigene Ängste hinzufügen',
+    specialDetails: 'Lieblingstier, Hoffnungen und andere Besonderheiten (Optional)',
+    specialDetailsPlaceholder: 'z.B. Liebt Hunde, träumt vom Fliegen, trägt immer einen roten Hut',
+    fears: 'Ängste',
+    addCustomRelationship: 'Eigene Beziehung hinzufügen',
+    cancel: 'Abbrechen',
+    saveCharacter: 'Charakter speichern',
+    editCharacter: 'Bearbeiten',
+    defineRelationships: 'Charakterbeziehungen definieren',
+    defineRelationshipsDesc: 'Definiere, wie die Charaktere zueinander stehen.',
+    is: 'ist',
+    reverseRelationship: 'Umgekehrte Beziehung:',
+    storySettings: 'Geschichten-Einstellungen',
+    selectMainCharacters: 'Hauptfiguren auswählen (max 2)',
+    numberOfPages: 'Anzahl der Seiten',
+    readingLevel: 'Lesestufe',
+    firstGrade: '1. Klasse',
+    firstGradeDesc: 'Einfache Wörter und kurze Sätze',
+    standard: 'Standard',
+    standardDesc: 'Altersgerechter Wortschatz',
+    advanced: 'Fortgeschritten',
+    advancedDesc: 'Komplexe Wörter und Sätze',
+    generateStory: 'Geschichte erstellen!',
+    creating: 'Erstelle deine Geschichte...',
+    storyReady: 'Deine Geschichte ist fertig!',
+    downloadTXT: 'Als TXT herunterladen',
+    downloadPDF: 'Als PDF herunterladen',
+    createAnotherStory: 'Neue Geschichte erstellen',
+    back: 'Zurück',
+    next: 'Weiter',
+    exportConfig: 'Konfiguration exportieren',
+    importConfig: 'Konfiguration importieren',
+    charactersCreated: 'Du hast bisher {count} Charakter{s} erstellt.',
+    mainCharacter: 'Hauptfigur'
+  },
+  fr: {
+    title: 'Créateur d\'Histoires IA',
+    subtitle: 'Créez des histoires magiques avec l\'IA!',
+    selectLanguage: 'Choisissez votre langue',
+    chooseStoryType: 'Choisissez votre type d\'histoire',
+    createCharacters: 'Créez vos personnages',
+    characterCreated: 'Personnage créé!',
+    createAnother: 'Créer un autre personnage',
+    continueToRelationships: 'Continuer vers les relations',
+    yourCharacters: 'Vos personnages:',
+    startCreating: 'Commencer à créer un personnage',
+    characterName: 'Nom du personnage',
+    characterPhoto: 'Photo du personnage (Optionnel)',
+    uploadPhoto: 'Télécharger une photo',
+    orDescribe: 'OU décrire le personnage',
+    characterAge: 'Âge',
+    hairColor: 'Couleur des cheveux',
+    otherFeatures: 'Autres caractéristiques',
+    descriptionPlaceholder: 'par ex. Yeux bleus, porte des lunettes, a des taches de rousseur',
+    gender: 'Genre',
+    male: 'Masculin',
+    female: 'Féminin',
+    other: 'Inconnu',
+    age: 'Âge',
+    strengths: 'Forces',
+    weaknesses: 'Faiblesses',
+    selectAtLeast: 'Sélectionnez au moins',
+    selected: 'Sélectionné',
+    addCustomStrengths: 'Ajouter des forces personnalisées',
+    addCustomWeaknesses: 'Ajouter des faiblesses personnalisées',
+    addCustomFears: 'Ajouter des peurs personnalisées',
+    specialDetails: 'Animal préféré, espoirs et autres détails (Optionnel)',
+    specialDetailsPlaceholder: 'par ex. Aime les chiens, rêve de voler, porte toujours un chapeau rouge',
+    fears: 'Peurs',
+    addCustomRelationship: 'Ajouter une relation personnalisée',
+    cancel: 'Annuler',
+    saveCharacter: 'Sauvegarder le personnage',
+    editCharacter: 'Modifier',
+    defineRelationships: 'Définir les relations entre personnages',
+    defineRelationshipsDesc: 'Définissez comment chaque personnage est lié aux autres.',
+    is: 'est',
+    reverseRelationship: 'Relation inverse:',
+    storySettings: 'Paramètres de l\'histoire',
+    selectMainCharacters: 'Sélectionner les personnages principaux (max 2)',
+    numberOfPages: 'Nombre de pages',
+    readingLevel: 'Niveau de lecture',
+    firstGrade: '1ère année',
+    firstGradeDesc: 'Mots simples et phrases courtes',
+    standard: 'Standard',
+    standardDesc: 'Vocabulaire adapté à l\'âge',
+    advanced: 'Avancé',
+    advancedDesc: 'Mots et phrases complexes',
+    generateStory: 'Générer l\'histoire!',
+    creating: 'Création de votre histoire...',
+    storyReady: 'Votre histoire est prête!',
+    downloadTXT: 'Télécharger en TXT',
+    downloadPDF: 'Télécharger en PDF',
+    createAnotherStory: 'Créer une nouvelle histoire',
+    back: 'Retour',
+    next: 'Suivant',
+    exportConfig: 'Exporter la configuration',
+    importConfig: 'Importer la configuration',
+    charactersCreated: 'Vous avez créé {count} personnage{s} jusqu\'à présent.',
+    mainCharacter: 'Personnage principal'
+  }
+};
+
+const detectGender = (name) => {
+  const femaleSuffixes = ['a', 'e', 'ie', 'ine', 'elle'];
+  const femaleNames = ['sophia', 'emma', 'olivia', 'ava', 'isabella', 'mia', 'charlotte', 'amelia', 'marie', 'anna', 'lisa', 'julia', 'sarah', 'laura', 'lena'];
+  const maleNames = ['liam', 'noah', 'oliver', 'james', 'lucas', 'max', 'leon', 'paul', 'ben', 'tom', 'felix', 'lukas', 'tim', 'jan', 'finn'];
+  
+  const lowerName = name.toLowerCase();
+  
+  if (femaleNames.some(n => lowerName.includes(n))) return 'female';
+  if (maleNames.some(n => lowerName.includes(n))) return 'male';
+  if (femaleSuffixes.some(suffix => lowerName.endsWith(suffix))) return 'female';
+  
+  return 'other';
+};
+
+export default function StoryCreator() {
+  const [language, setLanguage] = useState('de');
+  const [step, setStep] = useState(0);
+  const [storyType, setStoryType] = useState('');
+  const [characters, setCharacters] = useState([]);
+  const [currentCharacter, setCurrentCharacter] = useState(null);
+  const [showCharacterCreated, setShowCharacterCreated] = useState(false);
+  const [customStrengths, setCustomStrengths] = useState([]);
+  const [customWeaknesses, setCustomWeaknesses] = useState([]);
+  const [customFears, setCustomFears] = useState([]);
+  const [customRelationships, setCustomRelationships] = useState([]);
+  const [newStrength, setNewStrength] = useState('');
+  const [newWeakness, setNewWeakness] = useState('');
+  const [newFear, setNewFear] = useState('');
+  const [newRelationship, setNewRelationship] = useState('');
+  const [relationships, setRelationships] = useState({});
+  const [pages, setPages] = useState(5);
+  const [languageLevel, setLanguageLevel] = useState('standard');
+  const [mainCharacters, setMainCharacters] = useState([]);
+  const [generatedStory, setGeneratedStory] = useState('');
+  const [generatedPrompt, setGeneratedPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const t = translations[language];
+  const allStrengths = [...defaultStrengths[language], ...customStrengths];
+  const allWeaknesses = [...defaultWeaknesses[language], ...customWeaknesses];
+  const allFears = [...fearOptions[language], ...customFears];
+  const allRelationships = [...relationshipTypes, ...customRelationships.map(rel => ({
+    value: { en: rel, de: rel, fr: rel },
+    inverse: { en: rel, de: rel, fr: rel }
+  }))];
+
+  const getInverseRelationship = (relationship) => {
+    const rel = relationshipTypes.find(r => r.value[language] === relationship);
+    return rel ? rel.inverse[language] : relationship;
+  };
+
+  const startNewCharacter = () => {
+    setCurrentCharacter({
+      id: Date.now(),
+      name: '',
+      photo: null,
+      photoUrl: null,
+      useDescription: false,
+      descriptionAge: '',
+      hairColor: '',
+      otherFeatures: '',
+      gender: 'other',
+      age: '',
+      strengths: [],
+      weaknesses: [],
+      specialDetails: '',
+      fears: []
+    });
+    setShowCharacterCreated(false);
+  };
+
+  const editCharacter = (char) => {
+    setCurrentCharacter(char);
+    setCharacters(characters.filter(c => c.id !== char.id));
+    setShowCharacterCreated(false);
+  };
+
+  const saveCurrentCharacter = () => {
+    if (currentCharacter.name && 
+        currentCharacter.strengths.length >= 3 && 
+        currentCharacter.weaknesses.length >= 2) {
+      setCharacters([...characters, currentCharacter]);
+      setShowCharacterCreated(true);
+      setCurrentCharacter(null);
+    }
+  };
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCurrentCharacter({
+          ...currentCharacter,
+          photo: file,
+          photoUrl: reader.result
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleNameChange = (name) => {
+    const detectedGender = detectGender(name);
+    setCurrentCharacter({ 
+      ...currentCharacter, 
+      name, 
+      gender: detectedGender 
+    });
+  };
+
+  const toggleArrayItem = (field, item) => {
+    const currentArray = currentCharacter[field];
+    const newArray = currentArray.includes(item)
+      ? currentArray.filter(i => i !== item)
+      : [...currentArray, item];
+    setCurrentCharacter({ ...currentCharacter, [field]: newArray });
+  };
+
+  const addCustomStrength = () => {
+    if (newStrength && !allStrengths.includes(newStrength)) {
+      setCustomStrengths([...customStrengths, newStrength]);
+      setCurrentCharacter({ 
+        ...currentCharacter, 
+        strengths: [...currentCharacter.strengths, newStrength] 
+      });
+      setNewStrength('');
+    }
+  };
+
+  const addCustomWeakness = () => {
+    if (newWeakness && !allWeaknesses.includes(newWeakness)) {
+      setCustomWeaknesses([...customWeaknesses, newWeakness]);
+      setCurrentCharacter({ 
+        ...currentCharacter, 
+        weaknesses: [...currentCharacter.weaknesses, newWeakness] 
+      });
+      setNewWeakness('');
+    }
+  };
+
+  const addCustomFear = () => {
+    if (newFear && !allFears.includes(newFear)) {
+      setCustomFears([...customFears, newFear]);
+      setCurrentCharacter({ 
+        ...currentCharacter, 
+        fears: [...currentCharacter.fears, newFear] 
+      });
+      setNewFear('');
+    }
+  };
+
+  const addCustomRelationship = () => {
+    if (newRelationship && !customRelationships.includes(newRelationship)) {
+      setCustomRelationships([...customRelationships, newRelationship]);
+      setNewRelationship('');
+    }
+  };
+
+  const toggleMainCharacter = (charId) => {
+    if (mainCharacters.includes(charId)) {
+      setMainCharacters(mainCharacters.filter(id => id !== charId));
+    } else if (mainCharacters.length < 2) {
+      setMainCharacters([...mainCharacters, charId]);
+    }
+  };
+
+  const initializeRelationships = () => {
+    const newRelationships = {};
+    characters.forEach(char1 => {
+      characters.forEach(char2 => {
+        if (char1.id !== char2.id) {
+          const key = `${char1.id}-${char2.id}`;
+          if (!relationships[key]) {
+            newRelationships[key] = relationshipTypes[10].value[language]; // 'Not Known to'
+          } else {
+            newRelationships[key] = relationships[key];
+          }
+        }
+      });
+    });
+    setRelationships({ ...relationships, ...newRelationships });
+  };
+
+  const updateRelationship = (char1Id, char2Id, type) => {
+    const inverse = getInverseRelationship(type);
+    setRelationships({
+      ...relationships,
+      [`${char1Id}-${char2Id}`]: type,
+      [`${char2Id}-${char1Id}`]: inverse
+    });
+  };
+
+  const areAllRelationshipsDefined = () => {
+    for (let i = 0; i < characters.length; i++) {
+      for (let j = 0; j < characters.length; j++) {
+        if (i !== j) {
+          const key = `${characters[i].id}-${characters[j].id}`;
+          if (!relationships[key]) return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const exportConfiguration = () => {
+    try {
+      const config = {
+        version: '1.0',
+        language,
+        storyType,
+        characters: characters.map(char => ({
+          id: char.id,
+          name: char.name,
+          gender: char.gender,
+          age: char.age,
+          hairColor: char.hairColor || '',
+          otherFeatures: char.otherFeatures || '',
+          strengths: char.strengths,
+          weaknesses: char.weaknesses,
+          specialDetails: char.specialDetails || '',
+          fears: char.fears
+        })),
+        customStrengths,
+        customWeaknesses,
+        customFears,
+        customRelationships,
+        relationships,
+        pages,
+        languageLevel,
+        mainCharacters
+      };
+      
+      const jsonString = JSON.stringify(config, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `story-config-${Date.now()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      console.log('Export successful');
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Fehler beim Exportieren / Export error / Erreur d\'exportation: ' + error.message);
+    }
+  };
+
+  const importConfiguration = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const config = JSON.parse(event.target.result);
+          setLanguage(config.language || 'de');
+          setStoryType(config.storyType || '');
+          setCharacters(config.characters || []);
+          setCustomStrengths(config.customStrengths || []);
+          setCustomWeaknesses(config.customWeaknesses || []);
+          setCustomFears(config.customFears || []);
+          setCustomRelationships(config.customRelationships || []);
+          setRelationships(config.relationships || {});
+          setPages(config.pages || 5);
+          setLanguageLevel(config.languageLevel || 'standard');
+          setMainCharacters(config.mainCharacters || []);
+          setStep(1);
+          alert('Konfiguration erfolgreich importiert! / Configuration imported successfully! / Configuration importée avec succès!');
+        } catch (error) {
+          console.error('Import error:', error);
+          alert('Fehler beim Laden der Konfigurationsdatei / Error loading configuration file / Erreur lors du chargement du fichier de configuration');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const generateStory = async () => {
+    setIsGenerating(true);
+    
+    const characterDescriptions = characters.map(char => {
+      const isMain = mainCharacters.includes(char.id) ? ' (MAIN CHARACTER)' : '';
+      return `${char.name}${isMain} (${char.gender}, ${char.age} years old): ${t.strengths}: ${char.strengths.join(', ')}, ${t.weaknesses}: ${char.weaknesses.join(', ')}, ${t.specialDetails}: ${char.specialDetails || 'none'}, ${t.fears}: ${char.fears.join(', ') || 'none'}`;
+    }).join('\n');
+
+    const relationshipDescriptions = Object.entries(relationships)
+      .filter(([key, type]) => {
+        const [char1Id, _] = key.split('-').map(Number);
+        const char1Index = characters.findIndex(c => c.id === char1Id);
+        const char2Index = characters.findIndex(c => c.id === parseInt(key.split('-')[1]));
+        return type !== 'Not Known to' && char1Index < char2Index;
+      })
+      .map(([key, type]) => {
+        const [char1Id, char2Id] = key.split('-').map(Number);
+        const char1 = characters.find(c => c.id === char1Id);
+        const char2 = characters.find(c => c.id === char2Id);
+        return `${char1?.name} ${t.is} ${type} ${char2?.name}`;
+      }).join('\n');
+
+    const languageInstructions = {
+      'en': {
+        '1st-grade': 'Use very simple words and short sentences suitable for 1st graders who are just learning to read.',
+        'standard': 'Use age-appropriate vocabulary and sentence structure for elementary school children.',
+        'advanced': 'Use more complex vocabulary and varied sentence structure for advanced readers.'
+      },
+      'de': {
+        '1st-grade': 'Verwende sehr einfache Wörter und kurze Sätze, die für Erstklässler geeignet sind, die gerade lesen lernen.',
+        'standard': 'Verwende altersgerechtes Vokabular und Satzstruktur für Grundschulkinder.',
+        'advanced': 'Verwende komplexeres Vokabular und abwechslungsreiche Satzstruktur für fortgeschrittene Leser.'
+      },
+      'fr': {
+        '1st-grade': 'Utilisez des mots très simples et des phrases courtes adaptées aux élèves de 1ère année qui apprennent à lire.',
+        'standard': 'Utilisez un vocabulaire et une structure de phrase adaptés à l\'âge pour les enfants de l\'école primaire.',
+        'advanced': 'Utilisez un vocabulaire plus complexe et une structure de phrase variée pour les lecteurs avancés.'
+      }
+    };
+
+    const storyTypeName = storyTypes.find(t => t.id === storyType)?.name[language] || 'adventure';
+
+    const prompt = `Create a ${pages}-page children's story about a ${storyTypeName} in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.
+
+Characters:
+${characterDescriptions}
+
+Relationships:
+${relationshipDescriptions}
+
+Language Level: ${languageInstructions[language][languageLevel]}
+
+Please write an engaging, age-appropriate story that incorporates all the characters, their traits, and relationships. Focus especially on the main character(s). Structure it with clear page breaks (use "--- Page X ---" markers). Make it exciting, positive, and include a meaningful lesson or resolution. Each page should be a distinct scene or moment in the story. Write the complete story without truncation. The story should be written entirely in ${language === 'de' ? 'German' : language === 'fr' ? 'French' : 'English'}.`;
+
+    setGeneratedPrompt(prompt);
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          messages: [
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(`API Error: ${errorData.error?.message || 'Unknown error'}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.content || data.content.length === 0) {
+        throw new Error('No content received from API');
+      }
+      
+      const storyText = data.content
+        .filter(block => block.type === 'text')
+        .map(block => block.text)
+        .join('\n');
+      
+      if (!storyText) {
+        throw new Error('Story text is empty');
+      }
+      
+      setGeneratedStory(storyText);
+      setStep(6);
+    } catch (error) {
+      console.error('Error generating story:', error);
+      setGeneratedStory(`Sorry, there was an error generating your story: ${error.message}\n\nPlease try again!`);
+      setStep(6);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const downloadStory = (format) => {
+    try {
+      const storyTitle = `${storyTypes.find(t => t.id === storyType)?.name[language] || 'Story'} - ${new Date().toLocaleDateString()}`;
+      
+      if (format === 'txt') {
+        const blob = new Blob([generatedStory], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${storyTitle}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        console.log('TXT download successful');
+      } else if (format === 'pdf') {
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        if (printWindow) {
+          printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <title>${storyTitle}</title>
+                <style>
+                  body { font-family: Arial, sans-serif; padding: 40px; line-height: 1.6; }
+                  h1 { color: #7c3aed; margin-bottom: 20px; }
+                  p { margin-bottom: 10px; white-space: pre-wrap; }
+                </style>
+              </head>
+              <body>
+                <h1>${storyTitle}</h1>
+                <p>${generatedStory.replace(/\n/g, '<br>')}</p>
+                <script>
+                  window.onload = function() {
+                    setTimeout(function() {
+                      window.print();
+                    }, 500);
+                  };
+                </script>
+              </body>
+            </html>
+          `);
+          printWindow.document.close();
+        } else {
+          alert('Popup wurde blockiert. Bitte erlauben Sie Popups. / Popup blocked. Please allow popups. / Popup bloqué. Veuillez autoriser les popups.');
+        }
+      } else if (format === 'prompt') {
+        const blob = new Blob([generatedPrompt], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${storyTitle}-prompt.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        console.log('Prompt download successful');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Fehler beim Herunterladen / Download error / Erreur de téléchargement: ' + error.message);
+    }
+  };
+
+  const renderStep0 = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2 justify-center">
+        <BookOpen /> {t.selectLanguage}
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+        <button
+          onClick={() => {
+            setLanguage('de');
+            setStep(1);
+          }}
+          className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
+        >
+          <div className="font-bold text-2xl">Deutsch</div>
+        </button>
+        
+        <button
+          onClick={() => {
+            setLanguage('en');
+            setStep(1);
+          }}
+          className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
+        >
+          <div className="font-bold text-2xl">English</div>
+        </button>
+        
+        <button
+          onClick={() => {
+            setLanguage('fr');
+            setStep(1);
+          }}
+          className="p-8 rounded-xl border-2 transition-all hover:shadow-lg border-gray-200 hover:border-purple-300"
+        >
+          <div className="font-bold text-2xl">Français</div>
+        </button>
+      </div>
+      
+      <div className="text-center pt-6 border-t border-gray-200">
+        <label className="cursor-pointer bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 inline-flex items-center gap-2">
+          <FolderOpen size={20} /> {t.importConfig}
+          <input
+            type="file"
+            accept=".json"
+            onChange={importConfiguration}
+            className="hidden"
+          />
+        </label>
+      </div>
+    </div>
+  );
+
+  const renderStep1 = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+        <BookOpen /> {t.chooseStoryType}
+      </h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {storyTypes.map(type => (
+          <button
+            key={type.id}
+            onClick={() => setStoryType(type.id)}
+            className={`p-6 rounded-xl border-2 transition-all ${
+              storyType === type.id
+                ? 'border-purple-500 bg-purple-50 shadow-lg scale-105'
+                : 'border-gray-200 hover:border-purple-300 hover:shadow-md'
+            }`}
+          >
+            <div className="text-4xl mb-2">{type.emoji}</div>
+            <div className="font-semibold text-sm">{type.name[language]}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderStep2 = () => {
+    const canSave = currentCharacter && currentCharacter.name && 
+                    currentCharacter.strengths.length >= 3 && 
+                    currentCharacter.weaknesses.length >= 2;
+
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+          <Users /> {t.createCharacters}
+        </h2>
+
+        {/* Always show existing characters */}
+        {characters.length > 0 && (
+          <div className="bg-white border-2 border-purple-200 rounded-xl p-6 mb-6">
+            <h3 className="text-lg font-bold text-purple-700 mb-4">{t.yourCharacters}</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              {characters.map((char) => (
+                <div key={char.id} className="border border-gray-200 rounded-lg p-4 relative">
+                  <button
+                    onClick={() => editCharacter(char)}
+                    className="absolute top-2 right-2 bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 flex items-center gap-1"
+                  >
+                    {t.editCharacter}
+                  </button>
+                  {char.photoUrl && (
+                    <img src={char.photoUrl} alt={char.name} className="w-20 h-20 rounded-full mx-auto mb-2 object-cover" />
+                  )}
+                  <h4 className="font-bold text-center mb-2">{char.name}</h4>
+                  <p className="text-sm text-gray-600 text-center mb-1">
+                    {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age} {language === 'de' ? 'Jahre' : language === 'fr' ? 'ans' : 'years'}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>{t.strengths}:</strong> {char.strengths.slice(0, 3).join(', ')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showCharacterCreated && (
+          <div className="bg-green-50 border-2 border-green-300 rounded-xl p-8 text-center">
+            <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-green-700 mb-4">{t.characterCreated}</h2>
+            <p className="text-gray-700 mb-6">
+              {t.charactersCreated.replace('{count}', characters.length).replace('{s}', characters.length > 1 ? 's' : '')}
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={startNewCharacter}
+                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+              >
+                <Plus size={20} /> {t.createAnother}
+              </button>
+              <button
+                onClick={() => {
+                  initializeRelationships();
+                  setStep(3);
+                }}
+                className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+              >
+                {t.continueToRelationships} <ArrowRight size={20} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!currentCharacter && !showCharacterCreated && (
+          <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-12 text-center">
+            <p className="text-gray-700 mb-6 text-lg">
+              {characters.length === 0 
+                ? t.charactersCreated.replace('{count}', 0).replace('{s}', 's')
+                : t.charactersCreated.replace('{count}', characters.length).replace('{s}', characters.length > 1 ? 's' : '')}
+            </p>
+            <button
+              onClick={startNewCharacter}
+              className="bg-blue-500 text-white px-8 py-4 rounded-lg hover:bg-blue-600 font-bold text-lg flex items-center gap-2 mx-auto"
+            >
+              <Plus size={24} /> {t.startCreating}
+            </button>
+          </div>
+        )}
+        {currentCharacter && (
+          <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
+          <h3 className="text-xl font-bold text-purple-700">{currentCharacter.id ? t.editCharacter : t.startCreating}</h3>
+          <div>
+            <label className="block text-lg font-semibold mb-2">{t.characterName} *</label>
+            <input
+              type="text"
+              value={currentCharacter.name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+              placeholder={t.characterName}
+            />
+          </div>
+
+          <div>
+            <label className="block text-lg font-semibold mb-2">{t.gender}</label>
+            <select
+              value={currentCharacter.gender}
+              onChange={(e) => setCurrentCharacter({ ...currentCharacter, gender: e.target.value })}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+            >
+              <option value="male">{t.male}</option>
+              <option value="female">{t.female}</option>
+              <option value="other">{t.other}</option>
+            </select>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Photo Upload Option */}
+            <div className="border-2 border-purple-300 rounded-lg p-4 bg-purple-50">
+              <label className="block text-lg font-semibold mb-3 text-center">{t.characterPhoto}</label>
+              <div className="flex flex-col items-center gap-3">
+                {currentCharacter.photoUrl && (
+                  <img 
+                    src={currentCharacter.photoUrl} 
+                    alt="Character" 
+                    className="w-32 h-32 rounded-full object-cover border-4 border-purple-400"
+                  />
+                )}
+                <label className="cursor-pointer bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 flex items-center gap-2 font-semibold">
+                  <Upload size={20} /> {t.uploadPhoto}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Description Option */}
+            <div className="border-2 border-green-300 rounded-lg p-4 bg-green-50">
+              <label className="block text-lg font-semibold mb-3 text-center">{t.orDescribe}</label>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold mb-1">{t.age}</label>
+                  <input
+                    type="number"
+                    value={currentCharacter.age}
+                    onChange={(e) => setCurrentCharacter({ ...currentCharacter, age: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder={t.age}
+                    min="1"
+                    max="99"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1">{t.hairColor}</label>
+                  <input
+                    type="text"
+                    value={currentCharacter.hairColor}
+                    onChange={(e) => setCurrentCharacter({ ...currentCharacter, hairColor: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder={t.hairColor}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1">{t.otherFeatures}</label>
+                  <textarea
+                    value={currentCharacter.otherFeatures}
+                    onChange={(e) => setCurrentCharacter({ ...currentCharacter, otherFeatures: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder={t.descriptionPlaceholder}
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-lg font-semibold mb-2">
+              {t.strengths} * ({t.selectAtLeast} 3) - {t.selected}: {currentCharacter.strengths.length}
+            </label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {allStrengths.map(strength => (
+                <button
+                  key={strength}
+                  onClick={() => toggleArrayItem('strengths', strength)}
+                  className={`px-3 py-1 rounded-full text-sm ${
+                    currentCharacter.strengths.includes(strength)
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {strength}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newStrength}
+                onChange={(e) => setNewStrength(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addCustomStrength()}
+                placeholder={t.addCustomStrengths}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+              />
+              <button
+                onClick={addCustomStrength}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-lg font-semibold mb-2">
+              {t.weaknesses} * ({t.selectAtLeast} 2) - {t.selected}: {currentCharacter.weaknesses.length}
+            </label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {allWeaknesses.map(weakness => (
+                <button
+                  key={weakness}
+                  onClick={() => toggleArrayItem('weaknesses', weakness)}
+                  className={`px-3 py-1 rounded-full text-sm ${
+                    currentCharacter.weaknesses.includes(weakness)
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {weakness}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newWeakness}
+                onChange={(e) => setNewWeakness(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addCustomWeakness()}
+                placeholder={t.addCustomWeaknesses}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+              />
+              <button
+                onClick={addCustomWeakness}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-lg font-semibold mb-2">{t.fears}</label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {allFears.map(fear => (
+                <button
+                  key={fear}
+                  onClick={() => toggleArrayItem('fears', fear)}
+                  className={`px-3 py-1 rounded-full text-sm ${
+                    currentCharacter.fears.includes(fear)
+                      ? 'bg-red-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {fear}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newFear}
+                onChange={(e) => setNewFear(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addCustomFear()}
+                placeholder={t.addCustomFears}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+              />
+              <button
+                onClick={addCustomFear}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-lg font-semibold mb-2">{t.specialDetails}</label>
+            <textarea
+              value={currentCharacter.specialDetails}
+              onChange={(e) => setCurrentCharacter({ ...currentCharacter, specialDetails: e.target.value })}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+              placeholder={t.specialDetailsPlaceholder}
+              rows={3}
+            />
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setCurrentCharacter(null);
+                setShowCharacterCreated(false);
+              }}
+              className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 font-semibold"
+            >
+              {t.cancel}
+            </button>
+            <button
+              onClick={saveCurrentCharacter}
+              disabled={!canSave}
+              className={`flex-1 px-6 py-3 rounded-lg font-semibold ${
+                canSave
+                  ? 'bg-blue-500 text-white hover:bg-blue-600'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {t.saveCharacter}
+            </button>
+          </div>
+        </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderStep3 = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+        <Heart /> {t.defineRelationships}
+      </h2>
+      <p className="text-gray-600">{t.defineRelationshipsDesc}</p>
+
+      <div className="space-y-4">
+        {characters.map((char1, i) => (
+          <div key={char1.id}>
+            {characters.map((char2, j) => {
+              if (i >= j) return null;
+              const key1 = `${char1.id}-${char2.id}`;
+              const key2 = `${char2.id}-${char1.id}`;
+              
+              return (
+                <div key={key1} className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-4">
+                  <div className="grid md:grid-cols-3 gap-4 items-center">
+                    <div className="text-center">
+                      {char1.photoUrl && (
+                        <img src={char1.photoUrl} alt={char1.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
+                      )}
+                      <div className="font-bold">{char1.name}</div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-center">{t.is}</label>
+                      <select
+                        value={relationships[key1] || relationshipTypes[10].value[language]}
+                        onChange={(e) => updateRelationship(char1.id, char2.id, e.target.value)}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg font-semibold"
+                      >
+                        {allRelationships.map((type, idx) => (
+                          <option key={idx} value={type.value[language]}>{type.value[language]}</option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="text"
+                          value={newRelationship}
+                          onChange={(e) => setNewRelationship(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && addCustomRelationship()}
+                          placeholder={t.addCustomRelationship}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                        />
+                        <button
+                          onClick={addCustomRelationship}
+                          className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="text-center">
+                      {char2.photoUrl && (
+                        <img src={char2.photoUrl} alt={char2.name} className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
+                      )}
+                      <div className="font-bold">{char2.name}</div>
+                    </div>
+                  </div>
+                  
+                  {relationships[key1] && relationships[key2] && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <div className="text-xs text-gray-500 text-center mb-1">{t.reverseRelationship}</div>
+                      <div className="text-sm text-center text-gray-600">
+                        <strong>{char2.name}</strong> {t.is} <strong>{relationships[key2]}</strong> <strong>{char1.name}</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderStep4 = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+          <Wand2 /> {t.storySettings}
+        </h2>
+        <button
+          onClick={exportConfiguration}
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex items-center gap-2"
+        >
+          <Save size={20} /> {t.exportConfig}
+        </button>
+      </div>
+
+      <div className="bg-white border-2 border-purple-200 rounded-xl p-6 space-y-6">
+        <div>
+          <label className="block text-lg font-semibold mb-3">{t.selectMainCharacters}</label>
+          <div className="grid md:grid-cols-2 gap-3">
+            {characters.map(char => (
+              <button
+                key={char.id}
+                onClick={() => toggleMainCharacter(char.id)}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  mainCharacters.includes(char.id)
+                    ? 'border-yellow-500 bg-yellow-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {char.photoUrl && (
+                    <img src={char.photoUrl} alt={char.name} className="w-12 h-12 rounded-full object-cover" />
+                  )}
+                  <div className="flex-1">
+                    <div className="font-bold flex items-center gap-2">
+                      {char.name}
+                      {mainCharacters.includes(char.id) && <Star size={16} className="text-yellow-500 fill-yellow-500" />}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-lg font-semibold mb-3">{t.numberOfPages}</label>
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              min="3"
+              max="30"
+              value={pages}
+              onChange={(e) => setPages(parseInt(e.target.value))}
+              className="flex-1"
+            />
+            <span className="text-2xl font-bold text-purple-600 w-12 text-center">{pages}</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-lg font-semibold mb-3">{t.readingLevel}</label>
+          <div className="space-y-2">
+            {[
+              { value: '1st-grade', label: t.firstGrade, desc: t.firstGradeDesc },
+              { value: 'standard', label: t.standard, desc: t.standardDesc },
+              { value: 'advanced', label: t.advanced, desc: t.advancedDesc }
+            ].map(level => (
+              <button
+                key={level.value}
+                onClick={() => setLanguageLevel(level.value)}
+                className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                  languageLevel === level.value
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-200 hover:border-purple-300'
+                }`}
+              >
+                <div className="font-semibold">{level.label}</div>
+                <div className="text-sm text-gray-600">{level.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={generateStory}
+          disabled={isGenerating || characters.length === 0}
+          className={`w-full py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 ${
+            isGenerating || characters.length === 0
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
+          }`}
+        >
+          <Wand2 size={24} />
+          {isGenerating ? t.creating : t.generateStory}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderStep6 = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+        <BookOpen /> {t.storyReady}
+      </h2>
+
+      <div className="bg-white border-2 border-purple-200 rounded-xl p-8 prose max-w-none">
+        <div className="whitespace-pre-wrap leading-relaxed text-gray-800">
+          {generatedStory}
+        </div>
+      </div>
+
+      <div className="flex gap-4 flex-wrap">
+        <button
+          onClick={() => downloadStory('txt')}
+          className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 font-semibold flex items-center gap-2"
+        >
+          <Download size={20} /> {t.downloadTXT}
+        </button>
+        <button
+          onClick={() => downloadStory('pdf')}
+          className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 font-semibold flex items-center gap-2"
+        >
+          <Download size={20} /> {t.downloadPDF}
+        </button>
+        <button
+          onClick={exportConfiguration}
+          className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-semibold flex items-center gap-2"
+        >
+          <Save size={20} /> {t.exportConfig}
+        </button>
+        <button
+          onClick={() => {
+            setStep(1);
+            setGeneratedStory('');
+            setCharacters([]);
+            setRelationships({});
+            setStoryType('');
+            setMainCharacters([]);
+          }}
+          className="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 font-semibold ml-auto"
+        >
+          {t.createAnotherStory}
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 p-4 md:p-8">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-bold text-purple-700 mb-2">
+            ✨ {t.title} ✨
+          </h1>
+          <p className="text-gray-600">{t.subtitle}</p>
+        </div>
+
+        {step > 0 && step < 6 && (
+          <div className="flex justify-center mb-8">
+            <div className="flex items-center gap-2">
+              {[1, 2, 3, 4].map(s => (
+                <React.Fragment key={s}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                    step >= s ? 'bg-purple-500 text-white' : 'bg-gray-300 text-gray-600'
+                  }`}>
+                    {s}
+                  </div>
+                  {s < 4 && <div className={`w-12 h-1 ${step > s ? 'bg-purple-500' : 'bg-gray-300'}`} />}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 mb-6">
+          {step === 0 && renderStep0()}
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+          {step === 4 && renderStep4()}
+          {step === 6 && renderStep6()}
+        </div>
+
+        {step > 0 && step < 6 && step !== 2 && (
+          <div className="flex justify-between">
+            <button
+              onClick={() => setStep(Math.max(0, step - 1))}
+              className="bg-white text-purple-600 hover:bg-purple-50 border-2 border-purple-500 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+            >
+              <ArrowLeft size={20} /> {t.back}
+            </button>
+
+            <button
+              onClick={() => setStep(Math.min(4, step + 1))}
+              disabled={
+                (step === 1 && !storyType) ||
+                (step === 2 && characters.length === 0) ||
+                (step === 3 && !areAllRelationshipsDefined())
+              }
+              className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
+                (step === 1 && !storyType) || 
+                (step === 2 && characters.length === 0) ||
+                (step === 3 && !areAllRelationshipsDefined())
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              {t.next} <ArrowRight size={20} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

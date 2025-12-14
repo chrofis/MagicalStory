@@ -68,15 +68,60 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
   };
 }
 
+interface CharacterDataResponse {
+  characters: CharacterResponse[];
+  relationships: Record<string, string>;
+  relationshipTexts: Record<string, string>;
+  customRelationships: string[];
+  customStrengths: string[];
+  customWeaknesses: string[];
+  customFears: string[];
+}
+
+export interface CharacterData {
+  characters: Character[];
+  relationships: Record<string, string>;
+  relationshipTexts: Record<string, string>;
+  customRelationships: string[];
+  customStrengths: string[];
+  customWeaknesses: string[];
+  customFears: string[];
+}
+
 export const characterService = {
   async getCharacters(): Promise<Character[]> {
-    const response = await api.get<{ characters: CharacterResponse[] }>('/api/characters');
+    const response = await api.get<CharacterDataResponse>('/api/characters');
     return (response.characters || []).map(mapCharacterFromApi);
+  },
+
+  async getCharacterData(): Promise<CharacterData> {
+    const response = await api.get<CharacterDataResponse>('/api/characters');
+    return {
+      characters: (response.characters || []).map(mapCharacterFromApi),
+      relationships: response.relationships || {},
+      relationshipTexts: response.relationshipTexts || {},
+      customRelationships: response.customRelationships || [],
+      customStrengths: response.customStrengths || [],
+      customWeaknesses: response.customWeaknesses || [],
+      customFears: response.customFears || [],
+    };
   },
 
   async saveCharacters(characters: Character[]): Promise<void> {
     await api.post('/api/characters', {
       characters: characters.map(mapCharacterToApi),
+    });
+  },
+
+  async saveCharacterData(data: CharacterData): Promise<void> {
+    await api.post('/api/characters', {
+      characters: data.characters.map(mapCharacterToApi),
+      relationships: data.relationships,
+      relationshipTexts: data.relationshipTexts,
+      customRelationships: data.customRelationships,
+      customStrengths: data.customStrengths,
+      customWeaknesses: data.customWeaknesses,
+      customFears: data.customFears,
     });
   },
 
