@@ -2766,11 +2766,13 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const { id, coverType } = req.params;
     const { customPrompt } = req.body;
 
-    if (!['front', 'initialPage', 'back'].includes(coverType)) {
-      return res.status(400).json({ error: 'Invalid cover type. Must be: front, initialPage, or back' });
+    // Accept both 'initial' and 'initialPage' for backwards compatibility
+    const normalizedCoverType = coverType === 'initial' ? 'initialPage' : coverType;
+    if (!['front', 'initialPage', 'back'].includes(normalizedCoverType)) {
+      return res.status(400).json({ error: 'Invalid cover type. Must be: front, initial/initialPage, or back' });
     }
 
-    console.log(`🔄 Regenerating ${coverType} cover for story ${id}`);
+    console.log(`🔄 Regenerating ${normalizedCoverType} cover for story ${id}`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -2834,7 +2836,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       const storyTitle = storyData.title || 'My Story';
       const coverScenes = extractCoverScenes(storyData.outline || '');
 
-      if (coverType === 'front') {
+      if (normalizedCoverType === 'front') {
         const titlePageScene = coverScenes.titlePage || 'A beautiful, magical title page featuring the main characters.';
         coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
           TITLE_PAGE_SCENE: titlePageScene,
@@ -2842,7 +2844,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
           CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle
         });
-      } else if (coverType === 'initialPage') {
+      } else if (normalizedCoverType === 'initialPage') {
         const initialPageScene = coverScenes.initialPage || 'A warm, inviting dedication/introduction page.';
         coverPrompt = storyData.dedication
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
@@ -2868,14 +2870,14 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     }
 
     // Get the scene description for this cover type
-    const coverScenes = extractCoverScenes(storyData.outline || '');
+    const coverScenes2 = extractCoverScenes(storyData.outline || '');
     let sceneDescription;
-    if (coverType === 'front') {
-      sceneDescription = coverScenes.titlePage || 'A beautiful, magical title page featuring the main characters.';
-    } else if (coverType === 'initialPage') {
-      sceneDescription = coverScenes.initialPage || 'A warm, inviting dedication/introduction page.';
+    if (normalizedCoverType === 'front') {
+      sceneDescription = coverScenes2.titlePage || 'A beautiful, magical title page featuring the main characters.';
+    } else if (normalizedCoverType === 'initialPage') {
+      sceneDescription = coverScenes2.initialPage || 'A warm, inviting dedication/introduction page.';
     } else {
-      sceneDescription = coverScenes.backCover || 'A satisfying, conclusive ending scene.';
+      sceneDescription = coverScenes2.backCover || 'A satisfying, conclusive ending scene.';
     }
 
     // Generate new cover (use 'cover' evaluation for text-focused quality check)
@@ -2891,9 +2893,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       qualityReasoning: coverResult.reasoning || null
     };
 
-    if (coverType === 'front') {
+    if (normalizedCoverType === 'front') {
       storyData.coverImages.frontCover = coverData;
-    } else if (coverType === 'initialPage') {
+    } else if (normalizedCoverType === 'initialPage') {
       storyData.coverImages.initialPage = coverData;
     } else {
       storyData.coverImages.backCover = coverData;
@@ -2905,11 +2907,11 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ ${coverType} cover regenerated for story ${id} (score: ${coverResult.score})`);
+    console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score})`);
 
     res.json({
       success: true,
-      coverType,
+      coverType: normalizedCoverType,
       imageData: coverResult.imageData,
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning
@@ -3758,14 +3760,13 @@ Be concise but descriptive. Return ONLY valid JSON, no markdown or other text.`
       }
     };
 
-    // Helper function for Python analysis
-    // Note: First run may download AI models (~500MB), so allow longer timeout
+    // Helper function for Python analysis (face detection + background removal only)
     const analyzePython = async () => {
       const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageData }),
-        signal: AbortSignal.timeout(120000) // 2 minute timeout (allows for model download on first run)
+        signal: AbortSignal.timeout(30000) // 30 second timeout (MediaPipe is fast, no heavy model downloads)
       });
       return analyzerResponse.json();
     };

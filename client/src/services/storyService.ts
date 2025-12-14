@@ -189,10 +189,10 @@ export const storyService = {
   },
 
   async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial'): Promise<{ imageData: string }> {
-    const response = await api.post<{ image_data: string }>(
+    const response = await api.post<{ imageData: string }>(
       `/api/stories/${storyId}/regenerate/cover/${coverType}`
     );
-    return { imageData: response.image_data };
+    return { imageData: response.imageData };
   },
 
   async updatePage(storyId: string, pageNum: number, data: {
