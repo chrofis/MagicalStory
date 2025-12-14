@@ -81,8 +81,21 @@ EXTRA TEXT (not automatic fail):
 - Extra background text/decorations = DEDUCT 5-15 points (NOT automatic 0)
 - Focus on the REQUESTED title and dedication text being correct
 
-Output strictly in this format:
+**OUTPUT FORMAT:**
+
+Output STRICTLY in this format (all fields required):
+
 Score: [Score]/100
+
+Text_Error_Only: [YES/NO]
+(YES if score is low ONLY because of text issues - characters, style, composition are all acceptable)
+(NO if there are other significant issues beyond text)
+
+Expected_Text: [exact text that was requested in the prompt - extract title and/or dedication]
+
+Actual_Text: [exact text you can read in the image, or "MISSING" if no text found, or "ILLEGIBLE" if unreadable]
+
+Text_Issue: [NONE/MISSPELLED/WRONG_WORDS/MISSING/ILLEGIBLE/PARTIAL]
 
 Reasoning:
 [List each criterion evaluated:

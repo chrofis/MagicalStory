@@ -3119,15 +3119,24 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
 
       // Check if PDF file exists in files table (database mode only)
       if (STORAGE_MODE === 'database' && dbPool) {
+        console.log(`🖨️ [PRINT] Checking for PDF with story_id: ${storyId}`);
         const pdfFileResult = await dbQuery(
           "SELECT id FROM files WHERE story_id = $1 AND file_type = 'story_pdf' ORDER BY created_at DESC LIMIT 1",
           [storyId]
         );
+        console.log(`🖨️ [PRINT] PDF query result: ${pdfFileResult.length} files found`);
 
         if (pdfFileResult.length > 0) {
           const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
           pdfUrl = `${baseUrl}/api/files/${pdfFileResult[0].id}`;
+          console.log(`🖨️ [PRINT] Using PDF URL: ${pdfUrl}`);
         } else {
+          // Debug: Check what files exist for this story
+          const allFilesResult = await dbQuery(
+            "SELECT id, file_type, created_at FROM files WHERE story_id = $1",
+            [storyId]
+          );
+          console.log(`🖨️ [PRINT] All files for story ${storyId}:`, allFilesResult.map(f => `${f.file_type} (${f.id})`).join(', ') || 'NONE');
           return res.status(400).json({ error: 'Story does not have a PDF. Please download the PDF first to generate it.' });
         }
       } else {
