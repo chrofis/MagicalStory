@@ -91,7 +91,7 @@ export default function StoryWizard() {
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
   const [, setStoryOutline] = useState(''); // Outline stored for potential later use
-  const [, setSceneDescriptions] = useState<SceneDescription[]>([]);
+  const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [storyId, setStoryId] = useState<string | null>(null);
   const [, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
@@ -123,6 +123,8 @@ export default function StoryWizard() {
           setArtStyle(story.artStyle || 'pixar');
           setGeneratedStory(story.story || '');
           setSceneImages(story.sceneImages || []);
+          setSceneDescriptions(story.sceneDescriptions || []);
+          setLanguageLevel(story.languageLevel || 'standard');
           // Set to step 5 to show the story
           setStep(5);
           setIsGenerating(false);
@@ -827,10 +829,32 @@ export default function StoryWizard() {
               title={storyTitle}
               story={generatedStory}
               sceneImages={sceneImages}
+              sceneDescriptions={sceneDescriptions}
               languageLevel={languageLevel}
               isGenerating={isGenerating}
               developerMode={developerMode}
               storyId={storyId}
+              onRegenerateImage={storyId ? async (pageNumber: number) => {
+                try {
+                  log.info('Regenerating image for page:', pageNumber);
+                  setIsGenerating(true);
+                  const { imageData } = await storyService.regenerateImage(storyId, pageNumber);
+                  // Update the scene images array
+                  setSceneImages(prev => prev.map(img =>
+                    img.pageNumber === pageNumber ? { ...img, imageData } : img
+                  ));
+                  log.info('Image regenerated successfully');
+                } catch (error) {
+                  log.error('Image regeneration failed:', error);
+                  alert(language === 'de'
+                    ? 'Bildgenerierung fehlgeschlagen'
+                    : language === 'fr'
+                    ? 'Échec de la régénération de l\'image'
+                    : 'Image regeneration failed');
+                } finally {
+                  setIsGenerating(false);
+                }
+              } : undefined}
               onDownloadTxt={() => {
                 const blob = new Blob([generatedStory], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);

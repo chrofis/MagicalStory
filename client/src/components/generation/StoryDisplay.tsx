@@ -1,12 +1,13 @@
-import { BookOpen, FileText, ShoppingCart, Plus, Download } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import type { SceneImage } from '@/types/story';
+import type { SceneImage, SceneDescription } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 
 interface StoryDisplayProps {
   title: string;
   story: string;
   sceneImages: SceneImage[];
+  sceneDescriptions?: SceneDescription[];
   languageLevel?: LanguageLevel;
   isGenerating?: boolean;
   onDownloadPdf?: () => void;
@@ -14,6 +15,7 @@ interface StoryDisplayProps {
   onPrintBook?: () => void;
   onCreateAnother?: () => void;
   onDownloadTxt?: () => void;
+  onRegenerateImage?: (pageNumber: number) => Promise<void>;
   storyId?: string | null;
   developerMode?: boolean;
 }
@@ -22,6 +24,7 @@ export function StoryDisplay({
   title,
   story,
   sceneImages,
+  sceneDescriptions = [],
   languageLevel = 'standard',
   isGenerating = false,
   onDownloadPdf,
@@ -29,6 +32,7 @@ export function StoryDisplay({
   onPrintBook,
   onCreateAnother,
   onDownloadTxt,
+  onRegenerateImage,
   storyId,
   developerMode = false,
 }: StoryDisplayProps) {
@@ -44,6 +48,16 @@ export function StoryDisplay({
 
   const storyPages = parseStoryPages(story);
   const hasImages = sceneImages.length > 0;
+
+  // Helper to get scene description for a page
+  const getSceneDescription = (pageNumber: number): string | undefined => {
+    // First check sceneDescriptions array
+    const fromDescriptions = sceneDescriptions.find(s => s.pageNumber === pageNumber)?.description;
+    if (fromDescriptions) return fromDescriptions;
+    // Fall back to image.description if available
+    const image = sceneImages.find(img => img.pageNumber === pageNumber);
+    return image?.description;
+  };
 
   return (
     <div className="space-y-6">
@@ -147,46 +161,93 @@ export function StoryDisplay({
                           alt={`Scene for page ${pageNumber}`}
                           className="w-full rounded-lg shadow-md object-cover"
                         />
-                        {/* Developer Mode: Quality Score */}
-                        {developerMode && image.qualityScore !== undefined && (
-                          <div className="mt-2 p-2 bg-indigo-50 rounded border border-indigo-200">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="font-semibold text-indigo-700">Quality Score:</span>
-                              <span className={`font-bold ${
-                                image.qualityScore >= 70 ? 'text-green-600' :
-                                image.qualityScore >= 50 ? 'text-yellow-600' :
-                                'text-red-600'
-                              }`}>
-                                {(image.qualityScore / 10).toFixed(1)}/10
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {/* Developer Mode: Regeneration Info */}
-                        {developerMode && image.wasRegenerated && (
-                          <details className="mt-2 bg-orange-50 border border-orange-300 rounded-lg p-3">
-                            <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
-                              <span>🔄 Image Regenerated</span>
-                              {image.originalScore !== undefined && (
-                                <span className="text-red-600">Original: {(image.originalScore / 10).toFixed(1)}/10</span>
-                              )}
-                            </summary>
-                            <div className="mt-2">
-                              <p className="text-xs text-gray-600 mb-2">
-                                Image was automatically regenerated because the first version had low quality.
-                              </p>
-                              {image.originalImage && (
+                        {/* Developer Mode Features */}
+                        {developerMode && (
+                          <div className="mt-3 space-y-2">
+                            {/* Regenerate Image Button */}
+                            {onRegenerateImage && (
+                              <button
+                                onClick={() => onRegenerateImage(pageNumber)}
+                                disabled={isGenerating}
+                                className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                }`}
+                              >
+                                <RefreshCw size={14} /> {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
+                              </button>
+                            )}
+
+                            {/* Scene Description */}
+                            {getSceneDescription(pageNumber) && (
+                              <details className="bg-green-50 border border-green-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
+                                  {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                                </summary>
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                                  {getSceneDescription(pageNumber)}
+                                </pre>
+                              </details>
+                            )}
+
+                            {/* Quality Score with Reasoning */}
+                            {image.qualityScore !== undefined && (
+                              <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                                  <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                                  <span className={`text-lg font-bold ${
+                                    image.qualityScore >= 70 ? 'text-green-600' :
+                                    image.qualityScore >= 50 ? 'text-yellow-600' :
+                                    'text-red-600'
+                                  }`}>
+                                    {(image.qualityScore / 10).toFixed(1)}/10
+                                  </span>
+                                </summary>
+                                {image.qualityReasoning && (
+                                  <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
+                                    <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                                    <p className="whitespace-pre-wrap">{image.qualityReasoning}</p>
+                                  </div>
+                                )}
+                              </details>
+                            )}
+
+                            {/* Regeneration Info */}
+                            {image.wasRegenerated && (
+                              <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
+                                  <span>🔄 {language === 'de' ? 'Bild regeneriert' : language === 'fr' ? 'Image régénérée' : 'Image Regenerated'}</span>
+                                  {image.originalScore !== undefined && (
+                                    <span className="text-red-600">Original: {(image.originalScore / 10).toFixed(1)}/10</span>
+                                  )}
+                                </summary>
                                 <div className="mt-2">
-                                  <p className="text-xs font-semibold text-gray-700 mb-1">Original Image:</p>
-                                  <img
-                                    src={image.originalImage}
-                                    alt="Original (lower quality)"
-                                    className="w-full rounded border-2 border-orange-200 opacity-75"
-                                  />
+                                  <p className="text-xs text-gray-600 mb-2">
+                                    {language === 'de' ? 'Das Bild wurde automatisch regeneriert, da die erste Version eine niedrige Qualität hatte.' :
+                                     language === 'fr' ? "L'image a été automatiquement régénérée car la première version avait une qualité faible." :
+                                     'Image was automatically regenerated because the first version had low quality.'}
+                                  </p>
+                                  {image.originalImage && (
+                                    <div className="mt-2">
+                                      <p className="text-xs font-semibold text-gray-700 mb-1">
+                                        {language === 'de' ? 'Originalbild:' : language === 'fr' ? 'Image originale:' : 'Original Image:'}
+                                      </p>
+                                      <img
+                                        src={image.originalImage}
+                                        alt="Original (lower quality)"
+                                        className="w-full rounded border-2 border-orange-200 opacity-75"
+                                      />
+                                      {image.originalReasoning && (
+                                        <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border">
+                                          <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original:' : 'Original Feedback:'}</div>
+                                          <p className="whitespace-pre-wrap">{image.originalReasoning}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          </details>
+                              </details>
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : (
@@ -215,46 +276,93 @@ export function StoryDisplay({
                           alt={`Scene for page ${pageNumber}`}
                           className="w-full rounded-lg shadow-md object-cover"
                         />
-                        {/* Developer Mode: Quality Score */}
-                        {developerMode && image.qualityScore !== undefined && (
-                          <div className="mt-2 p-2 bg-indigo-50 rounded border border-indigo-200">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="font-semibold text-indigo-700">Quality Score:</span>
-                              <span className={`font-bold ${
-                                image.qualityScore >= 70 ? 'text-green-600' :
-                                image.qualityScore >= 50 ? 'text-yellow-600' :
-                                'text-red-600'
-                              }`}>
-                                {(image.qualityScore / 10).toFixed(1)}/10
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {/* Developer Mode: Regeneration Info */}
-                        {developerMode && image.wasRegenerated && (
-                          <details className="mt-2 bg-orange-50 border border-orange-300 rounded-lg p-3">
-                            <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
-                              <span>🔄 Image Regenerated</span>
-                              {image.originalScore !== undefined && (
-                                <span className="text-red-600">Original: {(image.originalScore / 10).toFixed(1)}/10</span>
-                              )}
-                            </summary>
-                            <div className="mt-2">
-                              <p className="text-xs text-gray-600 mb-2">
-                                Image was automatically regenerated because the first version had low quality.
-                              </p>
-                              {image.originalImage && (
+                        {/* Developer Mode Features */}
+                        {developerMode && (
+                          <div className="mt-3 space-y-2">
+                            {/* Regenerate Image Button */}
+                            {onRegenerateImage && (
+                              <button
+                                onClick={() => onRegenerateImage(pageNumber)}
+                                disabled={isGenerating}
+                                className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                }`}
+                              >
+                                <RefreshCw size={14} /> {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
+                              </button>
+                            )}
+
+                            {/* Scene Description */}
+                            {getSceneDescription(pageNumber) && (
+                              <details className="bg-green-50 border border-green-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
+                                  {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                                </summary>
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                                  {getSceneDescription(pageNumber)}
+                                </pre>
+                              </details>
+                            )}
+
+                            {/* Quality Score with Reasoning */}
+                            {image.qualityScore !== undefined && (
+                              <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                                  <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                                  <span className={`text-lg font-bold ${
+                                    image.qualityScore >= 70 ? 'text-green-600' :
+                                    image.qualityScore >= 50 ? 'text-yellow-600' :
+                                    'text-red-600'
+                                  }`}>
+                                    {(image.qualityScore / 10).toFixed(1)}/10
+                                  </span>
+                                </summary>
+                                {image.qualityReasoning && (
+                                  <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
+                                    <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                                    <p className="whitespace-pre-wrap">{image.qualityReasoning}</p>
+                                  </div>
+                                )}
+                              </details>
+                            )}
+
+                            {/* Regeneration Info */}
+                            {image.wasRegenerated && (
+                              <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
+                                  <span>🔄 {language === 'de' ? 'Bild regeneriert' : language === 'fr' ? 'Image régénérée' : 'Image Regenerated'}</span>
+                                  {image.originalScore !== undefined && (
+                                    <span className="text-red-600">Original: {(image.originalScore / 10).toFixed(1)}/10</span>
+                                  )}
+                                </summary>
                                 <div className="mt-2">
-                                  <p className="text-xs font-semibold text-gray-700 mb-1">Original Image:</p>
-                                  <img
-                                    src={image.originalImage}
-                                    alt="Original (lower quality)"
-                                    className="w-full rounded border-2 border-orange-200 opacity-75"
-                                  />
+                                  <p className="text-xs text-gray-600 mb-2">
+                                    {language === 'de' ? 'Das Bild wurde automatisch regeneriert, da die erste Version eine niedrige Qualität hatte.' :
+                                     language === 'fr' ? "L'image a été automatiquement régénérée car la première version avait une qualité faible." :
+                                     'Image was automatically regenerated because the first version had low quality.'}
+                                  </p>
+                                  {image.originalImage && (
+                                    <div className="mt-2">
+                                      <p className="text-xs font-semibold text-gray-700 mb-1">
+                                        {language === 'de' ? 'Originalbild:' : language === 'fr' ? 'Image originale:' : 'Original Image:'}
+                                      </p>
+                                      <img
+                                        src={image.originalImage}
+                                        alt="Original (lower quality)"
+                                        className="w-full rounded border-2 border-orange-200 opacity-75"
+                                      />
+                                      {image.originalReasoning && (
+                                        <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border">
+                                          <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original:' : 'Original Feedback:'}</div>
+                                          <p className="whitespace-pre-wrap">{image.originalReasoning}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          </details>
+                              </details>
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : (
