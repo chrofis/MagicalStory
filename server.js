@@ -6457,8 +6457,12 @@ ${outline}
 IMPORTANT: Now write pages ${startScene} through ${endScene} of the story following the outline above.
 ${batchNum === 0 ? 'Include the title and dedication at the beginning.' : 'Start directly with the page content (no title/dedication).'}
 
-You **MUST** write exactly pages ${startScene} through ${endScene}.
-Ensure there is **exactly one "--- Page X ---" marker per page**.
+**CRITICAL PAGE RANGE RULES:**
+- You **MUST** write exactly pages ${startScene} through ${endScene} - no more, no less
+- **STOP IMMEDIATELY** after completing page ${endScene}
+- Do **NOT** write page ${endScene + 1} or any pages beyond ${endScene}, even if the outline mentions them
+- The outline shows the full story for context, but you are ONLY responsible for pages ${startScene}-${endScene}
+- Ensure there is **exactly one "--- Page X ---" marker per page**
 
 Output Format:
 --- Page ${startScene} ---

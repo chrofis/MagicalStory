@@ -26,9 +26,12 @@ IMPORTANT: Now write pages {START_PAGE} through {END_PAGE} of the story followin
 If `{INCLUDE_TITLE}` is set to TRUE, provide a catchy, age-appropriate title at the very beginning of the first page you write (Page {START_PAGE}).
 Assume the story has progressed up to Page {START_PAGE - 1} and seamlessly continue the narrative from that point.
 
-You **MUST** write exactly pages {START_PAGE} through {END_PAGE}.
-**Do NOT stop** until all pages in this range are complete.
-Ensure there is **exactly one "--- Page X ---" marker per page**.
+**CRITICAL PAGE RANGE RULES:**
+- You **MUST** write exactly pages {START_PAGE} through {END_PAGE} - no more, no less
+- **STOP IMMEDIATELY** after completing page {END_PAGE}
+- Do **NOT** write page {END_PAGE + 1} or any pages beyond {END_PAGE}, even if the outline mentions them
+- The outline shows the full story for context, but you are ONLY responsible for pages {START_PAGE}-{END_PAGE}
+- Ensure there is **exactly one "--- Page X ---" marker per page**
 Write engaging, age-appropriate content for each page, maintaining a consistent narrative voice and tone.
 Ensure all characters consistently reflect their established traits, ages, and relationships from the BASE_PROMPT.
 Within this page range, ensure the plot progresses naturally and avoids rushing or excessive detail on any single page.
