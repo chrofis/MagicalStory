@@ -4009,7 +4009,202 @@ app.delete('/api/files/:fileId', authenticateToken, async (req, res) => {
   }
 });
 
-// Generate PDF from story
+// GET PDF for a story - fetches story from database and generates PDF
+app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
+  try {
+    const storyId = req.params.id;
+    const userId = req.user.userId;
+
+    console.log(`📄 [PDF GET] Generating PDF for story: ${storyId}`);
+
+    // Fetch story from database
+    const storyResult = await dbPool.query(
+      'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+      [storyId, userId]
+    );
+
+    if (storyResult.rows.length === 0) {
+      console.log(`📄 [PDF GET] Story not found: ${storyId}`);
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = storyResult.rows[0].data;
+    console.log(`📄 [PDF GET] Story found: ${storyData.title}`);
+
+    // Parse story into pages
+    const storyText = storyData.storyText || storyData.story || '';
+    const pageMatches = storyText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
+    const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
+
+    if (storyPages.length === 0) {
+      console.log(`📄 [PDF GET] No story pages found. Story text preview: ${storyText.substring(0, 200)}`);
+      return res.status(400).json({ error: 'No story pages found' });
+    }
+
+    // Forward to POST endpoint with story data
+    const isPictureBook = storyData.languageLevel === '1st-grade';
+    console.log(`📄 [PDF GET] Generating PDF with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
+
+    // Helper function to extract image data
+    const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
+
+    const PDFDocument = require('pdfkit');
+    const stream = require('stream');
+
+    // Convert mm to points (1mm = 2.83465 points)
+    const mmToPoints = (mm) => mm * 2.83465;
+
+    // Page dimensions for 14x14cm photobook
+    const coverWidth = mmToPoints(290.27);
+    const coverHeight = mmToPoints(146.0);
+    const pageSize = mmToPoints(140);
+
+    // Create PDF document
+    const doc = new PDFDocument({
+      size: [coverWidth, coverHeight],
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      autoFirstPage: false
+    });
+
+    // Collect PDF data in a buffer
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    const pdfPromise = new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+    });
+
+    // Add cover page (back cover + front cover)
+    doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    const backCoverWidth = coverWidth / 2;
+    const frontCoverWidth = coverWidth / 2;
+
+    // Back cover (left half)
+    const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+    if (backCoverImageData) {
+      try {
+        const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(backCoverBuffer, 0, 0, { width: backCoverWidth, height: coverHeight });
+      } catch (err) {
+        console.error('Error adding back cover:', err.message);
+      }
+    }
+
+    // Front cover (right half)
+    const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+    if (frontCoverImageData) {
+      try {
+        const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(frontCoverBuffer, backCoverWidth, 0, { width: frontCoverWidth, height: coverHeight });
+      } catch (err) {
+        console.error('Error adding front cover:', err.message);
+      }
+    }
+
+    // Add title on front cover
+    if (storyData.title) {
+      doc.fillColor('white').font('Helvetica-Bold').fontSize(24);
+      const titleX = backCoverWidth + 20;
+      const titleY = coverHeight - 50;
+      doc.text(storyData.title, titleX, titleY, { width: frontCoverWidth - 40, align: 'center' });
+    }
+
+    // Add initial page if exists
+    const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+    if (initialPageImageData) {
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      try {
+        const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
+      } catch (err) {
+        console.error('Error adding initial page:', err.message);
+      }
+    }
+
+    // Add story pages
+    if (isPictureBook) {
+      // Picture Book: combined image + text on same page
+      storyPages.forEach((pageText, index) => {
+        const pageNumber = index + 1;
+        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+        const margin = mmToPoints(5);
+
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+        const imageHeight = pageSize * 0.85;
+        const textAreaHeight = pageSize * 0.15;
+
+        if (image && image.imageData) {
+          try {
+            const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+            doc.image(imageBuffer, margin, margin, {
+              fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+              align: 'center',
+              valign: 'center'
+            });
+          } catch (err) {
+            console.error(`Error adding image for page ${pageNumber}:`, err.message);
+          }
+        }
+
+        // Add text at bottom
+        doc.fontSize(9).font('Helvetica').fillColor('#333');
+        const textY = imageHeight + 5;
+        doc.text(cleanText, margin, textY, {
+          width: pageSize - (margin * 2),
+          height: textAreaHeight - 10,
+          align: 'center',
+          ellipsis: true
+        });
+      });
+    } else {
+      // Standard: separate text and image pages
+      storyPages.forEach((pageText, index) => {
+        const pageNumber = index + 1;
+        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+        const margin = 28;
+
+        // Text page
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
+        doc.fontSize(9).font('Helvetica').fillColor('#333');
+        doc.text(cleanText, margin, margin, { width: pageSize - (margin * 2), align: 'left' });
+
+        // Image page
+        if (image && image.imageData) {
+          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          try {
+            const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+            const imgMargin = mmToPoints(5);
+            doc.image(imageBuffer, imgMargin, imgMargin, {
+              fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
+              align: 'center',
+              valign: 'center'
+            });
+          } catch (err) {
+            console.error(`Error adding image for page ${pageNumber}:`, err.message);
+          }
+        }
+      });
+    }
+
+    doc.end();
+    const pdfBuffer = await pdfPromise;
+
+    console.log(`📄 [PDF GET] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${storyData.title || 'story'}.pdf"`);
+    res.send(pdfBuffer);
+
+  } catch (err) {
+    console.error('Error generating PDF:', err);
+    res.status(500).json({ error: 'Failed to generate PDF', details: err.message });
+  }
+});
+
+// Generate PDF from story (POST - with data in body)
 app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
   try {
     const { storyId, storyTitle, storyPages, sceneImages, coverImages, languageLevel } = req.body;
