@@ -27,6 +27,14 @@ export interface SceneImage {
   pageNumber: number;
   imageData: string;
   score?: number;
+  description?: string;
+  qualityScore?: number;
+  qualityReasoning?: string;
+  // Regeneration info (for dev mode)
+  wasRegenerated?: boolean;
+  originalImage?: string;
+  originalScore?: number;
+  originalReasoning?: string;
 }
 
 export interface CoverImages {

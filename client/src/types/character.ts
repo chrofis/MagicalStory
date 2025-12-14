@@ -20,6 +20,7 @@ export interface Character {
   weaknesses: string[];
   fears: string[];
   photoUrl?: string;
+  thumbnailUrl?: string;  // Smaller cropped face photo for lists
   bodyPhotoUrl?: string;
   bodyNoBgUrl?: string;
   faceBox?: BoundingBox;

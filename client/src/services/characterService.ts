@@ -16,6 +16,7 @@ interface CharacterResponse {
   weaknesses: string[];
   fears: string[];
   photo_url?: string;
+  thumbnail_url?: string;
   body_photo_url?: string;
   body_no_bg_url?: string;
   face_box?: { x: number; y: number; width: number; height: number };

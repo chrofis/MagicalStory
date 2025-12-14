@@ -16,7 +16,7 @@ import type { LanguageLevel, SceneDescription, SceneImage, Language } from '@/ty
 
 // Services & Helpers
 import { characterService } from '@/services';
-import { getNotKnownRelationship, isNotKnownRelationship } from '@/constants/relationships';
+import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship } from '@/constants/relationships';
 
 export default function StoryWizard() {
   const navigate = useNavigate();
@@ -31,6 +31,7 @@ export default function StoryWizard() {
   // Step 1: Story Type & Art Style
   const [storyType, setStoryType] = useState('');
   const [artStyle, setArtStyle] = useState('pixar');
+  const [customStoryTypes, setCustomStoryTypes] = useState<Array<{ id: string; name: { en: string; de: string; fr: string }; emoji: string }>>([]);
 
   // Step 2: Characters
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -198,18 +199,20 @@ export default function StoryWizard() {
 
       if (!relationshipsInitialized.current || relationshipsInitialized.current !== charKey) {
         const lang = language as Language;
+        const notKnown = getNotKnownRelationship(lang);
         console.log('Initializing relationships for step 3, charKey:', charKey, 'existing:', Object.keys(relationships).length);
 
         setRelationships(prev => {
           const updated = { ...prev };
           let hasChanges = false;
 
+          // Initialize both directions for each pair
           characters.forEach((char1, i) => {
             characters.forEach((char2, j) => {
-              if (i < j) {
+              if (i !== j) {
                 const key = `${char1.id}-${char2.id}`;
                 if (!updated[key]) {
-                  updated[key] = getNotKnownRelationship(lang);
+                  updated[key] = notKnown;
                   hasChanges = true;
                   console.log('Initializing missing relationship:', key);
                 }
@@ -225,15 +228,17 @@ export default function StoryWizard() {
     }
   }, [step, characters, language, isLoading]);
 
-  // Check if all relationships are defined
+  // Check if all relationships are defined (both directions)
   const areAllRelationshipsDefined = () => {
     if (characters.length < 2) return true;
     for (let i = 0; i < characters.length; i++) {
-      for (let j = i + 1; j < characters.length; j++) {
-        const key = `${characters[i].id}-${characters[j].id}`;
-        const value = relationships[key];
-        if (!value || isNotKnownRelationship(value)) {
-          return false;
+      for (let j = 0; j < characters.length; j++) {
+        if (i !== j) {
+          const key = `${characters[i].id}-${characters[j].id}`;
+          const value = relationships[key];
+          if (!value || isNotKnownRelationship(value)) {
+            return false;
+          }
         }
       }
     }
@@ -382,19 +387,46 @@ export default function StoryWizard() {
     }
   };
 
-  // Relationship handlers
+  // Relationship handlers - set both forward and inverse relationships
   const updateRelationship = (char1Id: number, char2Id: number, value: string) => {
-    const key = `${char1Id}-${char2Id}`;
-    console.log('Updating relationship:', key, '=', value);
-    setRelationships(prev => {
-      const updated = { ...prev, [key]: value };
-      console.log('New relationships state:', updated);
-      return updated;
-    });
+    const lang = language as Language;
+    const inverse = findInverseRelationship(value, lang);
+    const forwardKey = `${char1Id}-${char2Id}`;
+    const inverseKey = `${char2Id}-${char1Id}`;
+    console.log('Updating relationship:', forwardKey, '=', value, ', inverse:', inverseKey, '=', inverse);
+    setRelationships(prev => ({
+      ...prev,
+      [forwardKey]: value,
+      [inverseKey]: inverse,
+    }));
   };
 
   const addCustomRelationship = (relationship: string) => {
     setCustomRelationships(prev => [...prev, relationship]);
+  };
+
+  // Add custom story type
+  const addCustomStoryType = () => {
+    const promptMsg = language === 'de' ? 'Name des Story-Typs eingeben:' :
+                     language === 'fr' ? 'Entrez le nom du type d\'histoire:' :
+                     'Enter story type name:';
+    const name = prompt(promptMsg);
+    if (name) {
+      const newType = {
+        id: `custom-${Date.now()}`,
+        name: { en: name, de: name, fr: name },
+        emoji: '✨',
+      };
+      setCustomStoryTypes(prev => [...prev, newType]);
+      setStoryType(newType.id);
+      // Auto-scroll to art style selection
+      setTimeout(() => {
+        const artStyleSection = document.getElementById('art-style-section');
+        if (artStyleSection) {
+          artStyleSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
   };
 
   // Main character toggle
@@ -528,6 +560,8 @@ And they all lived happily ever after.`);
                   }
                 }, 100);
               }}
+              customTypes={customStoryTypes}
+              onAddCustom={addCustomStoryType}
             />
             {storyType && (
               <ArtStyleSelector

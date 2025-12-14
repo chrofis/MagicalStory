@@ -1378,7 +1378,7 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
       return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
-    const { model, contents, safetySettings } = req.body;
+    const { model, contents, safetySettings, generationConfig } = req.body;
 
     await logActivity(req.user.id, req.user.username, 'GEMINI_API_CALL', {
       model: model || 'gemini-2.5-flash-image'
@@ -1389,6 +1389,19 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
     const requestBody = { contents };
     if (safetySettings) {
       requestBody.safetySettings = safetySettings;
+    }
+    // Add generationConfig with aspectRatio if not provided (for image generation)
+    if (generationConfig) {
+      requestBody.generationConfig = generationConfig;
+    } else {
+      // Default config for image generation - ensures 1:1 aspect ratio
+      requestBody.generationConfig = {
+        responseModalities: ["TEXT", "IMAGE"],
+        temperature: 0.5,
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      };
     }
 
     const response = await fetch(url, {

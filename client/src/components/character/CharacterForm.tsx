@@ -8,6 +8,22 @@ import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, weaknesses as defaultWeaknesses, fears as defaultFears } from '@/constants/traits';
 import type { Character } from '@/types/character';
 
+// Auto-detect gender from name
+function detectGender(name: string): 'male' | 'female' | 'other' {
+  const femaleSuffixes = ['a', 'e', 'ie', 'ine', 'elle'];
+  const femaleNames = ['sophia', 'emma', 'olivia', 'ava', 'isabella', 'mia', 'charlotte', 'amelia', 'marie', 'anna', 'lisa', 'julia', 'sarah', 'laura', 'lena', 'lea', 'emily', 'sophie', 'nina', 'nora'];
+  const maleNames = ['liam', 'noah', 'oliver', 'james', 'lucas', 'max', 'leon', 'paul', 'ben', 'tom', 'felix', 'lukas', 'tim', 'jan', 'finn', 'david', 'michael', 'daniel', 'alexander', 'william'];
+
+  const lowerName = name.toLowerCase().trim();
+  if (!lowerName) return 'other';
+
+  if (femaleNames.some(n => lowerName.includes(n))) return 'female';
+  if (maleNames.some(n => lowerName.includes(n))) return 'male';
+  if (femaleSuffixes.some(suffix => lowerName.endsWith(suffix))) return 'female';
+
+  return 'other';
+}
+
 interface CharacterFormProps {
   character: Character;
   onChange: (character: Character) => void;
@@ -60,7 +76,17 @@ export function CharacterForm({
       <Input
         label={`${t.characterName} *`}
         value={character.name}
-        onChange={(e) => updateField('name', e.target.value)}
+        onChange={(e) => {
+          const newName = e.target.value;
+          updateField('name', newName);
+          // Auto-detect gender from name if gender is still 'other'
+          if (character.gender === 'other' && newName.length >= 2) {
+            const detectedGender = detectGender(newName);
+            if (detectedGender !== 'other') {
+              updateField('gender', detectedGender);
+            }
+          }
+        }}
         placeholder={t.characterName}
       />
 

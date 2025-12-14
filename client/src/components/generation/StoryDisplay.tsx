@@ -132,6 +132,47 @@ export function StoryDisplay({
                           alt={`Scene for page ${pageNumber}`}
                           className="w-full rounded-lg shadow-md object-cover"
                         />
+                        {/* Developer Mode: Quality Score */}
+                        {developerMode && image.qualityScore !== undefined && (
+                          <div className="mt-2 p-2 bg-indigo-50 rounded border border-indigo-200">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="font-semibold text-indigo-700">Quality Score:</span>
+                              <span className={`font-bold ${
+                                image.qualityScore >= 70 ? 'text-green-600' :
+                                image.qualityScore >= 50 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {(image.qualityScore / 10).toFixed(1)}/10
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {/* Developer Mode: Regeneration Info */}
+                        {developerMode && image.wasRegenerated && (
+                          <details className="mt-2 bg-orange-50 border border-orange-300 rounded-lg p-3">
+                            <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
+                              <span>🔄 Image Regenerated</span>
+                              {image.originalScore !== undefined && (
+                                <span className="text-red-600">Original: {(image.originalScore / 10).toFixed(1)}/10</span>
+                              )}
+                            </summary>
+                            <div className="mt-2">
+                              <p className="text-xs text-gray-600 mb-2">
+                                Image was automatically regenerated because the first version had low quality.
+                              </p>
+                              {image.originalImage && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-semibold text-gray-700 mb-1">Original Image:</p>
+                                  <img
+                                    src={image.originalImage}
+                                    alt="Original (lower quality)"
+                                    className="w-full rounded border-2 border-orange-200 opacity-75"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </details>
+                        )}
                       </div>
                     ) : (
                       <div className="w-full flex items-center justify-center bg-gray-100 rounded-lg p-8 mb-4">
@@ -159,6 +200,47 @@ export function StoryDisplay({
                           alt={`Scene for page ${pageNumber}`}
                           className="w-full rounded-lg shadow-md object-cover"
                         />
+                        {/* Developer Mode: Quality Score */}
+                        {developerMode && image.qualityScore !== undefined && (
+                          <div className="mt-2 p-2 bg-indigo-50 rounded border border-indigo-200">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="font-semibold text-indigo-700">Quality Score:</span>
+                              <span className={`font-bold ${
+                                image.qualityScore >= 70 ? 'text-green-600' :
+                                image.qualityScore >= 50 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {(image.qualityScore / 10).toFixed(1)}/10
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {/* Developer Mode: Regeneration Info */}
+                        {developerMode && image.wasRegenerated && (
+                          <details className="mt-2 bg-orange-50 border border-orange-300 rounded-lg p-3">
+                            <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
+                              <span>🔄 Image Regenerated</span>
+                              {image.originalScore !== undefined && (
+                                <span className="text-red-600">Original: {(image.originalScore / 10).toFixed(1)}/10</span>
+                              )}
+                            </summary>
+                            <div className="mt-2">
+                              <p className="text-xs text-gray-600 mb-2">
+                                Image was automatically regenerated because the first version had low quality.
+                              </p>
+                              {image.originalImage && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-semibold text-gray-700 mb-1">Original Image:</p>
+                                  <img
+                                    src={image.originalImage}
+                                    alt="Original (lower quality)"
+                                    className="w-full rounded border-2 border-orange-200 opacity-75"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </details>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center justify-center bg-gray-100 rounded-lg p-8">

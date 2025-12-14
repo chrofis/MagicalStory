@@ -54,9 +54,9 @@ export function CharacterList({
               {/* Top row: Photo/Name on left, Buttons on right */}
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {char.photoUrl && (
+                  {(char.thumbnailUrl || char.photoUrl) && (
                     <img
-                      src={char.photoUrl}
+                      src={char.thumbnailUrl || char.photoUrl}
                       alt={char.name}
                       className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0"
                     />

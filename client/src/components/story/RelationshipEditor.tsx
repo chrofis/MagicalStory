@@ -81,9 +81,9 @@ export function RelationshipEditor({
                 <div className="flex items-center justify-center gap-3 md:gap-6 max-w-[75%] mx-auto">
                   {/* Character 1 - Left side */}
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    {char1.photoUrl && (
+                    {(char1.thumbnailUrl || char1.photoUrl) && (
                       <img
-                        src={char1.photoUrl}
+                        src={char1.thumbnailUrl || char1.photoUrl}
                         alt={char1.name}
                         className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover"
                       />
@@ -128,9 +128,9 @@ export function RelationshipEditor({
 
                   {/* Character 2 - Right side */}
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    {char2.photoUrl && (
+                    {(char2.thumbnailUrl || char2.photoUrl) && (
                       <img
-                        src={char2.photoUrl}
+                        src={char2.thumbnailUrl || char2.photoUrl}
                         alt={char2.name}
                         className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover"
                       />
