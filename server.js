@@ -3570,20 +3570,55 @@ app.get('/api/print-provider/products', async (req, res) => {
   }
 });
 
+// Photo Analyzer Health Check
+app.get('/api/photo-analyzer-status', async (req, res) => {
+  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+
+  try {
+    const response = await fetch(`${photoAnalyzerUrl}/health`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    const data = await response.json();
+
+    console.log('📸 [HEALTH] Python service status:', data);
+
+    res.json({
+      status: 'ok',
+      pythonService: data,
+      url: photoAnalyzerUrl
+    });
+  } catch (err) {
+    console.error('📸 [HEALTH] Python service unavailable:', err.message);
+    res.status(503).json({
+      status: 'error',
+      error: err.message,
+      url: photoAnalyzerUrl
+    });
+  }
+});
+
 // Photo Analysis Endpoint (calls Python DeepFace service)
 app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
   try {
     const { imageData } = req.body;
 
     if (!imageData) {
+      console.log('📸 [PHOTO] Missing imageData in request');
       return res.status(400).json({ error: 'Missing imageData' });
     }
+
+    // Log image info
+    const imageSize = imageData.length;
+    const imageType = imageData.substring(0, 30);
+    console.log(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}...`);
 
     // Call Python photo analyzer service
     // Use 127.0.0.1 instead of localhost to avoid IPv6 issues
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+    console.log(`📸 [PHOTO] Calling Python service at: ${photoAnalyzerUrl}/analyze`);
 
     try {
+      const startTime = Date.now();
       const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
         method: 'POST',
         headers: {
@@ -3594,17 +3629,38 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
       });
 
       const analyzerData = await analyzerResponse.json();
+      const duration = Date.now() - startTime;
+
+      // VERBOSE LOGGING
+      console.log(`📸 [PHOTO] Python response in ${duration}ms:`, {
+        status: analyzerResponse.status,
+        success: analyzerData.success,
+        hasError: !!analyzerData.error,
+        error: analyzerData.error || null,
+        hasFaceThumbnail: !!analyzerData.faceThumbnail || !!analyzerData.face_thumbnail,
+        hasBodyCrop: !!analyzerData.bodyCrop || !!analyzerData.body_crop,
+        hasBodyNoBg: !!analyzerData.bodyNoBg || !!analyzerData.body_no_bg,
+        hasFaceBox: !!analyzerData.faceBox || !!analyzerData.face_box,
+        hasBodyBox: !!analyzerData.bodyBox || !!analyzerData.body_box,
+        attributes: analyzerData.attributes || null,
+        imageDimensions: analyzerData.image_dimensions || null,
+        traceback: analyzerData.traceback ? analyzerData.traceback.substring(0, 500) : null
+      });
 
       if (!analyzerResponse.ok || !analyzerData.success) {
+        console.error('📸 [PHOTO] Analysis failed:', analyzerData.error, analyzerData.traceback);
         return res.status(500).json({
           error: 'Photo analysis failed',
-          details: analyzerData.error || 'Unknown error'
+          details: analyzerData.error || 'Unknown error',
+          traceback: analyzerData.traceback
         });
       }
 
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
         age: analyzerData.attributes?.age,
-        gender: analyzerData.attributes?.gender
+        gender: analyzerData.attributes?.gender,
+        hasFace: !!analyzerData.face_thumbnail,
+        hasBody: !!analyzerData.body_crop
       });
 
       res.json(analyzerData);
