@@ -4041,7 +4041,9 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const storyData = storyResult.rows[0].data;
+    const storyData = typeof storyResult.rows[0].data === 'string'
+      ? JSON.parse(storyResult.rows[0].data)
+      : storyResult.rows[0].data;
     console.log(`📄 [PDF GET] Story found: ${storyData.title}`);
 
     // Parse story into pages
