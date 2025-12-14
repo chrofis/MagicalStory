@@ -3086,10 +3086,43 @@ function updatePageText(storyText, pageNumber, newText) {
 // Print Provider API - Create photobook order
 app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
   try {
-    let { pdfUrl, shippingAddress, orderReference, productUid, pageCount } = req.body;
+    let { storyId, pdfUrl, shippingAddress, orderReference, productUid, pageCount } = req.body;
 
-    if (!pdfUrl || !shippingAddress || !productUid || !pageCount) {
-      return res.status(400).json({ error: 'Missing required fields: pdfUrl, shippingAddress, productUid, pageCount' });
+    // If storyId provided, look up story to get pdfUrl and pageCount
+    if (storyId && !pdfUrl) {
+      let story = null;
+      if (STORAGE_MODE === 'database' && dbPool) {
+        const rows = await dbQuery('SELECT * FROM stories WHERE id = $1 AND user_id = $2', [storyId, req.user.id]);
+        if (rows.length > 0) {
+          story = rows[0];
+        }
+      } else {
+        const allStories = await readJSON(STORIES_FILE);
+        const userStories = allStories[req.user.id] || [];
+        story = userStories.find(s => s.id === storyId);
+      }
+
+      if (!story) {
+        return res.status(404).json({ error: 'Story not found' });
+      }
+
+      // Get PDF URL from story
+      pdfUrl = story.pdf_url || story.pdfUrl;
+      if (!pdfUrl) {
+        return res.status(400).json({ error: 'Story does not have a PDF. Please generate the PDF first.' });
+      }
+
+      // Get page count from story
+      pageCount = story.pages || story.page_count || 30;
+    }
+
+    // Default productUid for hardcover photobook if not provided
+    if (!productUid) {
+      productUid = 'photobook-hardcover_pf_210x210-mm-8x8-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matte-lamination_prt_1-0';
+    }
+
+    if (!pdfUrl || !shippingAddress || !pageCount) {
+      return res.status(400).json({ error: 'Missing required fields: pdfUrl (or storyId), shippingAddress, pageCount' });
     }
 
     // Validate and normalize shipping address
