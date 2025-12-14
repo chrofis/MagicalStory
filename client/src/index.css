@@ -37,7 +37,13 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-purple-300 rounded hover:bg-purple-400;
+  @apply bg-indigo-300 rounded hover:bg-indigo-400;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #a5b4fc #f3f4f6;
 }
 
 /* Animation utilities */
