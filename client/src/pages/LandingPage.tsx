@@ -94,7 +94,7 @@ export default function LandingPage() {
                 {/* Avatar */}
                 <div className="text-center">
                   <div className="mb-1 lg:mb-2">
-                    <img src="/images/Avatar 2.png" alt="Your Character" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
+                    <img src="/images/Avatar.jpg" alt="Your Character" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
                     {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : 'Your Character'}
