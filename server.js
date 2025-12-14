@@ -3153,7 +3153,27 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
 
     // Default productUid for hardcover photobook if not provided
     if (!productUid) {
-      productUid = 'photobook-hardcover_pf_210x210-mm-8x8-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matte-lamination_prt_1-0';
+      // Try to get an active product from the database that supports the page count
+      if (STORAGE_MODE === 'database' && dbPool) {
+        const productResult = await dbQuery(
+          `SELECT product_uid FROM gelato_products
+           WHERE is_active = true
+           AND (min_pages IS NULL OR min_pages <= $1)
+           AND (max_pages IS NULL OR max_pages >= $1)
+           ORDER BY created_at DESC LIMIT 1`,
+          [pageCount]
+        );
+        if (productResult.length > 0) {
+          productUid = productResult[0].product_uid;
+          console.log(`🖨️ [PRINT] Using product from database: ${productUid} for ${pageCount} pages`);
+        }
+      }
+
+      // Fallback to hardcoded default if no database product found
+      if (!productUid) {
+        productUid = 'photobook-hardcover_pf_210x210-mm-8x8-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matte-lamination_prt_1-0';
+        console.log(`🖨️ [PRINT] Using fallback hardcoded product: ${productUid}`);
+      }
     }
 
     if (!pdfUrl || !shippingAddress || !pageCount) {
