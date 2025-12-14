@@ -261,7 +261,7 @@ export const storyService = {
         coverImages?: CoverImages;
       };
       error?: string;
-    }>(`/api/jobs/${jobId}`);
+    }>(`/api/jobs/${jobId}/status`);
     return {
       status: response.status as 'pending' | 'processing' | 'completed' | 'failed',
       progress: response.progress,
