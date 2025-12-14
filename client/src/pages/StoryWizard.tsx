@@ -100,7 +100,7 @@ export default function StoryWizard() {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
-  const [, setStoryOutline] = useState(''); // Outline stored for potential later use
+  const [storyOutline, setStoryOutline] = useState(''); // Outline for dev mode display
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
@@ -133,6 +133,7 @@ export default function StoryWizard() {
           setStoryType(story.storyType || '');
           setArtStyle(story.artStyle || 'pixar');
           setGeneratedStory(story.story || '');
+          setStoryOutline(story.outline || '');
           setSceneImages(story.sceneImages || []);
           setSceneDescriptions(story.sceneDescriptions || []);
           setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
@@ -962,6 +963,7 @@ export default function StoryWizard() {
             <StoryDisplay
               title={storyTitle}
               story={generatedStory}
+              outline={storyOutline}
               sceneImages={sceneImages}
               sceneDescriptions={sceneDescriptions}
               coverImages={coverImages}

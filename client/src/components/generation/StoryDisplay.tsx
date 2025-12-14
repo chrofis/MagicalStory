@@ -6,6 +6,7 @@ import type { LanguageLevel } from '@/types/story';
 interface StoryDisplayProps {
   title: string;
   story: string;
+  outline?: string;
   sceneImages: SceneImage[];
   sceneDescriptions?: SceneDescription[];
   coverImages?: CoverImages;
@@ -27,6 +28,7 @@ interface StoryDisplayProps {
 export function StoryDisplay({
   title,
   story,
+  outline,
   sceneImages,
   sceneDescriptions = [],
   coverImages,
@@ -154,6 +156,37 @@ export function StoryDisplay({
           </button>
         )}
       </div>
+
+      {/* Developer Mode: Story Overview and Full Text */}
+      {developerMode && (
+        <div className="space-y-4 mt-6">
+          {/* Story Outline/Overview */}
+          {outline && (
+            <details className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-purple-800 hover:text-purple-900 flex items-center gap-2">
+                <FileText size={20} />
+                {language === 'de' ? 'Story-Übersicht (Outline)' : language === 'fr' ? 'Aperçu de l\'histoire' : 'Story Overview (Outline)'}
+              </summary>
+              <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-purple-200 overflow-x-auto max-h-96 overflow-y-auto">
+                {outline}
+              </pre>
+            </details>
+          )}
+
+          {/* Full Story Text */}
+          {story && (
+            <details className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-amber-800 hover:text-amber-900 flex items-center gap-2">
+                <BookOpen size={20} />
+                {language === 'de' ? 'Vollständiger Story-Text' : language === 'fr' ? 'Texte complet de l\'histoire' : 'Full Story Text'}
+              </summary>
+              <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-96 overflow-y-auto">
+                {story}
+              </pre>
+            </details>
+          )}
+        </div>
+      )}
 
       {/* Cover Images Display */}
       {coverImages && (getCoverImageData(coverImages.frontCover) || getCoverImageData(coverImages.initialPage) || getCoverImageData(coverImages.backCover)) && (
