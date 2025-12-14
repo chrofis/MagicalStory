@@ -7077,8 +7077,8 @@ async function processStoryJob(jobId) {
       // Get reading level for this language level
       const languageLevelDescriptions = {
         '1st-grade': { description: 'Simple words and very short sentences for early readers', pageLength: '2-3 sentences per page (approximately 20-35 words)' },
-        'standard': { description: 'Age-appropriate vocabulary for elementary school children', pageLength: '6-8 sentences per page (approximately 50-80 words)' },
-        'advanced': { description: 'More complex vocabulary and varied sentence structure for advanced readers', pageLength: '10-14 sentences per page (approximately 100-170 words)' }
+        'standard': { description: 'Age-appropriate vocabulary for elementary school children', pageLength: 'approximately 120-150 words per page' },
+        'advanced': { description: 'More complex vocabulary and varied sentence structure for advanced readers', pageLength: 'approximately 250-300 words per page' }
       };
       const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
       const readingLevel = `${levelInfo.description}. ${levelInfo.pageLength}`;
@@ -7781,11 +7781,11 @@ function buildBasePrompt(inputData) {
     },
     'standard': {
       description: 'Age-appropriate vocabulary for elementary school children',
-      pageLength: '6-8 sentences per page (approximately 50-80 words)'
+      pageLength: 'approximately 120-150 words per page'
     },
     'advanced': {
       description: 'More complex vocabulary and varied sentence structure for advanced readers',
-      pageLength: '10-14 sentences per page (approximately 100-170 words)'
+      pageLength: 'approximately 250-300 words per page'
     }
   };
   const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
@@ -7821,11 +7821,11 @@ function buildStoryPrompt(inputData, sceneCount = null) {
     },
     'standard': {
       description: 'Age-appropriate vocabulary for elementary school children',
-      pageLength: '6-8 sentences per page (approximately 50-80 words)'
+      pageLength: 'approximately 120-150 words per page'
     },
     'advanced': {
       description: 'More complex vocabulary and varied sentence structure for advanced readers',
-      pageLength: '10-14 sentences per page (approximately 100-170 words)'
+      pageLength: 'approximately 250-300 words per page'
     }
   };
   const levelInfo = languageLevelDescriptions[inputData.languageLevel] || languageLevelDescriptions['standard'];
