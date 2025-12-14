@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { User, AuthState } from '@/types/user';
+import logger from '@/services/logger';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>;
@@ -43,6 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user,
           token,
         });
+        // Configure logger based on user role
+        logger.configure({ isAdmin: user.role === 'admin' });
+        logger.info(`Session restored for ${user.username}`);
       } catch {
         // Invalid stored data, clear it
         localStorage.removeItem('auth_token');
@@ -82,6 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       token: data.token,
     });
+
+    // Configure logger based on user role
+    logger.configure({ isAdmin: user.role === 'admin' });
+    logger.success(`Logged in as ${user.username} (${user.role})`);
   }, []);
 
   const register = useCallback(async (username: string, password: string, email?: string) => {
@@ -120,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    logger.info('Logging out...');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('current_user');
     setState({
@@ -127,6 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: null,
       token: null,
     });
+    // Reset logger to non-admin mode
+    logger.configure({ isAdmin: false });
   }, []);
 
   const updateQuota = useCallback((quota: { storyQuota: number; storiesGenerated: number }) => {

@@ -1,3 +1,7 @@
+import { createLogger } from './logger';
+
+const log = createLogger('PhotoService');
+
 export interface PhotoAnalysisResult {
   success: boolean;
   faceBox?: {
@@ -33,7 +37,7 @@ export const photoService = {
    */
   async analyzePhoto(imageData: string): Promise<PhotoAnalysisResult> {
     try {
-      console.log('Analyzing photo with Python MediaPipe API...');
+      log.info('Analyzing photo with Python MediaPipe API...');
 
       const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/analyze-photo`, {
         method: 'POST',
@@ -45,15 +49,15 @@ export const photoService = {
       });
 
       if (!response.ok) {
-        console.error('Python API analysis failed:', response.status);
+        log.error('Python API analysis failed:', response.status);
         return { success: false };
       }
 
       const data = await response.json();
-      console.log('Python API response:', data);
+      log.debug('Python API response:', data);
 
       if (data.error) {
-        console.warn('Python API returned error:', data.error);
+        log.warn('Python API returned error:', data.error);
         return { success: false };
       }
 
@@ -75,7 +79,7 @@ export const photoService = {
         source: 'python-mediapipe',
       };
     } catch (error) {
-      console.error('Error with Python API:', error);
+      log.error('Error with Python API:', error);
       return { success: false };
     }
   },

@@ -249,9 +249,11 @@ export const storyService = {
     error?: string;
   }> {
     const response = await api.get<{
+      jobId: string;
       status: string;
-      progress?: { current: number; total: number; message: string };
-      result?: {
+      progress: number;
+      progressMessage: string;
+      resultData?: {
         storyId: string;
         title: string;
         outline: string;
@@ -260,13 +262,19 @@ export const storyService = {
         sceneImages: SceneImage[];
         coverImages?: CoverImages;
       };
-      error?: string;
+      errorMessage?: string;
     }>(`/api/jobs/${jobId}/status`);
+
+    // Map server response to client format
     return {
       status: response.status as 'pending' | 'processing' | 'completed' | 'failed',
-      progress: response.progress,
-      result: response.result,
-      error: response.error,
+      progress: {
+        current: response.progress || 0,
+        total: 100,
+        message: response.progressMessage || '',
+      },
+      result: response.resultData,
+      error: response.errorMessage,
     };
   },
 

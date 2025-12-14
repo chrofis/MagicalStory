@@ -1,5 +1,8 @@
 import api from './api';
 import type { Character } from '@/types/character';
+import { createLogger } from './logger';
+
+const log = createLogger('CharacterService');
 
 interface CharacterResponse {
   id: number;
@@ -203,7 +206,7 @@ export const characterService = {
         } : undefined,
       };
     } catch (error) {
-      console.error('Photo analysis failed:', error);
+      log.error('Photo analysis failed:', error);
       return { success: false };
     }
   },

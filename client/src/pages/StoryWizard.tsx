@@ -18,6 +18,10 @@ import type { LanguageLevel, SceneDescription, SceneImage, Language } from '@/ty
 import { characterService, storyService } from '@/services';
 import { storyTypes } from '@/constants/storyTypes';
 import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship } from '@/constants/relationships';
+import { createLogger } from '@/services/logger';
+
+// Create namespaced logger
+const log = createLogger('StoryWizard');
 
 export default function StoryWizard() {
   const navigate = useNavigate();
@@ -112,7 +116,7 @@ export default function StoryWizard() {
       // Select all characters aged 1-10 as main characters
       const mainCharIds = youngCharacters.map(char => char.id);
       setMainCharacters(mainCharIds);
-      console.log(`Auto-selected ${youngCharacters.length} main character(s) aged 1-10`);
+      log.info(`Auto-selected ${youngCharacters.length} main character(s) aged 1-10`);
     } else {
       // No characters aged 1-10, select the youngest one
       const youngest = charactersList.reduce((min, char) => {
@@ -121,7 +125,7 @@ export default function StoryWizard() {
         return age < minAge ? char : min;
       });
       setMainCharacters([youngest.id]);
-      console.log(`Auto-selected youngest character as main: ${youngest.name} (age ${youngest.age})`);
+      log.info(`Auto-selected youngest character as main: ${youngest.name} (age ${youngest.age})`);
     }
   };
 
@@ -131,7 +135,7 @@ export default function StoryWizard() {
       try {
         setIsLoading(true);
         const data = await characterService.getCharacterData();
-        console.log('Loaded character data from API:', {
+        log.info('Loaded character data from API:', {
           characters: data.characters.length,
           relationships: Object.keys(data.relationships).length,
         });
@@ -155,7 +159,7 @@ export default function StoryWizard() {
           autoSelectMainCharacters(data.characters);
         }
       } catch (error) {
-        console.error('Failed to load character data:', error);
+        log.error('Failed to load character data:', error);
       } finally {
         setIsLoading(false);
       }
@@ -206,7 +210,7 @@ export default function StoryWizard() {
       if (!relationshipsInitialized.current || relationshipsInitialized.current !== charKey) {
         const lang = language as Language;
         const notKnown = getNotKnownRelationship(lang);
-        console.log('Initializing relationships for step 3, charKey:', charKey, 'existing:', Object.keys(relationships).length);
+        log.debug('Initializing relationships for step 3', { charKey, existingCount: Object.keys(relationships).length });
 
         setRelationships(prev => {
           const updated = { ...prev };
@@ -220,7 +224,7 @@ export default function StoryWizard() {
                 if (!updated[key]) {
                   updated[key] = notKnown;
                   hasChanges = true;
-                  console.log('Initializing missing relationship:', key);
+                  log.debug('Initializing missing relationship:', key);
                 }
               }
             });
@@ -277,7 +281,7 @@ export default function StoryWizard() {
 
       // Run photo analysis in BACKGROUND (non-blocking)
       try {
-        console.log('Starting background photo analysis...');
+        log.info('Starting background photo analysis...');
         const analysis = await characterService.analyzePhoto(originalPhotoUrl);
 
         if (analysis.success) {
@@ -286,7 +290,7 @@ export default function StoryWizard() {
           const bodyPhotoUrl = analysis.bodyCrop || originalPhotoUrl;
           const bodyNoBgUrl = analysis.bodyNoBg || undefined;
 
-          console.log('Photo analysis complete:', {
+          log.info('Photo analysis complete:', {
             hasFaceThumbnail: !!analysis.faceThumbnail,
             hasBodyCrop: !!analysis.bodyCrop,
             hasBodyNoBg: !!analysis.bodyNoBg,
@@ -309,10 +313,10 @@ export default function StoryWizard() {
             clothing: analysis.attributes?.clothing || prev.clothing,
           } : null);
         } else {
-          console.warn('Photo analysis returned no data, keeping original photo');
+          log.warn('Photo analysis returned no data, keeping original photo');
         }
       } catch (error) {
-        console.error('Background photo analysis error:', error);
+        log.error('Background photo analysis error:', error);
         // Keep original photo - user can still proceed
       }
     };
@@ -330,7 +334,7 @@ export default function StoryWizard() {
         ? characters.map(c => c.id === currentCharacter.id ? currentCharacter : c)
         : [...characters, currentCharacter];
 
-      console.log('Saving characters with relationships:', updatedCharacters.length);
+      log.info('Saving characters with relationships:', updatedCharacters.length);
       // Save characters along with relationships
       await characterService.saveCharacterData({
         characters: updatedCharacters,
@@ -341,7 +345,7 @@ export default function StoryWizard() {
         customWeaknesses: [],
         customFears: [],
       });
-      console.log('Character data saved successfully');
+      log.success('Character data saved successfully');
 
       setCharacters(updatedCharacters);
 
@@ -351,7 +355,7 @@ export default function StoryWizard() {
       setCurrentCharacter(null);
       setShowCharacterCreated(true);
     } catch (error) {
-      console.error('Failed to save character:', error);
+      log.error('Failed to save character:', error);
       alert('Failed to save character. Please try again.');
     } finally {
       setIsLoading(false);
@@ -392,7 +396,7 @@ export default function StoryWizard() {
       setRelationshipTexts(updatedRelationshipTexts);
       setMainCharacters(prev => prev.filter(cid => cid !== id));
     } catch (error) {
-      console.error('Failed to delete character:', error);
+      log.error('Failed to delete character:', error);
     }
   };
 
@@ -402,7 +406,7 @@ export default function StoryWizard() {
     const inverse = findInverseRelationship(value, lang);
     const forwardKey = `${char1Id}-${char2Id}`;
     const inverseKey = `${char2Id}-${char1Id}`;
-    console.log('Updating relationship:', forwardKey, '=', value, ', inverse:', inverseKey, '=', inverse);
+    log.debug('Updating relationship:', forwardKey, '=', value, ', inverse:', inverseKey, '=', inverse);
     setRelationships(prev => ({
       ...prev,
       [forwardKey]: value,
@@ -485,9 +489,9 @@ export default function StoryWizard() {
         customWeaknesses: [],
         customFears: [],
       });
-      console.log('Character data auto-saved');
+      log.debug('Character data auto-saved');
     } catch (error) {
-      console.error('Failed to auto-save character data:', error);
+      log.error('Failed to auto-save character data:', error);
     }
   };
 
@@ -552,7 +556,7 @@ export default function StoryWizard() {
       });
 
       setJobId(newJobId);
-      console.log('Story job created:', newJobId);
+      log.info('Story job created:', newJobId);
 
       // Poll for job status
       let completed = false;
@@ -560,7 +564,7 @@ export default function StoryWizard() {
         await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
 
         const status = await storyService.getJobStatus(newJobId);
-        console.log('Job status:', status);
+        log.debug('Job status:', status);
 
         if (status.progress) {
           setGenerationProgress(status.progress);
@@ -575,7 +579,7 @@ export default function StoryWizard() {
           setSceneDescriptions(status.result.sceneDescriptions || []);
           setSceneImages(status.result.sceneImages || []);
           completed = true;
-          console.log('Story generation completed!');
+          log.success('Story generation completed!');
         } else if (status.status === 'failed') {
           throw new Error(status.error || 'Story generation failed');
         }
@@ -587,7 +591,7 @@ export default function StoryWizard() {
         message: language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé!' : 'Complete!'
       });
     } catch (error) {
-      console.error('Generation failed:', error);
+      log.error('Generation failed:', error);
       alert(language === 'de'
         ? `Generierung fehlgeschlagen: ${error}`
         : language === 'fr'
@@ -783,7 +787,7 @@ export default function StoryWizard() {
                   a.click();
                   URL.revokeObjectURL(url);
                 } catch (error) {
-                  console.error('PDF download failed:', error);
+                  log.error('PDF download failed:', error);
                   alert(language === 'de'
                     ? 'PDF-Download fehlgeschlagen'
                     : language === 'fr'
