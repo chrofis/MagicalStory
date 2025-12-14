@@ -5416,7 +5416,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
 
     // Add story pages (text + images alternating)
     // The generated story might be in different fields depending on how it was saved
-    const generatedStoryText = storyData.generatedStory || storyData.story || storyData.text || '';
+    const generatedStoryText = storyData.storyText || storyData.generatedStory || storyData.story || storyData.text || '';
     if (!generatedStoryText) {
       throw new Error('Story text not found in story data. Available keys: ' + Object.keys(storyData).join(', '));
     }
