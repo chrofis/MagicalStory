@@ -4245,12 +4245,29 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
           }
         }
 
-        // Add text at bottom
-        doc.fontSize(9).font('Helvetica').fillColor('#333');
+        // Add text at bottom with auto-sizing
         const textY = imageHeight + 5;
+        const textWidth = pageSize - (margin * 2);
+        const maxTextHeight = textAreaHeight - 10;
+
+        const startFontSize = 10;
+        let fontSize = startFontSize;
+        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center' });
+
+        while (textHeight > maxTextHeight && fontSize > 4) {
+          fontSize -= 0.5;
+          doc.fontSize(fontSize);
+          textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center' });
+        }
+
+        if (fontSize < startFontSize) {
+          console.log(`📄 [PDF GET PictureBook] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (${cleanText.length} chars)`);
+        }
+
         doc.text(cleanText, margin, textY, {
-          width: pageSize - (margin * 2),
-          height: textAreaHeight - 10,
+          width: textWidth,
+          height: maxTextHeight,
           align: 'center',
           ellipsis: true
         });
@@ -4262,11 +4279,29 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
         const margin = 28;
+        const availableWidth = pageSize - (margin * 2);
+        const availableHeight = pageSize - (margin * 2);
 
         // Text page
         doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
-        doc.fontSize(9).font('Helvetica').fillColor('#333');
-        doc.text(cleanText, margin, margin, { width: pageSize - (margin * 2), align: 'left' });
+
+        // Auto-reduce font size if text doesn't fit
+        const startFontSize = 9;
+        let fontSize = startFontSize;
+        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
+
+        while (textHeight > availableHeight && fontSize > 5) {
+          fontSize -= 0.5;
+          doc.fontSize(fontSize);
+          textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
+        }
+
+        if (fontSize < startFontSize) {
+          console.log(`📄 [PDF GET] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (${cleanText.length} chars)`);
+        }
+
+        doc.text(cleanText, margin, margin, { width: availableWidth, align: 'left' });
 
         // Image page
         if (image && image.imageData) {
