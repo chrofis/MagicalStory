@@ -16,6 +16,18 @@ interface StoryDraft {
   language: Language;
 }
 
+interface StoryListItemServer {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt?: string;
+  pages: number;
+  language: Language;
+  characters?: { name: string; id: number }[];
+  pageCount?: number;
+  thumbnail?: string;
+}
+
 interface StoryListItem {
   id: string;
   title: string;
@@ -27,26 +39,26 @@ interface StoryListItem {
   thumbnail?: string;
 }
 
-interface StoryDetails {
+interface StoryDetailsServer {
   id: string;
   title: string;
-  story_type: string;
-  art_style: string;
+  storyType: string;
+  artStyle: string;
   language: Language;
-  language_level: LanguageLevel;
+  languageLevel: LanguageLevel;
   pages: number;
   dedication?: string;
   characters: Character[];
-  main_characters: number[];
+  mainCharacters: number[];
   relationships: RelationshipMap;
-  relationship_texts: RelationshipTextMap;
+  relationshipTexts: RelationshipTextMap;
   outline?: string;
-  story?: string;
-  scene_descriptions?: SceneDescription[];
-  scene_images?: SceneImage[];
-  cover_images?: CoverImages;
+  storyText?: string;
+  sceneDescriptions?: SceneDescription[];
+  sceneImages?: SceneImage[];
+  coverImages?: CoverImages;
   thumbnail?: string;
-  created_at: string;
+  createdAt: string;
 }
 
 export const storyService = {
@@ -70,34 +82,45 @@ export const storyService = {
 
   // Story CRUD
   async getStories(): Promise<StoryListItem[]> {
-    const response = await api.get<{ stories: StoryListItem[] }>('/api/stories');
-    return response.stories || [];
+    // Server returns array directly, not { stories: [...] }
+    const response = await api.get<StoryListItemServer[]>('/api/stories');
+    // Map server format to client format
+    return (response || []).map(s => ({
+      id: s.id,
+      title: s.title,
+      story_type: '', // Not returned in list view
+      art_style: '', // Not returned in list view
+      language: s.language,
+      pages: s.pageCount || s.pages || 0,
+      created_at: s.createdAt,
+      thumbnail: s.thumbnail,
+    }));
   },
 
   async getStory(id: string): Promise<SavedStory | null> {
     try {
-      const response = await api.get<{ story: StoryDetails }>(`/api/stories/${id}`);
-      const s = response.story;
+      // Server returns story directly, not wrapped in { story: ... }
+      const s = await api.get<StoryDetailsServer>(`/api/stories/${id}`);
       return {
         id: s.id,
         title: s.title,
-        storyType: s.story_type,
-        artStyle: s.art_style,
+        storyType: s.storyType,
+        artStyle: s.artStyle,
         language: s.language,
-        languageLevel: s.language_level,
+        languageLevel: s.languageLevel,
         pages: s.pages,
         dedication: s.dedication,
         characters: s.characters,
-        mainCharacters: s.main_characters,
+        mainCharacters: s.mainCharacters,
         relationships: s.relationships,
-        relationshipTexts: s.relationship_texts,
+        relationshipTexts: s.relationshipTexts,
         outline: s.outline,
-        story: s.story,
-        sceneDescriptions: s.scene_descriptions,
-        sceneImages: s.scene_images,
-        coverImages: s.cover_images,
+        story: s.storyText,
+        sceneDescriptions: s.sceneDescriptions,
+        sceneImages: s.sceneImages,
+        coverImages: s.coverImages,
         thumbnail: s.thumbnail,
-        createdAt: s.created_at,
+        createdAt: s.createdAt,
       };
     } catch {
       return null;
