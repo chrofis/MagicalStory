@@ -1606,7 +1606,8 @@ app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) 
       const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC';
       const rows = await dbQuery(selectQuery, [targetUserId]);
 
-      userStories = rows.map(row => {
+      // Generate small thumbnails in parallel
+      const storiesWithFullThumbnails = rows.map(row => {
         const story = JSON.parse(row.data);
         return {
           id: story.id,
@@ -1617,26 +1618,46 @@ app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) 
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
           pageCount: story.sceneImages?.length || 0,
-          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+          fullThumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
         };
       });
+
+      userStories = await Promise.all(storiesWithFullThumbnails.map(async (story) => {
+        const thumbnail = story.fullThumbnail ? await generateThumbnail(story.fullThumbnail, 200) : null;
+        return {
+          id: story.id,
+          title: story.title,
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          pages: story.pages,
+          language: story.language,
+          characters: story.characters,
+          pageCount: story.pageCount,
+          thumbnail
+        };
+      }));
 
       console.log(`📚 [ADMIN] Found ${userStories.length} stories for user ${targetUsername} (ID: ${targetUserId})`);
       res.json({ userId: targetUserId, username: targetUsername, stories: userStories });
     } else {
-      // File mode
+      // File mode - generate small thumbnails in parallel
       const allStories = await readJSON(STORIES_FILE);
       const fullStories = allStories[targetUserId] || [];
-      userStories = fullStories.map(story => ({
-        id: story.id,
-        title: story.title,
-        createdAt: story.createdAt,
-        updatedAt: story.updatedAt,
-        pages: story.pages,
-        language: story.language,
-        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: story.sceneImages?.length || 0,
-        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+
+      userStories = await Promise.all(fullStories.map(async (story) => {
+        const fullThumbnail = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
+        const thumbnail = fullThumbnail ? await generateThumbnail(fullThumbnail, 200) : null;
+        return {
+          id: story.id,
+          title: story.title,
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          pages: story.pages,
+          language: story.language,
+          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+          pageCount: story.sceneImages?.length || 0,
+          thumbnail
+        };
       }));
 
       console.log(`📚 [ADMIN] File mode: Found ${userStories.length} stories for user ${targetUserId}`);
@@ -2353,10 +2374,9 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const rows = await dbQuery(selectQuery, [req.user.id]);
       console.log(`📚 Query returned ${rows.length} rows`);
 
-      // Parse the JSON data from each row - return ONLY metadata (NO images)
-      userStories = rows.map(row => {
+      // Parse the JSON data from each row - return ONLY metadata with small thumbnails
+      const storiesWithFullThumbnails = rows.map(row => {
         const story = JSON.parse(row.data);
-        // Return metadata only - no images at all to minimize response size
         return {
           id: story.id,
           title: story.title,
@@ -2366,10 +2386,27 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
           pageCount: story.sceneImages?.length || 0,
-          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+          fullThumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
         };
       });
-      console.log(`📚 Parsed ${userStories.length} stories (metadata only, NO images)`);
+
+      // Generate small thumbnails in parallel (200px wide, ~5-15KB each instead of 500KB+)
+      console.log(`📚 Generating ${storiesWithFullThumbnails.length} small thumbnails...`);
+      userStories = await Promise.all(storiesWithFullThumbnails.map(async (story) => {
+        const thumbnail = story.fullThumbnail ? await generateThumbnail(story.fullThumbnail, 200) : null;
+        return {
+          id: story.id,
+          title: story.title,
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          pages: story.pages,
+          language: story.language,
+          characters: story.characters,
+          pageCount: story.pageCount,
+          thumbnail
+        };
+      }));
+      console.log(`📚 Parsed ${userStories.length} stories with small thumbnails`);
 
       if (userStories.length > 0) {
         console.log(`📚 First story: ${userStories[0].title} (ID: ${userStories[0].id})`);
@@ -2378,19 +2415,24 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       // File mode
       const allStories = await readJSON(STORIES_FILE);
       const fullStories = allStories[req.user.id] || [];
-      // Return ONLY metadata (NO images) to minimize response size
-      userStories = fullStories.map(story => ({
-        id: story.id,
-        title: story.title,
-        createdAt: story.createdAt,
-        updatedAt: story.updatedAt,
-        pages: story.pages,
-        language: story.language,
-        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: story.sceneImages?.length || 0,
-        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+
+      // Generate small thumbnails in parallel
+      userStories = await Promise.all(fullStories.map(async (story) => {
+        const fullThumbnail = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
+        const thumbnail = fullThumbnail ? await generateThumbnail(fullThumbnail, 200) : null;
+        return {
+          id: story.id,
+          title: story.title,
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          pages: story.pages,
+          language: story.language,
+          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+          pageCount: story.sceneImages?.length || 0,
+          thumbnail
+        };
       }));
-      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (metadata only, NO images)`);
+      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} with small thumbnails`);
     }
 
     console.log(`📚 Returning ${userStories.length} stories (total size: ${JSON.stringify(userStories).length} bytes)`);
@@ -9336,6 +9378,30 @@ async function compressImageToJPEG(pngBase64) {
   } catch (error) {
     console.error('❌ [COMPRESSION] Error compressing image:', error);
     throw error;
+  }
+}
+
+// Generate a small thumbnail for story listings (200px wide, low quality JPEG)
+async function generateThumbnail(imageBase64, maxWidth = 200) {
+  try {
+    if (!imageBase64) return null;
+
+    // Remove data URI prefix if present
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Resize and compress to small JPEG thumbnail
+    const thumbnailBuffer = await sharp(imageBuffer)
+      .resize({ width: maxWidth, withoutEnlargement: true })
+      .jpeg({ quality: 60, progressive: true })
+      .toBuffer();
+
+    return `data:image/jpeg;base64,${thumbnailBuffer.toString('base64')}`;
+  } catch (error) {
+    console.error('❌ [THUMBNAIL] Error generating thumbnail:', error.message);
+    return null;
   }
 }
 

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Book, Trash2, Eye, Loader2 } from 'lucide-react';
+import { Book, Trash2, Eye } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { storyService } from '@/services';
@@ -8,9 +8,6 @@ import { LoadingSpinner, Navigation } from '@/components/common';
 import { createLogger } from '@/services/logger';
 
 const log = createLogger('MyStories');
-
-// Number of stories to show initially (fast first paint)
-const INITIAL_BATCH_SIZE = 6;
 
 interface StoryListItem {
   id: string;
@@ -29,8 +26,6 @@ export default function MyStories() {
   const { isAuthenticated } = useAuth();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const loadedAllRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,28 +39,9 @@ export default function MyStories() {
     log.debug('Loading stories...');
     try {
       setIsLoading(true);
-      loadedAllRef.current = false;
-
-      const data = await storyService.getStories() as unknown as StoryListItem[];
+      const data = await storyService.getStories();
       log.info('Loaded stories:', data.length);
-
-      if (data.length <= INITIAL_BATCH_SIZE) {
-        // All stories fit in first batch
-        setStories(data);
-        loadedAllRef.current = true;
-      } else {
-        // Show first batch immediately, load rest in background
-        setStories(data.slice(0, INITIAL_BATCH_SIZE));
-        setIsLoading(false);
-        setIsLoadingMore(true);
-
-        // Small delay to let UI render, then add remaining stories
-        setTimeout(() => {
-          setStories(data);
-          setIsLoadingMore(false);
-          loadedAllRef.current = true;
-        }, 100);
-      }
+      setStories(data as unknown as StoryListItem[]);
     } catch (error) {
       log.error('Failed to load stories:', error);
     } finally {
