@@ -69,6 +69,12 @@ export interface SavedStory {
   outlinePrompt?: string;
   story?: string;
   storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
+  visualBible?: {
+    secondaryCharacters: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+    animals: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+    artifacts: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+    locations: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+  };
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];
   coverImages?: CoverImages;

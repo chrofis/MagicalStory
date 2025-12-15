@@ -310,6 +310,12 @@ export const storyService = {
       outlinePrompt?: string;
       story: string;
       storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
+      visualBible?: {
+        secondaryCharacters: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+        animals: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+        artifacts: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+        locations: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+      };
       sceneDescriptions: SceneDescription[];
       sceneImages: SceneImage[];
       coverImages?: CoverImages;
@@ -328,6 +334,12 @@ export const storyService = {
         outlinePrompt?: string;
         storyText?: string; // Server uses storyText
         storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
+        visualBible?: {
+          secondaryCharacters: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+          animals: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+          artifacts: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+          locations: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
+        };
         sceneDescriptions?: SceneDescription[];
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
@@ -351,6 +363,7 @@ export const storyService = {
         outlinePrompt: resultData.outlinePrompt,
         story: resultData.storyText || '', // Map storyText -> story
         storyTextPrompts: resultData.storyTextPrompts,
+        visualBible: resultData.visualBible,
         sceneDescriptions: resultData.sceneDescriptions || [],
         sceneImages: resultData.sceneImages || [],
         coverImages: resultData.coverImages,

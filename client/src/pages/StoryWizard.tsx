@@ -104,6 +104,7 @@ export default function StoryWizard() {
   const [storyOutline, setStoryOutline] = useState(''); // Outline for dev mode display
   const [outlinePrompt, setOutlinePrompt] = useState(''); // API prompt for outline (dev mode)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string }>>([]); // API prompts for story text (dev mode)
+  const [visualBible, setVisualBible] = useState<{ secondaryCharacters: any[]; animals: any[]; artifacts: any[]; locations: any[] } | null>(null); // Visual Bible for dev mode
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
@@ -144,6 +145,7 @@ export default function StoryWizard() {
           setStoryOutline(story.outline || '');
           setOutlinePrompt(story.outlinePrompt || '');
           setStoryTextPrompts(story.storyTextPrompts || []);
+          setVisualBible(story.visualBible || null);
           setSceneImages(story.sceneImages || []);
           setSceneDescriptions(story.sceneDescriptions || []);
           setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
@@ -786,6 +788,7 @@ export default function StoryWizard() {
           setStoryOutline(status.result.outline);
           setOutlinePrompt(status.result.outlinePrompt || '');
           setStoryTextPrompts(status.result.storyTextPrompts || []);
+          setVisualBible(status.result.visualBible || null);
           setGeneratedStory(status.result.story);
           setSceneDescriptions(status.result.sceneDescriptions || []);
           setSceneImages(status.result.sceneImages || []);
@@ -983,6 +986,7 @@ export default function StoryWizard() {
               outline={storyOutline}
               outlinePrompt={outlinePrompt}
               storyTextPrompts={storyTextPrompts}
+              visualBible={visualBible || undefined}
               sceneImages={sceneImages}
               sceneDescriptions={sceneDescriptions}
               coverImages={coverImages}

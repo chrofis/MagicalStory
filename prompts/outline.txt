@@ -125,6 +125,45 @@ In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for th
 
 ---
 
+# Part 5: Visual Bible (for Illustration Consistency)
+
+List ALL recurring visual elements that appear in MORE THAN ONE scene. This is CRITICAL for maintaining consistent illustrations throughout the book.
+
+**Why this matters:** Each illustration is generated independently. Without detailed descriptions, a white cat in scene 3 might become a brown cat in scene 8. The Visual Bible ensures consistency.
+
+## Secondary Characters
+For each person who is NOT a main character but appears in multiple scenes:
+- **Name/Role**: How they are referred to (e.g., "Fireman Fred" or "the friendly firefighter")
+- **Appears in pages**: List all page numbers
+- **Physical description**: Age, height, build, hair color/style, eye color, skin tone, distinguishing features
+- **Clothing**: What they wear (be specific about colors and details)
+
+## Animals & Creatures
+For any animal or creature appearing in multiple scenes:
+- **Name**: What it's called (e.g., "Whiskers" or "the family cat")
+- **Appears in pages**: List all page numbers
+- **Species**: Type of animal/creature
+- **Coloring**: Exact colors and patterns (e.g., "white fur with orange patches on both ears")
+- **Size**: Relative size description
+- **Distinguishing features**: Collar, markings, accessories
+
+## Important Artifacts
+For objects that appear in multiple scenes and must look consistent:
+- **Name**: What it's called (e.g., "the magic map" or "grandma's locket")
+- **Appears in pages**: List all page numbers
+- **Type**: What kind of object
+- **Description**: Size, color, material, condition, distinctive markings
+
+## Recurring Locations (if visually distinctive)
+For specific places that appear multiple times with unique visual features:
+- **Name**: What it's called
+- **Appears in pages**: List all page numbers
+- **Key visual features**: Colors, shapes, distinctive elements
+
+**NOTE:** Only include elements that appear in 2+ scenes. Main characters from the Characters list are already tracked separately.
+
+---
+
 # Format Your Response
 
 
@@ -178,6 +217,31 @@ Title Page Scene: [2-3 sentences: Main character doing something that captures t
 Initial Page Scene: [2-3 sentences: All characters together in a warm, welcoming moment. Simple group scene with positive atmosphere.]
 
 Back Cover Scene: [2-3 sentences: Characters together at the story's happy conclusion. Focus on emotional satisfaction and togetherness.]
+
+## Visual Bible
+
+### Secondary Characters
+**[Name/Role]** (pages X, Y, Z)
+- Physical: [age, height, build, hair, eyes, distinguishing features]
+- Clothing: [specific colors and details]
+
+### Animals & Creatures
+**[Name]** (pages X, Y, Z)
+- Species: [type]
+- Coloring: [exact colors and patterns]
+- Size: [relative size]
+- Features: [collar, markings, etc.]
+
+### Artifacts
+**[Name]** (pages X, Y, Z)
+- Type: [what it is]
+- Description: [size, color, material, distinctive details]
+
+### Locations
+**[Name]** (pages X, Y, Z)
+- Features: [distinctive visual elements]
+
+(Include only elements appearing in 2+ scenes. Write "None" for any category with no recurring elements.)
 
 ---
 

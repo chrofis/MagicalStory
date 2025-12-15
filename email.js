@@ -22,6 +22,16 @@ const EMAIL_FOOTER = `
   </p>
 `;
 
+// Extract first name from full name for greeting
+function getGreetingName(fullName) {
+  if (!fullName || typeof fullName !== 'string') {
+    return 'there';
+  }
+  // Get the first word (first name) from the full name
+  const firstName = fullName.trim().split(/\s+/)[0];
+  return firstName || 'there';
+}
+
 // Check if email is configured
 function isEmailConfigured() {
   return !!resend;

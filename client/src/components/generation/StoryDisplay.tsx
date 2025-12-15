@@ -10,12 +10,29 @@ interface StoryTextPrompt {
   prompt: string;
 }
 
+interface VisualBibleEntry {
+  id: string;
+  name: string;
+  appearsInPages: number[];
+  description: string;
+  extractedDescription: string | null;
+  firstAppearanceAnalyzed: boolean;
+}
+
+interface VisualBible {
+  secondaryCharacters: VisualBibleEntry[];
+  animals: VisualBibleEntry[];
+  artifacts: VisualBibleEntry[];
+  locations: VisualBibleEntry[];
+}
+
 interface StoryDisplayProps {
   title: string;
   story: string;
   outline?: string;
   outlinePrompt?: string;
   storyTextPrompts?: StoryTextPrompt[];
+  visualBible?: VisualBible;
   sceneImages: SceneImage[];
   sceneDescriptions?: SceneDescription[];
   coverImages?: CoverImages;
@@ -40,6 +57,7 @@ export function StoryDisplay({
   outline,
   outlinePrompt,
   storyTextPrompts = [],
+  visualBible,
   sceneImages,
   sceneDescriptions = [],
   coverImages,
@@ -226,6 +244,105 @@ export function StoryDisplay({
                     </pre>
                   </details>
                 ))}
+              </div>
+            </details>
+          )}
+
+          {/* Visual Bible - Recurring Elements for Consistency */}
+          {visualBible && (visualBible.secondaryCharacters.length > 0 || visualBible.animals.length > 0 || visualBible.artifacts.length > 0 || visualBible.locations.length > 0) && (
+            <details className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-rose-800 hover:text-rose-900 flex items-center gap-2">
+                <BookOpen size={20} />
+                {language === 'de' ? 'Visual Bible (Wiederkehrende Elemente)' : language === 'fr' ? 'Bible Visuelle (Éléments Récurrents)' : 'Visual Bible (Recurring Elements)'}
+              </summary>
+              <div className="mt-4 space-y-4">
+                {/* Secondary Characters */}
+                {visualBible.secondaryCharacters.length > 0 && (
+                  <div className="bg-white border border-rose-200 rounded-lg p-3">
+                    <h4 className="text-sm font-bold text-rose-700 mb-2">
+                      {language === 'de' ? 'Nebencharaktere' : language === 'fr' ? 'Personnages Secondaires' : 'Secondary Characters'}
+                    </h4>
+                    <div className="space-y-2">
+                      {visualBible.secondaryCharacters.map((entry) => (
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
+                          <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
+                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {entry.extractedDescription && (
+                            <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
+                              <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Animals & Creatures */}
+                {visualBible.animals.length > 0 && (
+                  <div className="bg-white border border-rose-200 rounded-lg p-3">
+                    <h4 className="text-sm font-bold text-rose-700 mb-2">
+                      {language === 'de' ? 'Tiere & Wesen' : language === 'fr' ? 'Animaux & Créatures' : 'Animals & Creatures'}
+                    </h4>
+                    <div className="space-y-2">
+                      {visualBible.animals.map((entry) => (
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
+                          <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
+                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {entry.extractedDescription && (
+                            <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
+                              <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Artifacts */}
+                {visualBible.artifacts.length > 0 && (
+                  <div className="bg-white border border-rose-200 rounded-lg p-3">
+                    <h4 className="text-sm font-bold text-rose-700 mb-2">
+                      {language === 'de' ? 'Artefakte & Objekte' : language === 'fr' ? 'Artefacts & Objets' : 'Artifacts & Objects'}
+                    </h4>
+                    <div className="space-y-2">
+                      {visualBible.artifacts.map((entry) => (
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
+                          <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
+                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {entry.extractedDescription && (
+                            <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
+                              <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Locations */}
+                {visualBible.locations.length > 0 && (
+                  <div className="bg-white border border-rose-200 rounded-lg p-3">
+                    <h4 className="text-sm font-bold text-rose-700 mb-2">
+                      {language === 'de' ? 'Wiederkehrende Orte' : language === 'fr' ? 'Lieux Récurrents' : 'Recurring Locations'}
+                    </h4>
+                    <div className="space-y-2">
+                      {visualBible.locations.map((entry) => (
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
+                          <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
+                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {entry.extractedDescription && (
+                            <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
+                              <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </details>
           )}

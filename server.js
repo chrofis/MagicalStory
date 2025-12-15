@@ -5958,25 +5958,61 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
 
     console.log(`🔍 Checking order status for session: ${sessionId}`);
 
-    // Check database for order
+    // Check database for order with retries (webhook might still be processing)
     if (STORAGE_MODE === 'database') {
-      const order = await dbPool.query(
-        'SELECT * FROM orders WHERE stripe_session_id = $1',
-        [sessionId]
-      );
+      const maxRetries = 5;
+      const retryDelay = 1000; // 1 second between retries
 
-      if (order.rows.length > 0) {
-        console.log(`✅ Order found in database:`, order.rows[0]);
-        return res.json({
-          status: 'completed',
-          order: order.rows[0]
-        });
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const order = await dbPool.query(
+          'SELECT * FROM orders WHERE stripe_session_id = $1',
+          [sessionId]
+        );
+
+        if (order.rows.length > 0) {
+          console.log(`✅ Order found in database (attempt ${attempt}):`, order.rows[0].id);
+          return res.json({
+            status: 'completed',
+            order: order.rows[0]
+          });
+        }
+
+        if (attempt < maxRetries) {
+          console.log(`⏳ Order not found yet, waiting... (attempt ${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
       }
+      console.log(`⚠️ Order not in database after ${maxRetries} attempts, checking Stripe directly`);
     }
 
-    // If not in database yet, check Stripe
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    // If not in database yet, check Stripe and return full session data
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['customer_details', 'shipping_details']
+    });
     console.log(`📋 Stripe session status: ${session.payment_status}`);
+
+    // If payment was successful, construct order-like response from Stripe data
+    if (session.payment_status === 'paid') {
+      const customerDetails = session.customer_details || {};
+      const shippingDetails = session.shipping_details || {};
+      const shippingAddress = shippingDetails.address || {};
+
+      console.log(`📦 Constructing order from Stripe session data`);
+      return res.json({
+        status: 'processing', // Webhook hasn't completed yet but payment succeeded
+        order: {
+          customer_name: customerDetails.name || 'Customer',
+          customer_email: customerDetails.email || '',
+          shipping_name: shippingDetails.name || customerDetails.name || 'Customer',
+          shipping_address_line1: shippingAddress.line1 || '',
+          shipping_city: shippingAddress.city || '',
+          shipping_postal_code: shippingAddress.postal_code || '',
+          shipping_country: shippingAddress.country || '',
+          amount_total: session.amount_total,
+          currency: session.currency
+        }
+      });
+    }
 
     res.json({
       status: session.payment_status,
@@ -6494,6 +6530,307 @@ const LANGUAGE_LEVELS = {
 function getReadingLevel(languageLevel) {
   const levelInfo = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
   return `${levelInfo.description}. ${levelInfo.pageLength}`;
+}
+
+// Helper function to parse Visual Bible from outline
+function parseVisualBible(outline) {
+  const visualBible = {
+    secondaryCharacters: [],
+    animals: [],
+    artifacts: [],
+    locations: []
+  };
+
+  if (!outline) return visualBible;
+
+  // Find the Visual Bible section
+  const visualBibleMatch = outline.match(/##\s*Visual\s*Bible([\s\S]*?)(?=^##\s|^---|\Z)/mi);
+  if (!visualBibleMatch) {
+    console.log('📖 [VISUAL BIBLE] No Visual Bible section found in outline');
+    return visualBible;
+  }
+
+  const visualBibleSection = visualBibleMatch[1];
+
+  // Parse Secondary Characters
+  const secondaryCharsMatch = visualBibleSection.match(/###\s*Secondary\s*Characters?([\s\S]*?)(?=###|$)/i);
+  if (secondaryCharsMatch && !secondaryCharsMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(secondaryCharsMatch[1]);
+    visualBible.secondaryCharacters = entries;
+  }
+
+  // Parse Animals & Creatures
+  const animalsMatch = visualBibleSection.match(/###\s*Animals?\s*(?:&|and)?\s*Creatures?([\s\S]*?)(?=###|$)/i);
+  if (animalsMatch && !animalsMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(animalsMatch[1]);
+    visualBible.animals = entries;
+  }
+
+  // Parse Artifacts
+  const artifactsMatch = visualBibleSection.match(/###\s*Artifacts?([\s\S]*?)(?=###|$)/i);
+  if (artifactsMatch && !artifactsMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(artifactsMatch[1]);
+    visualBible.artifacts = entries;
+  }
+
+  // Parse Locations
+  const locationsMatch = visualBibleSection.match(/###\s*Locations?([\s\S]*?)(?=###|$)/i);
+  if (locationsMatch && !locationsMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(locationsMatch[1]);
+    visualBible.locations = entries;
+  }
+
+  const totalEntries = visualBible.secondaryCharacters.length +
+                       visualBible.animals.length +
+                       visualBible.artifacts.length +
+                       visualBible.locations.length;
+
+  console.log(`📖 [VISUAL BIBLE] Parsed ${totalEntries} entries: ` +
+    `${visualBible.secondaryCharacters.length} characters, ` +
+    `${visualBible.animals.length} animals, ` +
+    `${visualBible.artifacts.length} artifacts, ` +
+    `${visualBible.locations.length} locations`);
+
+  return visualBible;
+}
+
+// Helper to parse individual Visual Bible entries
+function parseVisualBibleEntries(sectionText) {
+  const entries = [];
+
+  // Match entries that start with **Name** (pages X, Y, Z)
+  const entryPattern = /\*\*([^*]+)\*\*\s*\(pages?\s*([^)]+)\)([\s\S]*?)(?=\*\*[^*]+\*\*\s*\(pages?|$)/gi;
+  let match;
+
+  while ((match = entryPattern.exec(sectionText)) !== null) {
+    const name = match[1].trim();
+    const pagesStr = match[2].trim();
+    const descriptionBlock = match[3].trim();
+
+    // Parse page numbers
+    const pages = pagesStr.split(/[,\s]+/)
+      .map(p => parseInt(p.replace(/\D/g, '')))
+      .filter(p => !isNaN(p));
+
+    // Combine all description lines
+    const descriptionLines = descriptionBlock.split('\n')
+      .map(line => line.replace(/^[-•]\s*/, '').trim())
+      .filter(line => line.length > 0);
+
+    const description = descriptionLines.join('. ');
+
+    if (name && pages.length > 0) {
+      entries.push({
+        id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        name,
+        appearsInPages: pages,
+        description,
+        extractedDescription: null, // Will be filled after first image analysis
+        firstAppearanceAnalyzed: false
+      });
+    }
+  }
+
+  return entries;
+}
+
+// Get Visual Bible entries relevant to a specific page
+function getVisualBibleEntriesForPage(visualBible, pageNumber) {
+  if (!visualBible) return [];
+
+  const relevant = [];
+
+  const checkEntries = (entries, type) => {
+    for (const entry of entries) {
+      if (entry.appearsInPages.includes(pageNumber)) {
+        relevant.push({ ...entry, type });
+      }
+    }
+  };
+
+  checkEntries(visualBible.secondaryCharacters || [], 'character');
+  checkEntries(visualBible.animals || [], 'animal');
+  checkEntries(visualBible.artifacts || [], 'artifact');
+  checkEntries(visualBible.locations || [], 'location');
+
+  return relevant;
+}
+
+// Build Visual Bible prompt section for image generation
+function buildVisualBiblePrompt(visualBible, pageNumber) {
+  const entries = getVisualBibleEntriesForPage(visualBible, pageNumber);
+
+  if (entries.length === 0) return '';
+
+  let prompt = '\n\n**RECURRING ELEMENTS - MUST MATCH EXACTLY:**\n';
+  prompt += 'These elements have appeared before in this story. They MUST look IDENTICAL.\n\n';
+
+  for (const entry of entries) {
+    // Prefer extracted description (from actual generated image) over outline description
+    const description = entry.extractedDescription || entry.description;
+    prompt += `**${entry.name}** (${entry.type}):\n${description}\n\n`;
+  }
+
+  prompt += 'CRITICAL: Do not change colors, features, or any visual details of these recurring elements.\n';
+
+  return prompt;
+}
+
+// Analyze generated image to extract detailed descriptions of Visual Bible elements
+async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
+  if (!elementsToAnalyze || elementsToAnalyze.length === 0) {
+    return [];
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.log('⚠️  [VISUAL BIBLE] Gemini API key not configured, skipping analysis');
+    return [];
+  }
+
+  try {
+    // Build the analysis prompt
+    const elementsList = elementsToAnalyze.map(e => `- ${e.name} (${e.type})`).join('\n');
+
+    const analysisPrompt = `Analyze this children's book illustration and describe the following elements in EXACT visual detail.
+These descriptions will be used to maintain consistency in future illustrations.
+
+Elements to describe:
+${elementsList}
+
+For EACH element, provide a detailed description including:
+- Exact colors (be specific: "bright red" not just "red", "golden yellow" not just "yellow")
+- Size relative to other elements in the scene
+- Distinctive features, markings, patterns
+- For characters: clothing details, hair style, accessories
+- For animals: fur/feather patterns, collar or accessories
+- For objects: material, condition (new/worn), unique markings
+- Art style characteristics (how is it rendered?)
+
+Respond in JSON format:
+{
+  "elements": [
+    {
+      "name": "element name exactly as listed above",
+      "description": "detailed visual description, 2-3 sentences with specific details"
+    }
+  ]
+}
+
+Be extremely specific about colors and visual details - these descriptions must be precise enough to recreate the exact same appearance.`;
+
+    // Extract base64 and mime type
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Build content array
+    const parts = [
+      {
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      },
+      { text: analysisPrompt }
+    ];
+
+    // Use Gemini Flash for analysis
+    const modelId = 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          maxOutputTokens: 2000,
+          temperature: 0.3
+        }
+      })
+    });
+
+    if (!response.ok) {
+      console.log(`⚠️  [VISUAL BIBLE] Gemini API error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Parse JSON response
+    const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log('⚠️  [VISUAL BIBLE] Could not parse JSON response');
+      return [];
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const results = parsed.elements || [];
+
+    console.log(`📖 [VISUAL BIBLE] Analyzed ${results.length} elements from image`);
+
+    return results;
+  } catch (error) {
+    console.error('⚠️  [VISUAL BIBLE] Error analyzing image:', error.message);
+    return [];
+  }
+}
+
+// Update Visual Bible with extracted descriptions after first appearance
+function updateVisualBibleWithExtracted(visualBible, pageNumber, extractedDescriptions) {
+  if (!visualBible || !extractedDescriptions || extractedDescriptions.length === 0) {
+    return visualBible;
+  }
+
+  const updateEntries = (entries) => {
+    for (const entry of entries) {
+      // Check if this is the first appearance for this entry
+      const firstAppearancePage = Math.min(...entry.appearsInPages);
+      if (firstAppearancePage === pageNumber && !entry.firstAppearanceAnalyzed) {
+        // Find matching extracted description
+        const extracted = extractedDescriptions.find(
+          e => e.name.toLowerCase() === entry.name.toLowerCase()
+        );
+        if (extracted && extracted.description) {
+          entry.extractedDescription = extracted.description;
+          entry.firstAppearanceAnalyzed = true;
+          console.log(`📖 [VISUAL BIBLE] Updated "${entry.name}" with extracted description`);
+        }
+      }
+    }
+  };
+
+  updateEntries(visualBible.secondaryCharacters || []);
+  updateEntries(visualBible.animals || []);
+  updateEntries(visualBible.artifacts || []);
+  updateEntries(visualBible.locations || []);
+
+  return visualBible;
+}
+
+// Get elements that need analysis for a given page (first appearances only)
+function getElementsNeedingAnalysis(visualBible, pageNumber) {
+  if (!visualBible) return [];
+
+  const needsAnalysis = [];
+
+  const checkEntries = (entries, type) => {
+    for (const entry of entries) {
+      const firstAppearancePage = Math.min(...entry.appearsInPages);
+      if (firstAppearancePage === pageNumber && !entry.firstAppearanceAnalyzed) {
+        needsAnalysis.push({ ...entry, type });
+      }
+    }
+  };
+
+  checkEntries(visualBible.secondaryCharacters || [], 'character');
+  checkEntries(visualBible.animals || [], 'animal');
+  checkEntries(visualBible.artifacts || [], 'artifact');
+  checkEntries(visualBible.locations || [], 'location');
+
+  return needsAnalysis;
 }
 
 // Helper function to extract cover scene descriptions from outline
@@ -7448,8 +7785,11 @@ async function processStoryJob(jobId) {
     const shortSceneDescriptions = extractShortSceneDescriptions(outline);
     console.log(`📋 [PIPELINE] Extracted ${Object.keys(shortSceneDescriptions).length} short scene descriptions from outline`);
 
-    // Save checkpoint: scene hints
-    await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions });
+    // Parse Visual Bible for recurring elements consistency
+    const visualBible = parseVisualBible(outline);
+
+    // Save checkpoint: scene hints and visual bible
+    await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions, visualBible });
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -7642,8 +7982,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               const scenePhotos = getCharacterPhotos(sceneCharacters);
               console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
-              // Generate image from scene description with scene-specific characters
-              const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters);
+              // Generate image from scene description with scene-specific characters and visual bible
+              const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum);
               imagePrompts[pageNum] = imagePrompt;
 
               let imageResult = null;
@@ -7794,8 +8134,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const scenePhotos = getCharacterPhotos(sceneCharacters);
             console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
-            // Generate image from scene description with scene-specific characters
-            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, true); // isSequential = true
+            // Generate image from scene description with scene-specific characters and visual bible
+            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, true, visualBible, pageNum);
             imagePrompts[pageNum] = imagePrompt;
 
             let imageResult = null;
@@ -7817,6 +8157,14 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             }
 
             console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
+
+            // Analyze first-appearance elements and update Visual Bible
+            const elementsToAnalyze = getElementsNeedingAnalysis(visualBible, pageNum);
+            if (elementsToAnalyze.length > 0) {
+              console.log(`📖 [VISUAL BIBLE] Analyzing ${elementsToAnalyze.length} first-appearance elements on page ${pageNum}...`);
+              const extractedDescriptions = await analyzeVisualBibleElements(imageResult.imageData, elementsToAnalyze);
+              updateVisualBibleWithExtracted(visualBible, pageNum, extractedDescriptions);
+            }
 
             // Store this image as the previous image for the next iteration
             previousImage = imageResult.imageData;
@@ -8054,6 +8402,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       outline,
       outlinePrompt,  // API prompt for outline (dev mode)
       storyTextPrompts, // API prompts for story text batches (dev mode)
+      visualBible, // Visual Bible for recurring element consistency (dev mode)
       storyText: fullStoryText,
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
@@ -8091,6 +8440,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
+      visualBible: visualBible, // Visual Bible for recurring element consistency (dev mode)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -8394,7 +8744,7 @@ function parseSceneDescriptions(text, expectedCount) {
   return scenes;
 }
 
-function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false) {
+function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null) {
   // Build image generation prompt (matches step-by-step format)
   const artStyleId = inputData.artStyle || 'pixar';
   const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
@@ -8413,6 +8763,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       characterPrompts += `[${char.name}]: ${buildCharacterPhysicalDescription(char)}\n`;
     });
     characterPrompts += '\nCRITICAL: Match these character appearances exactly. Reference images are provided.';
+  }
+
+  // Add Visual Bible entries for recurring elements (secondary characters, animals, artifacts)
+  let visualBiblePrompt = '';
+  if (visualBible && pageNumber) {
+    visualBiblePrompt = buildVisualBiblePrompt(visualBible, pageNumber);
+    if (visualBiblePrompt) {
+      console.log(`📖 [IMAGE PROMPT] Added Visual Bible entries for page ${pageNumber}`);
+    }
   }
 
   // Select the correct template based on language and sequential mode
@@ -8440,7 +8799,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
     console.log(`📝 [IMAGE PROMPT] Using ${isSequential ? 'sequential' : 'parallel'} template for language: ${language}`);
-    return fillTemplate(template, {
+    let prompt = fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: sceneDescription,
       CHARACTER_PROMPTS: characterPrompts,
@@ -8448,12 +8807,17 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
+    // Append Visual Bible entries if present
+    if (visualBiblePrompt) {
+      prompt += visualBiblePrompt;
+    }
+    return prompt;
   }
 
   // Fallback to hardcoded prompt
   return `Create a cinematic scene in ${styleDescription}.
 
-Scene Description: ${sceneDescription}${characterPrompts}
+Scene Description: ${sceneDescription}${characterPrompts}${visualBiblePrompt}
 
 Important:
 - Show only the emotions visible on faces (happy, sad, surprised, worried, excited)
