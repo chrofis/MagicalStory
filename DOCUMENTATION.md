@@ -243,6 +243,116 @@ MagicalStory/
 
 ---
 
+## External Service Integrations
+
+### Firebase Authentication
+
+**Purpose:** User authentication and session management
+
+**Setup:**
+1. Create Firebase project at console.firebase.google.com
+2. Enable Email/Password authentication
+3. Generate service account key (Project Settings → Service Accounts)
+4. Base64 encode the JSON and set `FIREBASE_SERVICE_ACCOUNT`
+5. Add your domain to authorized domains
+
+**Client-side:** Uses Firebase SDK for login/signup flows
+**Server-side:** Verifies tokens using Firebase Admin SDK
+
+### Stripe Payments
+
+**Purpose:** Payment processing for print book orders
+
+**Endpoints:**
+- `POST /api/stripe/create-checkout-session` - Creates Stripe checkout
+- `POST /api/stripe/webhook` - Handles payment events
+- `GET /api/stripe/order-status/:sessionId` - Checks payment status
+
+**Webhook Events:**
+- `checkout.session.completed` - Payment successful, triggers print order
+- `payment_intent.succeeded` - Backup payment confirmation
+
+**Setup:**
+1. Create Stripe account at dashboard.stripe.com
+2. Get API keys (Settings → API keys)
+3. Create webhook endpoint pointing to `/api/stripe/webhook`
+4. Set `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
+
+### Gelato Print API
+
+**Purpose:** Print-on-demand book fulfillment
+
+**Flow:**
+1. User completes Stripe payment
+2. Server generates print-ready PDF
+3. Server creates Gelato order via API
+4. Gelato prints and ships book
+
+**Products:**
+- Hardcover photobook (28 pages minimum)
+- A4 format
+
+**Endpoints:**
+- `POST /api/print-provider/order` - Create print order (dev mode: no payment required)
+
+**Setup:**
+1. Create Gelato account at gelato.com
+2. Get API key from dashboard
+3. Set `GELATO_API_KEY`
+
+### Resend Email
+
+**Purpose:** Transactional emails (story completion, order confirmation)
+
+**Templates:**
+- Story completion notification
+- Order confirmation
+- Admin notifications
+
+**Setup:**
+1. Create Resend account at resend.com
+2. Verify your domain
+3. Get API key
+4. Set `RESEND_API_KEY` and `EMAIL_FROM`
+
+See [EMAIL_SETUP_GUIDE.md](EMAIL_SETUP_GUIDE.md) for detailed configuration.
+
+### Claude (Anthropic)
+
+**Purpose:** AI text generation
+
+**Used for:**
+- Story outline generation
+- Story text generation
+- Scene descriptions
+- Image quality evaluation
+
+**Model:** claude-sonnet-4-20250514 (configurable)
+
+**Setup:**
+1. Get API key from console.anthropic.com
+2. Set `ANTHROPIC_API_KEY`
+
+### Gemini (Google AI)
+
+**Purpose:** AI image generation and photo analysis
+
+**Used for:**
+- Character photo analysis (extract traits)
+- Scene image generation
+- Cover image generation
+- Image quality scoring
+
+**Models:**
+- `gemini-2.5-flash-image` - Image generation
+- `gemini-2.0-flash-exp-image-generation` - Image editing
+
+**Setup:**
+1. Get API key from ai.google.dev
+2. Set `GEMINI_API_KEY`
+
+---
+
 ## Support
 
 - **GitHub Issues:** Report bugs and feature requests

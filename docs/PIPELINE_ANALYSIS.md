@@ -1,10 +1,12 @@
 # MagicalStory - Story Generation Pipeline Analysis
 
+**Last Updated:** 2025-12-15
+
 ## Current Architecture Overview
 
 ### Complete Pipeline Flow
 ```
-User Input (Frontend)
+User Input (Frontend - React)
     │
     ▼
 POST /api/jobs/create-story
@@ -14,394 +16,212 @@ POST /api/jobs/create-story
 │  BACKGROUND JOB (processStoryJob)                           │
 │                                                             │
 │  Step 1: Generate Outline (5%)                              │
-│      └─► Claude API → outline (in memory)                   │
+│      └─► Claude API → outline + checkpoint                  │
 │                                                             │
 │  Step 2: Extract Scene Hints (internal)                     │
-│      └─► Parse outline → shortSceneDescriptions (in memory) │
+│      └─► Parse outline → shortSceneDescriptions + checkpoint│
 │                                                             │
 │  Step 3: Generate Story Text (10-40%)                       │
-│      └─► Claude API batches → fullStoryText (in memory)     │
+│      └─► Claude API batches → fullStoryText + checkpoint    │
 │                                                             │
 │  Step 4: Generate Scene Descriptions (parallel)             │
 │      └─► Claude API per page → allSceneDescriptions[]       │
 │                                                             │
-│  Step 5: Generate Images (10-90%, parallel, max 5)          │
+│  Step 5: Generate Images (10-90%, parallel/sequential)      │
 │      ├─► Gemini API per page → raw image                    │
 │      ├─► Compress to JPEG                                   │
-│      └─► Claude API: evaluateImageQuality() → score 0-100   │
+│      ├─► Gemini API: evaluateImageQuality() → score 0-100   │
+│      └─► Quality retry if below threshold + checkpoint      │
 │                                                             │
 │  Step 6: Generate Covers (95%)                              │
-│      └─► Gemini API × 3 → coverImages{}                     │
+│      ├─► Gemini API × 3 → coverImages{}                     │
+│      └─► Quality evaluation with text accuracy check        │
 │                                                             │
 │  Step 7: Save Final Result (100%)                           │
 │      └─► UPDATE story_jobs SET result_data = {...}          │
+│          + Send completion email                            │
 └─────────────────────────────────────────────────────────────┘
     │
     ▼
 GET /api/jobs/:jobId/status (polling)
     │
     ▼
-Frontend receives resultData → saves to /api/stories
+Frontend receives resultData → navigates to story view
 ```
 
 ---
 
-## Current State: What's on Browser vs Server
+## Implementation Status
 
-### Browser-Side Operations (index.html)
+### Checkpoint System ✅ IMPLEMENTED
 
-| Operation | Location | Status |
-|-----------|----------|--------|
-| `runAutoMode()` | line 4034 | Entry point - delegates to server |
-| `runAutoModeBackground()` | line 3064 | Creates job, polls status |
-| `runAutoModeClientSide()` | line 3256 | **LEGACY** - client-side fallback |
-| Job polling | line 3146 | 10-second interval |
-| Story saving | line 3226 | POST to /api/stories after completion |
-| Manual regeneration buttons | various | **Still client-side** |
+Checkpoints save progress after each major step:
+- `outline` - After outline generation
+- `scene_hints` - After scene hint extraction
+- `story_batch_N` - After each story text batch
+- `page_N` - After each page image generation
+- `cover_TYPE` - After each cover generation
 
-### Server-Side Operations (server.js)
+On job failure, all checkpoint data is logged for debugging.
 
-| Operation | Function | Progress |
-|-----------|----------|----------|
-| Create job | POST /api/jobs/create-story | 0% |
-| Generate outline | callClaudeAPI(outlinePrompt) | 5% |
-| Generate story batches | callClaudeAPI(batchPrompt) | 10-40% |
-| Generate scene descriptions | callClaudeAPI(scenePrompt) | 10-90% |
-| Generate images | callGeminiAPIForImage() | 10-90% |
-| **Evaluate image quality** | evaluateImageQuality() via Claude | 10-90% |
-| Generate covers | callGeminiAPIForImage() × 3 | 95% |
-| Save results | UPDATE story_jobs | 100% |
+### Image Generation Modes ✅ IMPLEMENTED
 
----
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `parallel` | Generate all images simultaneously | Faster, less consistent |
+| `sequential` | Generate one at a time, use previous as reference | Slower, more consistent characters |
 
-## Gap Analysis: Missing Intermediate Access
+### Quality Evaluation ✅ IMPLEMENTED
 
-### Data NOT Accessible During Pipeline
-
-| Step | Data Generated | Accessible? | Problem |
-|------|----------------|-------------|---------|
-| 1 | Story Outline | NO | Only in memory until job completes |
-| 2 | Scene Hints | NO | Extracted but not saved |
-| 3 | Story Text (partial) | NO | Concatenated in memory |
-| 4 | Scene Descriptions | NO | Array in memory |
-| 5a | Images (partial) | NO | Array in memory |
-| 5b | Quality Scores | NO | Stored with images but not queryable |
-| 6 | Cover Images | NO | Object in memory |
-| 7 | Final Result | YES | Saved to story_jobs.result_data |
-
-### Failure Scenarios
-
-1. **Server crash mid-pipeline** → All work lost
-2. **API rate limit** → Job fails, no partial recovery
-3. **Single image fails** → Entire job fails (after retries)
-4. **Database disconnect** → Progress updates lost
+- **Scene Images:** Evaluated by Gemini for character accuracy and scene matching
+- **Cover Images:** Additional text accuracy check (title spelling)
+- **Quality Threshold:** 50% (configurable via `IMAGE_QUALITY_THRESHOLD`)
+- **Auto-retry:** Up to 3 attempts for covers, 2 for scenes
+- **Text Error Enforcement:** Covers with text errors forced to score 0
 
 ---
 
-## Admin Story Editing Requirements
+## Regeneration Endpoints ✅ IMPLEMENTED
 
-### Use Cases for Admin
-
-1. **View any user's story** ✅ Already implemented (impersonation mode)
-2. **Edit story text** - Modify individual page text
-3. **Regenerate single scene description** - Without regenerating entire story
-4. **Regenerate single image** - Without regenerating all images
-5. **Regenerate single cover** - Just front/page0/back
-6. **View quality scores** - See which images scored low
-7. **Replace image manually** - Upload custom image
-8. **Adjust and re-run image prompt** - Edit prompt, regenerate
-
-### Current Limitations
-
-- Cannot regenerate single elements server-side
-- Must regenerate entire story or use client-side buttons
-- No API to regenerate individual pieces
-- Image prompts visible but not editable/reusable
+| Endpoint | Status | Description |
+|----------|--------|-------------|
+| `POST /api/stories/:id/regenerate/scene-description/:pageNum` | ✅ Done | Regenerate single scene description |
+| `POST /api/stories/:id/regenerate/image/:pageNum` | ✅ Done | Regenerate single page image |
+| `POST /api/stories/:id/regenerate/cover/:coverType` | ✅ Done | Regenerate single cover |
+| `POST /api/stories/:id/edit/image/:pageNum` | ✅ Done | Edit image with custom prompt |
+| `POST /api/stories/:id/edit/cover/:coverType` | ✅ Done | Edit cover with custom prompt |
+| `PATCH /api/stories/:id/page/:pageNum` | ✅ Done | Edit page text or scene description |
 
 ---
 
-## Proposed Architecture: Modular Regeneration
+## Admin Features
 
-### New Server Endpoints for Regeneration
+### Implemented ✅
 
-```
-POST /api/stories/:storyId/regenerate/outline
-    → Regenerate outline only, update story
+| Feature | Status |
+|---------|--------|
+| View all users | ✅ Done |
+| View user's stories | ✅ Done |
+| Impersonation mode | ✅ Done |
+| Storage usage metrics | ✅ Done |
+| Database size metrics | ✅ Done |
+| Developer mode (skip payment) | ✅ Done |
 
-POST /api/stories/:storyId/regenerate/page/:pageNum/text
-    → Regenerate single page text
+### Developer Mode (Admin Only)
 
-POST /api/stories/:storyId/regenerate/page/:pageNum/scene-description
-    → Regenerate scene description for one page
-
-POST /api/stories/:storyId/regenerate/page/:pageNum/image
-    Body: { customPrompt?: string }
-    → Regenerate image for one page (optionally with custom prompt)
-
-POST /api/stories/:storyId/regenerate/cover/:coverType
-    coverType: 'front' | 'page0' | 'back'
-    Body: { customPrompt?: string }
-    → Regenerate single cover
-
-POST /api/stories/:storyId/upload-image/:pageNum
-    Body: { imageData: base64 }
-    → Replace image with custom upload
-
-PATCH /api/stories/:storyId/page/:pageNum
-    Body: { text?: string, sceneDescription?: string }
-    → Edit page text or scene description directly
-```
-
-### Admin UI Workflow
-
-```
-Admin Panel → User List → View Stories → Select Story
-    │
-    ▼
-Story Editor (impersonation mode, new tab)
-    │
-    ├─► View all pages with images
-    ├─► See quality scores per image (highlight low scores)
-    ├─► Click page to expand:
-    │       ├─► Edit page text (inline)
-    │       ├─► View/edit scene description
-    │       ├─► View image prompt used
-    │       ├─► [Regenerate Description] button
-    │       ├─► [Regenerate Image] button
-    │       ├─► [Edit Prompt & Regenerate] button
-    │       └─► [Upload Custom Image] button
-    │
-    ├─► Cover section:
-    │       ├─► View front/page0/back covers
-    │       ├─► [Regenerate] button per cover
-    │       └─► [Upload Custom] button per cover
-    │
-    └─► [Save Changes] → Updates story in database
-```
-
----
-
-## Proposed Improvements
-
-### Phase 1: Checkpoint System (Fault Tolerance)
-
-Add `story_job_checkpoints` table to save after each step:
-
-```sql
-CREATE TABLE story_job_checkpoints (
-  id SERIAL PRIMARY KEY,
-  job_id VARCHAR(100) NOT NULL,
-  step_name VARCHAR(50) NOT NULL,
-  step_index INT DEFAULT 0,
-  step_data JSONB NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(job_id, step_name, step_index)
-);
-```
-
-### Phase 2: Modular Regeneration APIs
-
-New endpoints to regenerate individual components:
-- Scene description per page
-- Image per page (with optional custom prompt)
-- Cover images individually
-- Story text per page
-
-### Phase 3: Admin Story Editor
-
-Enhanced UI for admins:
-- View all story components
-- See quality scores
-- Edit text inline
-- Regenerate individual pieces
-- Upload custom images
-
-### Phase 4: Image Quality Dashboard
-
-- List images by quality score
-- Filter: show only low-scoring images
-- Bulk regenerate low-quality images
-- Compare before/after regeneration
-
----
-
-## Complete Pipeline with All Steps
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 1: OUTLINE GENERATION                                     │
-│  ─────────────────────────────                                  │
-│  Input: characters, storyType, theme, pages                     │
-│  API: Claude (callClaudeAPI)                                    │
-│  Tokens: 8192                                                   │
-│  Output: Structured outline with page summaries                 │
-│  Template: prompts/story-outline.txt                            │
-│  Save to: checkpoint + result_data.outline                      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 2: SCENE HINTS EXTRACTION                                 │
-│  ──────────────────────────────                                 │
-│  Input: outline                                                 │
-│  Function: extractShortSceneDescriptions()                      │
-│  Output: Map of pageNum → short scene hint                      │
-│  Save to: checkpoint (optional)                                 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 3: STORY TEXT GENERATION (batched or all-at-once)         │
-│  ──────────────────────────────────────────────────────         │
-│  Input: outline, characters, style                              │
-│  API: Claude (callClaudeAPI)                                    │
-│  Tokens: 16000 per batch                                        │
-│  Batch size: STORY_BATCH_SIZE env (0 = all at once)             │
-│  Output: Story text with "## Page X" markers                    │
-│  Template: prompts/story-text-batch.txt                         │
-│  Save to: checkpoint per batch + result_data.storyText          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 4: SCENE DESCRIPTION GENERATION (parallel per page)       │
-│  ────────────────────────────────────────────────────────       │
-│  Input: page text, characters, scene hint                       │
-│  API: Claude (callClaudeAPI)                                    │
-│  Tokens: 2048                                                   │
-│  Parallelism: All pages in batch simultaneously                 │
-│  Output: Detailed visual scene description                      │
-│  Template: prompts/scene-descriptions.txt                       │
-│  Save to: checkpoint per page + result_data.sceneDescriptions   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 5: IMAGE GENERATION (parallel, rate-limited)              │
-│  ─────────────────────────────────────────────────              │
-│  Input: scene description, character photos, art style          │
-│  API: Gemini (callGeminiAPIForImage)                            │
-│  Parallelism: Max 5 concurrent (pLimit)                         │
-│  Retries: 2 per image                                           │
-│  Output: Base64 PNG image                                       │
-│  Template: prompts/image-generation.txt                         │
-│  Post-process: Compress to JPEG (sharp)                         │
-│  Save to: checkpoint per page + result_data.images              │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 5b: IMAGE QUALITY EVALUATION                              │
-│  ─────────────────────────────────                              │
-│  Input: generated image, original prompt, reference photos      │
-│  API: Claude (evaluateImageQuality)                             │
-│  Output: Score 0-100                                            │
-│  Criteria: Character accuracy, scene matching, art quality      │
-│  Template: prompts/image-evaluation.txt                         │
-│  Save to: result_data.images[].qualityScore                     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 6: COVER GENERATION                                       │
-│  ────────────────────────                                       │
-│  6a: Front Cover                                                │
-│      Input: title, main characters, art style                   │
-│      Template: prompts/front-cover.txt                          │
-│                                                                 │
-│  6b: Page 0 (Dedication)                                        │
-│      Input: dedication text, characters                         │
-│      Template: prompts/page0-with-dedication.txt                │
-│               prompts/page0-no-dedication.txt                   │
-│                                                                 │
-│  6c: Back Cover                                                 │
-│      Input: story summary, characters                           │
-│      Template: prompts/back-cover.txt                           │
-│                                                                 │
-│  API: Gemini (callGeminiAPIForImage) × 3                        │
-│  Save to: checkpoint per cover + result_data.coverImages        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 7: FINAL ASSEMBLY                                         │
-│  ──────────────────────                                         │
-│  Combine all results into result_data:                          │
-│  {                                                              │
-│    outline: string,                                             │
-│    storyText: string,                                           │
-│    sceneDescriptions: [{ pageNumber, description }],            │
-│    images: [{ pageNumber, imageData, description, score }],     │
-│    coverImages: { frontCover, page0, backCover },               │
-│    imagePrompts: { pageNum: prompt },                           │
-│    title: string                                                │
-│  }                                                              │
-│  Save to: story_jobs.result_data                                │
-└─────────────────────────────────────────────────────────────────┘
-```
+When enabled, admins can:
+- Regenerate images directly from outline view
+- Edit images with custom prompts
+- Skip payment for print orders
+- Access detailed prompts and quality scores
 
 ---
 
 ## API Endpoints Summary
 
-### Existing Endpoints
+### Story Jobs
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/jobs/create-story` | POST | Start background job |
-| `/api/jobs/:jobId/status` | GET | Poll job progress |
-| `/api/jobs/my-jobs` | GET | List user's jobs |
-| `/api/stories` | GET/POST | List/save stories |
-| `/api/stories/:id` | GET/DELETE | Get/delete story |
-| `/api/admin/users/:userId/stories` | GET | Admin: list user's stories |
-| `/api/admin/users/:userId/stories/:storyId` | GET | Admin: get full story |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/jobs/create-story` | POST | Start background story generation |
+| `/api/jobs/:jobId/status` | GET | Poll job progress and results |
 
-### Proposed New Endpoints
+### Stories
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/jobs/:jobId/checkpoints` | GET | List all checkpoints |
-| `/api/jobs/:jobId/checkpoints/:step` | GET | Get specific checkpoint |
-| `/api/stories/:id/regenerate/scene-description/:page` | POST | Regenerate one scene desc |
-| `/api/stories/:id/regenerate/image/:page` | POST | Regenerate one image |
-| `/api/stories/:id/regenerate/cover/:type` | POST | Regenerate one cover |
-| `/api/stories/:id/page/:page` | PATCH | Edit page text/description |
-| `/api/stories/:id/upload-image/:page` | POST | Upload custom image |
-| `/api/admin/stories/low-quality-images` | GET | List low-scoring images |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/stories` | GET | List user's stories |
+| `/api/stories` | POST | Save new story |
+| `/api/stories/:id` | GET | Get story details |
+| `/api/stories/:id` | DELETE | Delete story |
+| `/api/stories/:id/pdf` | GET | Generate PDF |
+
+### Regeneration
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/stories/:id/regenerate/scene-description/:pageNum` | POST | Regenerate scene description |
+| `/api/stories/:id/regenerate/image/:pageNum` | POST | Regenerate page image |
+| `/api/stories/:id/regenerate/cover/:coverType` | POST | Regenerate cover |
+| `/api/stories/:id/edit/image/:pageNum` | POST | Edit image with prompt |
+| `/api/stories/:id/edit/cover/:coverType` | POST | Edit cover with prompt |
+
+### Admin
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/admin/metrics/summary` | GET | Dashboard metrics |
+| `/api/admin/users` | GET | List all users |
+| `/api/admin/user-storage` | GET | Storage per user |
+| `/api/admin/database-size` | GET | Database statistics |
+
+### Payments & Print
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/stripe/create-checkout-session` | POST | Create Stripe checkout |
+| `/api/stripe/order-status/:sessionId` | GET | Check order status |
+| `/api/stripe/webhook` | POST | Stripe webhook handler |
+| `/api/print-provider/order` | POST | Direct print order (dev mode) |
 
 ---
 
-## Implementation Priority
+## Prompt Templates
 
-### High Priority
-1. ✅ Server-side job pipeline (done)
-2. Add checkpoint saves
-3. Add regenerate single image endpoint
-4. Add regenerate single scene description endpoint
+Located in `prompts/` folder:
 
-### Medium Priority
-5. Add quality score visibility in UI
-6. Add admin story editor with regenerate buttons
-7. Add custom image upload
-
-### Low Priority
-8. Checkpoint inspection API
-9. Auto-resume crashed jobs
-10. Remove legacy client-side generation code
+| File | Purpose |
+|------|---------|
+| `story-outline.txt` | Generate story outline |
+| `story-text-batch.txt` | Generate story text |
+| `scene-descriptions.txt` | Generate scene descriptions |
+| `image-prompt-parallel.txt` | Image generation (parallel mode) |
+| `image-prompt-sequential.txt` | Image generation (sequential mode) |
+| `front-cover.txt` | Front cover generation |
+| `back-cover.txt` | Back cover generation |
+| `page0-with-dedication.txt` | Initial page with dedication |
+| `page0-no-dedication.txt` | Initial page without dedication |
 
 ---
 
-## Summary
+## Future Improvements
 
-**Current State:**
-- Full pipeline runs server-side ✅
-- All-or-nothing: no partial saves
-- Image quality scoring exists but not exposed
-- Admin can view but not edit/regenerate individual pieces
+### Potential Enhancements
 
-**Target State:**
-- Checkpoints after each step
-- Regenerate any single component
-- Admin can edit text, regenerate images, upload custom
-- Quality scores visible, low-quality flagged
-- Resume failed jobs from last checkpoint
+| Feature | Priority | Status |
+|---------|----------|--------|
+| Resume failed jobs from checkpoint | Medium | Not started |
+| Bulk regenerate low-quality images | Low | Not started |
+| Custom image upload | Low | Not started |
+| Visual Bible for secondary characters | Medium | Partially implemented |
+
+### Visual Bible System
+
+Tracks consistency for:
+- Secondary characters (extracted from story)
+- Animals
+- Artifacts/objects
+- Locations
+
+Currently extracts descriptions but not yet used for image generation consistency.
+
+---
+
+## Error Handling
+
+### Gemini Content Safety
+
+If Gemini blocks image generation:
+- `finishReason` and `finishMessage` are logged
+- Job continues with retry
+- After max retries, job fails with partial data dump
+
+### Checkpoint Recovery
+
+On job failure, debug log includes:
+- All input parameters
+- All checkpoint data
+- Generated prompts
+- Partial results
+
+This allows manual recovery or debugging of failed jobs.
