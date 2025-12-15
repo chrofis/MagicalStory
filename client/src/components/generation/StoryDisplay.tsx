@@ -386,7 +386,7 @@ export function StoryDisplay({
 
           {/* Visual Bible - Recurring Elements for Consistency */}
           {visualBible && (
-            <details className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4" open>
+            <details className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-rose-800 hover:text-rose-900 flex items-center gap-2">
                 <BookOpen size={20} />
                 {language === 'de' ? 'Visual Bible (Wiederkehrende Elemente)' : language === 'fr' ? 'Bible Visuelle (Éléments Récurrents)' : 'Visual Bible (Recurring Elements)'}

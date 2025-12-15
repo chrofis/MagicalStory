@@ -6644,7 +6644,8 @@ function parseVisualBible(outline) {
   if (!outline) return visualBible;
 
   // Find the Visual Bible section
-  const visualBibleMatch = outline.match(/##\s*Visual\s*Bible([\s\S]*?)(?=^##\s|^---|\Z)/mi);
+  // Note: \Z doesn't work in JavaScript - use $ for end of string
+  const visualBibleMatch = outline.match(/##\s*Visual\s*Bible([\s\S]*?)(?=^##\s|^---|$)/mi);
   if (!visualBibleMatch) {
     console.log('📖 [VISUAL BIBLE] No Visual Bible section found in outline');
     return visualBible;
