@@ -1,6 +1,6 @@
 import api from './api';
 import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
-import type { SavedStory, Language, LanguageLevel, SceneDescription, SceneImage, CoverImages } from '@/types/story';
+import type { SavedStory, Language, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt } from '@/types/story';
 
 interface StoryDraft {
   storyType: string;
@@ -290,11 +290,43 @@ export const storyService = {
     return response;
   },
 
-  async regenerateImage(storyId: string, pageNum: number): Promise<{ imageData: string }> {
-    const response = await api.post<{ imageData: string }>(
+  async regenerateImage(storyId: string, pageNum: number): Promise<{
+    imageData: string;
+    qualityScore?: number;
+    qualityReasoning?: string;
+    totalAttempts?: number;
+    retryHistory?: Array<{
+      attempt: number;
+      type: string;
+      imageData?: string;
+      score?: number;
+      reasoning?: string;
+      textIssue?: string;
+      expectedText?: string;
+      actualText?: string;
+      timestamp?: string;
+    }>;
+  }> {
+    const response = await api.post<{
+      imageData: string;
+      qualityScore?: number;
+      qualityReasoning?: string;
+      totalAttempts?: number;
+      retryHistory?: Array<{
+        attempt: number;
+        type: string;
+        imageData?: string;
+        score?: number;
+        reasoning?: string;
+        textIssue?: string;
+        expectedText?: string;
+        actualText?: string;
+        timestamp?: string;
+      }>;
+    }>(
       `/api/stories/${storyId}/regenerate/image/${pageNum}`
     );
-    return { imageData: response.imageData };
+    return response;
   },
 
   async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial'): Promise<{
@@ -303,6 +335,18 @@ export const storyService = {
     prompt?: string;
     qualityScore?: number;
     qualityReasoning?: string;
+    totalAttempts?: number;
+    retryHistory?: Array<{
+      attempt: number;
+      type: string;
+      imageData?: string;
+      score?: number;
+      reasoning?: string;
+      textIssue?: string;
+      expectedText?: string;
+      actualText?: string;
+      timestamp?: string;
+    }>;
   }> {
     const response = await api.post<{
       imageData: string;
@@ -310,16 +354,22 @@ export const storyService = {
       prompt?: string;
       qualityScore?: number;
       qualityReasoning?: string;
+      totalAttempts?: number;
+      retryHistory?: Array<{
+        attempt: number;
+        type: string;
+        imageData?: string;
+        score?: number;
+        reasoning?: string;
+        textIssue?: string;
+        expectedText?: string;
+        actualText?: string;
+        timestamp?: string;
+      }>;
     }>(
       `/api/stories/${storyId}/regenerate/cover/${coverType}`
     );
-    return {
-      imageData: response.imageData,
-      description: response.description,
-      prompt: response.prompt,
-      qualityScore: response.qualityScore,
-      qualityReasoning: response.qualityReasoning
-    };
+    return response;
   },
 
   async updatePage(storyId: string, pageNum: number, data: {

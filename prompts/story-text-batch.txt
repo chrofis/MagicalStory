@@ -41,16 +41,11 @@ The output MUST follow this EXACT format or the system will fail:
 - Write EXACTLY pages {START_PAGE} through {END_PAGE} - no more, no less
 - STOP IMMEDIATELY after page {END_PAGE}
 
-# PRIORITY 3: TEXT LENGTH - CRITICAL WORD LIMIT
+# PRIORITY 3: TEXT LENGTH
 
 **{READING_LEVEL}**
 
-⚠️ **HARD WORD LIMIT - DO NOT EXCEED** ⚠️
-- Count your words for each page BEFORE writing the next page
-- If a page exceeds the word limit, REWRITE it shorter
-- Exceeding the word limit will cause text to OVERFLOW onto the next page and RUIN the printed book
-- Better to write slightly UNDER the limit than over it
-- Aim for the MIDDLE of the word range, not the maximum
+Stay within the word count. Aim for the middle of the range, not the maximum.
 
 # Story Context
 
