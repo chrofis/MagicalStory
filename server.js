@@ -5929,8 +5929,8 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}?payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/create?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/create?payment=cancelled`,
       metadata: {
         userId: userId.toString(),
         storyId: storyId.toString(),
