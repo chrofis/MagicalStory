@@ -2777,8 +2777,15 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const scenePhotos = getCharacterPhotos(sceneCharacters);
     console.log(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}`);
 
-    // Build image prompt with scene-specific characters
-    const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData, sceneCharacters);
+    // Get visual bible from stored story (for recurring elements)
+    const visualBible = storyData.visualBible || null;
+    if (visualBible) {
+      const relevantEntries = getVisualBibleEntriesForPage(visualBible, pageNumber);
+      console.log(`📖 [REGEN] Visual Bible: ${relevantEntries.length} entries relevant to page ${pageNumber}`);
+    }
+
+    // Build image prompt with scene-specific characters and visual bible
+    const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData, sceneCharacters, false, visualBible, pageNumber);
 
     // Clear the image cache for this prompt to force a new generation
     const cacheKey = generateImageCacheKey(imagePrompt, scenePhotos, null);
