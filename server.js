@@ -9151,6 +9151,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   } else {
     console.error('❌ [IMAGE GEN] Unexpected candidate structure. Keys:', Object.keys(candidate));
+    // Log the finishReason and finishMessage to understand why image was blocked
+    if (candidate.finishReason) {
+      console.error('❌ [IMAGE GEN] finishReason:', candidate.finishReason);
+    }
+    if (candidate.finishMessage) {
+      console.error('❌ [IMAGE GEN] finishMessage:', candidate.finishMessage);
+    }
+    // Log the full candidate for debugging
+    console.error('❌ [IMAGE GEN] Full candidate:', JSON.stringify(candidate, null, 2));
   }
 
   console.error('❌ [IMAGE GEN] No image data found in any part');
