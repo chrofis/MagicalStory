@@ -2895,8 +2895,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const previousCover = storyData.coverImages[coverKey];
     const previousImageData = previousCover?.imageData || previousCover || null;
 
-    // Generate new cover (use 'cover' evaluation for text-focused quality check)
-    const coverResult = await callGeminiAPIForImage(coverPrompt, characterPhotos, null, 'cover');
+    // Generate new cover with quality retry (automatically retries on text errors)
+    const coverResult = await generateImageWithQualityRetry(coverPrompt, characterPhotos, null, 'cover');
 
     // Update the cover in story data with new structure including quality, description, prompt, and previous version
     const coverData = {
@@ -9457,7 +9457,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const actualText = actualTextMatch ? actualTextMatch[1].trim() : null;
     const textIssue = textIssueMatch ? textIssueMatch[1].toUpperCase() : null;
 
-    log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100`);
+    // ENFORCE text error = score 0 for covers (Gemini sometimes ignores this instruction)
+    let finalScore = score;
+    if (evaluationType === 'cover' && textIssue && textIssue !== 'NONE') {
+      log.warn(`⚠️  [QUALITY] Cover text error detected (${textIssue}) - enforcing score = 0`);
+      log.warn(`⚠️  [QUALITY] Expected: "${expectedText}" | Actual: "${actualText}"`);
+      log.warn(`⚠️  [QUALITY] Original Gemini score was ${score}, overriding to 0`);
+      finalScore = 0;
+    }
+
+    log.verbose(`⭐ [QUALITY] Image quality score: ${finalScore}/100`);
     if (textIssue && textIssue !== 'NONE') {
       log.verbose(`⭐ [QUALITY] Text issue detected: ${textIssue}`);
       log.verbose(`⭐ [QUALITY] Expected: "${expectedText}" | Actual: "${actualText}"`);
@@ -9469,7 +9478,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // Return score, reasoning, and text-specific info for covers
     return {
-      score,
+      score: finalScore,
       reasoning,
       textErrorOnly,
       expectedText,
@@ -9734,18 +9743,39 @@ IMPORTANT: Only change the text, nothing else. The result should look like the o
 
     const data = await response.json();
 
+    // Log response structure for debugging
+    console.log('✏️  [TEXT EDIT] Response structure:', {
+      hasCandidates: !!data.candidates,
+      candidatesCount: data.candidates?.length || 0,
+      responseKeys: Object.keys(data)
+    });
+
     // Extract the edited image from the response
     if (data.candidates && data.candidates[0]?.content?.parts) {
-      for (const part of data.candidates[0].content.parts) {
+      const parts = data.candidates[0].content.parts;
+      console.log(`✏️  [TEXT EDIT] Found ${parts.length} parts in response`);
+
+      for (const part of parts) {
+        console.log('✏️  [TEXT EDIT] Part keys:', Object.keys(part));
         if (part.inline_data && part.inline_data.data) {
           const editedImageData = `data:${part.inline_data.mime_type || 'image/png'};base64,${part.inline_data.data}`;
           console.log(`✅ [TEXT EDIT] Successfully edited cover image text`);
           return { imageData: editedImageData };
         }
+        if (part.text) {
+          console.log('✏️  [TEXT EDIT] Text response (model refused):', part.text.substring(0, 300));
+        }
       }
+    } else if (data.candidates && data.candidates[0]) {
+      const candidate = data.candidates[0];
+      console.log('✏️  [TEXT EDIT] Candidate structure:', {
+        hasContent: !!candidate.content,
+        finishReason: candidate.finishReason,
+        finishMessage: candidate.finishMessage
+      });
     }
 
-    console.warn('⚠️  [TEXT EDIT] No edited image in response');
+    console.warn('⚠️  [TEXT EDIT] No edited image in response - text editing may not be supported');
     return null;
   } catch (error) {
     console.error('❌ [TEXT EDIT] Error editing cover image text:', error);
@@ -9840,15 +9870,36 @@ IMPORTANT: Only apply the specific edit requested. Keep everything else the same
 
     const data = await response.json();
 
+    // Log response structure for debugging
+    console.log('✏️  [IMAGE EDIT] Response structure:', {
+      hasCandidates: !!data.candidates,
+      candidatesCount: data.candidates?.length || 0,
+      responseKeys: Object.keys(data)
+    });
+
     // Extract the edited image from the response
     if (data.candidates && data.candidates[0]?.content?.parts) {
-      for (const part of data.candidates[0].content.parts) {
+      const parts = data.candidates[0].content.parts;
+      console.log(`✏️  [IMAGE EDIT] Found ${parts.length} parts in response`);
+
+      for (const part of parts) {
+        console.log('✏️  [IMAGE EDIT] Part keys:', Object.keys(part));
         if (part.inline_data && part.inline_data.data) {
           const editedImageData = `data:${part.inline_data.mime_type || 'image/png'};base64,${part.inline_data.data}`;
           console.log(`✅ [IMAGE EDIT] Successfully edited image`);
           return { imageData: editedImageData };
         }
+        if (part.text) {
+          console.log('✏️  [IMAGE EDIT] Text response:', part.text.substring(0, 200));
+        }
       }
+    } else if (data.candidates && data.candidates[0]) {
+      const candidate = data.candidates[0];
+      console.log('✏️  [IMAGE EDIT] Candidate structure:', {
+        hasContent: !!candidate.content,
+        finishReason: candidate.finishReason,
+        finishMessage: candidate.finishMessage
+      });
     }
 
     console.warn('⚠️  [IMAGE EDIT] No edited image in response');
