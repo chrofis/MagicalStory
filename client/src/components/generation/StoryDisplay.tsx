@@ -145,6 +145,11 @@ interface StoryDisplayProps {
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   storyId?: string | null;
   developerMode?: boolean;
+  // Partial story fields
+  isPartial?: boolean;
+  failureReason?: string;
+  generatedPages?: number;
+  totalPages?: number;
 }
 
 export function StoryDisplay({
@@ -170,6 +175,10 @@ export function StoryDisplay({
   onEditCover,
   storyId,
   developerMode = false,
+  isPartial = false,
+  failureReason,
+  generatedPages,
+  totalPages,
 }: StoryDisplayProps) {
   const { t, language } = useLanguage();
   const isPictureBook = languageLevel === '1st-grade';
@@ -214,6 +223,37 @@ export function StoryDisplay({
       <h1 className="text-3xl md:text-4xl font-bold text-gray-800 text-center">
         {title || t.yourStory}
       </h1>
+
+      {/* Partial Story Warning Banner */}
+      {isPartial && (
+        <div className="bg-amber-50 border-2 border-amber-400 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="text-amber-500 text-2xl">⚠️</div>
+            <div>
+              <h3 className="font-bold text-amber-800">
+                {language === 'de' ? 'Unvollständige Geschichte' : language === 'fr' ? 'Histoire incomplète' : 'Incomplete Story'}
+              </h3>
+              <p className="text-amber-700 text-sm mt-1">
+                {language === 'de'
+                  ? `Diese Geschichte konnte nicht vollständig generiert werden. ${generatedPages || sceneImages.length} von ${totalPages || 'unbekannt'} Seiten wurden erstellt.`
+                  : language === 'fr'
+                  ? `Cette histoire n'a pas pu être générée complètement. ${generatedPages || sceneImages.length} sur ${totalPages || 'inconnu'} pages ont été créées.`
+                  : `This story could not be fully generated. ${generatedPages || sceneImages.length} of ${totalPages || 'unknown'} pages were created.`}
+              </p>
+              {failureReason && developerMode && (
+                <details className="mt-2 text-sm">
+                  <summary className="cursor-pointer text-amber-600 hover:text-amber-700">
+                    {language === 'de' ? 'Fehlerdetails' : language === 'fr' ? 'Détails de l\'erreur' : 'Error details'}
+                  </summary>
+                  <p className="mt-1 bg-amber-100 p-2 rounded text-amber-800 font-mono text-xs">
+                    {failureReason}
+                  </p>
+                </details>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action Buttons Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

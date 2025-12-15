@@ -9,18 +9,40 @@ const path = require('path');
 const { Pool } = require('pg');
 const pLimit = require('p-limit');
 const crypto = require('crypto');
-// Payment mode: 'test' uses test keys + Gelato drafts, 'live' uses live keys + real orders
-const PAYMENT_MODE = process.env.PAYMENT_MODE || 'test';
-const isLivePayments = PAYMENT_MODE === 'live';
+// Initialize BOTH Stripe clients - test for admins/developers, live for regular users
+const stripeTest = process.env.STRIPE_TEST_SECRET_KEY
+  ? require('stripe')(process.env.STRIPE_TEST_SECRET_KEY)
+  : null;
+const stripeLive = process.env.STRIPE_LIVE_SECRET_KEY
+  ? require('stripe')(process.env.STRIPE_LIVE_SECRET_KEY)
+  : null;
 
-// Initialize Stripe with appropriate key based on payment mode
-const stripeSecretKey = isLivePayments
-  ? process.env.STRIPE_LIVE_SECRET_KEY
-  : (process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_TEST_API_KEY); // fallback for existing env var
-const stripe = stripeSecretKey ? require('stripe')(stripeSecretKey) : null;
+// Legacy fallback: if only old env var exists, use it as test
+const stripeLegacy = (!stripeTest && process.env.STRIPE_TEST_API_KEY)
+  ? require('stripe')(process.env.STRIPE_TEST_API_KEY)
+  : null;
 
-// Log payment mode on startup
-console.log(`💳 Payment Mode: ${PAYMENT_MODE.toUpperCase()} ${isLivePayments ? '(REAL MONEY!)' : '(test mode)'}`);
+// Helper: Get appropriate Stripe client for user (admins get test mode)
+function getStripeForUser(user) {
+  const isTestMode = user?.role === 'admin';
+  if (isTestMode) {
+    return stripeTest || stripeLegacy;
+  }
+  return stripeLive || stripeTest || stripeLegacy; // fallback chain for live users
+}
+
+// Helper: Check if user should use test mode
+function isUserTestMode(user) {
+  return user?.role === 'admin';
+}
+
+// Log Stripe configuration on startup
+console.log(`💳 Stripe Configuration:`);
+console.log(`   - Test mode (for admins): ${stripeTest || stripeLegacy ? '✅ Configured' : '❌ Not configured'}`);
+console.log(`   - Live mode (for users): ${stripeLive ? '✅ Configured' : '❌ Not configured'}`);
+if (!stripeLive) {
+  console.log(`   ⚠️  Warning: STRIPE_LIVE_SECRET_KEY not set - all users will use test mode`);
+}
 const sharp = require('sharp');
 const email = require('./email');
 const admin = require('firebase-admin');
@@ -365,35 +387,55 @@ app.use(cors(corsOptions));
 // IMPORTANT: This MUST be defined BEFORE express.json() middleware
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
-  // Use appropriate webhook secret based on payment mode
-  const webhookSecret = isLivePayments
-    ? process.env.STRIPE_LIVE_WEBHOOK_SECRET
-    : (process.env.STRIPE_TEST_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET); // fallback for existing env var
 
-  // Check if webhook secret is configured
-  if (!webhookSecret) {
-    const secretName = isLivePayments ? 'STRIPE_LIVE_WEBHOOK_SECRET' : 'STRIPE_TEST_WEBHOOK_SECRET';
-    console.error(`❌ [STRIPE WEBHOOK] ${secretName} not configured in environment variables!`);
-    console.error('   Please add the webhook secret to your Railway environment variables');
-    console.error('   Get the webhook signing secret from: https://dashboard.stripe.com/webhooks');
+  // Try both webhook secrets (test and live) to verify the signature
+  const testWebhookSecret = process.env.STRIPE_TEST_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET;
+  const liveWebhookSecret = process.env.STRIPE_LIVE_WEBHOOK_SECRET;
+
+  if (!testWebhookSecret && !liveWebhookSecret) {
+    console.error('❌ [STRIPE WEBHOOK] No webhook secrets configured!');
+    console.error('   Please add STRIPE_TEST_WEBHOOK_SECRET and/or STRIPE_LIVE_WEBHOOK_SECRET');
     return res.status(500).json({ error: 'Webhook secret not configured' });
   }
 
   let event;
+  let isTestPayment = false;
+  let stripeClient = null;
 
-  try {
-    // Verify the webhook signature to ensure it came from Stripe
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    console.log('✅ [STRIPE WEBHOOK] Signature verified successfully');
-  } catch (err) {
-    console.error('❌ [STRIPE WEBHOOK] Signature verification failed:', err.message);
-    console.error('   This webhook request did not come from Stripe or has been tampered with');
-    return res.status(400).json({ error: `Webhook signature verification failed: ${err.message}` });
+  // Try to verify with live secret first (most common case for real users)
+  if (liveWebhookSecret) {
+    try {
+      event = (stripeLive || stripeTest || stripeLegacy).webhooks.constructEvent(req.body, sig, liveWebhookSecret);
+      stripeClient = stripeLive || stripeTest || stripeLegacy;
+      isTestPayment = false;
+      console.log('✅ [STRIPE WEBHOOK] Verified with LIVE webhook secret');
+    } catch (err) {
+      // Live verification failed, will try test secret
+    }
+  }
+
+  // If live verification failed or no live secret, try test secret
+  if (!event && testWebhookSecret) {
+    try {
+      event = (stripeTest || stripeLegacy || stripeLive).webhooks.constructEvent(req.body, sig, testWebhookSecret);
+      stripeClient = stripeTest || stripeLegacy || stripeLive;
+      isTestPayment = true;
+      console.log('✅ [STRIPE WEBHOOK] Verified with TEST webhook secret');
+    } catch (err) {
+      console.error('❌ [STRIPE WEBHOOK] Signature verification failed with both secrets:', err.message);
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+  }
+
+  if (!event) {
+    console.error('❌ [STRIPE WEBHOOK] Could not verify webhook signature');
+    return res.status(400).json({ error: 'Invalid signature' });
   }
 
   // Now handle the verified event
   try {
     console.log('💳 [STRIPE WEBHOOK] Received verified event:', event.type);
+    console.log(`   Payment type: ${isTestPayment ? 'TEST (admin/developer)' : 'LIVE (real payment)'}`);
 
     // Handle the checkout.session.completed event
     if (event.type === 'checkout.session.completed') {
@@ -404,9 +446,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       console.log('   Payment Intent:', session.payment_intent);
       console.log('   Amount:', session.amount_total, session.currency);
 
-      // Retrieve full session with customer details
+      // Retrieve full session with customer details (use the same Stripe client that verified)
       try {
-        const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+        const fullSession = await stripeClient.checkout.sessions.retrieve(session.id, {
           expand: ['customer', 'line_items']
         });
 
@@ -507,7 +549,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           console.log('   Story ID:', storyId);
 
           // Trigger background PDF generation and print provider order (don't await - fire and forget)
-          processBookOrder(fullSession.id, userId, storyId, customerInfo, address).catch(async (err) => {
+          // Pass isTestPayment so Gelato knows whether to create draft or real order
+          processBookOrder(fullSession.id, userId, storyId, customerInfo, address, isTestPayment).catch(async (err) => {
             console.error('❌ [BACKGROUND] Error processing book order:', err);
             console.error('   Error stack:', err.stack);
             console.error('   Session ID:', fullSession.id);
@@ -2379,7 +2422,11 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
           pageCount: story.sceneImages?.length || 0,
-          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null),
+          // Partial story fields
+          isPartial: story.isPartial || false,
+          generatedPages: story.generatedPages,
+          totalPages: story.totalPages
         };
       });
       console.log(`📚 Parsed ${userStories.length} stories with full-quality thumbnails`);
@@ -2402,7 +2449,11 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
         language: story.language,
         characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
         pageCount: story.sceneImages?.length || 0,
-        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null),
+        // Partial story fields
+        isPartial: story.isPartial || false,
+        generatedPages: story.generatedPages,
+        totalPages: story.totalPages
       }));
       console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} with full-quality thumbnails`);
     }
@@ -3424,8 +3475,8 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
     }
 
     const printApiKey = process.env.GELATO_API_KEY;
-    // Use payment mode to determine Gelato order type: test = draft, live = real order
-    const orderType = isLivePayments ? 'order' : 'draft';
+    // Use user role to determine Gelato order type: admin = draft, regular user = real order
+    const orderType = isUserTestMode(req.user) ? 'draft' : 'order';
 
     if (!printApiKey || printApiKey === 'your_print_api_key_here') {
       return res.status(500).json({
@@ -3434,7 +3485,7 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(`📦 [GELATO] Creating ${orderType} (PAYMENT_MODE=${PAYMENT_MODE})`);
+    console.log(`📦 [GELATO] Creating ${orderType} (user role: ${req.user.role})`);
 
     // Prepare print provider order payload
     const orderPayload = {
@@ -5274,9 +5325,10 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
       return res.status(500).json({ error: 'GELATO_API_KEY not configured' });
     }
 
-    // Use payment mode to determine Gelato order type
-    const orderType = isLivePayments ? 'order' : 'draft';
-    console.log(`📦 [GELATO] Retry: Creating ${orderType} (PAYMENT_MODE=${PAYMENT_MODE})`);
+    // Admin retry: Use user role to determine Gelato order type
+    // Admins get draft for testing, but can force real order if needed
+    const orderType = isUserTestMode(req.user) ? 'draft' : 'order';
+    console.log(`📦 [GELATO] Retry: Creating ${orderType} (user role: ${req.user.role})`);
 
     const printOrderPayload = {
       orderType: orderType,
@@ -5921,7 +5973,17 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
     const { storyId } = req.body;
     const userId = req.user.id;
 
+    // Get the appropriate Stripe client for this user (test for admins, live for regular users)
+    const userStripe = getStripeForUser(req.user);
+    const isTestMode = isUserTestMode(req.user);
+
+    if (!userStripe) {
+      const keyNeeded = isTestMode ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_LIVE_SECRET_KEY';
+      return res.status(500).json({ error: `Stripe not configured. Please set ${keyNeeded}` });
+    }
+
     console.log(`💳 Creating Stripe checkout session for user ${userId}, story ${storyId}`);
+    console.log(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}`);
 
     // Get story details
     const story = await (STORAGE_MODE === 'database'
@@ -5932,8 +5994,8 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    // Create checkout session with user-appropriate Stripe client
+    const session = await userStripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
         price_data: {
@@ -6048,8 +6110,13 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
 });
 
 // Background function to process book orders after payment
-async function processBookOrder(sessionId, userId, storyId, customerInfo, shippingAddress) {
+// isTestPayment: true = admin/developer (Gelato draft), false = real user (Gelato real order)
+async function processBookOrder(sessionId, userId, storyId, customerInfo, shippingAddress, isTestPayment = false) {
   console.log(`📚 [BACKGROUND] Starting book order processing for session ${sessionId}`);
+  console.log(`   Payment mode: ${isTestPayment ? 'TEST (Gelato draft)' : 'LIVE (real Gelato order)'}`);
+
+  // Determine Gelato order type based on payment mode
+  const gelatoOrderType = isTestPayment ? 'draft' : 'order';
 
   try {
     // Step 1: Update order status to "processing"
@@ -6390,13 +6457,14 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       console.log(`⚠️ [BACKGROUND] Using fallback product UID: ${printProductUid}`);
     }
 
-    const orderType = process.env.GELATO_ORDER_TYPE || 'order'; // 'draft' or 'order'
+    // Use gelatoOrderType determined from isTestPayment parameter
+    console.log(`📦 [BACKGROUND] Creating Gelato ${gelatoOrderType} order`);
 
     // Use CHF currency for print orders
     const currency = 'CHF';
 
     const printOrderPayload = {
-      orderType: orderType,
+      orderType: gelatoOrderType,
       orderReferenceId: `story-${storyId}-${Date.now()}`,
       customerReferenceId: userId,
       currency: currency,
@@ -8600,6 +8668,121 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       console.log('\n' + '='.repeat(80));
       console.log('📋 [DEBUG] END OF PARTIAL DATA DUMP');
       console.log('='.repeat(80) + '\n');
+
+      // SAVE PARTIAL RESULTS - reconstruct story from checkpoints and save to stories table
+      try {
+        const jobDataResult = await dbPool.query('SELECT user_id, input_data FROM story_jobs WHERE id = $1', [jobId]);
+        if (jobDataResult.rows.length > 0) {
+          const userId = jobDataResult.rows[0].user_id;
+          const inputData = jobDataResult.rows[0].input_data;
+
+          // Reconstruct story data from checkpoints
+          let outline = '';
+          let outlinePrompt = '';
+          let fullStoryText = '';
+          let sceneDescriptions = [];
+          let sceneImages = [];
+          let storyTextPrompts = [];
+          let visualBible = null;
+          let coverImages = {};
+
+          for (const cp of checkpoints) {
+            const data = typeof cp.step_data === 'string' ? JSON.parse(cp.step_data) : cp.step_data;
+
+            if (cp.step_name === 'outline') {
+              outline = data.outline || '';
+              outlinePrompt = data.outlinePrompt || '';
+            } else if (cp.step_name === 'scene_hints' && data.visualBible) {
+              visualBible = data.visualBible;
+            } else if (cp.step_name === 'story_batch') {
+              if (data.batchText) {
+                fullStoryText += (fullStoryText ? '\n\n' : '') + data.batchText;
+              }
+              if (data.batchPrompt) {
+                storyTextPrompts.push({
+                  batch: data.batchNum || storyTextPrompts.length + 1,
+                  startPage: data.startScene || 1,
+                  endPage: data.endScene || 15,
+                  prompt: data.batchPrompt
+                });
+              }
+            } else if (cp.step_name === 'partial_page') {
+              const pageNum = cp.step_index;
+              if (data.sceneDescription) {
+                sceneDescriptions.push({
+                  pageNumber: pageNum,
+                  description: data.sceneDescription.description || data.sceneDescription
+                });
+              }
+              if (data.imageData) {
+                sceneImages.push({
+                  pageNumber: pageNum,
+                  imageData: data.imageData,
+                  description: data.sceneDescription?.description || '',
+                  prompt: data.imagePrompt || '',
+                  qualityScore: data.score,
+                  qualityReasoning: data.reasoning
+                });
+              }
+            } else if (cp.step_name === 'cover') {
+              const coverType = data.type;
+              if (data.imageData) {
+                coverImages[coverType] = {
+                  imageData: data.imageData,
+                  description: data.description || '',
+                  prompt: data.prompt || '',
+                  qualityScore: data.score,
+                  qualityReasoning: data.reasoning
+                };
+              }
+            }
+          }
+
+          // Only save if we have at least some content
+          const hasContent = outline || fullStoryText || sceneImages.length > 0;
+          if (hasContent) {
+            const storyTitle = inputData?.title || `Partial Story (${new Date().toLocaleDateString()})`;
+            const storyData = {
+              id: jobId,
+              title: storyTitle + ' [PARTIAL]',
+              storyType: inputData?.storyType || 'unknown',
+              artStyle: inputData?.artStyle || 'pixar',
+              language: inputData?.language || 'en',
+              languageLevel: inputData?.languageLevel || 'standard',
+              pages: inputData?.pages || sceneImages.length,
+              dedication: inputData?.dedication || '',
+              characters: inputData?.characters || [],
+              mainCharacters: inputData?.mainCharacters || [],
+              relationships: inputData?.relationships || {},
+              relationshipTexts: inputData?.relationshipTexts || {},
+              outline: outline,
+              outlinePrompt: outlinePrompt,
+              story: fullStoryText,
+              storyTextPrompts: storyTextPrompts,
+              visualBible: visualBible,
+              sceneDescriptions: sceneDescriptions,
+              sceneImages: sceneImages,
+              coverImages: coverImages,
+              isPartial: true,
+              failureReason: error.message,
+              generatedPages: sceneImages.length,
+              totalPages: inputData?.pages || 15,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+
+            await dbPool.query(
+              'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
+              [jobId, userId, JSON.stringify(storyData)]
+            );
+            console.log(`📚 [PARTIAL SAVE] Saved partial story ${jobId} with ${sceneImages.length} images to stories table`);
+          } else {
+            console.log('📚 [PARTIAL SAVE] No content to save');
+          }
+        }
+      } catch (partialSaveErr) {
+        console.error('❌ [PARTIAL SAVE] Failed to save partial results:', partialSaveErr.message);
+      }
     } catch (dumpErr) {
       console.error('❌ Failed to dump partial data:', dumpErr.message);
     }

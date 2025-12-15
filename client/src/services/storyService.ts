@@ -26,6 +26,9 @@ interface StoryListItemServer {
   characters?: { name: string; id: number }[];
   pageCount?: number;
   thumbnail?: string;
+  isPartial?: boolean;
+  generatedPages?: number;
+  totalPages?: number;
 }
 
 interface StoryListItem {
@@ -37,6 +40,9 @@ interface StoryListItem {
   pages: number;
   created_at: string;
   thumbnail?: string;
+  isPartial?: boolean;
+  generatedPages?: number;
+  totalPages?: number;
 }
 
 interface StoryDetailsServer {
@@ -62,6 +68,11 @@ interface StoryDetailsServer {
   coverImages?: CoverImages;
   thumbnail?: string;
   createdAt: string;
+  // Partial story fields
+  isPartial?: boolean;
+  failureReason?: string;
+  generatedPages?: number;
+  totalPages?: number;
 }
 
 export const storyService = {
@@ -97,6 +108,9 @@ export const storyService = {
       pages: s.pageCount || s.pages || 0,
       created_at: s.createdAt,
       thumbnail: s.thumbnail,
+      isPartial: s.isPartial,
+      generatedPages: s.generatedPages,
+      totalPages: s.totalPages,
     }));
   },
 
@@ -128,6 +142,10 @@ export const storyService = {
         coverImages: s.coverImages,
         thumbnail: s.thumbnail,
         createdAt: s.createdAt,
+        isPartial: s.isPartial,
+        failureReason: s.failureReason,
+        generatedPages: s.generatedPages,
+        totalPages: s.totalPages,
       };
     } catch {
       return null;
@@ -214,6 +232,10 @@ export const storyService = {
       coverImages: s.coverImages,
       thumbnail: s.thumbnail,
       createdAt: s.createdAt,
+      isPartial: s.isPartial,
+      failureReason: s.failureReason,
+      generatedPages: s.generatedPages,
+      totalPages: s.totalPages,
     };
   },
 

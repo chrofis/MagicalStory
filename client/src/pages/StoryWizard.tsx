@@ -112,6 +112,12 @@ export default function StoryWizard() {
   const [storyId, setStoryId] = useState<string | null>(null);
   const [, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
 
+  // Partial story state (for stories that failed during generation)
+  const [isPartialStory, setIsPartialStory] = useState(false);
+  const [failureReason, setFailureReason] = useState<string | undefined>();
+  const [generatedPages, setGeneratedPages] = useState<number | undefined>();
+  const [totalPages, setTotalPages] = useState<number | undefined>();
+
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<{ type: 'image' | 'cover'; pageNumber?: number; coverType?: 'front' | 'back' | 'initial' } | null>(null);
@@ -139,7 +145,7 @@ export default function StoryWizard() {
           setLoadingProgress({ loaded, total });
         });
         if (story) {
-          log.info('Loaded story:', story.title);
+          log.info('Loaded story:', story.title, story.isPartial ? '(PARTIAL)' : '');
           // Populate story data - set generatedStory BEFORE step to avoid flash
           setStoryId(story.id);
           setStoryTitle(story.title || '');
@@ -154,6 +160,11 @@ export default function StoryWizard() {
           setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
           setLanguageLevel(story.languageLevel || 'standard');
           setIsGenerating(false);
+          // Set partial story fields
+          setIsPartialStory(story.isPartial || false);
+          setFailureReason(story.failureReason);
+          setGeneratedPages(story.generatedPages);
+          setTotalPages(story.totalPages);
           // Set generatedStory last, then step, then isLoading - ensures story is ready before showing
           setGeneratedStory(story.story || '');
           setStep(5);
@@ -1176,6 +1187,12 @@ export default function StoryWizard() {
                 setSceneImages([]);
                 setCoverImages({ frontCover: null, initialPage: null, backCover: null });
 
+                // Reset partial story fields
+                setIsPartialStory(false);
+                setFailureReason(undefined);
+                setGeneratedPages(undefined);
+                setTotalPages(undefined);
+
                 // Reset story settings to defaults
                 setStoryType('');
                 setArtStyle('pixar');
@@ -1233,6 +1250,10 @@ export default function StoryWizard() {
                 setEditPromptText('');
                 setEditModalOpen(true);
               }}
+              isPartial={isPartialStory}
+              failureReason={failureReason}
+              generatedPages={generatedPages}
+              totalPages={totalPages}
             />
           );
         }

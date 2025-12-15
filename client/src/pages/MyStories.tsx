@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Book, Trash2, Eye } from 'lucide-react';
+import { Book, Trash2, Eye, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { storyService } from '@/services';
@@ -19,6 +19,9 @@ interface StoryListItem {
   created_at: string;
   createdAt?: string;
   thumbnail?: string;
+  isPartial?: boolean;
+  generatedPages?: number;
+  totalPages?: number;
 }
 
 // Story card component with individual image loading state
@@ -39,7 +42,7 @@ function StoryCard({
   const [imageError, setImageError] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
+    <div className={`bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col ${story.isPartial ? 'ring-2 ring-amber-400' : ''}`}>
       {story.thumbnail && !imageError ? (
         <div className="relative w-full h-48 bg-gray-100">
           {!imageLoaded && (
@@ -54,18 +57,36 @@ function StoryCard({
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}
           />
+          {story.isPartial && (
+            <div className="absolute top-2 right-2 bg-amber-500 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
+              <AlertTriangle size={12} />
+              {language === 'de' ? 'Teilweise' : language === 'fr' ? 'Partiel' : 'Partial'}
+            </div>
+          )}
         </div>
       ) : (
-        <div className="w-full h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+        <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
           <Book className="w-12 h-12 text-indigo-300" />
+          {story.isPartial && (
+            <div className="absolute top-2 right-2 bg-amber-500 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
+              <AlertTriangle size={12} />
+              {language === 'de' ? 'Teilweise' : language === 'fr' ? 'Partiel' : 'Partial'}
+            </div>
+          )}
         </div>
       )}
       <div className="p-4 flex flex-col flex-1">
         <div className="flex-1">
           <h3 className="font-bold text-lg text-gray-800 mb-2">{story.title}</h3>
-          <p className="text-sm text-gray-500 mb-3">
-            {story.pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} • {formatDate(story.created_at || story.createdAt)}
-          </p>
+          {story.isPartial ? (
+            <p className="text-sm text-amber-600 mb-3">
+              {story.generatedPages || 0}/{story.totalPages || story.pages} {language === 'de' ? 'Seiten generiert' : language === 'fr' ? 'pages générées' : 'pages generated'} • {formatDate(story.created_at || story.createdAt)}
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500 mb-3">
+              {story.pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} • {formatDate(story.created_at || story.createdAt)}
+            </p>
+          )}
         </div>
         <div className="flex gap-2 mt-auto">
           <button

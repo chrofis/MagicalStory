@@ -102,6 +102,11 @@ export interface SavedStory {
   thumbnail?: string;
   createdAt: string;
   updatedAt?: string;
+  // Partial story fields (for stories that failed during generation)
+  isPartial?: boolean;
+  failureReason?: string;
+  generatedPages?: number;
+  totalPages?: number;
 }
 
 export interface StoryGenerationProgress {
