@@ -6465,28 +6465,54 @@ function extractShortSceneDescriptions(outline) {
   const descriptions = {};
   const lines = outline.split('\n');
 
+  // Debug: Log first few lines of outline to understand format
+  console.log(`📋 [SCENE-EXTRACT] Outline preview (first 500 chars): ${outline.substring(0, 500).replace(/\n/g, '\\n')}`);
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    // Look for "Page X:" lines (with or without markdown bold)
-    const pageMatch = line.match(/^\*{0,2}Page\s+(\d+):\*{0,2}/i);
+    // Look for various page header formats:
+    // - "Page X:" or "**Page X:**"
+    // - "## Page X" (markdown header)
+    // - "Seite X:" (German)
+    const pageMatch = line.match(/^(?:#{1,3}\s*)?\*{0,2}(?:Page|Seite)\s+(\d+)(?::|\.|\*{0,2})/i);
     if (pageMatch) {
       const pageNum = parseInt(pageMatch[1]);
+
+      // First check if scene is on the same line (e.g., "Page 1: Scene: description")
+      const inlineSceneMatch = line.match(/(?:Scene|Szene)(?:\s+Description)?[:\s]+(.+)/i);
+      if (inlineSceneMatch && inlineSceneMatch[1].trim().length > 10) {
+        descriptions[pageNum] = inlineSceneMatch[1].trim();
+        console.log(`📋 [SCENE-EXTRACT] Page ${pageNum} (inline): ${descriptions[pageNum].substring(0, 60)}...`);
+        continue;
+      }
+
       // Look for Scene: in the next few lines
-      for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+      for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
         const sceneLine = lines[j].trim();
-        // Match various Scene formats: "Scene:", "**Scene:**", "Scene Description:", etc.
-        const sceneMatch = sceneLine.match(/^\*{0,2}Scene(?:\s+Description)?:\*{0,2}\s*(.*)/i);
-        if (sceneMatch) {
+        // Match various Scene formats with more flexibility
+        const sceneMatch = sceneLine.match(/^[-*•]?\s*\*{0,2}(?:Scene|Szene|Visual|Setting|Image)(?:\s+Description)?[:\s]*\*{0,2}\s*(.*)/i);
+        if (sceneMatch && sceneMatch[1].trim().length > 5) {
           descriptions[pageNum] = sceneMatch[1].trim();
           console.log(`📋 [SCENE-EXTRACT] Page ${pageNum}: ${descriptions[pageNum].substring(0, 60)}...`);
           break;
         }
-        // Stop if we hit another Page: marker
-        if (sceneLine.match(/^\*{0,2}Page\s+\d+:/i)) break;
+        // Stop if we hit another Page marker
+        if (sceneLine.match(/^(?:#{1,3}\s*)?\*{0,2}(?:Page|Seite)\s+\d+/i)) break;
+      }
+
+      // If no scene found yet, try to use the line right after the page header
+      if (!descriptions[pageNum] && i + 1 < lines.length) {
+        const nextLine = lines[i + 1].trim();
+        // Skip empty lines, titles, and short lines
+        if (nextLine.length > 20 && !nextLine.match(/^(?:Title|Titel|Text|Story)/i)) {
+          descriptions[pageNum] = nextLine.replace(/^\*{1,2}/, '').replace(/\*{1,2}$/, '').trim();
+          console.log(`📋 [SCENE-EXTRACT] Page ${pageNum} (fallback): ${descriptions[pageNum].substring(0, 60)}...`);
+        }
       }
     }
   }
 
+  console.log(`📋 [SCENE-EXTRACT] Total extracted: ${Object.keys(descriptions).length} scene descriptions`);
   return descriptions;
 }
 
@@ -7172,7 +7198,7 @@ async function processStoryJob(jobId) {
     // Standard flow for normal stories
     await dbPool.query(
       'UPDATE story_jobs SET progress_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      ['Step 1: Generating story outline...', jobId]
+      ['Writing story...', jobId]
     );
 
     // Step 1: Generate story outline (using Claude API)
@@ -7195,7 +7221,7 @@ async function processStoryJob(jobId) {
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [10, 'Step 2: Writing story and generating images...', jobId]
+      [10, 'Writing story...', jobId]
     );
 
     // STREAMING PIPELINE: Generate story in batches, immediately generate images as pages complete
@@ -7441,7 +7467,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       // Update progress after each batch
       const storyProgress = 10 + Math.floor((batchNum + 1) / numBatches * 30); // 10-40%
       const completedImageCount = allImages.length;
-      const progressMsg = `Writing story (${endScene}/${sceneCount} scenes), generating images (${completedImageCount}/${sceneCount})...`;
+      // Show simple progress: either writing or which image we're on
+      const progressMsg = completedImageCount > 0
+        ? `Image ${completedImageCount}/${sceneCount}...`
+        : 'Writing story...';
 
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -7458,7 +7487,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         // Wait for all images to complete
         await dbPool.query(
           'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [50, `Generating images (0/${sceneCount} complete)...`, jobId]
+          [50, `Image 1/${sceneCount}...`, jobId]
         );
 
         let completedCount = 0;
@@ -7471,7 +7500,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const imageProgress = 50 + Math.floor(completedCount / sceneCount * 40); // 50-90%
             await dbPool.query(
               'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-              [imageProgress, `Generating images (${completedCount}/${sceneCount} complete)...`, jobId]
+              [imageProgress, `Image ${completedCount}/${sceneCount}...`, jobId]
             );
 
             allImages.push(result);
@@ -7494,7 +7523,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
         await dbPool.query(
           'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [50, `Generating images sequentially (0/${allPages.length} complete)...`, jobId]
+          [50, `Image 1/${allPages.length}...`, jobId]
         );
 
         let previousImage = null;
@@ -7587,7 +7616,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const imageProgress = 50 + Math.floor((i + 1) / allPages.length * 40); // 50-90%
             await dbPool.query(
               'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-              [imageProgress, `Generating images sequentially (${i + 1}/${allPages.length} complete)...`, jobId]
+              [imageProgress, `Image ${i + 1}/${allPages.length}...`, jobId]
             );
           } catch (error) {
             console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
@@ -7622,7 +7651,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     if (!skipImages) {
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [95, 'Generating cover images...', jobId]
+        [95, 'Creating covers...', jobId]
       );
 
       console.log(`📕 [PIPELINE] Generating cover images for job ${jobId}`);

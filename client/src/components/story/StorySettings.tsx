@@ -40,11 +40,11 @@ export function StorySettings({
   const { t, language } = useLanguage();
 
   // Available page options based on developer mode
-  const availablePageOptions = developerMode ? [10, 30, 40, 50] : [30, 40, 50];
+  const availablePageOptions = developerMode ? [4, 10, 30, 40, 50] : [30, 40, 50];
 
   // If current pages value is not in available options, reset to default (30)
   useEffect(() => {
-    const validOptions = developerMode ? [10, 30, 40, 50] : [30, 40, 50];
+    const validOptions = developerMode ? [4, 10, 30, 40, 50] : [30, 40, 50];
     if (!validOptions.includes(pages)) {
       onPagesChange(30);
     }
@@ -177,7 +177,7 @@ export function StorySettings({
             >
               {availablePageOptions.map((pageOption) => (
                 <option key={pageOption} value={pageOption}>
-                  {getPageLabel(pageOption, pageOption === 10)}
+                  {getPageLabel(pageOption, pageOption === 4 || pageOption === 10)}
                 </option>
               ))}
             </select>

@@ -39,12 +39,6 @@ export default function LandingPage() {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 px-4 lg:px-8 py-6 lg:py-8 relative">
-        {/* Decorative Sparkles - Hidden on mobile, positioned away from button */}
-        <div className="hidden lg:block absolute top-16 right-20 text-3xl opacity-50 animate-pulse">✨</div>
-        <div className="hidden lg:block absolute top-10 right-1/3 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1s'}}>✨</div>
-        <div className="hidden lg:block absolute top-1/3 left-16 text-3xl opacity-50 animate-pulse" style={{animationDelay: '1.5s'}}>✨</div>
-        <div className="hidden lg:block absolute bottom-20 right-1/4 text-3xl opacity-50 animate-pulse" style={{animationDelay: '2s'}}>✨</div>
-
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 w-full relative z-10 flex-1 items-center">
           {/* Left Side - Text and Button */}
           <div className="w-full lg:w-[35%] flex flex-col justify-center">
@@ -72,7 +66,13 @@ export default function LandingPage() {
           </div>
 
           {/* Right Side - Photos and Video */}
-          <div className="w-full lg:w-[65%] flex items-center">
+          <div className="w-full lg:w-[65%] flex items-center relative">
+            {/* Decorative Sparkles - Hidden on mobile, only in right area */}
+            <div className="hidden lg:block absolute top-4 right-8 text-3xl opacity-50 animate-pulse z-20">✨</div>
+            <div className="hidden lg:block absolute top-1/4 left-4 text-3xl opacity-50 animate-pulse z-20" style={{animationDelay: '1s'}}>✨</div>
+            <div className="hidden lg:block absolute bottom-8 right-1/4 text-3xl opacity-50 animate-pulse z-20" style={{animationDelay: '1.5s'}}>✨</div>
+            <div className="hidden lg:block absolute bottom-1/3 left-1/3 text-3xl opacity-50 animate-pulse z-20" style={{animationDelay: '2s'}}>✨</div>
+
             <div className="flex flex-row gap-3 lg:gap-6 items-center justify-center w-full">
               {/* Photos Column - Stacked Vertically */}
               <div className="flex flex-col gap-2 lg:gap-4 w-1/4 lg:w-[28%]">

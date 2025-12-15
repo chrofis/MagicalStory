@@ -94,23 +94,18 @@ export default function MyStories() {
       <Navigation currentStep={0} />
 
       <div className="px-4 md:px-8 py-8 max-w-6xl mx-auto">
-        {/* Back Button */}
-        <div className="mb-6">
+        {/* Header: Title and Create Button */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <Book size={28} />
+            {language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : 'My Stories'}
+          </h1>
           <button
             onClick={() => navigate('/create')}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
           >
-            <ArrowLeft size={20} />
             {language === 'de' ? 'Geschichte erstellen' : language === 'fr' ? 'Créer une histoire' : 'Create Story'}
           </button>
-        </div>
-
-        {/* Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center justify-center gap-2">
-            <Book size={28} />
-            {language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : 'My Stories'}
-          </h1>
         </div>
 
         {isLoading ? (

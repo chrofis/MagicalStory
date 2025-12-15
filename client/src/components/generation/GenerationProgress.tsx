@@ -14,26 +14,27 @@ interface GenerationProgressProps {
 function translateMessage(message: string, language: string): string {
   if (!message) return '';
 
+  // Handle "Image X/Y..." pattern
+  const imageMatch = message.match(/^Image (\d+)\/(\d+)\.\.\.$/);
+  if (imageMatch) {
+    const [, current, total] = imageMatch;
+    if (language === 'de') return `Bild ${current}/${total}...`;
+    if (language === 'fr') return `Image ${current}/${total}...`;
+    return message;
+  }
+
   const translations: Record<string, Record<string, string>> = {
+    'Writing story...': {
+      de: 'Geschichte wird geschrieben...',
+      fr: 'Écriture de l\'histoire...',
+    },
+    'Creating covers...': {
+      de: 'Cover werden erstellt...',
+      fr: 'Création des couvertures...',
+    },
     'Generating picture book story and scenes...': {
       de: 'Geschichte und Szenen werden erstellt...',
       fr: 'Création de l\'histoire et des scènes...',
-    },
-    'Story text complete.': {
-      de: 'Geschichte fertig.',
-      fr: 'Texte terminé.',
-    },
-    'images already generating...': {
-      de: 'Bilder werden bereits generiert...',
-      fr: 'images en cours de génération...',
-    },
-    'Generated image': {
-      de: 'Bild erstellt',
-      fr: 'Image générée',
-    },
-    'Generating cover images...': {
-      de: 'Cover-Bilder werden erstellt...',
-      fr: 'Création des images de couverture...',
     },
     'Picture book complete!': {
       de: 'Bilderbuch fertig!',
@@ -52,15 +53,7 @@ function translateMessage(message: string, language: string): string {
     return translations[message][language];
   }
 
-  // Check for partial matches and translate parts
-  let translated = message;
-  for (const [eng, trans] of Object.entries(translations)) {
-    if (message.includes(eng) && trans[language]) {
-      translated = translated.replace(eng, trans[language]);
-    }
-  }
-
-  return translated;
+  return message;
 }
 
 export function GenerationProgress({
