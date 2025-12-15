@@ -66,6 +66,25 @@ Action: [A group moment showing all characters together, main character central]
 Mood: [Warm, welcoming, cozy]
 **CHARACTER RULE: Include ALL characters in this scene. The main character should be in the CENTER, with all other characters arranged around them.**
 
+---VISUAL BIBLE---
+(Track recurring visual elements for consistency across illustrations. Skip any category that doesn't apply.)
+
+### Secondary Characters
+(Characters who appear but aren't the main characters - describe their appearance)
+- **[Name]** (pages X, Y, Z): [Physical description - hair color, clothing, distinctive features]
+
+### Animals & Creatures
+(Pets, magical creatures, animals that appear multiple times)
+- **[Name]** (pages X, Y, Z): [Species, color, size, distinctive features]
+
+### Artifacts
+(Important objects that appear multiple times)
+- **[Name]** (pages X, Y, Z): [Color, material, size, distinctive details]
+
+### Locations
+(Settings that appear multiple times)
+- **[Name]** (pages X, Y, Z): [Key visual features, colors, atmosphere]
+
 ---PAGE 1---
 TEXT:
 [Story text - 4-6 sentences, 50-70 words]

@@ -7313,13 +7313,20 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const pageTexts = {};
 
     // Helper function to generate image for a scene (used during streaming)
-    const generateImageForScene = async (pageNum, sceneDesc, pageText = null) => {
+    const generateImageForScene = async (pageNum, sceneDesc, pageText = null, vBible = null) => {
       try {
         const sceneCharacters = getCharactersInScene(sceneDesc, inputData.characters || []);
         const scenePhotos = getCharacterPhotos(sceneCharacters);
-        console.log(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} characters)...`);
 
-        const imagePrompt = buildImagePrompt(sceneDesc, inputData, sceneCharacters, false);
+        // Log with visual bible info if available
+        if (vBible) {
+          const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
+          console.log(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} chars, ${relevantEntries.length} visual bible entries)...`);
+        } else {
+          console.log(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} characters)...`);
+        }
+
+        const imagePrompt = buildImagePrompt(sceneDesc, inputData, sceneCharacters, false, vBible, pageNum);
         imagePrompts[pageNum] = imagePrompt;
 
         let imageResult = null;
@@ -7455,7 +7462,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     }
 
     // Extract INITIAL PAGE scene (for dedication/intro page)
-    const initialPageMatch = response.match(/---INITIAL PAGE---\s*([\s\S]*?)(?=---PAGE\s+\d+---|$)/i);
+    const initialPageMatch = response.match(/---INITIAL PAGE---\s*([\s\S]*?)(?=---VISUAL BIBLE---|---PAGE\s+\d+---|$)/i);
     if (initialPageMatch) {
       const initialPageBlock = initialPageMatch[1];
       const sceneMatch = initialPageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
@@ -7463,6 +7470,19 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         coverScenes.initialPage = sceneMatch[1].trim();
         console.log(`📖 [STORYBOOK] Extracted Initial Page scene: ${coverScenes.initialPage.substring(0, 100)}...`);
       }
+    }
+
+    // Extract VISUAL BIBLE section for recurring elements
+    let visualBible = null;
+    const visualBibleMatch = response.match(/---VISUAL BIBLE---\s*([\s\S]*?)(?=---PAGE\s+\d+---|$)/i);
+    if (visualBibleMatch) {
+      const visualBibleSection = visualBibleMatch[1];
+      visualBible = parseVisualBible('## Visual Bible\n' + visualBibleSection);
+      const totalEntries = (visualBible.secondaryCharacters?.length || 0) +
+                          (visualBible.animals?.length || 0) +
+                          (visualBible.artifacts?.length || 0) +
+                          (visualBible.locations?.length || 0);
+      console.log(`📖 [STORYBOOK] Extracted Visual Bible: ${totalEntries} entries`);
     }
 
     // Extract BACK COVER scene
@@ -7524,16 +7544,23 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       console.log(`🖼️  [STORYBOOK] Image generation mode: ${imageGenMode.toUpperCase()}`);
 
       // Helper function to generate a single image (used for sequential mode)
-      const generateImage = async (scene, idx, previousImage = null, isSequential = false) => {
+      const generateImage = async (scene, idx, previousImage = null, isSequential = false, vBible = null) => {
         const pageNum = scene.pageNumber;
         try {
           // Detect which characters appear in this scene
           const sceneCharacters = getCharactersInScene(scene.description, inputData.characters || []);
           const scenePhotos = getCharacterPhotos(sceneCharacters);
-          console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
-          // Build image prompt with only scene-specific characters
-          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters, isSequential);
+          // Log visual bible usage
+          if (vBible) {
+            const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
+            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, ${relevantEntries.length} visual bible entries)...`);
+          } else {
+            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
+          }
+
+          // Build image prompt with only scene-specific characters and visual bible
+          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters, isSequential, vBible, pageNum);
           imagePrompts[pageNum] = imagePrompt;
 
           let imageResult = null;
@@ -7591,13 +7618,16 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       if (imageGenMode === 'sequential') {
         // SEQUENTIAL MODE: Generate images one at a time, passing previous for consistency
         console.log(`🔗 [STORYBOOK] Starting SEQUENTIAL image generation for ${allSceneDescriptions.length} scenes...`);
+        if (visualBible) {
+          console.log(`📖 [STORYBOOK] Using visual bible for image generation`);
+        }
         let previousImage = null;
 
         for (let i = 0; i < allSceneDescriptions.length; i++) {
           const scene = allSceneDescriptions[i];
           console.log(`🔗 [STORYBOOK SEQUENTIAL ${i + 1}/${allSceneDescriptions.length}] Processing page ${scene.pageNumber}...`);
 
-          const result = await generateImage(scene, i, previousImage, true); // isSequential = true
+          const result = await generateImage(scene, i, previousImage, true, visualBible); // isSequential = true, with visual bible
           allImages.push(result);
 
           // Use this image as reference for next image
@@ -7626,10 +7656,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         if (missingScenes.length > 0) {
           console.log(`⚡ [STORYBOOK] Generating ${missingScenes.length} remaining images...`);
+          if (visualBible) {
+            console.log(`📖 [STORYBOOK] Using visual bible for remaining images`);
+          }
           const limit = pLimit(5);
 
           const remainingPromises = missingScenes.map((scene) => {
-            return limit(() => generateImageForScene(scene.pageNumber, scene.description));
+            return limit(() => generateImageForScene(scene.pageNumber, scene.description, null, visualBible));
           });
 
           const remainingResults = await Promise.all(remainingPromises);
@@ -7693,6 +7726,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
         const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
+        // Build visual bible prompt for covers (all recurring elements)
+        const visualBibleForCovers = buildFullVisualBiblePrompt(visualBible);
+        if (visualBibleForCovers) {
+          console.log(`📖 [STORYBOOK] Adding visual bible to cover prompts`);
+        }
+
         // Front cover - use same template as standard mode
         // Detect which characters appear in the front cover scene
         const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
@@ -7704,7 +7743,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle,
-          VISUAL_BIBLE: '' // Picture book mode doesn't have visual bible
+          VISUAL_BIBLE: visualBibleForCovers
         });
         coverPrompts.frontCover = frontCoverPrompt;
         const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
@@ -7731,14 +7770,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               DEDICATION: inputData.dedication,
-              VISUAL_BIBLE: '' // Picture book mode doesn't have visual bible
+              VISUAL_BIBLE: visualBibleForCovers
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle,
-              VISUAL_BIBLE: '' // Picture book mode doesn't have visual bible
+              VISUAL_BIBLE: visualBibleForCovers
             });
         coverPrompts.initialPage = initialPrompt;
         const initialResult = await generateImageWithQualityRetry(initialPrompt, characterPhotos, null, 'cover');
@@ -7763,7 +7802,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo,
-          VISUAL_BIBLE: '' // Picture book mode doesn't have visual bible
+          VISUAL_BIBLE: visualBibleForCovers
         });
         coverPrompts.backCover = backCoverPrompt;
         const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');
@@ -7791,6 +7830,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       title: storyTitle,
       storyText: fullStoryText,
       outline: '', // No outline for picture book mode
+      visualBible: visualBible, // Recurring visual elements for consistency
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
@@ -7824,6 +7864,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       relationships: inputData.relationships || {},
       relationshipTexts: inputData.relationshipTexts || {},
       outline: '',
+      visualBible: visualBible, // Recurring visual elements for consistency
       storyText: fullStoryText,
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
