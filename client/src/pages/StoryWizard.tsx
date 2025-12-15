@@ -753,13 +753,18 @@ export default function StoryWizard() {
 
       // Poll for job status
       let completed = false;
+      let lastProgress = 0;
       while (!completed) {
         await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
 
         const status = await storyService.getJobStatus(newJobId);
-        log.debug('Job status:', status);
 
         if (status.progress) {
+          // Only log when progress changes
+          if (status.progress.current !== lastProgress) {
+            log.debug(`Progress: ${status.progress.current}% - ${status.progress.message || ''}`);
+            lastProgress = status.progress.current;
+          }
           // Server progress is already in { current, total, message } format
           setGenerationProgress(status.progress);
         }

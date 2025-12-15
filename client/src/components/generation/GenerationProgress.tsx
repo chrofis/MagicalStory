@@ -78,19 +78,22 @@ export function GenerationProgress({
     en: {
       title: 'Creating Your Story!',
       timeInfo: 'This typically takes about 10 minutes.',
-      emailInfo: 'You will receive an email when ready.',
+      emailInfo: 'You will receive an email when your story is ready.',
+      canClose: 'You can wait here or close the browser - your story will keep generating.',
       noEmailInfo: 'You can close this page and come back later.',
     },
     de: {
       title: 'Geschichte wird erstellt!',
       timeInfo: 'Dies dauert normalerweise etwa 10 Minuten.',
-      emailInfo: 'Du erhältst eine E-Mail wenn die Geschichte bereit ist.',
+      emailInfo: 'Du erhältst eine E-Mail, wenn deine Geschichte bereit ist.',
+      canClose: 'Du kannst hier warten oder den Browser schließen - deine Geschichte wird weiter generiert.',
       noEmailInfo: 'Du kannst diese Seite schließen und später zurückkommen.',
     },
     fr: {
       title: 'Création de votre histoire!',
       timeInfo: 'Cela prend généralement environ 10 minutes.',
-      emailInfo: 'Vous recevrez un email quand ce sera prêt.',
+      emailInfo: 'Vous recevrez un email quand votre histoire sera prête.',
+      canClose: 'Vous pouvez attendre ici ou fermer le navigateur - votre histoire continuera à être générée.',
       noEmailInfo: 'Vous pouvez fermer cette page et revenir plus tard.',
     },
   };
@@ -130,16 +133,22 @@ export function GenerationProgress({
             <Clock size={16} className="text-gray-500 shrink-0" />
             <p className="text-sm">{t.timeInfo}</p>
           </div>
-          <div className="flex items-center gap-2 text-gray-700">
-            <Mail size={16} className="text-gray-500 shrink-0" />
-            <p className="text-sm">
-              {hasEmail ? (
-                <>{t.emailInfo} <span className="text-gray-500">({user?.email})</span></>
-              ) : (
-                t.noEmailInfo
-              )}
-            </p>
-          </div>
+          {hasEmail ? (
+            <>
+              <div className="flex items-center gap-2 text-gray-700">
+                <Mail size={16} className="text-gray-500 shrink-0" />
+                <p className="text-sm">
+                  {t.emailInfo} <span className="text-gray-500">({user?.email})</span>
+                </p>
+              </div>
+              <p className="text-sm text-gray-600 pl-6">{t.canClose}</p>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 text-gray-700">
+              <Mail size={16} className="text-gray-500 shrink-0" />
+              <p className="text-sm">{t.noEmailInfo}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
