@@ -7191,8 +7191,19 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           STORY_TITLE: storyTitle
         });
         coverPrompts.frontCover = frontCoverPrompt;
-        const frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos, null, 'cover');
-        coverImages.frontCover = { imageData: frontCoverResult.imageData, description: titlePageScene, prompt: frontCoverPrompt, qualityScore: frontCoverResult.score, qualityReasoning: frontCoverResult.reasoning || null };
+        const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
+        console.log(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
+        coverImages.frontCover = {
+          imageData: frontCoverResult.imageData,
+          description: titlePageScene,
+          prompt: frontCoverPrompt,
+          qualityScore: frontCoverResult.score,
+          qualityReasoning: frontCoverResult.reasoning || null,
+          wasRegenerated: frontCoverResult.wasRegenerated || false,
+          originalImage: frontCoverResult.originalImage || null,
+          originalScore: frontCoverResult.originalScore || null,
+          originalReasoning: frontCoverResult.originalReasoning || null
+        };
 
         // Initial page - use ALL characters (main character centered, all others around)
         // Pass ALL character photos since this is a group scene introducing everyone
@@ -7212,8 +7223,19 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               STORY_TITLE: storyTitle
             });
         coverPrompts.initialPage = initialPrompt;
-        const initialResult = await callGeminiAPIForImage(initialPrompt, characterPhotos, null, 'cover');
-        coverImages.initialPage = { imageData: initialResult.imageData, description: initialPageScene, prompt: initialPrompt, qualityScore: initialResult.score, qualityReasoning: initialResult.reasoning || null };
+        const initialResult = await generateImageWithQualityRetry(initialPrompt, characterPhotos, null, 'cover');
+        console.log(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
+        coverImages.initialPage = {
+          imageData: initialResult.imageData,
+          description: initialPageScene,
+          prompt: initialPrompt,
+          qualityScore: initialResult.score,
+          qualityReasoning: initialResult.reasoning || null,
+          wasRegenerated: initialResult.wasRegenerated || false,
+          originalImage: initialResult.originalImage || null,
+          originalScore: initialResult.originalScore || null,
+          originalReasoning: initialResult.originalReasoning || null
+        };
 
         // Back cover - use ALL characters with EQUAL prominence (no focus on main character)
         // Pass ALL character photos since this is a group scene with everyone equal
@@ -7225,8 +7247,19 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           CHARACTER_INFO: characterInfo
         });
         coverPrompts.backCover = backCoverPrompt;
-        const backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos, null, 'cover');
-        coverImages.backCover = { imageData: backCoverResult.imageData, description: backCoverScene, prompt: backCoverPrompt, qualityScore: backCoverResult.score, qualityReasoning: backCoverResult.reasoning || null };
+        const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');
+        console.log(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
+        coverImages.backCover = {
+          imageData: backCoverResult.imageData,
+          description: backCoverScene,
+          prompt: backCoverPrompt,
+          qualityScore: backCoverResult.score,
+          qualityReasoning: backCoverResult.reasoning || null,
+          wasRegenerated: backCoverResult.wasRegenerated || false,
+          originalImage: backCoverResult.originalImage || null,
+          originalScore: backCoverResult.originalScore || null,
+          originalReasoning: backCoverResult.originalReasoning || null
+        };
 
         console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
       } catch (error) {
@@ -7917,8 +7950,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           STORY_TITLE: storyTitle
         });
         coverPrompts.frontCover = frontCoverPrompt;
-        frontCoverResult = await callGeminiAPIForImage(frontCoverPrompt, frontCoverPhotos, null, 'cover');
-        console.log(`✅ [PIPELINE] Front cover generated successfully`);
+        frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
+        console.log(`✅ [PIPELINE] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
         // Save checkpoint: front cover
         await saveCheckpoint(jobId, 'cover', { type: 'front', prompt: frontCoverPrompt }, 0);
       } catch (error) {
@@ -7944,8 +7977,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               STORY_TITLE: storyTitle
             });
         coverPrompts.initialPage = initialPagePrompt;
-        initialPageResult = await callGeminiAPIForImage(initialPagePrompt, characterPhotos, null, 'cover');
-        console.log(`✅ [PIPELINE] Initial page generated successfully`);
+        initialPageResult = await generateImageWithQualityRetry(initialPagePrompt, characterPhotos, null, 'cover');
+        console.log(`✅ [PIPELINE] Initial page generated (score: ${initialPageResult.score}${initialPageResult.wasRegenerated ? ', regenerated' : ''})`);
         // Save checkpoint: initial page cover
         await saveCheckpoint(jobId, 'cover', { type: 'initialPage', prompt: initialPagePrompt }, 1);
       } catch (error) {
@@ -7963,8 +7996,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           CHARACTER_INFO: characterInfo
         });
         coverPrompts.backCover = backCoverPrompt;
-        backCoverResult = await callGeminiAPIForImage(backCoverPrompt, characterPhotos, null, 'cover');
-        console.log(`✅ [PIPELINE] Back cover generated successfully`);
+        backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');
+        console.log(`✅ [PIPELINE] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
         // Save checkpoint: back cover
         await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
       } catch (error) {
@@ -7978,25 +8011,40 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           description: titlePageScene,
           prompt: coverPrompts.frontCover,
           qualityScore: frontCoverResult.score,
-          qualityReasoning: frontCoverResult.reasoning || null
+          qualityReasoning: frontCoverResult.reasoning || null,
+          wasRegenerated: frontCoverResult.wasRegenerated || false,
+          originalImage: frontCoverResult.originalImage || null,
+          originalScore: frontCoverResult.originalScore || null,
+          originalReasoning: frontCoverResult.originalReasoning || null
         },
         initialPage: {
           imageData: initialPageResult.imageData,
           description: initialPageScene,
           prompt: coverPrompts.initialPage,
           qualityScore: initialPageResult.score,
-          qualityReasoning: initialPageResult.reasoning || null
+          qualityReasoning: initialPageResult.reasoning || null,
+          wasRegenerated: initialPageResult.wasRegenerated || false,
+          originalImage: initialPageResult.originalImage || null,
+          originalScore: initialPageResult.originalScore || null,
+          originalReasoning: initialPageResult.originalReasoning || null
         },
         backCover: {
           imageData: backCoverResult.imageData,
           description: backCoverScene,
           prompt: coverPrompts.backCover,
           qualityScore: backCoverResult.score,
-          qualityReasoning: backCoverResult.reasoning || null
+          qualityReasoning: backCoverResult.reasoning || null,
+          wasRegenerated: backCoverResult.wasRegenerated || false,
+          originalImage: backCoverResult.originalImage || null,
+          originalScore: backCoverResult.originalScore || null,
+          originalReasoning: backCoverResult.originalReasoning || null
         }
       };
 
-      console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCoverResult.score}, Initial: ${initialPageResult.score}, Back: ${backCoverResult.score}`);
+      const frontRegen = frontCoverResult.wasRegenerated ? ' (regenerated)' : '';
+      const initialRegen = initialPageResult.wasRegenerated ? ' (regenerated)' : '';
+      const backRegen = backCoverResult.wasRegenerated ? ' (regenerated)' : '';
+      console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCoverResult.score}${frontRegen}, Initial: ${initialPageResult.score}${initialRegen}, Back: ${backCoverResult.score}${backRegen}`);
     } else {
       console.log(`📝 [PIPELINE] Text-only mode - skipping cover image generation`);
     }
