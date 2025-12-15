@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Book, Trash2, Eye } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -17,7 +17,74 @@ interface StoryListItem {
   language: string;
   pages: number;
   created_at: string;
+  createdAt?: string;
   thumbnail?: string;
+}
+
+// Story card component with individual image loading state
+function StoryCard({
+  story,
+  language,
+  onView,
+  onDelete,
+  formatDate
+}: {
+  story: StoryListItem;
+  language: string;
+  onView: () => void;
+  onDelete: () => void;
+  formatDate: (date: string | undefined) => string;
+}) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  return (
+    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
+      {story.thumbnail && !imageError ? (
+        <div className="relative w-full h-48 bg-gray-100">
+          {!imageLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-8 h-8 spinner" />
+            </div>
+          )}
+          <img
+            src={story.thumbnail}
+            alt={story.title}
+            className={`w-full h-48 object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageError(true)}
+          />
+        </div>
+      ) : (
+        <div className="w-full h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+          <Book className="w-12 h-12 text-indigo-300" />
+        </div>
+      )}
+      <div className="p-4 flex flex-col flex-1">
+        <div className="flex-1">
+          <h3 className="font-bold text-lg text-gray-800 mb-2">{story.title}</h3>
+          <p className="text-sm text-gray-500 mb-3">
+            {story.pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} • {formatDate(story.created_at || story.createdAt)}
+          </p>
+        </div>
+        <div className="flex gap-2 mt-auto">
+          <button
+            onClick={onView}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            <Eye size={18} />
+            {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : 'View'}
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function MyStories() {
@@ -71,7 +138,7 @@ export default function MyStories() {
     }
   };
 
-  const formatDate = (dateStr: string | undefined) => {
+  const formatDate = useCallback((dateStr: string | undefined) => {
     if (!dateStr) return '';
     try {
       const date = new Date(dateStr);
@@ -83,7 +150,7 @@ export default function MyStories() {
     } catch {
       return '';
     }
-  };
+  }, [language]);
 
   if (!isAuthenticated) {
     return <LoadingSpinner fullScreen />;
@@ -130,41 +197,14 @@ export default function MyStories() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {stories.map((story) => (
-              <div
+              <StoryCard
                 key={story.id}
-                className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col"
-              >
-                {story.thumbnail && (
-                  <img
-                    src={story.thumbnail}
-                    alt={story.title}
-                    className="w-full h-48 object-cover"
-                  />
-                )}
-                <div className="p-4 flex flex-col flex-1">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg text-gray-800 mb-2">{story.title}</h3>
-                    <p className="text-sm text-gray-500 mb-3">
-                      {story.pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} • {formatDate(story.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex gap-2 mt-auto">
-                    <button
-                      onClick={() => navigate(`/create?storyId=${story.id}`)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                    >
-                      <Eye size={18} />
-                      {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : 'View'}
-                    </button>
-                    <button
-                      onClick={() => deleteStory(story.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+                story={story}
+                language={language}
+                onView={() => navigate(`/create?storyId=${story.id}`)}
+                onDelete={() => deleteStory(story.id)}
+                formatDate={formatDate}
+              />
             ))}
           </div>
         )}

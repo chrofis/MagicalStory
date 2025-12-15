@@ -140,12 +140,11 @@ export default function StoryWizard() {
         });
         if (story) {
           log.info('Loaded story:', story.title);
-          // Populate story data
+          // Populate story data - set generatedStory BEFORE step to avoid flash
           setStoryId(story.id);
           setStoryTitle(story.title || '');
           setStoryType(story.storyType || '');
           setArtStyle(story.artStyle || 'pixar');
-          setGeneratedStory(story.story || '');
           setStoryOutline(story.outline || '');
           setOutlinePrompt(story.outlinePrompt || '');
           setStoryTextPrompts(story.storyTextPrompts || []);
@@ -154,15 +153,22 @@ export default function StoryWizard() {
           setSceneDescriptions(story.sceneDescriptions || []);
           setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
           setLanguageLevel(story.languageLevel || 'standard');
-          // Set to step 5 to show the story
-          setStep(5);
           setIsGenerating(false);
+          // Set generatedStory last, then step, then isLoading - ensures story is ready before showing
+          setGeneratedStory(story.story || '');
+          setStep(5);
+          // Small delay to ensure React has processed all state updates
+          setTimeout(() => {
+            setIsLoading(false);
+            setLoadingProgress(null);
+          }, 50);
         } else {
           log.error('Story not found:', urlStoryId);
+          setIsLoading(false);
+          setLoadingProgress(null);
         }
       } catch (error) {
         log.error('Failed to load story:', error);
-      } finally {
         setIsLoading(false);
         setLoadingProgress(null);
       }

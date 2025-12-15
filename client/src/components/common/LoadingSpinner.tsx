@@ -14,7 +14,7 @@ export function LoadingSpinner({ size = 'md', fullScreen = false, message }: Loa
   const spinner = (
     <div className="flex flex-col items-center justify-center gap-4">
       <div className={`${sizeClasses[size]} spinner`} />
-      {message && <p className="text-purple-600 font-medium">{message}</p>}
+      {message && <p className="text-indigo-600 font-medium">{message}</p>}
     </div>
   );
 

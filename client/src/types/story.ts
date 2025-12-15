@@ -23,6 +23,19 @@ export interface SceneDescription {
   description: string;
 }
 
+export interface RetryAttempt {
+  attempt: number;
+  type: 'generation' | 'text_edit' | 'text_edit_failed';
+  imageData?: string;
+  score?: number;
+  reasoning?: string;
+  textIssue?: string | null;
+  expectedText?: string | null;
+  actualText?: string | null;
+  error?: string;
+  timestamp: string;
+}
+
 export interface SceneImage {
   pageNumber: number;
   imageData: string;
@@ -33,6 +46,8 @@ export interface SceneImage {
   qualityReasoning?: string;
   // Regeneration info (for dev mode)
   wasRegenerated?: boolean;
+  totalAttempts?: number;
+  retryHistory?: RetryAttempt[];
   originalImage?: string;
   originalScore?: number;
   originalReasoning?: string;
@@ -44,6 +59,12 @@ export interface CoverImageData {
   prompt?: string;       // The actual prompt sent to image generation API
   qualityScore?: number;
   qualityReasoning?: string;
+  // Regeneration info (for dev mode)
+  wasRegenerated?: boolean;
+  totalAttempts?: number;
+  retryHistory?: RetryAttempt[];
+  originalImage?: string;
+  originalScore?: number;
 }
 
 export interface CoverImages {

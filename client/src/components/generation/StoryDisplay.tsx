@@ -1,7 +1,103 @@
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3 } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
+
+// Helper component to display retry history
+function RetryHistoryDisplay({
+  retryHistory,
+  totalAttempts,
+  language
+}: {
+  retryHistory: RetryAttempt[];
+  totalAttempts: number;
+  language: string;
+}) {
+  if (!retryHistory || retryHistory.length === 0) return null;
+
+  return (
+    <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-purple-700 flex items-center justify-between">
+        <span className="flex items-center gap-2">
+          <History size={14} />
+          {language === 'de' ? 'Generierungshistorie' : language === 'fr' ? 'Historique de génération' : 'Generation History'}
+        </span>
+        <span className="text-purple-600">
+          {totalAttempts} {language === 'de' ? 'Versuche' : language === 'fr' ? 'tentatives' : 'attempts'}
+        </span>
+      </summary>
+      <div className="mt-3 space-y-3">
+        {retryHistory.map((attempt, idx) => (
+          <div key={idx} className={`border rounded-lg p-3 ${
+            idx === retryHistory.length - 1
+              ? 'bg-green-50 border-green-300'
+              : 'bg-white border-gray-200'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-sm">
+                {language === 'de' ? `Versuch ${attempt.attempt}` : language === 'fr' ? `Tentative ${attempt.attempt}` : `Attempt ${attempt.attempt}`}
+                {attempt.type === 'text_edit' && (
+                  <span className="text-xs ml-2 text-blue-600">(text edit)</span>
+                )}
+                {attempt.type === 'text_edit_failed' && (
+                  <span className="text-xs ml-2 text-red-600">(text edit failed)</span>
+                )}
+                {idx === retryHistory.length - 1 && (
+                  <span className="text-xs ml-2 text-green-600 font-bold">✓ USED</span>
+                )}
+              </span>
+              {attempt.score !== undefined && (
+                <span className={`font-bold ${
+                  attempt.score >= 70 ? 'text-green-600' :
+                  attempt.score >= 50 ? 'text-yellow-600' :
+                  'text-red-600'
+                }`}>
+                  {Math.round(attempt.score)}%
+                </span>
+              )}
+            </div>
+
+            {attempt.error && (
+              <div className="text-xs text-red-600 mb-2">Error: {attempt.error}</div>
+            )}
+
+            {attempt.textIssue && attempt.textIssue !== 'NONE' && (
+              <div className="text-xs text-orange-600 mb-2">
+                Text issue: {attempt.textIssue}
+                {attempt.expectedText && <span className="block">Expected: "{attempt.expectedText}"</span>}
+                {attempt.actualText && <span className="block">Actual: "{attempt.actualText}"</span>}
+              </div>
+            )}
+
+            {attempt.reasoning && (
+              <details className="text-xs text-gray-600 mb-2">
+                <summary className="cursor-pointer">{language === 'de' ? 'Feedback' : 'Feedback'}</summary>
+                <p className="mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded">{attempt.reasoning}</p>
+              </details>
+            )}
+
+            {attempt.imageData && (
+              <details>
+                <summary className="cursor-pointer text-xs text-blue-600">
+                  {language === 'de' ? 'Bild anzeigen' : language === 'fr' ? 'Voir image' : 'View image'}
+                </summary>
+                <img
+                  src={attempt.imageData}
+                  alt={`Attempt ${attempt.attempt}`}
+                  className={`mt-2 w-full rounded border ${idx === retryHistory.length - 1 ? 'border-green-300' : 'border-gray-200 opacity-75'}`}
+                />
+              </details>
+            )}
+
+            <div className="text-xs text-gray-400 mt-1">
+              {new Date(attempt.timestamp).toLocaleTimeString()}
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
 
 interface StoryTextPrompt {
   batch: number;
@@ -408,6 +504,13 @@ export function StoryDisplay({
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
                         </details>
                       )}
+                      {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
+                        <RetryHistoryDisplay
+                          retryHistory={coverObj.retryHistory}
+                          totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
+                          language={language}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -465,6 +568,13 @@ export function StoryDisplay({
                           </summary>
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
                         </details>
+                      )}
+                      {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
+                        <RetryHistoryDisplay
+                          retryHistory={coverObj.retryHistory}
+                          totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
+                          language={language}
+                        />
                       )}
                     </div>
                   )}

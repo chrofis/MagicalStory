@@ -1606,8 +1606,8 @@ app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) 
       const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC';
       const rows = await dbQuery(selectQuery, [targetUserId]);
 
-      // Generate small thumbnails in parallel
-      const storiesWithFullThumbnails = rows.map(row => {
+      // Return full-quality thumbnails
+      userStories = rows.map(row => {
         const story = JSON.parse(row.data);
         return {
           id: story.id,
@@ -1618,46 +1618,27 @@ app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) 
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
           pageCount: story.sceneImages?.length || 0,
-          fullThumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
         };
       });
-
-      userStories = await Promise.all(storiesWithFullThumbnails.map(async (story) => {
-        const thumbnail = story.fullThumbnail ? await generateThumbnail(story.fullThumbnail, 200) : null;
-        return {
-          id: story.id,
-          title: story.title,
-          createdAt: story.createdAt,
-          updatedAt: story.updatedAt,
-          pages: story.pages,
-          language: story.language,
-          characters: story.characters,
-          pageCount: story.pageCount,
-          thumbnail
-        };
-      }));
 
       console.log(`📚 [ADMIN] Found ${userStories.length} stories for user ${targetUsername} (ID: ${targetUserId})`);
       res.json({ userId: targetUserId, username: targetUsername, stories: userStories });
     } else {
-      // File mode - generate small thumbnails in parallel
+      // File mode - return full-quality thumbnails
       const allStories = await readJSON(STORIES_FILE);
       const fullStories = allStories[targetUserId] || [];
 
-      userStories = await Promise.all(fullStories.map(async (story) => {
-        const fullThumbnail = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
-        const thumbnail = fullThumbnail ? await generateThumbnail(fullThumbnail, 200) : null;
-        return {
-          id: story.id,
-          title: story.title,
-          createdAt: story.createdAt,
-          updatedAt: story.updatedAt,
-          pages: story.pages,
-          language: story.language,
-          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: story.sceneImages?.length || 0,
-          thumbnail
-        };
+      userStories = fullStories.map(story => ({
+        id: story.id,
+        title: story.title,
+        createdAt: story.createdAt,
+        updatedAt: story.updatedAt,
+        pages: story.pages,
+        language: story.language,
+        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+        pageCount: story.sceneImages?.length || 0,
+        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
       }));
 
       console.log(`📚 [ADMIN] File mode: Found ${userStories.length} stories for user ${targetUserId}`);
@@ -2374,8 +2355,8 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const rows = await dbQuery(selectQuery, [req.user.id]);
       console.log(`📚 Query returned ${rows.length} rows`);
 
-      // Parse the JSON data from each row - return ONLY metadata with small thumbnails
-      const storiesWithFullThumbnails = rows.map(row => {
+      // Parse the JSON data from each row - return metadata with full-quality thumbnails
+      userStories = rows.map(row => {
         const story = JSON.parse(row.data);
         return {
           id: story.id,
@@ -2386,27 +2367,10 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
           pageCount: story.sceneImages?.length || 0,
-          fullThumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
         };
       });
-
-      // Generate small thumbnails in parallel (200px wide, ~5-15KB each instead of 500KB+)
-      console.log(`📚 Generating ${storiesWithFullThumbnails.length} small thumbnails...`);
-      userStories = await Promise.all(storiesWithFullThumbnails.map(async (story) => {
-        const thumbnail = story.fullThumbnail ? await generateThumbnail(story.fullThumbnail, 200) : null;
-        return {
-          id: story.id,
-          title: story.title,
-          createdAt: story.createdAt,
-          updatedAt: story.updatedAt,
-          pages: story.pages,
-          language: story.language,
-          characters: story.characters,
-          pageCount: story.pageCount,
-          thumbnail
-        };
-      }));
-      console.log(`📚 Parsed ${userStories.length} stories with small thumbnails`);
+      console.log(`📚 Parsed ${userStories.length} stories with full-quality thumbnails`);
 
       if (userStories.length > 0) {
         console.log(`📚 First story: ${userStories[0].title} (ID: ${userStories[0].id})`);
@@ -2416,23 +2380,19 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const allStories = await readJSON(STORIES_FILE);
       const fullStories = allStories[req.user.id] || [];
 
-      // Generate small thumbnails in parallel
-      userStories = await Promise.all(fullStories.map(async (story) => {
-        const fullThumbnail = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
-        const thumbnail = fullThumbnail ? await generateThumbnail(fullThumbnail, 200) : null;
-        return {
-          id: story.id,
-          title: story.title,
-          createdAt: story.createdAt,
-          updatedAt: story.updatedAt,
-          pages: story.pages,
-          language: story.language,
-          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: story.sceneImages?.length || 0,
-          thumbnail
-        };
+      // Return full-quality thumbnails
+      userStories = fullStories.map(story => ({
+        id: story.id,
+        title: story.title,
+        createdAt: story.createdAt,
+        updatedAt: story.updatedAt,
+        pages: story.pages,
+        language: story.language,
+        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+        pageCount: story.sceneImages?.length || 0,
+        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
       }));
-      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} with small thumbnails`);
+      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} with full-quality thumbnails`);
     }
 
     console.log(`📚 Returning ${userStories.length} stories (total size: ${JSON.stringify(userStories).length} bytes)`);
@@ -2772,6 +2732,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning || null,
       wasRegenerated: imageResult.wasRegenerated || false,
+      totalAttempts: imageResult.totalAttempts || 1,
+      retryHistory: imageResult.retryHistory || [],
       originalImage: imageResult.originalImage || null,
       originalScore: imageResult.originalScore || null,
       originalReasoning: imageResult.originalReasoning || null
@@ -2802,7 +2764,9 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       pageNumber,
       imageData: imageResult.imageData,
       qualityScore: imageResult.score,
-      qualityReasoning: imageResult.reasoning
+      qualityReasoning: imageResult.reasoning,
+      totalAttempts: imageResult.totalAttempts || 1,
+      retryHistory: imageResult.retryHistory || []
     });
 
   } catch (err) {
@@ -2948,6 +2912,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning || null,
       wasRegenerated: true,
+      totalAttempts: coverResult.totalAttempts || 1,
+      retryHistory: coverResult.retryHistory || [],
       originalImage: previousImageData,
       originalScore: previousCover?.qualityScore || null,
       regeneratedAt: new Date().toISOString()
@@ -2978,7 +2944,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       description: sceneDescription,
       prompt: coverPrompt,
       qualityScore: coverResult.score,
-      qualityReasoning: coverResult.reasoning
+      qualityReasoning: coverResult.reasoning,
+      totalAttempts: coverResult.totalAttempts || 1,
+      retryHistory: coverResult.retryHistory || []
     });
 
   } catch (err) {
@@ -3024,14 +2992,8 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
       return res.status(404).json({ error: 'No image found for this page' });
     }
 
-    // Get character photos for reference
-    const sceneDescriptions = storyData.sceneDescriptions || [];
-    const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
-    const sceneCharacters = getCharactersInScene(sceneDesc?.description || '', storyData.characters || []);
-    const scenePhotos = getCharacterPhotos(sceneCharacters);
-
-    // Edit the image
-    const editResult = await editImageWithPrompt(currentImage.imageData, editPrompt, scenePhotos);
+    // Edit the image (pure text/instruction based - no character photos to avoid regeneration artifacts)
+    const editResult = await editImageWithPrompt(currentImage.imageData, editPrompt);
 
     if (!editResult || !editResult.imageData) {
       return res.status(500).json({ error: 'Failed to edit image - no result returned' });
@@ -3119,11 +3081,8 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
       return res.status(404).json({ error: 'No cover image data found' });
     }
 
-    // Get character photos for reference
-    const characterPhotos = getCharacterPhotos(storyData.characters || []);
-
-    // Edit the cover image
-    const editResult = await editImageWithPrompt(currentImageData, editPrompt, characterPhotos);
+    // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
+    const editResult = await editImageWithPrompt(currentImageData, editPrompt);
 
     if (!editResult || !editResult.imageData) {
       return res.status(500).json({ error: 'Failed to edit cover - no result returned' });
@@ -9381,30 +9340,6 @@ async function compressImageToJPEG(pngBase64) {
   }
 }
 
-// Generate a small thumbnail for story listings (200px wide, low quality JPEG)
-async function generateThumbnail(imageBase64, maxWidth = 200) {
-  try {
-    if (!imageBase64) return null;
-
-    // Remove data URI prefix if present
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-
-    // Convert base64 to buffer
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-
-    // Resize and compress to small JPEG thumbnail
-    const thumbnailBuffer = await sharp(imageBuffer)
-      .resize({ width: maxWidth, withoutEnlargement: true })
-      .jpeg({ quality: 60, progressive: true })
-      .toBuffer();
-
-    return `data:image/jpeg;base64,${thumbnailBuffer.toString('base64')}`;
-  } catch (error) {
-    console.error('❌ [THUMBNAIL] Error generating thumbnail:', error.message);
-    return null;
-  }
-}
-
 /**
  * Evaluate image quality using Claude API
  * Sends the image to Claude for quality assessment
@@ -9633,13 +9568,16 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     console.log(`🖼️  [IMAGE GEN] Added ${characterPhotos.length} character reference images`);
   }
 
+  // Use Gemini 3 Pro Image for covers (higher quality), 2.5 Flash for scenes (faster)
+  const modelId = evaluationType === 'cover' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+
   const requestBody = {
     contents: [{
       parts: parts
     }],
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
-      temperature: 0.5,
+      temperature: 0.8,
       imageConfig: {
         aspectRatio: "1:1"
       }
@@ -9647,10 +9585,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   };
 
   console.log('🖼️  [IMAGE GEN] Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
-  console.log('🖼️  [IMAGE GEN] Model: gemini-2.5-flash-image, Aspect Ratio: 1:1');
+  console.log(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8`);
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -9752,13 +9690,13 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
 /**
  * Edit text in a cover image using Gemini's image editing capabilities
+ * Pure text correction - no character photos to avoid regeneration artifacts
  * @param {string} imageData - The original image data (base64)
  * @param {string} actualText - The text currently in the image
  * @param {string} expectedText - The correct text that should be in the image
- * @param {string[]} characterPhotos - Character reference photos (optional)
  * @returns {Promise<{imageData: string}|null>}
  */
-async function editCoverImageText(imageData, actualText, expectedText, characterPhotos = []) {
+async function editCoverImageText(imageData, actualText, expectedText) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -9869,12 +9807,12 @@ IMPORTANT: Only change the text, nothing else. The result should look like the o
 
 /**
  * Edit an image based on a user-provided prompt using Gemini's image editing capabilities
+ * Pure text/instruction based - no character photos to avoid regeneration artifacts
  * @param {string} imageData - The original image data (base64)
  * @param {string} editInstruction - What the user wants to change
- * @param {string[]} characterPhotos - Character reference photos (optional)
  * @returns {Promise<{imageData: string}|null>}
  */
-async function editImageWithPrompt(imageData, editInstruction, characterPhotos = []) {
+async function editImageWithPrompt(imageData, editInstruction) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -9888,7 +9826,7 @@ async function editImageWithPrompt(imageData, editInstruction, characterPhotos =
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Build the editing prompt
+    // Build the editing prompt - pure text instruction, no character references
     const editPrompt = `Edit this children's storybook illustration according to the following instruction:
 
 USER'S EDIT REQUEST: "${editInstruction}"
@@ -9896,39 +9834,24 @@ USER'S EDIT REQUEST: "${editInstruction}"
 Instructions:
 1. Make ONLY the changes requested by the user
 2. Keep the EXACT same artistic style, colors, and overall composition
-3. Maintain character appearances - they should look the same
+3. Maintain ALL character appearances EXACTLY as they are - do not change any person or character
 4. Preserve the children's book illustration style
 5. Do NOT change anything else in the image beyond what was requested
-6. The result should still be appropriate for a children's storybook
+6. Do NOT crop, resize, or remove any part of the image
+7. The result should still be appropriate for a children's storybook
 
-IMPORTANT: Only apply the specific edit requested. Keep everything else the same.`;
+IMPORTANT: Only apply the specific edit requested. Keep everything else EXACTLY the same.`;
 
-    // Build parts array with the image, character references, and prompt
+    // Build parts array with ONLY the image and prompt - no character references
     const parts = [
       {
         inline_data: {
           mime_type: mimeType,
           data: base64Data
         }
-      }
+      },
+      { text: editPrompt }
     ];
-
-    // Add character reference photos if available
-    for (const photo of characterPhotos.slice(0, 3)) { // Limit to 3 refs
-      if (photo) {
-        const photoBase64 = photo.replace(/^data:image\/\w+;base64,/, '');
-        const photoMime = photo.match(/^data:(image\/\w+);base64,/) ?
-          photo.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
-        parts.push({
-          inline_data: {
-            mime_type: photoMime,
-            data: photoBase64
-          }
-        });
-      }
-    }
-
-    parts.push({ text: editPrompt });
 
     // Use Gemini 2.0 Flash for image editing (supports image generation/editing)
     const modelId = 'gemini-2.0-flash-exp-image-generation';
@@ -9999,11 +9922,12 @@ IMPORTANT: Only apply the specific edit requested. Keep everything else the same
 
 /**
  * Generate image with automatic retry if quality score is below threshold
+ * Stores all attempts for dev mode viewing
  * @param {string} prompt - The image generation prompt
  * @param {string[]} characterPhotos - Character reference photos
  * @param {string|null} previousImage - Previous image for sequential mode
  * @param {string} evaluationType - Type of evaluation ('scene' or 'cover')
- * @returns {Promise<{imageData, score, reasoning, wasRegenerated, originalImage, originalScore, originalReasoning}>}
+ * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene') {
   // MAX RETRIES: Covers get 3 attempts (text is tricky), scenes get 2
@@ -10011,6 +9935,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   let bestResult = null;
   let bestScore = -1;
   let attempts = 0;
+
+  // Store all attempts for dev mode
+  const retryHistory = [];
 
   while (attempts < MAX_ATTEMPTS) {
     attempts++;
@@ -10036,6 +9963,19 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       console.log(`🔤 [QUALITY RETRY] Expected: "${result.expectedText}" | Actual: "${result.actualText}"`);
     }
 
+    // Store this attempt in history
+    retryHistory.push({
+      attempt: attempts,
+      type: 'generation',
+      imageData: result.imageData,
+      score: score,
+      reasoning: result.reasoning,
+      textIssue: result.textIssue || null,
+      expectedText: result.expectedText || null,
+      actualText: result.actualText || null,
+      timestamp: new Date().toISOString()
+    });
+
     // Track best result
     if (score > bestScore) {
       bestScore = score;
@@ -10050,9 +9990,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         score: result.score,
         reasoning: result.reasoning,
         wasRegenerated: attempts > 1,
-        originalImage: null,
-        originalScore: null,
-        originalReasoning: null
+        totalAttempts: attempts,
+        retryHistory: retryHistory
       };
     }
 
@@ -10063,14 +10002,26 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         const editedResult = await editCoverImageText(
           result.imageData,
           result.actualText,
-          result.expectedText,
-          characterPhotos
+          result.expectedText
         );
 
         if (editedResult && editedResult.imageData) {
           const editedQuality = await evaluateImageQuality(editedResult.imageData, prompt, characterPhotos, 'cover');
           const editedScore = editedQuality?.score || 0;
           console.log(`⭐ [QUALITY RETRY] Edited image score: ${editedScore}%`);
+
+          // Store text edit attempt in history
+          retryHistory.push({
+            attempt: attempts,
+            type: 'text_edit',
+            imageData: editedResult.imageData,
+            score: editedScore,
+            reasoning: editedQuality?.reasoning || 'Text edited',
+            textIssue: editedQuality?.textIssue || null,
+            expectedText: result.expectedText,
+            actualText: editedQuality?.actualText || null,
+            timestamp: new Date().toISOString()
+          });
 
           if (editedScore >= IMAGE_QUALITY_THRESHOLD && (!editedQuality?.textIssue || editedQuality.textIssue === 'NONE')) {
             console.log(`✅ [QUALITY RETRY] Text edit succeeded!`);
@@ -10080,9 +10031,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               reasoning: editedQuality?.reasoning || 'Text edited',
               wasRegenerated: true,
               wasTextEdited: true,
-              originalImage: result.imageData,
-              originalScore: result.score,
-              originalReasoning: result.reasoning
+              totalAttempts: attempts,
+              retryHistory: retryHistory
             };
           }
 
@@ -10094,6 +10044,12 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         }
       } catch (editError) {
         console.log(`⚠️  [QUALITY RETRY] Text edit failed: ${editError.message}`);
+        retryHistory.push({
+          attempt: attempts,
+          type: 'text_edit_failed',
+          error: editError.message,
+          timestamp: new Date().toISOString()
+        });
       }
     }
   }
@@ -10105,9 +10061,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     score: bestResult.score,
     reasoning: bestResult.reasoning,
     wasRegenerated: true,
-    originalImage: null,
-    originalScore: null,
-    originalReasoning: null
+    totalAttempts: attempts,
+    retryHistory: retryHistory
   };
 }
 
