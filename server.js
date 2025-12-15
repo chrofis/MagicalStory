@@ -9460,9 +9460,9 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
 }
 
 /**
- * Crop image slightly to change aspect ratio
+ * Crop image to change aspect ratio for sequential mode
  * Used in sequential mode to prevent AI from copying too much from the reference image
- * Crops 8% from the bottom to force regeneration while preserving most context
+ * Crops 15% from top and 15% from bottom to force regeneration while preserving central context
  * @param {string} imageBase64 - Base64 encoded image (with data URI prefix)
  * @returns {Promise<string>} Cropped base64 encoded image with data URI prefix
  */
@@ -9483,15 +9483,16 @@ async function cropImageForSequential(imageBase64) {
       return imageBase64;
     }
 
-    // Crop 8% from the bottom - enough to change aspect ratio but preserve context
-    const cropAmount = Math.floor(height * 0.08);
-    const newHeight = height - cropAmount;
+    // Crop 15% from top and 15% from bottom (30% total) - focuses on central content
+    const cropTop = Math.floor(height * 0.15);
+    const cropBottom = Math.floor(height * 0.15);
+    const newHeight = height - cropTop - cropBottom;
 
-    console.log(`✂️ [CROP] Cropping reference image: ${width}x${height} → ${width}x${newHeight} (removed ${cropAmount}px from bottom)`);
+    console.log(`✂️ [CROP] Cropping reference image: ${width}x${height} → ${width}x${newHeight} (removed ${cropTop}px from top, ${cropBottom}px from bottom)`);
 
-    // Crop the image
+    // Crop the image - extract from cropTop offset
     const croppedBuffer = await sharp(imageBuffer)
-      .extract({ left: 0, top: 0, width: width, height: newHeight })
+      .extract({ left: 0, top: cropTop, width: width, height: newHeight })
       .png()
       .toBuffer();
 
@@ -9734,7 +9735,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // Crop the image slightly to change aspect ratio - this forces AI to regenerate
   // rather than copying too much from the reference image
   if (previousImage && previousImage.startsWith('data:image')) {
-    // Crop 8% from bottom to change aspect ratio
+    // Crop 15% from top and bottom to change aspect ratio
     const croppedImage = await cropImageForSequential(previousImage);
 
     const base64Data = croppedImage.replace(/^data:image\/\w+;base64,/, '');
