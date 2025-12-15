@@ -9,10 +9,18 @@ const path = require('path');
 const { Pool } = require('pg');
 const pLimit = require('p-limit');
 const crypto = require('crypto');
-// Initialize Stripe only if API key is provided (optional for local dev)
-const stripe = process.env.STRIPE_TEST_API_KEY
-  ? require('stripe')(process.env.STRIPE_TEST_API_KEY)
-  : null;
+// Payment mode: 'test' uses test keys + Gelato drafts, 'live' uses live keys + real orders
+const PAYMENT_MODE = process.env.PAYMENT_MODE || 'test';
+const isLivePayments = PAYMENT_MODE === 'live';
+
+// Initialize Stripe with appropriate key based on payment mode
+const stripeSecretKey = isLivePayments
+  ? process.env.STRIPE_LIVE_SECRET_KEY
+  : (process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_TEST_API_KEY); // fallback for existing env var
+const stripe = stripeSecretKey ? require('stripe')(stripeSecretKey) : null;
+
+// Log payment mode on startup
+console.log(`💳 Payment Mode: ${PAYMENT_MODE.toUpperCase()} ${isLivePayments ? '(REAL MONEY!)' : '(test mode)'}`);
 const sharp = require('sharp');
 const email = require('./email');
 const admin = require('firebase-admin');
@@ -357,12 +365,16 @@ app.use(cors(corsOptions));
 // IMPORTANT: This MUST be defined BEFORE express.json() middleware
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  // Use appropriate webhook secret based on payment mode
+  const webhookSecret = isLivePayments
+    ? process.env.STRIPE_LIVE_WEBHOOK_SECRET
+    : (process.env.STRIPE_TEST_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET); // fallback for existing env var
 
   // Check if webhook secret is configured
   if (!webhookSecret) {
-    console.error('❌ [STRIPE WEBHOOK] STRIPE_WEBHOOK_SECRET not configured in environment variables!');
-    console.error('   Please add STRIPE_WEBHOOK_SECRET to your Railway environment variables');
+    const secretName = isLivePayments ? 'STRIPE_LIVE_WEBHOOK_SECRET' : 'STRIPE_TEST_WEBHOOK_SECRET';
+    console.error(`❌ [STRIPE WEBHOOK] ${secretName} not configured in environment variables!`);
+    console.error('   Please add the webhook secret to your Railway environment variables');
     console.error('   Get the webhook signing secret from: https://dashboard.stripe.com/webhooks');
     return res.status(500).json({ error: 'Webhook secret not configured' });
   }
@@ -3412,7 +3424,8 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
     }
 
     const printApiKey = process.env.GELATO_API_KEY;
-    const orderType = process.env.GELATO_ORDER_TYPE || 'draft'; // 'draft' or 'order'
+    // Use payment mode to determine Gelato order type: test = draft, live = real order
+    const orderType = isLivePayments ? 'order' : 'draft';
 
     if (!printApiKey || printApiKey === 'your_print_api_key_here') {
       return res.status(500).json({
@@ -3420,6 +3433,8 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
         setupUrl: 'https://dashboard.gelato.com/'
       });
     }
+
+    console.log(`📦 [GELATO] Creating ${orderType} (PAYMENT_MODE=${PAYMENT_MODE})`);
 
     // Prepare print provider order payload
     const orderPayload = {
@@ -5259,7 +5274,9 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
       return res.status(500).json({ error: 'GELATO_API_KEY not configured' });
     }
 
-    const orderType = process.env.GELATO_ORDER_TYPE || 'order';
+    // Use payment mode to determine Gelato order type
+    const orderType = isLivePayments ? 'order' : 'draft';
+    console.log(`📦 [GELATO] Retry: Creating ${orderType} (PAYMENT_MODE=${PAYMENT_MODE})`);
 
     const printOrderPayload = {
       orderType: orderType,

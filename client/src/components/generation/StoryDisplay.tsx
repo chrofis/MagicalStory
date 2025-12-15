@@ -634,6 +634,13 @@ export function StoryDisplay({
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
                         </details>
                       )}
+                      {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
+                        <RetryHistoryDisplay
+                          retryHistory={coverObj.retryHistory}
+                          totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
+                          language={language}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -746,8 +753,17 @@ export function StoryDisplay({
                               </details>
                             )}
 
-                            {/* Regeneration Info */}
-                            {image.wasRegenerated && (
+                            {/* Retry History (shows all attempts with images) */}
+                            {image.retryHistory && image.retryHistory.length > 0 && (
+                              <RetryHistoryDisplay
+                                retryHistory={image.retryHistory}
+                                totalAttempts={image.totalAttempts || image.retryHistory.length}
+                                language={language}
+                              />
+                            )}
+
+                            {/* Regeneration Info (fallback for older data without retryHistory) */}
+                            {image.wasRegenerated && (!image.retryHistory || image.retryHistory.length === 0) && (
                               <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
                                   <span>🔄 {language === 'de' ? 'Bild regeneriert' : language === 'fr' ? 'Image régénérée' : 'Image Regenerated'}</span>
@@ -886,8 +902,17 @@ export function StoryDisplay({
                               </details>
                             )}
 
-                            {/* Regeneration Info */}
-                            {image.wasRegenerated && (
+                            {/* Retry History (shows all attempts with images) */}
+                            {image.retryHistory && image.retryHistory.length > 0 && (
+                              <RetryHistoryDisplay
+                                retryHistory={image.retryHistory}
+                                totalAttempts={image.totalAttempts || image.retryHistory.length}
+                                language={language}
+                              />
+                            )}
+
+                            {/* Regeneration Info (fallback for older data without retryHistory) */}
+                            {image.wasRegenerated && (!image.retryHistory || image.retryHistory.length === 0) && (
                               <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
                                   <span>🔄 {language === 'de' ? 'Bild regeneriert' : language === 'fr' ? 'Image régénérée' : 'Image Regenerated'}</span>
