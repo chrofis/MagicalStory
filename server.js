@@ -7408,8 +7408,8 @@ async function processStoryJob(jobId) {
     console.log(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
     const outline = await callTextModelStreaming(outlinePrompt, outlineTokens);
 
-    // Save checkpoint: outline
-    await saveCheckpoint(jobId, 'outline', { outline });
+    // Save checkpoint: outline (include prompt for debugging)
+    await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt });
 
     // Extract short scene descriptions from outline for better image generation
     const shortSceneDescriptions = extractShortSceneDescriptions(outline);
@@ -7516,8 +7516,8 @@ Output Format:
 
       console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
 
-      // Save checkpoint: story batch
-      await saveCheckpoint(jobId, 'story_batch', { batchNum, batchText, startScene, endScene }, batchNum);
+      // Save checkpoint: story batch (include prompt for debugging)
+      await saveCheckpoint(jobId, 'story_batch', { batchNum, batchText, startScene, endScene, batchPrompt }, batchNum);
 
       // Parse the pages from this batch
       let batchPages = parseStoryPages(batchText);
@@ -8092,6 +8092,72 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
   } catch (error) {
     console.error(`❌ Job ${jobId} failed:`, error);
+
+    // Log all partial data for debugging
+    try {
+      console.log('\n' + '='.repeat(80));
+      console.log('📋 [DEBUG] PARTIAL DATA DUMP FOR FAILED JOB:', jobId);
+      console.log('='.repeat(80));
+
+      // Get job input data
+      const jobDataResult = await dbPool.query('SELECT input_data FROM story_jobs WHERE id = $1', [jobId]);
+      if (jobDataResult.rows.length > 0) {
+        const inputData = jobDataResult.rows[0].input_data;
+        console.log('\n📥 [INPUT DATA]:');
+        console.log('  Story Type:', inputData?.storyType);
+        console.log('  Story Type Name:', inputData?.storyTypeName);
+        console.log('  Art Style:', inputData?.artStyle);
+        console.log('  Language:', inputData?.language);
+        console.log('  Language Level:', inputData?.languageLevel);
+        console.log('  Pages:', inputData?.pages);
+        console.log('  Story Details:', inputData?.storyDetails?.substring(0, 200) + (inputData?.storyDetails?.length > 200 ? '...' : ''));
+        console.log('  Characters:', inputData?.characters?.map(c => `${c.name} (${c.gender}, ${c.age})`).join(', '));
+        console.log('  Main Characters:', inputData?.mainCharacters);
+      }
+
+      // Get all checkpoints
+      const checkpoints = await getAllCheckpoints(jobId);
+      console.log(`\n💾 [CHECKPOINTS]: Found ${checkpoints.length} checkpoints`);
+
+      for (const cp of checkpoints) {
+        console.log(`\n--- ${cp.step_name} (index: ${cp.step_index}) at ${cp.created_at} ---`);
+        const data = typeof cp.step_data === 'string' ? JSON.parse(cp.step_data) : cp.step_data;
+
+        if (cp.step_name === 'outline') {
+          console.log('📜 [OUTLINE]:', data.outline?.substring(0, 500) + '...');
+          if (data.outlinePrompt) {
+            console.log('📜 [OUTLINE PROMPT]:', data.outlinePrompt?.substring(0, 1000) + '...');
+          }
+        } else if (cp.step_name === 'scene_hints') {
+          console.log('🎬 [SCENE HINTS]:', JSON.stringify(data.shortSceneDescriptions, null, 2).substring(0, 500) + '...');
+        } else if (cp.step_name === 'story_batch') {
+          console.log(`📖 [STORY BATCH ${data.batchNum}] Pages ${data.startScene}-${data.endScene}:`);
+          console.log('  Text preview:', data.batchText?.substring(0, 300) + '...');
+          if (data.batchPrompt) {
+            console.log('  Batch prompt:', data.batchPrompt?.substring(0, 500) + '...');
+          }
+        } else if (cp.step_name === 'partial_page') {
+          console.log(`🖼️  [PAGE ${cp.step_index}]:`);
+          console.log('  Scene description:', data.sceneDescription?.description?.substring(0, 200) + '...');
+          console.log('  Image prompt:', data.imagePrompt?.substring(0, 200) + '...');
+          console.log('  Has image:', !!data.imageData);
+          console.log('  Quality score:', data.score);
+        } else if (cp.step_name === 'cover') {
+          console.log(`🎨 [COVER ${data.type}]:`);
+          console.log('  Prompt:', data.prompt?.substring(0, 200) + '...');
+        } else if (cp.step_name === 'storybook_combined') {
+          console.log('📚 [STORYBOOK COMBINED]:', data.response?.substring(0, 500) + '...');
+        } else {
+          console.log('  Data keys:', Object.keys(data).join(', '));
+        }
+      }
+
+      console.log('\n' + '='.repeat(80));
+      console.log('📋 [DEBUG] END OF PARTIAL DATA DUMP');
+      console.log('='.repeat(80) + '\n');
+    } catch (dumpErr) {
+      console.error('❌ Failed to dump partial data:', dumpErr.message);
+    }
 
     await dbPool.query(
       `UPDATE story_jobs
