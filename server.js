@@ -6514,22 +6514,36 @@ const ART_STYLES = {
 const LANGUAGE_LEVELS = {
   '1st-grade': {
     description: 'Simple words and very short sentences for early readers',
-    pageLength: '2-3 sentences per page (approximately 20-35 words)'
+    wordsPerPageMin: 20,
+    wordsPerPageMax: 35,
   },
   'standard': {
     description: 'Age-appropriate vocabulary for elementary school children',
-    pageLength: 'approximately 120-150 words per page'
+    wordsPerPageMin: 120,
+    wordsPerPageMax: 150,
   },
   'advanced': {
     description: 'More complex vocabulary and varied sentence structure for advanced readers',
-    pageLength: 'approximately 250-300 words per page'
+    wordsPerPageMin: 250,
+    wordsPerPageMax: 300,
   }
 };
 
 // Helper function to get reading level text for prompts
 function getReadingLevel(languageLevel) {
   const levelInfo = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
-  return `${levelInfo.description}. ${levelInfo.pageLength}`;
+  const pageLength = languageLevel === '1st-grade'
+    ? `2-3 sentences per page (approximately ${levelInfo.wordsPerPageMin}-${levelInfo.wordsPerPageMax} words)`
+    : `approximately ${levelInfo.wordsPerPageMin}-${levelInfo.wordsPerPageMax} words per page`;
+  return `${levelInfo.description}. ${pageLength}`;
+}
+
+// Helper function to estimate tokens per page for batch size calculation
+function getTokensPerPage(languageLevel) {
+  const levelInfo = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
+  // Use max words, multiply by ~1.3 tokens/word (English average), add 2x safety margin
+  const tokensPerPage = Math.ceil(levelInfo.wordsPerPageMax * 1.3 * 2);
+  return tokensPerPage;
 }
 
 // Helper function to parse Visual Bible from outline
@@ -7804,12 +7818,11 @@ async function processStoryJob(jobId) {
       BATCH_SIZE = STORY_BATCH_SIZE;
       console.log(`📚 [PIPELINE] Using configured batch size: ${BATCH_SIZE} pages per batch`);
     } else {
-      // Auto-calculate optimal batch size based on model token limits
-      // Calculate batch size for progressive display - use conservative estimate
-      // Each batch gets full model capacity, so batch size just affects how often we show progress
-      const tokensPerScene = isPictureBook ? 2000 : 5000;
-      BATCH_SIZE = calculateOptimalBatchSize(sceneCount, tokensPerScene, 1.0); // Full capacity
-      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} scenes per batch (model: ${TEXT_MODEL}, max tokens: ${activeTextModel.maxOutputTokens})`);
+      // Auto-calculate optimal batch size based on model token limits and reading level
+      // Token estimate: max words/page × 1.3 tokens/word × 2 (safety margin)
+      const tokensPerPage = getTokensPerPage(inputData.languageLevel);
+      BATCH_SIZE = calculateOptimalBatchSize(sceneCount, tokensPerPage, 1.0); // Full capacity
+      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} pages per batch (${tokensPerPage} tokens/page estimate, model max: ${activeTextModel.maxOutputTokens})`);
     }
     const numBatches = Math.ceil(sceneCount / BATCH_SIZE);
 
@@ -9919,122 +9932,111 @@ IMPORTANT: Only apply the specific edit requested. Keep everything else the same
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, originalImage, originalScore, originalReasoning}>}
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene') {
-  // Generate first image
-  console.log(`🎨 [QUALITY RETRY] Generating image (threshold: ${IMAGE_QUALITY_THRESHOLD}%)...`);
-  const firstResult = await callGeminiAPIForImage(prompt, characterPhotos, previousImage, evaluationType);
+  // MAX RETRIES: Covers get 3 attempts (text is tricky), scenes get 2
+  const MAX_ATTEMPTS = evaluationType === 'cover' ? 3 : 2;
+  let bestResult = null;
+  let bestScore = -1;
+  let attempts = 0;
 
-  const firstScore = firstResult.score || 0;
-  console.log(`⭐ [QUALITY RETRY] First image score: ${firstScore}%`);
+  while (attempts < MAX_ATTEMPTS) {
+    attempts++;
+    console.log(`🎨 [QUALITY RETRY] Attempt ${attempts}/${MAX_ATTEMPTS} (threshold: ${IMAGE_QUALITY_THRESHOLD}%)...`);
 
-  // FOR COVER IMAGES: Check text errors FIRST, regardless of score
-  // Gemini sometimes gives high scores despite text errors, so we must force-check
-  const hasTextError = evaluationType === 'cover' &&
-    firstResult.textIssue &&
-    firstResult.textIssue !== 'NONE';
+    // Clear cache for retries to force new generation
+    if (attempts > 1) {
+      const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
+      imageCache.delete(cacheKey);
+    }
 
-  if (hasTextError) {
-    console.log(`🔤 [QUALITY RETRY] COVER TEXT ERROR DETECTED: ${firstResult.textIssue}`);
-    console.log(`🔤 [QUALITY RETRY] Expected: "${firstResult.expectedText}"`);
-    console.log(`🔤 [QUALITY RETRY] Actual: "${firstResult.actualText}"`);
-    console.log(`🔤 [QUALITY RETRY] Score was ${firstScore}% but FORCING retry due to text error`);
-  }
+    const result = await callGeminiAPIForImage(prompt, characterPhotos, previousImage, evaluationType);
+    const score = result.score || 0;
+    console.log(`⭐ [QUALITY RETRY] Attempt ${attempts} score: ${score}%`);
 
-  // If score meets threshold AND no text error, return immediately
-  if (firstScore >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
-    console.log(`✅ [QUALITY RETRY] Score ${firstScore}% >= ${IMAGE_QUALITY_THRESHOLD}%, keeping first image`);
-    return {
-      imageData: firstResult.imageData,
-      score: firstResult.score,
-      reasoning: firstResult.reasoning,
-      wasRegenerated: false,
-      originalImage: null,
-      originalScore: null,
-      originalReasoning: null
-    };
-  }
+    // Check for text errors on covers
+    const hasTextError = evaluationType === 'cover' &&
+      result.textIssue &&
+      result.textIssue !== 'NONE';
 
-  // Score below threshold OR has text error - needs retry
-  if (!hasTextError) {
-    console.log(`🔄 [QUALITY RETRY] Score ${firstScore}% < ${IMAGE_QUALITY_THRESHOLD}%`);
-  }
+    if (hasTextError) {
+      console.log(`🔤 [QUALITY RETRY] Text error: ${result.textIssue}`);
+      console.log(`🔤 [QUALITY RETRY] Expected: "${result.expectedText}" | Actual: "${result.actualText}"`);
+    }
 
-  // For cover images with text-only errors, try to edit the text instead of regenerating
-  if (evaluationType === 'cover' && firstResult.textErrorOnly && firstResult.expectedText && firstResult.actualText) {
-    console.log(`✏️  [QUALITY RETRY] Text-only error detected, attempting text edit...`);
-    console.log(`✏️  [QUALITY RETRY] Expected: "${firstResult.expectedText}"`);
-    console.log(`✏️  [QUALITY RETRY] Actual: "${firstResult.actualText}"`);
+    // Track best result
+    if (score > bestScore) {
+      bestScore = score;
+      bestResult = result;
+    }
 
-    try {
-      const editedResult = await editCoverImageText(
-        firstResult.imageData,
-        firstResult.actualText,
-        firstResult.expectedText,
-        characterPhotos
-      );
+    // Success: meets threshold AND no text error
+    if (score >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
+      console.log(`✅ [QUALITY RETRY] Success on attempt ${attempts}! Score ${score}% >= ${IMAGE_QUALITY_THRESHOLD}%`);
+      return {
+        imageData: result.imageData,
+        score: result.score,
+        reasoning: result.reasoning,
+        wasRegenerated: attempts > 1,
+        originalImage: null,
+        originalScore: null,
+        originalReasoning: null
+      };
+    }
 
-      if (editedResult && editedResult.imageData) {
-        // Evaluate the edited image
-        const editedQuality = await evaluateImageQuality(editedResult.imageData, prompt, characterPhotos, 'cover');
-        const editedScore = editedQuality?.score || 0;
-        console.log(`⭐ [QUALITY RETRY] Edited image score: ${editedScore}%`);
+    // For covers with text-only errors, try text edit before next full regeneration
+    if (evaluationType === 'cover' && result.textErrorOnly && result.expectedText && result.actualText && attempts < MAX_ATTEMPTS) {
+      console.log(`✏️  [QUALITY RETRY] Attempting text edit before next regeneration...`);
+      try {
+        const editedResult = await editCoverImageText(
+          result.imageData,
+          result.actualText,
+          result.expectedText,
+          characterPhotos
+        );
 
-        if (editedScore > firstScore) {
-          console.log(`✅ [QUALITY RETRY] Using edited image (score ${editedScore}% > ${firstScore}%)`);
-          return {
-            imageData: editedResult.imageData,
-            score: editedScore,
-            reasoning: editedQuality?.reasoning || 'Text edited',
-            wasRegenerated: true,
-            wasTextEdited: true,
-            originalImage: firstResult.imageData,
-            originalScore: firstResult.score,
-            originalReasoning: firstResult.reasoning
-          };
+        if (editedResult && editedResult.imageData) {
+          const editedQuality = await evaluateImageQuality(editedResult.imageData, prompt, characterPhotos, 'cover');
+          const editedScore = editedQuality?.score || 0;
+          console.log(`⭐ [QUALITY RETRY] Edited image score: ${editedScore}%`);
+
+          if (editedScore >= IMAGE_QUALITY_THRESHOLD && (!editedQuality?.textIssue || editedQuality.textIssue === 'NONE')) {
+            console.log(`✅ [QUALITY RETRY] Text edit succeeded!`);
+            return {
+              imageData: editedResult.imageData,
+              score: editedScore,
+              reasoning: editedQuality?.reasoning || 'Text edited',
+              wasRegenerated: true,
+              wasTextEdited: true,
+              originalImage: result.imageData,
+              originalScore: result.score,
+              originalReasoning: result.reasoning
+            };
+          }
+
+          // Track edited result if better
+          if (editedScore > bestScore) {
+            bestScore = editedScore;
+            bestResult = { ...editedResult, score: editedScore, reasoning: editedQuality?.reasoning };
+          }
         }
+      } catch (editError) {
+        console.log(`⚠️  [QUALITY RETRY] Text edit failed: ${editError.message}`);
       }
-    } catch (editError) {
-      console.log(`⚠️  [QUALITY RETRY] Text edit failed: ${editError.message}, falling back to regeneration`);
     }
   }
 
-  console.log(`🔄 [QUALITY RETRY] Regenerating entire image...`);
-
-  // Clear cache for this prompt to force new generation
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
-  imageCache.delete(cacheKey);
-
-  // Generate second image
-  const secondResult = await callGeminiAPIForImage(prompt, characterPhotos, previousImage, evaluationType);
-  const secondScore = secondResult.score || 0;
-  console.log(`⭐ [QUALITY RETRY] Second image score: ${secondScore}%`);
-
-  // Return the better image
-  if (secondScore > firstScore) {
-    console.log(`✅ [QUALITY RETRY] Using second image (score ${secondScore}% > ${firstScore}%)`);
-    return {
-      imageData: secondResult.imageData,
-      score: secondResult.score,
-      reasoning: secondResult.reasoning,
-      wasRegenerated: true,
-      originalImage: firstResult.imageData,
-      originalScore: firstResult.score,
-      originalReasoning: firstResult.reasoning
-    };
-  } else {
-    console.log(`✅ [QUALITY RETRY] Keeping first image (score ${firstScore}% >= ${secondScore}%)`);
-    // Put the first result back in cache since it's the better one
-    imageCache.set(cacheKey, firstResult);
-    return {
-      imageData: firstResult.imageData,
-      score: firstResult.score,
-      reasoning: firstResult.reasoning,
-      wasRegenerated: true,  // Still mark as regenerated for dev info
-      originalImage: secondResult.imageData,  // Second (worse) attempt becomes "original"
-      originalScore: secondResult.score,
-      originalReasoning: secondResult.reasoning
-    };
-  }
+  // Exhausted all attempts - return best result we got
+  console.log(`⚠️  [QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Best score: ${bestScore}%`);
+  return {
+    imageData: bestResult.imageData,
+    score: bestResult.score,
+    reasoning: bestResult.reasoning,
+    wasRegenerated: true,
+    originalImage: null,
+    originalScore: null,
+    originalReasoning: null
+  };
 }
+
 
 // Create a new story generation job
 app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
