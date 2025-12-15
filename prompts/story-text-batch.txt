@@ -47,6 +47,14 @@ The output MUST follow this EXACT format or the system will fail:
 
 Stay within the word count. Aim for the middle of the range, not the maximum.
 
+**FORMATTING:**
+- AVOID excessive line breaks - write in flowing paragraphs
+- Each paragraph should have at least 5-6 sentences before starting a new paragraph
+- Only start a new paragraph for major scene changes or significant shifts in action
+- Do NOT put each sentence on its own line
+- Dialogues should flow inline with the narrative, not on separate lines
+- Create dense, readable paragraphs like a traditional children's novel
+
 # Story Context
 
 {BASE_PROMPT}
