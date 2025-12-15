@@ -18,6 +18,7 @@ Create a front cover illustration for a children's book.
 - Supporting characters (if present in scene) should be smaller or positioned to the sides/background
 - Keep the composition simple and uncluttered
 - Leave clear space at the TOP for the title text
+{VISUAL_BIBLE}
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact title text: "{STORY_TITLE}"

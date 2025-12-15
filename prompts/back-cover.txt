@@ -18,6 +18,7 @@ Create a back cover illustration for a children's book.
 - Give EQUAL visual prominence to all characters - like a family/group photo
 - Arrange characters as a balanced group where each person is clearly visible
 - This should feel like a satisfying, warm conclusion to the story
+{VISUAL_BIBLE}
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact text: "magicalstory.ch"
