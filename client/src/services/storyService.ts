@@ -53,8 +53,10 @@ interface StoryDetailsServer {
   relationships: RelationshipMap;
   relationshipTexts: RelationshipTextMap;
   outline?: string;
+  outlinePrompt?: string;
   storyText?: string; // New stories use this
   story?: string; // Old stories use this
+  storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];
   coverImages?: CoverImages;
@@ -118,7 +120,9 @@ export const storyService = {
         relationships: s.relationships,
         relationshipTexts: s.relationshipTexts,
         outline: s.outline,
+        outlinePrompt: s.outlinePrompt,
         story: storyContent,
+        storyTextPrompts: s.storyTextPrompts,
         sceneDescriptions: s.sceneDescriptions,
         sceneImages: s.sceneImages,
         coverImages: s.coverImages,

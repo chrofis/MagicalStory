@@ -284,6 +284,20 @@ export function CharacterForm({
               placeholder={language === 'de' ? 'Brille, Bart, etc.' : language === 'fr' ? 'Lunettes, barbe, etc.' : 'Glasses, beard, etc.'}
             />
           </div>
+
+          {/* Clothing */}
+          <div className="col-span-2 md:col-span-4">
+            <label className="block text-xs font-semibold text-gray-500 mb-1">
+              {language === 'de' ? 'Kleidung' : language === 'fr' ? 'Vêtements' : 'Clothing'}
+            </label>
+            <input
+              type="text"
+              value={character.clothing || ''}
+              onChange={(e) => updateField('clothing', e.target.value)}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+              placeholder={language === 'de' ? 'z.B. blaues T-Shirt, Jeans' : language === 'fr' ? 'ex. t-shirt bleu, jeans' : 'e.g. blue t-shirt, jeans'}
+            />
+          </div>
         </div>
       </div>
 

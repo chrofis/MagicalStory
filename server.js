@@ -2889,17 +2889,26 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       sceneDescription = coverScenes2.backCover || 'A satisfying, conclusive ending scene.';
     }
 
+    // Get the current cover image before regenerating (to store as previous version)
+    storyData.coverImages = storyData.coverImages || {};
+    const coverKey = normalizedCoverType === 'front' ? 'frontCover' : normalizedCoverType === 'initialPage' ? 'initialPage' : 'backCover';
+    const previousCover = storyData.coverImages[coverKey];
+    const previousImageData = previousCover?.imageData || previousCover || null;
+
     // Generate new cover (use 'cover' evaluation for text-focused quality check)
     const coverResult = await callGeminiAPIForImage(coverPrompt, characterPhotos, null, 'cover');
 
-    // Update the cover in story data with new structure including quality, description, and prompt
-    storyData.coverImages = storyData.coverImages || {};
+    // Update the cover in story data with new structure including quality, description, prompt, and previous version
     const coverData = {
       imageData: coverResult.imageData,
       description: sceneDescription,
       prompt: coverPrompt,
       qualityScore: coverResult.score,
-      qualityReasoning: coverResult.reasoning || null
+      qualityReasoning: coverResult.reasoning || null,
+      wasRegenerated: true,
+      originalImage: previousImageData,
+      originalScore: previousCover?.qualityScore || null,
+      regeneratedAt: new Date().toISOString()
     };
 
     if (normalizedCoverType === 'front') {
@@ -2909,6 +2918,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     } else {
       storyData.coverImages.backCover = coverData;
     }
+
+    console.log(`📸 [COVER REGEN] Previous image stored (${previousImageData ? 'has data' : 'none'})`)
 
     // Save updated story
     await dbPool.query(
