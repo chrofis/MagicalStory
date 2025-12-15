@@ -9114,12 +9114,24 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         console.log(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...`);
         const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType);
 
-        // Extract score and reasoning from quality result
+        // Extract score, reasoning, and text error info from quality result
         const score = qualityResult ? qualityResult.score : null;
         const reasoning = qualityResult ? qualityResult.reasoning : null;
+        const textIssue = qualityResult ? qualityResult.textIssue : null;
+        const textErrorOnly = qualityResult ? qualityResult.textErrorOnly : false;
+        const expectedText = qualityResult ? qualityResult.expectedText : null;
+        const actualText = qualityResult ? qualityResult.actualText : null;
 
-        // Store in cache
-        const result = { imageData: compressedImageData, score, reasoning };
+        // Store in cache (include text error info for covers)
+        const result = {
+          imageData: compressedImageData,
+          score,
+          reasoning,
+          textIssue,
+          textErrorOnly,
+          expectedText,
+          actualText
+        };
         imageCache.set(cacheKey, result);
         log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
 
