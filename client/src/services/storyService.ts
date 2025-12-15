@@ -295,34 +295,14 @@ export const storyService = {
     qualityScore?: number;
     qualityReasoning?: string;
     totalAttempts?: number;
-    retryHistory?: Array<{
-      attempt: number;
-      type: string;
-      imageData?: string;
-      score?: number;
-      reasoning?: string;
-      textIssue?: string;
-      expectedText?: string;
-      actualText?: string;
-      timestamp?: string;
-    }>;
+    retryHistory?: RetryAttempt[];
   }> {
     const response = await api.post<{
       imageData: string;
       qualityScore?: number;
       qualityReasoning?: string;
       totalAttempts?: number;
-      retryHistory?: Array<{
-        attempt: number;
-        type: string;
-        imageData?: string;
-        score?: number;
-        reasoning?: string;
-        textIssue?: string;
-        expectedText?: string;
-        actualText?: string;
-        timestamp?: string;
-      }>;
+      retryHistory?: RetryAttempt[];
     }>(
       `/api/stories/${storyId}/regenerate/image/${pageNum}`
     );
@@ -336,17 +316,7 @@ export const storyService = {
     qualityScore?: number;
     qualityReasoning?: string;
     totalAttempts?: number;
-    retryHistory?: Array<{
-      attempt: number;
-      type: string;
-      imageData?: string;
-      score?: number;
-      reasoning?: string;
-      textIssue?: string;
-      expectedText?: string;
-      actualText?: string;
-      timestamp?: string;
-    }>;
+    retryHistory?: RetryAttempt[];
   }> {
     const response = await api.post<{
       imageData: string;
@@ -355,17 +325,7 @@ export const storyService = {
       qualityScore?: number;
       qualityReasoning?: string;
       totalAttempts?: number;
-      retryHistory?: Array<{
-        attempt: number;
-        type: string;
-        imageData?: string;
-        score?: number;
-        reasoning?: string;
-        textIssue?: string;
-        expectedText?: string;
-        actualText?: string;
-        timestamp?: string;
-      }>;
+      retryHistory?: RetryAttempt[];
     }>(
       `/api/stories/${storyId}/regenerate/cover/${coverType}`
     );
