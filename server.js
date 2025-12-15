@@ -217,7 +217,16 @@ function getCharacterPhotos(characters) {
 function buildCharacterPhysicalDescription(char) {
   const age = parseInt(char.age) || 10;
   const gender = char.gender || 'child';
-  const genderLabel = gender === 'male' ? 'boy' : gender === 'female' ? 'girl' : 'child';
+
+  // Use age-appropriate gender labels
+  let genderLabel;
+  if (gender === 'male') {
+    genderLabel = age >= 18 ? 'man' : 'boy';
+  } else if (gender === 'female') {
+    genderLabel = age >= 18 ? 'woman' : 'girl';
+  } else {
+    genderLabel = age >= 18 ? 'person' : 'child';
+  }
 
   let description = `${char.name} is a ${age}-year-old ${genderLabel}`;
 
@@ -2922,6 +2931,185 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
   } catch (err) {
     console.error('Error regenerating cover:', err);
     res.status(500).json({ error: 'Failed to regenerate cover: ' + err.message });
+  }
+});
+
+// Edit scene image with a user prompt
+app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { editPrompt } = req.body;
+    const pageNumber = parseInt(pageNum);
+
+    if (!editPrompt || editPrompt.trim().length === 0) {
+      return res.status(400).json({ error: 'editPrompt is required' });
+    }
+
+    console.log(`✏️ Editing image for story ${id}, page ${pageNumber}`);
+    console.log(`✏️ Edit instruction: "${editPrompt}"`);
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
+
+    // Get the current image
+    const sceneImages = storyData.sceneImages || [];
+    const currentImage = sceneImages.find(img => img.pageNumber === pageNumber);
+
+    if (!currentImage || !currentImage.imageData) {
+      return res.status(404).json({ error: 'No image found for this page' });
+    }
+
+    // Get character photos for reference
+    const sceneDescriptions = storyData.sceneDescriptions || [];
+    const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
+    const sceneCharacters = getCharactersInScene(sceneDesc?.description || '', storyData.characters || []);
+    const scenePhotos = getCharacterPhotos(sceneCharacters);
+
+    // Edit the image
+    const editResult = await editImageWithPrompt(currentImage.imageData, editPrompt, scenePhotos);
+
+    if (!editResult || !editResult.imageData) {
+      return res.status(500).json({ error: 'Failed to edit image - no result returned' });
+    }
+
+    // Update the image in story data
+    const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
+    if (existingIndex >= 0) {
+      // Store original before edit if not already stored
+      if (!sceneImages[existingIndex].originalBeforeEdit) {
+        sceneImages[existingIndex].originalBeforeEdit = currentImage.imageData;
+      }
+      sceneImages[existingIndex].imageData = editResult.imageData;
+      sceneImages[existingIndex].lastEditPrompt = editPrompt;
+    }
+
+    // Save updated story
+    storyData.sceneImages = sceneImages;
+    await dbPool.query(
+      'UPDATE stories SET data = $1 WHERE id = $2',
+      [JSON.stringify(storyData), id]
+    );
+
+    console.log(`✅ Image edited for story ${id}, page ${pageNumber}`);
+
+    res.json({
+      success: true,
+      pageNumber,
+      imageData: editResult.imageData
+    });
+
+  } catch (err) {
+    console.error('Error editing image:', err);
+    res.status(500).json({ error: 'Failed to edit image: ' + err.message });
+  }
+});
+
+// Edit cover image with a user prompt
+app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req, res) => {
+  try {
+    const { id, coverType } = req.params;
+    const { editPrompt } = req.body;
+
+    // Accept both 'initial' and 'initialPage' for backwards compatibility
+    const normalizedCoverType = coverType === 'initial' ? 'initialPage' : coverType;
+    if (!['front', 'initialPage', 'back'].includes(normalizedCoverType)) {
+      return res.status(400).json({ error: 'Invalid cover type. Must be: front, initial/initialPage, or back' });
+    }
+
+    if (!editPrompt || editPrompt.trim().length === 0) {
+      return res.status(400).json({ error: 'editPrompt is required' });
+    }
+
+    console.log(`✏️ Editing ${normalizedCoverType} cover for story ${id}`);
+    console.log(`✏️ Edit instruction: "${editPrompt}"`);
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
+
+    // Get the current cover image
+    const coverImages = storyData.coverImages || {};
+    const coverKey = normalizedCoverType === 'front' ? 'frontCover' :
+                     normalizedCoverType === 'back' ? 'backCover' : 'initialPage';
+    const currentCover = coverImages[coverKey];
+
+    if (!currentCover) {
+      return res.status(404).json({ error: 'No cover image found' });
+    }
+
+    // Get the image data (handle both string and object formats)
+    const currentImageData = typeof currentCover === 'string' ? currentCover : currentCover.imageData;
+    if (!currentImageData) {
+      return res.status(404).json({ error: 'No cover image data found' });
+    }
+
+    // Get character photos for reference
+    const characterPhotos = getCharacterPhotos(storyData.characters || []);
+
+    // Edit the cover image
+    const editResult = await editImageWithPrompt(currentImageData, editPrompt, characterPhotos);
+
+    if (!editResult || !editResult.imageData) {
+      return res.status(500).json({ error: 'Failed to edit cover - no result returned' });
+    }
+
+    // Update the cover image in story data
+    if (typeof currentCover === 'string') {
+      coverImages[coverKey] = {
+        imageData: editResult.imageData,
+        originalBeforeEdit: currentCover,
+        lastEditPrompt: editPrompt
+      };
+    } else {
+      if (!currentCover.originalBeforeEdit) {
+        currentCover.originalBeforeEdit = currentImageData;
+      }
+      currentCover.imageData = editResult.imageData;
+      currentCover.lastEditPrompt = editPrompt;
+      coverImages[coverKey] = currentCover;
+    }
+
+    // Save updated story
+    storyData.coverImages = coverImages;
+    await dbPool.query(
+      'UPDATE stories SET data = $1 WHERE id = $2',
+      [JSON.stringify(storyData), id]
+    );
+
+    console.log(`✅ Cover edited for story ${id}, type: ${normalizedCoverType}`);
+
+    res.json({
+      success: true,
+      coverType: normalizedCoverType,
+      imageData: editResult.imageData
+    });
+
+  } catch (err) {
+    console.error('Error editing cover:', err);
+    res.status(500).json({ error: 'Failed to edit cover: ' + err.message });
   }
 });
 
@@ -9040,6 +9228,112 @@ IMPORTANT: Only change the text, nothing else. The result should look like the o
 }
 
 /**
+ * Edit an image based on a user-provided prompt using Gemini's image editing capabilities
+ * @param {string} imageData - The original image data (base64)
+ * @param {string} editInstruction - What the user wants to change
+ * @param {string[]} characterPhotos - Character reference photos (optional)
+ * @returns {Promise<{imageData: string}|null>}
+ */
+async function editImageWithPrompt(imageData, editInstruction, characterPhotos = []) {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key not configured');
+    }
+
+    console.log(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}"`);
+
+    // Extract base64 and mime type from the image
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Build the editing prompt
+    const editPrompt = `Edit this children's storybook illustration according to the following instruction:
+
+USER'S EDIT REQUEST: "${editInstruction}"
+
+Instructions:
+1. Make ONLY the changes requested by the user
+2. Keep the EXACT same artistic style, colors, and overall composition
+3. Maintain character appearances - they should look the same
+4. Preserve the children's book illustration style
+5. Do NOT change anything else in the image beyond what was requested
+6. The result should still be appropriate for a children's storybook
+
+IMPORTANT: Only apply the specific edit requested. Keep everything else the same.`;
+
+    // Build parts array with the image, character references, and prompt
+    const parts = [
+      {
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      }
+    ];
+
+    // Add character reference photos if available
+    for (const photo of characterPhotos.slice(0, 3)) { // Limit to 3 refs
+      if (photo) {
+        const photoBase64 = photo.replace(/^data:image\/\w+;base64,/, '');
+        const photoMime = photo.match(/^data:(image\/\w+);base64,/) ?
+          photo.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+        parts.push({
+          inline_data: {
+            mime_type: photoMime,
+            data: photoBase64
+          }
+        });
+      }
+    }
+
+    parts.push({ text: editPrompt });
+
+    // Use Gemini 2.0 Flash for image editing (supports image generation/editing)
+    const modelId = 'gemini-2.0-flash-exp-image-generation';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseModalities: ['image', 'text'],
+          temperature: 0.6
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('❌ [IMAGE EDIT] Gemini API error:', error);
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Extract the edited image from the response
+    if (data.candidates && data.candidates[0]?.content?.parts) {
+      for (const part of data.candidates[0].content.parts) {
+        if (part.inline_data && part.inline_data.data) {
+          const editedImageData = `data:${part.inline_data.mime_type || 'image/png'};base64,${part.inline_data.data}`;
+          console.log(`✅ [IMAGE EDIT] Successfully edited image`);
+          return { imageData: editedImageData };
+        }
+      }
+    }
+
+    console.warn('⚠️  [IMAGE EDIT] No edited image in response');
+    return null;
+  } catch (error) {
+    console.error('❌ [IMAGE EDIT] Error editing image:', error);
+    throw error;
+  }
+}
+
+/**
  * Generate image with automatic retry if quality score is below threshold
  * @param {string} prompt - The image generation prompt
  * @param {string[]} characterPhotos - Character reference photos
@@ -9055,8 +9349,21 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   const firstScore = firstResult.score || 0;
   console.log(`⭐ [QUALITY RETRY] First image score: ${firstScore}%`);
 
-  // If score meets threshold, return immediately
-  if (firstScore >= IMAGE_QUALITY_THRESHOLD) {
+  // FOR COVER IMAGES: Check text errors FIRST, regardless of score
+  // Gemini sometimes gives high scores despite text errors, so we must force-check
+  const hasTextError = evaluationType === 'cover' &&
+    firstResult.textIssue &&
+    firstResult.textIssue !== 'NONE';
+
+  if (hasTextError) {
+    console.log(`🔤 [QUALITY RETRY] COVER TEXT ERROR DETECTED: ${firstResult.textIssue}`);
+    console.log(`🔤 [QUALITY RETRY] Expected: "${firstResult.expectedText}"`);
+    console.log(`🔤 [QUALITY RETRY] Actual: "${firstResult.actualText}"`);
+    console.log(`🔤 [QUALITY RETRY] Score was ${firstScore}% but FORCING retry due to text error`);
+  }
+
+  // If score meets threshold AND no text error, return immediately
+  if (firstScore >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
     console.log(`✅ [QUALITY RETRY] Score ${firstScore}% >= ${IMAGE_QUALITY_THRESHOLD}%, keeping first image`);
     return {
       imageData: firstResult.imageData,
@@ -9069,8 +9376,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     };
   }
 
-  // Score below threshold - check if it's a text-only error for covers
-  console.log(`🔄 [QUALITY RETRY] Score ${firstScore}% < ${IMAGE_QUALITY_THRESHOLD}%`);
+  // Score below threshold OR has text error - needs retry
+  if (!hasTextError) {
+    console.log(`🔄 [QUALITY RETRY] Score ${firstScore}% < ${IMAGE_QUALITY_THRESHOLD}%`);
+  }
 
   // For cover images with text-only errors, try to edit the text instead of regenerating
   if (evaluationType === 'cover' && firstResult.textErrorOnly && firstResult.expectedText && firstResult.actualText) {

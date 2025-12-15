@@ -110,6 +110,11 @@ export default function StoryWizard() {
   const [storyId, setStoryId] = useState<string | null>(null);
   const [, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
 
+  // Edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<{ type: 'image' | 'cover'; pageNumber?: number; coverType?: 'front' | 'back' | 'initial' } | null>(null);
+  const [editPromptText, setEditPromptText] = useState('');
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -1199,19 +1204,14 @@ export default function StoryWizard() {
                 }
               } : undefined}
               onEditImage={(pageNumber: number) => {
-                alert(language === 'de'
-                  ? `Bildbearbeitung für Seite ${pageNumber} kommt bald`
-                  : language === 'fr'
-                  ? `Édition d'image pour la page ${pageNumber} à venir`
-                  : `Image editing for page ${pageNumber} coming soon`);
+                setEditTarget({ type: 'image', pageNumber });
+                setEditPromptText('');
+                setEditModalOpen(true);
               }}
               onEditCover={(coverType: 'front' | 'back' | 'initial') => {
-                const coverName = coverType === 'front' ? 'Titelseite' : coverType === 'back' ? 'Rückseite' : 'Einleitungsseite';
-                alert(language === 'de'
-                  ? `Bearbeitung für ${coverName} kommt bald`
-                  : language === 'fr'
-                  ? `Édition de la couverture ${coverType} à venir`
-                  : `Cover editing for ${coverType} coming soon`);
+                setEditTarget({ type: 'cover', coverType });
+                setEditPromptText('');
+                setEditModalOpen(true);
               }}
             />
           );
@@ -1352,6 +1352,96 @@ export default function StoryWizard() {
             <p className="text-sm text-gray-500 mt-2">
               {language === 'de' ? 'Dies dauert etwa 30 Sekunden' : language === 'fr' ? 'Cela prend environ 30 secondes' : 'This takes about 30 seconds'}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Image Modal */}
+      {editModalOpen && editTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">
+              {language === 'de' ? 'Bild bearbeiten' : language === 'fr' ? 'Modifier l\'image' : 'Edit Image'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {editTarget.type === 'image'
+                ? (language === 'de' ? `Seite ${editTarget.pageNumber}` : language === 'fr' ? `Page ${editTarget.pageNumber}` : `Page ${editTarget.pageNumber}`)
+                : (language === 'de'
+                    ? (editTarget.coverType === 'front' ? 'Titelseite' : editTarget.coverType === 'back' ? 'Rückseite' : 'Einleitungsseite')
+                    : language === 'fr'
+                    ? (editTarget.coverType === 'front' ? 'Couverture' : editTarget.coverType === 'back' ? 'Dos' : 'Page de dédicace')
+                    : (editTarget.coverType === 'front' ? 'Front Cover' : editTarget.coverType === 'back' ? 'Back Cover' : 'Dedication Page')
+                  )
+              }
+            </p>
+            <textarea
+              value={editPromptText}
+              onChange={(e) => setEditPromptText(e.target.value)}
+              placeholder={language === 'de'
+                ? 'Beschreibe die gewünschte Änderung...\nz.B. "Mach den Himmel blauer" oder "Füge einen Schmetterling hinzu"'
+                : language === 'fr'
+                ? 'Décrivez le changement souhaité...\npar ex. "Rendre le ciel plus bleu" ou "Ajouter un papillon"'
+                : 'Describe what you want to change...\ne.g. "Make the sky bluer" or "Add a butterfly"'}
+              className="w-full h-32 p-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 resize-none"
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setEditModalOpen(false);
+                  setEditTarget(null);
+                  setEditPromptText('');
+                }}
+                className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!editPromptText.trim() || !storyId) return;
+                  setEditModalOpen(false);
+                  setIsRegenerating(true);
+                  try {
+                    if (editTarget.type === 'image' && editTarget.pageNumber) {
+                      const result = await storyService.editImage(storyId, editTarget.pageNumber, editPromptText);
+                      setSceneImages(prev => prev.map(img =>
+                        img.pageNumber === editTarget.pageNumber
+                          ? { ...img, imageData: result.imageData }
+                          : img
+                      ));
+                      log.info('Image edited successfully');
+                    } else if (editTarget.type === 'cover' && editTarget.coverType) {
+                      const result = await storyService.editCover(storyId, editTarget.coverType, editPromptText);
+                      setCoverImages(prev => {
+                        if (!prev) return prev;
+                        const key = editTarget.coverType === 'front' ? 'frontCover'
+                          : editTarget.coverType === 'back' ? 'backCover' : 'initialPage';
+                        const current = prev[key];
+                        if (typeof current === 'string' || !current) {
+                          return { ...prev, [key]: { imageData: result.imageData } };
+                        }
+                        return { ...prev, [key]: { ...current, imageData: result.imageData } };
+                      });
+                      log.info('Cover edited successfully');
+                    }
+                  } catch (error) {
+                    log.error('Edit failed:', error);
+                    alert(language === 'de'
+                      ? 'Bearbeitung fehlgeschlagen. Bitte versuche es erneut.'
+                      : language === 'fr'
+                      ? 'Échec de la modification. Veuillez réessayer.'
+                      : 'Edit failed. Please try again.');
+                  } finally {
+                    setIsRegenerating(false);
+                    setEditTarget(null);
+                    setEditPromptText('');
+                  }
+                }}
+                disabled={!editPromptText.trim()}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+              </button>
+            </div>
           </div>
         </div>
       )}

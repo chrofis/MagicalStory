@@ -225,6 +225,24 @@ export const storyService = {
     });
   },
 
+  // Edit image with user prompt
+  async editImage(storyId: string, pageNumber: number, editPrompt: string): Promise<{ imageData: string }> {
+    const response = await api.post<{ imageData: string }>(
+      `/api/stories/${storyId}/edit/image/${pageNumber}`,
+      { editPrompt }
+    );
+    return { imageData: response.imageData };
+  },
+
+  // Edit cover with user prompt
+  async editCover(storyId: string, coverType: 'front' | 'back' | 'initial', editPrompt: string): Promise<{ imageData: string }> {
+    const response = await api.post<{ imageData: string }>(
+      `/api/stories/${storyId}/edit/cover/${coverType}`,
+      { editPrompt }
+    );
+    return { imageData: response.imageData };
+  },
+
   // AI Generation
   async callClaude(prompt: string, maxTokens = 8192): Promise<string> {
     const response = await api.post<{ content: string }>('/api/claude', {

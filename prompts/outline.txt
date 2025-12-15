@@ -107,15 +107,21 @@ For EACH of the {PAGES} story pages, provide:
 
 # Part 4: Cover Scene Descriptions
 
-In addition to the {PAGES} story pages, provide scene descriptions for these 3 cover elements.
+In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for these 3 cover elements.
 
-**IMPORTANT: Scene descriptions must be VISUAL ONLY. Do NOT include any text instructions (no title text, no dedication text, no website text). Text will be added separately.**
+**IMPORTANT RULES FOR COVER SCENES:**
+- Keep descriptions SHORT (2-3 sentences max)
+- Focus on MOOD and SETTING, not precise character positions
+- Do NOT specify exact locations of each character
+- Do NOT include text instructions (title, dedication, website - these are added separately)
+- Do NOT over-specify details like weather effects, lighting, or props
+- Let the AI image generator handle composition
 
-**Title Page Scene**: A captivating cover illustration that features the main characters and sets the tone for the story. This should be visually striking and focus on the protagonist(s) in a way that draws readers in. Describe only the visual scene - characters, setting, mood, composition. Do NOT mention the title or any text.
+**Title Page Scene**: A simple, striking scene featuring the MAIN CHARACTER prominently. Describe the mood, setting, and what the main character is doing. Keep supporting characters minimal or in background. (2-3 sentences)
 
-**Initial Scene**: A dedication/introduction page illustration that creates a warm, inviting entry into the story world. This sets the mood and welcomes readers. Describe only the visual elements - do NOT mention dedication text or any text.
+**Initial Scene**: A warm group scene showing all characters together in a welcoming setting. Focus on the overall mood and atmosphere. (2-3 sentences)
 
-**Back Cover Scene**: A satisfying concluding illustration that provides closure and leaves readers with a positive feeling. This should feel like a natural ending to the visual journey. Describe only the visual scene - do NOT mention "magicalstory.ch" or any text.
+**Back Cover Scene**: A satisfying conclusion scene with all characters together, feeling happy/content. Focus on emotional closure. (2-3 sentences)
 
 ---
 
@@ -167,15 +173,14 @@ Scene: [Short visual description]
 
 ## Cover Scenes
 
-Title Page: [Summary of title page concept]
-Scene: [Visual description focusing on main characters]
+Title Page Scene: [2-3 sentences: Main character doing something that captures the story's spirit. Simple setting description. Mood/atmosphere.]
 
-Initial Page: [Summary of dedication/intro concept]
-Scene: [Visual description for welcoming scene]
+Initial Page Scene: [2-3 sentences: All characters together in a warm, welcoming moment. Simple group scene with positive atmosphere.]
 
-Back Cover: [Summary of back cover concept]
-Scene: [Visual description for concluding scene]
+Back Cover Scene: [2-3 sentences: Characters together at the story's happy conclusion. Focus on emotional satisfaction and togetherness.]
 
 ---
 
 Be specific and creative. Each scene description should paint a clear picture for the illustrator. Ensure character development is woven throughout the plot and that each page advances both the story and the characters' growth arcs.
+
+**Remember: Cover scene descriptions should be SIMPLE and SHORT - let the image generator handle the details.**

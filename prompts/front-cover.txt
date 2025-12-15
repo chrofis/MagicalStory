@@ -1,28 +1,26 @@
 Create a front cover illustration for a children's book.
 
+**SCENE:**
 {TITLE_PAGE_SCENE}
 
-Style: {STYLE_DESCRIPTION}.
+**ART STYLE:** {STYLE_DESCRIPTION}
 
 {CHARACTER_INFO}
 
 **STYLE TRANSFORMATION:**
 - Reference images show REAL PHOTOGRAPHS of people
 - Transform these people into the requested art style
-- Characters must be RECOGNIZABLE but in the artistic style
+- Characters must be RECOGNIZABLE but styled artistically
 - ALL characters must have the SAME consistent art style
 
-**CHARACTER COMPOSITION - CRITICAL:**
-- The MAIN CHARACTER must be the STAR of this image - LARGE, CENTRAL, and prominently featured
-- Include MINIMAL other characters (ideally 0-2 supporting characters only)
-- If supporting characters appear, they should be SMALLER, in the background, or partially visible
-- This is the MAIN CHARACTER'S spotlight moment - they should dominate the image
-- The main character should take up at least 40-50% of the image area
+**COMPOSITION GUIDELINES:**
+- The MAIN CHARACTER should be the focal point - prominent, centered, and clearly the star
+- Supporting characters (if present in scene) should be smaller or positioned to the sides/background
+- Keep the composition simple and uncluttered
+- Leave clear space at the TOP for the title text
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact title text: "{STORY_TITLE}"
-- Make the title PROMINENT and highly visible
-- Integrate the title beautifully into the illustration
+- Make the title PROMINENT and highly visible at the top
 - Use an attractive, readable font style that fits the art style
-- Position the title where it is clearly legible (typically top or center)
 - The title is the ONLY text that should appear in the image
