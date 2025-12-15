@@ -2780,6 +2780,13 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     // Build image prompt with scene-specific characters
     const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData, sceneCharacters);
 
+    // Clear the image cache for this prompt to force a new generation
+    const cacheKey = generateImageCacheKey(imagePrompt, scenePhotos, null);
+    if (imageCache.has(cacheKey)) {
+      imageCache.delete(cacheKey);
+      console.log(`🗑️ [REGEN] Cleared cache for page ${pageNumber} to force new generation`);
+    }
+
     // Generate new image with only scene-specific character photos
     // Use quality retry to regenerate if score is below threshold
     const imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos);
@@ -2963,6 +2970,13 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const coverKey = normalizedCoverType === 'front' ? 'frontCover' : normalizedCoverType === 'initialPage' ? 'initialPage' : 'backCover';
     const previousCover = storyData.coverImages[coverKey];
     const previousImageData = previousCover?.imageData || previousCover || null;
+
+    // Clear the image cache for this prompt to force a new generation
+    const cacheKey = generateImageCacheKey(coverPrompt, characterPhotos, null);
+    if (imageCache.has(cacheKey)) {
+      imageCache.delete(cacheKey);
+      console.log(`🗑️ [REGEN] Cleared cache for ${normalizedCoverType} cover to force new generation`);
+    }
 
     // Generate new cover with quality retry (automatically retries on text errors)
     const coverResult = await generateImageWithQualityRetry(coverPrompt, characterPhotos, null, 'cover');
