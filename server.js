@@ -7300,6 +7300,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           qualityScore: imageResult.score,
           qualityReasoning: imageResult.reasoning || null,
           wasRegenerated: imageResult.wasRegenerated || false,
+          totalAttempts: imageResult.totalAttempts || 1,
+          retryHistory: imageResult.retryHistory || [],
           originalImage: imageResult.originalImage || null,
           originalScore: imageResult.originalScore || null,
           originalReasoning: imageResult.originalReasoning || null
