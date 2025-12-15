@@ -57,9 +57,9 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId)
   // Use first name directly, fallback to 'there' if empty
   const greeting = firstName || 'there';
 
-  // Build direct story URL
+  // Build direct story URL (uses /create?storyId= format)
   const storyUrl = storyId
-    ? `https://www.magicalstory.ch/story/${storyId}`
+    ? `https://www.magicalstory.ch/create?storyId=${storyId}`
     : 'https://www.magicalstory.ch';
 
   try {
