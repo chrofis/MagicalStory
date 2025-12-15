@@ -4837,6 +4837,8 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 
       const availableWidth = pageSize - (marginLeftRight * 2);
       const availableHeight = pageSize - (marginTopBottom * 2);
+      // Add 10% safety margin to prevent overflow due to rendering differences
+      const safeAvailableHeight = availableHeight * 0.9;
 
       // PRE-CHECK: Verify all pages fit before generating PDF
       // If any page would be truncated, abort with error
@@ -4847,15 +4849,15 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         doc.fontSize(fontSize).font('Helvetica');
         let textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
 
-        while (textHeight > availableHeight && fontSize > 5) {
+        while (textHeight > safeAvailableHeight && fontSize > 4) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
         }
 
-        if (textHeight > availableHeight) {
+        if (textHeight > safeAvailableHeight) {
           truncatedPages.push(pageNumber);
-          console.error(`❌ Page ${pageNumber}: Text too long even at minimum font size - would be truncated`);
+          console.error(`❌ Page ${pageNumber}: Text too long even at minimum font size (${fontSize}pt) - would be truncated`);
         }
       });
 
@@ -4884,18 +4886,18 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
         const initialHeight = textHeight;
 
-        while (textHeight > availableHeight && fontSize > 5) {
+        while (textHeight > safeAvailableHeight && fontSize > 4) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
         }
 
         if (fontSize < startFontSize) {
-          console.log(`📄 [PDF] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (text: ${page.text.length} chars, height: ${Math.round(initialHeight)} → ${Math.round(textHeight)}, available: ${Math.round(availableHeight)})`);
+          console.log(`📄 [PDF] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (text: ${page.text.length} chars, height: ${Math.round(initialHeight)} → ${Math.round(textHeight)}, available: ${Math.round(safeAvailableHeight)})`);
         }
 
         textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
-        const yPosition = marginTopBottom + (availableHeight - textHeight) / 2;
+        const yPosition = marginTopBottom + (safeAvailableHeight - textHeight) / 2;
 
         doc.fillColor('#333333').text(page.text, marginLeftRight, yPosition, { width: availableWidth, align: 'left' });
 
@@ -5296,9 +5298,8 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
     // Calculate interior pages (covers not counted)
     let interiorPages = isPictureBook ? storyScenes : storyScenes * 2;
 
-    // Round up to valid Gelato page count
-    const validPageCounts = [20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80];
-    const printPageCount = validPageCounts.find(count => count >= interiorPages) || validPageCounts[validPageCounts.length - 1];
+    // Round up to even page count for Gelato (accepts any even number)
+    const printPageCount = interiorPages % 2 === 0 ? interiorPages : interiorPages + 1;
     console.log(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, layout=${isPictureBook ? 'Picture Book' : 'Standard'}, interior=${interiorPages}, printPageCount=${printPageCount}`);
 
     // Get print product UID
@@ -6303,24 +6304,30 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
         const lineGap = -2; // Tighter line spacing (40-50% less gap)
         let fontSize = 9;
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        // Add 10% safety margin to prevent overflow due to rendering differences
+        const safeAvailableHeight = availableHeight * 0.9;
         let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
 
-        // Auto-reduce font size if text doesn't fit
-        while (textHeight > availableHeight && fontSize > 5) {
+        // Auto-reduce font size if text doesn't fit (go down to 4pt if needed)
+        while (textHeight > safeAvailableHeight && fontSize > 4) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
         }
 
+        if (fontSize < 9) {
+          console.log(`📄 [PDF-BACKGROUND] Page ${pageNumber}: Font reduced 9pt → ${fontSize}pt (text: ${cleanText.length} chars, height: ${Math.round(textHeight)}, available: ${Math.round(safeAvailableHeight)})`);
+        }
+
         let textToRender = cleanText;
         // If still doesn't fit at minimum font size, truncate with ellipsis
-        if (textHeight > availableHeight) {
+        if (textHeight > safeAvailableHeight) {
           const words = cleanText.split(' ');
           textToRender = '';
           for (let i = 0; i < words.length; i++) {
             const testText = textToRender + (textToRender ? ' ' : '') + words[i];
             const testHeight = doc.heightOfString(testText + '...', { width: availableWidth, align: 'left', lineGap });
-            if (testHeight <= availableHeight) {
+            if (testHeight <= safeAvailableHeight) {
               textToRender = testText;
             } else {
               break;
@@ -6367,13 +6374,17 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     }
     console.log(`📄 [BACKGROUND] Story has ${storyPages.length} scenes, layout=${isPictureBook ? 'Picture Book (1 page/scene)' : 'Standard (2 pages/scene)'}, interior pages=${actualPdfPages}`);
 
-    // Calculate target page count for Gelato (must be valid count)
-    const validPageCounts = [20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80];
-    const targetPageCount = validPageCounts.find(count => count >= actualPdfPages) || validPageCounts[validPageCounts.length - 1];
+    // Calculate target page count for Gelato (must be even)
+    // Gelato accepts any even page count - just round up to next even if odd
+    const targetPageCount = actualPdfPages % 2 === 0 ? actualPdfPages : actualPdfPages + 1;
 
-    // Add blank pages to reach target count
+    // Add blank pages only if needed (odd page count)
     const blankPagesToAdd = targetPageCount - actualPdfPages;
-    console.log(`📄 [BACKGROUND] PDF has ${actualPdfPages} content pages, adding ${blankPagesToAdd} blank pages to reach ${targetPageCount}`);
+    if (blankPagesToAdd > 0) {
+      console.log(`📄 [BACKGROUND] PDF has ${actualPdfPages} content pages, adding ${blankPagesToAdd} blank page to reach even count ${targetPageCount}`);
+    } else {
+      console.log(`📄 [BACKGROUND] PDF has ${actualPdfPages} content pages (already even, no padding needed)`);
+    }
 
     for (let i = 0; i < blankPagesToAdd; i++) {
       doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -6493,7 +6504,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       }
     };
 
-    console.log(`📦 [BACKGROUND] Print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, orderType=${orderType}`);
+    console.log(`📦 [BACKGROUND] Print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, orderType=${gelatoOrderType}`);
 
     const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
       method: 'POST',
