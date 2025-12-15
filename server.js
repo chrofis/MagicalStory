@@ -9489,10 +9489,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning.substring(0, 150)}...`);
     }
 
-    // Return score, reasoning, and text-specific info for covers
+    // Return score, full raw response, and text-specific info for covers
     return {
       score: finalScore,
-      reasoning,
+      reasoning: responseText, // Return full raw API response for transparency
       textErrorOnly,
       expectedText,
       actualText,
@@ -9627,11 +9627,13 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     console.log('🖼️  [IMAGE GEN] Found', candidate.content.parts.length, 'parts in candidate');
     for (const part of candidate.content.parts) {
       console.log('🖼️  [IMAGE GEN] Part keys:', Object.keys(part));
-      if (part.inlineData && part.inlineData.data) {
-        const imageDataSize = part.inlineData.data.length;
+      // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API may vary
+      const inlineData = part.inlineData || part.inline_data;
+      if (inlineData && inlineData.data) {
+        const imageDataSize = inlineData.data.length;
         const imageSizeKB = (imageDataSize / 1024).toFixed(2);
         console.log(`✅ [IMAGE GEN] Successfully extracted image data (${imageSizeKB} KB base64)`);
-        const pngImageData = `data:image/png;base64,${part.inlineData.data}`;
+        const pngImageData = `data:image/png;base64,${inlineData.data}`;
 
         // Compress PNG to JPEG
         console.log('🗜️  [COMPRESSION] Compressing image to JPEG...');
@@ -9770,8 +9772,11 @@ IMPORTANT: Only change the text, nothing else. The result should look like the o
 
       for (const part of parts) {
         console.log('✏️  [TEXT EDIT] Part keys:', Object.keys(part));
-        if (part.inline_data && part.inline_data.data) {
-          const editedImageData = `data:${part.inline_data.mime_type || 'image/png'};base64,${part.inline_data.data}`;
+        // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API varies
+        const inlineData = part.inlineData || part.inline_data;
+        if (inlineData && inlineData.data) {
+          const mimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+          const editedImageData = `data:${mimeType};base64,${inlineData.data}`;
           console.log(`✅ [TEXT EDIT] Successfully edited cover image text`);
           return { imageData: editedImageData };
         }
@@ -9897,8 +9902,11 @@ IMPORTANT: Only apply the specific edit requested. Keep everything else the same
 
       for (const part of parts) {
         console.log('✏️  [IMAGE EDIT] Part keys:', Object.keys(part));
-        if (part.inline_data && part.inline_data.data) {
-          const editedImageData = `data:${part.inline_data.mime_type || 'image/png'};base64,${part.inline_data.data}`;
+        // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API varies
+        const inlineData = part.inlineData || part.inline_data;
+        if (inlineData && inlineData.data) {
+          const mimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+          const editedImageData = `data:${mimeType};base64,${inlineData.data}`;
           console.log(`✅ [IMAGE EDIT] Successfully edited image`);
           return { imageData: editedImageData };
         }

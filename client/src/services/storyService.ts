@@ -186,10 +186,10 @@ export const storyService = {
   },
 
   async regenerateImage(storyId: string, pageNum: number): Promise<{ imageData: string }> {
-    const response = await api.post<{ image_data: string }>(
+    const response = await api.post<{ imageData: string }>(
       `/api/stories/${storyId}/regenerate/image/${pageNum}`
     );
-    return { imageData: response.image_data };
+    return { imageData: response.imageData };
   },
 
   async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial'): Promise<{
