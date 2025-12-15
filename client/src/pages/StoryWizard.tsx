@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { ArrowLeft, ArrowRight, Sparkles, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Sparkles, Users } from 'lucide-react';
 
 // Components
 import { Button, LoadingSpinner, Navigation } from '@/components/common';
@@ -96,11 +96,14 @@ export default function StoryWizard() {
   });
 
   // Step 5: Generation & Display
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false); // Full story generation
+  const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
   const [storyOutline, setStoryOutline] = useState(''); // Outline for dev mode display
+  const [outlinePrompt, setOutlinePrompt] = useState(''); // API prompt for outline (dev mode)
+  const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string }>>([]); // API prompts for story text (dev mode)
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
@@ -134,6 +137,8 @@ export default function StoryWizard() {
           setArtStyle(story.artStyle || 'pixar');
           setGeneratedStory(story.story || '');
           setStoryOutline(story.outline || '');
+          setOutlinePrompt(story.outlinePrompt || '');
+          setStoryTextPrompts(story.storyTextPrompts || []);
           setSceneImages(story.sceneImages || []);
           setSceneDescriptions(story.sceneDescriptions || []);
           setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
@@ -774,6 +779,8 @@ export default function StoryWizard() {
           setStoryId(status.result.storyId);
           setStoryTitle(status.result.title);
           setStoryOutline(status.result.outline);
+          setOutlinePrompt(status.result.outlinePrompt || '');
+          setStoryTextPrompts(status.result.storyTextPrompts || []);
           setGeneratedStory(status.result.story);
           setSceneDescriptions(status.result.sceneDescriptions || []);
           setSceneImages(status.result.sceneImages || []);
@@ -969,6 +976,8 @@ export default function StoryWizard() {
               title={storyTitle}
               story={generatedStory}
               outline={storyOutline}
+              outlinePrompt={outlinePrompt}
+              storyTextPrompts={storyTextPrompts}
               sceneImages={sceneImages}
               sceneDescriptions={sceneDescriptions}
               coverImages={coverImages}
@@ -1163,7 +1172,7 @@ export default function StoryWizard() {
               onRegenerateCover={storyId ? async (coverType: 'front' | 'back' | 'initial') => {
                 try {
                   log.info('Regenerating cover:', coverType);
-                  setIsGenerating(true);
+                  setIsRegenerating(true);
                   const result = await storyService.regenerateCover(storyId, coverType);
                   // Update the cover images with all metadata
                   setCoverImages(prev => {
@@ -1186,7 +1195,7 @@ export default function StoryWizard() {
                     ? 'Échec de la régénération de la couverture'
                     : 'Cover regeneration failed');
                 } finally {
-                  setIsGenerating(false);
+                  setIsRegenerating(false);
                 }
               } : undefined}
               onEditImage={(pageNumber: number) => {
@@ -1321,13 +1330,30 @@ export default function StoryWizard() {
         </div>
       </div>
 
-      {/* Generation Progress Modal */}
+      {/* Generation Progress Modal - Full story generation */}
       {isGenerating && (
         <GenerationProgress
           current={generationProgress.current}
           total={generationProgress.total}
           message={generationProgress.message}
         />
+      )}
+
+      {/* Simple Regeneration Overlay - Single image/cover */}
+      {isRegenerating && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+            <div className="relative inline-block mb-4">
+              <Loader2 size={40} className="animate-spin text-indigo-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800">
+              {language === 'de' ? 'Bild wird erstellt...' : language === 'fr' ? 'Création de l\'image...' : 'Generating image...'}
+            </h3>
+            <p className="text-sm text-gray-500 mt-2">
+              {language === 'de' ? 'Dies dauert etwa 30 Sekunden' : language === 'fr' ? 'Cela prend environ 30 secondes' : 'This takes about 30 seconds'}
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

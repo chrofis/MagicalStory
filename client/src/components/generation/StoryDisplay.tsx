@@ -3,10 +3,19 @@ import { useLanguage } from '@/context/LanguageContext';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 
+interface StoryTextPrompt {
+  batch: number;
+  startPage: number;
+  endPage: number;
+  prompt: string;
+}
+
 interface StoryDisplayProps {
   title: string;
   story: string;
   outline?: string;
+  outlinePrompt?: string;
+  storyTextPrompts?: StoryTextPrompt[];
   sceneImages: SceneImage[];
   sceneDescriptions?: SceneDescription[];
   coverImages?: CoverImages;
@@ -29,6 +38,8 @@ export function StoryDisplay({
   title,
   story,
   outline,
+  outlinePrompt,
+  storyTextPrompts = [],
   sceneImages,
   sceneDescriptions = [],
   coverImages,
@@ -181,6 +192,41 @@ export function StoryDisplay({
               <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-96 overflow-y-auto">
                 {story}
               </pre>
+            </details>
+          )}
+
+          {/* Outline API Prompt */}
+          {outlinePrompt && (
+            <details className="bg-cyan-50 border-2 border-cyan-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-cyan-800 hover:text-cyan-900 flex items-center gap-2">
+                <FileText size={20} />
+                {language === 'de' ? 'API-Prompt: Outline' : language === 'fr' ? 'Prompt API: Plan' : 'API Prompt: Outline'}
+              </summary>
+              <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-cyan-200 overflow-x-auto max-h-96 overflow-y-auto">
+                {outlinePrompt}
+              </pre>
+            </details>
+          )}
+
+          {/* Story Text API Prompts */}
+          {storyTextPrompts.length > 0 && (
+            <details className="bg-teal-50 border-2 border-teal-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-teal-800 hover:text-teal-900 flex items-center gap-2">
+                <FileText size={20} />
+                {language === 'de' ? `API-Prompts: Story-Text (${storyTextPrompts.length} Batches)` : language === 'fr' ? `Prompts API: Texte (${storyTextPrompts.length} lots)` : `API Prompts: Story Text (${storyTextPrompts.length} batches)`}
+              </summary>
+              <div className="mt-4 space-y-4">
+                {storyTextPrompts.map((batch) => (
+                  <details key={batch.batch} className="bg-white border border-teal-200 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-teal-700">
+                      {language === 'de' ? `Batch ${batch.batch}: Seiten ${batch.startPage}-${batch.endPage}` : language === 'fr' ? `Lot ${batch.batch}: Pages ${batch.startPage}-${batch.endPage}` : `Batch ${batch.batch}: Pages ${batch.startPage}-${batch.endPage}`}
+                    </summary>
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border overflow-x-auto max-h-64 overflow-y-auto">
+                      {batch.prompt}
+                    </pre>
+                  </details>
+                ))}
+              </div>
             </details>
           )}
         </div>

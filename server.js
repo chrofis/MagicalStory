@@ -7245,6 +7245,7 @@ async function processStoryJob(jobId) {
     const allImages = [];
     const allSceneDescriptions = [];
     const imagePrompts = {};
+    const storyTextPrompts = []; // Collect all story text batch prompts for dev mode
 
     // Create rate limiter for parallel image generation: max 5 concurrent
     const limit = pLimit(5);
@@ -7297,6 +7298,14 @@ Output Format:
 [Story text...]
 
 ...continue until page ${endScene}...`;
+
+      // Store batch prompt for dev mode
+      storyTextPrompts.push({
+        batch: batchNum + 1,
+        startPage: startScene,
+        endPage: endScene,
+        prompt: batchPrompt
+      });
 
       // Use the full model capacity - no artificial limits
       // Claude stops naturally when done (end_turn), we only pay for tokens actually used
@@ -7796,6 +7805,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     // Job complete - save result
     const resultData = {
       outline,
+      outlinePrompt,  // API prompt for outline (dev mode)
+      storyTextPrompts, // API prompts for story text batches (dev mode)
       storyText: fullStoryText,
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
@@ -7827,6 +7838,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       relationships: inputData.relationships || {},
       relationshipTexts: inputData.relationshipTexts || {},
       outline: outline,
+      outlinePrompt: outlinePrompt, // API prompt for outline (dev mode)
+      storyTextPrompts: storyTextPrompts, // API prompts for story text (dev mode)
       storyText: fullStoryText,
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,

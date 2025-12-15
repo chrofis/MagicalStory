@@ -66,7 +66,9 @@ export interface SavedStory {
   relationships: RelationshipMap;
   relationshipTexts: RelationshipTextMap;
   outline?: string;
+  outlinePrompt?: string;
   story?: string;
+  storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];
   coverImages?: CoverImages;

@@ -285,7 +285,9 @@ export const storyService = {
       storyId: string;
       title: string;
       outline: string;
+      outlinePrompt?: string;
       story: string;
+      storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
       sceneDescriptions: SceneDescription[];
       sceneImages: SceneImage[];
       coverImages?: CoverImages;
@@ -301,7 +303,9 @@ export const storyService = {
         storyId?: string;
         title?: string;
         outline?: string;
+        outlinePrompt?: string;
         storyText?: string; // Server uses storyText
+        storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
         sceneDescriptions?: SceneDescription[];
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
@@ -322,7 +326,9 @@ export const storyService = {
         storyId: resultData.storyId || '',
         title: resultData.title || '',
         outline: resultData.outline || '',
+        outlinePrompt: resultData.outlinePrompt,
         story: resultData.storyText || '', // Map storyText -> story
+        storyTextPrompts: resultData.storyTextPrompts,
         sceneDescriptions: resultData.sceneDescriptions || [],
         sceneImages: resultData.sceneImages || [],
         coverImages: resultData.coverImages,
