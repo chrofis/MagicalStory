@@ -134,6 +134,89 @@ export const storyService = {
     }
   },
 
+  // Get story with download progress tracking
+  async getStoryWithProgress(
+    id: string,
+    onProgress: (loaded: number, total: number | null) => void
+  ): Promise<SavedStory | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      // Get total size from Content-Length header (may be null if not provided)
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : null;
+
+      // Read the response body with progress tracking
+      const reader = response.body?.getReader();
+      if (!reader) {
+        // Fallback to regular fetch if streaming not supported
+        const s = await response.json() as StoryDetailsServer;
+        return this.mapServerStoryToClient(s);
+      }
+
+      const chunks: Uint8Array[] = [];
+      let loaded = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        chunks.push(value);
+        loaded += value.length;
+        onProgress(loaded, total);
+      }
+
+      // Combine chunks and parse JSON
+      const allChunks = new Uint8Array(loaded);
+      let position = 0;
+      for (const chunk of chunks) {
+        allChunks.set(chunk, position);
+        position += chunk.length;
+      }
+
+      const text = new TextDecoder().decode(allChunks);
+      const s = JSON.parse(text) as StoryDetailsServer;
+      return this.mapServerStoryToClient(s);
+    } catch {
+      return null;
+    }
+  },
+
+  // Helper to map server response to client format
+  mapServerStoryToClient(s: StoryDetailsServer): SavedStory {
+    const storyContent = s.storyText || s.story || '';
+    return {
+      id: s.id,
+      title: s.title,
+      storyType: s.storyType,
+      artStyle: s.artStyle,
+      language: s.language,
+      languageLevel: s.languageLevel,
+      pages: s.pages,
+      dedication: s.dedication,
+      characters: s.characters,
+      mainCharacters: s.mainCharacters,
+      relationships: s.relationships,
+      relationshipTexts: s.relationshipTexts,
+      outline: s.outline,
+      outlinePrompt: s.outlinePrompt,
+      story: storyContent,
+      storyTextPrompts: s.storyTextPrompts,
+      sceneDescriptions: s.sceneDescriptions,
+      sceneImages: s.sceneImages,
+      coverImages: s.coverImages,
+      thumbnail: s.thumbnail,
+      createdAt: s.createdAt,
+    };
+  },
+
   async createStory(data: {
     title: string;
     storyType: string;

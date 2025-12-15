@@ -40,6 +40,7 @@ export default function StoryWizard() {
     const params = new URLSearchParams(window.location.search);
     return !!params.get('storyId');
   });
+  const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const [developerMode, setDeveloperMode] = useState(false);
   const [imageGenMode, setImageGenMode] = useState<'parallel' | 'sequential' | null>(null); // null = server default
 
@@ -131,9 +132,12 @@ export default function StoryWizard() {
 
       log.info('Loading saved story:', urlStoryId);
       setIsLoading(true);
+      setLoadingProgress({ loaded: 0, total: null });
 
       try {
-        const story = await storyService.getStory(urlStoryId);
+        const story = await storyService.getStoryWithProgress(urlStoryId, (loaded, total) => {
+          setLoadingProgress({ loaded, total });
+        });
         if (story) {
           log.info('Loaded story:', story.title);
           // Populate story data
@@ -160,6 +164,7 @@ export default function StoryWizard() {
         log.error('Failed to load story:', error);
       } finally {
         setIsLoading(false);
+        setLoadingProgress(null);
       }
     };
 
@@ -998,12 +1003,17 @@ export default function StoryWizard() {
                 try {
                   log.info('Regenerating image for page:', pageNumber);
                   setIsGenerating(true);
-                  const { imageData } = await storyService.regenerateImage(storyId, pageNumber);
+                  const result = await storyService.regenerateImage(storyId, pageNumber);
+                  log.info('Regenerate result:', { hasImageData: !!result?.imageData, length: result?.imageData?.length });
+                  if (!result?.imageData) {
+                    log.error('No imageData in response!', result);
+                    throw new Error('No image data returned from server');
+                  }
                   // Update the scene images array
                   setSceneImages(prev => prev.map(img =>
-                    img.pageNumber === pageNumber ? { ...img, imageData } : img
+                    img.pageNumber === pageNumber ? { ...img, imageData: result.imageData } : img
                   ));
-                  log.info('Image regenerated successfully');
+                  log.info('Image regenerated successfully, updated state');
                 } catch (error) {
                   log.error('Image regeneration failed:', error);
                   alert(language === 'de'
@@ -1257,8 +1267,33 @@ export default function StoryWizard() {
       <div className="px-3 md:px-8 mt-2 md:mt-8 flex-1">
         <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
           {isLoading && !isGenerating ? (
-            <div className="py-12">
-              <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : 'Loading...'} />
+            <div className="py-12 flex flex-col items-center justify-center">
+              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+              <p className="text-gray-600 font-medium mb-2">
+                {language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire...' : 'Loading story...'}
+              </p>
+              {loadingProgress && (
+                <div className="w-64 mt-2">
+                  {/* Progress bar */}
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-600 transition-all duration-300 ease-out"
+                      style={{
+                        width: loadingProgress.total
+                          ? `${Math.min(100, (loadingProgress.loaded / loadingProgress.total) * 100)}%`
+                          : '100%'
+                      }}
+                    />
+                  </div>
+                  {/* Progress text */}
+                  <p className="text-sm text-gray-500 mt-2 text-center">
+                    {(loadingProgress.loaded / (1024 * 1024)).toFixed(1)} MB
+                    {loadingProgress.total && (
+                      <span> ({Math.round((loadingProgress.loaded / loadingProgress.total) * 100)}%)</span>
+                    )}
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             renderStep()
@@ -1407,12 +1442,17 @@ export default function StoryWizard() {
                   try {
                     if (editTarget.type === 'image' && editTarget.pageNumber) {
                       const result = await storyService.editImage(storyId, editTarget.pageNumber, editPromptText);
+                      log.info('Edit result:', { hasImageData: !!result?.imageData, length: result?.imageData?.length });
+                      if (!result?.imageData) {
+                        log.error('No imageData in edit response!', result);
+                        throw new Error('No image data returned from server');
+                      }
                       setSceneImages(prev => prev.map(img =>
                         img.pageNumber === editTarget.pageNumber
                           ? { ...img, imageData: result.imageData }
                           : img
                       ));
-                      log.info('Image edited successfully');
+                      log.info('Image edited successfully, updated state');
                     } else if (editTarget.type === 'cover' && editTarget.coverType) {
                       const result = await storyService.editCover(storyId, editTarget.coverType, editPromptText);
                       setCoverImages(prev => {
