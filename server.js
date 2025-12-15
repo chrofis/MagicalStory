@@ -8099,7 +8099,23 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         console.log(`📚 [STREAMING] All story batches complete. Starting SEQUENTIAL image generation...`);
 
         // Parse all pages from the full story text
-        const allPages = parseStoryPages(fullStoryText);
+        let allPages = parseStoryPages(fullStoryText);
+
+        // Deduplicate pages - keep only first occurrence of each page number
+        const seenPages = new Set();
+        const beforeDedup = allPages.length;
+        allPages = allPages.filter(page => {
+          if (seenPages.has(page.pageNumber)) {
+            console.log(`⚠️ [SEQUENTIAL] Removing duplicate page ${page.pageNumber}`);
+            return false;
+          }
+          seenPages.add(page.pageNumber);
+          return true;
+        });
+        if (allPages.length < beforeDedup) {
+          console.log(`⚠️ [SEQUENTIAL] Removed ${beforeDedup - allPages.length} duplicate pages`);
+        }
+
         console.log(`📄 [SEQUENTIAL] Found ${allPages.length} pages to generate images for`);
 
         await dbPool.query(
