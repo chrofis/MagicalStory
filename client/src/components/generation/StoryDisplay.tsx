@@ -385,8 +385,8 @@ export function StoryDisplay({
           )}
 
           {/* Visual Bible - Recurring Elements for Consistency */}
-          {visualBible && (visualBible.secondaryCharacters.length > 0 || visualBible.animals.length > 0 || visualBible.artifacts.length > 0 || visualBible.locations.length > 0) && (
-            <details className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4">
+          {visualBible && (
+            <details className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4" open>
               <summary className="cursor-pointer text-lg font-bold text-rose-800 hover:text-rose-900 flex items-center gap-2">
                 <BookOpen size={20} />
                 {language === 'de' ? 'Visual Bible (Wiederkehrende Elemente)' : language === 'fr' ? 'Bible Visuelle (Éléments Récurrents)' : 'Visual Bible (Recurring Elements)'}
@@ -477,6 +477,13 @@ export function StoryDisplay({
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Empty state message */}
+                {visualBible.secondaryCharacters.length === 0 && visualBible.animals.length === 0 && visualBible.artifacts.length === 0 && visualBible.locations.length === 0 && (
+                  <div className="text-gray-500 text-sm italic">
+                    {language === 'de' ? 'Keine wiederkehrenden Elemente gefunden' : language === 'fr' ? 'Aucun élément récurrent trouvé' : 'No recurring elements found in this story'}
                   </div>
                 )}
               </div>
