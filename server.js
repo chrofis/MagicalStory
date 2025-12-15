@@ -7960,7 +7960,7 @@ async function processStoryJob(jobId) {
       console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating scenes ${startScene}-${endScene}`);
 
       // Generate story text for this batch
-      const basePrompt = buildBasePrompt(inputData);
+      const basePrompt = buildBasePrompt(inputData, sceneCount);
       const readingLevel = getReadingLevel(inputData.languageLevel);
 
       console.log(`📝 [BATCH ${batchNum + 1}] Reading level: ${inputData.languageLevel || 'standard'} - ${readingLevel}`);
@@ -8849,8 +8849,17 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 // Helper functions for story generation
 
 // Build base prompt with character/setting info for story text generation
-function buildBasePrompt(inputData) {
+// textPageCount: the actual number of text pages/scenes (not total PDF pages)
+function buildBasePrompt(inputData, textPageCount = null) {
   const mainCharacterIds = inputData.mainCharacters || [];
+  // Use textPageCount if provided, otherwise calculate from total pages
+  // For advanced/standard: total PDF pages / 2 = text pages (since each scene = 1 text + 1 image page)
+  // For 1st-grade: total PDF pages = text pages (combined layout)
+  const actualTextPages = textPageCount || (
+    inputData.languageLevel === '1st-grade'
+      ? (inputData.pages || 15)
+      : Math.ceil((inputData.pages || 15) / 2)
+  );
 
   // For story text generation, we use BASIC character info (no strengths/weaknesses)
   // Strengths/weaknesses are only used in outline generation to avoid repetitive trait mentions
@@ -8901,7 +8910,7 @@ function buildBasePrompt(inputData) {
   return `# Story Parameters
 
 - **Title**: ${inputData.title || 'Untitled'}
-- **Length**: ${inputData.pages || 15} pages
+- **Length**: ${actualTextPages} text pages (write exactly this many pages, each within word limit)
 - **Language**: ${language}${languageNote}
 - **Reading Level**: ${readingLevel}
 - **Story Type**: ${inputData.storyType || 'adventure'}

@@ -1026,9 +1026,17 @@ export default function StoryWizard() {
                     log.error('No imageData in response!', result);
                     throw new Error('No image data returned from server');
                   }
-                  // Update the scene images array
+                  // Update the scene images array with all returned data (including quality evaluation)
                   setSceneImages(prev => prev.map(img =>
-                    img.pageNumber === pageNumber ? { ...img, imageData: result.imageData } : img
+                    img.pageNumber === pageNumber ? {
+                      ...img,
+                      imageData: result.imageData,
+                      qualityScore: result.qualityScore,
+                      qualityReasoning: result.qualityReasoning,
+                      totalAttempts: result.totalAttempts,
+                      retryHistory: result.retryHistory,
+                      wasRegenerated: true
+                    } : img
                   ));
                   log.info('Image regenerated successfully, updated state');
                 } catch (error) {
@@ -1255,6 +1263,18 @@ export default function StoryWizard() {
               generatedPages={generatedPages}
               totalPages={totalPages}
             />
+          );
+        }
+        // If we have a storyId in URL but no story content yet, show loading (story is being fetched)
+        const urlStoryId = searchParams.get('storyId');
+        if (urlStoryId) {
+          return (
+            <div className="py-12 flex flex-col items-center justify-center">
+              <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+              <p className="text-gray-600 font-medium">
+                {language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire...' : 'Loading story...'}
+              </p>
+            </div>
           );
         }
         return (
