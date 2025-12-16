@@ -6686,42 +6686,97 @@ function parseVisualBible(outline) {
 
   if (!outline) return visualBible;
 
+  // Log outline length for debugging
+  console.log(`📖 [VISUAL BIBLE] Parsing outline, length: ${outline.length} chars`);
+
+  // Check if outline contains Visual Bible mention at all
+  if (!outline.includes('Visual Bible')) {
+    console.log('📖 [VISUAL BIBLE] Outline does not contain "Visual Bible" text');
+    return visualBible;
+  }
+
   // Find the Visual Bible section
-  // Note: \Z doesn't work in JavaScript - use $ for end of string
-  const visualBibleMatch = outline.match(/##\s*Visual\s*Bible([\s\S]*?)(?=^##\s|^---|$)/mi);
+  // The outline ends with "## Visual Bible" section which continues until end of string or next ## heading or ---
+  // Use a more robust regex that captures everything after "## Visual Bible"
+  const visualBibleMatch = outline.match(/##\s*Visual\s*Bible\b([\s\S]*?)(?=\n##\s|\n---|$)/i);
   if (!visualBibleMatch) {
-    console.log('📖 [VISUAL BIBLE] No Visual Bible section found in outline');
+    console.log('📖 [VISUAL BIBLE] Regex did not match Visual Bible section');
+    // Try alternate regex patterns
+    const altMatch = outline.match(/Visual\s*Bible[\s\S]{0,50}/i);
+    if (altMatch) {
+      console.log(`📖 [VISUAL BIBLE] Found text near "Visual Bible": "${altMatch[0].substring(0, 100)}..."`);
+    }
     return visualBible;
   }
 
   const visualBibleSection = visualBibleMatch[1];
+  console.log(`📖 [VISUAL BIBLE] Found section, length: ${visualBibleSection.length} chars`);
+  console.log(`📖 [VISUAL BIBLE] Section preview: "${visualBibleSection.substring(0, 200)}..."`);
+
+  // Log what subsections we find
+  console.log(`📖 [VISUAL BIBLE] Looking for ### Secondary Characters...`);
+  console.log(`📖 [VISUAL BIBLE] Looking for ### Animals...`);
+  console.log(`📖 [VISUAL BIBLE] Looking for ### Artifacts...`);
+  console.log(`📖 [VISUAL BIBLE] Looking for ### Locations...`);
 
   // Parse Secondary Characters
   const secondaryCharsMatch = visualBibleSection.match(/###\s*Secondary\s*Characters?([\s\S]*?)(?=###|$)/i);
-  if (secondaryCharsMatch && !secondaryCharsMatch[1].toLowerCase().includes('none')) {
-    const entries = parseVisualBibleEntries(secondaryCharsMatch[1]);
-    visualBible.secondaryCharacters = entries;
+  if (secondaryCharsMatch) {
+    console.log(`📖 [VISUAL BIBLE] Secondary Characters section found, length: ${secondaryCharsMatch[1].length}`);
+    if (!secondaryCharsMatch[1].toLowerCase().includes('none')) {
+      const entries = parseVisualBibleEntries(secondaryCharsMatch[1]);
+      visualBible.secondaryCharacters = entries;
+      console.log(`📖 [VISUAL BIBLE] Parsed ${entries.length} secondary characters`);
+    } else {
+      console.log(`📖 [VISUAL BIBLE] Secondary Characters section contains "None"`);
+    }
+  } else {
+    console.log(`📖 [VISUAL BIBLE] No ### Secondary Characters section found`);
   }
 
   // Parse Animals & Creatures
   const animalsMatch = visualBibleSection.match(/###\s*Animals?\s*(?:&|and)?\s*Creatures?([\s\S]*?)(?=###|$)/i);
-  if (animalsMatch && !animalsMatch[1].toLowerCase().includes('none')) {
-    const entries = parseVisualBibleEntries(animalsMatch[1]);
-    visualBible.animals = entries;
+  if (animalsMatch) {
+    console.log(`📖 [VISUAL BIBLE] Animals section found, length: ${animalsMatch[1].length}`);
+    if (!animalsMatch[1].toLowerCase().includes('none')) {
+      const entries = parseVisualBibleEntries(animalsMatch[1]);
+      visualBible.animals = entries;
+      console.log(`📖 [VISUAL BIBLE] Parsed ${entries.length} animals`);
+    } else {
+      console.log(`📖 [VISUAL BIBLE] Animals section contains "None"`);
+    }
+  } else {
+    console.log(`📖 [VISUAL BIBLE] No ### Animals section found`);
   }
 
   // Parse Artifacts
   const artifactsMatch = visualBibleSection.match(/###\s*Artifacts?([\s\S]*?)(?=###|$)/i);
-  if (artifactsMatch && !artifactsMatch[1].toLowerCase().includes('none')) {
-    const entries = parseVisualBibleEntries(artifactsMatch[1]);
-    visualBible.artifacts = entries;
+  if (artifactsMatch) {
+    console.log(`📖 [VISUAL BIBLE] Artifacts section found, length: ${artifactsMatch[1].length}`);
+    if (!artifactsMatch[1].toLowerCase().includes('none')) {
+      const entries = parseVisualBibleEntries(artifactsMatch[1]);
+      visualBible.artifacts = entries;
+      console.log(`📖 [VISUAL BIBLE] Parsed ${entries.length} artifacts`);
+    } else {
+      console.log(`📖 [VISUAL BIBLE] Artifacts section contains "None"`);
+    }
+  } else {
+    console.log(`📖 [VISUAL BIBLE] No ### Artifacts section found`);
   }
 
   // Parse Locations
   const locationsMatch = visualBibleSection.match(/###\s*Locations?([\s\S]*?)(?=###|$)/i);
-  if (locationsMatch && !locationsMatch[1].toLowerCase().includes('none')) {
-    const entries = parseVisualBibleEntries(locationsMatch[1]);
-    visualBible.locations = entries;
+  if (locationsMatch) {
+    console.log(`📖 [VISUAL BIBLE] Locations section found, length: ${locationsMatch[1].length}`);
+    if (!locationsMatch[1].toLowerCase().includes('none')) {
+      const entries = parseVisualBibleEntries(locationsMatch[1]);
+      visualBible.locations = entries;
+      console.log(`📖 [VISUAL BIBLE] Parsed ${entries.length} locations`);
+    } else {
+      console.log(`📖 [VISUAL BIBLE] Locations section contains "None"`);
+    }
+  } else {
+    console.log(`📖 [VISUAL BIBLE] No ### Locations section found`);
   }
 
   const totalEntries = visualBible.secondaryCharacters.length +
@@ -6741,6 +6796,10 @@ function parseVisualBible(outline) {
 // Helper to parse individual Visual Bible entries
 function parseVisualBibleEntries(sectionText) {
   const entries = [];
+
+  // Log raw section text for debugging
+  console.log(`📖 [VISUAL BIBLE ENTRIES] Parsing section text (${sectionText.length} chars):`);
+  console.log(`📖 [VISUAL BIBLE ENTRIES] First 300 chars: "${sectionText.substring(0, 300)}..."`);
 
   // Match entries that start with **Name** (pages X, Y, Z)
   const entryPattern = /\*\*([^*]+)\*\*\s*\(pages?\s*([^)]+)\)([\s\S]*?)(?=\*\*[^*]+\*\*\s*\(pages?|$)/gi;
@@ -6802,7 +6861,9 @@ function getVisualBibleEntriesForPage(visualBible, pageNumber) {
 
 // Build Visual Bible prompt section for image generation
 function buildVisualBiblePrompt(visualBible, pageNumber) {
+  console.log(`📖 [VISUAL BIBLE PROMPT] Building prompt for page ${pageNumber}`);
   const entries = getVisualBibleEntriesForPage(visualBible, pageNumber);
+  console.log(`📖 [VISUAL BIBLE PROMPT] Found ${entries.length} entries for page ${pageNumber}: ${entries.map(e => e.name).join(', ') || 'none'}`);
 
   if (entries.length === 0) return '';
 
@@ -8016,6 +8077,12 @@ async function processStoryJob(jobId) {
 
     // Parse Visual Bible for recurring elements consistency
     const visualBible = parseVisualBible(outline);
+    console.log(`📖 [PIPELINE] Visual Bible after parsing: ${JSON.stringify({
+      secondaryCharacters: visualBible.secondaryCharacters.length,
+      animals: visualBible.animals.length,
+      artifacts: visualBible.artifacts.length,
+      locations: visualBible.locations.length
+    })}`);
 
     // Save checkpoint: scene hints and visual bible
     await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions, visualBible });
