@@ -301,6 +301,7 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.initialPageNoDedication = await fs.readFile(path.join(promptsDir, 'initial-page-no-dedication.txt'), 'utf-8');
     PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
     PROMPT_TEMPLATES.storybookCombined = await fs.readFile(path.join(promptsDir, 'storybook-combined.txt'), 'utf-8');
+    PROMPT_TEMPLATES.rewriteBlockedScene = await fs.readFile(path.join(promptsDir, 'rewrite-blocked-scene.txt'), 'utf-8');
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
     log.error('❌ Failed to load prompt templates:', err.message);
@@ -9923,6 +9924,29 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
   }
 }
 
+/**
+ * Rewrite a blocked scene description to be safer while preserving the story moment
+ * @param {string} sceneDescription - The original scene that was blocked
+ * @returns {Promise<string>} - The rewritten, safer scene description
+ */
+async function rewriteBlockedScene(sceneDescription) {
+  console.log(`🔄 [REWRITE] Rewriting blocked scene to be safer...`);
+  console.log(`🔄 [REWRITE] Original: ${sceneDescription.substring(0, 100)}...`);
+
+  try {
+    const rewritePrompt = fillTemplate(PROMPT_TEMPLATES.rewriteBlockedScene, {
+      SCENE_DESCRIPTION: sceneDescription
+    });
+
+    const rewrittenScene = await callTextModel(rewritePrompt, 1000);
+    console.log(`✅ [REWRITE] Scene rewritten: ${rewrittenScene.substring(0, 100)}...`);
+    return rewrittenScene.trim();
+  } catch (error) {
+    console.error(`❌ [REWRITE] Failed to rewrite scene:`, error.message);
+    throw error;
+  }
+}
+
 async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene') {
   // Check cache first (include previousImage presence in cache key for sequential mode)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
@@ -10358,6 +10382,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   let bestResult = null;
   let bestScore = -1;
   let attempts = 0;
+  let currentPrompt = prompt;
+  let wasSceneRewritten = false;
 
   // Store all attempts for dev mode
   const retryHistory = [];
@@ -10368,11 +10394,68 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
     // Clear cache for retries to force new generation
     if (attempts > 1) {
-      const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
+      const cacheKey = generateImageCacheKey(currentPrompt, characterPhotos, previousImage ? 'seq' : null);
       imageCache.delete(cacheKey);
     }
 
-    const result = await callGeminiAPIForImage(prompt, characterPhotos, previousImage, evaluationType);
+    let result;
+    try {
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType);
+    } catch (error) {
+      // Check if this is a safety/content block error
+      const errorMsg = error.message.toLowerCase();
+      const isSafetyBlock = errorMsg.includes('blocked') || errorMsg.includes('safety') ||
+                           errorMsg.includes('prohibited') || errorMsg.includes('filtered');
+
+      if (isSafetyBlock && !wasSceneRewritten && attempts < MAX_ATTEMPTS) {
+        console.log(`🚫 [QUALITY RETRY] Image blocked by safety filter, attempting to rewrite scene...`);
+
+        // Extract scene description from prompt
+        const sceneMatch = currentPrompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i) ||
+                          currentPrompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
+
+        if (sceneMatch && sceneMatch[1]) {
+          try {
+            const originalScene = sceneMatch[1].trim();
+            const rewrittenScene = await rewriteBlockedScene(originalScene);
+
+            // Replace scene in prompt
+            currentPrompt = currentPrompt.replace(originalScene, rewrittenScene);
+            wasSceneRewritten = true;
+
+            // Record the rewrite attempt
+            retryHistory.push({
+              attempt: attempts,
+              type: 'safety_block_rewrite',
+              originalScene: originalScene.substring(0, 200),
+              rewrittenScene: rewrittenScene.substring(0, 200),
+              error: error.message,
+              timestamp: new Date().toISOString()
+            });
+
+            // Don't increment attempts for the rewrite, let it retry with new prompt
+            attempts--;
+            continue;
+          } catch (rewriteError) {
+            console.error(`❌ [QUALITY RETRY] Scene rewrite failed:`, rewriteError.message);
+          }
+        }
+      }
+
+      // If we can't recover, record the error and continue
+      retryHistory.push({
+        attempt: attempts,
+        type: 'generation_failed',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+
+      // If this was the last attempt, throw the error
+      if (attempts >= MAX_ATTEMPTS) {
+        throw error;
+      }
+      continue;
+    }
     const score = result.score || 0;
     console.log(`⭐ [QUALITY RETRY] Attempt ${attempts} score: ${score}%`);
 
@@ -10407,12 +10490,13 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
     // Success: meets threshold AND no text error
     if (score >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
-      console.log(`✅ [QUALITY RETRY] Success on attempt ${attempts}! Score ${score}% >= ${IMAGE_QUALITY_THRESHOLD}%`);
+      console.log(`✅ [QUALITY RETRY] Success on attempt ${attempts}! Score ${score}% >= ${IMAGE_QUALITY_THRESHOLD}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}`);
       return {
         imageData: result.imageData,
         score: result.score,
         reasoning: result.reasoning,
         wasRegenerated: attempts > 1,
+        wasSceneRewritten: wasSceneRewritten,
         totalAttempts: attempts,
         retryHistory: retryHistory
       };
@@ -10454,6 +10538,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               reasoning: editedQuality?.reasoning || 'Text edited',
               wasRegenerated: true,
               wasTextEdited: true,
+              wasSceneRewritten: wasSceneRewritten,
               totalAttempts: attempts,
               retryHistory: retryHistory
             };
@@ -10478,12 +10563,13 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   }
 
   // Exhausted all attempts - return best result we got
-  console.log(`⚠️  [QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Best score: ${bestScore}%`);
+  console.log(`⚠️  [QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Best score: ${bestScore}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}`);
   return {
     imageData: bestResult.imageData,
     score: bestResult.score,
     reasoning: bestResult.reasoning,
     wasRegenerated: true,
+    wasSceneRewritten: wasSceneRewritten,
     totalAttempts: attempts,
     retryHistory: retryHistory
   };
