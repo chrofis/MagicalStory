@@ -11330,10 +11330,16 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const userCredits = userResult.rows[0].credits;
+      let userCredits = userResult.rows[0].credits;
 
-      // Skip credit check if user has unlimited credits (-1)
-      if (userCredits !== -1) {
+      // Handle null credits - set default based on role (this shouldn't happen after migration)
+      if (userCredits === null || userCredits === undefined) {
+        console.log(`⚠️ User ${userId} has null credits, defaulting based on role`);
+        userCredits = req.user.role === 'admin' ? -1 : 500;
+      }
+
+      // Skip credit check if user has unlimited credits (-1) OR is admin
+      if (userCredits !== -1 && req.user.role !== 'admin') {
         if (userCredits < creditsNeeded) {
           return res.status(402).json({
             error: 'Insufficient credits',

@@ -21,6 +21,7 @@ interface CharacterResponse {
   body_no_bg_url?: string;
   face_box?: { x: number; y: number; width: number; height: number };
   body_box?: { x: number; y: number; width: number; height: number };
+  style_analysis?: StyleAnalysis;
   // CamelCase (old format from database)
   hairColor?: string;
   otherFeatures?: string;
@@ -31,6 +32,7 @@ interface CharacterResponse {
   bodyNoBgUrl?: string;
   faceBox?: { x: number; y: number; width: number; height: number };
   bodyBox?: { x: number; y: number; width: number; height: number };
+  styleAnalysis?: StyleAnalysis;
   // Common fields
   clothing?: string;
   strengths: string[];
@@ -66,6 +68,7 @@ function mapCharacterFromApi(char: CharacterResponse): Character {
     bodyNoBgUrl: char.body_no_bg_url || char.bodyNoBgUrl,
     faceBox: char.face_box || char.faceBox,
     bodyBox: char.body_box || char.bodyBox,
+    styleAnalysis: char.style_analysis || char.styleAnalysis,
   };
 }
 
@@ -93,6 +96,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     body_no_bg_url: char.bodyNoBgUrl,
     face_box: char.faceBox,
     body_box: char.bodyBox,
+    style_analysis: char.styleAnalysis,
   };
 }
 
