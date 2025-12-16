@@ -10410,9 +10410,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       if (isSafetyBlock && !wasSceneRewritten && attempts < MAX_ATTEMPTS) {
         console.log(`🚫 [QUALITY RETRY] Image blocked by safety filter, attempting to rewrite scene...`);
 
-        // Extract scene description from prompt
+        // Extract scene description from prompt - supports English, German, and French
         const sceneMatch = currentPrompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i) ||
-                          currentPrompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
+                          currentPrompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i) ||
+                          currentPrompt.match(/Szenenbeschreibung:\s*([\s\S]*?)(?=\n\n\*\*|$)/i) ||
+                          currentPrompt.match(/Description de la scène:\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
 
         if (sceneMatch && sceneMatch[1]) {
           try {
@@ -10439,6 +10441,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
           } catch (rewriteError) {
             console.error(`❌ [QUALITY RETRY] Scene rewrite failed:`, rewriteError.message);
           }
+        } else {
+          console.log(`⚠️ [QUALITY RETRY] Could not extract scene from prompt for rewriting. First 500 chars: ${currentPrompt.substring(0, 500)}`);
         }
       }
 
