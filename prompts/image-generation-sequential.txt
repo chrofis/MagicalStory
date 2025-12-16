@@ -1,47 +1,27 @@
 CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 
-Create a cinematic scene in {STYLE_DESCRIPTION}.
+**STYLE: {STYLE_DESCRIPTION}**
 
-Scene Description: {SCENE_DESCRIPTION}
+**STYLE TRANSFORMATION:**
+- Reference images show REAL PHOTOGRAPHS - transform into the art style
+- Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
+- Render in artistic style - NOT photo-realistic copies
+- ALL characters in the SAME consistent style
 
-{CHARACTER_INFO}
+**CLOTHING:**
+- FACES and HAIR exactly as in reference images
+- Clothing appropriate to scene context (winter=warm, summer=light, etc.)
+- Maintain color preferences, keep accessories consistent
 
-**STYLE TRANSFORMATION - CRITICAL:**
-- Reference images show REAL PHOTOGRAPHS of people
-- Transform these people into the requested art style ({STYLE_DESCRIPTION})
-- Characters must be RECOGNIZABLE as the same person (same hair color, face shape, age, gender, distinguishing features)
-- But rendered in the artistic style - NOT photo-realistic copies
-- ALL characters must have the SAME consistent art style
+**VISUAL CONTINUITY:**
+From previous scene image COPY: props, furniture, background elements, art style, color palette
+DO NOT COPY: poses, positions, facial expressions - these must be NEW for the current scene
 
-**CLOTHING & APPEARANCE:**
-- Character FACES, HAIR, and BODY PROPORTIONS must match reference images exactly
-- Clothing should be APPROPRIATE TO THE SCENE CONTEXT:
-  - Winter/snow scenes → warm clothing (coats, boots, hats)
-  - Beach/summer scenes → light clothing (shorts, dresses, sandals)
-  - Formal events → dressy attire
-  - Bedtime scenes → pajamas
-- Maintain consistent COLOR PREFERENCES when adapting clothing (if character wears blue in reference, use blue tones)
-- Signature accessories (glasses, favorite hat, necklace) should remain consistent across scenes
+---
 
-**VISUAL CONTINUITY - WHAT TO COPY vs. WHAT TO CHANGE:**
+**SCENE:** {SCENE_DESCRIPTION}
 
-From the PREVIOUS scene image (first attached image), COPY EXACTLY:
-- Props and objects (maps, lamps, skis, toys, books, vehicles)
-- Furniture and room details
-- Background elements and setting
-- Clothing style and colors (unless scene context requires change)
-- Art style, lighting approach, and color palette
+---
 
-From the PREVIOUS scene image, DO NOT COPY:
-- Character POSES - must be NEW and match the current scene description
-- Character POSITIONS in frame - arrange according to current scene
-- Facial expressions - must match current scene's emotion
-
-CRITICAL: Characters must be RECOGNIZABLE (same face, hair, body) but in FRESH POSES appropriate to the new scene's action. Never copy-paste character poses from the previous image.
-
-Important:
-- Show appropriate emotions on faces (happy, sad, surprised, worried, excited)
-- Characters must be recognizable throughout the story
-- Clean, clear composition
-
+Show appropriate emotions. Clean, clear composition.
 This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.

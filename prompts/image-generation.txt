@@ -1,27 +1,23 @@
-Create a **cinematic scene** in {STYLE_DESCRIPTION}. Use professional photography/cinematography techniques, focusing on lighting, composition, and depth of field to create a visually striking image.
+CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 
-Scene Description: {SCENE_DESCRIPTION}
-{CHARACTER_PROMPTS}
+**STYLE: {STYLE_DESCRIPTION}**
 
-**STYLE TRANSFORMATION - CRITICAL:**
-- Reference images show REAL PHOTOGRAPHS of people
-- Transform these people into the requested art style ({STYLE_DESCRIPTION})
-- Characters must be RECOGNIZABLE as the same person (same hair color, face shape, age, gender, distinguishing features)
-- But rendered in the artistic style - NOT photo-realistic copies
-- ALL characters must have the SAME consistent art style
+**STYLE TRANSFORMATION:**
+- Reference images show REAL PHOTOGRAPHS - transform into the art style
+- Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
+- Render in artistic style - NOT photo-realistic copies
+- ALL characters in the SAME consistent style
 
-**CLOTHING & APPEARANCE:**
-- Character FACES, HAIR, and BODY PROPORTIONS must match reference images exactly
-- Clothing should be APPROPRIATE TO THE SCENE CONTEXT:
-  - Winter/snow scenes → warm clothing (coats, boots, hats)
-  - Beach/summer scenes → light clothing (shorts, dresses, sandals)
-  - Formal events → dressy attire
-  - Bedtime scenes → pajamas
-- Maintain consistent COLOR PREFERENCES when adapting clothing (if character wears blue in reference, use blue tones)
-- Signature accessories (glasses, favorite hat, necklace) should remain consistent across scenes
+**CLOTHING:**
+- FACES and HAIR exactly as in reference images
+- Clothing appropriate to scene context (winter=warm, summer=light, etc.)
+- Maintain color preferences, keep accessories consistent
 
-Important:
-- Focus on a **clear, uncluttered composition** that highlights the main subjects and action
-- Capture the emotion and narrative of the scene vividly
-- **No text, watermarks, or extraneous elements** should be present in the image
-- Do not add objects or details not explicitly mentioned in the scene description or character prompts
+---
+
+**SCENE:** {SCENE_DESCRIPTION}
+
+---
+
+Show appropriate emotions. Clean, clear composition. No text or watermarks.
+This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.

@@ -744,6 +744,14 @@ async function initializeDatabase() {
       END $$;
     `);
 
+    // Update existing users with NULL credits: admins get -1 (unlimited), users get 500
+    await dbPool.query(`
+      UPDATE users SET credits = -1 WHERE credits IS NULL AND role = 'admin';
+    `);
+    await dbPool.query(`
+      UPDATE users SET credits = 500 WHERE credits IS NULL AND role = 'user';
+    `);
+
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS config (
         id SERIAL PRIMARY KEY,
@@ -1225,7 +1233,7 @@ app.post('/api/auth/login', async (req, res) => {
         role: user.role,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits !== undefined ? user.credits : 500
+        credits: user.credits != null ? user.credits : 500
       }
     });
   } catch (err) {
@@ -1316,7 +1324,7 @@ app.post('/api/auth/firebase', async (req, res) => {
           role: user.role,
           storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
           storiesGenerated: user.stories_generated || 0,
-          credits: user.credits !== undefined ? user.credits : 500
+          credits: user.credits != null ? user.credits : 500
         }
       });
     } else {
@@ -1613,7 +1621,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         role: user.role,
         storyQuota: user.story_quota,
         storiesGenerated: user.stories_generated,
-        credits: user.credits !== undefined ? user.credits : 500,
+        credits: user.credits != null ? user.credits : 500,
         createdAt: user.created_at,
         totalOrders: parseInt(user.total_orders) || 0,
         failedOrders: parseInt(user.failed_orders) || 0
@@ -1625,7 +1633,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         ...user,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits !== undefined ? user.credits : 500,
+        credits: user.credits != null ? user.credits : 500,
         totalOrders: 0,
         failedOrders: 0
       }));
@@ -1639,7 +1647,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
 });
 
 // Update user credits (admin only)
-app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) => {
+app.post('/api/admin/users/:userId/quota', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
@@ -2115,7 +2123,7 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      credits = user.credits !== undefined ? user.credits : 500;
+      credits = user.credits != null ? user.credits : 500;
     }
 
     res.json({
@@ -2964,8 +2972,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
     }
 
-    // Note: Visual bible is NOT used for covers - covers show main characters (from user photos)
-    // not secondary story characters from the visual bible
+    // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
+    const visualBible = storyData.visualBible || null;
+    const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
     // Build cover prompt
     let coverPrompt;
@@ -2980,9 +2989,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
         coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle,
-          VISUAL_BIBLE: ''
+          VISUAL_BIBLE: visualBiblePrompt
         });
       } else if (normalizedCoverType === 'initialPage') {
         const initialPageScene = coverScenes.initialPage || 'A warm, inviting dedication/introduction page.';
@@ -2990,24 +2998,21 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
-              CHARACTER_INFO: characterInfo,
               DEDICATION: storyData.dedication,
-              VISUAL_BIBLE: ''
+              VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
-              CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle,
-              VISUAL_BIBLE: ''
+              VISUAL_BIBLE: visualBiblePrompt
             });
       } else {
         const backCoverScene = coverScenes.backCover || 'A satisfying, conclusive ending scene.';
         coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_INFO: characterInfo,
-          VISUAL_BIBLE: ''
+          VISUAL_BIBLE: visualBiblePrompt
         });
       }
     }
@@ -8414,8 +8419,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
         const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
-        // Note: Visual bible is NOT used for covers - covers show main characters (from user photos)
-        // not secondary story characters from the visual bible
+        // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
+        const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
         // Front cover - use same template as standard mode
         // Detect which characters appear in the front cover scene
@@ -8426,9 +8431,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle,
-          VISUAL_BIBLE: ''
+          VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.frontCover = frontCoverPrompt;
         const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
@@ -8453,16 +8457,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
-              CHARACTER_INFO: characterInfo,
               DEDICATION: inputData.dedication,
-              VISUAL_BIBLE: ''
+              VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
-              CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle,
-              VISUAL_BIBLE: ''
+              VISUAL_BIBLE: visualBiblePrompt
             });
         coverPrompts.initialPage = initialPrompt;
         const initialResult = await generateImageWithQualityRetry(initialPrompt, characterPhotos, null, 'cover');
@@ -8486,8 +8488,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_INFO: characterInfo,
-          VISUAL_BIBLE: ''
+          VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.backCover = backCoverPrompt;
         const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');
@@ -9275,8 +9276,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
       const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
-      // Note: Visual bible is NOT used for covers - covers show main characters (from user photos)
-      // not secondary story characters from the visual bible
+      // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
+      const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
       let frontCoverResult, initialPageResult, backCoverResult;
 
@@ -9290,9 +9291,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle,
-          VISUAL_BIBLE: ''
+          VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.frontCover = frontCoverPrompt;
         frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
@@ -9312,16 +9312,14 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
-              CHARACTER_INFO: characterInfo,
               DEDICATION: inputData.dedication,
-              VISUAL_BIBLE: ''
+              VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
-              CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle,
-              VISUAL_BIBLE: ''
+              VISUAL_BIBLE: visualBiblePrompt
             });
         coverPrompts.initialPage = initialPagePrompt;
         initialPageResult = await generateImageWithQualityRetry(initialPagePrompt, characterPhotos, null, 'cover');
@@ -9340,8 +9338,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_INFO: characterInfo,
-          VISUAL_BIBLE: ''
+          VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.backCover = backCoverPrompt;
         backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');

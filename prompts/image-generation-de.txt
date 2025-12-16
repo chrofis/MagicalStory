@@ -1,27 +1,23 @@
-Erstelle eine **filmische Szene** im Stil {STYLE_DESCRIPTION}. Verwende professionelle Fotografie-/Filmtechniken mit Fokus auf Beleuchtung, Komposition und Tiefenschärfe, um ein visuell eindrucksvolles Bild zu schaffen.
+KINDERBUCH-ILLUSTRATION - Sichere, familienfreundliche Inhalte.
 
-Szenenbeschreibung: {SCENE_DESCRIPTION}
-{CHARACTER_PROMPTS}
+**STIL: {STYLE_DESCRIPTION}**
 
-**STILTRANSFORMATION - KRITISCH:**
-- Die Referenzbilder zeigen ECHTE FOTOGRAFIEN von Personen
-- Transformiere diese Personen in den gewünschten Kunststil ({STYLE_DESCRIPTION})
-- Die Charaktere müssen als dieselbe Person ERKENNBAR sein (gleiche Haarfarbe, Gesichtsform, Alter, Geschlecht, unterscheidende Merkmale)
-- Aber im künstlerischen Stil gerendert - KEINE fotorealistischen Kopien
-- ALLE Charaktere müssen den GLEICHEN konsistenten Kunststil haben
+**STILTRANSFORMATION:**
+- Referenzbilder zeigen ECHTE FOTOGRAFIEN - transformiere in den Kunststil
+- Charaktere müssen ERKENNBAR bleiben (Haarfarbe, Gesichtsform, Alter, Geschlecht)
+- Im künstlerischen Stil rendern - KEINE fotorealistischen Kopien
+- ALLE Charaktere im GLEICHEN konsistenten Stil
 
-**KLEIDUNG & ERSCHEINUNG:**
-- GESICHTER, HAARE und KÖRPERPROPORTIONEN der Charaktere müssen exakt mit den Referenzbildern übereinstimmen
-- Kleidung sollte dem SZENENKONTEXT ANGEMESSEN sein:
-  - Winter-/Schneeszenen → warme Kleidung (Mäntel, Stiefel, Mützen)
-  - Strand-/Sommerszenen → leichte Kleidung (Shorts, Kleider, Sandalen)
-  - Formelle Anlässe → elegante Kleidung
-  - Schlafenszeit-Szenen → Schlafanzüge
-- Behalte konsistente FARBPRÄFERENZEN bei der Anpassung der Kleidung bei (wenn der Charakter im Referenzbild Blau trägt, verwende Blautöne)
-- Charakteristische Accessoires (Brille, Lieblingshut, Halskette) sollten über alle Szenen hinweg konsistent bleiben
+**KLEIDUNG:**
+- GESICHTER und HAARE exakt wie in Referenzbildern
+- Kleidung passend zum Szenenkontext (Winter=warm, Sommer=leicht, etc.)
+- Farbpräferenzen beibehalten, Accessoires konsistent halten
 
-Wichtig:
-- Fokussiere auf eine **klare, aufgeräumte Komposition**, die die Hauptfiguren und die Handlung hervorhebt
-- Fange die Emotion und Erzählung der Szene lebendig ein
-- **Kein Text, keine Wasserzeichen oder überflüssige Elemente** sollten im Bild vorhanden sein
-- Füge keine Objekte oder Details hinzu, die nicht explizit in der Szenenbeschreibung oder den Charakterbeschreibungen erwähnt werden
+---
+
+**SZENE:** {SCENE_DESCRIPTION}
+
+---
+
+Zeige angemessene Emotionen. Klare, aufgeräumte Komposition. Kein Text oder Wasserzeichen.
+Dies ist eine kindgerechte Bilderbuch-Illustration. Alle Inhalte sind unschuldig und altersgerecht.

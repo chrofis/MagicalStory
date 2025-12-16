@@ -5,8 +5,6 @@ Create a dedication page illustration for a children's book.
 
 **ART STYLE:** {STYLE_DESCRIPTION}
 
-{CHARACTER_INFO}
-
 **STYLE TRANSFORMATION:**
 - Reference images show REAL PHOTOGRAPHS of people
 - Transform these people into the requested art style
