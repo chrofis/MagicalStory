@@ -1591,7 +1591,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
       // Database mode - include order counts with JOIN
       const selectQuery = `
         SELECT
-          u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.created_at,
+          u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at,
           COALESCE(order_stats.total_orders, 0) as total_orders,
           COALESCE(order_stats.failed_orders, 0) as failed_orders
         FROM users u
@@ -1613,6 +1613,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         role: user.role,
         storyQuota: user.story_quota,
         storiesGenerated: user.stories_generated,
+        credits: user.credits !== undefined ? user.credits : 500,
         createdAt: user.created_at,
         totalOrders: parseInt(user.total_orders) || 0,
         failedOrders: parseInt(user.failed_orders) || 0
@@ -1624,6 +1625,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         ...user,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
+        credits: user.credits !== undefined ? user.credits : 500,
         totalOrders: 0,
         failedOrders: 0
       }));
@@ -2601,28 +2603,8 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
       const existing = await dbQuery(checkQuery, [story.id, req.user.id]);
       isNewStory = existing.length === 0;
 
-      // Check quota only for new stories
-      if (isNewStory) {
-        const userQuery = 'SELECT story_quota, stories_generated FROM users WHERE id = $1';
-        const userRows = await dbQuery(userQuery, [req.user.id]);
-        if (userRows.length > 0) {
-          const quota = userRows[0].story_quota !== undefined ? userRows[0].story_quota : 2;
-          const generated = userRows[0].stories_generated || 0;
-
-          if (quota !== -1 && generated >= quota) {
-            return res.status(403).json({
-              error: 'Story quota exceeded',
-              quota: quota,
-              used: generated,
-              remaining: 0
-            });
-          }
-
-          // Increment story counter
-          const updateQuery = 'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = $1';
-          await dbQuery(updateQuery, [req.user.id]);
-        }
-      }
+      // Note: Credits are now checked and deducted at job creation time (/api/jobs/create-story)
+      // This endpoint is for saving/updating story data only
 
       // Save or update story
       if (isNewStory) {
@@ -2644,26 +2626,8 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
       const existingIndex = allStories[req.user.id].findIndex(s => s.id === story.id);
       isNewStory = existingIndex < 0;
 
-      // Check quota only for new stories
-      if (isNewStory) {
-        const user = users.find(u => u.id === req.user.id);
-        if (user) {
-          const quota = user.storyQuota !== undefined ? user.storyQuota : 2;
-          const generated = user.storiesGenerated || 0;
-
-          if (quota !== -1 && generated >= quota) {
-            return res.status(403).json({
-              error: 'Story quota exceeded',
-              quota: quota,
-              used: generated,
-              remaining: 0
-            });
-          }
-
-          user.storiesGenerated = generated + 1;
-          await writeJSON(USERS_FILE, users);
-        }
-      }
+      // Note: Credits are now checked and deducted at job creation time (/api/jobs/create-story)
+      // This endpoint is for saving/updating story data only
 
       if (existingIndex >= 0) {
         allStories[req.user.id][existingIndex] = story;
@@ -4189,16 +4153,22 @@ Be VERY specific about colors and patterns. Return ONLY valid JSON.`
         const data = await response.json();
         if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
           const text = data.candidates[0].content.parts[0].text;
+          console.log('📸 [GEMINI] Raw response length:', text.length);
           // Extract JSON from response (may have markdown wrapping)
           const jsonMatch = text.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const result = JSON.parse(jsonMatch[0]);
             // Handle both old format (flat traits) and new format (nested traits + styleAnalysis)
             if (result.traits) {
+              // Ensure analyzedAt is set
+              if (result.styleAnalysis) {
+                result.styleAnalysis.analyzedAt = new Date().toISOString();
+              }
               console.log('📸 [GEMINI] Extracted traits + styleAnalysis:', {
                 traits: result.traits,
                 hasStyleAnalysis: !!result.styleAnalysis,
-                aesthetic: result.styleAnalysis?.styleDNA?.aesthetic
+                aesthetic: result.styleAnalysis?.styleDNA?.aesthetic,
+                setting: result.styleAnalysis?.referenceOutfit?.setting
               });
               return result; // New format: { traits, styleAnalysis }
             } else {
@@ -4206,7 +4176,11 @@ Be VERY specific about colors and patterns. Return ONLY valid JSON.`
               console.log('📸 [GEMINI] Extracted traits (legacy format):', result);
               return { traits: result, styleAnalysis: null };
             }
+          } else {
+            console.error('📸 [GEMINI] No JSON found in response:', text.substring(0, 200));
           }
+        } else {
+          console.error('📸 [GEMINI] Unexpected response structure:', JSON.stringify(data).substring(0, 200));
         }
         return null;
       } catch (err) {
@@ -4293,13 +4267,21 @@ Be VERY specific about colors and patterns. Return ONLY valid JSON.`
 
       // Store styleAnalysis for response
       analyzerData.styleAnalysis = styleAnalysis;
+      console.log('📸 [PHOTO] styleAnalysis to be returned:', styleAnalysis ? {
+        hasPhysical: !!styleAnalysis.physical,
+        hasReferenceOutfit: !!styleAnalysis.referenceOutfit,
+        hasStyleDNA: !!styleAnalysis.styleDNA,
+        aesthetic: styleAnalysis.styleDNA?.aesthetic,
+        setting: styleAnalysis.referenceOutfit?.setting
+      } : 'null');
 
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
         age: analyzerData.attributes?.age,
         gender: analyzerData.attributes?.gender,
         hasFace: !!analyzerData.face_thumbnail || !!analyzerData.faceThumbnail,
         hasBody: !!analyzerData.body_crop || !!analyzerData.bodyCrop,
-        hasGeminiTraits: !!geminiTraits
+        hasGeminiTraits: !!geminiTraits,
+        hasStyleAnalysis: !!styleAnalysis
       });
 
       // Convert snake_case to camelCase for frontend compatibility
@@ -8583,11 +8565,27 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     );
     console.log(`📚 [STORYBOOK] Story ${storyId} saved to stories table`);
 
-    // Increment user's stories_generated counter
-    await dbPool.query(
-      'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = $1',
-      [userId]
-    );
+    // Log credit completion (credits were already reserved at job creation)
+    try {
+      const jobResult = await dbPool.query(
+        'SELECT credits_reserved FROM story_jobs WHERE id = $1',
+        [jobId]
+      );
+      if (jobResult.rows.length > 0 && jobResult.rows[0].credits_reserved > 0) {
+        const creditsUsed = jobResult.rows[0].credits_reserved;
+        const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [userId]);
+        const currentBalance = userResult.rows[0]?.credits || 0;
+
+        await dbPool.query(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [userId, 0, currentBalance, 'story_complete', jobId, `Story completed - ${creditsUsed} credits used`]
+        );
+        console.log(`💳 [STORYBOOK] Story completed, ${creditsUsed} credits used for job ${jobId}`);
+      }
+    } catch (creditErr) {
+      console.error('❌ [STORYBOOK] Failed to log credit completion:', creditErr.message);
+    }
 
     // Add storyId to resultData so client can navigate to it
     resultData.storyId = storyId;
@@ -9454,11 +9452,27 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     );
     console.log(`📚 Story ${storyId} saved to stories table`);
 
-    // Increment user's stories_generated counter
-    await dbPool.query(
-      'UPDATE users SET stories_generated = stories_generated + 1 WHERE id = $1',
-      [job.user_id]
-    );
+    // Log credit completion (credits were already reserved at job creation)
+    try {
+      const creditJobResult = await dbPool.query(
+        'SELECT credits_reserved FROM story_jobs WHERE id = $1',
+        [jobId]
+      );
+      if (creditJobResult.rows.length > 0 && creditJobResult.rows[0].credits_reserved > 0) {
+        const creditsUsed = creditJobResult.rows[0].credits_reserved;
+        const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [job.user_id]);
+        const currentBalance = userResult.rows[0]?.credits || 0;
+
+        await dbPool.query(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [job.user_id, 0, currentBalance, 'story_complete', jobId, `Story completed - ${creditsUsed} credits used`]
+        );
+        console.log(`💳 Story completed, ${creditsUsed} credits used for job ${jobId}`);
+      }
+    } catch (creditErr) {
+      console.error('❌ Failed to log credit completion:', creditErr.message);
+    }
 
     // Add storyId to resultData so client can navigate to it
     resultData.storyId = storyId;
