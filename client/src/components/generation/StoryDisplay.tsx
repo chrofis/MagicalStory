@@ -2,6 +2,7 @@ import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, His
 import { useLanguage } from '@/context/LanguageContext';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
+import type { VisualBible, VisualBibleEntry } from '@/types/character';
 
 // Helper component to display retry history
 function RetryHistoryDisplay({
@@ -104,22 +105,6 @@ interface StoryTextPrompt {
   startPage: number;
   endPage: number;
   prompt: string;
-}
-
-interface VisualBibleEntry {
-  id: string;
-  name: string;
-  appearsInPages: number[];
-  description: string;
-  extractedDescription: string | null;
-  firstAppearanceAnalyzed: boolean;
-}
-
-interface VisualBible {
-  secondaryCharacters: VisualBibleEntry[];
-  animals: VisualBibleEntry[];
-  artifacts: VisualBibleEntry[];
-  locations: VisualBibleEntry[];
 }
 
 interface StoryDisplayProps {
@@ -390,10 +375,102 @@ export function StoryDisplay({
               <summary className="cursor-pointer text-lg font-bold text-rose-800 hover:text-rose-900 flex items-center gap-2">
                 <BookOpen size={20} />
                 {language === 'de' ? 'Visual Bible (Wiederkehrende Elemente)' : language === 'fr' ? 'Bible Visuelle (Éléments Récurrents)' : 'Visual Bible (Recurring Elements)'}
+                {visualBible.changeLog && visualBible.changeLog.length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-rose-200 text-rose-800 rounded-full text-xs font-medium">
+                    {visualBible.changeLog.length} {language === 'de' ? 'Änderungen' : language === 'fr' ? 'changements' : 'changes'}
+                  </span>
+                )}
               </summary>
               <div className="mt-4 space-y-4">
+                {/* Main Characters - Style Analysis */}
+                {visualBible.mainCharacters && visualBible.mainCharacters.length > 0 && (
+                  <div className="bg-white border border-purple-300 rounded-lg p-3">
+                    <h4 className="text-sm font-bold text-purple-700 mb-2 flex items-center gap-2">
+                      <span className="text-lg">👗</span>
+                      {language === 'de' ? 'Hauptcharaktere (Style Profile)' : language === 'fr' ? 'Personnages Principaux (Profil Style)' : 'Main Characters (Style Profile)'}
+                    </h4>
+                    <div className="space-y-3">
+                      {visualBible.mainCharacters.map((char) => (
+                        <details key={char.id} className="bg-purple-50 p-2 rounded text-sm">
+                          <summary className="cursor-pointer font-semibold text-purple-800 hover:text-purple-900">
+                            {char.name}
+                            <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                              char.referenceOutfit?.setting === 'outdoor-cold' ? 'bg-blue-100 text-blue-800' :
+                              char.referenceOutfit?.setting === 'outdoor-warm' ? 'bg-yellow-100 text-yellow-800' :
+                              char.referenceOutfit?.setting === 'indoor-casual' ? 'bg-green-100 text-green-800' :
+                              char.referenceOutfit?.setting === 'indoor-formal' ? 'bg-purple-100 text-purple-800' :
+                              char.referenceOutfit?.setting === 'active' ? 'bg-orange-100 text-orange-800' :
+                              char.referenceOutfit?.setting === 'sleep' ? 'bg-indigo-100 text-indigo-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {char.referenceOutfit?.setting || 'neutral'}
+                            </span>
+                            {Object.keys(char.generatedOutfits || {}).length > 0 && (
+                              <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                {Object.keys(char.generatedOutfits).length} {language === 'de' ? 'Outfits' : language === 'fr' ? 'tenues' : 'outfits'}
+                              </span>
+                            )}
+                          </summary>
+                          <div className="mt-2 space-y-2">
+                            {/* Physical Features */}
+                            <div className="text-xs">
+                              <span className="font-medium text-gray-600">Physical:</span>
+                              <span className="text-gray-700 ml-1">
+                                {char.physical?.face || 'Not analyzed'} | {char.physical?.hair || 'N/A'} | {char.physical?.build || 'N/A'}
+                              </span>
+                            </div>
+                            {/* Style DNA */}
+                            {char.styleDNA && (
+                              <div className="text-xs">
+                                <span className="font-medium text-gray-600">Style DNA:</span>
+                                {char.styleDNA.aesthetic && (
+                                  <span className="text-gray-700 italic ml-1">{char.styleDNA.aesthetic}</span>
+                                )}
+                                {char.styleDNA.signatureColors && char.styleDNA.signatureColors.length > 0 && (
+                                  <span className="text-gray-700 ml-1">| Colors: {char.styleDNA.signatureColors.slice(0, 3).join(', ')}</span>
+                                )}
+                              </div>
+                            )}
+                            {/* Reference Outfit */}
+                            {char.referenceOutfit && (
+                              <div className="text-xs">
+                                <span className="font-medium text-gray-600">Reference:</span>
+                                <span className="text-gray-700 ml-1">
+                                  {char.referenceOutfit.garmentType} in {char.referenceOutfit.primaryColor}
+                                  {char.referenceOutfit.pattern && char.referenceOutfit.pattern !== 'solid' && char.referenceOutfit.pattern !== 'none' && ` (${char.referenceOutfit.pattern})`}
+                                </span>
+                              </div>
+                            )}
+                            {/* Generated Outfits */}
+                            {char.generatedOutfits && Object.keys(char.generatedOutfits).length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-purple-200">
+                                <span className="font-medium text-gray-600 text-xs">Generated Outfits:</span>
+                                <div className="mt-1 space-y-1">
+                                  {Object.entries(char.generatedOutfits).map(([pageNum, outfit]) => (
+                                    <div key={pageNum} className="bg-white p-1.5 rounded text-xs">
+                                      <span className="font-medium text-purple-600">Page {pageNum}:</span>
+                                      <span className="text-gray-700 ml-1">{outfit.outfit?.substring(0, 80)}...</span>
+                                      <span className={`ml-1 px-1 py-0.5 rounded text-[10px] ${
+                                        outfit.setting === 'outdoor-cold' ? 'bg-blue-100 text-blue-700' :
+                                        outfit.setting === 'outdoor-warm' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-gray-100 text-gray-600'
+                                      }`}>
+                                        {outfit.setting}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Secondary Characters */}
-                {visualBible.secondaryCharacters.length > 0 && (
+                {visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0 && (
                   <div className="bg-white border border-rose-200 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-rose-700 mb-2">
                       {language === 'de' ? 'Nebencharaktere' : language === 'fr' ? 'Personnages Secondaires' : 'Secondary Characters'}
@@ -480,8 +557,59 @@ export function StoryDisplay({
                   </div>
                 )}
 
+                {/* Change Log */}
+                {visualBible.changeLog && visualBible.changeLog.length > 0 && (
+                  <details className="bg-white border border-amber-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-bold text-amber-700 hover:text-amber-800 flex items-center gap-2">
+                      <span className="text-lg">📝</span>
+                      {language === 'de' ? 'Änderungsprotokoll' : language === 'fr' ? 'Journal des Modifications' : 'Change Log'}
+                      <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                        {visualBible.changeLog.length}
+                      </span>
+                    </summary>
+                    <div className="mt-2 space-y-1 max-h-64 overflow-y-auto">
+                      {visualBible.changeLog.slice().reverse().map((entry, idx) => (
+                        <div key={idx} className="bg-amber-50 p-2 rounded text-xs border-l-2 border-amber-400">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                              entry.type === 'mainCharacter' ? 'bg-purple-100 text-purple-700' :
+                              entry.type === 'secondaryCharacter' ? 'bg-rose-100 text-rose-700' :
+                              entry.type === 'generatedOutfit' ? 'bg-green-100 text-green-700' :
+                              entry.type === 'animal' ? 'bg-orange-100 text-orange-700' :
+                              entry.type === 'artifact' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {entry.type}
+                            </span>
+                            <span className="font-semibold text-amber-800">{entry.element}</span>
+                            <span className="text-gray-500">
+                              {language === 'de' ? 'Seite' : language === 'fr' ? 'Page' : 'Page'} {entry.page}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-gray-600">
+                            <span className="font-medium">{entry.change}:</span>
+                            <span className="ml-1 text-gray-700">{entry.after?.substring(0, 100)}{entry.after && entry.after.length > 100 ? '...' : ''}</span>
+                          </div>
+                          {entry.before && (
+                            <div className="text-gray-400 line-through text-[10px] mt-0.5">
+                              {language === 'de' ? 'Vorher' : language === 'fr' ? 'Avant' : 'Before'}: {entry.before.substring(0, 50)}...
+                            </div>
+                          )}
+                          <div className="text-gray-400 text-[10px] mt-0.5">
+                            {new Date(entry.timestamp).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
                 {/* Empty state message */}
-                {visualBible.secondaryCharacters.length === 0 && visualBible.animals.length === 0 && visualBible.artifacts.length === 0 && visualBible.locations.length === 0 && (
+                {(!visualBible.mainCharacters || visualBible.mainCharacters.length === 0) &&
+                 (!visualBible.secondaryCharacters || visualBible.secondaryCharacters.length === 0) &&
+                 (!visualBible.animals || visualBible.animals.length === 0) &&
+                 (!visualBible.artifacts || visualBible.artifacts.length === 0) &&
+                 (!visualBible.locations || visualBible.locations.length === 0) && (
                   <div className="text-gray-500 text-sm italic">
                     {language === 'de' ? 'Keine wiederkehrenden Elemente gefunden' : language === 'fr' ? 'Aucun élément récurrent trouvé' : 'No recurring elements found in this story'}
                   </div>

@@ -1,0 +1,16 @@
+Categorize this scene description into a clothing-appropriate setting type.
+
+Scene: {SCENE_DESCRIPTION}
+
+Choose the SINGLE most appropriate category based on what clothing would be suitable:
+
+- outdoor-cold: Snow, winter, rain, cold weather, frost, ice skating, skiing, autumn wind
+- outdoor-warm: Summer, sunshine, beach, garden, picnic, swimming, flowers blooming, hot day
+- indoor-casual: Home, bedroom, living room, kitchen, playing inside, watching TV, breakfast
+- indoor-formal: Party, ceremony, wedding, restaurant, church service, graduation, dinner guests
+- active: Sports, running, playing energetically, dancing, hiking, cycling, gymnastics
+- sleep: Bedtime, pajamas, in bed, waking up, nap time, sleepover
+- neutral: Cannot determine from description, generic indoor/outdoor without weather cues
+
+Respond with ONLY the category name, nothing else. Example response:
+outdoor-cold

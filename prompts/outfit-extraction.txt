@@ -1,0 +1,43 @@
+Analyze this children's book illustration and extract the outfit details for the character named "{CHARACTER_NAME}".
+
+Look carefully at what this specific character is wearing in the image.
+
+Provide a JSON response:
+
+{
+  "characterFound": true,
+  "outfit": "Complete outfit description with specific colors, patterns, fabrics, and all details visible",
+  "setting": "Scene setting category (see options below)",
+  "details": {
+    "top": "Upper body clothing description",
+    "bottom": "Lower body clothing if visible",
+    "outerwear": "Coat, jacket, sweater if any",
+    "footwear": "Shoes, boots, socks if visible",
+    "accessories": ["List of accessories: hat, scarf, bag, jewelry, hair items"]
+  }
+}
+
+Setting categories (choose ONE):
+- outdoor-cold (snow, winter, rain, cold weather visible)
+- outdoor-warm (summer, sunshine, beach, garden, flowers)
+- indoor-casual (home, bedroom, living room, kitchen)
+- indoor-formal (party, ceremony, restaurant, church)
+- active (sports, playing actively, running, swimming)
+- sleep (bedtime, pajamas, in bed)
+- neutral (setting unclear or could be any)
+
+If the character "{CHARACTER_NAME}" is not found in the image, respond:
+{
+  "characterFound": false,
+  "outfit": null,
+  "setting": null,
+  "details": null
+}
+
+Be specific about:
+- Exact colors (use "light coral pink" not just "pink")
+- Patterns if any (stripes, floral, polka dots - describe exactly)
+- Garment types (wool coat, cotton dress, denim jacket)
+- Style details (buttons, zippers, collars, cuffs)
+
+Respond with ONLY the JSON, no additional text.

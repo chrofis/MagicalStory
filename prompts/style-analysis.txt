@@ -1,0 +1,42 @@
+Analyze this photo of a person for a children's book illustration system.
+Extract EXACT visual details that will be used to maintain consistency across different scenes and clothing changes.
+
+Provide a JSON response with this EXACT structure:
+
+{
+  "physical": {
+    "face": "Detailed face description: shape, eye color, skin tone, distinctive features like freckles, dimples, birthmarks",
+    "hair": "Exact hair description: color (be specific like 'honey blonde' not just 'blonde'), length, style, texture, any accessories like ribbons/clips/hairbands",
+    "build": "Body type description and apparent age"
+  },
+  "referenceOutfit": {
+    "garmentType": "e.g., knee-length dress, t-shirt and jeans, blouse and skirt",
+    "primaryColor": "Main color of outfit (be specific: 'light sky blue' not 'blue')",
+    "secondaryColors": ["Other colors present in the outfit"],
+    "pattern": "Exact pattern description if any, e.g., 'small red and white roses scattered', 'horizontal navy stripes 1cm wide', 'solid/no pattern'",
+    "patternScale": "small/medium/large and scattered/dense/regular, or 'none' if solid",
+    "seamColor": "Color of visible seams, trim, piping, or 'matching' if same as fabric",
+    "seamStyle": "e.g., 'thin black piping along neckline and hem', 'contrast white stitching', 'none visible'",
+    "fabric": "Apparent fabric type and finish: 'cotton matte', 'silk shiny', 'wool textured', 'denim'",
+    "neckline": "Neckline style with any trim details: 'round collar with lace trim', 'v-neck', 'crew neck'",
+    "sleeves": "Sleeve style with details: 'short puff sleeves with elastic cuffs', 'long fitted sleeves', 'sleeveless'",
+    "accessories": ["All visible accessories: shoes, socks, jewelry, hair items, bags, hats"],
+    "setting": "Categorize the outfit as: 'outdoor-warm', 'outdoor-cold', 'indoor-casual', 'indoor-formal', 'active', 'sleep', 'neutral'"
+  },
+  "styleDNA": {
+    "signatureColors": ["3-5 colors that define this person's color palette, most dominant first"],
+    "signaturePatterns": ["Patterns present that define their style, or ['solid'] if no patterns"],
+    "signatureDetails": ["Distinctive style elements that should be repeated: 'Peter Pan collar', 'puff sleeves', 'lace trim', 'contrast piping'"],
+    "aesthetic": "2-3 words describing overall style: 'classic feminine', 'sporty casual', 'bohemian playful', 'preppy neat'",
+    "alwaysPresent": ["Elements that should ALWAYS appear on this character: 'red hair ribbons', 'round glasses', 'silver necklace', or [] if none"]
+  }
+}
+
+IMPORTANT:
+- Be extremely specific about colors (not "blue" but "light sky blue with slight grey undertone")
+- Be exact about patterns (not "floral" but "small scattered roses in coral pink and cream white, approximately 1cm diameter")
+- Note construction details that define the style (seam colors, trim types, collar styles)
+- The styleDNA will be used to generate NEW outfits in different settings that still look like "this character's style"
+- If something is not visible or not applicable, use "not visible" or "none"
+
+Respond with ONLY the JSON, no additional text.

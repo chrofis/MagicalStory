@@ -302,6 +302,10 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
     PROMPT_TEMPLATES.storybookCombined = await fs.readFile(path.join(promptsDir, 'storybook-combined.txt'), 'utf-8');
     PROMPT_TEMPLATES.rewriteBlockedScene = await fs.readFile(path.join(promptsDir, 'rewrite-blocked-scene.txt'), 'utf-8');
+    // Style analysis prompts for Visual Bible
+    PROMPT_TEMPLATES.styleAnalysis = await fs.readFile(path.join(promptsDir, 'style-analysis.txt'), 'utf-8');
+    PROMPT_TEMPLATES.outfitExtraction = await fs.readFile(path.join(promptsDir, 'outfit-extraction.txt'), 'utf-8');
+    PROMPT_TEMPLATES.sceneSettingAnalysis = await fs.readFile(path.join(promptsDir, 'scene-setting-analysis.txt'), 'utf-8');
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
     log.error('❌ Failed to load prompt templates:', err.message);
@@ -4208,6 +4212,322 @@ Be concise but descriptive. For age, give your best estimate as a number. Return
   }
 });
 
+// Analyze photo style for Visual Bible integration
+// Called after body photo upload to extract clothing/style details
+app.post('/api/analyze-style', authenticateToken, async (req, res) => {
+  try {
+    const { imageData } = req.body;
+
+    if (!imageData) {
+      console.log('👗 [STYLE] Missing imageData in request');
+      return res.status(400).json({ error: 'Missing imageData' });
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      console.log('👗 [STYLE] No Gemini API key, cannot analyze style');
+      return res.status(503).json({ error: 'Style analysis service unavailable' });
+    }
+
+    console.log('👗 [STYLE] Analyzing photo style with Gemini...');
+    const startTime = Date.now();
+
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+    // Use the style analysis prompt template
+    const prompt = PROMPT_TEMPLATES.styleAnalysis || `Analyze this photo for style details. Return JSON with physical, referenceOutfit, and styleDNA fields.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Data,
+                },
+              },
+            ],
+          }],
+          generationConfig: {
+            temperature: 0.2, // Low temperature for consistent, accurate extraction
+            maxOutputTokens: 2048
+          }
+        }),
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('👗 [STYLE] Gemini API error:', response.status, errorText);
+      return res.status(500).json({ error: 'Style analysis failed', details: errorText });
+    }
+
+    const data = await response.json();
+    const duration = Date.now() - startTime;
+
+    if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+      const text = data.candidates[0].content.parts[0].text;
+      // Extract JSON from response (may have markdown wrapping)
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const styleAnalysis = JSON.parse(jsonMatch[0]);
+          styleAnalysis.analyzedAt = new Date().toISOString();
+
+          console.log(`👗 [STYLE] Analysis complete in ${duration}ms:`, {
+            hasPhysical: !!styleAnalysis.physical,
+            hasReferenceOutfit: !!styleAnalysis.referenceOutfit,
+            hasStyleDNA: !!styleAnalysis.styleDNA,
+            setting: styleAnalysis.referenceOutfit?.setting || 'unknown'
+          });
+
+          return res.json({ success: true, styleAnalysis });
+        } catch (parseErr) {
+          console.error('👗 [STYLE] JSON parse error:', parseErr.message);
+          console.error('👗 [STYLE] Raw response:', text.substring(0, 500));
+          return res.status(500).json({ error: 'Failed to parse style analysis', details: parseErr.message });
+        }
+      }
+    }
+
+    console.error('👗 [STYLE] No valid response from Gemini');
+    return res.status(500).json({ error: 'No valid response from style analysis' });
+
+  } catch (err) {
+    console.error('👗 [STYLE] Error analyzing style:', err);
+    res.status(500).json({
+      error: 'Failed to analyze style',
+      details: err.message
+    });
+  }
+});
+
+// Analyze scene description to determine setting category
+app.post('/api/analyze-scene-setting', authenticateToken, async (req, res) => {
+  try {
+    const { sceneDescription } = req.body;
+
+    if (!sceneDescription) {
+      return res.status(400).json({ error: 'Missing sceneDescription' });
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      // Fallback to simple keyword matching
+      const setting = analyzeSceneSettingFallback(sceneDescription);
+      return res.json({ success: true, setting });
+    }
+
+    const prompt = fillTemplate(PROMPT_TEMPLATES.sceneSettingAnalysis || 'Categorize this scene: {SCENE_DESCRIPTION}', {
+      SCENE_DESCRIPTION: sceneDescription
+    });
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 50
+          }
+        }),
+        signal: AbortSignal.timeout(10000)
+      }
+    );
+
+    if (!response.ok) {
+      const setting = analyzeSceneSettingFallback(sceneDescription);
+      return res.json({ success: true, setting, fallback: true });
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase() || '';
+
+    const validSettings = ['outdoor-cold', 'outdoor-warm', 'indoor-casual', 'indoor-formal', 'active', 'sleep', 'neutral'];
+    const setting = validSettings.find(s => text.includes(s)) || 'neutral';
+
+    console.log(`🎬 [SCENE SETTING] "${sceneDescription.substring(0, 50)}..." -> ${setting}`);
+    res.json({ success: true, setting });
+
+  } catch (err) {
+    console.error('Error analyzing scene setting:', err);
+    const setting = analyzeSceneSettingFallback(req.body.sceneDescription || '');
+    res.json({ success: true, setting, fallback: true });
+  }
+});
+
+// Helper function for fallback scene setting analysis
+function analyzeSceneSettingFallback(sceneDescription) {
+  const desc = sceneDescription.toLowerCase();
+
+  if (desc.match(/snow|winter|cold|frost|ice|christmas|skiing|coat|scarf|mittens/)) return 'outdoor-cold';
+  if (desc.match(/summer|beach|sun|swim|garden|picnic|hot|warm weather/)) return 'outdoor-warm';
+  if (desc.match(/bed|sleep|pajama|night|dream|pillow/)) return 'sleep';
+  if (desc.match(/party|wedding|ceremony|church|formal|dinner|restaurant/)) return 'indoor-formal';
+  if (desc.match(/run|sport|play|dance|jump|active|game|soccer|basketball/)) return 'active';
+  if (desc.match(/home|house|room|kitchen|living|bedroom|couch|sofa/)) return 'indoor-casual';
+
+  return 'neutral';
+}
+
+// Extract outfit from generated image for Visual Bible update
+app.post('/api/extract-outfit', authenticateToken, async (req, res) => {
+  try {
+    const { imageData, characterName } = req.body;
+
+    if (!imageData || !characterName) {
+      return res.status(400).json({ error: 'Missing imageData or characterName' });
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      return res.status(503).json({ error: 'Outfit extraction service unavailable' });
+    }
+
+    console.log(`👕 [OUTFIT] Extracting outfit for "${characterName}" from generated image...`);
+
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+    const prompt = fillTemplate(PROMPT_TEMPLATES.outfitExtraction || 'Extract outfit for {CHARACTER_NAME}', {
+      CHARACTER_NAME: characterName
+    });
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Data,
+                },
+              },
+            ],
+          }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 1024
+          }
+        }),
+        signal: AbortSignal.timeout(20000)
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('👕 [OUTFIT] Gemini API error:', response.status);
+      return res.status(500).json({ error: 'Outfit extraction failed', details: errorText });
+    }
+
+    const data = await response.json();
+
+    if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+      const text = data.candidates[0].content.parts[0].text;
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const outfitData = JSON.parse(jsonMatch[0]);
+          console.log(`👕 [OUTFIT] Extracted for "${characterName}":`, {
+            found: outfitData.characterFound,
+            setting: outfitData.setting,
+            outfitPreview: outfitData.outfit?.substring(0, 50) + '...'
+          });
+          return res.json({ success: true, ...outfitData });
+        } catch (parseErr) {
+          console.error('👕 [OUTFIT] JSON parse error:', parseErr.message);
+          return res.status(500).json({ error: 'Failed to parse outfit data' });
+        }
+      }
+    }
+
+    return res.status(500).json({ error: 'No valid response from outfit extraction' });
+
+  } catch (err) {
+    console.error('👕 [OUTFIT] Error extracting outfit:', err);
+    res.status(500).json({ error: 'Failed to extract outfit', details: err.message });
+  }
+});
+
+// Smart reference selection - determine which photo type to use for each character based on scene
+// Returns recommendations for face-only vs full-body reference and clothing prompts
+app.post('/api/select-reference', authenticateToken, async (req, res) => {
+  try {
+    const { characters, sceneDescription, sceneSetting } = req.body;
+
+    if (!characters || !Array.isArray(characters)) {
+      return res.status(400).json({ error: 'Missing characters array' });
+    }
+
+    // First determine scene setting if not provided
+    let effectiveSceneSetting = sceneSetting;
+    if (!effectiveSceneSetting && sceneDescription) {
+      // Use fallback analysis (synchronous, fast)
+      effectiveSceneSetting = analyzeSceneSettingFallback(sceneDescription);
+    }
+    effectiveSceneSetting = effectiveSceneSetting || 'neutral';
+
+    console.log(`👗 [REF SELECT] Analyzing ${characters.length} characters for scene setting: ${effectiveSceneSetting}`);
+
+    const recommendations = characters.map(char => {
+      const referenceType = selectReferenceImageType(char, effectiveSceneSetting);
+      const clothingPrompt = referenceType === 'face'
+        ? buildClothingPromptFromStyleDNA(char, effectiveSceneSetting)
+        : '';
+
+      // Select appropriate photo URL based on reference type
+      let photoUrl;
+      if (referenceType === 'face') {
+        // Use thumbnail (face) or fall back to photo
+        photoUrl = char.thumbnailUrl || char.photoUrl;
+      } else {
+        // Use full body
+        photoUrl = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+      }
+
+      return {
+        characterId: char.id,
+        characterName: char.name,
+        referenceType, // 'body' or 'face'
+        photoUrl,
+        clothingPrompt, // Only set if using face-only
+        hasStyleAnalysis: !!char.styleAnalysis,
+        referenceOutfitSetting: char.styleAnalysis?.referenceOutfit?.setting || 'neutral'
+      };
+    });
+
+    console.log(`👗 [REF SELECT] Recommendations: ${recommendations.map(r => `${r.characterName}:${r.referenceType}`).join(', ')}`);
+
+    res.json({
+      success: true,
+      sceneSetting: effectiveSceneSetting,
+      recommendations
+    });
+
+  } catch (err) {
+    console.error('👗 [REF SELECT] Error:', err);
+    res.status(500).json({ error: 'Failed to select references', details: err.message });
+  }
+});
+
 // File Management Endpoints
 
 // Upload file (image or PDF)
@@ -6673,12 +6993,15 @@ function getTokensPerPage(languageLevel) {
 }
 
 // Helper function to parse Visual Bible from outline
+// Now includes mainCharacters (populated separately) and changeLog
 function parseVisualBible(outline) {
   const visualBible = {
-    secondaryCharacters: [],
-    animals: [],
-    artifacts: [],
-    locations: []
+    mainCharacters: [],      // Populated from inputData.characters with styleAnalysis
+    secondaryCharacters: [], // Parsed from outline
+    animals: [],             // Parsed from outline
+    artifacts: [],           // Parsed from outline
+    locations: [],           // Parsed from outline
+    changeLog: []            // Track all updates during story generation
   };
 
   if (!outline) return visualBible;
@@ -6693,9 +7016,12 @@ function parseVisualBible(outline) {
   }
 
   // Find the Visual Bible section
-  // The outline ends with "## Visual Bible" section which continues until end of string or next ## heading or ---
-  // Use a more robust regex that captures everything after "## Visual Bible"
-  const visualBibleMatch = outline.match(/##\s*Visual\s*Bible\b([\s\S]*?)(?=\n##\s|\n---|$)/i);
+  // Supports multiple formats:
+  // - "## Visual Bible" (original format)
+  // - "# Part 5: Visual Bible" or "# PART 5: VISUAL BIBLE" (Claude's actual output)
+  // - "# Visual Bible" (simple format)
+  const visualBibleMatch = outline.match(/##\s*Visual\s*Bible\b([\s\S]*?)(?=\n#\s|\n---|$)/i) ||
+                           outline.match(/#\s*(?:Part\s*\d+[:\s]*)?Visual\s*Bible\b([\s\S]*?)(?=\n#\s|\n---|$)/i);
   if (!visualBibleMatch) {
     console.log('📖 [VISUAL BIBLE] Regex did not match Visual Bible section');
     // Try alternate regex patterns
@@ -6716,8 +7042,8 @@ function parseVisualBible(outline) {
   console.log(`📖 [VISUAL BIBLE] Looking for ### Artifacts...`);
   console.log(`📖 [VISUAL BIBLE] Looking for ### Locations...`);
 
-  // Parse Secondary Characters
-  const secondaryCharsMatch = visualBibleSection.match(/###\s*Secondary\s*Characters?([\s\S]*?)(?=###|$)/i);
+  // Parse Secondary Characters (supports ## or ### headers)
+  const secondaryCharsMatch = visualBibleSection.match(/##\s*#?\s*Secondary\s*Characters?([\s\S]*?)(?=\n##|$)/i);
   if (secondaryCharsMatch) {
     console.log(`📖 [VISUAL BIBLE] Secondary Characters section found, length: ${secondaryCharsMatch[1].length}`);
     if (!secondaryCharsMatch[1].toLowerCase().includes('none')) {
@@ -6728,11 +7054,11 @@ function parseVisualBible(outline) {
       console.log(`📖 [VISUAL BIBLE] Secondary Characters section contains "None"`);
     }
   } else {
-    console.log(`📖 [VISUAL BIBLE] No ### Secondary Characters section found`);
+    console.log(`📖 [VISUAL BIBLE] No Secondary Characters section found`);
   }
 
-  // Parse Animals & Creatures
-  const animalsMatch = visualBibleSection.match(/###\s*Animals?\s*(?:&|and)?\s*Creatures?([\s\S]*?)(?=###|$)/i);
+  // Parse Animals & Creatures (supports ## or ### headers)
+  const animalsMatch = visualBibleSection.match(/##\s*#?\s*Animals?\s*(?:&|and)?\s*Creatures?([\s\S]*?)(?=\n##|$)/i);
   if (animalsMatch) {
     console.log(`📖 [VISUAL BIBLE] Animals section found, length: ${animalsMatch[1].length}`);
     if (!animalsMatch[1].toLowerCase().includes('none')) {
@@ -6743,11 +7069,11 @@ function parseVisualBible(outline) {
       console.log(`📖 [VISUAL BIBLE] Animals section contains "None"`);
     }
   } else {
-    console.log(`📖 [VISUAL BIBLE] No ### Animals section found`);
+    console.log(`📖 [VISUAL BIBLE] No Animals section found`);
   }
 
-  // Parse Artifacts
-  const artifactsMatch = visualBibleSection.match(/###\s*Artifacts?([\s\S]*?)(?=###|$)/i);
+  // Parse Artifacts (supports ## or ### headers, also "Important Artifacts")
+  const artifactsMatch = visualBibleSection.match(/##\s*#?\s*(?:Important\s*)?Artifacts?([\s\S]*?)(?=\n##|$)/i);
   if (artifactsMatch) {
     console.log(`📖 [VISUAL BIBLE] Artifacts section found, length: ${artifactsMatch[1].length}`);
     if (!artifactsMatch[1].toLowerCase().includes('none')) {
@@ -6758,11 +7084,11 @@ function parseVisualBible(outline) {
       console.log(`📖 [VISUAL BIBLE] Artifacts section contains "None"`);
     }
   } else {
-    console.log(`📖 [VISUAL BIBLE] No ### Artifacts section found`);
+    console.log(`📖 [VISUAL BIBLE] No Artifacts section found`);
   }
 
-  // Parse Locations
-  const locationsMatch = visualBibleSection.match(/###\s*Locations?([\s\S]*?)(?=###|$)/i);
+  // Parse Locations (supports ## or ### headers, also "Recurring Locations")
+  const locationsMatch = visualBibleSection.match(/##\s*#?\s*(?:Recurring\s*)?Locations?([\s\S]*?)(?=\n##|$)/i);
   if (locationsMatch) {
     console.log(`📖 [VISUAL BIBLE] Locations section found, length: ${locationsMatch[1].length}`);
     if (!locationsMatch[1].toLowerCase().includes('none')) {
@@ -6773,7 +7099,7 @@ function parseVisualBible(outline) {
       console.log(`📖 [VISUAL BIBLE] Locations section contains "None"`);
     }
   } else {
-    console.log(`📖 [VISUAL BIBLE] No ### Locations section found`);
+    console.log(`📖 [VISUAL BIBLE] No Locations section found`);
   }
 
   const totalEntries = visualBible.secondaryCharacters.length +
@@ -6834,6 +7160,190 @@ function parseVisualBibleEntries(sectionText) {
   }
 
   return entries;
+}
+
+// Initialize main characters in Visual Bible from inputData.characters
+// Called at the start of story generation to populate mainCharacters array
+function initializeVisualBibleMainCharacters(visualBible, characters) {
+  if (!visualBible || !characters || !Array.isArray(characters)) {
+    return visualBible;
+  }
+
+  console.log(`📖 [VISUAL BIBLE] Initializing ${characters.length} main characters...`);
+
+  visualBible.mainCharacters = characters.map(char => {
+    const mainChar = {
+      id: char.id,
+      name: char.name,
+      physical: char.styleAnalysis?.physical || {
+        face: char.otherFeatures || 'Not analyzed',
+        hair: char.hairColor || 'Not analyzed',
+        build: char.build || 'Not analyzed'
+      },
+      styleDNA: char.styleAnalysis?.styleDNA || {
+        signatureColors: [],
+        signaturePatterns: [],
+        signatureDetails: [],
+        aesthetic: 'Not analyzed',
+        alwaysPresent: []
+      },
+      referenceOutfit: char.styleAnalysis?.referenceOutfit || {
+        garmentType: char.clothing || 'Not analyzed',
+        primaryColor: 'Unknown',
+        secondaryColors: [],
+        pattern: 'Unknown',
+        patternScale: 'none',
+        seamColor: 'matching',
+        seamStyle: 'none visible',
+        fabric: 'Unknown',
+        neckline: 'Unknown',
+        sleeves: 'Unknown',
+        accessories: [],
+        setting: 'neutral'
+      },
+      generatedOutfits: char.generatedOutfits || {}
+    };
+
+    console.log(`📖 [VISUAL BIBLE] Added main character: ${char.name} (id: ${char.id}, hasStyleAnalysis: ${!!char.styleAnalysis})`);
+    return mainChar;
+  });
+
+  return visualBible;
+}
+
+// Add a change log entry to Visual Bible
+function addVisualBibleChangeLog(visualBible, pageNumber, element, type, change, before, after) {
+  if (!visualBible) return;
+
+  const entry = {
+    timestamp: new Date().toISOString(),
+    page: pageNumber,
+    element,
+    type,
+    change,
+    before: before || null,
+    after
+  };
+
+  visualBible.changeLog.push(entry);
+  console.log(`📖 [VISUAL BIBLE CHANGE] Page ${pageNumber}: ${element} (${type}) - ${change}`);
+}
+
+// Update main character's generated outfit in Visual Bible
+function updateMainCharacterOutfit(visualBible, characterId, pageNumber, outfit) {
+  if (!visualBible || !characterId) return;
+
+  const mainChar = visualBible.mainCharacters.find(c => c.id === characterId);
+  if (!mainChar) {
+    console.log(`📖 [VISUAL BIBLE] Main character ${characterId} not found for outfit update`);
+    return;
+  }
+
+  const previousOutfit = mainChar.generatedOutfits[pageNumber]?.outfit || null;
+  mainChar.generatedOutfits[pageNumber] = outfit;
+
+  addVisualBibleChangeLog(
+    visualBible,
+    pageNumber,
+    mainChar.name,
+    'generatedOutfit',
+    previousOutfit ? 'Updated outfit' : 'New outfit extracted',
+    previousOutfit,
+    outfit.outfit
+  );
+
+  console.log(`📖 [VISUAL BIBLE] Updated outfit for ${mainChar.name} on page ${pageNumber}`);
+}
+
+// Determine if reference outfit matches scene setting
+// Returns true if the outfit is appropriate for the scene
+function isOutfitAppropriateForScene(referenceOutfitSetting, sceneSetting) {
+  // Define which settings are compatible
+  const compatibility = {
+    'outdoor-cold': ['outdoor-cold', 'neutral'],
+    'outdoor-warm': ['outdoor-warm', 'active', 'neutral'],
+    'indoor-casual': ['indoor-casual', 'indoor-formal', 'neutral'],
+    'indoor-formal': ['indoor-casual', 'indoor-formal', 'neutral'],
+    'active': ['active', 'outdoor-warm', 'neutral'],
+    'sleep': ['sleep', 'indoor-casual', 'neutral'],
+    'neutral': ['outdoor-cold', 'outdoor-warm', 'indoor-casual', 'indoor-formal', 'active', 'sleep', 'neutral']
+  };
+
+  const compatibleSettings = compatibility[sceneSetting] || ['neutral'];
+  const isCompatible = compatibleSettings.includes(referenceOutfitSetting);
+
+  console.log(`👗 [OUTFIT MATCH] Reference: ${referenceOutfitSetting}, Scene: ${sceneSetting} -> ${isCompatible ? 'MATCH' : 'NO MATCH'}`);
+  return isCompatible;
+}
+
+// Get the best reference image type for a character based on scene
+// Returns 'body' (full body), 'face' (face only), or null
+function selectReferenceImageType(character, sceneSetting) {
+  if (!character) return null;
+
+  // If no style analysis, always use full body (best we have)
+  if (!character.styleAnalysis) {
+    console.log(`👗 [REF SELECT] ${character.name}: No style analysis, using full body`);
+    return 'body';
+  }
+
+  const referenceOutfitSetting = character.styleAnalysis.referenceOutfit?.setting || 'neutral';
+
+  // Check if reference outfit matches scene
+  if (isOutfitAppropriateForScene(referenceOutfitSetting, sceneSetting)) {
+    console.log(`👗 [REF SELECT] ${character.name}: Outfit matches scene, using full body`);
+    return 'body';
+  }
+
+  // Outfit doesn't match - use face only, let Visual Bible provide clothing guidance
+  console.log(`👗 [REF SELECT] ${character.name}: Outfit doesn't match scene (${referenceOutfitSetting} vs ${sceneSetting}), using face only`);
+  return 'face';
+}
+
+// Build clothing prompt for a character when using face-only reference
+// Uses style DNA to generate scene-appropriate clothing description
+function buildClothingPromptFromStyleDNA(character, sceneSetting) {
+  if (!character.styleAnalysis?.styleDNA) {
+    return '';
+  }
+
+  const styleDNA = character.styleAnalysis.styleDNA;
+  const referenceOutfit = character.styleAnalysis.referenceOutfit;
+
+  let prompt = `\n**CLOTHING for ${character.name}** (generate appropriate for ${sceneSetting} scene):\n`;
+  prompt += `Style DNA (maintain these elements):\n`;
+
+  if (styleDNA.signatureColors?.length > 0) {
+    prompt += `- Signature colors: ${styleDNA.signatureColors.join(', ')}\n`;
+  }
+  if (styleDNA.signaturePatterns?.length > 0) {
+    prompt += `- Patterns: ${styleDNA.signaturePatterns.join(', ')}\n`;
+  }
+  if (styleDNA.signatureDetails?.length > 0) {
+    prompt += `- Style details: ${styleDNA.signatureDetails.join(', ')}\n`;
+  }
+  if (styleDNA.aesthetic) {
+    prompt += `- Overall aesthetic: ${styleDNA.aesthetic}\n`;
+  }
+  if (styleDNA.alwaysPresent?.length > 0) {
+    prompt += `- MUST include: ${styleDNA.alwaysPresent.join(', ')}\n`;
+  }
+
+  // Add scene-specific guidance
+  const sceneGuidance = {
+    'outdoor-cold': 'Winter clothing: coat, warm layers, possible hat/scarf/mittens',
+    'outdoor-warm': 'Summer clothing: light fabrics, short sleeves or sleeveless, breathable',
+    'indoor-casual': 'Casual indoor wear: comfortable, relaxed fit',
+    'indoor-formal': 'Formal/dressy: neat, presentable, possibly festive',
+    'active': 'Active wear: movement-friendly, sporty, practical',
+    'sleep': 'Sleepwear: pajamas, nightgown, cozy and soft',
+    'neutral': 'Versatile clothing suitable for the scene context'
+  };
+
+  prompt += `\nScene requirement: ${sceneGuidance[sceneSetting] || sceneGuidance.neutral}\n`;
+  prompt += `Generate clothing that matches BOTH the style DNA above AND the scene requirement.\n`;
+
+  return prompt;
 }
 
 // Get Visual Bible entries relevant to a specific page
@@ -8073,11 +8583,17 @@ async function processStoryJob(jobId) {
 
     // Parse Visual Bible for recurring elements consistency
     const visualBible = parseVisualBible(outline);
+
+    // Initialize main characters from inputData.characters with their style analysis
+    initializeVisualBibleMainCharacters(visualBible, inputData.characters);
+
     console.log(`📖 [PIPELINE] Visual Bible after parsing: ${JSON.stringify({
+      mainCharacters: visualBible.mainCharacters.length,
       secondaryCharacters: visualBible.secondaryCharacters.length,
       animals: visualBible.animals.length,
       artifacts: visualBible.artifacts.length,
-      locations: visualBible.locations.length
+      locations: visualBible.locations.length,
+      changeLog: visualBible.changeLog.length
     })}`);
 
     // Save checkpoint: scene hints and visual bible

@@ -194,6 +194,131 @@ export function CharacterForm({
         </div>
       )}
 
+      {/* Developer Mode: Style Profile from photo analysis */}
+      {developerMode && character.styleAnalysis && (
+        <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-purple-700 mb-3">
+            👗 Style Profile (from photo analysis)
+          </h4>
+
+          {/* Physical Features */}
+          <div className="mb-4">
+            <h5 className="text-xs font-bold text-purple-600 uppercase mb-2">Physical Features</h5>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+              <div>
+                <span className="font-medium text-gray-600">Face:</span>
+                <p className="text-gray-800">{character.styleAnalysis.physical?.face || 'Not analyzed'}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Hair:</span>
+                <p className="text-gray-800">{character.styleAnalysis.physical?.hair || 'Not analyzed'}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Build:</span>
+                <p className="text-gray-800">{character.styleAnalysis.physical?.build || 'Not analyzed'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Reference Outfit */}
+          <div className="mb-4">
+            <h5 className="text-xs font-bold text-purple-600 uppercase mb-2">Reference Outfit</h5>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+              <div>
+                <span className="font-medium text-gray-600">Type:</span>
+                <p className="text-gray-800">{character.styleAnalysis.referenceOutfit?.garmentType || 'Unknown'}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Primary Color:</span>
+                <p className="text-gray-800">{character.styleAnalysis.referenceOutfit?.primaryColor || 'Unknown'}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Pattern:</span>
+                <p className="text-gray-800">{character.styleAnalysis.referenceOutfit?.pattern || 'None'}</p>
+              </div>
+              <div>
+                <span className="font-medium text-gray-600">Setting:</span>
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                  character.styleAnalysis.referenceOutfit?.setting === 'outdoor-cold' ? 'bg-blue-100 text-blue-800' :
+                  character.styleAnalysis.referenceOutfit?.setting === 'outdoor-warm' ? 'bg-yellow-100 text-yellow-800' :
+                  character.styleAnalysis.referenceOutfit?.setting === 'indoor-casual' ? 'bg-green-100 text-green-800' :
+                  character.styleAnalysis.referenceOutfit?.setting === 'indoor-formal' ? 'bg-purple-100 text-purple-800' :
+                  character.styleAnalysis.referenceOutfit?.setting === 'active' ? 'bg-orange-100 text-orange-800' :
+                  character.styleAnalysis.referenceOutfit?.setting === 'sleep' ? 'bg-indigo-100 text-indigo-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {character.styleAnalysis.referenceOutfit?.setting || 'neutral'}
+                </span>
+              </div>
+            </div>
+            {character.styleAnalysis.referenceOutfit?.secondaryColors && character.styleAnalysis.referenceOutfit.secondaryColors.length > 0 && (
+              <div className="mt-2 text-sm">
+                <span className="font-medium text-gray-600">Secondary Colors:</span>
+                <span className="text-gray-800 ml-1">{character.styleAnalysis.referenceOutfit.secondaryColors.join(', ')}</span>
+              </div>
+            )}
+            {character.styleAnalysis.referenceOutfit?.accessories && character.styleAnalysis.referenceOutfit.accessories.length > 0 && (
+              <div className="mt-1 text-sm">
+                <span className="font-medium text-gray-600">Accessories:</span>
+                <span className="text-gray-800 ml-1">{character.styleAnalysis.referenceOutfit.accessories.join(', ')}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Style DNA */}
+          <div>
+            <h5 className="text-xs font-bold text-purple-600 uppercase mb-2">Style DNA</h5>
+            <div className="space-y-2 text-sm">
+              {character.styleAnalysis.styleDNA?.aesthetic && (
+                <div>
+                  <span className="font-medium text-gray-600">Aesthetic:</span>
+                  <span className="text-gray-800 ml-1 italic">{character.styleAnalysis.styleDNA.aesthetic}</span>
+                </div>
+              )}
+              {character.styleAnalysis.styleDNA?.signatureColors && character.styleAnalysis.styleDNA.signatureColors.length > 0 && (
+                <div className="flex flex-wrap gap-1 items-center">
+                  <span className="font-medium text-gray-600">Signature Colors:</span>
+                  {character.styleAnalysis.styleDNA.signatureColors.map((color, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs">{color}</span>
+                  ))}
+                </div>
+              )}
+              {character.styleAnalysis.styleDNA?.signaturePatterns && character.styleAnalysis.styleDNA.signaturePatterns.length > 0 && (
+                <div className="flex flex-wrap gap-1 items-center">
+                  <span className="font-medium text-gray-600">Patterns:</span>
+                  {character.styleAnalysis.styleDNA.signaturePatterns.map((pattern, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs">{pattern}</span>
+                  ))}
+                </div>
+              )}
+              {character.styleAnalysis.styleDNA?.signatureDetails && character.styleAnalysis.styleDNA.signatureDetails.length > 0 && (
+                <div className="flex flex-wrap gap-1 items-center">
+                  <span className="font-medium text-gray-600">Details:</span>
+                  {character.styleAnalysis.styleDNA.signatureDetails.map((detail, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs">{detail}</span>
+                  ))}
+                </div>
+              )}
+              {character.styleAnalysis.styleDNA?.alwaysPresent && character.styleAnalysis.styleDNA.alwaysPresent.length > 0 && (
+                <div className="flex flex-wrap gap-1 items-center">
+                  <span className="font-medium text-gray-600">Always Present:</span>
+                  {character.styleAnalysis.styleDNA.alwaysPresent.map((item, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">{item}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Analysis timestamp */}
+          {character.styleAnalysis.analyzedAt && (
+            <div className="mt-3 pt-2 border-t border-purple-200 text-xs text-purple-500">
+              Analyzed: {new Date(character.styleAnalysis.analyzedAt).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Extracted Features - Editable */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <h4 className="text-sm font-semibold text-gray-600 mb-3">
