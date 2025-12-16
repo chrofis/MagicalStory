@@ -2920,12 +2920,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
     }
 
-    // Get visual bible for recurring elements
-    const visualBible = storyData.visualBible || null;
-    const visualBibleForCovers = buildFullVisualBiblePrompt(visualBible);
-    if (visualBibleForCovers) {
-      console.log(`📖 [COVER REGEN] Adding visual bible to ${normalizedCoverType} cover prompt`);
-    }
+    // Note: Visual bible is NOT used for covers - covers show main characters (from user photos)
+    // not secondary story characters from the visual bible
 
     // Build cover prompt
     let coverPrompt;
@@ -2942,7 +2938,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle,
-          VISUAL_BIBLE: visualBibleForCovers
+          VISUAL_BIBLE: ''
         });
       } else if (normalizedCoverType === 'initialPage') {
         const initialPageScene = coverScenes.initialPage || 'A warm, inviting dedication/introduction page.';
@@ -2952,14 +2948,14 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               DEDICATION: storyData.dedication,
-              VISUAL_BIBLE: visualBibleForCovers
+              VISUAL_BIBLE: ''
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle,
-              VISUAL_BIBLE: visualBibleForCovers
+              VISUAL_BIBLE: ''
             });
       } else {
         const backCoverScene = coverScenes.backCover || 'A satisfying, conclusive ending scene.';
@@ -2967,7 +2963,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo,
-          VISUAL_BIBLE: visualBibleForCovers
+          VISUAL_BIBLE: ''
         });
       }
     }
@@ -7793,11 +7789,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
         const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
-        // Build visual bible prompt for covers (all recurring elements)
-        const visualBibleForCovers = buildFullVisualBiblePrompt(visualBible);
-        if (visualBibleForCovers) {
-          console.log(`📖 [STORYBOOK] Adding visual bible to cover prompts`);
-        }
+        // Note: Visual bible is NOT used for covers - covers show main characters (from user photos)
+        // not secondary story characters from the visual bible
 
         // Front cover - use same template as standard mode
         // Detect which characters appear in the front cover scene
@@ -7810,7 +7803,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle,
-          VISUAL_BIBLE: visualBibleForCovers
+          VISUAL_BIBLE: ''
         });
         coverPrompts.frontCover = frontCoverPrompt;
         const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
@@ -7837,14 +7830,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               DEDICATION: inputData.dedication,
-              VISUAL_BIBLE: visualBibleForCovers
+              VISUAL_BIBLE: ''
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle,
-              VISUAL_BIBLE: visualBibleForCovers
+              VISUAL_BIBLE: ''
             });
         coverPrompts.initialPage = initialPrompt;
         const initialResult = await generateImageWithQualityRetry(initialPrompt, characterPhotos, null, 'cover');
@@ -7869,7 +7862,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo,
-          VISUAL_BIBLE: visualBibleForCovers
+          VISUAL_BIBLE: ''
         });
         coverPrompts.backCover = backCoverPrompt;
         const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');
@@ -8595,11 +8588,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
       const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
-      // Build visual bible prompt for covers (all recurring elements)
-      const visualBibleForCovers = buildFullVisualBiblePrompt(visualBible);
-      if (visualBibleForCovers) {
-        console.log(`📖 [PIPELINE] Adding visual bible to cover prompts`);
-      }
+      // Note: Visual bible is NOT used for covers - covers show main characters (from user photos)
+      // not secondary story characters from the visual bible
 
       let frontCoverResult, initialPageResult, backCoverResult;
 
@@ -8615,7 +8605,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo,
           STORY_TITLE: storyTitle,
-          VISUAL_BIBLE: visualBibleForCovers
+          VISUAL_BIBLE: ''
         });
         coverPrompts.frontCover = frontCoverPrompt;
         frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
@@ -8637,14 +8627,14 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               DEDICATION: inputData.dedication,
-              VISUAL_BIBLE: visualBibleForCovers
+              VISUAL_BIBLE: ''
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               CHARACTER_INFO: characterInfo,
               STORY_TITLE: storyTitle,
-              VISUAL_BIBLE: visualBibleForCovers
+              VISUAL_BIBLE: ''
             });
         coverPrompts.initialPage = initialPagePrompt;
         initialPageResult = await generateImageWithQualityRetry(initialPagePrompt, characterPhotos, null, 'cover');
@@ -8664,7 +8654,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
           CHARACTER_INFO: characterInfo,
-          VISUAL_BIBLE: visualBibleForCovers
+          VISUAL_BIBLE: ''
         });
         coverPrompts.backCover = backCoverPrompt;
         backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');
