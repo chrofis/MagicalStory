@@ -729,8 +729,19 @@ async function initializeDatabase() {
         role VARCHAR(50) DEFAULT 'user',
         story_quota INT DEFAULT 2,
         stories_generated INT DEFAULT 0,
+        credits INT DEFAULT 500,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Add credits column to existing users table if it doesn't exist
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='credits') THEN
+          ALTER TABLE users ADD COLUMN credits INT DEFAULT 500;
+        END IF;
+      END $$;
     `);
 
     await dbPool.query(`
@@ -844,6 +855,22 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_orders_stripe_session_id ON orders(stripe_session_id)`);
 
+    // Credit transactions table for tracking credit history
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS credit_transactions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount INT NOT NULL,
+        balance_after INT NOT NULL,
+        transaction_type VARCHAR(50) NOT NULL,
+        reference_id VARCHAR(255),
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_credit_transactions_type ON credit_transactions(transaction_type)`);
+
     // Story generation jobs table for background processing
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS story_jobs (
@@ -855,6 +882,7 @@ async function initializeDatabase() {
         error_message TEXT,
         progress INT DEFAULT 0,
         progress_message TEXT,
+        credits_reserved INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         completed_at TIMESTAMP
@@ -862,6 +890,16 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_jobs_user ON story_jobs(user_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_jobs_status ON story_jobs(status)`);
+
+    // Add credits_reserved column to existing story_jobs table if it doesn't exist
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='story_jobs' AND column_name='credits_reserved') THEN
+          ALTER TABLE story_jobs ADD COLUMN credits_reserved INT DEFAULT 0;
+        END IF;
+      END $$;
+    `);
 
     // Story job checkpoints for fault tolerance and intermediate data access
     await dbPool.query(`
@@ -1042,9 +1080,19 @@ app.post('/api/auth/register', async (req, res) => {
       const userId = Date.now().toString();
       const role = isFirstUser ? 'admin' : 'user';
       const storyQuota = isFirstUser ? -1 : 2;
+      const initialCredits = isFirstUser ? -1 : 500;
 
-      const insertQuery = 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated) VALUES ($1, $2, $3, $4, $5, $6, $7)';
-      await dbQuery(insertQuery, [userId, username, username, hashedPassword, role, storyQuota, 0]);
+      const insertQuery = 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
+      await dbQuery(insertQuery, [userId, username, username, hashedPassword, role, storyQuota, 0, initialCredits]);
+
+      // Create initial credit transaction record
+      if (initialCredits > 0) {
+        await dbQuery(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [userId, initialCredits, initialCredits, 'initial', 'Welcome credits for new account']
+        );
+      }
 
       newUser = {
         id: userId,
@@ -1052,7 +1100,8 @@ app.post('/api/auth/register', async (req, res) => {
         email: username,
         role,
         storyQuota,
-        storiesGenerated: 0
+        storiesGenerated: 0,
+        credits: initialCredits
       };
     } else {
       // File mode
@@ -1063,15 +1112,17 @@ app.post('/api/auth/register', async (req, res) => {
         return res.status(400).json({ error: 'This email is already registered' });
       }
 
+      const isFirstUser = users.length === 0;
       newUser = {
         id: Date.now().toString(),
         username,
         email: username,
         password: hashedPassword,
         createdAt: new Date().toISOString(),
-        role: users.length === 0 ? 'admin' : 'user',
-        storyQuota: users.length === 0 ? -1 : 2,
-        storiesGenerated: 0
+        role: isFirstUser ? 'admin' : 'user',
+        storyQuota: isFirstUser ? -1 : 2,
+        storiesGenerated: 0,
+        credits: isFirstUser ? -1 : 500
       };
 
       users.push(newUser);

@@ -504,6 +504,27 @@ export default function StoryWizard() {
             attributes: analysis.attributes,
           });
 
+          // Run style analysis on body photo for Visual Bible integration
+          let styleAnalysis = undefined;
+          try {
+            const styleImageData = analysis.bodyCrop || resizedPhoto;
+            log.info('Starting style analysis for Visual Bible...');
+            const styleResult = await storyService.analyzeStyle(styleImageData);
+            if (styleResult.success && styleResult.styleAnalysis) {
+              styleAnalysis = styleResult.styleAnalysis;
+              log.info('Style analysis complete:', {
+                aesthetic: styleAnalysis.styleDNA?.aesthetic,
+                setting: styleAnalysis.referenceOutfit?.setting,
+                signatureColors: styleAnalysis.styleDNA?.signatureColors?.slice(0, 3),
+              });
+            } else {
+              log.warn('Style analysis returned no data');
+            }
+          } catch (styleError) {
+            log.warn('Style analysis failed (non-critical):', styleError);
+            // Style analysis is optional, continue without it
+          }
+
           setCurrentCharacter(prev => prev ? {
             ...prev,
             photoUrl,
@@ -511,6 +532,7 @@ export default function StoryWizard() {
             bodyNoBgUrl,
             faceBox: analysis.faceBox,
             bodyBox: analysis.bodyBox,
+            styleAnalysis, // Add style analysis for Visual Bible
             // Only update attributes if user hasn't already filled them in
             gender: (!prev.gender || prev.gender === 'other') && analysis.attributes?.gender
               ? (analysis.attributes.gender as 'male' | 'female' | 'other')
