@@ -195,6 +195,7 @@ export function CharacterForm({
       )}
 
       {/* Developer Mode: Style Profile from photo analysis */}
+      {developerMode && (console.log('CharacterForm developerMode check:', { developerMode, hasStyleAnalysis: !!character.styleAnalysis, styleAnalysis: character.styleAnalysis }), null)}
       {developerMode && character.styleAnalysis && (
         <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-purple-700 mb-3">
