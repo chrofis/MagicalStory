@@ -8610,6 +8610,46 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
   } catch (error) {
     console.error(`❌ [STORYBOOK] Job ${jobId} failed:`, error);
 
+    // Refund reserved credits on failure
+    try {
+      const jobResult = await dbPool.query(
+        'SELECT user_id, credits_reserved FROM story_jobs WHERE id = $1',
+        [jobId]
+      );
+      if (jobResult.rows.length > 0 && jobResult.rows[0].credits_reserved > 0) {
+        const refundUserId = jobResult.rows[0].user_id;
+        const creditsToRefund = jobResult.rows[0].credits_reserved;
+
+        // Get current balance
+        const userResult = await dbPool.query(
+          'SELECT credits FROM users WHERE id = $1',
+          [refundUserId]
+        );
+
+        if (userResult.rows.length > 0 && userResult.rows[0].credits !== -1) {
+          const currentBalance = userResult.rows[0].credits;
+          const newBalance = currentBalance + creditsToRefund;
+
+          // Refund credits
+          await dbPool.query(
+            'UPDATE users SET credits = $1 WHERE id = $2',
+            [newBalance, refundUserId]
+          );
+
+          // Create refund transaction record
+          await dbPool.query(
+            `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, `Refunded ${creditsToRefund} credits - storybook generation failed`]
+          );
+
+          console.log(`💳 [STORYBOOK] Refunded ${creditsToRefund} credits for failed job ${jobId}`);
+        }
+      }
+    } catch (refundErr) {
+      console.error('❌ [STORYBOOK] Failed to refund credits:', refundErr.message);
+    }
+
     await dbPool.query(
       `UPDATE story_jobs SET
         status = 'failed',
@@ -9640,6 +9680,46 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       }
     } catch (dumpErr) {
       console.error('❌ Failed to dump partial data:', dumpErr.message);
+    }
+
+    // Refund reserved credits on failure
+    try {
+      const jobResult = await dbPool.query(
+        'SELECT user_id, credits_reserved FROM story_jobs WHERE id = $1',
+        [jobId]
+      );
+      if (jobResult.rows.length > 0 && jobResult.rows[0].credits_reserved > 0) {
+        const refundUserId = jobResult.rows[0].user_id;
+        const creditsToRefund = jobResult.rows[0].credits_reserved;
+
+        // Get current balance
+        const userResult = await dbPool.query(
+          'SELECT credits FROM users WHERE id = $1',
+          [refundUserId]
+        );
+
+        if (userResult.rows.length > 0 && userResult.rows[0].credits !== -1) {
+          const currentBalance = userResult.rows[0].credits;
+          const newBalance = currentBalance + creditsToRefund;
+
+          // Refund credits
+          await dbPool.query(
+            'UPDATE users SET credits = $1 WHERE id = $2',
+            [newBalance, refundUserId]
+          );
+
+          // Create refund transaction record
+          await dbPool.query(
+            `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, `Refunded ${creditsToRefund} credits - story generation failed`]
+          );
+
+          console.log(`💳 Refunded ${creditsToRefund} credits for failed job ${jobId} (user balance: ${currentBalance} -> ${newBalance})`);
+        }
+      }
+    } catch (refundErr) {
+      console.error('❌ Failed to refund credits:', refundErr.message);
     }
 
     await dbPool.query(

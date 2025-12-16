@@ -32,3 +32,8 @@ Create a detailed visual description of ONE key moment from the scene context pr
 - Every character in the scene MUST be named explicitly
 - Fewer characters = better illustration quality
 - **OUTPUT LANGUAGE: Write the entire scene description in {LANGUAGE}**
+
+**SAFETY - AVOID THESE SETTINGS:**
+- Bedroom/sleeping scenes → use living room, garden, or outdoor alternatives
+- Bathroom/bathing scenes → use kitchen or outdoor water play instead
+- Dark, scary, or threatening imagery → keep scenes bright and cheerful
