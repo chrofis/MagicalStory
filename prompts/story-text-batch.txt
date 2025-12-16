@@ -48,11 +48,11 @@ The output MUST follow this EXACT format or the system will fail:
 Stay within the word count. Aim for the middle of the range, not the maximum.
 
 **FORMATTING:**
-- Write in natural, flowing paragraphs (2-4 sentences each is ideal)
-- Start a new paragraph for: dialogue exchanges, scene changes, new actions, or shifts in focus
-- Dialogue can be on its own line for clarity, but group related exchanges together
-- Avoid putting EVERY sentence on its own line - that's too fragmented
-- Aim for a balanced, readable style like a picture book or early chapter book
+- Write in flowing paragraphs with 3-6 sentences each
+- Aim for 3-6 paragraphs per page for good visual rhythm
+- Dialogues flow inline with the narrative text
+- Start new paragraphs for scene changes, shifts in action, or new topics
+- Create a readable, engaging style appropriate for the target age
 
 # Story Context
 
