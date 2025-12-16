@@ -4,10 +4,6 @@ import type {
   RelationshipMap,
   RelationshipTextMap,
   StyleAnalysis,
-  GeneratedOutfit,
-  VisualBibleMainCharacter,
-  VisualBibleEntry,
-  VisualBibleChangeLogEntry,
   VisualBible
 } from '@/types/character';
 import type { SavedStory, Language, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt } from '@/types/story';

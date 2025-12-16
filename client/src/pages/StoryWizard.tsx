@@ -12,7 +12,7 @@ import { CharacterList, CharacterForm, PhotoUpload } from '@/components/characte
 import { GenerationProgress, StoryDisplay } from '@/components/generation';
 
 // Types
-import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
+import type { Character, RelationshipMap, RelationshipTextMap, VisualBible } from '@/types/character';
 import type { LanguageLevel, SceneDescription, SceneImage, Language, CoverImages } from '@/types/story';
 
 // Services & Helpers
@@ -105,7 +105,7 @@ export default function StoryWizard() {
   const [storyOutline, setStoryOutline] = useState(''); // Outline for dev mode display
   const [outlinePrompt, setOutlinePrompt] = useState(''); // API prompt for outline (dev mode)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string }>>([]); // API prompts for story text (dev mode)
-  const [visualBible, setVisualBible] = useState<{ secondaryCharacters: any[]; animals: any[]; artifacts: any[]; locations: any[] } | null>(null); // Visual Bible for dev mode
+  const [visualBible, setVisualBible] = useState<VisualBible | null>(null); // Visual Bible for dev mode
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
@@ -154,7 +154,19 @@ export default function StoryWizard() {
           setStoryOutline(story.outline || '');
           setOutlinePrompt(story.outlinePrompt || '');
           setStoryTextPrompts(story.storyTextPrompts || []);
-          setVisualBible(story.visualBible || null);
+          // Ensure visualBible has required fields (backward compatibility)
+          if (story.visualBible) {
+            setVisualBible({
+              mainCharacters: story.visualBible.mainCharacters || [],
+              secondaryCharacters: story.visualBible.secondaryCharacters || [],
+              animals: story.visualBible.animals || [],
+              artifacts: story.visualBible.artifacts || [],
+              locations: story.visualBible.locations || [],
+              changeLog: story.visualBible.changeLog || []
+            });
+          } else {
+            setVisualBible(null);
+          }
           setSceneImages(story.sceneImages || []);
           setSceneDescriptions(story.sceneDescriptions || []);
           setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
@@ -810,7 +822,19 @@ export default function StoryWizard() {
           setStoryOutline(status.result.outline);
           setOutlinePrompt(status.result.outlinePrompt || '');
           setStoryTextPrompts(status.result.storyTextPrompts || []);
-          setVisualBible(status.result.visualBible || null);
+          // Ensure visualBible has required fields (backward compatibility)
+          if (status.result.visualBible) {
+            setVisualBible({
+              mainCharacters: status.result.visualBible.mainCharacters || [],
+              secondaryCharacters: status.result.visualBible.secondaryCharacters || [],
+              animals: status.result.visualBible.animals || [],
+              artifacts: status.result.visualBible.artifacts || [],
+              locations: status.result.visualBible.locations || [],
+              changeLog: status.result.visualBible.changeLog || []
+            });
+          } else {
+            setVisualBible(null);
+          }
           setGeneratedStory(status.result.story);
           setSceneDescriptions(status.result.sceneDescriptions || []);
           setSceneImages(status.result.sceneImages || []);

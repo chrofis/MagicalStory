@@ -1,4 +1,4 @@
-import type { Character, RelationshipMap, RelationshipTextMap, LocalizedString } from './character';
+import type { Character, RelationshipMap, RelationshipTextMap, LocalizedString, VisualBible } from './character';
 
 export type Language = 'en' | 'de' | 'fr';
 export type LanguageLevel = '1st-grade' | 'standard' | 'advanced';
@@ -90,12 +90,7 @@ export interface SavedStory {
   outlinePrompt?: string;
   story?: string;
   storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
-  visualBible?: {
-    secondaryCharacters: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
-    animals: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
-    artifacts: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
-    locations: Array<{ id: string; name: string; appearsInPages: number[]; description: string; extractedDescription: string | null; firstAppearanceAnalyzed: boolean }>;
-  };
+  visualBible?: Partial<VisualBible>;
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];
   coverImages?: CoverImages;

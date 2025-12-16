@@ -2,7 +2,7 @@ import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, His
 import { useLanguage } from '@/context/LanguageContext';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
-import type { VisualBible, VisualBibleEntry } from '@/types/character';
+import type { VisualBible } from '@/types/character';
 
 // Helper component to display retry history
 function RetryHistoryDisplay({
