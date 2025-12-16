@@ -6798,7 +6798,9 @@ function parseVisualBibleEntries(sectionText) {
   console.log(`📖 [VISUAL BIBLE ENTRIES] First 300 chars: "${sectionText.substring(0, 300)}..."`);
 
   // Match entries that start with **Name** (pages X, Y, Z)
-  const entryPattern = /\*\*([^*]+)\*\*\s*\(pages?\s*([^)]+)\)([\s\S]*?)(?=\*\*[^*]+\*\*\s*\(pages?|$)/gi;
+  // Support English "pages/page", German "Seiten/Seite", French "pages/page"
+  const pageKeyword = '(?:pages?|Seiten?|Page)';
+  const entryPattern = new RegExp(`\\*\\*([^*]+)\\*\\*\\s*\\(${pageKeyword}\\s*([^)]+)\\)([\\s\\S]*?)(?=\\*\\*[^*]+\\*\\*\\s*\\(${pageKeyword}|$)`, 'gi');
   let match;
 
   while ((match = entryPattern.exec(sectionText)) !== null) {
