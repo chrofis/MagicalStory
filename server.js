@@ -8851,10 +8851,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           }
         } else if (cp.step_name === 'partial_page') {
           console.log(`🖼️  [PAGE ${cp.step_index}]:`);
-          console.log('  Scene description:', data.sceneDescription?.description?.substring(0, 200) + '...');
-          console.log('  Image prompt:', data.imagePrompt?.substring(0, 200) + '...');
+          console.log('  Scene description:', (data.description || data.sceneDescription?.description)?.substring(0, 200) + '...');
+          console.log('  Image prompt:', (data.prompt || data.imagePrompt)?.substring(0, 200) + '...');
           console.log('  Has image:', !!data.imageData);
-          console.log('  Quality score:', data.score);
+          console.log('  Quality score:', data.qualityScore || data.score);
         } else if (cp.step_name === 'cover') {
           console.log(`🎨 [COVER ${data.type}]:`);
           console.log('  Prompt:', data.prompt?.substring(0, 200) + '...');
@@ -8908,20 +8908,28 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               }
             } else if (cp.step_name === 'partial_page') {
               const pageNum = cp.step_index;
-              if (data.sceneDescription) {
+              // Handle both old format (sceneDescription object) and new format (description string)
+              const sceneDesc = data.description || data.sceneDescription?.description || data.sceneDescription || '';
+              if (sceneDesc) {
                 sceneDescriptions.push({
                   pageNumber: pageNum,
-                  description: data.sceneDescription.description || data.sceneDescription
+                  description: sceneDesc
                 });
               }
               if (data.imageData) {
                 sceneImages.push({
                   pageNumber: pageNum,
                   imageData: data.imageData,
-                  description: data.sceneDescription?.description || '',
-                  prompt: data.imagePrompt || '',
-                  qualityScore: data.score,
-                  qualityReasoning: data.reasoning
+                  description: sceneDesc,
+                  prompt: data.prompt || data.imagePrompt || '',
+                  qualityScore: data.qualityScore || data.score,
+                  qualityReasoning: data.qualityReasoning || data.reasoning,
+                  totalAttempts: data.totalAttempts,
+                  retryHistory: data.retryHistory,
+                  wasRegenerated: data.wasRegenerated,
+                  originalImage: data.originalImage,
+                  originalScore: data.originalScore,
+                  originalReasoning: data.originalReasoning
                 });
               }
             } else if (cp.step_name === 'cover') {
@@ -10085,13 +10093,18 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     console.error('❌ [IMAGE GEN] Unexpected candidate structure. Keys:', Object.keys(candidate));
     // Log the finishReason and finishMessage to understand why image was blocked
     if (candidate.finishReason) {
-      console.error('❌ [IMAGE GEN] finishReason:', candidate.finishReason);
+      console.error('🚫 [IMAGE GEN] FINISH REASON:', candidate.finishReason);
     }
     if (candidate.finishMessage) {
-      console.error('❌ [IMAGE GEN] finishMessage:', candidate.finishMessage);
+      console.error('🚫 [IMAGE GEN] FINISH MESSAGE:', candidate.finishMessage);
     }
     // Log the full candidate for debugging
-    console.error('❌ [IMAGE GEN] Full candidate:', JSON.stringify(candidate, null, 2));
+    console.error('🚫 [IMAGE GEN] FULL CANDIDATE DUMP:', JSON.stringify(candidate, null, 2));
+
+    // Throw with more context about why it failed
+    const reason = candidate.finishReason || 'unknown';
+    const message = candidate.finishMessage || 'no message';
+    throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
   }
 
   console.error('❌ [IMAGE GEN] No image data found in any part');
