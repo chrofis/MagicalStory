@@ -1,5 +1,5 @@
 import api from './api';
-import type { Character } from '@/types/character';
+import type { Character, StyleAnalysis } from '@/types/character';
 import { createLogger } from './logger';
 
 const log = createLogger('CharacterService');
@@ -169,6 +169,7 @@ export const characterService = {
       clothing?: string;
       otherFeatures?: string;
     };
+    styleAnalysis?: StyleAnalysis; // Style DNA for Visual Bible
   }> {
     try {
       const response = await api.post<{
@@ -187,6 +188,7 @@ export const characterService = {
           clothing?: string;
           other_features?: string;
         };
+        styleAnalysis?: StyleAnalysis;
         error?: string;
         fallback?: boolean;
       }>('/api/analyze-photo', { imageData });
@@ -207,6 +209,7 @@ export const characterService = {
           clothing: response.attributes.clothing,
           otherFeatures: response.attributes.other_features,
         } : undefined,
+        styleAnalysis: response.styleAnalysis,
       };
     } catch (error) {
       log.error('Photo analysis failed:', error);

@@ -1148,7 +1148,8 @@ app.post('/api/auth/register', async (req, res) => {
         email: newUser.email,
         role: newUser.role,
         storyQuota: newUser.storyQuota,
-        storiesGenerated: newUser.storiesGenerated
+        storiesGenerated: newUser.storiesGenerated,
+        credits: newUser.credits
       }
     });
   } catch (err) {
@@ -1184,7 +1185,8 @@ app.post('/api/auth/login', async (req, res) => {
         password: dbUser.password,
         role: dbUser.role,
         storyQuota: dbUser.story_quota,
-        storiesGenerated: dbUser.stories_generated
+        storiesGenerated: dbUser.stories_generated,
+        credits: dbUser.credits !== undefined ? dbUser.credits : 500
       };
     } else {
       // File mode
@@ -1222,7 +1224,8 @@ app.post('/api/auth/login', async (req, res) => {
         email: user.email,
         role: user.role,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
-        storiesGenerated: user.storiesGenerated || 0
+        storiesGenerated: user.storiesGenerated || 0,
+        credits: user.credits !== undefined ? user.credits : 500
       }
     });
   } catch (err) {
@@ -1268,18 +1271,28 @@ app.post('/api/auth/firebase', async (req, res) => {
         const isFirstUser = parseInt(userCount[0].count) === 0;
         const role = isFirstUser ? 'admin' : 'user';
         const storyQuota = isFirstUser ? 999 : 2;
+        const initialCredits = isFirstUser ? -1 : 500;
 
         // Generate a random password (user won't need it - they use Firebase)
         const randomPassword = crypto.randomBytes(32).toString('hex');
         const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
         const insertQuery = `
-          INSERT INTO users (username, email, password, role, story_quota, stories_generated)
-          VALUES ($1, $2, $3, $4, $5, $6)
-          RETURNING id, username, email, role, story_quota, stories_generated
+          INSERT INTO users (username, email, password, role, story_quota, stories_generated, credits)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING id, username, email, role, story_quota, stories_generated, credits
         `;
-        const result = await dbQuery(insertQuery, [username, firebaseEmail, hashedPassword, role, storyQuota, 0]);
+        const result = await dbQuery(insertQuery, [username, firebaseEmail, hashedPassword, role, storyQuota, 0, initialCredits]);
         user = result[0];
+
+        // Create initial credit transaction record
+        if (initialCredits > 0) {
+          await dbQuery(
+            `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [user.id, initialCredits, initialCredits, 'initial', 'Welcome credits for new account']
+          );
+        }
 
         await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
         console.log(`✅ New Firebase user registered: ${username} (role: ${role})`);
@@ -1302,7 +1315,8 @@ app.post('/api/auth/firebase', async (req, res) => {
           email: user.email || firebaseEmail,
           role: user.role,
           storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
-          storiesGenerated: user.stories_generated || 0
+          storiesGenerated: user.stories_generated || 0,
+          credits: user.credits !== undefined ? user.credits : 500
         }
       });
     } else {
@@ -1622,7 +1636,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
   }
 });
 
-// Update user quota (admin only)
+// Update user credits (admin only)
 app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -1630,13 +1644,14 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
     }
 
     const { userId } = req.params;
-    const { storyQuota } = req.body;
+    const { credits } = req.body;
 
-    if (storyQuota === undefined || (storyQuota !== -1 && storyQuota < 0)) {
-      return res.status(400).json({ error: 'Invalid quota value. Use -1 for unlimited or a positive number.' });
+    if (credits === undefined || (credits !== -1 && credits < 0)) {
+      return res.status(400).json({ error: 'Invalid credits value. Use -1 for unlimited or a positive number.' });
     }
 
     let user;
+    let previousCredits;
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
@@ -1647,14 +1662,30 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const updateQuery = 'UPDATE users SET story_quota = $1 WHERE id = $2';
-      await dbQuery(updateQuery, [storyQuota, userId]);
+      previousCredits = rows[0].credits || 0;
+      const creditDiff = credits - previousCredits;
+
+      const updateQuery = 'UPDATE users SET credits = $1 WHERE id = $2';
+      await dbQuery(updateQuery, [credits, userId]);
+
+      // Create transaction record
+      if (creditDiff !== 0) {
+        const transactionType = creditDiff > 0 ? 'admin_add' : 'admin_deduct';
+        const description = creditDiff > 0
+          ? `Admin added ${creditDiff} credits`
+          : `Admin deducted ${Math.abs(creditDiff)} credits`;
+
+        await dbQuery(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [userId, creditDiff, credits, transactionType, req.user.id, description]
+        );
+      }
 
       user = {
         id: rows[0].id,
         username: rows[0].username,
-        storyQuota: storyQuota,
-        storiesGenerated: rows[0].stories_generated
+        credits: credits
       };
     } else {
       // File mode
@@ -1665,28 +1696,27 @@ app.patch('/api/admin/users/:userId/quota', authenticateToken, async (req, res) 
         return res.status(404).json({ error: 'User not found' });
       }
 
-      user.storyQuota = storyQuota;
+      user.credits = credits;
       await writeJSON(USERS_FILE, users);
     }
 
-    await logActivity(req.user.id, req.user.username, 'USER_QUOTA_UPDATED', {
+    await logActivity(req.user.id, req.user.username, 'USER_CREDITS_UPDATED', {
       targetUserId: userId,
       targetUsername: user.username,
-      newQuota: storyQuota
+      newCredits: credits
     });
 
     res.json({
-      message: 'User quota updated successfully',
+      message: 'User credits updated successfully',
       user: {
         id: user.id,
         username: user.username,
-        storyQuota: user.storyQuota,
-        storiesGenerated: user.storiesGenerated || 0
+        credits: user.credits
       }
     });
   } catch (err) {
-    console.error('Error updating user quota:', err);
-    res.status(500).json({ error: 'Failed to update user quota' });
+    console.error('Error updating user credits:', err);
+    res.status(500).json({ error: 'Failed to update user credits' });
   }
 });
 
@@ -2059,22 +2089,21 @@ app.delete('/api/admin/print-products/:id', authenticateToken, async (req, res) 
   }
 });
 
-// Get current user's quota status
+// Get current user's credits status
 app.get('/api/user/quota', authenticateToken, async (req, res) => {
   try {
-    let quota, generated;
+    let credits;
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = 'SELECT story_quota, stories_generated FROM users WHERE id = $1';
+      const selectQuery = 'SELECT credits FROM users WHERE id = $1';
       const rows = await dbQuery(selectQuery, [req.user.id]);
 
       if (rows.length === 0) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      quota = rows[0].story_quota !== undefined ? rows[0].story_quota : 2;
-      generated = rows[0].stories_generated || 0;
+      credits = rows[0].credits !== undefined ? rows[0].credits : 500;
     } else {
       // File mode
       const users = await readJSON(USERS_FILE);
@@ -2084,21 +2113,16 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      quota = user.storyQuota !== undefined ? user.storyQuota : 2;
-      generated = user.storiesGenerated || 0;
+      credits = user.credits !== undefined ? user.credits : 500;
     }
 
-    const remaining = quota === -1 ? -1 : Math.max(0, quota - generated);
-
     res.json({
-      quota: quota,
-      used: generated,
-      remaining: remaining,
-      unlimited: quota === -1
+      credits: credits,
+      unlimited: credits === -1
     });
   } catch (err) {
-    console.error('Error fetching user quota:', err);
-    res.status(500).json({ error: 'Failed to fetch user quota' });
+    console.error('Error fetching user credits:', err);
+    res.status(500).json({ error: 'Failed to fetch user credits' });
   }
 });
 
@@ -4094,20 +4118,51 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
               contents: [{
                 parts: [
                   {
-                    text: `Analyze this image of a person and describe their physical attributes.
+                    text: `Analyze this image of a person. Extract BOTH basic attributes AND detailed style information for a children's book illustration system.
 
-Return a JSON object with this exact structure:
+Return a JSON object with this EXACT structure:
 {
-  "age": "<estimated age as a number, e.g. 8, 25, 45>",
-  "gender": "<male, female, or other>",
-  "height": "<estimated height description, e.g. 'tall', 'average', 'short', or specific like '170cm' if visible>",
-  "build": "<body type, e.g. 'slim', 'average', 'athletic', 'stocky'>",
-  "hair": "<color and style, e.g. 'brown curly hair', 'blonde straight hair'>",
-  "clothing": "<description of visible clothing, e.g. 'blue t-shirt with jeans'>",
-  "features": "<eye color, glasses, facial hair, distinctive features>"
+  "traits": {
+    "age": "<estimated age as a number, e.g. 8, 25, 45>",
+    "gender": "<male, female, or other>",
+    "height": "<'tall', 'average', 'short'>",
+    "build": "<'slim', 'average', 'athletic', 'stocky'>",
+    "hair": "<color and style, e.g. 'brown curly hair'>",
+    "clothing": "<brief description of visible clothing>",
+    "features": "<eye color, glasses, facial hair, distinctive features>"
+  },
+  "styleAnalysis": {
+    "physical": {
+      "face": "<detailed face: shape, eye color, skin tone, distinctive features>",
+      "hair": "<exact: specific color like 'honey blonde', length, style, texture, accessories>",
+      "build": "<body type and apparent age>"
+    },
+    "referenceOutfit": {
+      "garmentType": "<e.g., knee-length dress, t-shirt and jeans>",
+      "primaryColor": "<specific like 'light sky blue' not just 'blue'>",
+      "secondaryColors": ["<other colors>"],
+      "pattern": "<exact pattern or 'solid/no pattern'>",
+      "patternScale": "<small/medium/large or 'none'>",
+      "seamColor": "<seam/trim color or 'matching'>",
+      "seamStyle": "<'contrast stitching' or 'none visible'>",
+      "fabric": "<'cotton matte', 'denim', etc.>",
+      "neckline": "<neckline with trim details>",
+      "sleeves": "<sleeve style with details>",
+      "accessories": ["<shoes, jewelry, hair items>"],
+      "setting": "<ONE of: outdoor-warm, outdoor-cold, indoor-casual, indoor-formal, active, sleep, neutral>"
+    },
+    "styleDNA": {
+      "signatureColors": ["<3-5 colors, dominant first>"],
+      "signaturePatterns": ["<patterns or 'solid'>"],
+      "signatureDetails": ["<'Peter Pan collar', 'puff sleeves'>"],
+      "aesthetic": "<2-3 words: 'classic feminine', 'sporty casual'>",
+      "alwaysPresent": ["<always present: 'glasses', 'red ribbons', or empty>"]
+    },
+    "analyzedAt": "${new Date().toISOString()}"
+  }
 }
 
-Be concise but descriptive. For age, give your best estimate as a number. Return ONLY valid JSON, no markdown or other text.`
+Be VERY specific about colors and patterns. Return ONLY valid JSON.`
                   },
                   {
                     inlineData: {
@@ -4116,9 +4171,13 @@ Be concise but descriptive. For age, give your best estimate as a number. Return
                     },
                   },
                 ],
-              }]
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 2048
+              }
             }),
-            signal: AbortSignal.timeout(15000) // 15 second timeout
+            signal: AbortSignal.timeout(20000) // 20 second timeout
           }
         );
 
@@ -4133,9 +4192,20 @@ Be concise but descriptive. For age, give your best estimate as a number. Return
           // Extract JSON from response (may have markdown wrapping)
           const jsonMatch = text.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
-            const traits = JSON.parse(jsonMatch[0]);
-            console.log('📸 [GEMINI] Extracted traits:', traits);
-            return traits;
+            const result = JSON.parse(jsonMatch[0]);
+            // Handle both old format (flat traits) and new format (nested traits + styleAnalysis)
+            if (result.traits) {
+              console.log('📸 [GEMINI] Extracted traits + styleAnalysis:', {
+                traits: result.traits,
+                hasStyleAnalysis: !!result.styleAnalysis,
+                aesthetic: result.styleAnalysis?.styleDNA?.aesthetic
+              });
+              return result; // New format: { traits, styleAnalysis }
+            } else {
+              // Old format fallback (flat traits object)
+              console.log('📸 [GEMINI] Extracted traits (legacy format):', result);
+              return { traits: result, styleAnalysis: null };
+            }
           }
         }
         return null;
@@ -4190,32 +4260,39 @@ Be concise but descriptive. For age, give your best estimate as a number. Return
       }
 
       // Merge Gemini traits into attributes (only fill if not already set)
-      if (geminiTraits) {
+      // geminiTraits is now { traits, styleAnalysis } format
+      const traits = geminiTraits?.traits || geminiTraits; // Handle both formats
+      const styleAnalysis = geminiTraits?.styleAnalysis || null;
+
+      if (traits) {
         analyzerData.attributes = analyzerData.attributes || {};
         // Age, gender, height, build - only fill if blank
-        if (geminiTraits.age && !analyzerData.attributes.age) {
-          analyzerData.attributes.age = String(geminiTraits.age);
+        if (traits.age && !analyzerData.attributes.age) {
+          analyzerData.attributes.age = String(traits.age);
         }
-        if (geminiTraits.gender && !analyzerData.attributes.gender) {
-          analyzerData.attributes.gender = geminiTraits.gender.toLowerCase();
+        if (traits.gender && !analyzerData.attributes.gender) {
+          analyzerData.attributes.gender = traits.gender.toLowerCase();
         }
-        if (geminiTraits.height && !analyzerData.attributes.height) {
-          analyzerData.attributes.height = geminiTraits.height;
+        if (traits.height && !analyzerData.attributes.height) {
+          analyzerData.attributes.height = traits.height;
         }
-        if (geminiTraits.build && !analyzerData.attributes.build) {
-          analyzerData.attributes.build = geminiTraits.build;
+        if (traits.build && !analyzerData.attributes.build) {
+          analyzerData.attributes.build = traits.build;
         }
         // Hair, clothing, features - always set from Gemini (more accurate)
-        if (geminiTraits.hair) {
-          analyzerData.attributes.hair_color = geminiTraits.hair;
+        if (traits.hair) {
+          analyzerData.attributes.hair_color = traits.hair;
         }
-        if (geminiTraits.clothing) {
-          analyzerData.attributes.clothing = geminiTraits.clothing;
+        if (traits.clothing) {
+          analyzerData.attributes.clothing = traits.clothing;
         }
-        if (geminiTraits.features) {
-          analyzerData.attributes.other_features = geminiTraits.features;
+        if (traits.features) {
+          analyzerData.attributes.other_features = traits.features;
         }
       }
+
+      // Store styleAnalysis for response
+      analyzerData.styleAnalysis = styleAnalysis;
 
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
         age: analyzerData.attributes?.age,
@@ -4233,9 +4310,11 @@ Be concise but descriptive. For age, give your best estimate as a number. Return
         bodyNoBg: analyzerData.body_no_bg || analyzerData.bodyNoBg,
         faceBox: analyzerData.face_box || analyzerData.faceBox,
         bodyBox: analyzerData.body_box || analyzerData.bodyBox,
-        attributes: analyzerData.attributes
+        attributes: analyzerData.attributes,
+        styleAnalysis: analyzerData.styleAnalysis // Style DNA for Visual Bible
       };
 
+      console.log('📸 [PHOTO] Sending response with styleAnalysis:', !!analyzerData.styleAnalysis);
       res.json(response);
 
     } catch (fetchErr) {
@@ -11157,10 +11236,54 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
     console.log(`📝 Creating story job ${jobId} for user ${req.user.username}`);
 
     if (STORAGE_MODE === 'database') {
+      // Calculate credits needed: 10 credits per page
+      const pages = inputData.pages || 10;
+      const creditsNeeded = pages * 10;
+
+      // Check user's credits
+      const userResult = await dbPool.query(
+        'SELECT credits FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const userCredits = userResult.rows[0].credits;
+
+      // Skip credit check if user has unlimited credits (-1)
+      if (userCredits !== -1) {
+        if (userCredits < creditsNeeded) {
+          return res.status(402).json({
+            error: 'Insufficient credits',
+            creditsNeeded: creditsNeeded,
+            creditsAvailable: userCredits,
+            message: `This story requires ${creditsNeeded} credits (${pages} pages x 10 credits), but you only have ${userCredits} credits.`
+          });
+        }
+
+        // Reserve credits (deduct from balance)
+        const newBalance = userCredits - creditsNeeded;
+        await dbPool.query(
+          'UPDATE users SET credits = $1 WHERE id = $2',
+          [newBalance, userId]
+        );
+
+        // Create transaction record for credit reservation
+        await dbPool.query(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [userId, -creditsNeeded, newBalance, 'story_reserve', jobId, `Reserved ${creditsNeeded} credits for ${pages}-page story`]
+        );
+
+        console.log(`💳 Reserved ${creditsNeeded} credits for job ${jobId} (user balance: ${userCredits} -> ${newBalance})`);
+      }
+
       await dbPool.query(
-        `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...']
+        `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', userCredits === -1 ? 0 : creditsNeeded]
       );
     } else {
       // File mode fallback - not supported for background jobs
