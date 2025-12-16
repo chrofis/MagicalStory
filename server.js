@@ -9938,20 +9938,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
   const language = (inputData.language || 'en').toLowerCase();
 
-  // Use only characters that appear in this scene (if not provided, detect from scene)
-  const charactersInScene = sceneCharacters ||
-    getCharactersInScene(sceneDescription, inputData.characters || []);
-
-  // Build character info with FULL physical descriptions
-  let characterPrompts = '';
-  if (charactersInScene.length > 0) {
-    characterPrompts = '\n\nCHARACTERS IN THIS SCENE - Use these exact appearances:\n\n';
-    charactersInScene.forEach((char) => {
-      // Use full physical description including height, build, hair, clothing
-      characterPrompts += `[${char.name}]: ${buildCharacterPhysicalDescription(char)}\n`;
-    });
-    characterPrompts += '\nCRITICAL: Match these character appearances exactly. Reference images are provided.';
-  }
+  // Character info is now provided via:
+  // 1. Reference photos attached to the API call
+  // 2. Character names/actions in the scene description from Claude
+  // Removed redundant CHARACTER_INFO text block to reduce prompt size and avoid language mixing
 
   // Add Visual Bible entries for recurring elements (secondary characters, animals, artifacts)
   let visualBiblePrompt = '';
@@ -9990,8 +9980,6 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     let prompt = fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: sceneDescription,
-      CHARACTER_PROMPTS: characterPrompts,
-      CHARACTER_INFO: characterPrompts, // Sequential template uses CHARACTER_INFO
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
@@ -10005,10 +9993,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Fallback to hardcoded prompt
   return `Create a cinematic scene in ${styleDescription}.
 
-Scene Description: ${sceneDescription}${characterPrompts}${visualBiblePrompt}
+Scene Description: ${sceneDescription}${visualBiblePrompt}
 
 Important:
-- Show only the emotions visible on faces (happy, sad, surprised, worried, excited)
+- Match characters to the reference photos provided
+- Show appropriate emotions on faces (happy, sad, surprised, worried, excited)
 - Maintain consistent character appearance across ALL pages
 - Clean, clear composition
 - Age-appropriate for ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years old`;

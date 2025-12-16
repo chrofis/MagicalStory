@@ -43,9 +43,8 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
     navigate('/');
   };
 
-  const remaining = user ? (user.storyQuota === -1 ? null : user.storyQuota - user.storiesGenerated) : null;
-  const total = user?.storyQuota;
-  const isUnlimited = user?.storyQuota === -1;
+  const credits = user?.credits ?? 0;
+  const isUnlimited = user?.credits === -1;
 
   return (
     <nav className="bg-black text-white px-3 py-3">
@@ -121,13 +120,13 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                   <div className="text-white font-semibold text-sm mb-1">
                     {user.username} {user.role === 'admin' && '👑'}
                   </div>
-                  {!isUnlimited && remaining !== null && (
+                  {!isUnlimited && (
                     <div className={`text-xs px-2 py-1 rounded inline-block ${
-                      remaining === 0 ? 'bg-red-600 text-white' :
-                      remaining === 1 ? 'bg-yellow-600 text-white' :
+                      credits === 0 ? 'bg-red-600 text-white' :
+                      credits < 50 ? 'bg-yellow-600 text-white' :
                       'bg-green-600 text-white'
                     }`}>
-                      {remaining} / {total} {language === 'de' ? 'Geschichten' : language === 'fr' ? 'histoires' : 'stories'}
+                      {credits} {language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits'}
                     </div>
                   )}
                 </div>

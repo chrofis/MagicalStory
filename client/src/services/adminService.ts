@@ -14,8 +14,9 @@ export interface AdminUser {
   username: string;
   email: string;
   role: 'user' | 'admin';
-  storyQuota: number;
-  storiesGenerated: number;
+  credits: number;
+  storyQuota?: number;
+  storiesGenerated?: number;
   createdAt: string;
   lastLogin?: string;
 }
@@ -29,8 +30,8 @@ export const adminService = {
     return api.get<AdminUser[]>('/api/admin/users');
   },
 
-  async updateUserQuota(userId: string, quota: number): Promise<void> {
-    return api.post(`/api/admin/users/${userId}/quota`, { quota });
+  async updateUserCredits(userId: string, credits: number): Promise<void> {
+    return api.post(`/api/admin/users/${userId}/quota`, { credits });
   },
 
   async updateUserRole(userId: string, role: 'user' | 'admin'): Promise<void> {

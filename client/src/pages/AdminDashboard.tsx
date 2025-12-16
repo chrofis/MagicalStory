@@ -36,7 +36,7 @@ export default function AdminDashboard() {
 
   // Modal states
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
-  const [newQuota, setNewQuota] = useState('');
+  const [newCredits, setNewCredits] = useState('');
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -62,11 +62,10 @@ export default function AdminDashboard() {
       username: 'Username',
       email: 'Email',
       role: 'Role',
-      quota: 'Quota',
-      generated: 'Generated',
+      credits: 'Credits',
       actions: 'Actions',
-      editQuota: 'Edit Quota',
-      newQuota: 'New Quota',
+      editCredits: 'Edit Credits',
+      newCredits: 'New Credits',
       save: 'Save',
       cancel: 'Cancel',
       makeAdmin: 'Make Admin',
@@ -99,11 +98,10 @@ export default function AdminDashboard() {
       username: 'Benutzername',
       email: 'E-Mail',
       role: 'Rolle',
-      quota: 'Kontingent',
-      generated: 'Generiert',
+      credits: 'Credits',
       actions: 'Aktionen',
-      editQuota: 'Kontingent bearbeiten',
-      newQuota: 'Neues Kontingent',
+      editCredits: 'Credits bearbeiten',
+      newCredits: 'Neue Credits',
       save: 'Speichern',
       cancel: 'Abbrechen',
       makeAdmin: 'Zum Admin machen',
@@ -136,11 +134,10 @@ export default function AdminDashboard() {
       username: 'Nom d\'utilisateur',
       email: 'E-mail',
       role: 'Role',
-      quota: 'Quota',
-      generated: 'Genere',
+      credits: 'Credits',
       actions: 'Actions',
-      editQuota: 'Modifier le quota',
-      newQuota: 'Nouveau quota',
+      editCredits: 'Modifier les credits',
+      newCredits: 'Nouveaux credits',
       save: 'Enregistrer',
       cancel: 'Annuler',
       makeAdmin: 'Rendre admin',
@@ -224,17 +221,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateQuota = async () => {
+  const handleUpdateCredits = async () => {
     if (!editingUser) return;
     setIsActionLoading(true);
     try {
-      const quota = newQuota === '-1' ? -1 : parseInt(newQuota, 10);
-      await adminService.updateUserQuota(editingUser.id, quota);
+      const credits = newCredits === '-1' ? -1 : parseInt(newCredits, 10);
+      await adminService.updateUserCredits(editingUser.id, credits);
       setUsers(users.map(u =>
-        u.id === editingUser.id ? { ...u, storyQuota: quota } : u
+        u.id === editingUser.id ? { ...u, credits } : u
       ));
       setEditingUser(null);
-      setNewQuota('');
+      setNewCredits('');
     } catch (err) {
       setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed' });
     } finally {
@@ -446,8 +443,7 @@ export default function AdminDashboard() {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.username}</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.email}</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.role}</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.quota}</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.generated}</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.credits}</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.actions}</th>
                   </tr>
                 </thead>
@@ -466,18 +462,17 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        {u.storyQuota === -1 ? texts.unlimited : u.storyQuota}
+                        {u.credits === -1 ? texts.unlimited : u.credits}
                       </td>
-                      <td className="px-4 py-3 text-sm">{u.storiesGenerated}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
                               setEditingUser(u);
-                              setNewQuota(String(u.storyQuota));
+                              setNewCredits(String(u.credits));
                             }}
                             className="p-1 rounded hover:bg-gray-100 text-blue-600"
-                            title={texts.editQuota}
+                            title={texts.editCredits}
                           >
                             <Edit2 size={16} />
                           </button>
@@ -510,31 +505,31 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* Edit Quota Modal */}
+      {/* Edit Credits Modal */}
       <Modal
         isOpen={!!editingUser}
         onClose={() => {
           setEditingUser(null);
-          setNewQuota('');
+          setNewCredits('');
         }}
-        title={texts.editQuota}
+        title={texts.editCredits}
       >
         <div className="space-y-4">
           <p className="text-gray-600">
             {editingUser?.username} ({editingUser?.email})
           </p>
           <Input
-            label={texts.newQuota}
+            label={texts.newCredits}
             type="number"
-            value={newQuota}
-            onChange={(e) => setNewQuota(e.target.value)}
+            value={newCredits}
+            onChange={(e) => setNewCredits(e.target.value)}
             placeholder="-1 for unlimited"
           />
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={() => setEditingUser(null)}>
               {texts.cancel}
             </Button>
-            <Button onClick={handleUpdateQuota} disabled={isActionLoading}>
+            <Button onClick={handleUpdateCredits} disabled={isActionLoading}>
               {texts.save}
             </Button>
           </div>

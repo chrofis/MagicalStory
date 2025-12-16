@@ -1,5 +1,5 @@
 import api from './api';
-import type { User, UserQuota } from '@/types/user';
+import type { User, UserQuota, UserCredits } from '@/types/user';
 
 interface LoginResponse {
   token: string;
@@ -8,8 +8,9 @@ interface LoginResponse {
     username: string;
     email?: string;
     role: 'user' | 'admin';
-    story_quota: number;
-    stories_generated: number;
+    credits: number;
+    story_quota?: number;
+    stories_generated?: number;
   };
 }
 
@@ -33,8 +34,7 @@ export const authService = {
       username: response.user.username,
       email: response.user.email,
       role: response.user.role,
-      storyQuota: response.user.story_quota,
-      storiesGenerated: response.user.stories_generated,
+      credits: response.user.credits,
     };
 
     return { token: response.token, user };
@@ -58,8 +58,7 @@ export const authService = {
       username: response.user.username,
       email: response.user.email,
       role: response.user.role,
-      storyQuota: response.user.story_quota,
-      storiesGenerated: response.user.stories_generated,
+      credits: response.user.credits,
     };
 
     return { token: response.token, user };
@@ -76,6 +75,18 @@ export const authService = {
       storyQuota: response.story_quota,
       storiesGenerated: response.stories_generated,
       remaining: response.remaining,
+    };
+  },
+
+  async getCredits(): Promise<UserCredits> {
+    const response = await api.get<{
+      credits: number;
+      unlimited: boolean;
+    }>('/api/user/quota');
+
+    return {
+      credits: response.credits,
+      unlimited: response.unlimited,
     };
   },
 

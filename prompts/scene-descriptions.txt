@@ -22,8 +22,15 @@ Create a detailed visual description of ONE key moment from the scene context pr
 1. **Setting & Atmosphere:** Describe the background, time of day, lighting, and mood.
 2. **Composition:** Describe the camera angle (e.g., low angle, wide shot) and framing.
 3. **Characters:**
-   * **[Character Name]:** Exact action, body language, facial expression, and location in the frame.
+   * **[Character Name]:** Action, pose, body language, facial expression, and location in the frame.
    (List EACH character BY NAME - do not use generic group terms)
+
+**CHARACTER DESCRIPTION RULES - CRITICAL:**
+- DO NOT describe physical appearance (hair color, eye color, skin tone, body type, height, facial features)
+- Physical traits come from reference photos - your job is ONLY to describe what they are DOING
+- Focus on: poses, actions, gestures, expressions, positions, movements
+- Example GOOD: "Emma: Standing on tiptoes reaching for a jar, expression of determination, positioned left of frame"
+- Example BAD: "Emma: A girl with blonde hair and blue eyes standing on tiptoes..." (NO physical traits!)
 
 **CONSTRAINTS:**
 - Do not include dialogue or speech

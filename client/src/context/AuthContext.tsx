@@ -9,7 +9,7 @@ interface AuthContextType extends AuthState {
   loginWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => void;
-  updateQuota: (quota: { storyQuota: number; storiesGenerated: number }) => void;
+  updateCredits: (credits: number) => void;
   isLoading: boolean;
 }
 
@@ -75,8 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: data.user.username,
       email: data.user.email,
       role: data.user.role,
-      storyQuota: data.user.story_quota,
-      storiesGenerated: data.user.stories_generated,
+      credits: data.user.credits,
     };
 
     localStorage.setItem('auth_token', data.token);
@@ -130,8 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: data.user.username,
       email: data.user.email,
       role: data.user.role,
-      storyQuota: data.user.story_quota,
-      storiesGenerated: data.user.stories_generated,
+      credits: data.user.credits,
     };
 
     localStorage.setItem('auth_token', data.token);
@@ -199,13 +197,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [state.isAuthenticated, state.token, handleFirebaseAuth]);
 
-  const updateQuota = useCallback((quota: { storyQuota: number; storiesGenerated: number }) => {
+  const updateCredits = useCallback((credits: number) => {
     setState(prev => {
       if (!prev.user) return prev;
       const updatedUser = {
         ...prev.user,
-        storyQuota: quota.storyQuota,
-        storiesGenerated: quota.storiesGenerated,
+        credits,
       };
       localStorage.setItem('current_user', JSON.stringify(updatedUser));
       return {
@@ -224,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithGoogle,
         resetPassword,
         logout,
-        updateQuota,
+        updateCredits,
         isLoading,
       }}
     >
