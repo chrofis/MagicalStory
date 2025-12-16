@@ -7380,8 +7380,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     };
 
     // Set up progressive scene parser to start image generation during streaming
-    // Only use for parallel mode (sequential mode needs to wait for all text first)
-    const shouldStreamImages = !skipImages && imageGenMode === 'parallel';
+    // DISABLED: Don't stream images in storybook mode - wait for Visual Bible to be parsed first
+    // This ensures all images get Visual Bible entries for recurring elements
+    const shouldStreamImages = false; // Was: !skipImages && imageGenMode === 'parallel'
     let scenesEmittedCount = 0;
 
     const sceneParser = new ProgressiveSceneParser((completedScene) => {
@@ -7477,12 +7478,17 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const visualBibleMatch = response.match(/---VISUAL BIBLE---\s*([\s\S]*?)(?=---PAGE\s+\d+---|$)/i);
     if (visualBibleMatch) {
       const visualBibleSection = visualBibleMatch[1];
+      console.log(`📖 [STORYBOOK] Visual Bible section found, length: ${visualBibleSection.length}`);
+      console.log(`📖 [STORYBOOK] Visual Bible raw content:\n${visualBibleSection.substring(0, 500)}...`);
       visualBible = parseVisualBible('## Visual Bible\n' + visualBibleSection);
       const totalEntries = (visualBible.secondaryCharacters?.length || 0) +
                           (visualBible.animals?.length || 0) +
                           (visualBible.artifacts?.length || 0) +
                           (visualBible.locations?.length || 0);
       console.log(`📖 [STORYBOOK] Extracted Visual Bible: ${totalEntries} entries`);
+      console.log(`📖 [STORYBOOK] Visual Bible parsed:`, JSON.stringify(visualBible, null, 2).substring(0, 500));
+    } else {
+      console.log(`📖 [STORYBOOK] No Visual Bible section found in response`);
     }
 
     // Extract BACK COVER scene
