@@ -13,9 +13,75 @@ export const defaultFlaws: Record<Language, string[]> = {
 };
 
 export const defaultChallenges: Record<Language, string[]> = {
-  en: ['Fear of heights', 'Fear of spiders', 'Fear of the dark', 'Fear of being alone', 'Fear of loud noises', 'Making new friends', 'Speaking in public', 'Trying new things', 'Accepting help', 'Dealing with change', 'Standing up for oneself', 'Sharing with others', 'Following rules', 'Controlling emotions', 'Asking for help'],
-  de: ['Höhenangst', 'Angst vor Spinnen', 'Angst vor der Dunkelheit', 'Angst allein zu sein', 'Angst vor lauten Geräuschen', 'Neue Freunde finden', 'Vor anderen sprechen', 'Neues ausprobieren', 'Hilfe annehmen', 'Mit Veränderungen umgehen', 'Für sich einstehen', 'Mit anderen teilen', 'Regeln befolgen', 'Gefühle kontrollieren', 'Um Hilfe bitten'],
-  fr: ['Peur du vide', 'Peur des araignées', 'Peur du noir', "Peur d'être seul", 'Peur des bruits forts', 'Se faire de nouveaux amis', 'Parler en public', 'Essayer de nouvelles choses', "Accepter de l'aide", 'Gérer le changement', 'Se défendre', 'Partager avec les autres', 'Suivre les règles', 'Contrôler ses émotions', "Demander de l'aide"],
+  en: [
+    // Challenges first
+    'Following rules',
+    'Controlling emotions',
+    'Sharing with others',
+    'Tests and grades',
+    'Making new friends',
+    'Speaking in public',
+    'Trying new things',
+    'Accepting and asking for help',
+    'Dealing with change',
+    'Standing up for oneself',
+    // Fears at the end
+    'Fear of the dark',
+    'Bad dreams and nightmares',
+    'Monsters, ghosts and things under the bed',
+    'Fear of being alone',
+    'Fear of getting lost',
+    'Doctors, dentists and shots',
+    'Fear of heights',
+    'Fear of spiders',
+    'Fear of loud noises'
+  ],
+  de: [
+    // Herausforderungen zuerst
+    'Regeln befolgen',
+    'Gefühle kontrollieren',
+    'Mit anderen teilen',
+    'Prüfungen und Noten',
+    'Neue Freunde finden',
+    'Vor anderen sprechen',
+    'Neues ausprobieren',
+    'Hilfe annehmen und darum bitten',
+    'Mit Veränderungen umgehen',
+    'Für sich einstehen',
+    // Ängste am Ende
+    'Angst vor der Dunkelheit',
+    'Albträume und schlechte Träume',
+    'Monster, Geister und Dinge unter dem Bett',
+    'Angst allein zu sein',
+    'Angst sich zu verlaufen',
+    'Ärzte, Zahnärzte und Spritzen',
+    'Höhenangst',
+    'Angst vor Spinnen',
+    'Angst vor lauten Geräuschen'
+  ],
+  fr: [
+    // Défis en premier
+    'Suivre les règles',
+    'Contrôler ses émotions',
+    'Partager avec les autres',
+    'Examens et notes',
+    'Se faire de nouveaux amis',
+    'Parler en public',
+    'Essayer de nouvelles choses',
+    "Accepter et demander de l'aide",
+    'Gérer le changement',
+    'Se défendre',
+    // Peurs à la fin
+    'Peur du noir',
+    'Cauchemars et mauvais rêves',
+    'Monstres, fantômes et choses sous le lit',
+    "Peur d'être seul",
+    'Peur de se perdre',
+    'Médecins, dentistes et piqûres',
+    'Peur du vide',
+    'Peur des araignées',
+    'Peur des bruits forts'
+  ],
 };
 
 // Aliases for convenience
