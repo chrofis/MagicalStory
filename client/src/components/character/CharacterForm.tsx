@@ -1,10 +1,71 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useState, useCallback } from 'react';
 import { Upload, Save, ArrowRight, Edit3, X, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import type { Character, StyleAnalysis } from '@/types/character';
+
+// Editable field component - defined outside to prevent re-creation on each render
+interface EditableStyleFieldProps {
+  label: string;
+  value: string;
+  placeholder?: string;
+  isEditing: boolean;
+  editValue: string;
+  onEditValueChange: (value: string) => void;
+  onStartEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+function EditableStyleField({
+  label,
+  value,
+  placeholder,
+  isEditing,
+  editValue,
+  onEditValueChange,
+  onStartEdit,
+  onSave,
+  onCancel,
+}: EditableStyleFieldProps) {
+  return (
+    <div>
+      <span className="font-medium text-gray-600 text-xs">{label}:</span>
+      {isEditing ? (
+        <div className="flex items-center gap-1 mt-0.5">
+          <input
+            type="text"
+            value={editValue}
+            onChange={(e) => onEditValueChange(e.target.value)}
+            className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
+            autoFocus
+            placeholder={placeholder}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSave();
+              if (e.key === 'Escape') onCancel();
+            }}
+          />
+          <button onClick={onSave} className="p-1 text-green-600 hover:bg-green-100 rounded">
+            <Check size={14} />
+          </button>
+          <button onClick={onCancel} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <div
+          onClick={onStartEdit}
+          className="flex items-center gap-1 cursor-pointer hover:bg-purple-100 rounded px-2 py-1 -mx-2 -my-1 group"
+        >
+          <p className="text-gray-800 text-sm flex-1">{value || <span className="text-gray-400 italic">{placeholder || 'Click to set'}</span>}</p>
+          <Edit3 size={12} className="text-purple-400 group-hover:text-purple-600" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface CharacterFormProps {
   character: Character;
@@ -104,45 +165,11 @@ export function CharacterForm({
     setEditStyleValue('');
   };
 
-  // Editable field component for style profile
-  const EditableStyleField = ({ label, path, value, placeholder }: { label: string; path: string; value: string; placeholder?: string }) => {
-    const isEditing = editingStyleField === path;
-    return (
-      <div>
-        <span className="font-medium text-gray-600 text-xs">{label}:</span>
-        {isEditing ? (
-          <div className="flex items-center gap-1 mt-0.5">
-            <input
-              type="text"
-              value={editStyleValue}
-              onChange={(e) => setEditStyleValue(e.target.value)}
-              className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
-              autoFocus
-              placeholder={placeholder}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveStyleEdit();
-                if (e.key === 'Escape') cancelStyleEdit();
-              }}
-            />
-            <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
-              <Check size={14} />
-            </button>
-            <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
-              <X size={14} />
-            </button>
-          </div>
-        ) : (
-          <div
-            onClick={() => startEditingStyle(path, value)}
-            className="flex items-center gap-1 cursor-pointer hover:bg-purple-100 rounded px-2 py-1 -mx-2 -my-1 group"
-          >
-            <p className="text-gray-800 text-sm flex-1">{value || <span className="text-gray-400 italic">{placeholder || 'Click to set'}</span>}</p>
-            <Edit3 size={12} className="text-purple-400 group-hover:text-purple-600" />
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Stable callback for starting edit
+  const handleStartEdit = useCallback((path: string, value: string) => {
+    setEditingStyleField(path);
+    setEditStyleValue(value || '');
+  }, []);
 
   const canSaveName = character.name && character.name.trim().length >= 2;
 
@@ -356,21 +383,36 @@ export function CharacterForm({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <EditableStyleField
             label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
-            path="physical.face"
             value={character.styleAnalysis?.physical?.face || ''}
             placeholder={language === 'de' ? 'z.B. rund, oval, eckig' : 'e.g. round, oval, square'}
+            isEditing={editingStyleField === 'physical.face'}
+            editValue={editStyleValue}
+            onEditValueChange={setEditStyleValue}
+            onStartEdit={() => handleStartEdit('physical.face', character.styleAnalysis?.physical?.face || '')}
+            onSave={saveStyleEdit}
+            onCancel={cancelStyleEdit}
           />
           <EditableStyleField
             label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
-            path="physical.hair"
             value={character.styleAnalysis?.physical?.hair || ''}
             placeholder={language === 'de' ? 'z.B. braun, kurz, lockig' : 'e.g. brown, short, curly'}
+            isEditing={editingStyleField === 'physical.hair'}
+            editValue={editStyleValue}
+            onEditValueChange={setEditStyleValue}
+            onStartEdit={() => handleStartEdit('physical.hair', character.styleAnalysis?.physical?.hair || '')}
+            onSave={saveStyleEdit}
+            onCancel={cancelStyleEdit}
           />
           <EditableStyleField
             label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
-            path="physical.build"
             value={character.styleAnalysis?.physical?.build || ''}
             placeholder={language === 'de' ? 'z.B. schlank, athletisch' : 'e.g. slim, athletic'}
+            isEditing={editingStyleField === 'physical.build'}
+            editValue={editStyleValue}
+            onEditValueChange={setEditStyleValue}
+            onStartEdit={() => handleStartEdit('physical.build', character.styleAnalysis?.physical?.build || '')}
+            onSave={saveStyleEdit}
+            onCancel={cancelStyleEdit}
           />
         </div>
 
@@ -436,21 +478,36 @@ export function CharacterForm({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <EditableStyleField
             label={language === 'de' ? 'Kleidungsart' : language === 'fr' ? 'Type de vêtement' : 'Garment Type'}
-            path="referenceOutfit.garmentType"
             value={character.styleAnalysis?.referenceOutfit?.garmentType || ''}
             placeholder="e.g. t-shirt, dress"
+            isEditing={editingStyleField === 'referenceOutfit.garmentType'}
+            editValue={editStyleValue}
+            onEditValueChange={setEditStyleValue}
+            onStartEdit={() => handleStartEdit('referenceOutfit.garmentType', character.styleAnalysis?.referenceOutfit?.garmentType || '')}
+            onSave={saveStyleEdit}
+            onCancel={cancelStyleEdit}
           />
           <EditableStyleField
             label={language === 'de' ? 'Hauptfarbe' : language === 'fr' ? 'Couleur principale' : 'Primary Color'}
-            path="referenceOutfit.primaryColor"
             value={character.styleAnalysis?.referenceOutfit?.primaryColor || ''}
             placeholder="e.g. blue, red"
+            isEditing={editingStyleField === 'referenceOutfit.primaryColor'}
+            editValue={editStyleValue}
+            onEditValueChange={setEditStyleValue}
+            onStartEdit={() => handleStartEdit('referenceOutfit.primaryColor', character.styleAnalysis?.referenceOutfit?.primaryColor || '')}
+            onSave={saveStyleEdit}
+            onCancel={cancelStyleEdit}
           />
           <EditableStyleField
             label={language === 'de' ? 'Muster' : language === 'fr' ? 'Motif' : 'Pattern'}
-            path="referenceOutfit.pattern"
             value={character.styleAnalysis?.referenceOutfit?.pattern || ''}
             placeholder="e.g. stripes, solid"
+            isEditing={editingStyleField === 'referenceOutfit.pattern'}
+            editValue={editStyleValue}
+            onEditValueChange={setEditStyleValue}
+            onStartEdit={() => handleStartEdit('referenceOutfit.pattern', character.styleAnalysis?.referenceOutfit?.pattern || '')}
+            onSave={saveStyleEdit}
+            onCancel={cancelStyleEdit}
           />
           <div>
             <span className="font-medium text-gray-600 text-xs">
