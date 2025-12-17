@@ -14,18 +14,28 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files for server
 COPY package*.json ./
 COPY requirements.txt ./
 
-# Install Node.js dependencies
+# Install Node.js dependencies for server
 RUN npm install --production
 
 # Install Python dependencies (--break-system-packages is safe in Docker containers)
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Copy application files
+# Copy client package files and install dependencies
+COPY client/package*.json ./client/
+RUN cd client && npm install
+
+# Copy all application files
 COPY . .
+
+# Build the React client
+RUN cd client && npm run build
+
+# Move built files to dist/ in root (where server expects them)
+RUN mv client/dist ./dist
 
 # Expose ports
 EXPOSE 3000 5000
