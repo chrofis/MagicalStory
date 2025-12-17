@@ -119,6 +119,10 @@ export function CharacterForm({
               className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
               autoFocus
               placeholder={placeholder}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveStyleEdit();
+                if (e.key === 'Escape') cancelStyleEdit();
+              }}
             />
             <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
               <Check size={14} />
@@ -128,14 +132,12 @@ export function CharacterForm({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1 group">
-            <p className="text-gray-800 text-sm flex-1">{value || <span className="text-gray-400 italic">{placeholder || 'Not set'}</span>}</p>
-            <button
-              onClick={() => startEditingStyle(path, value)}
-              className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Edit3 size={12} />
-            </button>
+          <div
+            onClick={() => startEditingStyle(path, value)}
+            className="flex items-center gap-1 cursor-pointer hover:bg-purple-100 rounded px-2 py-1 -mx-2 -my-1 group"
+          >
+            <p className="text-gray-800 text-sm flex-1">{value || <span className="text-gray-400 italic">{placeholder || 'Click to set'}</span>}</p>
+            <Edit3 size={12} className="text-purple-400 group-hover:text-purple-600" />
           </div>
         )}
       </div>
