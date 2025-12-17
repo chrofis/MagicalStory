@@ -4634,7 +4634,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
           if (isFemale) {
             return 'Short-sleeved top, sundress, or tank top with the SAME pattern/colors as reference. Shorts, skirt, or light dress. Sandals or summer slides.';
           }
-          return 'Short-sleeved top or tank top with the SAME pattern/colors as reference. Shorts or light pants. Sandals or summer slides.';
+          return 'Short-sleeved top or tank top with the SAME pattern/colors as reference. Shorts. Sandals or summer slides.';
         case 'formal':
           if (isFemale) {
             return 'Elegant dress, formal gown, or blouse with skirt with the SAME pattern/colors as reference (adapted elegantly). Formal heels or dress shoes.';
