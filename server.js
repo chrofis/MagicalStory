@@ -2,6 +2,8 @@
 // Includes: User quota system, email authentication, admin panel, PostgreSQL database support
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
@@ -439,7 +441,7 @@ const corsOptions = {
       callback(null, true);
     } else {
       console.warn('⚠️  CORS blocked origin:', origin);
-      callback(null, true); // Allow anyway for now, log for debugging
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
@@ -447,6 +449,41 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Security headers with helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP as it can interfere with inline scripts/styles
+  crossOriginEmbedderPolicy: false, // Allow embedding external resources
+}));
+
+// Rate limiting for authentication endpoints (prevent brute force attacks)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Max 10 attempts per window
+  message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // Max 5 registrations per hour per IP
+  message: { error: 'Too many registration attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// General API rate limiter (more permissive)
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply general rate limit to all API routes
+app.use('/api/', apiLimiter);
 
 // Stripe webhook endpoint needs raw body for signature verification
 // IMPORTANT: This MUST be defined BEFORE express.json() middleware
@@ -1118,7 +1155,7 @@ function authenticateToken(req, res, next) {
 }
 
 // Auth endpoints
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', registerLimiter, async (req, res) => {
   try {
     const { username, password, email } = req.body;
 
@@ -1226,7 +1263,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -1303,7 +1340,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Firebase Authentication (Google, Apple, etc.)
-app.post('/api/auth/firebase', async (req, res) => {
+app.post('/api/auth/firebase', authLimiter, async (req, res) => {
   try {
     const { idToken } = req.body;
 
@@ -10712,13 +10749,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
   const language = (inputData.language || 'en').toLowerCase();
 
-  // Character info is now provided via:
-  // 1. Reference photos attached to the API call
-  // 2. Character names/actions in the scene description from Claude
-  // 3. Visual Bible recurring elements are already in the scene description
-
+  // Build character reference list (Option B: explicit labeling in prompt)
+  let characterReferenceList = '';
   if (sceneCharacters && sceneCharacters.length > 0) {
     console.log(`📖 [IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
+
+    // Build a numbered list of characters with brief descriptions
+    const charDescriptions = sceneCharacters.map((char, index) => {
+      const age = char.age ? `${char.age} years old` : '';
+      const gender = char.gender === 'male' ? 'boy/man' : char.gender === 'female' ? 'girl/woman' : '';
+      const brief = [char.name, age, gender].filter(Boolean).join(', ');
+      return `${index + 1}. ${brief}`;
+    });
+
+    characterReferenceList = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
   }
 
   // Select the correct template based on language and sequential mode
@@ -10746,16 +10790,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
     console.log(`📝 [IMAGE PROMPT] Using ${isSequential ? 'sequential' : 'parallel'} template for language: ${language}`);
-    return fillTemplate(template, {
+    // Add character reference list before the template content
+    const basePrompt = fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: sceneDescription,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
+    return characterReferenceList + basePrompt;
   }
 
   // Fallback to hardcoded prompt
-  return `Create a cinematic scene in ${styleDescription}.
+  return `${characterReferenceList}Create a cinematic scene in ${styleDescription}.
 
 Scene Description: ${sceneDescription}
 
@@ -11485,14 +11531,27 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   }
 
   // Add character photos as reference images
+  // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
   if (characterPhotos && characterPhotos.length > 0) {
     let addedCount = 0;
     let skippedCount = 0;
-    characterPhotos.forEach((photoUrl, index) => {
+    const characterNames = [];
+
+    characterPhotos.forEach((photoData, index) => {
+      // Handle both formats: string URL or {name, photoUrl} object
+      const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+      const characterName = typeof photoData === 'object' ? photoData?.name : null;
+
       if (photoUrl && photoUrl.startsWith('data:image')) {
         const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
         const mimeType = photoUrl.match(/^data:(image\/\w+);base64,/) ?
           photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+        // Option A: Add text label BEFORE the image if we have a name
+        if (characterName) {
+          parts.push({ text: `[Reference photo of ${characterName}]:` });
+          characterNames.push(characterName);
+        }
 
         parts.push({
           inline_data: {
@@ -11508,7 +11567,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         console.warn(`⚠️ [IMAGE GEN] Skipping character photo ${index + 1}: not a valid data URL (starts with: ${preview}...)`);
       }
     });
-    console.log(`🖼️  [IMAGE GEN] Added ${addedCount}/${characterPhotos.length} character reference images to API request`);
+
+    if (characterNames.length > 0) {
+      console.log(`🖼️  [IMAGE GEN] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')}`);
+    } else {
+      console.log(`🖼️  [IMAGE GEN] Added ${addedCount}/${characterPhotos.length} character reference images (unlabeled)`);
+    }
     if (skippedCount > 0) {
       console.warn(`⚠️ [IMAGE GEN] WARNING: ${skippedCount} photos were SKIPPED (not base64 data URLs)`);
     }
