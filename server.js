@@ -11480,11 +11480,18 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // ENFORCE text error = score 0 for covers (Gemini sometimes ignores this instruction)
     let finalScore = score;
-    if (evaluationType === 'cover' && textIssue && textIssue !== 'NONE') {
+
+    // Exception: If no text was expected and text is missing, that's correct behavior
+    const noTextExpected = expectedText && expectedText.toUpperCase() === 'NO TEXT';
+    const isExpectedNoText = noTextExpected && textIssue === 'MISSING';
+
+    if (evaluationType === 'cover' && textIssue && textIssue !== 'NONE' && !isExpectedNoText) {
       log.warn(`⚠️  [QUALITY] Cover text error detected (${textIssue}) - enforcing score = 0`);
       log.warn(`⚠️  [QUALITY] Expected: "${expectedText}" | Actual: "${actualText}"`);
       log.warn(`⚠️  [QUALITY] Original Gemini score was ${score}, overriding to 0`);
       finalScore = 0;
+    } else if (isExpectedNoText) {
+      log.verbose(`✅ [QUALITY] No text expected and none found - correct behavior`);
     }
 
     log.verbose(`⭐ [QUALITY] Image quality score: ${finalScore}/100`);
@@ -12081,14 +12088,19 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const score = result.score || 0;
     console.log(`⭐ [QUALITY RETRY] Attempt ${attempts} score: ${score}%`);
 
-    // Check for text errors on covers
+    // Check for text errors on covers (but not when "NO TEXT" was expected and is missing)
+    const noTextExpected = result.expectedText && result.expectedText.toUpperCase() === 'NO TEXT';
+    const isExpectedNoText = noTextExpected && result.textIssue === 'MISSING';
     const hasTextError = evaluationType === 'cover' &&
       result.textIssue &&
-      result.textIssue !== 'NONE';
+      result.textIssue !== 'NONE' &&
+      !isExpectedNoText;
 
     if (hasTextError) {
       console.log(`🔤 [QUALITY RETRY] Text error: ${result.textIssue}`);
       console.log(`🔤 [QUALITY RETRY] Expected: "${result.expectedText}" | Actual: "${result.actualText}"`);
+    } else if (isExpectedNoText) {
+      console.log(`✅ [QUALITY RETRY] No text expected and none found - correct`);
     }
 
     // Store this attempt in history
