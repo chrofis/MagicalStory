@@ -8311,7 +8311,7 @@ function extractShortSceneDescriptions(outline) {
 }
 
 // Process picture book (storybook) job - simplified flow with combined text+scene generation
-async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, userId) {
+async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId) {
   console.log(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
   // For Picture Book: pages = scenes (each page has image + text)
@@ -8781,7 +8781,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Store cover prompts for dev mode display
     const coverPrompts = {};
 
-    if (!skipImages) {
+    if (!skipImages && !skipCovers) {
       try {
         const artStyleId = inputData.artStyle || 'pixar';
         const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
@@ -9089,6 +9089,7 @@ async function processStoryJob(jobId) {
     const job = jobResult.rows[0];
     const inputData = job.input_data;
     const skipImages = inputData.skipImages === true; // Developer mode: text only
+    const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
 
     // Check if this is a picture book (1st-grade) - use simplified combined flow
     const isPictureBook = inputData.languageLevel === '1st-grade';
@@ -9106,6 +9107,9 @@ async function processStoryJob(jobId) {
 
     if (skipImages) {
       console.log(`📝 [PIPELINE] Text-only mode enabled - skipping image generation`);
+    }
+    if (skipCovers) {
+      console.log(`📝 [PIPELINE] Skip covers enabled - skipping cover image generation`);
     }
 
     // Determine image generation mode: sequential (consistent) or parallel (fast)
@@ -9134,7 +9138,7 @@ async function processStoryJob(jobId) {
 
     if (isPictureBook) {
       console.log(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, job.user_id);
+      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id);
     }
 
     // Standard flow for normal stories
@@ -9668,8 +9672,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     let coverImages = null;
     const coverPrompts = {};  // Store cover prompts for dev mode
 
-    // Step 5: Generate cover images (unless skipImages)
-    if (!skipImages) {
+    // Step 5: Generate cover images (unless skipImages or skipCovers)
+    if (!skipImages && !skipCovers) {
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
         [95, 'Creating covers...', jobId]

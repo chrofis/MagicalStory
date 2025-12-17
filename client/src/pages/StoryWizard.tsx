@@ -44,6 +44,13 @@ export default function StoryWizard() {
   const [developerMode, setDeveloperMode] = useState(false);
   const [imageGenMode, setImageGenMode] = useState<'parallel' | 'sequential' | null>(null); // null = server default
 
+  // Developer skip options for faster testing
+  const [devSkipOutline, setDevSkipOutline] = useState(false);
+  const [devSkipText, setDevSkipText] = useState(false);
+  const [devSkipSceneDescriptions, setDevSkipSceneDescriptions] = useState(false);
+  const [devSkipImages, setDevSkipImages] = useState(false);
+  const [devSkipCovers, setDevSkipCovers] = useState(false);
+
   // Step 1: Story Type & Art Style
   const [storyType, setStoryType] = useState('');
   const [artStyle, setArtStyle] = useState('pixar');
@@ -897,7 +904,7 @@ export default function StoryWizard() {
     return storyType;
   };
 
-  const generateStory = async (skipImages = false) => {
+  const generateStory = async (overrides?: { skipImages?: boolean }) => {
     setIsGenerating(true);
     setStep(5);
     // Use 0-100 scale to match server progress
@@ -908,7 +915,7 @@ export default function StoryWizard() {
     });
 
     try {
-      // Create the story generation job
+      // Create the story generation job with developer skip options
       const { jobId: newJobId } = await storyService.createStoryJob({
         storyType,
         storyTypeName: getStoryTypeName(),
@@ -922,8 +929,13 @@ export default function StoryWizard() {
         mainCharacters,
         relationships,
         relationshipTexts,
-        skipImages,
+        skipImages: overrides?.skipImages ?? devSkipImages,
         imageGenMode,
+        // Developer skip options
+        skipOutline: devSkipOutline,
+        skipText: devSkipText,
+        skipSceneDescriptions: devSkipSceneDescriptions,
+        skipCovers: devSkipCovers,
       });
 
       setJobId(newJobId);
@@ -1461,7 +1473,65 @@ export default function StoryWizard() {
             <p className="text-gray-600 mb-6">
               {language === 'de' ? 'Bereit, deine Geschichte zu erstellen!' : language === 'fr' ? 'Prêt à créer votre histoire!' : 'Ready to create your story!'}
             </p>
-            <Button onClick={() => generateStory(false)} size="lg" icon={Sparkles}>
+
+            {/* Developer Skip Options */}
+            {developerMode && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg text-left max-w-md mx-auto">
+                <h3 className="text-sm font-semibold text-orange-700 mb-3">🛠️ Developer Options - Skip Steps</h3>
+                <div className="space-y-2 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={devSkipOutline}
+                      onChange={(e) => setDevSkipOutline(e.target.checked)}
+                      className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-gray-700">Skip outline generation</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={devSkipText}
+                      onChange={(e) => setDevSkipText(e.target.checked)}
+                      className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-gray-700">Skip text generation</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={devSkipSceneDescriptions}
+                      onChange={(e) => setDevSkipSceneDescriptions(e.target.checked)}
+                      className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-gray-700">Skip scene descriptions</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={devSkipImages}
+                      onChange={(e) => setDevSkipImages(e.target.checked)}
+                      className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-gray-700">Skip image generation</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={devSkipCovers}
+                      onChange={(e) => setDevSkipCovers(e.target.checked)}
+                      className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-gray-700">Skip cover images</span>
+                  </label>
+                </div>
+                <p className="text-xs text-orange-600 mt-2">
+                  Note: Skipped steps will use placeholder/empty data
+                </p>
+              </div>
+            )}
+
+            <Button onClick={() => generateStory()} size="lg" icon={Sparkles}>
               {t.generateStory}
             </Button>
           </div>
@@ -1560,7 +1630,7 @@ export default function StoryWizard() {
                   </button>
 
                   <button
-                    onClick={() => generateStory(false)}
+                    onClick={() => generateStory()}
                     disabled={!canGoNext()}
                     className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
                       !canGoNext()
@@ -1574,7 +1644,7 @@ export default function StoryWizard() {
                   {/* Developer Mode: Generate Text Only (no images) */}
                   {developerMode && (
                     <button
-                      onClick={() => generateStory(true)}
+                      onClick={() => generateStory({ skipImages: true })}
                       disabled={!canGoNext()}
                       className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
                         !canGoNext()

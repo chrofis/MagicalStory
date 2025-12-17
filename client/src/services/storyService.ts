@@ -423,6 +423,11 @@ export const storyService = {
     relationshipTexts: RelationshipTextMap;
     skipImages?: boolean;
     imageGenMode?: 'parallel' | 'sequential' | null;
+    // Developer skip options
+    skipOutline?: boolean;
+    skipText?: boolean;
+    skipSceneDescriptions?: boolean;
+    skipCovers?: boolean;
   }): Promise<{ jobId: string }> {
     const response = await api.post<{ jobId: string; message: string }>('/api/jobs/create-story', {
       storyType: data.storyType,
@@ -439,6 +444,11 @@ export const storyService = {
       relationshipTexts: data.relationshipTexts,
       skipImages: data.skipImages,
       imageGenMode: data.imageGenMode,
+      // Developer skip options
+      skipOutline: data.skipOutline,
+      skipText: data.skipText,
+      skipSceneDescriptions: data.skipSceneDescriptions,
+      skipCovers: data.skipCovers,
     });
     return { jobId: response.jobId };
   },
