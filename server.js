@@ -7299,10 +7299,24 @@ function parseVisualBibleEntries(sectionText) {
     const pagesStr = match[2].trim();
     const descriptionBlock = match[3].trim();
 
-    // Parse page numbers
-    const pages = pagesStr.split(/[,\s]+/)
-      .map(p => parseInt(p.replace(/\D/g, '')))
-      .filter(p => !isNaN(p));
+    // Parse page numbers (handle special pages: Title/Front=0, Initial=-1, Back=-2)
+    const pages = [];
+    const pageTokens = pagesStr.split(/,\s*/);
+    for (const token of pageTokens) {
+      const t = token.trim().toLowerCase();
+      if (t.includes('title') || t.includes('front')) {
+        pages.push(0); // Title/Front cover = page 0
+      } else if (t.includes('initial')) {
+        pages.push(-1); // Initial page = -1
+      } else if (t.includes('back')) {
+        pages.push(-2); // Back cover = -2
+      } else {
+        const num = parseInt(t.replace(/\D/g, ''));
+        if (!isNaN(num)) {
+          pages.push(num);
+        }
+      }
+    }
 
     // Combine all description lines
     const descriptionLines = descriptionBlock.split('\n')
@@ -7310,6 +7324,8 @@ function parseVisualBibleEntries(sectionText) {
       .filter(line => line.length > 0);
 
     const description = descriptionLines.join('. ');
+
+    console.log(`📖 [VISUAL BIBLE ENTRIES] Entry "${name}" pages raw: "${pagesStr}" → parsed: [${pages.join(', ')}]`);
 
     if (name && pages.length > 0) {
       entries.push({
