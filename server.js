@@ -8598,7 +8598,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           wasRegenerated: frontCoverResult.wasRegenerated || false,
           originalImage: frontCoverResult.originalImage || null,
           originalScore: frontCoverResult.originalScore || null,
-          originalReasoning: frontCoverResult.originalReasoning || null
+          originalReasoning: frontCoverResult.originalReasoning || null,
+          referencePhotos: getCharacterPhotoDetails(frontCoverCharacters)
         };
 
         // Initial page - use ALL characters (main character centered, all others around)
@@ -8630,7 +8631,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           wasRegenerated: initialResult.wasRegenerated || false,
           originalImage: initialResult.originalImage || null,
           originalScore: initialResult.originalScore || null,
-          originalReasoning: initialResult.originalReasoning || null
+          originalReasoning: initialResult.originalReasoning || null,
+          referencePhotos: getCharacterPhotoDetails(inputData.characters || [])
         };
 
         // Back cover - use ALL characters with EQUAL prominence (no focus on main character)
@@ -8654,7 +8656,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           wasRegenerated: backCoverResult.wasRegenerated || false,
           originalImage: backCoverResult.originalImage || null,
           originalScore: backCoverResult.originalScore || null,
-          originalReasoning: backCoverResult.originalReasoning || null
+          originalReasoning: backCoverResult.originalReasoning || null,
+          referencePhotos: getCharacterPhotoDetails(inputData.characters || [])
         };
 
         console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
@@ -9522,6 +9525,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         throw new Error(`Back cover generation failed: ${error.message}`);
       }
 
+      // Get reference photo details for covers (all characters)
+      const coverReferencePhotos = getCharacterPhotoDetails(inputData.characters || []);
+
       coverImages = {
         frontCover: {
           imageData: frontCoverResult.imageData,
@@ -9532,7 +9538,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           wasRegenerated: frontCoverResult.wasRegenerated || false,
           originalImage: frontCoverResult.originalImage || null,
           originalScore: frontCoverResult.originalScore || null,
-          originalReasoning: frontCoverResult.originalReasoning || null
+          originalReasoning: frontCoverResult.originalReasoning || null,
+          referencePhotos: coverReferencePhotos
         },
         initialPage: {
           imageData: initialPageResult.imageData,
@@ -9543,7 +9550,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           wasRegenerated: initialPageResult.wasRegenerated || false,
           originalImage: initialPageResult.originalImage || null,
           originalScore: initialPageResult.originalScore || null,
-          originalReasoning: initialPageResult.originalReasoning || null
+          originalReasoning: initialPageResult.originalReasoning || null,
+          referencePhotos: coverReferencePhotos
         },
         backCover: {
           imageData: backCoverResult.imageData,
@@ -9554,7 +9562,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           wasRegenerated: backCoverResult.wasRegenerated || false,
           originalImage: backCoverResult.originalImage || null,
           originalScore: backCoverResult.originalScore || null,
-          originalReasoning: backCoverResult.originalReasoning || null
+          originalReasoning: backCoverResult.originalReasoning || null,
+          referencePhotos: coverReferencePhotos
         }
       };
 

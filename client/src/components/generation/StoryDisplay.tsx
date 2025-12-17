@@ -136,24 +136,21 @@ function ReferencePhotosDisplay({
         {language === 'de' ? 'Referenzfotos' : language === 'fr' ? 'Photos de référence' : 'Reference Photos'}
         <span className="text-xs text-pink-600">({referencePhotos.length})</span>
       </summary>
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
         {referencePhotos.map((photo, idx) => (
           <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold text-sm text-gray-800">{photo.name}</span>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getPhotoTypeColor(photo.photoType)}`}>
+              <span className="font-semibold text-xs text-gray-800 truncate">{photo.name}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${getPhotoTypeColor(photo.photoType)}`}>
                 {getPhotoTypeLabel(photo.photoType)}
               </span>
             </div>
             {photo.photoUrl && (
-              <a
-                href={photo.photoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-800 underline break-all"
-              >
-                {photo.photoUrl.length > 60 ? photo.photoUrl.substring(0, 60) + '...' : photo.photoUrl}
-              </a>
+              <img
+                src={photo.photoUrl}
+                alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
+                className="w-full h-24 object-cover rounded border border-gray-200"
+              />
             )}
           </div>
         ))}
@@ -933,6 +930,12 @@ export function StoryDisplay({
                           language={language}
                         />
                       )}
+                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
+                        <ReferencePhotosDisplay
+                          referencePhotos={coverObj.referencePhotos}
+                          language={language}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -998,6 +1001,12 @@ export function StoryDisplay({
                           language={language}
                         />
                       )}
+                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
+                        <ReferencePhotosDisplay
+                          referencePhotos={coverObj.referencePhotos}
+                          language={language}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -1060,6 +1069,12 @@ export function StoryDisplay({
                         <RetryHistoryDisplay
                           retryHistory={coverObj.retryHistory}
                           totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
+                          language={language}
+                        />
+                      )}
+                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
+                        <ReferencePhotosDisplay
+                          referencePhotos={coverObj.referencePhotos}
                           language={language}
                         />
                       )}

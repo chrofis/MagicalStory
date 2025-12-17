@@ -75,6 +75,8 @@ export interface CoverImageData {
   retryHistory?: RetryAttempt[];
   originalImage?: string;
   originalScore?: number;
+  // Reference photos used (for dev mode)
+  referencePhotos?: ReferencePhoto[];
 }
 
 export interface CoverImages {
