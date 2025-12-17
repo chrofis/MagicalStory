@@ -2989,7 +2989,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const sceneCharacters = getCharactersInScene(sceneText, storyData.characters || []);
     // Parse clothing category from scene description
     const clothingCategory = parseClothingCategory(sceneText) || 'standard';
-    const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+    // Use detailed photo info (with names) for labeled reference images
     const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
     console.log(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}`);
 
@@ -3004,15 +3004,15 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData, sceneCharacters, false, visualBible, pageNumber);
 
     // Clear the image cache for this prompt to force a new generation
-    const cacheKey = generateImageCacheKey(imagePrompt, scenePhotos, null);
+    const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
     if (imageCache.has(cacheKey)) {
       imageCache.delete(cacheKey);
       console.log(`🗑️ [REGEN] Cleared cache for page ${pageNumber} to force new generation`);
     }
 
-    // Generate new image with only scene-specific character photos
+    // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
-    const imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos);
+    const imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos);
 
     // Update the image in story data
     let sceneImages = storyData.sceneImages || [];
@@ -3098,15 +3098,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       ? JSON.parse(story.data)
       : story.data;
 
-    // Get character photos
-    const characterPhotos = [];
-    if (storyData.characters) {
-      storyData.characters.forEach(char => {
-        // Prefer body without background > body crop > face photo
-        const photoUrl = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
-        if (photoUrl) characterPhotos.push(photoUrl);
-      });
-    }
+    // Get labeled character photos for reference (with names)
+    const characterPhotos = getCharacterPhotoDetails(storyData.characters || []);
 
     // Get art style
     const artStyleId = storyData.artStyle || 'pixar';
@@ -8744,7 +8737,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const sceneCharacters = getCharactersInScene(sceneDesc, inputData.characters || []);
         // Parse clothing category from scene description
         const clothingCategory = parseClothingCategory(sceneDesc) || 'standard';
-        const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+        // Use detailed photo info (with names) for labeled reference images
+        const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
 
         // Log with visual bible info if available
         if (vBible) {
@@ -8762,8 +8756,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         while (retries <= MAX_RETRIES && !imageResult) {
           try {
-            // Use quality retry to regenerate if score is below threshold
-            imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos, null);
+            // Use quality retry with labeled character photos (name + photoUrl)
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null);
           } catch (error) {
             retries++;
             console.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -8985,7 +8979,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const sceneCharacters = getCharactersInScene(scene.description, inputData.characters || []);
           // Parse clothing category from scene description
           const clothingCategory = parseClothingCategory(scene.description) || 'standard';
-          const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+          // Use detailed photo info (with names) for labeled reference images
           const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
 
           // Log visual bible usage
@@ -9005,10 +8999,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
           while (retries <= MAX_RETRIES && !imageResult) {
             try {
-              // Pass only photos of characters in this scene
+              // Pass labeled character photos (name + photoUrl)
               // In sequential mode, also pass previous image for consistency
               // Use quality retry to regenerate if score is below threshold
-              imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos, previousImage);
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage);
             } catch (error) {
               retries++;
               console.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -9171,7 +9165,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Front cover - use same template as standard mode
         // Detect which characters appear in the front cover scene
         const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
-        const frontCoverPhotos = getCharacterPhotos(frontCoverCharacters);
+        // Use detailed photo info (with names) for labeled reference images
+        const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters);
         console.log(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
 
         const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
@@ -9471,18 +9466,10 @@ async function processStoryJob(jobId) {
     const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'sequential';
     console.log(`🖼️  [PIPELINE] Image generation mode: ${imageGenMode.toUpperCase()}`);
 
-    // Extract character photos for reference images
-    // Prefer body without background > body crop > face photo
-    const characterPhotos = [];
-    if (inputData.characters && inputData.characters.length > 0) {
-      inputData.characters.forEach(char => {
-        const photoUrl = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
-        if (photoUrl) {
-          characterPhotos.push(photoUrl);
-        }
-      });
-      console.log(`📸 [PIPELINE] Found ${characterPhotos.length} character photos for reference (using body crops)`);
-    }
+    // Extract character photos for reference images (with names for labeling)
+    // Use getCharacterPhotoDetails for labeled references
+    const characterPhotos = getCharacterPhotoDetails(inputData.characters || []);
+    console.log(`📸 [PIPELINE] Found ${characterPhotos.length} labeled character photos for reference`);
 
     // Update status to processing
     await dbPool.query(
@@ -9740,7 +9727,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
               // Parse clothing category from scene description
               const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
-              const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+              // Use detailed photo info (with names) for labeled reference images
               const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
               console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
 
@@ -9753,9 +9740,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
               while (retries <= MAX_RETRIES && !imageResult) {
                 try {
-                  // Pass only photos of characters in this scene (no previous image in parallel mode)
+                  // Pass labeled character photos (name + photoUrl) - no previous image in parallel mode
                   // Use quality retry to regenerate if score is below threshold
-                  imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos, null);
+                  imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null);
                 } catch (error) {
                   retries++;
                   console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -9920,7 +9907,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
             // Parse clothing category from scene description
             const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
-            const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+            // Use detailed photo info (with names) for labeled reference images
             const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
             console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
 
@@ -9933,9 +9920,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
-                // Pass previous image for visual continuity (SEQUENTIAL MODE)
+                // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
                 // Use quality retry to regenerate if score is below threshold
-                imageResult = await generateImageWithQualityRetry(imagePrompt, scenePhotos, previousImage);
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage);
               } catch (error) {
                 retries++;
                 console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -10078,7 +10065,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       // Generate front cover (matches step-by-step prompt format)
       // Detect which characters appear in the front cover scene
       const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
-      const frontCoverPhotos = getCharacterPhotos(frontCoverCharacters);
+      // Use detailed photo info (with names) for labeled reference images
+      const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters);
 
       try {
         console.log(`📕 [PIPELINE] Generating front cover for job ${jobId} (${frontCoverCharacters.length} characters: ${frontCoverCharacters.map(c => c.name).join(', ') || 'none'})`);

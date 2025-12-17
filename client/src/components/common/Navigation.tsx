@@ -16,7 +16,7 @@ interface NavigationProps {
 export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange }: NavigationProps) {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, isImpersonating } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -86,8 +86,8 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
 
         {/* Right side: DEV toggle + Menu */}
         <div className="flex items-center gap-3">
-          {/* Developer Mode Toggle - Admin only */}
-          {isAuthenticated && user?.role === 'admin' && onDeveloperModeChange && (
+          {/* Developer Mode Toggle - Admin or impersonating */}
+          {isAuthenticated && (user?.role === 'admin' || isImpersonating) && onDeveloperModeChange && (
             <button
               onClick={() => onDeveloperModeChange(!developerMode)}
               className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors ${
@@ -171,8 +171,8 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                     <span>{language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : 'My Stories'}</span>
                   </button>
 
-                  {/* Admin Panel (Admin only) */}
-                  {user?.role === 'admin' && (
+                  {/* Admin Panel (Admin or impersonating) */}
+                  {(user?.role === 'admin' || isImpersonating) && (
                     <>
                       <button
                         onClick={() => {
