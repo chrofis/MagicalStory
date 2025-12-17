@@ -1,5 +1,5 @@
 # Use Node.js 18 base image with Python pre-installed
-FROM node:18-bullseye
+FROM node:18
 
 # Install Python and pip
 RUN apt-get update && apt-get install -y \
