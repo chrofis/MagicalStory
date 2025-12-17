@@ -825,8 +825,16 @@ export default function StoryWizard() {
   };
 
   // Navigation
-  const safeSetStep = (newStep: number) => {
+  const safeSetStep = async (newStep: number) => {
     if (newStep >= 0 && newStep <= 5) {
+      // Auto-save character if leaving step 2 while editing
+      if (step === 2 && currentCharacter && newStep !== 2) {
+        await saveCharacter();
+      }
+      // Save relationships when leaving step 3
+      if (step === 3 && newStep !== 3) {
+        await saveAllCharacterData();
+      }
       setStep(newStep);
     }
   };
@@ -874,21 +882,13 @@ export default function StoryWizard() {
 
   const goNext = async () => {
     if (step < 4 && canGoNext()) {
-      // Save relationships when leaving step 3
-      if (step === 3) {
-        await saveAllCharacterData();
-      }
-      safeSetStep(step + 1);
+      await safeSetStep(step + 1);
     }
   };
 
   const goBack = async () => {
     if (step > 0) {
-      // Save relationships when leaving step 3
-      if (step === 3) {
-        await saveAllCharacterData();
-      }
-      safeSetStep(step - 1);
+      await safeSetStep(step - 1);
     }
   };
 
