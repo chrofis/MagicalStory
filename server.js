@@ -7173,8 +7173,8 @@ function parseVisualBible(outline) {
   // Log outline length for debugging
   console.log(`📖 [VISUAL BIBLE] Parsing outline, length: ${outline.length} chars`);
 
-  // Check if outline contains Visual Bible mention at all
-  if (!outline.includes('Visual Bible')) {
+  // Check if outline contains Visual Bible mention at all (case-insensitive)
+  if (!outline.toLowerCase().includes('visual bible')) {
     console.log('📖 [VISUAL BIBLE] Outline does not contain "Visual Bible" text');
     return visualBible;
   }
@@ -8876,6 +8876,11 @@ async function processStoryJob(jobId) {
     // Initialize main characters from inputData.characters with their style analysis
     initializeVisualBibleMainCharacters(visualBible, inputData.characters);
 
+    const visualBibleEntryCount = visualBible.secondaryCharacters.length +
+                                   visualBible.animals.length +
+                                   visualBible.artifacts.length +
+                                   visualBible.locations.length;
+
     console.log(`📖 [PIPELINE] Visual Bible after parsing: ${JSON.stringify({
       mainCharacters: visualBible.mainCharacters.length,
       secondaryCharacters: visualBible.secondaryCharacters.length,
@@ -8884,6 +8889,15 @@ async function processStoryJob(jobId) {
       locations: visualBible.locations.length,
       changeLog: visualBible.changeLog.length
     })}`);
+
+    // Validate visual bible was parsed - if outline contains "visual bible" but we got 0 entries, fail
+    if (outline.toLowerCase().includes('visual bible') && visualBibleEntryCount === 0) {
+      console.error('❌ [PIPELINE] Visual Bible section exists in outline but parsing returned 0 entries!');
+      console.error('📖 [PIPELINE] This indicates a parsing bug. Outline preview around "visual bible":');
+      const vbIndex = outline.toLowerCase().indexOf('visual bible');
+      console.error(outline.substring(Math.max(0, vbIndex - 50), Math.min(outline.length, vbIndex + 500)));
+      throw new Error('Visual Bible parsing failed: section exists but no entries extracted. Check outline format.');
+    }
 
     // Save checkpoint: scene hints and visual bible
     await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions, visualBible });
