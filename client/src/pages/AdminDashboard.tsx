@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type AdminUser } from '@/services';
+import { adminService, type DashboardStats, type AdminUser, type CreditTransaction } from '@/services';
 import {
   Users,
   BookOpen,
@@ -17,7 +17,9 @@ import {
   Loader2,
   RefreshCw,
   Download,
-  FileText
+  FileText,
+  History,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
@@ -25,7 +27,7 @@ import { Input } from '@/components/common/Input';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, impersonate } = useAuth();
   const { language } = useLanguage();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -39,6 +41,11 @@ export default function AdminDashboard() {
   const [newCredits, setNewCredits] = useState('');
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Credit history state
+  const [creditHistoryUser, setCreditHistoryUser] = useState<AdminUser | null>(null);
+  const [creditHistory, setCreditHistory] = useState<CreditTransaction[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const t = {
     en: {
@@ -76,6 +83,17 @@ export default function AdminDashboard() {
       cleaned: 'Cleaned {count} orphaned files',
       cacheCleared: 'Cache cleared successfully',
       refreshStats: 'Refresh Stats',
+      creditHistory: 'Credit History',
+      viewHistory: 'View History',
+      amount: 'Amount',
+      balance: 'Balance',
+      type: 'Type',
+      description: 'Description',
+      date: 'Date',
+      noTransactions: 'No transactions found',
+      currentBalance: 'Current Balance',
+      impersonate: 'View as User',
+      impersonating: 'Now viewing as {username}',
     },
     de: {
       title: 'Admin-Dashboard',
@@ -112,6 +130,17 @@ export default function AdminDashboard() {
       cleaned: '{count} verwaiste Dateien bereinigt',
       cacheCleared: 'Cache erfolgreich geleert',
       refreshStats: 'Statistiken aktualisieren',
+      impersonate: 'Als Benutzer ansehen',
+      impersonating: 'Ansicht als {username}',
+      creditHistory: 'Credit-Verlauf',
+      viewHistory: 'Verlauf anzeigen',
+      amount: 'Betrag',
+      balance: 'Guthaben',
+      type: 'Typ',
+      description: 'Beschreibung',
+      date: 'Datum',
+      noTransactions: 'Keine Transaktionen gefunden',
+      currentBalance: 'Aktuelles Guthaben',
     },
     fr: {
       title: 'Tableau de bord Admin',
@@ -148,6 +177,17 @@ export default function AdminDashboard() {
       cleaned: '{count} fichiers orphelins nettoyes',
       cacheCleared: 'Cache vide avec succes',
       refreshStats: 'Actualiser les stats',
+      impersonate: 'Voir comme utilisateur',
+      impersonating: 'Vue en tant que {username}',
+      creditHistory: 'Historique des credits',
+      viewHistory: 'Voir l\'historique',
+      amount: 'Montant',
+      balance: 'Solde',
+      type: 'Type',
+      description: 'Description',
+      date: 'Date',
+      noTransactions: 'Aucune transaction trouvee',
+      currentBalance: 'Solde actuel',
     },
   };
 
@@ -264,6 +304,34 @@ export default function AdminDashboard() {
       setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed' });
     } finally {
       setIsActionLoading(false);
+    }
+  };
+
+  const handleImpersonate = async (targetUser: AdminUser) => {
+    setIsActionLoading(true);
+    try {
+      await impersonate(targetUser.id);
+      // Navigate to home page as the impersonated user
+      navigate('/');
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Impersonation failed' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleViewCreditHistory = async (targetUser: AdminUser) => {
+    setCreditHistoryUser(targetUser);
+    setIsLoadingHistory(true);
+    setCreditHistory([]);
+    try {
+      const result = await adminService.getCreditHistory(targetUser.id);
+      setCreditHistory(result.transactions);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to load credit history' });
+      setCreditHistoryUser(null);
+    } finally {
+      setIsLoadingHistory(false);
     }
   };
 
@@ -487,6 +555,21 @@ export default function AdminDashboard() {
                             {u.role === 'admin' ? <ShieldOff size={16} /> : <Shield size={16} />}
                           </button>
                           <button
+                            onClick={() => handleViewCreditHistory(u)}
+                            className="p-1 rounded hover:bg-gray-100 text-green-600"
+                            title={texts.viewHistory || 'View History'}
+                          >
+                            <History size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleImpersonate(u)}
+                            className="p-1 rounded hover:bg-gray-100 text-cyan-600"
+                            title={texts.impersonate}
+                            disabled={u.id === user?.id}
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
                             onClick={() => handleDeleteUser(u)}
                             className="p-1 rounded hover:bg-gray-100 text-red-600"
                             title={texts.deleteUser}
@@ -531,6 +614,84 @@ export default function AdminDashboard() {
             </Button>
             <Button onClick={handleUpdateCredits} disabled={isActionLoading}>
               {texts.save}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Credit History Modal */}
+      <Modal
+        isOpen={!!creditHistoryUser}
+        onClose={() => {
+          setCreditHistoryUser(null);
+          setCreditHistory([]);
+        }}
+        title={`${texts.creditHistory || 'Credit History'}: ${creditHistoryUser?.username || ''}`}
+      >
+        <div className="space-y-4">
+          {/* Current Balance */}
+          <div className="bg-indigo-50 rounded-lg p-4">
+            <p className="text-sm text-indigo-600 font-medium">{texts.currentBalance || 'Current Balance'}</p>
+            <p className="text-2xl font-bold text-indigo-800">
+              {creditHistoryUser?.credits === -1 ? (texts.unlimited || 'Unlimited') : creditHistoryUser?.credits}
+            </p>
+          </div>
+
+          {/* Transaction List */}
+          {isLoadingHistory ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+            </div>
+          ) : creditHistory.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">{texts.noTransactions || 'No transactions found'}</p>
+          ) : (
+            <div className="max-h-96 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">{texts.date || 'Date'}</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">{texts.type || 'Type'}</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-700">{texts.amount || 'Amount'}</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-700">{texts.balance || 'Balance'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {creditHistory.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-gray-600">
+                        {new Date(tx.createdAt).toLocaleDateString()} {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          tx.type === 'story_reserve' ? 'bg-yellow-100 text-yellow-700' :
+                          tx.type === 'story_complete' ? 'bg-green-100 text-green-700' :
+                          tx.type === 'story_refund' ? 'bg-blue-100 text-blue-700' :
+                          tx.type === 'admin_add' ? 'bg-purple-100 text-purple-700' :
+                          tx.type === 'admin_deduct' ? 'bg-red-100 text-red-700' :
+                          tx.type === 'initial' ? 'bg-gray-100 text-gray-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {tx.type.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className={`px-3 py-2 text-right font-medium ${
+                        tx.amount > 0 ? 'text-green-600' : tx.amount < 0 ? 'text-red-600' : 'text-gray-600'
+                      }`}>
+                        {tx.amount > 0 ? '+' : ''}{tx.amount}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium text-gray-800">
+                        {tx.balanceAfter}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setCreditHistoryUser(null)}>
+              {texts.cancel || 'Close'}
             </Button>
           </div>
         </div>

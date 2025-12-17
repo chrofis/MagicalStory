@@ -10,6 +10,8 @@ interface AuthContextType extends AuthState {
   resetPassword: (email: string) => Promise<void>;
   logout: () => void;
   updateCredits: (credits: number) => void;
+  impersonate: (userId: string) => Promise<void>;
+  stopImpersonating: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -22,6 +24,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: false,
     user: null,
     token: null,
+    isImpersonating: false,
+    originalAdmin: null,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,18 +44,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token && userJson) {
       try {
         const user = JSON.parse(userJson) as User;
+        // Restore impersonation state if present
+        const impersonationJson = localStorage.getItem('impersonation_state');
+        let isImpersonating = false;
+        let originalAdmin = null;
+        if (impersonationJson) {
+          try {
+            const impersonationState = JSON.parse(impersonationJson);
+            isImpersonating = impersonationState.isImpersonating || false;
+            originalAdmin = impersonationState.originalAdmin || null;
+          } catch {
+            localStorage.removeItem('impersonation_state');
+          }
+        }
         setState({
           isAuthenticated: true,
           user,
           token,
+          isImpersonating,
+          originalAdmin,
         });
-        // Configure logger based on user role
-        logger.configure({ isAdmin: user.role === 'admin' });
-        logger.info(`Session restored for ${user.username}`);
+        // Configure logger based on original admin role or current user role
+        logger.configure({ isAdmin: originalAdmin ? true : user.role === 'admin' });
+        logger.info(`Session restored for ${user.username}${isImpersonating ? ' (impersonating)' : ''}`);
       } catch {
         // Invalid stored data, clear it
         localStorage.removeItem('auth_token');
         localStorage.removeItem('current_user');
+        localStorage.removeItem('impersonation_state');
       }
     }
     setIsLoading(false);
@@ -80,11 +100,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('current_user', JSON.stringify(user));
+    localStorage.removeItem('impersonation_state'); // Clear any impersonation state on fresh login
 
     setState({
       isAuthenticated: true,
       user,
       token: data.token,
+      isImpersonating: false,
+      originalAdmin: null,
     });
 
     // Configure logger based on user role
@@ -134,11 +157,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('current_user', JSON.stringify(user));
+    localStorage.removeItem('impersonation_state');
 
     setState({
       isAuthenticated: true,
       user,
       token: data.token,
+      isImpersonating: false,
+      originalAdmin: null,
     });
 
     logger.configure({ isAdmin: user.role === 'admin' });
@@ -167,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.info('Logging out...');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('current_user');
+    localStorage.removeItem('impersonation_state');
     // Also sign out from Firebase
     firebaseSignOut().catch(err => {
       console.warn('Firebase sign out error:', err);
@@ -175,10 +202,98 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: false,
       user: null,
       token: null,
+      isImpersonating: false,
+      originalAdmin: null,
     });
     // Reset logger to non-admin mode
     logger.configure({ isAdmin: false });
   }, []);
+
+  // Impersonate another user (admin only)
+  const impersonate = useCallback(async (userId: string) => {
+    const response = await fetch(`${API_URL}/api/admin/impersonate/${userId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Impersonation failed');
+    }
+
+    const data = await response.json();
+    const user: User = {
+      id: data.user.id,
+      username: data.user.username,
+      email: data.user.email,
+      role: data.user.role,
+      credits: data.user.credits || 0,
+    };
+
+    // Store impersonation state
+    const impersonationState = {
+      isImpersonating: true,
+      originalAdmin: data.originalAdmin,
+    };
+
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('current_user', JSON.stringify(user));
+    localStorage.setItem('impersonation_state', JSON.stringify(impersonationState));
+
+    setState({
+      isAuthenticated: true,
+      user,
+      token: data.token,
+      isImpersonating: true,
+      originalAdmin: data.originalAdmin,
+    });
+
+    logger.configure({ isAdmin: true }); // Keep admin logging
+    logger.info(`Now impersonating ${user.username}`);
+  }, [state.token]);
+
+  // Stop impersonating and return to admin account
+  const stopImpersonating = useCallback(async () => {
+    const response = await fetch(`${API_URL}/api/admin/stop-impersonate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to stop impersonation');
+    }
+
+    const data = await response.json();
+    const user: User = {
+      id: data.user.id,
+      username: data.user.username,
+      email: data.user.email,
+      role: data.user.role,
+      credits: data.user.credits || 0,
+    };
+
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('current_user', JSON.stringify(user));
+    localStorage.removeItem('impersonation_state');
+
+    setState({
+      isAuthenticated: true,
+      user,
+      token: data.token,
+      isImpersonating: false,
+      originalAdmin: null,
+    });
+
+    logger.configure({ isAdmin: true });
+    logger.info(`Stopped impersonating, back to ${user.username}`);
+  }, [state.token]);
 
   // Firebase Auth State Listener - catches sign-in even if popup handling fails
   useEffect(() => {
@@ -222,6 +337,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resetPassword,
         logout,
         updateCredits,
+        impersonate,
+        stopImpersonating,
         isLoading,
       }}
     >

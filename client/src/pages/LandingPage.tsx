@@ -29,7 +29,14 @@ export default function LandingPage() {
   };
 
   const handleAuthSuccess = () => {
-    navigate('/create');
+    // Check for redirect parameter (e.g., from email link when not logged in)
+    const redirectUrl = searchParams.get('redirect');
+    if (redirectUrl) {
+      // Decode and navigate to the original URL
+      navigate(decodeURIComponent(redirectUrl));
+    } else {
+      navigate('/create');
+    }
   };
 
   return (

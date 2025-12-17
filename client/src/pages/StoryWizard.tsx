@@ -131,10 +131,12 @@ export default function StoryWizard() {
   const [editTarget, setEditTarget] = useState<{ type: 'image' | 'cover'; pageNumber?: number; coverType?: 'front' | 'back' | 'initial' } | null>(null);
   const [editPromptText, setEditPromptText] = useState('');
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated, preserving the current URL for after login
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/');
+      const currentUrl = window.location.pathname + window.location.search;
+      const redirectParam = encodeURIComponent(currentUrl);
+      navigate(`/?login=true&redirect=${redirectParam}`);
     }
   }, [isAuthenticated, navigate]);
 

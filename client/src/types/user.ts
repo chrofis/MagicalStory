@@ -12,6 +12,9 @@ export interface AuthState {
   isAuthenticated: boolean;
   user: User | null;
   token: string | null;
+  // Impersonation state
+  isImpersonating: boolean;
+  originalAdmin: { id: string; username: string } | null;
 }
 
 export interface UserQuota {

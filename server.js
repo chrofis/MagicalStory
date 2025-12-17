@@ -1790,6 +1790,67 @@ app.post('/api/admin/users/:userId/quota', authenticateToken, async (req, res) =
   }
 });
 
+// Get credit transaction history for a user (admin only)
+app.get('/api/admin/users/:userId/credits', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const targetUserId = req.params.userId;
+    const limit = parseInt(req.query.limit) || 50;
+
+    console.log(`💳 [ADMIN] GET /api/admin/users/${targetUserId}/credits - Admin: ${req.user.username}`);
+
+    if (STORAGE_MODE !== 'database' || !dbPool) {
+      return res.status(503).json({ error: 'Database mode required for credit history' });
+    }
+
+    // Get user info
+    const userResult = await dbPool.query(
+      'SELECT username, email, credits FROM users WHERE id = $1',
+      [targetUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+
+    // Get credit transactions
+    const transactionsResult = await dbPool.query(
+      `SELECT id, amount, balance_after, transaction_type, reference_id, description, created_at
+       FROM credit_transactions
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [targetUserId, limit]
+    );
+
+    res.json({
+      user: {
+        id: targetUserId,
+        username: user.username,
+        email: user.email,
+        currentCredits: user.credits
+      },
+      transactions: transactionsResult.rows.map(t => ({
+        id: t.id,
+        amount: t.amount,
+        balanceAfter: t.balance_after,
+        type: t.transaction_type,
+        referenceId: t.reference_id,
+        description: t.description,
+        createdAt: t.created_at
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching credit history:', err);
+    res.status(500).json({ error: 'Failed to fetch credit history' });
+  }
+});
+
 // Get stories for any user (admin only) - for debugging/fixing crashed stories
 app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) => {
   try {
@@ -6733,6 +6794,135 @@ app.delete('/api/admin/users/:userId', authenticateToken, async (req, res) => {
     }
   } catch (err) {
     console.error('❌ [ADMIN] Error deleting user:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin Dashboard - Impersonate user (view app as another user)
+app.post('/api/admin/impersonate/:userId', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin (and not already impersonating)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    // Prevent nested impersonation
+    if (req.user.impersonating) {
+      return res.status(400).json({ error: 'Cannot impersonate while already impersonating. Stop current impersonation first.' });
+    }
+
+    const targetUserId = req.params.userId;
+
+    // Get the target user
+    let targetUser;
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const result = await dbPool.query('SELECT id, username, email, role FROM users WHERE id = $1', [targetUserId]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      targetUser = result.rows[0];
+    } else {
+      const users = await readJSON(USERS_FILE);
+      targetUser = users.find(u => String(u.id) === String(targetUserId));
+      if (!targetUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+    }
+
+    // Don't allow impersonating yourself
+    if (String(targetUser.id) === String(req.user.id)) {
+      return res.status(400).json({ error: 'Cannot impersonate yourself' });
+    }
+
+    console.log(`👤 [ADMIN] ${req.user.username} is impersonating user ${targetUser.username}`);
+
+    // Generate impersonation token - includes both the target user info AND the original admin info
+    const impersonationToken = jwt.sign(
+      {
+        id: targetUser.id,
+        username: targetUser.username,
+        role: targetUser.role,
+        impersonating: true,
+        originalAdminId: req.user.id,
+        originalAdminUsername: req.user.username,
+        originalAdminRole: 'admin'
+      },
+      JWT_SECRET,
+      { expiresIn: '2h' } // Shorter expiry for impersonation tokens
+    );
+
+    res.json({
+      token: impersonationToken,
+      user: {
+        id: targetUser.id,
+        username: targetUser.username,
+        email: targetUser.email,
+        role: targetUser.role
+      },
+      impersonating: true,
+      originalAdmin: {
+        id: req.user.id,
+        username: req.user.username
+      }
+    });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error impersonating user:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin Dashboard - Stop impersonating
+app.post('/api/admin/stop-impersonate', authenticateToken, async (req, res) => {
+  try {
+    // Check if currently impersonating
+    if (!req.user.impersonating || !req.user.originalAdminId) {
+      return res.status(400).json({ error: 'Not currently impersonating anyone' });
+    }
+
+    const originalAdminId = req.user.originalAdminId;
+
+    // Get the original admin user
+    let adminUser;
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const result = await dbPool.query('SELECT id, username, email, role, credits FROM users WHERE id = $1', [originalAdminId]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Original admin user not found' });
+      }
+      adminUser = result.rows[0];
+    } else {
+      const users = await readJSON(USERS_FILE);
+      adminUser = users.find(u => String(u.id) === String(originalAdminId));
+      if (!adminUser) {
+        return res.status(404).json({ error: 'Original admin user not found' });
+      }
+    }
+
+    console.log(`👤 [ADMIN] ${req.user.originalAdminUsername} stopped impersonating ${req.user.username}`);
+
+    // Generate a fresh admin token
+    const adminToken = jwt.sign(
+      {
+        id: adminUser.id,
+        username: adminUser.username,
+        role: adminUser.role
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token: adminToken,
+      user: {
+        id: adminUser.id,
+        username: adminUser.username,
+        email: adminUser.email,
+        role: adminUser.role,
+        credits: adminUser.credits
+      },
+      impersonating: false
+    });
+  } catch (err) {
+    console.error('❌ [ADMIN] Error stopping impersonation:', err);
     res.status(500).json({ error: err.message });
   }
 });

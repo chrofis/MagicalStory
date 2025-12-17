@@ -21,6 +21,26 @@ export interface AdminUser {
   lastLogin?: string;
 }
 
+export interface CreditTransaction {
+  id: number;
+  amount: number;
+  balanceAfter: number;
+  type: 'initial' | 'story_reserve' | 'story_complete' | 'story_refund' | 'admin_add' | 'admin_deduct' | 'purchase';
+  referenceId?: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface CreditHistoryResponse {
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    currentCredits: number;
+  };
+  transactions: CreditTransaction[];
+}
+
 export const adminService = {
   async getStats(): Promise<DashboardStats> {
     return api.get<DashboardStats>('/api/admin/stats');
@@ -32,6 +52,10 @@ export const adminService = {
 
   async updateUserCredits(userId: string, credits: number): Promise<void> {
     return api.post(`/api/admin/users/${userId}/quota`, { credits });
+  },
+
+  async getCreditHistory(userId: string, limit = 50): Promise<CreditHistoryResponse> {
+    return api.get<CreditHistoryResponse>(`/api/admin/users/${userId}/credits?limit=${limit}`);
   },
 
   async updateUserRole(userId: string, role: 'user' | 'admin'): Promise<void> {
