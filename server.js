@@ -4791,8 +4791,18 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
         }
 
         if (imageData) {
-          results[category] = imageData;
-          console.log(`✅ [CLOTHING AVATARS] ${category} avatar generated successfully`);
+          // Compress avatar to JPEG for smaller file size
+          try {
+            const originalSize = Math.round(imageData.length / 1024);
+            const compressedImage = await compressImageToJPEG(imageData);
+            const compressedSize = Math.round(compressedImage.length / 1024);
+            results[category] = compressedImage;
+            console.log(`✅ [CLOTHING AVATARS] ${category} avatar generated and compressed (${originalSize}KB -> ${compressedSize}KB)`);
+          } catch (compressErr) {
+            // If compression fails, use original
+            console.warn(`⚠️ [CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
+            results[category] = imageData;
+          }
         } else {
           console.log(`⚠️ [CLOTHING AVATARS] No image in ${category} response`);
         }
