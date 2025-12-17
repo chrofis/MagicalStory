@@ -9433,7 +9433,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
               allSceneDescriptions.push({
                 pageNumber: pageNum,
-                description: sceneDescription
+                description: sceneDescription,
+                outlineExtract: shortSceneDesc,  // Store the outline extract for debugging
+                scenePrompt: scenePrompt         // Store the Art Director prompt for debugging
               });
 
               // Detect which characters appear in this scene
@@ -9611,7 +9613,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
-              description: sceneDescription
+              description: sceneDescription,
+              outlineExtract: shortSceneDesc,  // Store the outline extract for debugging
+              scenePrompt: scenePrompt         // Store the Art Director prompt for debugging
             });
 
             // Detect which characters appear in this scene

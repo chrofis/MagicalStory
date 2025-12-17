@@ -21,6 +21,8 @@ export interface ArtStyle {
 export interface SceneDescription {
   pageNumber: number;
   description: string;
+  outlineExtract?: string;  // Short scene description from outline
+  scenePrompt?: string;     // Art Director prompt used to generate description
 }
 
 export interface RetryAttempt {

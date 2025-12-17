@@ -334,6 +334,16 @@ export function StoryDisplay({
     return image?.description;
   };
 
+  // Helper to get outline extract for a page
+  const getOutlineExtract = (pageNumber: number): string | undefined => {
+    return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.outlineExtract;
+  };
+
+  // Helper to get scene prompt (Art Director prompt) for a page
+  const getScenePrompt = (pageNumber: number): string | undefined => {
+    return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.scenePrompt;
+  };
+
   return (
     <div className="space-y-6">
       {/* Story Title */}
@@ -1152,7 +1162,31 @@ export function StoryDisplay({
                               )}
                             </div>
 
-                            {/* Scene Description */}
+                            {/* 1. Outline Extract */}
+                            {getOutlineExtract(pageNumber) && (
+                              <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
+                                  {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
+                                </summary>
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                                  {getOutlineExtract(pageNumber)}
+                                </pre>
+                              </details>
+                            )}
+
+                            {/* 2. Scene Prompt (Art Director) */}
+                            {getScenePrompt(pageNumber) && (
+                              <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900">
+                                  {language === 'de' ? 'Szenen-Prompt' : language === 'fr' ? 'Prompt de scène' : 'Scene Prompt'}
+                                </summary>
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-64 overflow-y-auto">
+                                  {getScenePrompt(pageNumber)}
+                                </pre>
+                              </details>
+                            )}
+
+                            {/* 3. Scene Description */}
                             {getSceneDescription(pageNumber) && (
                               <details className="bg-green-50 border border-green-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
@@ -1164,7 +1198,7 @@ export function StoryDisplay({
                               </details>
                             )}
 
-                            {/* API Prompt */}
+                            {/* 4. API Prompt (Image Generation) */}
                             {image.prompt && (
                               <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
@@ -1309,7 +1343,31 @@ export function StoryDisplay({
                               )}
                             </div>
 
-                            {/* Scene Description */}
+                            {/* 1. Outline Extract */}
+                            {getOutlineExtract(pageNumber) && (
+                              <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
+                                  {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
+                                </summary>
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                                  {getOutlineExtract(pageNumber)}
+                                </pre>
+                              </details>
+                            )}
+
+                            {/* 2. Scene Prompt (Art Director) */}
+                            {getScenePrompt(pageNumber) && (
+                              <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900">
+                                  {language === 'de' ? 'Szenen-Prompt' : language === 'fr' ? 'Prompt de scène' : 'Scene Prompt'}
+                                </summary>
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-64 overflow-y-auto">
+                                  {getScenePrompt(pageNumber)}
+                                </pre>
+                              </details>
+                            )}
+
+                            {/* 3. Scene Description */}
                             {getSceneDescription(pageNumber) && (
                               <details className="bg-green-50 border border-green-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
@@ -1321,7 +1379,7 @@ export function StoryDisplay({
                               </details>
                             )}
 
-                            {/* API Prompt */}
+                            {/* 4. API Prompt (Image Generation) */}
                             {image.prompt && (
                               <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
