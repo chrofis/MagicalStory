@@ -10731,8 +10731,8 @@ function parseSceneDescriptions(text, expectedCount) {
 
 function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null) {
   // Build image generation prompt (matches step-by-step format)
-  // Note: visualBible and pageNumber params kept for backward compatibility but no longer used here
-  // Visual Bible recurring elements are now included in the scene description via buildSceneDescriptionPrompt
+  // For storybook mode: visualBible entries are added here since there's no separate scene description step
+  // For parallel/sequential modes: Visual Bible is also in scene description, but adding here ensures consistency
   const artStyleId = inputData.artStyle || 'pixar';
   const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
   const language = (inputData.language || 'en').toLowerCase();
@@ -10751,6 +10751,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     });
 
     characterReferenceList = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+  }
+
+  // Build Visual Bible section for page-specific recurring elements (animals, artifacts, locations)
+  let visualBibleSection = '';
+  if (visualBible && pageNumber !== null) {
+    const sceneCharacterNames = sceneCharacters ? sceneCharacters.map(c => c.name) : null;
+    visualBibleSection = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames);
+    if (visualBibleSection) {
+      console.log(`📖 [IMAGE PROMPT] Added Visual Bible section for page ${pageNumber}`);
+    }
   }
 
   // Select the correct template based on language and sequential mode
@@ -10785,14 +10795,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
-    return characterReferenceList + basePrompt;
+    // Append Visual Bible section at the end for recurring elements consistency
+    return characterReferenceList + basePrompt + visualBibleSection;
   }
 
   // Fallback to hardcoded prompt
   return `${characterReferenceList}Create a cinematic scene in ${styleDescription}.
 
 Scene Description: ${sceneDescription}
-
+${visualBibleSection}
 Important:
 - Match characters to the reference photos provided
 - Show appropriate emotions on faces (happy, sad, surprised, worried, excited)
