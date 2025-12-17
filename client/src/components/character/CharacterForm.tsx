@@ -6,6 +6,58 @@ import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import type { Character, StyleAnalysis } from '@/types/character';
 
+// Helper function to generate the avatar prompt for display (mirrors server logic)
+function getAvatarPrompt(category: string, gender: string | undefined): string {
+  const isFemale = gender === 'female';
+
+  const getClothingStyle = () => {
+    switch (category) {
+      case 'winter':
+        return 'Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.';
+      case 'standard':
+        if (isFemale) {
+          return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or leggings. Sneakers.';
+        }
+        return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Sneakers.';
+      case 'summer':
+        if (isFemale) {
+          return 'T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.';
+        }
+        return 'T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.';
+      case 'formal':
+        if (isFemale) {
+          return 'Elegant dress, formal gown, or blouse with skirt with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal heels or dress shoes.';
+        }
+        return 'Formal suit or dress shirt with trousers with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal dress shoes.';
+      default:
+        return 'Full outfit with shoes matching the style of the input image.';
+    }
+  };
+
+  return `Subject: Generate a fashion photograph of the person in the input image.
+
+CRITICAL PRIORITIES (in order):
+1. FACE IDENTITY: The face MUST be an exact match to the input image - same facial features, skin tone, eye color, hair color and style. This is non-negotiable.
+2. CLOTHING STYLE TRANSFER: Copy the EXACT pattern AND colors from the clothing in the input image. Apply these to the new outfit.
+
+COMPOSITION:
+- Framing: Wide shot. The entire outfit must be visible from head to toe.
+- Background: Pure solid white background (#FFFFFF).
+
+WARDROBE DETAILS:
+- Style Transfer Rule: Copy the EXACT pattern AND colors from the clothing in the input image. Apply these to the new outfit.
+- Pants Rule: If trousers/pants are visible in the input image, replicate them. If NOT visible, create plain/neutral pants - do NOT match the shirt pattern.
+- Outfit: ${getClothingStyle()}
+
+PHOTOGRAPHY STYLE:
+- Style: High-End Editorial Photography.
+- Lighting: Soft, evenly diffused studio lighting.
+- Details: Sharp focus on fabric textures.
+- Presentation: Clean, professional, magazine-quality look.
+
+Output Quality: 4k, Photorealistic.`;
+}
+
 // Editable field component - defined outside to prevent re-creation on each render
 interface EditableStyleFieldProps {
   label: string;
@@ -490,6 +542,27 @@ export function CharacterForm({
               <span className="text-xs font-normal text-red-600">✗ Failed</span>
             )}
           </h4>
+          {/* Show input image used for generation */}
+          <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+            <div className="text-xs font-medium text-yellow-700 mb-1">📸 Input Image Used:</div>
+            <div className="flex items-start gap-3">
+              {(character.thumbnailUrl || character.photoUrl) ? (
+                <img
+                  src={character.thumbnailUrl || character.photoUrl}
+                  alt="Input for avatar generation"
+                  className="w-20 h-20 object-cover rounded border border-yellow-300"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-yellow-100 rounded border border-yellow-300 flex items-center justify-center text-yellow-500 text-xs">No image</div>
+              )}
+              <div className="text-[10px] text-yellow-600 flex-1">
+                <div><strong>thumbnailUrl:</strong> {character.thumbnailUrl ? '✓ Set' : '✗ Not set'}</div>
+                <div><strong>photoUrl:</strong> {character.photoUrl ? '✓ Set' : '✗ Not set'}</div>
+                <div><strong>Using:</strong> {character.thumbnailUrl ? 'thumbnailUrl' : character.photoUrl ? 'photoUrl' : 'None'}</div>
+                <div className="mt-1 break-all opacity-60">{(character.thumbnailUrl || character.photoUrl || 'N/A').substring(0, 100)}...</div>
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {(['winter', 'standard', 'summer', 'formal'] as const).map((category) => (
               <div key={category} className="text-center">
@@ -509,6 +582,15 @@ export function CharacterForm({
                   <div className="w-full h-48 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">
                     {character.clothingAvatars?.status === 'generating' ? '...' : 'Not generated'}
                   </div>
+                )}
+                {/* Show prompt in developer mode */}
+                {developerMode && (
+                  <details className="mt-1 text-left">
+                    <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
+                    <pre className="mt-1 p-2 bg-gray-100 rounded text-[9px] text-gray-600 whitespace-pre-wrap overflow-auto max-h-48 border">
+                      {getAvatarPrompt(category, character.gender)}
+                    </pre>
+                  </details>
                 )}
               </div>
             ))}
