@@ -149,7 +149,7 @@ function ReferencePhotosDisplay({
               <img
                 src={photo.photoUrl}
                 alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
-                className="w-full h-24 object-cover rounded border border-gray-200"
+                className="w-full max-h-32 object-contain rounded border border-gray-200 bg-gray-50"
               />
             )}
           </div>
