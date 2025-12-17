@@ -7179,13 +7179,9 @@ function parseVisualBible(outline) {
     return visualBible;
   }
 
-  // Find the Visual Bible section
-  // Supports multiple formats:
-  // - "## Visual Bible" (original format)
-  // - "# Part 5: Visual Bible" or "# PART 5: VISUAL BIBLE" (Claude's actual output)
-  // - "# Visual Bible" (simple format)
-  const visualBibleMatch = outline.match(/##\s*Visual\s*Bible\b([\s\S]*?)(?=\n#\s|\n---|$)/i) ||
-                           outline.match(/#\s*(?:Part\s*\d+[:\s]*)?Visual\s*Bible\b([\s\S]*?)(?=\n#\s|\n---|$)/i);
+  // Find the Visual Bible section - simplified regex
+  // Matches: "# VISUAL BIBLE", "## Visual Bible", "# Part 5: Visual Bible", etc.
+  const visualBibleMatch = outline.match(/#+\s*(?:Part\s*\d+[:\s]*)?Visual\s*Bible\b([\s\S]*?)(?=\n#[^#]|\n---|$)/i);
   if (!visualBibleMatch) {
     console.log('📖 [VISUAL BIBLE] Regex did not match Visual Bible section');
     // Try alternate regex patterns
@@ -7207,7 +7203,7 @@ function parseVisualBible(outline) {
   console.log(`📖 [VISUAL BIBLE] Looking for ### Locations...`);
 
   // Parse Secondary Characters (supports ## or ### headers)
-  const secondaryCharsMatch = visualBibleSection.match(/##\s*#?\s*Secondary\s*Characters?([\s\S]*?)(?=\n##|$)/i);
+  const secondaryCharsMatch = visualBibleSection.match(/#{2,3}\s*Secondary\s*Characters?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
   if (secondaryCharsMatch) {
     console.log(`📖 [VISUAL BIBLE] Secondary Characters section found, length: ${secondaryCharsMatch[1].length}`);
     if (!secondaryCharsMatch[1].toLowerCase().includes('none')) {
@@ -7222,7 +7218,7 @@ function parseVisualBible(outline) {
   }
 
   // Parse Animals & Creatures (supports ## or ### headers)
-  const animalsMatch = visualBibleSection.match(/##\s*#?\s*Animals?\s*(?:&|and)?\s*Creatures?([\s\S]*?)(?=\n##|$)/i);
+  const animalsMatch = visualBibleSection.match(/#{2,3}\s*Animals?\s*(?:&|and)?\s*Creatures?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
   if (animalsMatch) {
     console.log(`📖 [VISUAL BIBLE] Animals section found, length: ${animalsMatch[1].length}`);
     if (!animalsMatch[1].toLowerCase().includes('none')) {
@@ -7237,7 +7233,7 @@ function parseVisualBible(outline) {
   }
 
   // Parse Artifacts (supports ## or ### headers, also "Important Artifacts")
-  const artifactsMatch = visualBibleSection.match(/##\s*#?\s*(?:Important\s*)?Artifacts?([\s\S]*?)(?=\n##|$)/i);
+  const artifactsMatch = visualBibleSection.match(/#{2,3}\s*(?:Important\s*)?Artifacts?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
   if (artifactsMatch) {
     console.log(`📖 [VISUAL BIBLE] Artifacts section found, length: ${artifactsMatch[1].length}`);
     if (!artifactsMatch[1].toLowerCase().includes('none')) {
@@ -7252,7 +7248,7 @@ function parseVisualBible(outline) {
   }
 
   // Parse Locations (supports ## or ### headers, also "Recurring Locations")
-  const locationsMatch = visualBibleSection.match(/##\s*#?\s*(?:Recurring\s*)?Locations?([\s\S]*?)(?=\n##|$)/i);
+  const locationsMatch = visualBibleSection.match(/#{2,3}\s*(?:Recurring\s*)?Locations?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
   if (locationsMatch) {
     console.log(`📖 [VISUAL BIBLE] Locations section found, length: ${locationsMatch[1].length}`);
     if (!locationsMatch[1].toLowerCase().includes('none')) {
@@ -7549,91 +7545,112 @@ function getVisualBibleEntriesForPage(visualBible, pageNumber) {
 }
 
 // Build Visual Bible prompt section for image generation
-function buildVisualBiblePrompt(visualBible, pageNumber) {
+// sceneCharacterNames: optional array of character names that appear in this scene (for filtering)
+function buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames = null) {
   console.log(`📖 [VISUAL BIBLE PROMPT] Building prompt for page ${pageNumber}`);
   const entries = getVisualBibleEntriesForPage(visualBible, pageNumber);
   console.log(`📖 [VISUAL BIBLE PROMPT] Found ${entries.length} entries for page ${pageNumber}: ${entries.map(e => e.name).join(', ') || 'none'}`);
 
   let prompt = '';
 
-  // Add main characters (they appear on all pages)
+  // Add main characters (filtered to those in scene if specified)
   if (visualBible.mainCharacters && visualBible.mainCharacters.length > 0) {
-    prompt += '\n\n**MAIN CHARACTERS - Must match reference photos:**\n';
-    for (const char of visualBible.mainCharacters) {
-      prompt += `**${char.name}:**`;
-      if (char.physical) {
-        const physicalParts = [char.physical.face, char.physical.hair, char.physical.build].filter(p => p && p !== 'Not analyzed');
-        if (physicalParts.length > 0) {
-          prompt += ` ${physicalParts.join(', ')}`;
+    let charsToInclude = visualBible.mainCharacters;
+
+    // Filter to only characters in the scene if scene character names provided
+    if (sceneCharacterNames && sceneCharacterNames.length > 0) {
+      const sceneNamesLower = sceneCharacterNames.map(n => n.toLowerCase());
+      charsToInclude = visualBible.mainCharacters.filter(char =>
+        sceneNamesLower.some(sceneName => char.name.toLowerCase().includes(sceneName) || sceneName.includes(char.name.toLowerCase()))
+      );
+      console.log(`📖 [VISUAL BIBLE PROMPT] Filtered to ${charsToInclude.length} characters in scene: ${charsToInclude.map(c => c.name).join(', ')}`);
+    }
+
+    if (charsToInclude.length > 0) {
+      prompt += '\n\n**MAIN CHARACTERS - Must match reference photos:**\n';
+      for (const char of charsToInclude) {
+        prompt += `**${char.name}:**\n`;
+        if (char.physical) {
+          if (char.physical.face && char.physical.face !== 'Not analyzed') {
+            prompt += `- Face: ${char.physical.face}\n`;
+          }
+          if (char.physical.hair && char.physical.hair !== 'Not analyzed') {
+            prompt += `- Hair: ${char.physical.hair}\n`;
+          }
+          if (char.physical.build && char.physical.build !== 'Not analyzed') {
+            prompt += `- Build: ${char.physical.build}\n`;
+          }
+        }
+        if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
+          prompt += `- Signature colors: ${char.styleDNA.signatureColors.join(', ')}\n`;
         }
       }
-      if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
-        prompt += `. Signature colors: ${char.styleDNA.signatureColors.join(', ')}`;
-      }
-      prompt += '\n';
     }
   }
 
   // Add page-specific recurring elements
   if (entries.length > 0) {
     prompt += '\n**RECURRING ELEMENTS - MUST MATCH EXACTLY:**\n';
-    prompt += 'These elements have appeared before in this story. They MUST look IDENTICAL.\n\n';
 
     for (const entry of entries) {
       const description = entry.extractedDescription || entry.description;
-      prompt += `**${entry.name}** (${entry.type}):\n${description}\n\n`;
+      prompt += `**${entry.name}** (${entry.type}): ${description}\n`;
     }
-
-    prompt += 'CRITICAL: Do not change colors, features, or any visual details of these recurring elements.\n';
   }
 
   return prompt;
 }
 
-// Build FULL Visual Bible prompt for covers (includes ALL entries, not filtered by page)
+// Build Visual Bible prompt for covers (all main characters + 2-3 key story elements)
 function buildFullVisualBiblePrompt(visualBible) {
   if (!visualBible) return '';
 
   let prompt = '';
 
-  // Add main characters with their style DNA
+  // Add ALL main characters with their style DNA
   if (visualBible.mainCharacters && visualBible.mainCharacters.length > 0) {
     prompt += '\n\n**MAIN CHARACTERS - Must match reference photos exactly:**\n';
     for (const char of visualBible.mainCharacters) {
       prompt += `**${char.name}:**\n`;
       if (char.physical) {
-        prompt += `- Physical: ${char.physical.face || ''}, ${char.physical.hair || ''}, ${char.physical.build || ''}\n`;
+        if (char.physical.face && char.physical.face !== 'Not analyzed') {
+          prompt += `- Face: ${char.physical.face}\n`;
+        }
+        if (char.physical.hair && char.physical.hair !== 'Not analyzed') {
+          prompt += `- Hair: ${char.physical.hair}\n`;
+        }
+        if (char.physical.build && char.physical.build !== 'Not analyzed') {
+          prompt += `- Build: ${char.physical.build}\n`;
+        }
       }
       if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
         prompt += `- Signature colors: ${char.styleDNA.signatureColors.join(', ')}\n`;
       }
-      if (char.styleDNA && char.styleDNA.alwaysPresent?.length > 0) {
-        prompt += `- Always present: ${char.styleDNA.alwaysPresent.join(', ')}\n`;
-      }
-      prompt += '\n';
     }
   }
 
-  const allEntries = [];
+  // Add only 2-3 key story elements (prioritize animals and important artifacts)
+  const keyElements = [];
 
-  const addEntries = (entries, type) => {
-    for (const entry of entries || []) {
-      allEntries.push({ ...entry, type });
+  // First add animals (pets, companions - usually most important)
+  for (const entry of visualBible.animals || []) {
+    if (keyElements.length < 3) {
+      keyElements.push({ ...entry, type: 'animal' });
     }
-  };
+  }
 
-  addEntries(visualBible.secondaryCharacters, 'character');
-  addEntries(visualBible.animals, 'animal');
-  addEntries(visualBible.artifacts, 'artifact');
-  addEntries(visualBible.locations, 'location');
+  // Then add artifacts if we have room
+  for (const entry of visualBible.artifacts || []) {
+    if (keyElements.length < 3) {
+      keyElements.push({ ...entry, type: 'artifact' });
+    }
+  }
 
-  if (allEntries.length > 0) {
-    prompt += '\n**RECURRING STORY ELEMENTS - Include if relevant to scene:**\n';
-    prompt += 'These elements appear throughout the story. Include them if they fit the scene.\n\n';
-
-    for (const entry of allEntries) {
+  if (keyElements.length > 0) {
+    prompt += '\n**KEY STORY ELEMENTS:**\n';
+    for (const entry of keyElements) {
       const description = entry.extractedDescription || entry.description;
-      prompt += `**${entry.name}** (${entry.type}):\n${description}\n\n`;
+      prompt += `**${entry.name}** (${entry.type}): ${description}\n`;
     }
   }
 
@@ -10044,10 +10061,17 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Removed redundant CHARACTER_INFO text block to reduce prompt size and avoid language mixing
 
   // Add Visual Bible entries for recurring elements (secondary characters, animals, artifacts)
+  // Extract character names from sceneCharacters for filtering
+  let sceneCharacterNames = null;
+  if (sceneCharacters && sceneCharacters.length > 0) {
+    sceneCharacterNames = sceneCharacters.map(c => c.name);
+    console.log(`📖 [IMAGE PROMPT] Scene characters: ${sceneCharacterNames.join(', ')}`);
+  }
+
   let visualBiblePrompt = '';
   if (visualBible && pageNumber) {
     console.log(`📖 [IMAGE PROMPT] Visual Bible present for page ${pageNumber}, entries: animals=${visualBible.animals?.length || 0}, artifacts=${visualBible.artifacts?.length || 0}, locations=${visualBible.locations?.length || 0}`);
-    visualBiblePrompt = buildVisualBiblePrompt(visualBible, pageNumber);
+    visualBiblePrompt = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames);
     if (visualBiblePrompt) {
       console.log(`📖 [IMAGE PROMPT] Added Visual Bible entries for page ${pageNumber}`);
     } else {
