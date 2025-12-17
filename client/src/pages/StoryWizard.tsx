@@ -1043,6 +1043,21 @@ export default function StoryWizard() {
               isGenerating={isGenerating}
               developerMode={developerMode}
               storyId={storyId}
+              onVisualBibleChange={storyId ? async (updatedBible) => {
+                try {
+                  log.info('Updating Visual Bible for story:', storyId);
+                  await storyService.updateVisualBible(storyId, updatedBible);
+                  setVisualBible(updatedBible);
+                  log.success('Visual Bible updated successfully');
+                } catch (error) {
+                  log.error('Failed to update Visual Bible:', error);
+                  alert(language === 'de'
+                    ? 'Visual Bible konnte nicht aktualisiert werden'
+                    : language === 'fr'
+                    ? 'Échec de la mise à jour de la Bible Visuelle'
+                    : 'Failed to update Visual Bible');
+                }
+              } : undefined}
               onRegenerateImage={storyId ? async (pageNumber: number) => {
                 try {
                   log.info('Regenerating image for page:', pageNumber);

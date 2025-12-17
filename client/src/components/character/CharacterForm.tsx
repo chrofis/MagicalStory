@@ -1,10 +1,10 @@
-import { ChangeEvent } from 'react';
-import { Upload, Save, ArrowRight } from 'lucide-react';
+import { ChangeEvent, useState } from 'react';
+import { Upload, Save, ArrowRight, Edit3, X, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
-import type { Character } from '@/types/character';
+import type { Character, StyleAnalysis } from '@/types/character';
 
 interface CharacterFormProps {
   character: Character;
@@ -42,6 +42,104 @@ export function CharacterForm({
 
   const updateField = <K extends keyof Character>(field: K, value: Character[K]) => {
     onChange({ ...character, [field]: value });
+  };
+
+  // Style profile editing state
+  const [editingStyleField, setEditingStyleField] = useState<string | null>(null);
+  const [editStyleValue, setEditStyleValue] = useState('');
+
+  // Helper to update styleAnalysis fields
+  const updateStyleAnalysis = (path: string, value: string) => {
+    const currentStyle = character.styleAnalysis || {
+      physical: { face: '', hair: '', build: '' },
+      referenceOutfit: {
+        garmentType: '', primaryColor: '', secondaryColors: [], pattern: '',
+        patternScale: '', seamColor: '', seamStyle: '', fabric: '',
+        neckline: '', sleeves: '', accessories: [], setting: 'neutral' as const
+      },
+      styleDNA: {
+        signatureColors: [], signaturePatterns: [], signatureDetails: [],
+        aesthetic: '', alwaysPresent: []
+      },
+      analyzedAt: new Date().toISOString()
+    };
+
+    const parts = path.split('.');
+    const updated = JSON.parse(JSON.stringify(currentStyle)) as StyleAnalysis;
+
+    if (parts[0] === 'physical') {
+      if (parts[1] === 'face') updated.physical.face = value;
+      else if (parts[1] === 'hair') updated.physical.hair = value;
+      else if (parts[1] === 'build') updated.physical.build = value;
+    } else if (parts[0] === 'styleDNA') {
+      if (parts[1] === 'aesthetic') updated.styleDNA.aesthetic = value;
+      else if (parts[1] === 'signatureColors') updated.styleDNA.signatureColors = value.split(',').map(s => s.trim()).filter(Boolean);
+      else if (parts[1] === 'signaturePatterns') updated.styleDNA.signaturePatterns = value.split(',').map(s => s.trim()).filter(Boolean);
+      else if (parts[1] === 'alwaysPresent') updated.styleDNA.alwaysPresent = value.split(',').map(s => s.trim()).filter(Boolean);
+    } else if (parts[0] === 'referenceOutfit') {
+      if (parts[1] === 'garmentType') updated.referenceOutfit.garmentType = value;
+      else if (parts[1] === 'primaryColor') updated.referenceOutfit.primaryColor = value;
+      else if (parts[1] === 'pattern') updated.referenceOutfit.pattern = value;
+      else if (parts[1] === 'setting') updated.referenceOutfit.setting = value as typeof updated.referenceOutfit.setting;
+    }
+
+    onChange({ ...character, styleAnalysis: updated });
+  };
+
+  const startEditingStyle = (field: string, currentValue: string) => {
+    setEditingStyleField(field);
+    setEditStyleValue(currentValue || '');
+  };
+
+  const saveStyleEdit = () => {
+    if (editingStyleField) {
+      updateStyleAnalysis(editingStyleField, editStyleValue);
+    }
+    setEditingStyleField(null);
+    setEditStyleValue('');
+  };
+
+  const cancelStyleEdit = () => {
+    setEditingStyleField(null);
+    setEditStyleValue('');
+  };
+
+  // Editable field component for style profile
+  const EditableStyleField = ({ label, path, value, placeholder }: { label: string; path: string; value: string; placeholder?: string }) => {
+    const isEditing = editingStyleField === path;
+    return (
+      <div>
+        <span className="font-medium text-gray-600 text-xs">{label}:</span>
+        {isEditing ? (
+          <div className="flex items-center gap-1 mt-0.5">
+            <input
+              type="text"
+              value={editStyleValue}
+              onChange={(e) => setEditStyleValue(e.target.value)}
+              className="flex-1 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
+              autoFocus
+              placeholder={placeholder}
+            />
+            <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
+              <Check size={14} />
+            </button>
+            <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 group">
+            <p className="text-gray-800 text-sm flex-1">{value || <span className="text-gray-400 italic">{placeholder || 'Not set'}</span>}</p>
+            <button
+              onClick={() => startEditingStyle(path, value)}
+              className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Edit3 size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const canSaveName = character.name && character.name.trim().length >= 2;
@@ -194,138 +292,12 @@ export function CharacterForm({
         </div>
       )}
 
-      {/* Developer Mode: Style Profile from photo analysis */}
-      {developerMode && (console.log('CharacterForm developerMode check:', { developerMode, hasStyleAnalysis: !!character.styleAnalysis, styleAnalysis: character.styleAnalysis }), null)}
-      {developerMode && character.styleAnalysis && (
-        <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-purple-700 mb-3">
-            👗 Style Profile (from photo analysis)
-          </h4>
-
-          {/* Physical Features */}
-          <div className="mb-4">
-            <h5 className="text-xs font-bold text-purple-600 uppercase mb-2">Physical Features</h5>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-              <div>
-                <span className="font-medium text-gray-600">Face:</span>
-                <p className="text-gray-800">{character.styleAnalysis.physical?.face || 'Not analyzed'}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-600">Hair:</span>
-                <p className="text-gray-800">{character.styleAnalysis.physical?.hair || 'Not analyzed'}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-600">Build:</span>
-                <p className="text-gray-800">{character.styleAnalysis.physical?.build || 'Not analyzed'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Reference Outfit */}
-          <div className="mb-4">
-            <h5 className="text-xs font-bold text-purple-600 uppercase mb-2">Reference Outfit</h5>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-              <div>
-                <span className="font-medium text-gray-600">Type:</span>
-                <p className="text-gray-800">{character.styleAnalysis.referenceOutfit?.garmentType || 'Unknown'}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-600">Primary Color:</span>
-                <p className="text-gray-800">{character.styleAnalysis.referenceOutfit?.primaryColor || 'Unknown'}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-600">Pattern:</span>
-                <p className="text-gray-800">{character.styleAnalysis.referenceOutfit?.pattern || 'None'}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-600">Setting:</span>
-                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                  character.styleAnalysis.referenceOutfit?.setting === 'outdoor-cold' ? 'bg-blue-100 text-blue-800' :
-                  character.styleAnalysis.referenceOutfit?.setting === 'outdoor-warm' ? 'bg-yellow-100 text-yellow-800' :
-                  character.styleAnalysis.referenceOutfit?.setting === 'indoor-casual' ? 'bg-green-100 text-green-800' :
-                  character.styleAnalysis.referenceOutfit?.setting === 'indoor-formal' ? 'bg-purple-100 text-purple-800' :
-                  character.styleAnalysis.referenceOutfit?.setting === 'active' ? 'bg-orange-100 text-orange-800' :
-                  character.styleAnalysis.referenceOutfit?.setting === 'sleep' ? 'bg-indigo-100 text-indigo-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {character.styleAnalysis.referenceOutfit?.setting || 'neutral'}
-                </span>
-              </div>
-            </div>
-            {character.styleAnalysis.referenceOutfit?.secondaryColors && character.styleAnalysis.referenceOutfit.secondaryColors.length > 0 && (
-              <div className="mt-2 text-sm">
-                <span className="font-medium text-gray-600">Secondary Colors:</span>
-                <span className="text-gray-800 ml-1">{character.styleAnalysis.referenceOutfit.secondaryColors.join(', ')}</span>
-              </div>
-            )}
-            {character.styleAnalysis.referenceOutfit?.accessories && character.styleAnalysis.referenceOutfit.accessories.length > 0 && (
-              <div className="mt-1 text-sm">
-                <span className="font-medium text-gray-600">Accessories:</span>
-                <span className="text-gray-800 ml-1">{character.styleAnalysis.referenceOutfit.accessories.join(', ')}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Style DNA */}
-          <div>
-            <h5 className="text-xs font-bold text-purple-600 uppercase mb-2">Style DNA</h5>
-            <div className="space-y-2 text-sm">
-              {character.styleAnalysis.styleDNA?.aesthetic && (
-                <div>
-                  <span className="font-medium text-gray-600">Aesthetic:</span>
-                  <span className="text-gray-800 ml-1 italic">{character.styleAnalysis.styleDNA.aesthetic}</span>
-                </div>
-              )}
-              {character.styleAnalysis.styleDNA?.signatureColors && character.styleAnalysis.styleDNA.signatureColors.length > 0 && (
-                <div className="flex flex-wrap gap-1 items-center">
-                  <span className="font-medium text-gray-600">Signature Colors:</span>
-                  {character.styleAnalysis.styleDNA.signatureColors.map((color, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs">{color}</span>
-                  ))}
-                </div>
-              )}
-              {character.styleAnalysis.styleDNA?.signaturePatterns && character.styleAnalysis.styleDNA.signaturePatterns.length > 0 && (
-                <div className="flex flex-wrap gap-1 items-center">
-                  <span className="font-medium text-gray-600">Patterns:</span>
-                  {character.styleAnalysis.styleDNA.signaturePatterns.map((pattern, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs">{pattern}</span>
-                  ))}
-                </div>
-              )}
-              {character.styleAnalysis.styleDNA?.signatureDetails && character.styleAnalysis.styleDNA.signatureDetails.length > 0 && (
-                <div className="flex flex-wrap gap-1 items-center">
-                  <span className="font-medium text-gray-600">Details:</span>
-                  {character.styleAnalysis.styleDNA.signatureDetails.map((detail, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-white border border-gray-300 rounded text-xs">{detail}</span>
-                  ))}
-                </div>
-              )}
-              {character.styleAnalysis.styleDNA?.alwaysPresent && character.styleAnalysis.styleDNA.alwaysPresent.length > 0 && (
-                <div className="flex flex-wrap gap-1 items-center">
-                  <span className="font-medium text-gray-600">Always Present:</span>
-                  {character.styleAnalysis.styleDNA.alwaysPresent.map((item, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">{item}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Analysis timestamp */}
-          {character.styleAnalysis.analyzedAt && (
-            <div className="mt-3 pt-2 border-t border-purple-200 text-xs text-purple-500">
-              Analyzed: {new Date(character.styleAnalysis.analyzedAt).toLocaleString()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Extracted Features - Editable */}
+      {/* Basic Info - Gender, Age */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <h4 className="text-sm font-semibold text-gray-600 mb-3">
-          {language === 'de' ? 'Erkannte Eigenschaften (bearbeitbar)' : language === 'fr' ? 'Caractéristiques détectées (modifiables)' : 'Detected Features (editable)'}
+          {language === 'de' ? 'Grundinformationen' : language === 'fr' ? 'Informations de base' : 'Basic Info'}
         </h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {/* Gender */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">{t.gender}</label>
@@ -368,64 +340,234 @@ export function CharacterForm({
               max="250"
             />
           </div>
+        </div>
+      </div>
 
-          {/* Build */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">
-              {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
-            </label>
-            <select
-              value={character.build || ''}
-              onChange={(e) => updateField('build', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="">{language === 'de' ? 'Wählen...' : language === 'fr' ? 'Choisir...' : 'Select...'}</option>
-              <option value="slim">{language === 'de' ? 'Schlank' : language === 'fr' ? 'Mince' : 'Slim'}</option>
-              <option value="average">{language === 'de' ? 'Durchschnittlich' : language === 'fr' ? 'Moyenne' : 'Average'}</option>
-              <option value="athletic">{language === 'de' ? 'Athletisch' : language === 'fr' ? 'Athlétique' : 'Athletic'}</option>
-              <option value="chubby">{language === 'de' ? 'Mollig' : language === 'fr' ? 'Potelé' : 'Chubby'}</option>
-            </select>
-          </div>
+      {/* Physical Features - from Style Analysis (editable) */}
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
+          👤 {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
+          <span className="text-xs font-normal text-purple-500">
+            ({language === 'de' ? 'klicken zum Bearbeiten' : language === 'fr' ? 'cliquez pour modifier' : 'click to edit'})
+          </span>
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <EditableStyleField
+            label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
+            path="physical.face"
+            value={character.styleAnalysis?.physical?.face || ''}
+            placeholder={language === 'de' ? 'z.B. rund, oval, eckig' : 'e.g. round, oval, square'}
+          />
+          <EditableStyleField
+            label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
+            path="physical.hair"
+            value={character.styleAnalysis?.physical?.hair || ''}
+            placeholder={language === 'de' ? 'z.B. braun, kurz, lockig' : 'e.g. brown, short, curly'}
+          />
+          <EditableStyleField
+            label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
+            path="physical.build"
+            value={character.styleAnalysis?.physical?.build || ''}
+            placeholder={language === 'de' ? 'z.B. schlank, athletisch' : 'e.g. slim, athletic'}
+          />
+        </div>
 
-          {/* Hair Color */}
-          <div className="col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 mb-1">{t.hairColor}</label>
-            <input
-              type="text"
-              value={character.hairColor || ''}
-              onChange={(e) => updateField('hairColor', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
-              placeholder={language === 'de' ? 'z.B. braun, blond' : language === 'fr' ? 'ex. brun, blond' : 'e.g. brown, blonde'}
-            />
-          </div>
-
-          {/* Other Features */}
-          <div className="col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 mb-1">{t.otherFeatures}</label>
-            <input
-              type="text"
-              value={character.otherFeatures || ''}
-              onChange={(e) => updateField('otherFeatures', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
-              placeholder={language === 'de' ? 'Brille, Bart, etc.' : language === 'fr' ? 'Lunettes, barbe, etc.' : 'Glasses, beard, etc.'}
-            />
-          </div>
-
-          {/* Clothing */}
-          <div className="col-span-2 md:col-span-4">
-            <label className="block text-xs font-semibold text-gray-500 mb-1">
-              {language === 'de' ? 'Kleidung' : language === 'fr' ? 'Vêtements' : 'Clothing'}
-            </label>
-            <input
-              type="text"
-              value={character.clothing || ''}
-              onChange={(e) => updateField('clothing', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
-              placeholder={language === 'de' ? 'z.B. blaues T-Shirt, Jeans' : language === 'fr' ? 'ex. t-shirt bleu, jeans' : 'e.g. blue t-shirt, jeans'}
-            />
+        {/* Other Features - additional details */}
+        <div className="mt-3 pt-3 border-t border-purple-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">{t.otherFeatures}</label>
+              <input
+                type="text"
+                value={character.otherFeatures || ''}
+                onChange={(e) => updateField('otherFeatures', e.target.value)}
+                className="w-full px-2 py-1.5 border border-purple-200 rounded text-sm focus:border-purple-500 focus:outline-none bg-white"
+                placeholder={language === 'de' ? 'Brille, Bart, Sommersprossen...' : language === 'fr' ? 'Lunettes, barbe, taches de rousseur...' : 'Glasses, beard, freckles...'}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                {language === 'de' ? 'Style-Ästhetik' : language === 'fr' ? 'Esthétique de style' : 'Style Aesthetic'}
+              </label>
+              {editingStyleField === 'styleDNA.aesthetic' ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={editStyleValue}
+                    onChange={(e) => setEditStyleValue(e.target.value)}
+                    className="flex-1 px-2 py-1.5 text-sm border border-purple-300 rounded focus:outline-none focus:border-purple-500"
+                    autoFocus
+                    placeholder={language === 'de' ? 'z.B. casual, sportlich, elegant' : 'e.g. casual, sporty, elegant'}
+                  />
+                  <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
+                    <Check size={14} />
+                  </button>
+                  <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => startEditingStyle('styleDNA.aesthetic', character.styleAnalysis?.styleDNA?.aesthetic || '')}
+                  className="w-full px-2 py-1.5 border border-purple-200 rounded text-sm bg-white cursor-pointer hover:border-purple-400 flex items-center justify-between group"
+                >
+                  <span className={character.styleAnalysis?.styleDNA?.aesthetic ? 'text-gray-800' : 'text-gray-400 italic'}>
+                    {character.styleAnalysis?.styleDNA?.aesthetic || (language === 'de' ? 'Klicken zum Setzen...' : 'Click to set...')}
+                  </span>
+                  <Edit3 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Reference Outfit - from Style Analysis (editable, collapsed by default) */}
+      <details className="bg-indigo-50 border border-indigo-200 rounded-lg">
+        <summary className="p-4 cursor-pointer text-sm font-semibold text-indigo-700 flex items-center gap-2 hover:bg-indigo-100 rounded-lg transition-colors">
+          👗 {language === 'de' ? 'Referenz-Outfit (aus Foto)' : language === 'fr' ? 'Tenue de référence (de la photo)' : 'Reference Outfit (from photo)'}
+          <span className="text-xs font-normal text-indigo-500">
+            ({language === 'de' ? 'klicken zum Erweitern' : language === 'fr' ? 'cliquez pour développer' : 'click to expand'})
+          </span>
+        </summary>
+        <div className="px-4 pb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <EditableStyleField
+            label={language === 'de' ? 'Kleidungsart' : language === 'fr' ? 'Type de vêtement' : 'Garment Type'}
+            path="referenceOutfit.garmentType"
+            value={character.styleAnalysis?.referenceOutfit?.garmentType || ''}
+            placeholder="e.g. t-shirt, dress"
+          />
+          <EditableStyleField
+            label={language === 'de' ? 'Hauptfarbe' : language === 'fr' ? 'Couleur principale' : 'Primary Color'}
+            path="referenceOutfit.primaryColor"
+            value={character.styleAnalysis?.referenceOutfit?.primaryColor || ''}
+            placeholder="e.g. blue, red"
+          />
+          <EditableStyleField
+            label={language === 'de' ? 'Muster' : language === 'fr' ? 'Motif' : 'Pattern'}
+            path="referenceOutfit.pattern"
+            value={character.styleAnalysis?.referenceOutfit?.pattern || ''}
+            placeholder="e.g. stripes, solid"
+          />
+          <div>
+            <span className="font-medium text-gray-600 text-xs">
+              {language === 'de' ? 'Umgebung' : language === 'fr' ? 'Contexte' : 'Setting'}:
+            </span>
+            <select
+              value={character.styleAnalysis?.referenceOutfit?.setting || 'neutral'}
+              onChange={(e) => updateStyleAnalysis('referenceOutfit.setting', e.target.value)}
+              className={`w-full mt-0.5 px-2 py-1 text-xs border rounded focus:outline-none ${
+                character.styleAnalysis?.referenceOutfit?.setting === 'outdoor-cold' ? 'bg-blue-100 border-blue-300 text-blue-800' :
+                character.styleAnalysis?.referenceOutfit?.setting === 'outdoor-warm' ? 'bg-yellow-100 border-yellow-300 text-yellow-800' :
+                character.styleAnalysis?.referenceOutfit?.setting === 'indoor-casual' ? 'bg-green-100 border-green-300 text-green-800' :
+                character.styleAnalysis?.referenceOutfit?.setting === 'indoor-formal' ? 'bg-purple-100 border-purple-300 text-purple-800' :
+                character.styleAnalysis?.referenceOutfit?.setting === 'active' ? 'bg-orange-100 border-orange-300 text-orange-800' :
+                character.styleAnalysis?.referenceOutfit?.setting === 'sleep' ? 'bg-indigo-100 border-indigo-300 text-indigo-800' :
+                'bg-gray-100 border-gray-300 text-gray-800'
+              }`}
+            >
+              <option value="neutral">Neutral</option>
+              <option value="outdoor-warm">{language === 'de' ? 'Draussen (warm)' : 'Outdoor (warm)'}</option>
+              <option value="outdoor-cold">{language === 'de' ? 'Draussen (kalt)' : 'Outdoor (cold)'}</option>
+              <option value="indoor-casual">{language === 'de' ? 'Drinnen (casual)' : 'Indoor (casual)'}</option>
+              <option value="indoor-formal">{language === 'de' ? 'Drinnen (formal)' : 'Indoor (formal)'}</option>
+              <option value="active">{language === 'de' ? 'Aktiv/Sport' : 'Active/Sports'}</option>
+              <option value="sleep">{language === 'de' ? 'Schlaf' : 'Sleep'}</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Signature colors (editable as comma-separated) */}
+        <div className="mt-3 pt-3 border-t border-indigo-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                {language === 'de' ? 'Signaturfarben' : language === 'fr' ? 'Couleurs signature' : 'Signature Colors'}
+                <span className="font-normal text-gray-400 ml-1">(comma-separated)</span>
+              </label>
+              {editingStyleField === 'styleDNA.signatureColors' ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={editStyleValue}
+                    onChange={(e) => setEditStyleValue(e.target.value)}
+                    className="flex-1 px-2 py-1.5 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
+                    autoFocus
+                    placeholder="blue, white, navy"
+                  />
+                  <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
+                    <Check size={14} />
+                  </button>
+                  <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => startEditingStyle('styleDNA.signatureColors', character.styleAnalysis?.styleDNA?.signatureColors?.join(', ') || '')}
+                  className="w-full px-2 py-1.5 border border-indigo-200 rounded text-sm bg-white cursor-pointer hover:border-indigo-400 flex items-center gap-1 flex-wrap group min-h-[34px]"
+                >
+                  {character.styleAnalysis?.styleDNA?.signatureColors?.length ? (
+                    character.styleAnalysis.styleDNA.signatureColors.map((color, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">{color}</span>
+                    ))
+                  ) : (
+                    <span className="text-gray-400 italic text-xs">{language === 'de' ? 'Klicken zum Setzen...' : 'Click to set...'}</span>
+                  )}
+                  <Edit3 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 ml-auto" />
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                {language === 'de' ? 'Immer dabei' : language === 'fr' ? 'Toujours présent' : 'Always Present'}
+                <span className="font-normal text-gray-400 ml-1">(comma-separated)</span>
+              </label>
+              {editingStyleField === 'styleDNA.alwaysPresent' ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={editStyleValue}
+                    onChange={(e) => setEditStyleValue(e.target.value)}
+                    className="flex-1 px-2 py-1.5 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
+                    autoFocus
+                    placeholder="glasses, watch, bracelet"
+                  />
+                  <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
+                    <Check size={14} />
+                  </button>
+                  <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => startEditingStyle('styleDNA.alwaysPresent', character.styleAnalysis?.styleDNA?.alwaysPresent?.join(', ') || '')}
+                  className="w-full px-2 py-1.5 border border-indigo-200 rounded text-sm bg-white cursor-pointer hover:border-indigo-400 flex items-center gap-1 flex-wrap group min-h-[34px]"
+                >
+                  {character.styleAnalysis?.styleDNA?.alwaysPresent?.length ? (
+                    character.styleAnalysis.styleDNA.alwaysPresent.map((item, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">{item}</span>
+                    ))
+                  ) : (
+                    <span className="text-gray-400 italic text-xs">{language === 'de' ? 'Klicken zum Setzen...' : 'Click to set...'}</span>
+                  )}
+                  <Edit3 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 ml-auto" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Analysis timestamp */}
+        {character.styleAnalysis?.analyzedAt && (
+          <div className="mt-3 pt-2 border-t border-indigo-200 text-xs text-indigo-500">
+            {language === 'de' ? 'Analysiert' : 'Analyzed'}: {new Date(character.styleAnalysis.analyzedAt).toLocaleString()}
+          </div>
+        )}
+        </div>
+      </details>
 
       {/* Trait Selectors - all indigo color */}
       <TraitSelector

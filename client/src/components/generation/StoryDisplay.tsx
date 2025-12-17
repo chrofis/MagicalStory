@@ -171,6 +171,69 @@ export function StoryDisplay({
   const { t, language } = useLanguage();
   const isPictureBook = languageLevel === '1st-grade';
 
+  // Visual Bible editing state (only used in developer mode)
+  const [editingEntry, setEditingEntry] = useState<{ type: string; id: string; field: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  // Helper to start editing a Visual Bible entry
+  const startEditing = (type: string, id: string, field: string, currentValue: string) => {
+    setEditingEntry({ type, id, field });
+    setEditValue(currentValue || '');
+  };
+
+  // Helper to save Visual Bible edit
+  const saveEdit = () => {
+    if (!editingEntry || !visualBible || !onVisualBibleChange) return;
+
+    const { type, id, field } = editingEntry;
+    const updatedBible = { ...visualBible };
+
+    // Find and update the entry based on type
+    if (type === 'secondaryCharacter') {
+      updatedBible.secondaryCharacters = (updatedBible.secondaryCharacters || []).map(entry =>
+        entry.id === id ? { ...entry, [field]: editValue } : entry
+      );
+    } else if (type === 'animal') {
+      updatedBible.animals = (updatedBible.animals || []).map(entry =>
+        entry.id === id ? { ...entry, [field]: editValue } : entry
+      );
+    } else if (type === 'artifact') {
+      updatedBible.artifacts = (updatedBible.artifacts || []).map(entry =>
+        entry.id === id ? { ...entry, [field]: editValue } : entry
+      );
+    } else if (type === 'location') {
+      updatedBible.locations = (updatedBible.locations || []).map(entry =>
+        entry.id === id ? { ...entry, [field]: editValue } : entry
+      );
+    } else if (type === 'mainCharacter') {
+      // Handle main character physical/styleDNA edits
+      const charId = parseInt(id);
+      updatedBible.mainCharacters = (updatedBible.mainCharacters || []).map(char => {
+        if (char.id !== charId) return char;
+
+        if (field === 'physical.face') {
+          return { ...char, physical: { ...char.physical, face: editValue } };
+        } else if (field === 'physical.hair') {
+          return { ...char, physical: { ...char.physical, hair: editValue } };
+        } else if (field === 'physical.build') {
+          return { ...char, physical: { ...char.physical, build: editValue } };
+        } else if (field === 'styleDNA.aesthetic') {
+          return { ...char, styleDNA: { ...char.styleDNA, aesthetic: editValue } };
+        }
+        return char;
+      });
+    }
+
+    onVisualBibleChange(updatedBible);
+    setEditingEntry(null);
+    setEditValue('');
+  };
+
+  const cancelEdit = () => {
+    setEditingEntry(null);
+    setEditValue('');
+  };
+
   // Parse story into pages - handle both markdown (## Seite/Page 1) and old format (--- Page 1 ---)
   const parseStoryPages = (storyText: string) => {
     if (!storyText) return [];
@@ -482,7 +545,37 @@ export function StoryDisplay({
                       {visualBible.secondaryCharacters.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
                           <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
-                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {editingEntry?.type === 'secondaryCharacter' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
+                            <div className="mt-1">
+                              <textarea
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="w-full p-2 text-xs border border-rose-300 rounded resize-y min-h-[60px]"
+                                autoFocus
+                              />
+                              <div className="flex gap-2 mt-1">
+                                <button onClick={saveEdit} className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 flex items-center gap-1">
+                                  <Save size={12} /> Save
+                                </button>
+                                <button onClick={cancelEdit} className="px-2 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500 flex items-center gap-1">
+                                  <X size={12} /> Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-gray-700 text-xs mt-1 flex items-start gap-1">
+                              <span className="flex-1">{entry.description}</span>
+                              {developerMode && onVisualBibleChange && (
+                                <button
+                                  onClick={() => startEditing('secondaryCharacter', entry.id, 'description', entry.description)}
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded"
+                                  title="Edit description"
+                                >
+                                  <Edit3 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {entry.extractedDescription && (
                             <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
@@ -504,7 +597,37 @@ export function StoryDisplay({
                       {visualBible.animals.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
                           <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
-                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {editingEntry?.type === 'animal' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
+                            <div className="mt-1">
+                              <textarea
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="w-full p-2 text-xs border border-rose-300 rounded resize-y min-h-[60px]"
+                                autoFocus
+                              />
+                              <div className="flex gap-2 mt-1">
+                                <button onClick={saveEdit} className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 flex items-center gap-1">
+                                  <Save size={12} /> Save
+                                </button>
+                                <button onClick={cancelEdit} className="px-2 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500 flex items-center gap-1">
+                                  <X size={12} /> Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-gray-700 text-xs mt-1 flex items-start gap-1">
+                              <span className="flex-1">{entry.description}</span>
+                              {developerMode && onVisualBibleChange && (
+                                <button
+                                  onClick={() => startEditing('animal', entry.id, 'description', entry.description)}
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded"
+                                  title="Edit description"
+                                >
+                                  <Edit3 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {entry.extractedDescription && (
                             <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
@@ -526,7 +649,37 @@ export function StoryDisplay({
                       {visualBible.artifacts.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
                           <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
-                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {editingEntry?.type === 'artifact' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
+                            <div className="mt-1">
+                              <textarea
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="w-full p-2 text-xs border border-rose-300 rounded resize-y min-h-[60px]"
+                                autoFocus
+                              />
+                              <div className="flex gap-2 mt-1">
+                                <button onClick={saveEdit} className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 flex items-center gap-1">
+                                  <Save size={12} /> Save
+                                </button>
+                                <button onClick={cancelEdit} className="px-2 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500 flex items-center gap-1">
+                                  <X size={12} /> Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-gray-700 text-xs mt-1 flex items-start gap-1">
+                              <span className="flex-1">{entry.description}</span>
+                              {developerMode && onVisualBibleChange && (
+                                <button
+                                  onClick={() => startEditing('artifact', entry.id, 'description', entry.description)}
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded"
+                                  title="Edit description"
+                                >
+                                  <Edit3 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {entry.extractedDescription && (
                             <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
@@ -548,7 +701,37 @@ export function StoryDisplay({
                       {visualBible.locations.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
                           <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
-                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {editingEntry?.type === 'location' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
+                            <div className="mt-1">
+                              <textarea
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="w-full p-2 text-xs border border-rose-300 rounded resize-y min-h-[60px]"
+                                autoFocus
+                              />
+                              <div className="flex gap-2 mt-1">
+                                <button onClick={saveEdit} className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 flex items-center gap-1">
+                                  <Save size={12} /> Save
+                                </button>
+                                <button onClick={cancelEdit} className="px-2 py-1 bg-gray-400 text-white text-xs rounded hover:bg-gray-500 flex items-center gap-1">
+                                  <X size={12} /> Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-gray-700 text-xs mt-1 flex items-start gap-1">
+                              <span className="flex-1">{entry.description}</span>
+                              {developerMode && onVisualBibleChange && (
+                                <button
+                                  onClick={() => startEditing('location', entry.id, 'description', entry.description)}
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded"
+                                  title="Edit description"
+                                >
+                                  <Edit3 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           {entry.extractedDescription && (
                             <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}

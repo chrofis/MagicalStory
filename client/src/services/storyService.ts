@@ -83,6 +83,7 @@ interface StoryDetailsServer {
   storyText?: string; // New stories use this
   story?: string; // Old stories use this
   storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
+  visualBible?: VisualBible;
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];
   coverImages?: CoverImages;
@@ -157,6 +158,7 @@ export const storyService = {
         outlinePrompt: s.outlinePrompt,
         story: storyContent,
         storyTextPrompts: s.storyTextPrompts,
+        visualBible: s.visualBible,
         sceneDescriptions: s.sceneDescriptions,
         sceneImages: s.sceneImages,
         coverImages: s.coverImages,
@@ -247,6 +249,7 @@ export const storyService = {
       outlinePrompt: s.outlinePrompt,
       story: storyContent,
       storyTextPrompts: s.storyTextPrompts,
+      visualBible: s.visualBible,
       sceneDescriptions: s.sceneDescriptions,
       sceneImages: s.sceneImages,
       coverImages: s.coverImages,
