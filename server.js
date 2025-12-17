@@ -4618,29 +4618,32 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
     console.log(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})`);
 
-    // Clothing style prompts matching the reference implementation
+    // Gender-aware clothing style prompts with style transfer from reference
+    const isFemale = gender === 'female';
+
     const getClothingStylePrompt = (category) => {
       switch (category) {
         case 'winter':
-          return 'Apparel: Heavy Winter Outerwear. The subject is wearing a prominent thick winter coat or parka. Layers are visible. Footwear: Heavy winter boots.';
+          return 'Heavy winter coat or parka with the SAME pattern/colors as reference clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.';
         case 'standard':
-          return 'Apparel: Casual Long-Sleeve attire. Long-sleeved top and long trousers or jeans. No outer coat. Footwear: Sneakers or casual shoes.';
+          if (isFemale) {
+            return 'Long-sleeved top, casual dress, or sweater dress with the SAME pattern/colors as reference. Jeans, leggings, or skirt. Sneakers or casual shoes.';
+          }
+          return 'Long-sleeved top with the SAME pattern/colors as reference. Long trousers or jeans. Sneakers or casual shoes.';
         case 'summer':
-          return 'Apparel: Summer attire. Short-sleeved top and shorts. Light and airy fabric textures. Footwear: Sandals or summer slides.';
+          if (isFemale) {
+            return 'Short-sleeved top, sundress, or tank top with the SAME pattern/colors as reference. Shorts, skirt, or light dress. Sandals or summer slides.';
+          }
+          return 'Short-sleeved top or tank top with the SAME pattern/colors as reference. Shorts or light pants. Sandals or summer slides.';
         case 'formal':
-          return 'Apparel: Formal Event wear. A formal suit or evening gown. Sophisticated fabrics. Color palette matches reference. Footwear: Formal dress shoes.';
+          if (isFemale) {
+            return 'Elegant dress, formal gown, or blouse with skirt with the SAME pattern/colors as reference (adapted elegantly). Formal heels or dress shoes.';
+          }
+          return 'Formal suit or dress shirt with trousers with the SAME pattern/colors as reference (adapted elegantly). Formal dress shoes.';
         default:
-          return 'Full outfit with shoes.';
+          return 'Full outfit with shoes matching the style of the reference.';
       }
     };
-
-    // Enhancement style - using POLISHED for clean professional look
-    const enhancementStyle = `
-        Style: High-End Editorial Photography.
-        - Lighting: Soft, evenly diffused studio lighting.
-        - Details: Sharp focus on fabric textures.
-        - Presentation: Clean, professional, magazine-quality look.
-        - Face: Preserve identity strictly.`;
 
     // Define clothing categories
     const clothingCategories = {
@@ -4658,23 +4661,29 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
     // Generate avatars sequentially to avoid rate limits
     for (const [category, config] of Object.entries(clothingCategories)) {
       try {
-        console.log(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name}...`);
+        console.log(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'})...`);
 
-        // Build the prompt matching the reference implementation exactly
+        // Build the prompt with priority on face matching and style transfer
         const avatarPrompt = `
     Subject: Generate a fashion photograph of the person in the reference images.
 
+    CRITICAL PRIORITIES (in order):
+    1. FACE IDENTITY: The face MUST be an exact match to the reference photo - same facial features, skin tone, eye color, hair color and style. This is non-negotiable.
+    2. CLOTHING STYLE TRANSFER: The main clothing piece MUST inherit the pattern, texture, colors, and fabric style from the reference image. Apply these visual elements to the new garment type.
+
     COMPOSITION:
-    1. Framing: Wide shot. The entire outfit must be visible from head to toe.
-    2. Background: Pure solid white background (#FFFFFF).
-    3. Identity: The face must match the reference photos exactly.
+    - Framing: Wide shot. The entire outfit must be visible from head to toe.
+    - Background: Pure solid white background (#FFFFFF).
 
     WARDROBE DETAILS:
-    1. Reference Logic: Use the exact pattern and texture from the source image for the main clothing item.
-    2. ${getClothingStylePrompt(category)}
+    - Style Transfer Rule: Whatever pattern, texture, or colors the person wears in the reference image, apply those SAME visual elements to the outfit below.
+    - Outfit: ${getClothingStylePrompt(category)}
 
     PHOTOGRAPHY STYLE:
-    ${enhancementStyle}
+    - Style: High-End Editorial Photography.
+    - Lighting: Soft, evenly diffused studio lighting.
+    - Details: Sharp focus on fabric textures.
+    - Presentation: Clean, professional, magazine-quality look.
 
     Output Quality: 4k, Photorealistic.
   `;

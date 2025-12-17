@@ -6,74 +6,71 @@ These avatars are used as reference images during story illustration generation.
 
 ## Base Prompt Template
 
+```
 Subject: Generate a fashion photograph of the person in the reference images.
 
+CRITICAL PRIORITIES (in order):
+1. FACE IDENTITY: The face MUST be an exact match to the reference photo - same facial features,
+   skin tone, eye color, hair color and style. This is non-negotiable.
+2. CLOTHING STYLE TRANSFER: The main clothing piece MUST inherit the pattern, texture, colors,
+   and fabric style from the reference image. Apply these visual elements to the new garment type.
+
 COMPOSITION:
-1. Framing: Wide shot. The entire outfit must be visible from head to toe.
-2. Background: Pure solid white background (#FFFFFF).
-3. Identity: The face must match the reference photos exactly.
+- Framing: Wide shot. The entire outfit must be visible from head to toe.
+- Background: Pure solid white background (#FFFFFF).
 
 WARDROBE DETAILS:
-1. {CLOTHING_CONSISTENCY_INSTRUCTION}
-2. {CLOTHING_STYLE}
+- Style Transfer Rule: Whatever pattern, texture, or colors the person wears in the reference
+  image, apply those SAME visual elements to the outfit below.
+- Outfit: {CLOTHING_STYLE}
 
 PHOTOGRAPHY STYLE:
-{ENHANCEMENT_STYLE}
-
-Output Quality: 4k, Photorealistic.
-
----
-
-## Clothing Consistency Instructions
-
-### Single Reference Image
-Reference Logic: Use the exact pattern and texture from the source image for the main clothing item.
-
-### Multiple Reference Images
-Reference Logic: Select one cohesive clothing style/color from the provided references.
-
----
-
-## Clothing Styles by Category
-
-### WINTER
-Apparel: Heavy Winter Outerwear. The subject is wearing a prominent thick winter coat or parka. Layers are visible. Footwear: Heavy winter boots.
-
-### STANDARD (Casual Long)
-Apparel: Casual Long-Sleeve attire. Long-sleeved top and long trousers or jeans. No outer coat. Footwear: Sneakers or casual shoes.
-
-### SUMMER
-Apparel: Summer attire. Short-sleeved top and shorts. Light and airy fabric textures. Footwear: Sandals or summer slides.
-
-### FORMAL
-Apparel: Formal Event wear. A formal suit or evening gown. Sophisticated fabrics. Color palette matches reference. Footwear: Formal dress shoes.
-
----
-
-## Enhancement Styles
-
-### POLISHED (High-End Editorial)
-Style: High-End Editorial Photography.
+- Style: High-End Editorial Photography.
 - Lighting: Soft, evenly diffused studio lighting.
 - Details: Sharp focus on fabric textures.
 - Presentation: Clean, professional, magazine-quality look.
-- Face: Preserve identity strictly.
 
-### AUTHENTIC (Documentary)
-Style: Photojournalism / Documentary.
-- Lighting: Natural, existing light.
-- Presentation: Unfiltered, candid, realistic texture.
-- Face: Preserve identity strictly.
+Output Quality: 4k, Photorealistic.
+```
 
 ---
 
-## Usage Notes
+## Clothing Styles by Category (Gender-Aware)
 
-- The POLISHED style is recommended for children's book avatars as it produces cleaner, more consistent results
-- Always use a pure white background (#FFFFFF) for easy compositing
-- Face identity preservation is critical - the avatar must look like the same person
-- Full body framing (head to toe) ensures outfit visibility in illustrations
-- Use aspect ratio 9:16 (portrait) for full-body shots
+### WINTER
+Heavy winter coat or parka with the SAME pattern/colors as reference clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.
+
+### STANDARD
+**Female:** Long-sleeved top, casual dress, or sweater dress with the SAME pattern/colors as reference. Jeans, leggings, or skirt. Sneakers or casual shoes.
+
+**Male:** Long-sleeved top with the SAME pattern/colors as reference. Long trousers or jeans. Sneakers or casual shoes.
+
+### SUMMER
+**Female:** Short-sleeved top, sundress, or tank top with the SAME pattern/colors as reference. Shorts, skirt, or light dress. Sandals or summer slides.
+
+**Male:** Short-sleeved top or tank top with the SAME pattern/colors as reference. Shorts or light pants. Sandals or summer slides.
+
+### FORMAL
+**Female:** Elegant dress, formal gown, or blouse with skirt with the SAME pattern/colors as reference (adapted elegantly). Formal heels or dress shoes.
+
+**Male:** Formal suit or dress shirt with trousers with the SAME pattern/colors as reference (adapted elegantly). Formal dress shoes.
+
+---
+
+## Priority System
+
+1. **FACE IDENTITY (Priority #1)**: Non-negotiable - the face must match exactly
+2. **CLOTHING STYLE TRANSFER (Priority #2)**: Pattern, texture, and colors from reference applied to new garment
+
+---
+
+## Style Transfer Examples
+
+| Reference Clothing | Winter Output | Summer Output | Formal Output |
+|-------------------|---------------|---------------|---------------|
+| Blue striped hoodie | Blue striped winter parka | Blue striped t-shirt | Blue suit with subtle stripes |
+| Red polka dot dress | Red polka dot coat | Red polka dot sundress | Red formal gown with polka dots |
+| Green plaid shirt | Green plaid winter jacket | Green plaid short-sleeve | Green plaid formal vest/shirt |
 
 ---
 
@@ -84,3 +81,12 @@ When generating fashion photography, use relaxed safety settings to avoid false 
 - HARM_CATEGORY_HATE_SPEECH: BLOCK_ONLY_HIGH
 - HARM_CATEGORY_SEXUALLY_EXPLICIT: BLOCK_ONLY_HIGH
 - HARM_CATEGORY_DANGEROUS_CONTENT: BLOCK_ONLY_HIGH
+
+---
+
+## Technical Notes
+
+- Aspect ratio: 9:16 (portrait) for full-body shots
+- Background: Pure white (#FFFFFF) for easy compositing
+- Model: gemini-2.5-flash-image
+- Gender is passed from character data to select appropriate clothing options
