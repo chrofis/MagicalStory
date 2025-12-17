@@ -4624,22 +4624,22 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
     const getClothingStylePrompt = (category) => {
       switch (category) {
         case 'winter':
-          return 'Heavy winter coat or parka with the SAME pattern/colors as reference clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.';
+          return 'Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.';
         case 'standard':
           if (isFemale) {
-            return 'Long-sleeved top, casual dress, or sweater dress with the SAME pattern/colors as reference. Jeans, leggings, or skirt. Sneakers or casual shoes.';
+            return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or leggings. Sneakers.';
           }
-          return 'Long-sleeved top with the SAME pattern/colors as reference. Long trousers or jeans. Sneakers or casual shoes.';
+          return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Sneakers.';
         case 'summer':
           if (isFemale) {
-            return 'Short-sleeved top, sundress, or tank top with the SAME pattern/colors as reference. Shorts, skirt, or light dress. Sandals or summer slides.';
+            return 'T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.';
           }
-          return 'Short-sleeved top or tank top with the SAME pattern/colors as reference. Shorts. Sandals or summer slides.';
+          return 'T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.';
         case 'formal':
           if (isFemale) {
-            return 'Elegant dress, formal gown, or blouse with skirt with the SAME pattern/colors as reference (adapted elegantly). Formal heels or dress shoes.';
+            return 'Elegant dress, formal gown, or blouse with skirt with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal heels or dress shoes.';
           }
-          return 'Formal suit or dress shirt with trousers with the SAME pattern/colors as reference (adapted elegantly). Formal dress shoes.';
+          return 'Formal suit or dress shirt with trousers with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal dress shoes.';
         default:
           return 'Full outfit with shoes matching the style of the reference.';
       }
@@ -4665,19 +4665,19 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
         // Build the prompt with priority on face matching and style transfer
         const avatarPrompt = `
-    Subject: Generate a fashion photograph of the person in the reference images.
+    Subject: Generate a fashion photograph of the person in the input image.
 
     CRITICAL PRIORITIES (in order):
-    1. FACE IDENTITY: The face MUST be an exact match to the reference photo - same facial features, skin tone, eye color, hair color and style. This is non-negotiable.
-    2. CLOTHING STYLE TRANSFER: The main clothing piece MUST inherit the pattern, texture, colors, and fabric style from the reference image. Apply these visual elements to the new garment type.
+    1. FACE IDENTITY: The face MUST be an exact match to the input image - same facial features, skin tone, eye color, hair color and style. This is non-negotiable.
+    2. CLOTHING STYLE TRANSFER: Copy the EXACT pattern AND colors from the clothing in the input image. Apply these to the new outfit.
 
     COMPOSITION:
     - Framing: Wide shot. The entire outfit must be visible from head to toe.
     - Background: Pure solid white background (#FFFFFF).
 
     WARDROBE DETAILS:
-    - Style Transfer Rule: Whatever pattern, texture, or colors the person wears in the reference image, apply those SAME visual elements to the outfit below.
-    - Pants Rule: If trousers/pants are visible in the reference photo, replicate them. If NOT visible, create plain/neutral pants - do NOT match the shirt pattern.
+    - Style Transfer Rule: Copy the EXACT pattern AND colors from the clothing in the input image. Apply these to the new outfit.
+    - Pants Rule: If trousers/pants are visible in the input image, replicate them. If NOT visible, create plain/neutral pants - do NOT match the shirt pattern.
     - Outfit: ${getClothingStylePrompt(category)}
 
     PHOTOGRAPHY STYLE:
@@ -4738,12 +4738,45 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
           continue; // Skip this category, try next
         }
 
-        const data = await response.json();
+        let data = await response.json();
 
-        // Check if blocked by safety filters
+        // Check if blocked by safety filters - retry once with simplified prompt
         if (data.promptFeedback?.blockReason) {
           console.warn(`⚠️ [CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
-          continue;
+          console.log(`🔄 [CLOTHING AVATARS] Retrying ${category} with simplified prompt...`);
+
+          // Simplified retry prompt
+          const retryPrompt = `Generate a fashion photograph of this person wearing ${category === 'winter' ? 'a winter coat' : category === 'summer' ? 'a casual T-shirt and shorts' : category === 'formal' ? 'formal attire' : 'casual clothes'}. Full body shot, white background, photorealistic.`;
+
+          const retryRequestBody = {
+            ...requestBody,
+            contents: [{
+              parts: [
+                requestBody.contents[0].parts[0], // Keep the image
+                { text: retryPrompt }
+              ]
+            }]
+          };
+
+          const retryResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(retryRequestBody)
+            }
+          );
+
+          if (retryResponse.ok) {
+            data = await retryResponse.json();
+            if (data.promptFeedback?.blockReason) {
+              console.warn(`⚠️ [CLOTHING AVATARS] ${category} retry also blocked:`, data.promptFeedback.blockReason);
+              continue;
+            }
+          } else {
+            console.error(`❌ [CLOTHING AVATARS] ${category} retry failed`);
+            continue;
+          }
         }
 
         // Extract image from response

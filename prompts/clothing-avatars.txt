@@ -7,22 +7,22 @@ These avatars are used as reference images during story illustration generation.
 ## Base Prompt Template
 
 ```
-Subject: Generate a fashion photograph of the person in the reference images.
+Subject: Generate a fashion photograph of the person in the input image.
 
 CRITICAL PRIORITIES (in order):
-1. FACE IDENTITY: The face MUST be an exact match to the reference photo - same facial features,
+1. FACE IDENTITY: The face MUST be an exact match to the input image - same facial features,
    skin tone, eye color, hair color and style. This is non-negotiable.
-2. CLOTHING STYLE TRANSFER: The main clothing piece MUST inherit the pattern, texture, colors,
-   and fabric style from the reference image. Apply these visual elements to the new garment type.
+2. CLOTHING STYLE TRANSFER: Copy the EXACT pattern AND colors from the clothing in the input image.
+   Apply these to the new outfit.
 
 COMPOSITION:
 - Framing: Wide shot. The entire outfit must be visible from head to toe.
 - Background: Pure solid white background (#FFFFFF).
 
 WARDROBE DETAILS:
-- Style Transfer Rule: Whatever pattern, texture, or colors the person wears in the reference
-  image, apply those SAME visual elements to the outfit below.
-- Pants Rule: If trousers/pants are visible in the reference photo, replicate them. If NOT visible,
+- Style Transfer Rule: Copy the EXACT pattern AND colors from the clothing in the input image.
+  Apply these to the new outfit.
+- Pants Rule: If trousers/pants are visible in the input image, replicate them. If NOT visible,
   create plain/neutral pants - do NOT match the shirt pattern.
 - Outfit: {CLOTHING_STYLE}
 
@@ -40,29 +40,29 @@ Output Quality: 4k, Photorealistic.
 ## Clothing Styles by Category (Gender-Aware)
 
 ### WINTER
-Heavy winter coat or parka with the SAME pattern/colors as reference clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.
+Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.
 
 ### STANDARD
-**Female:** Long-sleeved top, casual dress, or sweater dress with the SAME pattern/colors as reference. Jeans, leggings, or skirt. Sneakers or casual shoes.
+**Female:** Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or leggings. Sneakers.
 
-**Male:** Long-sleeved top with the SAME pattern/colors as reference. Long trousers or jeans. Sneakers or casual shoes.
+**Male:** Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Sneakers.
 
 ### SUMMER
-**Female:** Short-sleeved top, sundress, or tank top with the SAME pattern/colors as reference. Shorts, skirt, or light dress. Sandals or summer slides.
+**Female:** T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.
 
-**Male:** Short-sleeved top or tank top with the SAME pattern/colors as reference. Shorts. Sandals or summer slides.
+**Male:** T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.
 
 ### FORMAL
-**Female:** Elegant dress, formal gown, or blouse with skirt with the SAME pattern/colors as reference (adapted elegantly). Formal heels or dress shoes.
+**Female:** Elegant dress, formal gown, or blouse with skirt with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal heels or dress shoes.
 
-**Male:** Formal suit or dress shirt with trousers with the SAME pattern/colors as reference (adapted elegantly). Formal dress shoes.
+**Male:** Formal suit or dress shirt with trousers with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal dress shoes.
 
 ---
 
 ## Priority System
 
 1. **FACE IDENTITY (Priority #1)**: Non-negotiable - the face must match exactly
-2. **CLOTHING STYLE TRANSFER (Priority #2)**: Pattern, texture, and colors from reference applied to new garment
+2. **CLOTHING STYLE TRANSFER (Priority #2)**: Copy EXACT pattern AND colors from input image clothing
 
 ---
 
