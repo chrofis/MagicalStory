@@ -4677,6 +4677,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
     WARDROBE DETAILS:
     - Style Transfer Rule: Whatever pattern, texture, or colors the person wears in the reference image, apply those SAME visual elements to the outfit below.
+    - Pants Rule: If trousers/pants are visible in the reference photo, replicate them. If NOT visible, create plain/neutral pants - do NOT match the shirt pattern.
     - Outfit: ${getClothingStylePrompt(category)}
 
     PHOTOGRAPHY STYLE:
