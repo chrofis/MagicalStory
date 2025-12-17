@@ -11383,21 +11383,26 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     ];
 
     // Add reference images if provided
+    // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
     if (referenceImages && referenceImages.length > 0) {
+      let addedCount = 0;
       referenceImages.forEach(refImg => {
-        if (refImg && refImg.startsWith('data:image')) {
-          const refBase64 = refImg.replace(/^data:image\/\w+;base64,/, '');
-          const refMimeType = refImg.match(/^data:(image\/\w+);base64,/) ?
-            refImg.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+        // Handle both formats: string URL or {name, photoUrl} object
+        const photoUrl = typeof refImg === 'string' ? refImg : refImg?.photoUrl;
+        if (photoUrl && photoUrl.startsWith('data:image')) {
+          const refBase64 = photoUrl.replace(/^data:image\/\w+;base64,/, '');
+          const refMimeType = photoUrl.match(/^data:(image\/\w+);base64,/) ?
+            photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
           parts.push({
             inline_data: {
               mime_type: refMimeType,
               data: refBase64
             }
           });
+          addedCount++;
         }
       });
-      log.verbose(`⭐ [QUALITY] Added ${referenceImages.length} reference images for evaluation`);
+      log.verbose(`⭐ [QUALITY] Added ${addedCount}/${referenceImages.length} reference images for evaluation`);
     }
 
     // Add evaluation prompt text
