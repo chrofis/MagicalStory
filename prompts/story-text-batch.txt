@@ -45,13 +45,13 @@ The output MUST follow this EXACT format or the system will fail:
 
 **{READING_LEVEL}**
 
-Stay within the word count. Aim for the middle of the range, not the maximum.
+Stay within the word count. Count your words. Aim for the middle of the range, not the maximum.
 
 **FORMATTING:**
-- Write in flowing paragraphs with 3-6 sentences each
-- Aim for 3-6 paragraphs per page for good visual rhythm
+- Write in flowing paragraphs with 2-4 sentences each
+- Maximum 3-4 paragraphs per page
 - Dialogues flow inline with the narrative text
-- Start new paragraphs for scene changes, shifts in action, or new topics
+- Scene changes or location changes = start a NEW PAGE, not a new paragraph
 - Create a readable, engaging style appropriate for the target age
 
 # Story Context

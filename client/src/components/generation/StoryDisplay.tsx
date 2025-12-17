@@ -1,4 +1,5 @@
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History } from 'lucide-react';
+import { useState } from 'react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
@@ -128,6 +129,7 @@ interface StoryDisplayProps {
   onRegenerateCover?: (coverType: 'front' | 'back' | 'initial') => Promise<void>;
   onEditImage?: (pageNumber: number) => void;
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
+  onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
   developerMode?: boolean;
   // Partial story fields
@@ -158,6 +160,7 @@ export function StoryDisplay({
   onRegenerateCover,
   onEditImage,
   onEditCover,
+  onVisualBibleChange,
   storyId,
   developerMode = false,
   isPartial = false,

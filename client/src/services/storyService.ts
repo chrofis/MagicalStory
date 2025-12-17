@@ -364,6 +364,11 @@ export const storyService = {
     });
   },
 
+  // Update Visual Bible (developer mode)
+  async updateVisualBible(storyId: string, visualBible: VisualBible): Promise<void> {
+    await api.put(`/api/stories/${storyId}/visual-bible`, { visualBible });
+  },
+
   // Edit image with user prompt
   async editImage(storyId: string, pageNumber: number, editPrompt: string): Promise<{ imageData: string }> {
     const response = await api.post<{ imageData: string }>(

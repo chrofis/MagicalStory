@@ -3332,6 +3332,53 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
   }
 });
 
+// Update Visual Bible for a story (developer mode)
+app.put('/api/stories/:id/visual-bible', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { visualBible } = req.body;
+
+    if (!visualBible) {
+      return res.status(400).json({ error: 'visualBible is required' });
+    }
+
+    console.log(`📖 PUT /api/stories/${id}/visual-bible - User: ${req.user.username}`);
+
+    // Get existing story
+    const result = await dbPool.query(
+      'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = JSON.parse(result.rows[0].data);
+
+    // Update Visual Bible
+    storyData.visualBible = visualBible;
+    storyData.updatedAt = new Date().toISOString();
+
+    // Save updated story
+    await dbPool.query(
+      'UPDATE stories SET data = $1 WHERE id = $2',
+      [JSON.stringify(storyData), id]
+    );
+
+    console.log(`✅ Visual Bible updated for story ${id}`);
+
+    res.json({
+      success: true,
+      message: 'Visual Bible updated successfully'
+    });
+
+  } catch (err) {
+    console.error('Error updating Visual Bible:', err);
+    res.status(500).json({ error: 'Failed to update Visual Bible: ' + err.message });
+  }
+});
+
 // Get checkpoints for a job (for debugging/admin)
 app.get('/api/jobs/:jobId/checkpoints', authenticateToken, async (req, res) => {
   try {
