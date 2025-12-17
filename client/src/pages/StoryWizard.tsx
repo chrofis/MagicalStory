@@ -658,6 +658,10 @@ export default function StoryWizard() {
         }
         return prev;
       });
+      log.success(`✅ Avatars regenerated for ${currentCharacter.name}`);
+    } catch (error) {
+      log.error(`❌ Failed to regenerate avatars for ${currentCharacter.name}:`, error);
+      alert(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRegeneratingAvatars(false);
     }
