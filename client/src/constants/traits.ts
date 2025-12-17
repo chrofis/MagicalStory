@@ -1,9 +1,9 @@
 import type { Language } from '@/types/story';
 
 export const defaultStrengths: Record<Language, string[]> = {
-  en: ['Brave', 'Smart', 'Kind', 'Strong', 'Fast', 'Creative', 'Funny', 'Leader', 'Helpful', 'Patient', 'Honest', 'Loyal', 'Curious', 'Determined', 'Caring', 'Confident', 'Cheerful', 'Generous', 'Clever', 'Adventurous', 'Resourceful', 'Protective', 'Imaginative', 'Hardworking', 'Trustworthy'],
-  de: ['Mutig', 'Klug', 'Freundlich', 'Stark', 'Schnell', 'Kreativ', 'Lustig', 'Führungspersönlichkeit', 'Hilfsbereit', 'Geduldig', 'Ehrlich', 'Treu', 'Neugierig', 'Entschlossen', 'Fürsorglich', 'Selbstbewusst', 'Fröhlich', 'Grosszügig', 'Schlau', 'Abenteuerlustig', 'Einfallsreich', 'Beschützend', 'Fantasievoll', 'Fleissig', 'Vertrauenswürdig'],
-  fr: ['Courageux', 'Intelligent', 'Gentil', 'Fort', 'Rapide', 'Créatif', 'Drôle', 'Leader', 'Serviable', 'Patient', 'Honnête', 'Loyal', 'Curieux', 'Déterminé', 'Attentionné', 'Confiant', 'Joyeux', 'Généreux', 'Astucieux', 'Aventureux', 'Débrouillard', 'Protecteur', 'Imaginatif', 'Travailleur', 'Digne de confiance'],
+  en: ['Cheerful', 'Kind', 'Caring', 'Funny', 'Forgiving', 'Protective', 'Loyal', 'Generous', 'Fair-minded', 'Honest', 'Confident', 'Brave', 'Trustworthy', 'Determined', 'Hardworking', 'Leader', 'Patient', 'Curious', 'Imaginative', 'Smart', 'Creative', 'Observant', 'Resourceful', 'Energetic', 'Fast', 'Strong', 'Adventurous'],
+  de: ['Fröhlich', 'Freundlich', 'Hilfsbereit', 'Lustig', 'Nachsichtig', 'Beschützend', 'Treu', 'Grosszügig', 'Gerecht', 'Ehrlich', 'Selbstbewusst', 'Mutig', 'Vertrauenswürdig', 'Entschlossen', 'Fleissig', 'Leader', 'Geduldig', 'Neugierig', 'Fantasievoll', 'Klug', 'Kreativ', 'Aufmerksam', 'Einfallsreich', 'Energiegeladen', 'Schnell', 'Stark', 'Abenteuerlustig'],
+  fr: ['Joyeux', 'Gentil', 'Attentionné', 'Drôle', 'Indulgent', 'Protecteur', 'Loyal', 'Généreux', 'Équitable', 'Honnête', 'Confiant', 'Courageux', 'Digne de confiance', 'Déterminé', 'Travailleur', 'Leader', 'Patient', 'Curieux', 'Imaginatif', 'Intelligent', 'Créatif', 'Observateur', 'Débrouillard', 'Énergique', 'Rapide', 'Fort', 'Aventureux'],
 };
 
 export const defaultFlaws: Record<Language, string[]> = {

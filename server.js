@@ -8813,7 +8813,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           retryHistory: imageResult.retryHistory || [],
           originalImage: imageResult.originalImage || null,
           originalScore: imageResult.originalScore || null,
-          originalReasoning: imageResult.originalReasoning || null
+          originalReasoning: imageResult.originalReasoning || null,
+          referencePhotos  // Dev mode: which photos were used
         };
 
         // Save partial result checkpoint for progressive display
