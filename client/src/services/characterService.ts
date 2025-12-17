@@ -191,12 +191,13 @@ export const characterService = {
         if (character.otherFeatures) physicalDescription += `, ${character.otherFeatures}`;
       }
 
-      log.info(`Generating clothing avatars for ${character.name}...`);
+      log.info(`Generating clothing avatars for ${character.name} (id: ${character.id})...`);
       const response = await api.post<{
         success: boolean;
         clothingAvatars?: ClothingAvatars;
         error?: string;
       }>('/api/generate-clothing-avatars', {
+        characterId: character.id,
         facePhoto: character.thumbnailUrl || character.photoUrl,
         physicalDescription,
         name: character.name,

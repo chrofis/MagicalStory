@@ -372,7 +372,8 @@ export function CharacterForm({
         </div>
       </div>
 
-      {/* Physical Features - from Style Analysis (editable) */}
+      {/* Physical Features - from Style Analysis (editable, developer only) */}
+      {developerMode && (
       <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
         <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
           👤 {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
@@ -465,6 +466,7 @@ export function CharacterForm({
           </div>
         </div>
       </div>
+      )}
 
       {/* Clothing Avatars - generated for different settings (developer only) */}
       {developerMode && character.clothingAvatars && (
@@ -497,10 +499,10 @@ export function CharacterForm({
                   <img
                     src={character.clothingAvatars[category]}
                     alt={`${character.name} - ${category}`}
-                    className="w-full h-24 object-contain rounded border border-teal-200 bg-white"
+                    className="w-full h-48 object-contain rounded border border-teal-200 bg-white"
                   />
                 ) : (
-                  <div className="w-full h-24 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">
+                  <div className="w-full h-48 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">
                     {character.clothingAvatars?.status === 'generating' ? '...' : 'Not generated'}
                   </div>
                 )}
