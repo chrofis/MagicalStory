@@ -31,11 +31,8 @@ RUN cd client && npm install
 # Copy all application files
 COPY . .
 
-# Build the React client
+# Build the React client (outputs to ./dist in root, per vite.config.ts)
 RUN cd client && npm run build
-
-# Move built files to dist/ in root (where server expects them)
-RUN mv client/dist ./dist
 
 # Expose ports
 EXPOSE 3000 5000
