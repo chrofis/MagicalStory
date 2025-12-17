@@ -554,7 +554,14 @@ export default function StoryWizard() {
   };
 
   // Generate clothing avatars in the background for a character
-  const generateAvatarsInBackground = async (char: Character, allCharacters: Character[]) => {
+  // Takes current relationship data as parameters to avoid stale closures
+  const generateAvatarsInBackground = async (
+    char: Character,
+    allCharacters: Character[],
+    currentRelationships: Record<string, string>,
+    currentRelationshipTexts: Record<string, string>,
+    currentCustomRelationships: string[]
+  ) => {
     // Only generate if character has a face photo
     if (!char.photoUrl && !char.thumbnailUrl) {
       log.debug(`Skipping avatar generation for ${char.name}: no photo`);
@@ -589,21 +596,26 @@ export default function StoryWizard() {
           }
         };
 
-        // Update state and save to backend
-        setCharacters(prev => {
-          const updated = prev.map(c => c.id === char.id ? charWithAvatars : c);
-          // Save updated characters to backend (fire and forget)
-          characterService.saveCharacterData({
-            characters: updated,
-            relationships,
-            relationshipTexts,
-            customRelationships,
+        // Update state first
+        setCharacters(prev => prev.map(c => c.id === char.id ? charWithAvatars : c));
+
+        // Then save to backend with fresh character data
+        const updatedCharacters = allCharacters.map(c => c.id === char.id ? charWithAvatars : c);
+        log.info(`💾 Saving avatars for ${char.name} to backend...`);
+        try {
+          await characterService.saveCharacterData({
+            characters: updatedCharacters,
+            relationships: currentRelationships,
+            relationshipTexts: currentRelationshipTexts,
+            customRelationships: currentCustomRelationships,
             customStrengths: [],
             customWeaknesses: [],
             customFears: [],
-          }).catch(err => log.error('Failed to save avatars:', err));
-          return updated;
-        });
+          });
+          log.success(`💾 Avatars saved for ${char.name}`);
+        } catch (saveErr) {
+          log.error(`Failed to save avatars for ${char.name}:`, saveErr);
+        }
       } else {
         log.error(`❌ Avatar generation failed for ${char.name}: ${result.error}`);
         // Mark as failed
@@ -653,7 +665,14 @@ export default function StoryWizard() {
       const savedChar = updatedCharacters.find(c => c.id === currentCharacter.id);
       if (savedChar && (savedChar.photoUrl || savedChar.thumbnailUrl) && !savedChar.clothingAvatars?.winter) {
         // Fire and forget - don't await
-        generateAvatarsInBackground(savedChar, updatedCharacters);
+        // Pass current relationship data to avoid stale closure issues
+        generateAvatarsInBackground(
+          savedChar,
+          updatedCharacters,
+          relationships,
+          relationshipTexts,
+          customRelationships
+        );
       }
 
       setCurrentCharacter(null);
