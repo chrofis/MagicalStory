@@ -110,7 +110,7 @@ console.log('💾 Image cache initialized');
 const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;  // 0 = no batching (generate all at once)
 
 // Image generation mode: 'parallel' (fast) or 'sequential' (consistent - passes previous image)
-const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'sequential';
+const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
 
 // Image quality threshold - regenerate if score below this value (0-100 scale)
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
@@ -8754,7 +8754,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Track image generation promises (started during streaming)
     const streamingImagePromises = [];
     const completedSceneNumbers = new Set();
-    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'sequential';
+    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
     const MAX_RETRIES = 2;
 
     // Rate limiter for parallel image generation during streaming
@@ -9499,7 +9499,7 @@ async function processStoryJob(jobId) {
 
     // Determine image generation mode: sequential (consistent) or parallel (fast)
     // Sequential passes previous image to next for better character consistency
-    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'sequential';
+    const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
     console.log(`🖼️  [PIPELINE] Image generation mode: ${imageGenMode.toUpperCase()}`);
 
     // Extract character photos for reference images (with names for labeling)
