@@ -9119,13 +9119,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Add storyId to resultData so client can navigate to it
     resultData.storyId = storyId;
 
-    // Mark job as completed
+    // Mark job as completed and reset credits_reserved to prevent accidental refunds
     await dbPool.query(
       `UPDATE story_jobs SET
         status = 'completed',
         progress = 100,
         progress_message = 'Picture book complete!',
         result_data = $1,
+        credits_reserved = 0,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $2`,
       [JSON.stringify(resultData), jobId]
@@ -9168,6 +9169,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
              VALUES ($1, $2, $3, $4, $5, $6)`,
             [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, `Refunded ${creditsToRefund} credits - storybook generation failed`]
+          );
+
+          // Reset credits_reserved to prevent double refunds
+          await dbPool.query(
+            'UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1',
+            [jobId]
           );
 
           console.log(`💳 [STORYBOOK] Refunded ${creditsToRefund} credits for failed job ${jobId}`);
@@ -10049,7 +10056,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     await dbPool.query(
       `UPDATE story_jobs
        SET status = $1, progress = $2, progress_message = $3, result_data = $4,
-           completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+           credits_reserved = 0, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $5`,
       ['completed', 100, 'Story generation complete!', JSON.stringify(resultData), jobId]
     );
@@ -10296,6 +10303,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
              VALUES ($1, $2, $3, $4, $5, $6)`,
             [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, `Refunded ${creditsToRefund} credits - story generation failed`]
+          );
+
+          // Reset credits_reserved to prevent double refunds
+          await dbPool.query(
+            'UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1',
+            [jobId]
           );
 
           console.log(`💳 Refunded ${creditsToRefund} credits for failed job ${jobId} (user balance: ${currentBalance} -> ${newBalance})`);
