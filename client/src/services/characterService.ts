@@ -191,14 +191,17 @@ export const characterService = {
         if (character.otherFeatures) physicalDescription += `, ${character.otherFeatures}`;
       }
 
-      log.info(`Generating clothing avatars for ${character.name} (id: ${character.id})...`);
+      // Prefer body with no background for best avatar generation results
+      const inputPhoto = character.bodyNoBgUrl || character.bodyPhotoUrl || character.thumbnailUrl || character.photoUrl;
+      log.info(`Generating clothing avatars for ${character.name} (id: ${character.id}), using: ${character.bodyNoBgUrl ? 'bodyNoBgUrl' : character.bodyPhotoUrl ? 'bodyPhotoUrl' : character.thumbnailUrl ? 'thumbnailUrl' : 'photoUrl'}`);
+
       const response = await api.post<{
         success: boolean;
         clothingAvatars?: ClothingAvatars;
         error?: string;
       }>('/api/generate-clothing-avatars', {
         characterId: character.id,
-        facePhoto: character.thumbnailUrl || character.photoUrl,
+        facePhoto: inputPhoto,
         physicalDescription,
         name: character.name,
         age: character.age,

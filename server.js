@@ -2809,8 +2809,11 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Get language from story data
     const language = storyData.language || 'English';
 
-    // Generate new scene description
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language);
+    // Get Visual Bible for recurring elements
+    const visualBible = storyData.visualBible || null;
+
+    // Generate new scene description (includes Visual Bible recurring elements)
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible);
     const newSceneDescription = await callClaudeAPI(scenePrompt, 2048);
 
     // Update the scene description in story data
@@ -8176,7 +8179,7 @@ function extractCoverScenes(outline) {
 }
 
 // Helper function to build Art Director scene description prompt (matches frontend)
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English') {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null) {
   const characterDetails = characters.map(c => {
     const details = [];
     if (c.age) details.push(`Age ${c.age}`);
@@ -8188,6 +8191,31 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     return `* **${c.name}:** ${details.join(', ')}`;
   }).join('\n');
 
+  // Build Visual Bible recurring elements section
+  let recurringElements = '';
+  if (visualBible) {
+    const entries = getVisualBibleEntriesForPage(visualBible, pageNumber);
+    if (entries.length > 0) {
+      recurringElements = '\n**RECURRING ELEMENTS IN THIS SCENE:**\n';
+      for (const entry of entries) {
+        const description = entry.extractedDescription || entry.description;
+        recurringElements += `* **${entry.name}** (${entry.type}): ${description}\n`;
+      }
+    }
+    // Add secondary characters if any appear
+    if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
+      const secondaryInScene = visualBible.secondaryCharacters.filter(sc =>
+        sc.appearsOnPages && sc.appearsOnPages.includes(pageNumber)
+      );
+      if (secondaryInScene.length > 0) {
+        if (!recurringElements) recurringElements = '\n**RECURRING ELEMENTS IN THIS SCENE:**\n';
+        for (const sc of secondaryInScene) {
+          recurringElements += `* **${sc.name}** (secondary character): ${sc.description}\n`;
+        }
+      }
+    }
+  }
+
   // Use template from file if available
   if (PROMPT_TEMPLATES.sceneDescriptions) {
     return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
@@ -8195,6 +8223,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       PAGE_NUMBER: pageNumber.toString(),
       PAGE_CONTENT: pageContent,
       CHARACTERS: characterDetails,
+      RECURRING_ELEMENTS: recurringElements,
       LANGUAGE: language
     });
   }
@@ -8209,7 +8238,7 @@ ${pageContent}
 
 **AVAILABLE CHARACTERS & VISUAL REFERENCES:**
 ${characterDetails}
-
+${recurringElements}
 **TASK:**
 Create a detailed visual description of ONE key moment from the scene context provided.
 
@@ -8226,7 +8255,8 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 - Do not include dialogue or speech
 - Focus purely on visual elements
 - Use simple, clear language
-- Only include characters essential to this scene`;
+- Only include characters essential to this scene
+- If recurring elements appear, describe them consistently as specified above`;
 }
 
 // Helper function to parse story text into pages
@@ -9374,7 +9404,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
 
           // Generate scene description using Art Director prompt (in story language)
-          const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText);
+          // Pass visualBible so recurring elements are included in scene description
+          const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
 
           // Start scene description + image generation (don't await yet)
           const imagePromise = limit(async () => {
@@ -9556,7 +9587,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
           try {
             // Generate scene description using Art Director prompt (in story language)
-            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText);
+            // Pass visualBible so recurring elements are included in scene description
+            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
 
             console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
             const sceneDescription = await callTextModelStreaming(scenePrompt, 2048);
@@ -10395,6 +10427,8 @@ function parseSceneDescriptions(text, expectedCount) {
 
 function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null) {
   // Build image generation prompt (matches step-by-step format)
+  // Note: visualBible and pageNumber params kept for backward compatibility but no longer used here
+  // Visual Bible recurring elements are now included in the scene description via buildSceneDescriptionPrompt
   const artStyleId = inputData.artStyle || 'pixar';
   const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
   const language = (inputData.language || 'en').toLowerCase();
@@ -10402,27 +10436,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Character info is now provided via:
   // 1. Reference photos attached to the API call
   // 2. Character names/actions in the scene description from Claude
-  // Removed redundant CHARACTER_INFO text block to reduce prompt size and avoid language mixing
+  // 3. Visual Bible recurring elements are already in the scene description
 
-  // Add Visual Bible entries for recurring elements (secondary characters, animals, artifacts)
-  // Extract character names from sceneCharacters for filtering
-  let sceneCharacterNames = null;
   if (sceneCharacters && sceneCharacters.length > 0) {
-    sceneCharacterNames = sceneCharacters.map(c => c.name);
-    console.log(`📖 [IMAGE PROMPT] Scene characters: ${sceneCharacterNames.join(', ')}`);
-  }
-
-  let visualBiblePrompt = '';
-  if (visualBible && pageNumber) {
-    console.log(`📖 [IMAGE PROMPT] Visual Bible present for page ${pageNumber}, entries: animals=${visualBible.animals?.length || 0}, artifacts=${visualBible.artifacts?.length || 0}, locations=${visualBible.locations?.length || 0}`);
-    visualBiblePrompt = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames);
-    if (visualBiblePrompt) {
-      console.log(`📖 [IMAGE PROMPT] Added Visual Bible entries for page ${pageNumber}`);
-    } else {
-      console.log(`📖 [IMAGE PROMPT] No Visual Bible entries for page ${pageNumber} (none match this page)`);
-    }
-  } else {
-    console.log(`📖 [IMAGE PROMPT] Visual Bible: ${visualBible ? 'present but no pageNumber' : 'not present'}, pageNumber: ${pageNumber}`);
+    console.log(`📖 [IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
   }
 
   // Select the correct template based on language and sequential mode
@@ -10450,23 +10467,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
     console.log(`📝 [IMAGE PROMPT] Using ${isSequential ? 'sequential' : 'parallel'} template for language: ${language}`);
-    let prompt = fillTemplate(template, {
+    return fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: sceneDescription,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
-    // Append Visual Bible entries if present
-    if (visualBiblePrompt) {
-      prompt += visualBiblePrompt;
-    }
-    return prompt;
   }
 
   // Fallback to hardcoded prompt
   return `Create a cinematic scene in ${styleDescription}.
 
-Scene Description: ${sceneDescription}${visualBiblePrompt}
+Scene Description: ${sceneDescription}
 
 Important:
 - Match characters to the reference photos provided

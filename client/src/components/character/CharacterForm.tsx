@@ -542,24 +542,26 @@ export function CharacterForm({
               <span className="text-xs font-normal text-red-600">✗ Failed</span>
             )}
           </h4>
-          {/* Show input image used for generation */}
+          {/* Show input image used for generation - priority: bodyNoBgUrl > bodyPhotoUrl > thumbnailUrl > photoUrl */}
           <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-            <div className="text-xs font-medium text-yellow-700 mb-1">📸 Input Image Used:</div>
+            <div className="text-xs font-medium text-yellow-700 mb-1">📸 Input Image Used for Avatar Generation:</div>
             <div className="flex items-start gap-3">
-              {(character.thumbnailUrl || character.photoUrl) ? (
+              {(character.bodyNoBgUrl || character.bodyPhotoUrl || character.thumbnailUrl || character.photoUrl) ? (
                 <img
-                  src={character.thumbnailUrl || character.photoUrl}
+                  src={character.bodyNoBgUrl || character.bodyPhotoUrl || character.thumbnailUrl || character.photoUrl}
                   alt="Input for avatar generation"
-                  className="w-20 h-20 object-cover rounded border border-yellow-300"
+                  className="w-20 h-28 object-contain rounded border border-yellow-300"
+                  style={character.bodyNoBgUrl ? { background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 10px 10px' } : undefined}
                 />
               ) : (
-                <div className="w-20 h-20 bg-yellow-100 rounded border border-yellow-300 flex items-center justify-center text-yellow-500 text-xs">No image</div>
+                <div className="w-20 h-28 bg-yellow-100 rounded border border-yellow-300 flex items-center justify-center text-yellow-500 text-xs">No image</div>
               )}
               <div className="text-[10px] text-yellow-600 flex-1">
+                <div><strong>bodyNoBgUrl:</strong> {character.bodyNoBgUrl ? '✓ Set (BEST)' : '✗ Not set'}</div>
+                <div><strong>bodyPhotoUrl:</strong> {character.bodyPhotoUrl ? '✓ Set' : '✗ Not set'}</div>
                 <div><strong>thumbnailUrl:</strong> {character.thumbnailUrl ? '✓ Set' : '✗ Not set'}</div>
                 <div><strong>photoUrl:</strong> {character.photoUrl ? '✓ Set' : '✗ Not set'}</div>
-                <div><strong>Using:</strong> {character.thumbnailUrl ? 'thumbnailUrl' : character.photoUrl ? 'photoUrl' : 'None'}</div>
-                <div className="mt-1 break-all opacity-60">{(character.thumbnailUrl || character.photoUrl || 'N/A').substring(0, 100)}...</div>
+                <div className="mt-1 font-semibold"><strong>Using:</strong> {character.bodyNoBgUrl ? 'bodyNoBgUrl ✓' : character.bodyPhotoUrl ? 'bodyPhotoUrl' : character.thumbnailUrl ? 'thumbnailUrl' : character.photoUrl ? 'photoUrl' : 'None'}</div>
               </div>
             </div>
           </div>

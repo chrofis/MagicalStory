@@ -7,7 +7,7 @@ You are an expert Art Director creating an illustration brief for a children's b
 
 **AVAILABLE CHARACTERS & VISUAL REFERENCES:**
 {CHARACTERS}
-
+{RECURRING_ELEMENTS}
 **TASK:**
 Create a detailed visual description of ONE key moment from the scene context provided.
 
@@ -43,6 +43,7 @@ Create a detailed visual description of ONE key moment from the scene context pr
 - Use simple, clear language
 - Every character in the scene MUST be named explicitly
 - Fewer characters = better illustration quality
+- If recurring elements (animals, artifacts, locations) appear, include them with exact descriptions from above
 - **OUTPUT LANGUAGE: Write the entire scene description in {LANGUAGE}**
 
 **SAFETY - AVOID THESE SETTINGS:**
