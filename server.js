@@ -222,39 +222,60 @@ function getCharactersInScene(sceneDescription, characters) {
 }
 
 /**
- * Get photo URLs for specific characters
- * Prefers body with no background > body crop > face photo
+ * Get photo URLs for specific characters based on clothing category
+ * Prefers clothing avatar for the category > body with no background > body crop > face photo
  * @param {Array} characters - Array of character objects (filtered to scene)
+ * @param {string} clothingCategory - Optional clothing category (winter, summer, formal, standard)
  * @returns {Array} Array of photo URLs for image generation
  */
-function getCharacterPhotos(characters) {
+function getCharacterPhotos(characters, clothingCategory = null) {
   if (!characters || characters.length === 0) return [];
   return characters
     .map(char => {
-      // Prefer body without background for cleaner image generation
-      // Fall back to body with background, then face photo
-      return char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
+      // If clothing category specified and character has clothing avatar for it, use it
+      if (clothingCategory && char.clothingAvatars && char.clothingAvatars[clothingCategory]) {
+        return char.clothingAvatars[clothingCategory];
+      }
+      // Fall back to face photo only (no longer using body photos)
+      return char.photoUrl;
     })
     .filter(url => url); // Remove nulls
 }
 
 /**
+ * Parse clothing category from scene description
+ * Looks for patterns like "Clothing: winter" or "**Clothing:** standard"
+ * @param {string} sceneDescription - The scene description text
+ * @returns {string|null} Clothing category (winter, summer, formal, standard) or null if not found
+ */
+function parseClothingCategory(sceneDescription) {
+  if (!sceneDescription) return null;
+
+  // Match patterns like "Clothing: winter", "**Clothing:** standard", "3. **Clothing:** formal"
+  const clothingMatch = sceneDescription.match(/\*?\*?Clothing\*?\*?:?\s*\*?\*?(winter|summer|formal|standard)\*?\*?/i);
+  if (clothingMatch) {
+    return clothingMatch[1].toLowerCase();
+  }
+  return null;
+}
+
+/**
  * Get detailed photo info for characters (for dev mode display)
  * @param {Array} characters - Array of character objects
+ * @param {string} clothingCategory - Optional clothing category to show which avatar is used
  * @returns {Array} Array of objects with character name and photo type used
  */
-function getCharacterPhotoDetails(characters) {
+function getCharacterPhotoDetails(characters, clothingCategory = null) {
   if (!characters || characters.length === 0) return [];
   return characters
     .map(char => {
       let photoType = 'none';
       let photoUrl = null;
-      if (char.bodyNoBgUrl) {
-        photoType = 'body-no-bg';
-        photoUrl = char.bodyNoBgUrl;
-      } else if (char.bodyPhotoUrl) {
-        photoType = 'body';
-        photoUrl = char.bodyPhotoUrl;
+
+      // Check for clothing avatar first
+      if (clothingCategory && char.clothingAvatars && char.clothingAvatars[clothingCategory]) {
+        photoType = `clothing-${clothingCategory}`;
+        photoUrl = char.clothingAvatars[clothingCategory];
       } else if (char.photoUrl) {
         photoType = 'face';
         photoUrl = char.photoUrl;
@@ -264,6 +285,7 @@ function getCharacterPhotoDetails(characters) {
         id: char.id,
         photoType,
         photoUrl,
+        clothingCategory: clothingCategory || null,
         hasPhoto: photoType !== 'none'
       };
     })
@@ -4578,6 +4600,186 @@ function analyzeSceneSettingFallback(sceneDescription) {
   return 'neutral';
 }
 
+// Generate clothing avatars for a character (4 categories: winter, standard, summer, formal)
+// This creates photorealistic avatars with different clothing for story illustration
+// Prompts based on reference implementation - see prompts/clothing-avatars.txt
+app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) => {
+  try {
+    const { characterId, facePhoto, physicalDescription, name, age, gender } = req.body;
+
+    if (!facePhoto) {
+      return res.status(400).json({ error: 'Missing facePhoto' });
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      return res.status(503).json({ error: 'Avatar generation service unavailable' });
+    }
+
+    console.log(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})`);
+
+    // Clothing style prompts matching the reference implementation
+    const getClothingStylePrompt = (category) => {
+      switch (category) {
+        case 'winter':
+          return 'Apparel: Heavy Winter Outerwear. The subject is wearing a prominent thick winter coat or parka. Layers are visible. Footwear: Heavy winter boots.';
+        case 'standard':
+          return 'Apparel: Casual Long-Sleeve attire. Long-sleeved top and long trousers or jeans. No outer coat. Footwear: Sneakers or casual shoes.';
+        case 'summer':
+          return 'Apparel: Summer attire. Short-sleeved top and shorts. Light and airy fabric textures. Footwear: Sandals or summer slides.';
+        case 'formal':
+          return 'Apparel: Formal Event wear. A formal suit or evening gown. Sophisticated fabrics. Color palette matches reference. Footwear: Formal dress shoes.';
+        default:
+          return 'Full outfit with shoes.';
+      }
+    };
+
+    // Enhancement style - using POLISHED for clean professional look
+    const enhancementStyle = `
+        Style: High-End Editorial Photography.
+        - Lighting: Soft, evenly diffused studio lighting.
+        - Details: Sharp focus on fabric textures.
+        - Presentation: Clean, professional, magazine-quality look.
+        - Face: Preserve identity strictly.`;
+
+    // Define clothing categories
+    const clothingCategories = {
+      winter: { emoji: '❄️' },
+      standard: { emoji: '👕' },
+      summer: { emoji: '☀️' },
+      formal: { emoji: '👔' }
+    };
+
+    const results = {
+      status: 'generating',
+      generatedAt: null
+    };
+
+    // Generate avatars sequentially to avoid rate limits
+    for (const [category, config] of Object.entries(clothingCategories)) {
+      try {
+        console.log(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name}...`);
+
+        // Build the prompt matching the reference implementation exactly
+        const avatarPrompt = `
+    Subject: Generate a fashion photograph of the person in the reference images.
+
+    COMPOSITION:
+    1. Framing: Wide shot. The entire outfit must be visible from head to toe.
+    2. Background: Pure solid white background (#FFFFFF).
+    3. Identity: The face must match the reference photos exactly.
+
+    WARDROBE DETAILS:
+    1. Reference Logic: Use the exact pattern and texture from the source image for the main clothing item.
+    2. ${getClothingStylePrompt(category)}
+
+    PHOTOGRAPHY STYLE:
+    ${enhancementStyle}
+
+    Output Quality: 4k, Photorealistic.
+  `;
+
+        // Prepare the request with reference photo
+        const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+        const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
+          facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+        const requestBody = {
+          contents: [{
+            parts: [
+              // Image first, then text prompt (matching reference implementation order)
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Data
+                }
+              },
+              { text: avatarPrompt }
+            ]
+          }],
+          generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+            imageConfig: {
+              aspectRatio: "9:16"  // Portrait aspect ratio for full body shots
+            }
+          },
+          // Relaxed safety settings to avoid false positives on fashion photography
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+          ]
+        };
+
+        // Use gemini-2.5-flash-image for avatar generation
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ [CLOTHING AVATARS] ${category} generation failed:`, errorText);
+          continue; // Skip this category, try next
+        }
+
+        const data = await response.json();
+
+        // Check if blocked by safety filters
+        if (data.promptFeedback?.blockReason) {
+          console.warn(`⚠️ [CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
+          continue;
+        }
+
+        // Extract image from response
+        let imageData = null;
+        if (data.candidates && data.candidates[0]?.content?.parts) {
+          for (const part of data.candidates[0].content.parts) {
+            if (part.inlineData) {
+              imageData = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+              break;
+            }
+          }
+        }
+
+        if (imageData) {
+          results[category] = imageData;
+          console.log(`✅ [CLOTHING AVATARS] ${category} avatar generated successfully`);
+        } else {
+          console.log(`⚠️ [CLOTHING AVATARS] No image in ${category} response`);
+        }
+
+        // Small delay between generations to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+      } catch (err) {
+        console.error(`❌ [CLOTHING AVATARS] Error generating ${category}:`, err.message);
+      }
+    }
+
+    // Check if at least one avatar was generated
+    const generatedCount = ['winter', 'standard', 'summer', 'formal'].filter(c => results[c]).length;
+    if (generatedCount === 0) {
+      return res.status(500).json({ error: 'Failed to generate any avatars' });
+    }
+
+    results.status = 'complete';
+    results.generatedAt = new Date().toISOString();
+
+    console.log(`✅ [CLOTHING AVATARS] Generated ${generatedCount}/4 avatars for ${name}`);
+    res.json({ success: true, clothingAvatars: results });
+
+  } catch (err) {
+    console.error('Error generating clothing avatars:', err);
+    res.status(500).json({ error: 'Failed to generate clothing avatars', details: err.message });
+  }
+});
+
 // Extract outfit from generated image for Visual Bible update
 app.post('/api/extract-outfit', authenticateToken, async (req, res) => {
   try {
@@ -8155,7 +8357,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const generateImageForScene = async (pageNum, sceneDesc, pageText = null, vBible = null) => {
       try {
         const sceneCharacters = getCharactersInScene(sceneDesc, inputData.characters || []);
-        const scenePhotos = getCharacterPhotos(sceneCharacters);
+        // Parse clothing category from scene description
+        const clothingCategory = parseClothingCategory(sceneDesc) || 'standard';
+        const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
 
         // Log with visual bible info if available
         if (vBible) {
@@ -9130,9 +9334,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
               // Detect which characters appear in this scene
               const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
-              const scenePhotos = getCharacterPhotos(sceneCharacters);
-              const referencePhotos = getCharacterPhotoDetails(sceneCharacters);
-              console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
+              // Parse clothing category from scene description
+              const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
+              const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+              const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+              console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
 
               // Generate image from scene description with scene-specific characters and visual bible
               const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum);
@@ -9305,9 +9511,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
             // Detect which characters appear in this scene
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
-            const scenePhotos = getCharacterPhotos(sceneCharacters);
-            const referencePhotos = getCharacterPhotoDetails(sceneCharacters);
-            console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
+            // Parse clothing category from scene description
+            const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
+            const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+            const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+            console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
 
             // Generate image from scene description with scene-specific characters and visual bible
             const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, true, visualBible, pageNum);

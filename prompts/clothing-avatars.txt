@@ -1,0 +1,86 @@
+# Clothing Avatar Generation Prompts
+
+## Overview
+This file contains prompts for generating character avatars in different clothing styles.
+These avatars are used as reference images during story illustration generation.
+
+## Base Prompt Template
+
+Subject: Generate a fashion photograph of the person in the reference images.
+
+COMPOSITION:
+1. Framing: Wide shot. The entire outfit must be visible from head to toe.
+2. Background: Pure solid white background (#FFFFFF).
+3. Identity: The face must match the reference photos exactly.
+
+WARDROBE DETAILS:
+1. {CLOTHING_CONSISTENCY_INSTRUCTION}
+2. {CLOTHING_STYLE}
+
+PHOTOGRAPHY STYLE:
+{ENHANCEMENT_STYLE}
+
+Output Quality: 4k, Photorealistic.
+
+---
+
+## Clothing Consistency Instructions
+
+### Single Reference Image
+Reference Logic: Use the exact pattern and texture from the source image for the main clothing item.
+
+### Multiple Reference Images
+Reference Logic: Select one cohesive clothing style/color from the provided references.
+
+---
+
+## Clothing Styles by Category
+
+### WINTER
+Apparel: Heavy Winter Outerwear. The subject is wearing a prominent thick winter coat or parka. Layers are visible. Footwear: Heavy winter boots.
+
+### STANDARD (Casual Long)
+Apparel: Casual Long-Sleeve attire. Long-sleeved top and long trousers or jeans. No outer coat. Footwear: Sneakers or casual shoes.
+
+### SUMMER
+Apparel: Summer attire. Short-sleeved top and shorts. Light and airy fabric textures. Footwear: Sandals or summer slides.
+
+### FORMAL
+Apparel: Formal Event wear. A formal suit or evening gown. Sophisticated fabrics. Color palette matches reference. Footwear: Formal dress shoes.
+
+---
+
+## Enhancement Styles
+
+### POLISHED (High-End Editorial)
+Style: High-End Editorial Photography.
+- Lighting: Soft, evenly diffused studio lighting.
+- Details: Sharp focus on fabric textures.
+- Presentation: Clean, professional, magazine-quality look.
+- Face: Preserve identity strictly.
+
+### AUTHENTIC (Documentary)
+Style: Photojournalism / Documentary.
+- Lighting: Natural, existing light.
+- Presentation: Unfiltered, candid, realistic texture.
+- Face: Preserve identity strictly.
+
+---
+
+## Usage Notes
+
+- The POLISHED style is recommended for children's book avatars as it produces cleaner, more consistent results
+- Always use a pure white background (#FFFFFF) for easy compositing
+- Face identity preservation is critical - the avatar must look like the same person
+- Full body framing (head to toe) ensures outfit visibility in illustrations
+- Use aspect ratio 9:16 (portrait) for full-body shots
+
+---
+
+## Safety Settings
+
+When generating fashion photography, use relaxed safety settings to avoid false positives:
+- HARM_CATEGORY_HARASSMENT: BLOCK_ONLY_HIGH
+- HARM_CATEGORY_HATE_SPEECH: BLOCK_ONLY_HIGH
+- HARM_CATEGORY_SEXUALLY_EXPLICIT: BLOCK_ONLY_HIGH
+- HARM_CATEGORY_DANGEROUS_CONTENT: BLOCK_ONLY_HIGH

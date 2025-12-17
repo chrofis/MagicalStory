@@ -553,6 +553,72 @@ export default function StoryWizard() {
     reader.readAsDataURL(file);
   };
 
+  // Generate clothing avatars in the background for a character
+  const generateAvatarsInBackground = async (char: Character, allCharacters: Character[]) => {
+    // Only generate if character has a face photo
+    if (!char.photoUrl && !char.thumbnailUrl) {
+      log.debug(`Skipping avatar generation for ${char.name}: no photo`);
+      return;
+    }
+
+    // Skip if already generating or has avatars
+    if (char.clothingAvatars?.status === 'generating') {
+      log.debug(`Skipping avatar generation for ${char.name}: already generating`);
+      return;
+    }
+
+    // Mark as generating
+    const updatedCharsGenerating = allCharacters.map(c =>
+      c.id === char.id ? { ...c, clothingAvatars: { ...c.clothingAvatars, status: 'generating' as const } } : c
+    );
+    setCharacters(updatedCharsGenerating);
+
+    try {
+      log.info(`🎨 Starting background avatar generation for ${char.name}...`);
+      const result = await characterService.generateClothingAvatars(char);
+
+      if (result.success && result.clothingAvatars) {
+        log.success(`✅ Avatars generated for ${char.name}`);
+        // Update character with new avatars
+        const charWithAvatars = {
+          ...char,
+          clothingAvatars: {
+            ...result.clothingAvatars,
+            status: 'complete' as const,
+            generatedAt: new Date().toISOString()
+          }
+        };
+
+        // Update state and save to backend
+        setCharacters(prev => {
+          const updated = prev.map(c => c.id === char.id ? charWithAvatars : c);
+          // Save updated characters to backend (fire and forget)
+          characterService.saveCharacterData({
+            characters: updated,
+            relationships,
+            relationshipTexts,
+            customRelationships,
+            customStrengths: [],
+            customWeaknesses: [],
+            customFears: [],
+          }).catch(err => log.error('Failed to save avatars:', err));
+          return updated;
+        });
+      } else {
+        log.error(`❌ Avatar generation failed for ${char.name}: ${result.error}`);
+        // Mark as failed
+        setCharacters(prev => prev.map(c =>
+          c.id === char.id ? { ...c, clothingAvatars: { ...c.clothingAvatars, status: 'failed' as const } } : c
+        ));
+      }
+    } catch (error) {
+      log.error(`❌ Avatar generation error for ${char.name}:`, error);
+      setCharacters(prev => prev.map(c =>
+        c.id === char.id ? { ...c, clothingAvatars: { ...c.clothingAvatars, status: 'failed' as const } } : c
+      ));
+    }
+  };
+
   const saveCharacter = async () => {
     if (!currentCharacter) return;
 
@@ -581,6 +647,14 @@ export default function StoryWizard() {
 
       // Auto-select main characters after save
       autoSelectMainCharacters(updatedCharacters);
+
+      // Generate clothing avatars in the background (non-blocking)
+      // Only if character has a photo and doesn't already have avatars
+      const savedChar = updatedCharacters.find(c => c.id === currentCharacter.id);
+      if (savedChar && (savedChar.photoUrl || savedChar.thumbnailUrl) && !savedChar.clothingAvatars?.winter) {
+        // Fire and forget - don't await
+        generateAvatarsInBackground(savedChar, updatedCharacters);
+      }
 
       setCurrentCharacter(null);
       setShowCharacterCreated(true);

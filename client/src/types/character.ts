@@ -5,6 +5,19 @@ export interface BoundingBox {
   height: number;
 }
 
+// Clothing categories for scene-appropriate avatars
+export type ClothingCategory = 'winter' | 'standard' | 'summer' | 'formal';
+
+// Generated avatars for each clothing category
+export interface ClothingAvatars {
+  winter?: string;   // Warm clothing (coats, scarves, boots)
+  standard?: string; // Casual everyday clothing
+  summer?: string;   // Light clothing (t-shirts, shorts, dresses)
+  formal?: string;   // Formal attire (suits, dresses)
+  generatedAt?: string;
+  status?: 'pending' | 'generating' | 'complete' | 'failed';
+}
+
 // Style Analysis types for Visual Bible integration
 
 export interface PhysicalFeatures {
@@ -83,6 +96,8 @@ export interface Character {
   // Style analysis from photo (for Visual Bible integration)
   styleAnalysis?: StyleAnalysis;
   generatedOutfits?: Record<number, GeneratedOutfit>;
+  // Generated avatars for different clothing categories (admin only)
+  clothingAvatars?: ClothingAvatars;
 }
 
 export interface RelationshipMap {

@@ -1,5 +1,5 @@
 import api from './api';
-import type { Character, StyleAnalysis } from '@/types/character';
+import type { Character, StyleAnalysis, ClothingAvatars } from '@/types/character';
 import { createLogger } from './logger';
 
 const log = createLogger('CharacterService');
@@ -33,6 +33,8 @@ interface CharacterResponse {
   faceBox?: { x: number; y: number; width: number; height: number };
   bodyBox?: { x: number; y: number; width: number; height: number };
   styleAnalysis?: StyleAnalysis;
+  clothing_avatars?: ClothingAvatars;
+  clothingAvatars?: ClothingAvatars;
   // Common fields
   clothing?: string;
   strengths: string[];
@@ -69,6 +71,7 @@ function mapCharacterFromApi(char: CharacterResponse): Character {
     faceBox: char.face_box || char.faceBox,
     bodyBox: char.body_box || char.bodyBox,
     styleAnalysis: char.style_analysis || char.styleAnalysis,
+    clothingAvatars: char.clothing_avatars || char.clothingAvatars,
   };
 }
 
@@ -97,6 +100,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     face_box: char.faceBox,
     body_box: char.bodyBox,
     style_analysis: char.styleAnalysis,
+    clothing_avatars: char.clothingAvatars,
   };
 }
 
@@ -155,6 +159,62 @@ export const characterService = {
       customWeaknesses: data.customWeaknesses,
       customFears: data.customFears,
     });
+  },
+
+  async generateClothingAvatars(character: Character): Promise<{
+    success: boolean;
+    clothingAvatars?: ClothingAvatars;
+    error?: string;
+  }> {
+    try {
+      // Build physical description from character data
+      const age = parseInt(character.age) || 10;
+      const gender = character.gender || 'child';
+      let genderLabel;
+      if (gender === 'male') {
+        genderLabel = age >= 18 ? 'man' : 'boy';
+      } else if (gender === 'female') {
+        genderLabel = age >= 18 ? 'woman' : 'girl';
+      } else {
+        genderLabel = age >= 18 ? 'person' : 'child';
+      }
+
+      let physicalDescription = `${character.name} is a ${age}-year-old ${genderLabel}`;
+      if (character.styleAnalysis?.physical) {
+        const physical = character.styleAnalysis.physical;
+        if (physical.hair) physicalDescription += `, ${physical.hair}`;
+        if (physical.face) physicalDescription += `, ${physical.face}`;
+        if (physical.build) physicalDescription += `, ${physical.build}`;
+      } else {
+        if (character.hairColor) physicalDescription += `, ${character.hairColor} hair`;
+        if (character.build) physicalDescription += `, ${character.build} build`;
+        if (character.otherFeatures) physicalDescription += `, ${character.otherFeatures}`;
+      }
+
+      log.info(`Generating clothing avatars for ${character.name}...`);
+      const response = await api.post<{
+        success: boolean;
+        clothingAvatars?: ClothingAvatars;
+        error?: string;
+      }>('/api/generate-clothing-avatars', {
+        facePhoto: character.thumbnailUrl || character.photoUrl,
+        physicalDescription,
+        name: character.name,
+        age: character.age,
+        gender: character.gender,
+      });
+
+      if (response.success && response.clothingAvatars) {
+        log.success(`Clothing avatars generated for ${character.name}`);
+        return { success: true, clothingAvatars: response.clothingAvatars };
+      } else {
+        log.error(`Failed to generate avatars: ${response.error}`);
+        return { success: false, error: response.error };
+      }
+    } catch (error) {
+      log.error('Clothing avatar generation failed:', error);
+      return { success: false, error: String(error) };
+    }
   },
 
   async analyzePhoto(imageData: string): Promise<{

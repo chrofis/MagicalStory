@@ -21,7 +21,12 @@ Create a detailed visual description of ONE key moment from the scene context pr
 **OUTPUT FORMAT:**
 1. **Setting & Atmosphere:** Describe the background, time of day, lighting, and mood.
 2. **Composition:** Describe the camera angle (e.g., low angle, wide shot) and framing.
-3. **Characters:**
+3. **Clothing:** Select ONE category that best matches the scene:
+   - **winter** - Cold weather scenes (coats, scarves, boots)
+   - **summer** - Warm weather scenes (t-shirts, shorts, light clothes)
+   - **formal** - Special occasions (suits, dresses, fancy attire)
+   - **standard** - Everyday casual scenes (casual clothes)
+4. **Characters:**
    * **[Character Name]:** Action, pose, body language, facial expression, and location in the frame.
    (List EACH character BY NAME - do not use generic group terms)
 

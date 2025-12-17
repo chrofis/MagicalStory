@@ -116,6 +116,10 @@ function ReferencePhotosDisplay({
       case 'body-no-bg': return language === 'de' ? 'Ganzkörper (freigestellt)' : language === 'fr' ? 'Corps entier (détouré)' : 'Full body (no bg)';
       case 'body': return language === 'de' ? 'Ganzkörper' : language === 'fr' ? 'Corps entier' : 'Full body';
       case 'face': return language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face only';
+      case 'clothing-winter': return language === 'de' ? 'Winter-Avatar' : language === 'fr' ? 'Avatar hiver' : 'Winter avatar';
+      case 'clothing-summer': return language === 'de' ? 'Sommer-Avatar' : language === 'fr' ? 'Avatar été' : 'Summer avatar';
+      case 'clothing-formal': return language === 'de' ? 'Formell-Avatar' : language === 'fr' ? 'Avatar formel' : 'Formal avatar';
+      case 'clothing-standard': return language === 'de' ? 'Standard-Avatar' : language === 'fr' ? 'Avatar standard' : 'Standard avatar';
       default: return photoType;
     }
   };
@@ -125,6 +129,10 @@ function ReferencePhotosDisplay({
       case 'body-no-bg': return 'bg-green-100 text-green-700 border-green-300';
       case 'body': return 'bg-blue-100 text-blue-700 border-blue-300';
       case 'face': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
+      case 'clothing-winter': return 'bg-cyan-100 text-cyan-700 border-cyan-300';
+      case 'clothing-summer': return 'bg-orange-100 text-orange-700 border-orange-300';
+      case 'clothing-formal': return 'bg-purple-100 text-purple-700 border-purple-300';
+      case 'clothing-standard': return 'bg-teal-100 text-teal-700 border-teal-300';
       default: return 'bg-gray-100 text-gray-700 border-gray-300';
     }
   };

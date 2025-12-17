@@ -101,6 +101,12 @@ For EACH of the {PAGES} story pages, provide:
 
 **Character Focus**: Which character(s) are featured and how their traits/development are shown (remember: SHOW don't TELL).
 
+**Clothing**: Select the appropriate clothing category based on the scene setting:
+- **winter**: Cold weather, snow, ice, outdoor winter activities (coats, scarves, boots, warm layers)
+- **summer**: Warm weather, beach, swimming, outdoor summer activities (t-shirts, shorts, light dresses, sandals)
+- **formal**: Special occasions, celebrations, parties, church, weddings (suits, dresses, fancy clothes)
+- **standard**: All other situations - everyday casual clothing (jeans, casual tops, sneakers)
+
 **Scene Description**: A brief visual description (1-2 sentences) of the crucial scene, character interaction, or significant visual for illustration purposes.
 
 ---
@@ -202,10 +208,12 @@ Title: [Story title]
 
 Page 1: [Key Action/Plot Point]
 Character Focus: [Which character(s) and what trait/development is shown]
+Clothing: [winter|summer|formal|standard]
 Scene: [Short visual description for illustration]
 
 Page 2: [Key Action/Plot Point]
 Character Focus: [Description]
+Clothing: [winter|summer|formal|standard]
 Scene: [Short visual description]
 
 ...and so on for all {PAGES} pages.
@@ -213,10 +221,13 @@ Scene: [Short visual description]
 ## Cover Scenes
 
 Title Page Scene: [2-3 sentences: Main character doing something that captures the story's spirit. Simple setting description. Mood/atmosphere.]
+Clothing: [winter|summer|formal|standard]
 
 Initial Page Scene: [2-3 sentences: All characters together in a warm, welcoming moment. Simple group scene with positive atmosphere.]
+Clothing: [winter|summer|formal|standard]
 
 Back Cover Scene: [2-3 sentences: Characters together at the story's happy conclusion. Focus on emotional satisfaction and togetherness.]
+Clothing: [winter|summer|formal|standard]
 
 ## Visual Bible
 

@@ -466,7 +466,57 @@ export function CharacterForm({
         </div>
       </div>
 
-      {/* Reference Outfit - from Style Analysis (editable, collapsed by default) */}
+      {/* Clothing Avatars - generated for different settings (developer only) */}
+      {developerMode && character.clothingAvatars && (
+        <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-2">
+            👔 {language === 'de' ? 'Kleidungs-Avatare' : language === 'fr' ? 'Avatars vestimentaires' : 'Clothing Avatars'}
+            {character.clothingAvatars.status === 'generating' && (
+              <span className="text-xs font-normal text-teal-500 flex items-center gap-1">
+                <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                {language === 'de' ? 'Generierung läuft...' : 'Generating...'}
+              </span>
+            )}
+            {character.clothingAvatars.status === 'complete' && (
+              <span className="text-xs font-normal text-green-600">✓ Complete</span>
+            )}
+            {character.clothingAvatars.status === 'failed' && (
+              <span className="text-xs font-normal text-red-600">✗ Failed</span>
+            )}
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {(['winter', 'standard', 'summer', 'formal'] as const).map((category) => (
+              <div key={category} className="text-center">
+                <div className="text-xs font-medium text-gray-600 mb-1 capitalize">
+                  {category === 'winter' ? '❄️ ' : category === 'summer' ? '☀️ ' : category === 'formal' ? '👔 ' : '👕 '}
+                  {language === 'de'
+                    ? (category === 'winter' ? 'Winter' : category === 'summer' ? 'Sommer' : category === 'formal' ? 'Formal' : 'Standard')
+                    : category}
+                </div>
+                {character.clothingAvatars?.[category] ? (
+                  <img
+                    src={character.clothingAvatars[category]}
+                    alt={`${character.name} - ${category}`}
+                    className="w-full h-24 object-contain rounded border border-teal-200 bg-white"
+                  />
+                ) : (
+                  <div className="w-full h-24 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">
+                    {character.clothingAvatars?.status === 'generating' ? '...' : 'Not generated'}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {character.clothingAvatars.generatedAt && (
+            <div className="mt-2 text-xs text-teal-500">
+              Generated: {new Date(character.clothingAvatars.generatedAt).toLocaleString()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reference Outfit - from Style Analysis (editable, collapsed by default, developer only) */}
+      {developerMode && (
       <details className="bg-indigo-50 border border-indigo-200 rounded-lg">
         <summary className="p-4 cursor-pointer text-sm font-semibold text-indigo-700 flex items-center gap-2 hover:bg-indigo-100 rounded-lg transition-colors">
           👗 {language === 'de' ? 'Referenz-Outfit (aus Foto)' : language === 'fr' ? 'Tenue de référence (de la photo)' : 'Reference Outfit (from photo)'}
@@ -627,6 +677,7 @@ export function CharacterForm({
         )}
         </div>
       </details>
+      )}
 
       {/* Trait Selectors - all indigo color */}
       <TraitSelector
