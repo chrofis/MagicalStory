@@ -2889,8 +2889,11 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     // Detect which characters appear in this scene
     const sceneText = customPrompt || sceneDesc?.description || '';
     const sceneCharacters = getCharactersInScene(sceneText, storyData.characters || []);
-    const scenePhotos = getCharacterPhotos(sceneCharacters);
-    console.log(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}`);
+    // Parse clothing category from scene description
+    const clothingCategory = parseClothingCategory(sceneText) || 'standard';
+    const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+    const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+    console.log(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}`);
 
     // Get visual bible from stored story (for recurring elements)
     const visualBible = storyData.visualBible || null;
@@ -2928,7 +2931,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       retryHistory: imageResult.retryHistory || [],
       originalImage: imageResult.originalImage || null,
       originalScore: imageResult.originalScore || null,
-      originalReasoning: imageResult.originalReasoning || null
+      originalReasoning: imageResult.originalReasoning || null,
+      referencePhotos
     };
 
     if (existingIndex >= 0) {
@@ -8687,14 +8691,17 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         try {
           // Detect which characters appear in this scene
           const sceneCharacters = getCharactersInScene(scene.description, inputData.characters || []);
-          const scenePhotos = getCharacterPhotos(sceneCharacters);
+          // Parse clothing category from scene description
+          const clothingCategory = parseClothingCategory(scene.description) || 'standard';
+          const scenePhotos = getCharacterPhotos(sceneCharacters, clothingCategory);
+          const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
 
           // Log visual bible usage
           if (vBible) {
             const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
-            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, ${relevantEntries.length} visual bible entries)...`);
+            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, clothing: ${clothingCategory}, ${relevantEntries.length} visual bible entries)...`);
           } else {
-            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
+            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
           }
 
           // Build image prompt with only scene-specific characters and visual bible
@@ -8739,7 +8746,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             retryHistory: imageResult.retryHistory || [],
             originalImage: imageResult.originalImage || null,
             originalScore: imageResult.originalScore || null,
-            originalReasoning: imageResult.originalReasoning || null
+            originalReasoning: imageResult.originalReasoning || null,
+            referencePhotos
           };
         } catch (error) {
           console.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
@@ -8748,7 +8756,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             imageData: null,
             description: scene.description,
             prompt: null,
-            error: error.message
+            error: error.message,
+            referencePhotos: []
           };
         }
       };
