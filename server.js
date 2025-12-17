@@ -4721,6 +4721,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
             ]
           }],
           generationConfig: {
+            temperature: 0.3,  // Low temperature for better face consistency
             responseModalities: ["TEXT", "IMAGE"],
             imageConfig: {
               aspectRatio: "9:16"  // Portrait aspect ratio for full body shots
