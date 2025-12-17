@@ -11185,7 +11185,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Add character photos as reference images
   if (characterPhotos && characterPhotos.length > 0) {
-    characterPhotos.forEach(photoUrl => {
+    let addedCount = 0;
+    let skippedCount = 0;
+    characterPhotos.forEach((photoUrl, index) => {
       if (photoUrl && photoUrl.startsWith('data:image')) {
         const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
         const mimeType = photoUrl.match(/^data:(image\/\w+);base64,/) ?
@@ -11197,9 +11199,18 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
             data: base64Data
           }
         });
+        addedCount++;
+      } else {
+        skippedCount++;
+        // Log warning for skipped photos to help diagnose issues
+        const preview = photoUrl ? photoUrl.substring(0, 50) : 'null/undefined';
+        console.warn(`⚠️ [IMAGE GEN] Skipping character photo ${index + 1}: not a valid data URL (starts with: ${preview}...)`);
       }
     });
-    console.log(`🖼️  [IMAGE GEN] Added ${characterPhotos.length} character reference images`);
+    console.log(`🖼️  [IMAGE GEN] Added ${addedCount}/${characterPhotos.length} character reference images to API request`);
+    if (skippedCount > 0) {
+      console.warn(`⚠️ [IMAGE GEN] WARNING: ${skippedCount} photos were SKIPPED (not base64 data URLs)`);
+    }
   }
 
   // Use Gemini 3 Pro Image for covers (higher quality), 2.5 Flash for scenes (faster)
