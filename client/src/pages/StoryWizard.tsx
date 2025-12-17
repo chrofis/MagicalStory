@@ -563,9 +563,9 @@ export default function StoryWizard() {
 
   // Generate clothing avatars in the background for a character
   // Takes current relationship data as parameters to avoid stale closures
+  // Note: We use setCharacters callback to get latest state, so allCharacters param is not needed
   const generateAvatarsInBackground = async (
     char: Character,
-    allCharacters: Character[],
     currentRelationships: Record<string, string>,
     currentRelationshipTexts: Record<string, string>,
     currentCustomRelationships: string[]
@@ -583,17 +583,16 @@ export default function StoryWizard() {
     }
 
     // Mark as generating
-    const updatedCharsGenerating = allCharacters.map(c =>
+    setCharacters(prev => prev.map(c =>
       c.id === char.id ? { ...c, clothingAvatars: { ...c.clothingAvatars, status: 'generating' as const } } : c
-    );
-    setCharacters(updatedCharsGenerating);
+    ));
 
     try {
       log.info(`🎨 Starting background avatar generation for ${char.name}...`);
       const result = await characterService.generateClothingAvatars(char);
 
       if (result.success && result.clothingAvatars) {
-        log.success(`✅ Avatars generated for ${char.name}`);
+        log.success(`✅ Avatars generated for ${char.name} (id: ${char.id})`);
         // Update character with new avatars
         const charWithAvatars = {
           ...char,
@@ -604,14 +603,14 @@ export default function StoryWizard() {
           }
         };
 
-        // Update state first
-        setCharacters(prev => prev.map(c => c.id === char.id ? charWithAvatars : c));
+        // Update state and save to backend using the LATEST state (not stale allCharacters)
+        // This ensures we don't overwrite new characters added while avatars were generating
+        setCharacters(prev => {
+          const updatedCharacters = prev.map(c => c.id === char.id ? charWithAvatars : c);
 
-        // Then save to backend with fresh character data
-        const updatedCharacters = allCharacters.map(c => c.id === char.id ? charWithAvatars : c);
-        log.info(`💾 Saving avatars for ${char.name} to backend...`);
-        try {
-          await characterService.saveCharacterData({
+          // Save to backend with the fresh character list
+          log.info(`💾 Saving avatars for ${char.name} (id: ${char.id}) to backend...`);
+          characterService.saveCharacterData({
             characters: updatedCharacters,
             relationships: currentRelationships,
             relationshipTexts: currentRelationshipTexts,
@@ -619,11 +618,14 @@ export default function StoryWizard() {
             customStrengths: [],
             customWeaknesses: [],
             customFears: [],
+          }).then(() => {
+            log.success(`💾 Avatars saved for ${char.name}`);
+          }).catch(saveErr => {
+            log.error(`Failed to save avatars for ${char.name}:`, saveErr);
           });
-          log.success(`💾 Avatars saved for ${char.name}`);
-        } catch (saveErr) {
-          log.error(`Failed to save avatars for ${char.name}:`, saveErr);
-        }
+
+          return updatedCharacters;
+        });
       } else {
         log.error(`❌ Avatar generation failed for ${char.name}: ${result.error}`);
         // Mark as failed
@@ -652,7 +654,6 @@ export default function StoryWizard() {
       log.info(`🔄 Regenerating avatars for ${currentCharacter.name}...`);
       await generateAvatarsInBackground(
         charWithoutAvatars,
-        characters.map(c => c.id === currentCharacter.id ? charWithoutAvatars : c),
         relationships,
         relationshipTexts,
         customRelationships
@@ -711,7 +712,6 @@ export default function StoryWizard() {
         // Pass current relationship data to avoid stale closure issues
         generateAvatarsInBackground(
           savedChar,
-          updatedCharacters,
           relationships,
           relationshipTexts,
           customRelationships

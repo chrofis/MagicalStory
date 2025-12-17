@@ -4627,12 +4627,12 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
     const getClothingStylePrompt = (category) => {
       switch (category) {
         case 'winter':
-          return 'Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.';
+          return 'Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Layers visible underneath. Warm full-length pants or leggings. Heavy winter boots. Scarf and gloves optional.';
         case 'standard':
           if (isFemale) {
-            return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or leggings. Sneakers.';
+            return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Full-length jeans or leggings (NO shorts).';
           }
-          return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Sneakers.';
+          return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Full-length jeans or casual trousers (NO shorts).';
         case 'summer':
           if (isFemale) {
             return 'T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.';
@@ -4640,9 +4640,9 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
           return 'T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.';
         case 'formal':
           if (isFemale) {
-            return 'Elegant dress, formal gown, or blouse with skirt with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal heels or dress shoes.';
+            return 'Elegant dress, formal gown, or blouse with skirt in colors INSPIRED BY the input image (similar tones, not identical). Formal heels or dress shoes.';
           }
-          return 'Formal suit or dress shirt with trousers with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal dress shoes.';
+          return 'Formal suit or dress shirt with trousers in colors INSPIRED BY the input image (similar tones, not identical). Formal dress shoes.';
         default:
           return 'Full outfit with shoes matching the style of the reference.';
       }
@@ -4679,8 +4679,8 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
     - Background: Pure solid white background (#FFFFFF).
 
     WARDROBE DETAILS:
-    - Style Transfer Rule: Copy the EXACT pattern AND colors from the clothing in the input image. Apply these to the new outfit.
-    - Pants Rule: If trousers/pants are visible in the input image, replicate them. If NOT visible, create plain/neutral pants - do NOT match the shirt pattern.
+    - Style Transfer Rule: Copy the EXACT pattern AND colors from the TOP/SHIRT in the input image. Apply these to the new top/shirt only.
+    - CRITICAL PANTS RULE: Pants/trousers MUST be DIFFERENT from the top. Use plain/solid neutral colors (black, navy, khaki, gray, brown) for pants. NEVER apply the shirt's pattern or bright colors to the pants.
     - Outfit: ${getClothingStylePrompt(category)}
 
     PHOTOGRAPHY STYLE:
