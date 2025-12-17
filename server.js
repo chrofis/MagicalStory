@@ -9646,14 +9646,6 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
             console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
-            // Analyze first-appearance elements and update Visual Bible
-            const elementsToAnalyze = getElementsNeedingAnalysis(visualBible, pageNum);
-            if (elementsToAnalyze.length > 0) {
-              console.log(`📖 [VISUAL BIBLE] Analyzing ${elementsToAnalyze.length} first-appearance elements on page ${pageNum}...`);
-              const extractedDescriptions = await analyzeVisualBibleElements(imageResult.imageData, elementsToAnalyze);
-              updateVisualBibleWithExtracted(visualBible, pageNum, extractedDescriptions);
-            }
-
             // Store this image as the previous image for the next iteration
             previousImage = imageResult.imageData;
 
