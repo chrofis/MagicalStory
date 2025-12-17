@@ -11200,8 +11200,10 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
  */
 function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = null) {
   // Hash each photo and sort them for consistency
+  // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
   const photoHashes = characterPhotos
-    .filter(p => p && p.startsWith('data:image'))
+    .map(p => typeof p === 'string' ? p : p?.photoUrl)
+    .filter(url => url && url.startsWith('data:image'))
     .map(photoUrl => {
       const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
       return crypto.createHash('sha256').update(base64Data).digest('hex').substring(0, 16);
