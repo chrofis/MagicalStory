@@ -74,8 +74,10 @@ interface CharacterFormProps {
   onCancel?: () => void;
   onPhotoChange: (file: File) => void;
   onContinueToTraits?: () => void;
+  onRegenerateAvatars?: () => void;
   isLoading?: boolean;
   isAnalyzingPhoto?: boolean;
+  isRegeneratingAvatars?: boolean;
   step: 'name' | 'traits';
   developerMode?: boolean;
 }
@@ -87,8 +89,10 @@ export function CharacterForm({
   onCancel,
   onPhotoChange,
   onContinueToTraits,
+  onRegenerateAvatars,
   isLoading,
   isAnalyzingPhoto,
+  isRegeneratingAvatars,
   step,
   developerMode,
 }: CharacterFormProps) {
@@ -509,11 +513,31 @@ export function CharacterForm({
               </div>
             ))}
           </div>
-          {character.clothingAvatars.generatedAt && (
-            <div className="mt-2 text-xs text-teal-500">
-              Generated: {new Date(character.clothingAvatars.generatedAt).toLocaleString()}
-            </div>
-          )}
+          <div className="mt-3 flex items-center justify-between">
+            {character.clothingAvatars.generatedAt && (
+              <div className="text-xs text-teal-500">
+                Generated: {new Date(character.clothingAvatars.generatedAt).toLocaleString()}
+              </div>
+            )}
+            {onRegenerateAvatars && (
+              <button
+                onClick={onRegenerateAvatars}
+                disabled={isRegeneratingAvatars || character.clothingAvatars?.status === 'generating'}
+                className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {isRegeneratingAvatars ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {language === 'de' ? 'Generiere...' : 'Generating...'}
+                  </>
+                ) : (
+                  <>
+                    🔄 {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

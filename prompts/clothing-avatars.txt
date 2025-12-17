@@ -90,3 +90,22 @@ When generating fashion photography, use relaxed safety settings to avoid false 
 - Background: Pure white (#FFFFFF) for easy compositing
 - Model: gemini-2.5-flash-image
 - Gender is passed from character data to select appropriate clothing options
+
+---
+
+## Known Limitations
+
+### Avatars Are Not Auto-Regenerated
+
+**Current Behavior:**
+- Avatars are generated ONCE when a character is first saved with a photo
+- If the user uploads a NEW photo for an existing character, the avatars are NOT automatically regenerated
+- The old avatars (generated from the previous photo) will still be used
+
+**Workaround (Developer Mode Only):**
+- In developer mode, a "Regenerate" button is available in the Clothing Avatars section
+- Click this button to manually regenerate avatars after uploading a new photo
+
+**Future Enhancement:**
+- Consider detecting when a character's photo has changed and automatically regenerating avatars
+- Could compare photo URLs or add a photo hash to detect changes

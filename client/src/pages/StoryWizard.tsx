@@ -55,6 +55,7 @@ export default function StoryWizard() {
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
   const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits'>('photo');
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
+  const [isRegeneratingAvatars, setIsRegeneratingAvatars] = useState(false);
 
   // Step 3: Relationships - loaded from API with characters
   const [relationships, setRelationships] = useState<RelationshipMap>({});
@@ -631,6 +632,37 @@ export default function StoryWizard() {
     }
   };
 
+  // Handler for regenerating avatars from developer mode
+  const handleRegenerateAvatars = async () => {
+    if (!currentCharacter) return;
+
+    // Clear existing avatars and trigger regeneration
+    const charWithoutAvatars = { ...currentCharacter, clothingAvatars: undefined };
+    setCurrentCharacter(charWithoutAvatars);
+    setIsRegeneratingAvatars(true);
+
+    try {
+      log.info(`🔄 Regenerating avatars for ${currentCharacter.name}...`);
+      await generateAvatarsInBackground(
+        charWithoutAvatars,
+        characters.map(c => c.id === currentCharacter.id ? charWithoutAvatars : c),
+        relationships,
+        relationshipTexts,
+        customRelationships
+      );
+      // Update currentCharacter with the new avatars from state
+      setCharacters(prev => {
+        const updated = prev.find(c => c.id === currentCharacter.id);
+        if (updated?.clothingAvatars) {
+          setCurrentCharacter(curr => curr ? { ...curr, clothingAvatars: updated.clothingAvatars } : curr);
+        }
+        return prev;
+      });
+    } finally {
+      setIsRegeneratingAvatars(false);
+    }
+  };
+
   const saveCharacter = async () => {
     if (!currentCharacter) return;
 
@@ -1023,8 +1055,10 @@ export default function StoryWizard() {
                   onCancel={() => setCurrentCharacter(null)}
                   onPhotoChange={handlePhotoSelect}
                   onContinueToTraits={() => setCharacterStep('traits')}
+                  onRegenerateAvatars={handleRegenerateAvatars}
                   isLoading={isLoading}
                   isAnalyzingPhoto={isAnalyzingPhoto}
+                  isRegeneratingAvatars={isRegeneratingAvatars}
                   step="name"
                   developerMode={developerMode}
                 />
@@ -1044,8 +1078,10 @@ export default function StoryWizard() {
                 onSave={saveCharacter}
                 onCancel={() => setCurrentCharacter(null)}
                 onPhotoChange={handlePhotoSelect}
+                onRegenerateAvatars={handleRegenerateAvatars}
                 isLoading={isLoading}
                 isAnalyzingPhoto={isAnalyzingPhoto}
+                isRegeneratingAvatars={isRegeneratingAvatars}
                 step="traits"
                 developerMode={developerMode}
               />
