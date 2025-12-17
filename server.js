@@ -7554,18 +7554,38 @@ function buildVisualBiblePrompt(visualBible, pageNumber) {
   const entries = getVisualBibleEntriesForPage(visualBible, pageNumber);
   console.log(`📖 [VISUAL BIBLE PROMPT] Found ${entries.length} entries for page ${pageNumber}: ${entries.map(e => e.name).join(', ') || 'none'}`);
 
-  if (entries.length === 0) return '';
+  let prompt = '';
 
-  let prompt = '\n\n**RECURRING ELEMENTS - MUST MATCH EXACTLY:**\n';
-  prompt += 'These elements have appeared before in this story. They MUST look IDENTICAL.\n\n';
-
-  for (const entry of entries) {
-    // Prefer extracted description (from actual generated image) over outline description
-    const description = entry.extractedDescription || entry.description;
-    prompt += `**${entry.name}** (${entry.type}):\n${description}\n\n`;
+  // Add main characters (they appear on all pages)
+  if (visualBible.mainCharacters && visualBible.mainCharacters.length > 0) {
+    prompt += '\n\n**MAIN CHARACTERS - Must match reference photos:**\n';
+    for (const char of visualBible.mainCharacters) {
+      prompt += `**${char.name}:**`;
+      if (char.physical) {
+        const physicalParts = [char.physical.face, char.physical.hair, char.physical.build].filter(p => p && p !== 'Not analyzed');
+        if (physicalParts.length > 0) {
+          prompt += ` ${physicalParts.join(', ')}`;
+        }
+      }
+      if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
+        prompt += `. Signature colors: ${char.styleDNA.signatureColors.join(', ')}`;
+      }
+      prompt += '\n';
+    }
   }
 
-  prompt += 'CRITICAL: Do not change colors, features, or any visual details of these recurring elements.\n';
+  // Add page-specific recurring elements
+  if (entries.length > 0) {
+    prompt += '\n**RECURRING ELEMENTS - MUST MATCH EXACTLY:**\n';
+    prompt += 'These elements have appeared before in this story. They MUST look IDENTICAL.\n\n';
+
+    for (const entry of entries) {
+      const description = entry.extractedDescription || entry.description;
+      prompt += `**${entry.name}** (${entry.type}):\n${description}\n\n`;
+    }
+
+    prompt += 'CRITICAL: Do not change colors, features, or any visual details of these recurring elements.\n';
+  }
 
   return prompt;
 }
@@ -7573,6 +7593,26 @@ function buildVisualBiblePrompt(visualBible, pageNumber) {
 // Build FULL Visual Bible prompt for covers (includes ALL entries, not filtered by page)
 function buildFullVisualBiblePrompt(visualBible) {
   if (!visualBible) return '';
+
+  let prompt = '';
+
+  // Add main characters with their style DNA
+  if (visualBible.mainCharacters && visualBible.mainCharacters.length > 0) {
+    prompt += '\n\n**MAIN CHARACTERS - Must match reference photos exactly:**\n';
+    for (const char of visualBible.mainCharacters) {
+      prompt += `**${char.name}:**\n`;
+      if (char.physical) {
+        prompt += `- Physical: ${char.physical.face || ''}, ${char.physical.hair || ''}, ${char.physical.build || ''}\n`;
+      }
+      if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
+        prompt += `- Signature colors: ${char.styleDNA.signatureColors.join(', ')}\n`;
+      }
+      if (char.styleDNA && char.styleDNA.alwaysPresent?.length > 0) {
+        prompt += `- Always present: ${char.styleDNA.alwaysPresent.join(', ')}\n`;
+      }
+      prompt += '\n';
+    }
+  }
 
   const allEntries = [];
 
@@ -7587,14 +7627,14 @@ function buildFullVisualBiblePrompt(visualBible) {
   addEntries(visualBible.artifacts, 'artifact');
   addEntries(visualBible.locations, 'location');
 
-  if (allEntries.length === 0) return '';
+  if (allEntries.length > 0) {
+    prompt += '\n**RECURRING STORY ELEMENTS - Include if relevant to scene:**\n';
+    prompt += 'These elements appear throughout the story. Include them if they fit the scene.\n\n';
 
-  let prompt = '\n\n**RECURRING STORY ELEMENTS - Include if relevant to scene:**\n';
-  prompt += 'These elements appear throughout the story. Include them if they fit the scene.\n\n';
-
-  for (const entry of allEntries) {
-    const description = entry.extractedDescription || entry.description;
-    prompt += `**${entry.name}** (${entry.type}):\n${description}\n\n`;
+    for (const entry of allEntries) {
+      const description = entry.extractedDescription || entry.description;
+      prompt += `**${entry.name}** (${entry.type}):\n${description}\n\n`;
+    }
   }
 
   return prompt;
@@ -10006,10 +10046,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Add Visual Bible entries for recurring elements (secondary characters, animals, artifacts)
   let visualBiblePrompt = '';
   if (visualBible && pageNumber) {
+    console.log(`📖 [IMAGE PROMPT] Visual Bible present for page ${pageNumber}, entries: animals=${visualBible.animals?.length || 0}, artifacts=${visualBible.artifacts?.length || 0}, locations=${visualBible.locations?.length || 0}`);
     visualBiblePrompt = buildVisualBiblePrompt(visualBible, pageNumber);
     if (visualBiblePrompt) {
       console.log(`📖 [IMAGE PROMPT] Added Visual Bible entries for page ${pageNumber}`);
+    } else {
+      console.log(`📖 [IMAGE PROMPT] No Visual Bible entries for page ${pageNumber} (none match this page)`);
     }
+  } else {
+    console.log(`📖 [IMAGE PROMPT] Visual Bible: ${visualBible ? 'present but no pageNumber' : 'not present'}, pageNumber: ${pageNumber}`);
   }
 
   // Select the correct template based on language and sequential mode
