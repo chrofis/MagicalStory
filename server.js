@@ -729,7 +729,7 @@ async function initializeDatabase() {
         role VARCHAR(50) DEFAULT 'user',
         story_quota INT DEFAULT 2,
         stories_generated INT DEFAULT 0,
-        credits INT DEFAULT 500,
+        credits INT DEFAULT 1000,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -739,17 +739,17 @@ async function initializeDatabase() {
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='credits') THEN
-          ALTER TABLE users ADD COLUMN credits INT DEFAULT 500;
+          ALTER TABLE users ADD COLUMN credits INT DEFAULT 1000;
         END IF;
       END $$;
     `);
 
-    // Update existing users with NULL credits: admins get -1 (unlimited), users get 500
+    // Update existing users with NULL credits: admins get -1 (unlimited), users get 1000
     await dbPool.query(`
       UPDATE users SET credits = -1 WHERE credits IS NULL AND role = 'admin';
     `);
     await dbPool.query(`
-      UPDATE users SET credits = 500 WHERE credits IS NULL AND role = 'user';
+      UPDATE users SET credits = 1000 WHERE credits IS NULL AND role = 'user';
     `);
 
     await dbPool.query(`
@@ -1088,7 +1088,7 @@ app.post('/api/auth/register', async (req, res) => {
       const userId = Date.now().toString();
       const role = isFirstUser ? 'admin' : 'user';
       const storyQuota = isFirstUser ? -1 : 2;
-      const initialCredits = isFirstUser ? -1 : 500;
+      const initialCredits = isFirstUser ? -1 : 1000;
 
       const insertQuery = 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
       await dbQuery(insertQuery, [userId, username, username, hashedPassword, role, storyQuota, 0, initialCredits]);
@@ -1130,7 +1130,7 @@ app.post('/api/auth/register', async (req, res) => {
         role: isFirstUser ? 'admin' : 'user',
         storyQuota: isFirstUser ? -1 : 2,
         storiesGenerated: 0,
-        credits: isFirstUser ? -1 : 500
+        credits: isFirstUser ? -1 : 1000
       };
 
       users.push(newUser);
@@ -1194,7 +1194,7 @@ app.post('/api/auth/login', async (req, res) => {
         role: dbUser.role,
         storyQuota: dbUser.story_quota,
         storiesGenerated: dbUser.stories_generated,
-        credits: dbUser.credits !== undefined ? dbUser.credits : 500
+        credits: dbUser.credits !== undefined ? dbUser.credits : 1000
       };
     } else {
       // File mode
@@ -1233,7 +1233,7 @@ app.post('/api/auth/login', async (req, res) => {
         role: user.role,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits != null ? user.credits : 500
+        credits: user.credits != null ? user.credits : 1000
       }
     });
   } catch (err) {
@@ -1279,7 +1279,7 @@ app.post('/api/auth/firebase', async (req, res) => {
         const isFirstUser = parseInt(userCount[0].count) === 0;
         const role = isFirstUser ? 'admin' : 'user';
         const storyQuota = isFirstUser ? 999 : 2;
-        const initialCredits = isFirstUser ? -1 : 500;
+        const initialCredits = isFirstUser ? -1 : 1000;
 
         // Generate a random password (user won't need it - they use Firebase)
         const randomPassword = crypto.randomBytes(32).toString('hex');
@@ -1324,7 +1324,7 @@ app.post('/api/auth/firebase', async (req, res) => {
           role: user.role,
           storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
           storiesGenerated: user.stories_generated || 0,
-          credits: user.credits != null ? user.credits : 500
+          credits: user.credits != null ? user.credits : 1000
         }
       });
     } else {
@@ -1621,7 +1621,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         role: user.role,
         storyQuota: user.story_quota,
         storiesGenerated: user.stories_generated,
-        credits: user.credits != null ? user.credits : 500,
+        credits: user.credits != null ? user.credits : 1000,
         createdAt: user.created_at,
         totalOrders: parseInt(user.total_orders) || 0,
         failedOrders: parseInt(user.failed_orders) || 0
@@ -1633,7 +1633,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         ...user,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits != null ? user.credits : 500,
+        credits: user.credits != null ? user.credits : 1000,
         totalOrders: 0,
         failedOrders: 0
       }));
@@ -2113,7 +2113,7 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      credits = rows[0].credits !== undefined ? rows[0].credits : 500;
+      credits = rows[0].credits !== undefined ? rows[0].credits : 1000;
     } else {
       // File mode
       const users = await readJSON(USERS_FILE);
@@ -2123,7 +2123,7 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      credits = user.credits != null ? user.credits : 500;
+      credits = user.credits != null ? user.credits : 1000;
     }
 
     res.json({
@@ -11335,7 +11335,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
       // Handle null credits - set default based on role (this shouldn't happen after migration)
       if (userCredits === null || userCredits === undefined) {
         console.log(`⚠️ User ${userId} has null credits, defaulting based on role`);
-        userCredits = req.user.role === 'admin' ? -1 : 500;
+        userCredits = req.user.role === 'admin' ? -1 : 1000;
       }
 
       // Skip credit check if user has unlimited credits (-1) OR is admin

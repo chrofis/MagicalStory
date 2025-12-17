@@ -74,17 +74,20 @@ export function StorySettings({
   // Generate page option label based on language level
   const getPageLabel = (pageCount: number, isTest = false) => {
     const testSuffix = isTest ? ' (Test)' : '';
+    const creditsCost = pageCount * 10;
+    const creditsLabel = language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits';
+
     if (languageLevel === '1st-grade') {
-      return `${pageCount} ${language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}${testSuffix}`;
+      return `${pageCount} ${language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} = ${creditsCost} ${creditsLabel}${testSuffix}`;
     }
     const textPages = pageCount / 2;
     const imagePages = pageCount / 2;
     if (language === 'de') {
-      return `${pageCount} Seiten (${textPages} Text + ${imagePages} Bilder)${testSuffix}`;
+      return `${pageCount} Seiten (${textPages} Text + ${imagePages} Bilder) = ${creditsCost} ${creditsLabel}${testSuffix}`;
     } else if (language === 'fr') {
-      return `${pageCount} pages (${textPages} texte + ${imagePages} images)${testSuffix}`;
+      return `${pageCount} pages (${textPages} texte + ${imagePages} images) = ${creditsCost} ${creditsLabel}${testSuffix}`;
     }
-    return `${pageCount} pages (${textPages} text + ${imagePages} images)${testSuffix}`;
+    return `${pageCount} pages (${textPages} text + ${imagePages} images) = ${creditsCost} ${creditsLabel}${testSuffix}`;
   };
 
   return (
