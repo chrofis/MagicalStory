@@ -9223,7 +9223,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalImage: frontCoverResult.originalImage || null,
           originalScore: frontCoverResult.originalScore || null,
           originalReasoning: frontCoverResult.originalReasoning || null,
-          referencePhotos: getCharacterPhotoDetails(frontCoverCharacters)
+          referencePhotos: getCharacterPhotoDetails(frontCoverCharacters),
+          modelId: frontCoverResult.modelId || null
         };
 
         // Initial page - use ALL characters (main character centered, all others around)
@@ -9258,7 +9259,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalImage: initialResult.originalImage || null,
           originalScore: initialResult.originalScore || null,
           originalReasoning: initialResult.originalReasoning || null,
-          referencePhotos: getCharacterPhotoDetails(inputData.characters || [])
+          referencePhotos: getCharacterPhotoDetails(inputData.characters || []),
+          modelId: initialResult.modelId || null
         };
 
         // Back cover - use ALL characters with EQUAL prominence (no focus on main character)
@@ -9285,7 +9287,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalImage: backCoverResult.originalImage || null,
           originalScore: backCoverResult.originalScore || null,
           originalReasoning: backCoverResult.originalReasoning || null,
-          referencePhotos: getCharacterPhotoDetails(inputData.characters || [])
+          referencePhotos: getCharacterPhotoDetails(inputData.characters || []),
+          modelId: backCoverResult.modelId || null
         };
 
         console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
@@ -9801,7 +9804,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 originalImage: imageResult.originalImage || null,
                 originalScore: imageResult.originalScore || null,
                 originalReasoning: imageResult.originalReasoning || null,
-                referencePhotos: referencePhotos  // Dev mode: which photos were used
+                referencePhotos: referencePhotos,  // Dev mode: which photos were used
+                modelId: imageResult.modelId || null  // Dev mode: which API model was used
               };
 
               // Save partial result checkpoint for progressive display
@@ -9818,7 +9822,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 originalImage: imageResult.originalImage || null,
                 originalScore: imageResult.originalScore || null,
                 originalReasoning: imageResult.originalReasoning || null,
-                referencePhotos: referencePhotos
+                referencePhotos: referencePhotos,
+                modelId: imageResult.modelId || null
               }, pageNum);
               console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
 
@@ -10181,7 +10186,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           originalImage: frontCoverResult.originalImage || null,
           originalScore: frontCoverResult.originalScore || null,
           originalReasoning: frontCoverResult.originalReasoning || null,
-          referencePhotos: coverReferencePhotos
+          referencePhotos: coverReferencePhotos,
+          modelId: frontCoverResult.modelId || null
         },
         initialPage: {
           imageData: initialPageResult.imageData,
@@ -10195,7 +10201,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           originalImage: initialPageResult.originalImage || null,
           originalScore: initialPageResult.originalScore || null,
           originalReasoning: initialPageResult.originalReasoning || null,
-          referencePhotos: coverReferencePhotos
+          referencePhotos: coverReferencePhotos,
+          modelId: initialPageResult.modelId || null
         },
         backCover: {
           imageData: backCoverResult.imageData,
@@ -10209,7 +10216,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           originalImage: backCoverResult.originalImage || null,
           originalScore: backCoverResult.originalScore || null,
           originalReasoning: backCoverResult.originalReasoning || null,
-          referencePhotos: coverReferencePhotos
+          referencePhotos: coverReferencePhotos,
+          modelId: backCoverResult.modelId || null
         }
       };
 
@@ -12184,7 +12192,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     wasRegenerated: true,
     wasSceneRewritten: wasSceneRewritten,
     totalAttempts: attempts,
-    retryHistory: retryHistory
+    retryHistory: retryHistory,
+    modelId: bestResult.modelId  // Include which model was used
   };
 }
 

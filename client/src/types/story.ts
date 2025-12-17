@@ -64,6 +64,8 @@ export interface SceneImage {
   originalReasoning?: string;
   // Reference photos used (for dev mode)
   referencePhotos?: ReferencePhoto[];
+  // API model used (for dev mode)
+  modelId?: string;
 }
 
 export interface CoverImageData {
@@ -80,6 +82,8 @@ export interface CoverImageData {
   originalScore?: number;
   // Reference photos used (for dev mode)
   referencePhotos?: ReferencePhoto[];
+  // API model used (for dev mode)
+  modelId?: string;
 }
 
 export interface CoverImages {

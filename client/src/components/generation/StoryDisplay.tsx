@@ -1226,6 +1226,7 @@ export function StoryDisplay({
                               <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
                                   {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                                  {image.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
                                   {image.prompt}
@@ -1407,6 +1408,7 @@ export function StoryDisplay({
                               <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
                                   {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                                  {image.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
                                   {image.prompt}
