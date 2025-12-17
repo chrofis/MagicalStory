@@ -5,45 +5,78 @@ You are an expert Art Director creating an illustration brief for a children's b
 {SCENE_SUMMARY}Story Text (Page {PAGE_NUMBER}):
 {PAGE_CONTENT}
 
-**AVAILABLE CHARACTERS & VISUAL REFERENCES:**
+**CHARACTERS IN THIS STORY:**
 {CHARACTERS}
+
+**RECURRING ELEMENTS (copy descriptions exactly as shown):**
 {RECURRING_ELEMENTS}
+
 **TASK:**
 Create a detailed visual description of ONE key moment from the scene context provided.
+Include COMPLETE physical descriptions of all characters, objects, and locations present.
 
 **CHARACTER RULES - CRITICAL:**
 - Prefer scenes with 1-2 characters (easier to illustrate well)
 - Only include more characters if absolutely essential to the scene
-- ALWAYS refer to characters BY THEIR EXACT NAME - never use generic terms like "the family", "everyone", "the group", "the children", "the parents"
-- If a character appears in the scene, they MUST be listed by name in the Characters section below
-- If the story text mentions "the whole family" doing something, pick 1-2 key characters to focus on instead
+- ALWAYS refer to characters BY THEIR EXACT NAME - never use generic terms like "the family", "everyone", "the group"
+- For each character present, include their FULL physical description from above
 
 **OUTPUT FORMAT:**
-1. **Setting & Atmosphere:** Describe the background, time of day, lighting, and mood.
-2. **Composition:** Describe the camera angle (e.g., low angle, wide shot) and framing.
+
+1. **Setting & Atmosphere:**
+   - Describe the location in detail (if from Visual Bible, use exact description)
+   - Time of day, lighting quality, mood
+   - Weather conditions if relevant
+
+2. **Composition:**
+   - Camera angle (e.g., low angle, wide shot, medium close-up)
+   - Framing and focal point
+
 3. **Clothing:** Select ONE category that best matches the scene:
    - **winter** - Cold weather scenes (coats, scarves, boots)
    - **summer** - Warm weather scenes (t-shirts, shorts, light clothes)
    - **formal** - Special occasions (suits, dresses, fancy attire)
    - **standard** - Everyday casual scenes (casual clothes)
-4. **Characters:**
-   * **[Character Name]:** Action, pose, body language, facial expression, and location in the frame.
-   (List EACH character BY NAME - do not use generic group terms)
 
-**CHARACTER DESCRIPTION RULES - CRITICAL:**
-- DO NOT describe physical appearance (hair color, eye color, skin tone, body type, height, facial features)
-- Physical traits come from reference photos - your job is ONLY to describe what they are DOING
-- Focus on: poses, actions, gestures, expressions, positions, movements
-- Example GOOD: "Emma: Standing on tiptoes reaching for a jar, expression of determination, positioned left of frame"
-- Example BAD: "Emma: A girl with blonde hair and blue eyes standing on tiptoes..." (NO physical traits!)
+4. **Characters:** For EACH character present, include:
+   * **[Character Name]:**
+     - PHYSICAL DESCRIPTION: Copy their full physical description (hair color, eye color, skin tone, build, distinguishing features) exactly as provided above
+     - ACTION: What they are doing, their pose, body language
+     - EXPRESSION: Facial expression and emotion
+     - POSITION: Where they are in the frame
+
+5. **Objects & Animals:** If any recurring elements from the Visual Bible appear:
+   - Copy their description VERBATIM from above
+   - Describe their position and interaction with characters
+
+**EXAMPLE OUTPUT:**
+```
+1. **Setting & Atmosphere:** A cozy kitchen with warm morning light streaming through a window. Wooden cabinets, a blue-tiled backsplash, and a round oak table in the center. Cheerful, domestic mood.
+
+2. **Composition:** Medium shot at eye level, centered on the table with characters on either side.
+
+3. **Clothing:** standard
+
+4. **Characters:**
+   * **Emma:**
+     - PHYSICAL: 8-year-old girl with long wavy auburn hair, bright green eyes, fair skin with freckles across her nose, slim build
+     - ACTION: Standing on tiptoes reaching for a cookie jar on the counter
+     - EXPRESSION: Mischievous grin, eyes sparkling with excitement
+     - POSITION: Left side of frame, facing right
+
+   * **Max (the dog):**
+     - PHYSICAL: Golden retriever with fluffy golden fur, brown eyes, red collar with silver tag
+     - ACTION: Sitting attentively, tail wagging
+     - EXPRESSION: Alert and hopeful
+     - POSITION: At Emma's feet, looking up at her
+```
 
 **CONSTRAINTS:**
-- Do not include dialogue or speech
+- Include COMPLETE physical descriptions for every character - this ensures visual consistency
+- Do not include dialogue or speech bubbles
 - Focus purely on visual elements
-- Use simple, clear language
-- Every character in the scene MUST be named explicitly
-- Fewer characters = better illustration quality
-- If recurring elements (animals, artifacts, locations) appear, include them with exact descriptions from above
+- Every character in the scene MUST be named explicitly and fully described
+- For Visual Bible elements, use descriptions EXACTLY as provided
 - **OUTPUT LANGUAGE: Write the entire scene description in {LANGUAGE}**
 
 **SAFETY - AVOID THESE SETTINGS:**

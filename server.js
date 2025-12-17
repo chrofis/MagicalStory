@@ -8191,40 +8191,104 @@ function extractCoverScenes(outline) {
 
 // Helper function to build Art Director scene description prompt (matches frontend)
 function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null) {
+  // Build detailed character descriptions - include full physical details
   const characterDetails = characters.map(c => {
-    const details = [];
-    if (c.age) details.push(`Age ${c.age}`);
-    if (c.gender) details.push(c.gender === 'male' ? 'Male' : c.gender === 'female' ? 'Female' : 'Non-binary');
-    if (c.hairColor) details.push(c.hairColor);
-    if (c.clothing) details.push(c.clothing);
-    if (c.otherFeatures) details.push(c.otherFeatures);
-    if (c.specialDetails) details.push(c.specialDetails);
-    return `* **${c.name}:** ${details.join(', ')}`;
-  }).join('\n');
+    // Check if character has detailed description in Visual Bible
+    let visualBibleDesc = null;
+    if (visualBible && visualBible.mainCharacters) {
+      const vbChar = visualBible.mainCharacters.find(vbc =>
+        vbc.id === c.id || vbc.name.toLowerCase() === c.name.toLowerCase()
+      );
+      if (vbChar && vbChar.physicalDescription) {
+        visualBibleDesc = vbChar.physicalDescription;
+      }
+    }
 
-  // Build Visual Bible recurring elements section
+    // Build comprehensive physical description
+    const physicalParts = [];
+
+    // Basic info
+    if (c.age) physicalParts.push(`${c.age} years old`);
+    if (c.gender) physicalParts.push(c.gender === 'male' ? 'male' : c.gender === 'female' ? 'female' : 'non-binary');
+
+    // From style analysis (most detailed)
+    if (c.styleAnalysis) {
+      const sa = c.styleAnalysis;
+      if (sa.face) physicalParts.push(`Face: ${sa.face}`);
+      if (sa.hair) physicalParts.push(`Hair: ${sa.hair}`);
+      if (sa.build) physicalParts.push(`Build: ${sa.build}`);
+      if (sa.skinTone) physicalParts.push(`Skin: ${sa.skinTone}`);
+      if (sa.distinguishingFeatures) physicalParts.push(`Features: ${sa.distinguishingFeatures}`);
+    } else {
+      // Fallback to individual fields
+      if (c.hairColor) physicalParts.push(`Hair: ${c.hairColor}`);
+      if (c.hairStyle) physicalParts.push(`Hair style: ${c.hairStyle}`);
+      if (c.eyeColor) physicalParts.push(`Eyes: ${c.eyeColor}`);
+      if (c.skinTone) physicalParts.push(`Skin: ${c.skinTone}`);
+      if (c.build) physicalParts.push(`Build: ${c.build}`);
+    }
+
+    // Additional features
+    if (c.otherFeatures) physicalParts.push(c.otherFeatures);
+    if (c.specialDetails) physicalParts.push(c.specialDetails);
+
+    // Use Visual Bible description if available and more complete
+    const physicalDesc = visualBibleDesc || physicalParts.join('. ');
+
+    return `* **${c.name}:**\n  PHYSICAL: ${physicalDesc}`;
+  }).join('\n\n');
+
+  // Build Visual Bible recurring elements section (animals, objects, locations)
   let recurringElements = '';
   if (visualBible) {
     const entries = getVisualBibleEntriesForPage(visualBible, pageNumber);
     if (entries.length > 0) {
-      recurringElements = '\n**RECURRING ELEMENTS IN THIS SCENE:**\n';
       for (const entry of entries) {
         const description = entry.extractedDescription || entry.description;
         recurringElements += `* **${entry.name}** (${entry.type}): ${description}\n`;
       }
     }
-    // Add secondary characters if any appear
+    // Add secondary characters if any appear on this page
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
       const secondaryInScene = visualBible.secondaryCharacters.filter(sc =>
         sc.appearsOnPages && sc.appearsOnPages.includes(pageNumber)
       );
-      if (secondaryInScene.length > 0) {
-        if (!recurringElements) recurringElements = '\n**RECURRING ELEMENTS IN THIS SCENE:**\n';
-        for (const sc of secondaryInScene) {
-          recurringElements += `* **${sc.name}** (secondary character): ${sc.description}\n`;
-        }
+      for (const sc of secondaryInScene) {
+        recurringElements += `* **${sc.name}** (secondary character): ${sc.description}\n`;
       }
     }
+    // Add locations if any appear on this page
+    if (visualBible.locations && visualBible.locations.length > 0) {
+      const locationsInScene = visualBible.locations.filter(loc =>
+        loc.appearsOnPages && loc.appearsOnPages.includes(pageNumber)
+      );
+      for (const loc of locationsInScene) {
+        recurringElements += `* **${loc.name}** (location): ${loc.description}\n`;
+      }
+    }
+    // Add animals if any appear on this page
+    if (visualBible.animals && visualBible.animals.length > 0) {
+      const animalsInScene = visualBible.animals.filter(animal =>
+        animal.appearsOnPages && animal.appearsOnPages.includes(pageNumber)
+      );
+      for (const animal of animalsInScene) {
+        recurringElements += `* **${animal.name}** (animal): ${animal.description}\n`;
+      }
+    }
+    // Add artifacts if any appear on this page
+    if (visualBible.artifacts && visualBible.artifacts.length > 0) {
+      const artifactsInScene = visualBible.artifacts.filter(artifact =>
+        artifact.appearsOnPages && artifact.appearsOnPages.includes(pageNumber)
+      );
+      for (const artifact of artifactsInScene) {
+        recurringElements += `* **${artifact.name}** (object): ${artifact.description}\n`;
+      }
+    }
+  }
+
+  // Default message if no recurring elements
+  if (!recurringElements) {
+    recurringElements = '(None for this page)';
   }
 
   // Use template from file if available
