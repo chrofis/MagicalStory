@@ -7901,7 +7901,13 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
       generatedOutfits: char.generatedOutfits || {}
     };
 
-    console.log(`📖 [VISUAL BIBLE] Added main character: ${char.name} (id: ${char.id}, hasStyleAnalysis: ${!!char.styleAnalysis})`);
+    // Debug: Log what physical data we're using
+    const hasStylePhysical = !!char.styleAnalysis?.physical;
+    console.log(`📖 [VISUAL BIBLE] Added main character: ${char.name} (id: ${char.id})`);
+    console.log(`📖 [VISUAL BIBLE]   - hasStyleAnalysis: ${!!char.styleAnalysis}, hasStyleAnalysis.physical: ${hasStylePhysical}`);
+    console.log(`📖 [VISUAL BIBLE]   - physical.face: "${mainChar.physical.face?.substring(0, 60)}..."`);
+    console.log(`📖 [VISUAL BIBLE]   - physical.hair: "${mainChar.physical.hair}"`);
+    console.log(`📖 [VISUAL BIBLE]   - physical.build: "${mainChar.physical.build}"`);
     return mainChar;
   });
 
@@ -8411,20 +8417,40 @@ function extractCoverScenes(outline) {
 
 // Helper function to build Art Director scene description prompt (matches frontend)
 function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null) {
-  // Build detailed character descriptions - include full physical details
+  // Debug: Log Visual Bible mainCharacters status
+  console.log(`📖 [SCENE PROMPT P${pageNumber}] Building prompt for ${characters.length} characters`);
+  console.log(`📖 [SCENE PROMPT P${pageNumber}] Visual Bible mainCharacters: ${visualBible?.mainCharacters?.length || 0}`);
+
+  // Build detailed character descriptions - include full physical details from Visual Bible
   const characterDetails = characters.map(c => {
     // Check if character has detailed description in Visual Bible
     let visualBibleDesc = null;
     if (visualBible && visualBible.mainCharacters) {
       const vbChar = visualBible.mainCharacters.find(vbc =>
-        vbc.id === c.id || vbc.name.toLowerCase() === c.name.toLowerCase()
+        vbc.id === c.id || vbc.name.toLowerCase().trim() === c.name.toLowerCase().trim()
       );
-      if (vbChar && vbChar.physicalDescription) {
-        visualBibleDesc = vbChar.physicalDescription;
+
+      // Debug logging
+      console.log(`📖 [SCENE PROMPT P${pageNumber}] Looking for "${c.name}" (id: ${c.id}) in Visual Bible...`);
+      console.log(`📖 [SCENE PROMPT P${pageNumber}] Found match: ${vbChar ? vbChar.name : 'NO'}, has physical: ${vbChar?.physical ? 'YES' : 'NO'}`);
+      if (vbChar?.physical) {
+        console.log(`📖 [SCENE PROMPT P${pageNumber}] Physical data: face="${vbChar.physical.face?.substring(0, 50)}...", hair="${vbChar.physical.hair}", build="${vbChar.physical.build}"`);
+      }
+
+      if (vbChar && vbChar.physical) {
+        // Build description from Visual Bible physical object
+        const vbParts = [];
+        if (vbChar.physical.face) vbParts.push(vbChar.physical.face);
+        if (vbChar.physical.hair) vbParts.push(`Hair: ${vbChar.physical.hair}`);
+        if (vbChar.physical.build) vbParts.push(vbChar.physical.build);
+        if (vbParts.length > 0) {
+          visualBibleDesc = vbParts.join(' | ');
+          console.log(`📖 [SCENE PROMPT P${pageNumber}] Using Visual Bible description for ${c.name}`);
+        }
       }
     }
 
-    // Build comprehensive physical description
+    // Fallback: Build comprehensive physical description from character data
     const physicalParts = [];
 
     // Basic info
@@ -8432,7 +8458,13 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     if (c.gender) physicalParts.push(c.gender === 'male' ? 'male' : c.gender === 'female' ? 'female' : 'non-binary');
 
     // From style analysis (most detailed)
-    if (c.styleAnalysis) {
+    if (c.styleAnalysis && c.styleAnalysis.physical) {
+      const sa = c.styleAnalysis.physical;
+      if (sa.face) physicalParts.push(sa.face);
+      if (sa.hair) physicalParts.push(`Hair: ${sa.hair}`);
+      if (sa.build) physicalParts.push(sa.build);
+    } else if (c.styleAnalysis) {
+      // Legacy format
       const sa = c.styleAnalysis;
       if (sa.face) physicalParts.push(`Face: ${sa.face}`);
       if (sa.hair) physicalParts.push(`Hair: ${sa.hair}`);
@@ -8452,7 +8484,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     if (c.otherFeatures) physicalParts.push(c.otherFeatures);
     if (c.specialDetails) physicalParts.push(c.specialDetails);
 
-    // Use Visual Bible description if available and more complete
+    // Use Visual Bible description if available (preferred), otherwise use character data
     const physicalDesc = visualBibleDesc || physicalParts.join('. ');
 
     return `* **${c.name}:**\n  PHYSICAL: ${physicalDesc}`;
