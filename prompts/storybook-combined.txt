@@ -93,6 +93,7 @@ SCENE:
 Setting: [Location, time of day, atmosphere]
 Characters: [Who is in this scene]
 Action: [What is happening - the key visual moment]
+Clothing: [winter/summer/formal/standard - pick ONE based on scene context]
 Mood: [Emotional tone]
 
 ---PAGE 2---
@@ -103,6 +104,7 @@ SCENE:
 Setting: [Description]
 Characters: [Who is present]
 Action: [Key visual moment]
+Clothing: [winter/summer/formal/standard]
 Mood: [Emotional tone]
 
 ... continue for all {PAGES} pages ...
@@ -114,6 +116,14 @@ Characters: [ALL characters from the story together as a group, with EQUAL promi
 Action: [A peaceful group moment showing all characters together, celebrating or content]
 Mood: [Happy, content, peaceful, hopeful]
 **CHARACTER RULE: Include ALL characters with EQUAL visual prominence. No single character should be the focus - this is a GROUP scene where everyone matters equally.**
+
+# Clothing Categories
+
+Select ONE clothing category per scene based on the context:
+- **winter** - Cold weather scenes (coats, scarves, boots, snow)
+- **summer** - Warm weather scenes (t-shirts, shorts, light dresses)
+- **formal** - Special occasions (suits, dresses, fancy attire, parties)
+- **standard** - Everyday casual scenes (regular clothes, indoor activities)
 
 # Character Guidelines
 

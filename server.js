@@ -11712,7 +11712,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           textIssue,
           textErrorOnly,
           expectedText,
-          actualText
+          actualText,
+          modelId  // Include which model was used for dev mode
         };
         imageCache.set(cacheKey, result);
         log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
@@ -12109,7 +12110,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         wasRegenerated: attempts > 1,
         wasSceneRewritten: wasSceneRewritten,
         totalAttempts: attempts,
-        retryHistory: retryHistory
+        retryHistory: retryHistory,
+        modelId: result.modelId  // Include which model was used
       };
     }
 
