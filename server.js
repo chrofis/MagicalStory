@@ -239,6 +239,38 @@ function getCharacterPhotos(characters) {
 }
 
 /**
+ * Get detailed photo info for characters (for dev mode display)
+ * @param {Array} characters - Array of character objects
+ * @returns {Array} Array of objects with character name and photo type used
+ */
+function getCharacterPhotoDetails(characters) {
+  if (!characters || characters.length === 0) return [];
+  return characters
+    .map(char => {
+      let photoType = 'none';
+      let photoUrl = null;
+      if (char.bodyNoBgUrl) {
+        photoType = 'body-no-bg';
+        photoUrl = char.bodyNoBgUrl;
+      } else if (char.bodyPhotoUrl) {
+        photoType = 'body';
+        photoUrl = char.bodyPhotoUrl;
+      } else if (char.photoUrl) {
+        photoType = 'face';
+        photoUrl = char.photoUrl;
+      }
+      return {
+        name: char.name,
+        id: char.id,
+        photoType,
+        photoUrl,
+        hasPhoto: photoType !== 'none'
+      };
+    })
+    .filter(info => info.hasPhoto);
+}
+
+/**
  * Build a physical description of a character for image generation
  * Only includes visual attributes, not psychological traits
  * @param {Object} char - Character object
@@ -9090,6 +9122,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               // Detect which characters appear in this scene
               const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
               const scenePhotos = getCharacterPhotos(sceneCharacters);
+              const referencePhotos = getCharacterPhotoDetails(sceneCharacters);
               console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
               // Generate image from scene description with scene-specific characters and visual bible
@@ -9126,7 +9159,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 wasRegenerated: imageResult.wasRegenerated || false,
                 originalImage: imageResult.originalImage || null,
                 originalScore: imageResult.originalScore || null,
-                originalReasoning: imageResult.originalReasoning || null
+                originalReasoning: imageResult.originalReasoning || null,
+                referencePhotos: referencePhotos  // Dev mode: which photos were used
               };
 
               // Save partial result checkpoint for progressive display
@@ -9140,7 +9174,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 wasRegenerated: imageResult.wasRegenerated || false,
                 originalImage: imageResult.originalImage || null,
                 originalScore: imageResult.originalScore || null,
-                originalReasoning: imageResult.originalReasoning || null
+                originalReasoning: imageResult.originalReasoning || null,
+                referencePhotos: referencePhotos
               }, pageNum);
               console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
 
@@ -9258,6 +9293,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Detect which characters appear in this scene
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
             const scenePhotos = getCharacterPhotos(sceneCharacters);
+            const referencePhotos = getCharacterPhotoDetails(sceneCharacters);
             console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'})...`);
 
             // Generate image from scene description with scene-specific characters and visual bible
@@ -9306,7 +9342,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               wasRegenerated: imageResult.wasRegenerated || false,
               originalImage: imageResult.originalImage || null,
               originalScore: imageResult.originalScore || null,
-              originalReasoning: imageResult.originalReasoning || null
+              originalReasoning: imageResult.originalReasoning || null,
+              referencePhotos: referencePhotos  // Dev mode: which photos were used
             };
 
             // Save partial result checkpoint for progressive display
@@ -9323,7 +9360,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               retryHistory: imageResult.retryHistory || [],
               originalImage: imageResult.originalImage || null,
               originalScore: imageResult.originalScore || null,
-              originalReasoning: imageResult.originalReasoning || null
+              originalReasoning: imageResult.originalReasoning || null,
+              referencePhotos: referencePhotos
             }, pageNum);
             console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
 

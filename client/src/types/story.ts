@@ -36,6 +36,14 @@ export interface RetryAttempt {
   timestamp: string;
 }
 
+export interface ReferencePhoto {
+  name: string;
+  id: number;
+  photoType: 'face' | 'body' | 'body-no-bg' | 'none';
+  photoUrl: string | null;
+  hasPhoto: boolean;
+}
+
 export interface SceneImage {
   pageNumber: number;
   imageData: string;
@@ -51,6 +59,8 @@ export interface SceneImage {
   originalImage?: string;
   originalScore?: number;
   originalReasoning?: string;
+  // Reference photos used (for dev mode)
+  referencePhotos?: ReferencePhoto[];
 }
 
 export interface CoverImageData {

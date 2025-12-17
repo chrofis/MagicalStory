@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt, ReferencePhoto } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 
@@ -94,6 +94,67 @@ function RetryHistoryDisplay({
             <div className="text-xs text-gray-400 mt-1">
               {new Date(attempt.timestamp).toLocaleTimeString()}
             </div>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+// Helper component to display reference photos used for image generation
+function ReferencePhotosDisplay({
+  referencePhotos,
+  language
+}: {
+  referencePhotos: ReferencePhoto[];
+  language: string;
+}) {
+  if (!referencePhotos || referencePhotos.length === 0) return null;
+
+  const getPhotoTypeLabel = (photoType: string) => {
+    switch (photoType) {
+      case 'body-no-bg': return language === 'de' ? 'Ganzkörper (freigestellt)' : language === 'fr' ? 'Corps entier (détouré)' : 'Full body (no bg)';
+      case 'body': return language === 'de' ? 'Ganzkörper' : language === 'fr' ? 'Corps entier' : 'Full body';
+      case 'face': return language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face only';
+      default: return photoType;
+    }
+  };
+
+  const getPhotoTypeColor = (photoType: string) => {
+    switch (photoType) {
+      case 'body-no-bg': return 'bg-green-100 text-green-700 border-green-300';
+      case 'body': return 'bg-blue-100 text-blue-700 border-blue-300';
+      case 'face': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
+      default: return 'bg-gray-100 text-gray-700 border-gray-300';
+    }
+  };
+
+  return (
+    <details className="bg-pink-50 border border-pink-300 rounded-lg p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-pink-700 hover:text-pink-900 flex items-center gap-2">
+        <span>📸</span>
+        {language === 'de' ? 'Referenzfotos' : language === 'fr' ? 'Photos de référence' : 'Reference Photos'}
+        <span className="text-xs text-pink-600">({referencePhotos.length})</span>
+      </summary>
+      <div className="mt-3 space-y-2">
+        {referencePhotos.map((photo, idx) => (
+          <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-sm text-gray-800">{photo.name}</span>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getPhotoTypeColor(photo.photoType)}`}>
+                {getPhotoTypeLabel(photo.photoType)}
+              </span>
+            </div>
+            {photo.photoUrl && (
+              <a
+                href={photo.photoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-800 underline break-all"
+              >
+                {photo.photoUrl.length > 60 ? photo.photoUrl.substring(0, 60) + '...' : photo.photoUrl}
+              </a>
+            )}
           </div>
         ))}
       </div>
@@ -1092,6 +1153,14 @@ export function StoryDisplay({
                               </details>
                             )}
 
+                            {/* Reference Photos */}
+                            {image.referencePhotos && image.referencePhotos.length > 0 && (
+                              <ReferencePhotosDisplay
+                                referencePhotos={image.referencePhotos}
+                                language={language}
+                              />
+                            )}
+
                             {/* Quality Score with Reasoning */}
                             {image.qualityScore !== undefined && (
                               <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
@@ -1239,6 +1308,14 @@ export function StoryDisplay({
                                   {image.prompt}
                                 </pre>
                               </details>
+                            )}
+
+                            {/* Reference Photos */}
+                            {image.referencePhotos && image.referencePhotos.length > 0 && (
+                              <ReferencePhotosDisplay
+                                referencePhotos={image.referencePhotos}
+                                language={language}
+                              />
                             )}
 
                             {/* Quality Score with Reasoning */}
