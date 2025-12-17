@@ -7,9 +7,9 @@ export const defaultStrengths: Record<Language, string[]> = {
 };
 
 export const defaultFlaws: Record<Language, string[]> = {
-  en: ['Shy', 'Clumsy', 'Impatient', 'Forgetful', 'Messy', 'Talkative', 'Stubborn', 'Lazy', 'Greedy', 'Jealous', 'Anxious', 'Distracted', 'Reckless', 'Bossy', 'Easily scared', 'Too trusting', 'Perfectionist', 'Indecisive', 'Secretive', 'Boastful', 'Quick-tempered', 'Careless', 'Overly cautious', 'Selfish'],
-  de: ['Schüchtern', 'Tollpatschig', 'Ungeduldig', 'Vergesslich', 'Unordentlich', 'Gesprächig', 'Stur', 'Faul', 'Gierig', 'Eifersüchtig', 'Ängstlich', 'Abgelenkt', 'Leichtsinnig', 'Herrschsüchtig', 'Leicht ängstlich', 'Zu vertrauensvoll', 'Perfektionist', 'Unentschlossen', 'Verschlossen', 'Prahlerisch', 'Jähzornig', 'Nachlässig', 'Übervorsichtig', 'Egoistisch'],
-  fr: ['Timide', 'Maladroit', 'Impatient', 'Distrait', 'Désordonné', 'Bavard', 'Têtu', 'Paresseux', 'Avide', 'Jaloux', 'Anxieux', 'Distrait', 'Imprudent', 'Autoritaire', 'Facilement effrayé', 'Trop confiant', 'Perfectionniste', 'Indécis', 'Secret', 'Vantard', 'Colérique', 'Négligent', 'Trop prudent', 'Égoïste'],
+  en: ['Impatient', 'Distracted', 'Talkative', 'Whiny', 'Messy', 'Forgetful', 'Tattletale', 'Sore Loser', 'Stubborn', 'Lying', 'Bossy', 'Gullible', 'Jealous', 'Easily scared', 'Clingy', 'Quick-tempered', 'Selfish', 'Sneaky', 'Reckless', 'Shy', 'Clumsy', 'Lazy', 'Boastful', 'Indecisive', 'Perfectionist'],
+  de: ['Ungeduldig', 'Zerstreut', 'Gesprächig', 'Weinerlich', 'Unordentlich', 'Vergesslich', 'Petze', 'Schlechter Verlierer', 'Stur', 'Lügnerisch', 'Rechthaberisch', 'Leichtgläubig', 'Eifersüchtig', 'Ängstlich', 'Anhänglich', 'Jähzornig', 'Egoistisch', 'Hinterlistig', 'Leichtsinnig', 'Schüchtern', 'Tollpatschig', 'Faul', 'Prahlerisch', 'Unentschlossen', 'Perfektionist'],
+  fr: ['Impatient', 'Distrait', 'Bavard', 'Pleurnicheur', 'Désordonné', 'Oublieux', 'Rapporteur', 'Mauvais perdant', 'Têtu', 'Menteur', 'Autoritaire', 'Crédule', 'Jaloux', 'Facilement effrayé', 'Collant', 'Colérique', 'Égoïste', 'Sournois', 'Imprudent', 'Timide', 'Maladroit', 'Paresseux', 'Vantard', 'Indécis', 'Perfectionniste'],
 };
 
 export const defaultChallenges: Record<Language, string[]> = {

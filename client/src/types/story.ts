@@ -41,9 +41,10 @@ export interface RetryAttempt {
 export interface ReferencePhoto {
   name: string;
   id: number;
-  photoType: 'face' | 'body' | 'body-no-bg' | 'none';
+  photoType: 'face' | 'body' | 'bodyNoBg' | 'body-no-bg' | 'clothing-winter' | 'clothing-summer' | 'clothing-formal' | 'clothing-standard' | 'none';
   photoUrl: string | null;
   hasPhoto: boolean;
+  clothingCategory?: 'winter' | 'summer' | 'formal' | 'standard' | null;
 }
 
 export interface SceneImage {
