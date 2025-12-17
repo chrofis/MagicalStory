@@ -21,8 +21,8 @@ COPY requirements.txt ./
 # Install Node.js dependencies
 RUN npm install --production
 
-# Install Python dependencies
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Install Python dependencies (--break-system-packages is safe in Docker containers)
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Copy application files
 COPY . .
