@@ -9796,6 +9796,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 imageData: imageResult.imageData,
                 description: sceneDescription,
                 text: pageContent,  // Include page text for progressive display
+                prompt: imagePrompt,  // Dev mode: the actual API prompt sent to image generation
                 qualityScore: imageResult.score,
                 qualityReasoning: imageResult.reasoning || null,
                 wasRegenerated: imageResult.wasRegenerated || false,
@@ -9814,6 +9815,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 imageData: imageResult.imageData,
                 description: sceneDescription,
                 text: pageContent,
+                prompt: imagePrompt,
                 qualityScore: imageResult.score,
                 qualityReasoning: imageResult.reasoning || null,
                 wasRegenerated: imageResult.wasRegenerated || false,
