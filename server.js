@@ -236,8 +236,8 @@ function getCharacterPhotos(characters, clothingCategory = null) {
       if (clothingCategory && char.clothingAvatars && char.clothingAvatars[clothingCategory]) {
         return char.clothingAvatars[clothingCategory];
       }
-      // Fall back to face photo only (no longer using body photos)
-      return char.photoUrl;
+      // Fall back to body without background > body crop > face photo
+      return char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
     })
     .filter(url => url); // Remove nulls
 }
@@ -276,6 +276,12 @@ function getCharacterPhotoDetails(characters, clothingCategory = null) {
       if (clothingCategory && char.clothingAvatars && char.clothingAvatars[clothingCategory]) {
         photoType = `clothing-${clothingCategory}`;
         photoUrl = char.clothingAvatars[clothingCategory];
+      } else if (char.bodyNoBgUrl) {
+        photoType = 'bodyNoBg';
+        photoUrl = char.bodyNoBgUrl;
+      } else if (char.bodyPhotoUrl) {
+        photoType = 'body';
+        photoUrl = char.bodyPhotoUrl;
       } else if (char.photoUrl) {
         photoType = 'face';
         photoUrl = char.photoUrl;
