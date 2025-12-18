@@ -4433,8 +4433,9 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.clothing) {
           analyzerData.attributes.clothing = traits.clothing;
         }
-        if (traits.features) {
-          analyzerData.attributes.other_features = traits.features;
+        // Support both 'features' (old) and 'face' (new) field names
+        if (traits.features || traits.face) {
+          analyzerData.attributes.other_features = traits.features || traits.face;
         }
       }
 
@@ -7610,13 +7611,18 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
   console.log(`📖 [VISUAL BIBLE] Initializing ${characters.length} main characters...`);
 
   visualBible.mainCharacters = characters.map(char => {
+    // Build physical description from all available sources
+    const stylePhysical = char.styleAnalysis?.physical || {};
     const mainChar = {
       id: char.id,
       name: char.name,
-      physical: char.styleAnalysis?.physical || {
-        face: char.otherFeatures || 'Not analyzed',
-        hair: char.hairColor || 'Not analyzed',
-        build: char.build || 'Not analyzed'
+      physical: {
+        age: char.age || stylePhysical.age || 'Unknown',
+        gender: char.gender || stylePhysical.gender || 'Unknown',
+        height: char.height || stylePhysical.height || 'Unknown',
+        build: stylePhysical.build || char.build || 'Unknown',
+        face: stylePhysical.face || char.otherFeatures || 'Not analyzed',
+        hair: stylePhysical.hair || char.hairColor || 'Not analyzed'
       },
       styleDNA: char.styleAnalysis?.styleDNA || {
         signatureColors: [],
@@ -7646,9 +7652,12 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
     const hasStylePhysical = !!char.styleAnalysis?.physical;
     console.log(`📖 [VISUAL BIBLE] Added main character: ${char.name} (id: ${char.id})`);
     console.log(`📖 [VISUAL BIBLE]   - hasStyleAnalysis: ${!!char.styleAnalysis}, hasStyleAnalysis.physical: ${hasStylePhysical}`);
+    console.log(`📖 [VISUAL BIBLE]   - physical.age: "${mainChar.physical.age}"`);
+    console.log(`📖 [VISUAL BIBLE]   - physical.gender: "${mainChar.physical.gender}"`);
+    console.log(`📖 [VISUAL BIBLE]   - physical.height: "${mainChar.physical.height}"`);
+    console.log(`📖 [VISUAL BIBLE]   - physical.build: "${mainChar.physical.build}"`);
     console.log(`📖 [VISUAL BIBLE]   - physical.face: "${mainChar.physical.face?.substring(0, 60)}..."`);
     console.log(`📖 [VISUAL BIBLE]   - physical.hair: "${mainChar.physical.hair}"`);
-    console.log(`📖 [VISUAL BIBLE]   - physical.build: "${mainChar.physical.build}"`);
     return mainChar;
   });
 
@@ -7839,14 +7848,25 @@ function buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames = n
       for (const char of charsToInclude) {
         prompt += `**${char.name}:**\n`;
         if (char.physical) {
+          // Basic traits
+          if (char.physical.age && char.physical.age !== 'Unknown') {
+            prompt += `- Age: ${char.physical.age} years old\n`;
+          }
+          if (char.physical.gender && char.physical.gender !== 'Unknown') {
+            prompt += `- Gender: ${char.physical.gender}\n`;
+          }
+          if (char.physical.height && char.physical.height !== 'Unknown') {
+            prompt += `- Height: ${char.physical.height} cm\n`;
+          }
+          if (char.physical.build && char.physical.build !== 'Unknown' && char.physical.build !== 'Not analyzed') {
+            prompt += `- Build: ${char.physical.build}\n`;
+          }
+          // Detailed features
           if (char.physical.face && char.physical.face !== 'Not analyzed') {
             prompt += `- Face: ${char.physical.face}\n`;
           }
           if (char.physical.hair && char.physical.hair !== 'Not analyzed') {
             prompt += `- Hair: ${char.physical.hair}\n`;
-          }
-          if (char.physical.build && char.physical.build !== 'Not analyzed') {
-            prompt += `- Build: ${char.physical.build}\n`;
           }
         }
         if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
@@ -7881,14 +7901,25 @@ function buildFullVisualBiblePrompt(visualBible) {
     for (const char of visualBible.mainCharacters) {
       prompt += `**${char.name}:**\n`;
       if (char.physical) {
+        // Basic traits
+        if (char.physical.age && char.physical.age !== 'Unknown') {
+          prompt += `- Age: ${char.physical.age} years old\n`;
+        }
+        if (char.physical.gender && char.physical.gender !== 'Unknown') {
+          prompt += `- Gender: ${char.physical.gender}\n`;
+        }
+        if (char.physical.height && char.physical.height !== 'Unknown') {
+          prompt += `- Height: ${char.physical.height} cm\n`;
+        }
+        if (char.physical.build && char.physical.build !== 'Unknown' && char.physical.build !== 'Not analyzed') {
+          prompt += `- Build: ${char.physical.build}\n`;
+        }
+        // Detailed features
         if (char.physical.face && char.physical.face !== 'Not analyzed') {
           prompt += `- Face: ${char.physical.face}\n`;
         }
         if (char.physical.hair && char.physical.hair !== 'Not analyzed') {
           prompt += `- Hair: ${char.physical.hair}\n`;
-        }
-        if (char.physical.build && char.physical.build !== 'Not analyzed') {
-          prompt += `- Build: ${char.physical.build}\n`;
         }
       }
       if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
@@ -11833,64 +11864,6 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       };
     }
 
-    // For covers with text-only errors, try text edit before next full regeneration
-    if (evaluationType === 'cover' && result.textErrorOnly && result.expectedText && result.actualText && attempts < MAX_ATTEMPTS) {
-      console.log(`✏️  [QUALITY RETRY] Attempting text edit before next regeneration...`);
-      try {
-        const editedResult = await editCoverImageText(
-          result.imageData,
-          result.actualText,
-          result.expectedText
-        );
-
-        if (editedResult && editedResult.imageData) {
-          const editedQuality = await evaluateImageQuality(editedResult.imageData, prompt, characterPhotos, 'cover');
-          const editedScore = editedQuality?.score || 0;
-          console.log(`⭐ [QUALITY RETRY] Edited image score: ${editedScore}%`);
-
-          // Store text edit attempt in history
-          retryHistory.push({
-            attempt: attempts,
-            type: 'text_edit',
-            imageData: editedResult.imageData,
-            score: editedScore,
-            reasoning: editedQuality?.reasoning || 'Text edited',
-            textIssue: editedQuality?.textIssue || null,
-            expectedText: result.expectedText,
-            actualText: editedQuality?.actualText || null,
-            timestamp: new Date().toISOString()
-          });
-
-          if (editedScore >= IMAGE_QUALITY_THRESHOLD && (!editedQuality?.textIssue || editedQuality.textIssue === 'NONE')) {
-            console.log(`✅ [QUALITY RETRY] Text edit succeeded!`);
-            return {
-              imageData: editedResult.imageData,
-              score: editedScore,
-              reasoning: editedQuality?.reasoning || 'Text edited',
-              wasRegenerated: true,
-              wasTextEdited: true,
-              wasSceneRewritten: wasSceneRewritten,
-              totalAttempts: attempts,
-              retryHistory: retryHistory
-            };
-          }
-
-          // Track edited result if better
-          if (editedScore > bestScore) {
-            bestScore = editedScore;
-            bestResult = { ...editedResult, score: editedScore, reasoning: editedQuality?.reasoning };
-          }
-        }
-      } catch (editError) {
-        console.log(`⚠️  [QUALITY RETRY] Text edit failed: ${editError.message}`);
-        retryHistory.push({
-          attempt: attempts,
-          type: 'text_edit_failed',
-          error: editError.message,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
   }
 
   // Exhausted all attempts - return best result we got

@@ -1,4 +1,4 @@
-Analyze this image of a person for a children's book illustration system.
+Analyze this image of a person 
 Extract visual attributes that will maintain consistency across different scenes.
 
 Return a JSON object with this EXACT structure:
@@ -7,23 +7,9 @@ Return a JSON object with this EXACT structure:
   "traits": {
     "age": "<estimated age as a number, e.g. 8, 25, 45>",
     "gender": "<male, female, or other>",
-    "height": "<tall, average, short>",
+    "height": "<height in cm as a number, e.g. 180>",
     "build": "<slim, average, athletic, stocky>"
-  },
-  "styleAnalysis": {
-    "physical": {
-      "face": "<detailed: face shape, eye color, skin tone, distinctive features like freckles, dimples, birthmarks, glasses>",
-      "hair": "<exact: specific color like 'honey blonde', length, style, texture, any accessories like ribbons/clips>",
-      "build": "<body type and apparent age, e.g. 'Slim build, appears to be around 9 years old'>"
-    }
+    "face": "<detailed: face shape, eye color, skin tone, distinctive features like freckles, dimples, birthmarks, glasses>",
+    "hair": "<exact: specific color, length, style, texture, any accessories like ribbons/clips>",
   }
 }
-
-IMPORTANT:
-- Be extremely specific about colors (not "blue" but "light sky blue")
-- Be exact about hair details (color, length, style, texture)
-- Note distinctive features that make this person recognizable
-- Do NOT describe clothing - clothing will be determined by the scene context
-- If something is not visible, use "not visible"
-
-Respond with ONLY valid JSON, no additional text.
