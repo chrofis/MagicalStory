@@ -43,6 +43,7 @@ export interface ReferencePhoto {
   id: number;
   photoType: 'face' | 'body' | 'bodyNoBg' | 'body-no-bg' | 'clothing-winter' | 'clothing-summer' | 'clothing-formal' | 'clothing-standard' | 'none';
   photoUrl: string | null;
+  photoHash?: string | null;  // SHA256 hash (first 8 chars) for verification
   hasPhoto: boolean;
   clothingCategory?: 'winter' | 'summer' | 'formal' | 'standard' | null;
 }

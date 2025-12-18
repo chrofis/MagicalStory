@@ -8,14 +8,13 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 - Render in artistic style - NOT photo-realistic copies
 - ALL characters in the SAME consistent style
 
-**CLOTHING:**
-- FACES and HAIR exactly as in reference images
-- Clothing appropriate to scene context (winter=warm, summer=light, etc.)
-- Maintain color preferences, keep accessories consistent
-
 ---
 
+{CHARACTER_REFERENCE_LIST}
+
 **SCENE:** {SCENE_DESCRIPTION}
+
+{VISUAL_BIBLE}
 
 ---
 

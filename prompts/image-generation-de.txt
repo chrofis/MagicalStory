@@ -8,14 +8,13 @@ KINDERBUCH-ILLUSTRATION - Sichere, familienfreundliche Inhalte.
 - Im künstlerischen Stil rendern - KEINE fotorealistischen Kopien
 - ALLE Charaktere im GLEICHEN konsistenten Stil
 
-**KLEIDUNG:**
-- GESICHTER und HAARE exakt wie in Referenzbildern
-- Kleidung passend zum Szenenkontext (Winter=warm, Sommer=leicht, etc.)
-- Farbpräferenzen beibehalten, Accessoires konsistent halten
-
 ---
 
+{CHARACTER_REFERENCE_LIST}
+
 **SZENE:** {SCENE_DESCRIPTION}
+
+{VISUAL_BIBLE}
 
 ---
 

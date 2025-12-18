@@ -177,11 +177,18 @@ function ReferencePhotosDisplay({
               </span>
             </div>
             {photo.photoUrl && (
-              <img
-                src={photo.photoUrl}
-                alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
-                className="w-full max-h-32 object-contain rounded border border-gray-200 bg-gray-50"
-              />
+              <>
+                <img
+                  src={photo.photoUrl}
+                  alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
+                  className="w-full max-h-32 object-contain rounded border border-gray-200 bg-gray-50"
+                />
+                {photo.photoHash && (
+                  <div className="mt-1 text-[9px] font-mono text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-center">
+                    🔐 {photo.photoHash}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ))}

@@ -262,6 +262,17 @@ function parseClothingCategory(sceneDescription) {
 }
 
 /**
+ * Generate a short hash for image data (for verification in dev mode)
+ * @param {string} imageData - Base64 image data URL
+ * @returns {string} Short hash (8 characters)
+ */
+function hashImageData(imageData) {
+  if (!imageData) return null;
+  const data = imageData.replace(/^data:image\/\w+;base64,/, '');
+  return crypto.createHash('sha256').update(data).digest('hex').substring(0, 8);
+}
+
+/**
  * Get detailed photo info for characters (for dev mode display)
  * @param {Array} characters - Array of character objects
  * @param {string} clothingCategory - Optional clothing category to show which avatar is used
@@ -293,6 +304,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null) {
         id: char.id,
         photoType,
         photoUrl,
+        photoHash: hashImageData(photoUrl),  // For dev mode verification
         clothingCategory: clothingCategory || null,
         hasPhoto: photoType !== 'none'
       };
@@ -8456,11 +8468,27 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Helper function to generate image for a scene (used during streaming)
     const generateImageForScene = async (pageNum, sceneDesc, pageText = null, vBible = null) => {
       try {
+        // DEBUG: Log available characters before filtering
+        const allCharacters = inputData.characters || [];
+        console.log(`🔍 [DEBUG PAGE ${pageNum}] Total available characters: ${allCharacters.length}`);
+        allCharacters.forEach(char => {
+          const hasPhoto = char.photoUrl?.startsWith('data:image');
+          const hasBody = char.bodyPhotoUrl?.startsWith('data:image');
+          const hasBodyNoBg = char.bodyNoBgUrl?.startsWith('data:image');
+          const hasClothing = char.clothingAvatars ? Object.keys(char.clothingAvatars).filter(k => char.clothingAvatars[k]?.startsWith('data:image')).join(',') : 'none';
+          console.log(`   - ${char.name}: face=${hasPhoto}, body=${hasBody}, bodyNoBg=${hasBodyNoBg}, clothing=[${hasClothing}]`);
+        });
+
         const sceneCharacters = getCharactersInScene(sceneDesc, inputData.characters || []);
+        console.log(`🔍 [DEBUG PAGE ${pageNum}] Characters found in scene: ${sceneCharacters.map(c => c.name).join(', ') || 'NONE'}`);
+
         // Parse clothing category from scene description
         const clothingCategory = parseClothingCategory(sceneDesc) || 'standard';
+        console.log(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
+
         // Use detailed photo info (with names) for labeled reference images
         const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+        console.log(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
         // Log with visual bible info if available
         if (vBible) {
@@ -8698,12 +8726,28 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       const generateImage = async (scene, idx, previousImage = null, isSequential = false, vBible = null) => {
         const pageNum = scene.pageNumber;
         try {
+          // DEBUG: Log available characters before filtering
+          const allChars = inputData.characters || [];
+          console.log(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Total characters: ${allChars.length}`);
+          allChars.forEach(char => {
+            const hasPhoto = char.photoUrl?.startsWith('data:image');
+            const hasBody = char.bodyPhotoUrl?.startsWith('data:image');
+            const hasBodyNoBg = char.bodyNoBgUrl?.startsWith('data:image');
+            const hasClothing = char.clothingAvatars ? Object.keys(char.clothingAvatars).filter(k => char.clothingAvatars[k]?.startsWith('data:image')).join(',') : 'none';
+            console.log(`   - ${char.name}: face=${hasPhoto}, body=${hasBody}, bodyNoBg=${hasBodyNoBg}, clothing=[${hasClothing}]`);
+          });
+
           // Detect which characters appear in this scene
           const sceneCharacters = getCharactersInScene(scene.description, inputData.characters || []);
+          console.log(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Characters found in scene: ${sceneCharacters.map(c => c.name).join(', ') || 'NONE'}`);
+
           // Parse clothing category from scene description
           const clothingCategory = parseClothingCategory(scene.description) || 'standard';
+          console.log(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
+
           // Use detailed photo info (with names) for labeled reference images
           const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+          console.log(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Reference photos: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
           // Log visual bible usage
           if (vBible) {
@@ -10521,20 +10565,21 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
     console.log(`📝 [IMAGE PROMPT] Using ${isSequential ? 'sequential' : 'parallel'} template for language: ${language}`);
-    // Add character reference list before the template content
-    const basePrompt = fillTemplate(template, {
+    // Fill all placeholders in template
+    return fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
       SCENE_DESCRIPTION: sceneDescription,
+      CHARACTER_REFERENCE_LIST: characterReferenceList,
+      VISUAL_BIBLE: visualBibleSection,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
-    // Append Visual Bible section at the end for recurring elements consistency
-    return characterReferenceList + basePrompt + visualBibleSection;
   }
 
   // Fallback to hardcoded prompt
-  return `${characterReferenceList}Create a cinematic scene in ${styleDescription}.
+  return `Create a cinematic scene in ${styleDescription}.
 
+${characterReferenceList}
 Scene Description: ${sceneDescription}
 ${visualBibleSection}
 Important:
@@ -11282,16 +11327,26 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     let addedCount = 0;
     let skippedCount = 0;
     const characterNames = [];
+    const apiImageHashes = [];  // Track hashes of images actually sent to API
 
     characterPhotos.forEach((photoData, index) => {
       // Handle both formats: string URL or {name, photoUrl} object
       const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
       const characterName = typeof photoData === 'object' ? photoData?.name : null;
+      const providedHash = typeof photoData === 'object' ? photoData?.photoHash : null;
 
       if (photoUrl && photoUrl.startsWith('data:image')) {
         const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
         const mimeType = photoUrl.match(/^data:(image\/\w+);base64,/) ?
           photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+        // Calculate hash of the actual data being sent to API
+        const apiHash = hashImageData(photoUrl);
+        apiImageHashes.push({
+          name: characterName || `photo_${index + 1}`,
+          hash: apiHash,
+          matchesProvided: providedHash ? apiHash === providedHash : null
+        });
 
         // Option A: Add text label BEFORE the image if we have a name
         if (characterName) {
@@ -11313,6 +11368,11 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         console.warn(`⚠️ [IMAGE GEN] Skipping character photo ${index + 1}: not a valid data URL (starts with: ${preview}...)`);
       }
     });
+
+    // Log hashes of images being sent to API
+    if (apiImageHashes.length > 0) {
+      console.log(`🔐 [IMAGE GEN] API image hashes:`, apiImageHashes.map(h => `${h.name}:${h.hash}`).join(', '));
+    }
 
     if (characterNames.length > 0) {
       console.log(`🖼️  [IMAGE GEN] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')}`);

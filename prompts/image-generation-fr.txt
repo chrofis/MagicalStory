@@ -8,14 +8,13 @@ ILLUSTRATION DE LIVRE POUR ENFANTS - Contenu sûr et familial.
 - Rendre dans le style artistique - PAS de copies photo-réalistes
 - TOUS les personnages dans le MÊME style cohérent
 
-**VÊTEMENTS:**
-- VISAGES et CHEVEUX exactement comme dans les références
-- Vêtements appropriés au contexte de la scène (hiver=chaud, été=léger, etc.)
-- Maintenir les préférences de couleur, garder les accessoires cohérents
-
 ---
 
+{CHARACTER_REFERENCE_LIST}
+
 **SCÈNE:** {SCENE_DESCRIPTION}
+
+{VISUAL_BIBLE}
 
 ---
 
