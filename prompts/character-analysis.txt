@@ -1,4 +1,4 @@
-Analyze this image of a person 
+Analyze this image of a person.
 Extract visual attributes that will maintain consistency across different scenes.
 
 Return a JSON object with this EXACT structure:
@@ -7,9 +7,10 @@ Return a JSON object with this EXACT structure:
   "traits": {
     "age": "<estimated age as a number, e.g. 8, 25, 45>",
     "gender": "<male, female, or other>",
-    "height": "<height in cm as a number, e.g. 180>",
-    "build": "<slim, average, athletic, stocky>"
-    "face": "<detailed: face shape, eye color, skin tone, distinctive features like freckles, dimples, birthmarks, glasses>",
-    "hair": "<exact: specific color, length, style, texture, any accessories like ribbons/clips>",
+    "height": "<height in cm as a number, e.g. 120 for child, 170 for adult>",
+    "build": "<slim, average, athletic, stocky>",
+    "face": "<face shape, eye color, skin tone>",
+    "hair": "<specific color, length, style, texture>",
+    "distinctiveFeatures": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces, or 'none'>"
   }
 }

@@ -4423,16 +4423,13 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.build && !analyzerData.attributes.build) {
           analyzerData.attributes.build = traits.build;
         }
-        // Hair, clothing, features - always set from Gemini (more accurate)
+        // Hair and distinctive features - always set from Gemini (more accurate)
         if (traits.hair) {
           analyzerData.attributes.hair_color = traits.hair;
         }
-        if (traits.clothing) {
-          analyzerData.attributes.clothing = traits.clothing;
-        }
-        // Support both 'features' (old) and 'face' (new) field names
-        if (traits.features || traits.face) {
-          analyzerData.attributes.other_features = traits.features || traits.face;
+        // Support distinctiveFeatures (new), features (old), and face field names
+        if (traits.distinctiveFeatures || traits.features || traits.face) {
+          analyzerData.attributes.other_features = traits.distinctiveFeatures || traits.features || traits.face;
         }
       }
 

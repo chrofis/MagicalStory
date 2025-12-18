@@ -61,6 +61,9 @@ export const photoService = {
         return { success: false };
       }
 
+      // Extract attributes from nested object (server returns { attributes: {...} })
+      const attrs = data.attributes || {};
+
       return {
         success: true,
         faceBox: data.faceBox,
@@ -68,14 +71,14 @@ export const photoService = {
         faceThumbnail: data.faceThumbnail,
         bodyCrop: data.bodyCrop,
         bodyNoBg: data.bodyNoBg,
-        age: data.age,
-        gender: data.gender,
-        height: data.height,
-        build: data.build,
-        hairColor: data.hairColor,
-        skinTone: data.skinTone,
-        eyeColor: data.eyeColor,
-        distinctiveFeatures: data.distinctiveFeatures,
+        age: attrs.age || data.age,
+        gender: attrs.gender || data.gender,
+        height: attrs.height || data.height,
+        build: attrs.build || data.build,
+        hairColor: attrs.hair_color || attrs.hairColor || data.hairColor,
+        skinTone: attrs.skin_tone || attrs.skinTone || data.skinTone,
+        eyeColor: attrs.eye_color || attrs.eyeColor || data.eyeColor,
+        distinctiveFeatures: attrs.other_features || attrs.distinctiveFeatures || data.distinctiveFeatures,
         source: 'python-mediapipe',
       };
     } catch (error) {

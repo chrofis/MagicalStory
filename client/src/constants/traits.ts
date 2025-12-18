@@ -41,7 +41,7 @@ export const defaultChallenges: Record<Language, string[]> = {
     'Regeln befolgen',
     'Gefühle kontrollieren',
     'Mit anderen teilen',
-    'Prüfungen und Noten',
+    'Prüfungsangst',
     'Neue Freunde finden',
     'Vor anderen sprechen',
     'Neues ausprobieren',
