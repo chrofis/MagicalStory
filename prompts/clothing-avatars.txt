@@ -31,8 +31,8 @@ IDENTITY PERSISTENCE:
 - Focus: Ultra-sharp focus on facial features.
 
 WARDROBE DETAILS:
-- Style Transfer Rule: Copy the EXACT pattern AND colors from the TOP/SHIRT in the input image. Apply these to the new top/shirt only.
-- CRITICAL PANTS RULE: Pants/trousers MUST be DIFFERENT from the top. Use plain/solid neutral colors (black, navy, khaki, gray, brown) for pants. NEVER apply the shirt's pattern or bright colors to the pants.
+- Style Transfer Rule: Copy the EXACT pattern AND colors from the input image. Just change from short to long sleave / legs, etc. 
+- If parts of the clothing are not visible in the input picture use plain/solid neutral colors (black, navy, khaki, gray, brown) to create them. Added / invented parts of the clothing MUST be DIFFERENT from  input image. NEVER apply the shirt's pattern or bright colors to the pants.
 - Outfit: {CLOTHING_STYLE}
 
 Output Quality: 4k, Photorealistic.
@@ -42,13 +42,13 @@ Output Quality: 4k, Photorealistic.
 ## Clothing Styles by Category
 
 ### WINTER
-Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.
+Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Warm pants or leggings. Heavy winter boots and gloves.
 
 ### STANDARD (Female)
-Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or leggings. Sneakers.
+Long-sleeved dress, T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or leggings. Casual shoes.
 
 ### STANDARD (Male)
-Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Sneakers.
+Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Casual shoes.
 
 ### SUMMER (Female)
 T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.
