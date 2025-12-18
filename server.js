@@ -364,7 +364,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
     PROMPT_TEMPLATES.storybookCombined = await fs.readFile(path.join(promptsDir, 'storybook-combined.txt'), 'utf-8');
     PROMPT_TEMPLATES.rewriteBlockedScene = await fs.readFile(path.join(promptsDir, 'rewrite-blocked-scene.txt'), 'utf-8');
-    // Style analysis prompts for Visual Bible
+    // Character and style analysis prompts
+    PROMPT_TEMPLATES.characterAnalysis = await fs.readFile(path.join(promptsDir, 'character-analysis.txt'), 'utf-8');
     PROMPT_TEMPLATES.styleAnalysis = await fs.readFile(path.join(promptsDir, 'style-analysis.txt'), 'utf-8');
     PROMPT_TEMPLATES.outfitExtraction = await fs.readFile(path.join(promptsDir, 'outfit-extraction.txt'), 'utf-8');
     PROMPT_TEMPLATES.sceneSettingAnalysis = await fs.readFile(path.join(promptsDir, 'scene-setting-analysis.txt'), 'utf-8');
@@ -4292,51 +4293,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
               contents: [{
                 parts: [
                   {
-                    text: `Analyze this image of a person. Extract BOTH basic attributes AND detailed style information for a children's book illustration system.
-
-Return a JSON object with this EXACT structure:
-{
-  "traits": {
-    "age": "<estimated age as a number, e.g. 8, 25, 45>",
-    "gender": "<male, female, or other>",
-    "height": "<'tall', 'average', 'short'>",
-    "build": "<'slim', 'average', 'athletic', 'stocky'>",
-    "hair": "<color and style, e.g. 'brown curly hair'>",
-    "clothing": "<brief description of visible clothing>",
-    "features": "<eye color, glasses, facial hair, distinctive features>"
-  },
-  "styleAnalysis": {
-    "physical": {
-      "face": "<detailed face: shape, eye color, skin tone, distinctive features>",
-      "hair": "<exact: specific color like 'honey blonde', length, style, texture, accessories>",
-      "build": "<body type and apparent age>"
-    },
-    "referenceOutfit": {
-      "garmentType": "<e.g., knee-length dress, t-shirt and jeans>",
-      "primaryColor": "<specific like 'light sky blue' not just 'blue'>",
-      "secondaryColors": ["<other colors>"],
-      "pattern": "<exact pattern or 'solid/no pattern'>",
-      "patternScale": "<small/medium/large or 'none'>",
-      "seamColor": "<seam/trim color or 'matching'>",
-      "seamStyle": "<'contrast stitching' or 'none visible'>",
-      "fabric": "<'cotton matte', 'denim', etc.>",
-      "neckline": "<neckline with trim details>",
-      "sleeves": "<sleeve style with details>",
-      "accessories": ["<shoes, jewelry, hair items>"],
-      "setting": "<ONE of: outdoor-warm, outdoor-cold, indoor-casual, indoor-formal, active, sleep, neutral>"
-    },
-    "styleDNA": {
-      "signatureColors": ["<3-5 colors, dominant first>"],
-      "signaturePatterns": ["<patterns or 'solid'>"],
-      "signatureDetails": ["<'Peter Pan collar', 'puff sleeves'>"],
-      "aesthetic": "<2-3 words: 'classic feminine', 'sporty casual'>",
-      "alwaysPresent": ["<always present: 'glasses', 'red ribbons', or empty>"]
-    },
-    "analyzedAt": "${new Date().toISOString()}"
-  }
-}
-
-Be VERY specific about colors and patterns. Return ONLY valid JSON.`
+                    text: PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build) and styleAnalysis (physical, styleDNA). Be specific about colors and patterns.`
                   },
                   {
                     inlineData: {
@@ -9749,8 +9706,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             try {
               console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
 
-              // Generate detailed scene description (2048 tokens to avoid MAX_TOKENS cutoff)
-              const sceneDescription = await callTextModelStreaming(scenePrompt, 2048);
+              // Generate detailed scene description (4000 tokens to avoid MAX_TOKENS cutoff)
+              const sceneDescription = await callTextModelStreaming(scenePrompt, 4000);
 
               allSceneDescriptions.push({
                 pageNumber: pageNum,
@@ -9934,7 +9891,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
 
             console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
-            const sceneDescription = await callTextModelStreaming(scenePrompt, 2048);
+            const sceneDescription = await callTextModelStreaming(scenePrompt, 4000);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,

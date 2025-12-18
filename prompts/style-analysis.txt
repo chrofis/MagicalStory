@@ -6,8 +6,8 @@ Provide a JSON response with this EXACT structure:
 {
   "physical": {
     "face": "Detailed face description: shape, eye color, skin tone, distinctive features like freckles, dimples, birthmarks",
-    "hair": "Exact hair description: color (be specific like 'honey blonde' not just 'blonde'), length, style, texture, any accessories like ribbons/clips/hairbands",
-    "build": "Body type description and apparent age"
+    "hair": "Exact hair description: color, length, style, texture, any accessories like ribbons/clips/hairbands",
+    "build": "Body type description"
   },
   "referenceOutfit": {
     "garmentType": "e.g., knee-length dress, t-shirt and jeans, blouse and skirt",
