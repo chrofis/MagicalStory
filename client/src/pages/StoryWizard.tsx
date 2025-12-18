@@ -513,7 +513,6 @@ export default function StoryWizard() {
             hasBodyNoBg: !!analysis.bodyNoBg,
             attributes: analysis.attributes,
             hasStyleAnalysis: !!analysis.styleAnalysis,
-            aesthetic: analysis.styleAnalysis?.styleDNA?.aesthetic,
           });
 
           setCurrentCharacter(prev => prev ? {

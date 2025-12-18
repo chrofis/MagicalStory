@@ -174,10 +174,6 @@ export function CharacterForm({
         patternScale: '', seamColor: '', seamStyle: '', fabric: '',
         neckline: '', sleeves: '', accessories: [], setting: 'neutral' as const
       },
-      styleDNA: {
-        signatureColors: [], signaturePatterns: [], signatureDetails: [],
-        aesthetic: '', alwaysPresent: []
-      },
       analyzedAt: new Date().toISOString()
     };
 
@@ -188,24 +184,14 @@ export function CharacterForm({
       if (parts[1] === 'face') updated.physical.face = value;
       else if (parts[1] === 'hair') updated.physical.hair = value;
       else if (parts[1] === 'build') updated.physical.build = value;
-    } else if (parts[0] === 'styleDNA') {
-      if (parts[1] === 'aesthetic') updated.styleDNA.aesthetic = value;
-      else if (parts[1] === 'signatureColors') updated.styleDNA.signatureColors = value.split(',').map(s => s.trim()).filter(Boolean);
-      else if (parts[1] === 'signaturePatterns') updated.styleDNA.signaturePatterns = value.split(',').map(s => s.trim()).filter(Boolean);
-      else if (parts[1] === 'alwaysPresent') updated.styleDNA.alwaysPresent = value.split(',').map(s => s.trim()).filter(Boolean);
-    } else if (parts[0] === 'referenceOutfit') {
+    } else if (parts[0] === 'referenceOutfit' && updated.referenceOutfit) {
       if (parts[1] === 'garmentType') updated.referenceOutfit.garmentType = value;
       else if (parts[1] === 'primaryColor') updated.referenceOutfit.primaryColor = value;
       else if (parts[1] === 'pattern') updated.referenceOutfit.pattern = value;
-      else if (parts[1] === 'setting') updated.referenceOutfit.setting = value as typeof updated.referenceOutfit.setting;
+      else if (parts[1] === 'setting') updated.referenceOutfit.setting = value as 'outdoor-warm' | 'outdoor-cold' | 'indoor-casual' | 'indoor-formal' | 'active' | 'sleep' | 'neutral';
     }
 
     onChange({ ...character, styleAnalysis: updated });
-  };
-
-  const startEditingStyle = (field: string, currentValue: string) => {
-    setEditingStyleField(field);
-    setEditStyleValue(currentValue || '');
   };
 
   const saveStyleEdit = () => {
@@ -491,47 +477,6 @@ export function CharacterForm({
         </div>
       </details>
 
-      {/* Style DNA - developer only */}
-      {developerMode && (
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-purple-700 mb-3">
-          🎨 Style DNA
-        </h4>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">
-            {language === 'de' ? 'Style-Ästhetik' : language === 'fr' ? 'Esthétique de style' : 'Style Aesthetic'}
-          </label>
-          {editingStyleField === 'styleDNA.aesthetic' ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="text"
-                value={editStyleValue}
-                onChange={(e) => setEditStyleValue(e.target.value)}
-                className="flex-1 px-2 py-1.5 text-sm border border-purple-300 rounded focus:outline-none focus:border-purple-500"
-                autoFocus
-                placeholder={language === 'de' ? 'z.B. casual, sportlich, elegant' : 'e.g. casual, sporty, elegant'}
-              />
-              <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
-                <Check size={14} />
-              </button>
-              <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <div
-              onClick={() => startEditingStyle('styleDNA.aesthetic', character.styleAnalysis?.styleDNA?.aesthetic || '')}
-              className="w-full px-2 py-1.5 border border-purple-200 rounded text-sm bg-white cursor-pointer hover:border-purple-400 flex items-center justify-between group"
-            >
-              <span className={character.styleAnalysis?.styleDNA?.aesthetic ? 'text-gray-800' : 'text-gray-400 italic'}>
-                {character.styleAnalysis?.styleDNA?.aesthetic || (language === 'de' ? 'Klicken zum Setzen...' : 'Click to set...')}
-              </span>
-              <Edit3 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100" />
-            </div>
-          )}
-        </div>
-      </div>
-      )}
 
       {/* Clothing Avatars - generated for different settings (developer only) */}
       {developerMode && character.clothingAvatars && (
@@ -706,87 +651,6 @@ export function CharacterForm({
           </div>
         </div>
 
-        {/* Signature colors (editable as comma-separated) */}
-        <div className="mt-3 pt-3 border-t border-indigo-200">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">
-                {language === 'de' ? 'Signaturfarben' : language === 'fr' ? 'Couleurs signature' : 'Signature Colors'}
-                <span className="font-normal text-gray-400 ml-1">(comma-separated)</span>
-              </label>
-              {editingStyleField === 'styleDNA.signatureColors' ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={editStyleValue}
-                    onChange={(e) => setEditStyleValue(e.target.value)}
-                    className="flex-1 px-2 py-1.5 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
-                    autoFocus
-                    placeholder="blue, white, navy"
-                  />
-                  <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
-                    <Check size={14} />
-                  </button>
-                  <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onClick={() => startEditingStyle('styleDNA.signatureColors', character.styleAnalysis?.styleDNA?.signatureColors?.join(', ') || '')}
-                  className="w-full px-2 py-1.5 border border-indigo-200 rounded text-sm bg-white cursor-pointer hover:border-indigo-400 flex items-center gap-1 flex-wrap group min-h-[34px]"
-                >
-                  {character.styleAnalysis?.styleDNA?.signatureColors?.length ? (
-                    character.styleAnalysis.styleDNA.signatureColors.map((color, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">{color}</span>
-                    ))
-                  ) : (
-                    <span className="text-gray-400 italic text-xs">{language === 'de' ? 'Klicken zum Setzen...' : 'Click to set...'}</span>
-                  )}
-                  <Edit3 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 ml-auto" />
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">
-                {language === 'de' ? 'Immer dabei' : language === 'fr' ? 'Toujours présent' : 'Always Present'}
-                <span className="font-normal text-gray-400 ml-1">(comma-separated)</span>
-              </label>
-              {editingStyleField === 'styleDNA.alwaysPresent' ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={editStyleValue}
-                    onChange={(e) => setEditStyleValue(e.target.value)}
-                    className="flex-1 px-2 py-1.5 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
-                    autoFocus
-                    placeholder="glasses, watch, bracelet"
-                  />
-                  <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
-                    <Check size={14} />
-                  </button>
-                  <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onClick={() => startEditingStyle('styleDNA.alwaysPresent', character.styleAnalysis?.styleDNA?.alwaysPresent?.join(', ') || '')}
-                  className="w-full px-2 py-1.5 border border-indigo-200 rounded text-sm bg-white cursor-pointer hover:border-indigo-400 flex items-center gap-1 flex-wrap group min-h-[34px]"
-                >
-                  {character.styleAnalysis?.styleDNA?.alwaysPresent?.length ? (
-                    character.styleAnalysis.styleDNA.alwaysPresent.map((item, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">{item}</span>
-                    ))
-                  ) : (
-                    <span className="text-gray-400 italic text-xs">{language === 'de' ? 'Klicken zum Setzen...' : 'Click to set...'}</span>
-                  )}
-                  <Edit3 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100 ml-auto" />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
 
         {/* Analysis timestamp */}
         {character.styleAnalysis?.analyzedAt && (

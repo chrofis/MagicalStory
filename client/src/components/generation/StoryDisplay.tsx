@@ -295,7 +295,7 @@ export function StoryDisplay({
         entry.id === id ? { ...entry, [field]: editValue } : entry
       );
     } else if (type === 'mainCharacter') {
-      // Handle main character physical/styleDNA edits
+      // Handle main character physical edits
       const charId = parseInt(id);
       updatedBible.mainCharacters = (updatedBible.mainCharacters || []).map(char => {
         if (char.id !== charId) return char;
@@ -306,8 +306,6 @@ export function StoryDisplay({
           return { ...char, physical: { ...char.physical, hair: editValue } };
         } else if (field === 'physical.build') {
           return { ...char, physical: { ...char.physical, build: editValue } };
-        } else if (field === 'styleDNA.aesthetic') {
-          return { ...char, styleDNA: { ...char.styleDNA, aesthetic: editValue } };
         }
         return char;
       });
@@ -584,18 +582,6 @@ export function StoryDisplay({
                                 {char.physical?.face || 'Not analyzed'} | {char.physical?.hair || 'N/A'} | {char.physical?.build || 'N/A'}
                               </span>
                             </div>
-                            {/* Style DNA */}
-                            {char.styleDNA && (
-                              <div className="text-xs">
-                                <span className="font-medium text-gray-600">Style DNA:</span>
-                                {char.styleDNA.aesthetic && (
-                                  <span className="text-gray-700 italic ml-1">{char.styleDNA.aesthetic}</span>
-                                )}
-                                {char.styleDNA.signatureColors && char.styleDNA.signatureColors.length > 0 && (
-                                  <span className="text-gray-700 ml-1">| Colors: {char.styleDNA.signatureColors.slice(0, 3).join(', ')}</span>
-                                )}
-                              </div>
-                            )}
                             {/* Reference Outfit */}
                             {char.referenceOutfit && (
                               <div className="text-xs">

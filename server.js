@@ -4298,7 +4298,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
               contents: [{
                 parts: [
                   {
-                    text: PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build) and styleAnalysis (physical, styleDNA). Be specific about colors and patterns.`
+                    text: PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`
                   },
                   {
                     inlineData: {
@@ -4338,9 +4338,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
               }
               console.log('📸 [GEMINI] Extracted traits + styleAnalysis:', {
                 traits: result.traits,
-                hasStyleAnalysis: !!result.styleAnalysis,
-                aesthetic: result.styleAnalysis?.styleDNA?.aesthetic,
-                setting: result.styleAnalysis?.referenceOutfit?.setting
+                hasStyleAnalysis: !!result.styleAnalysis
               });
               return result; // New format: { traits, styleAnalysis }
             } else {
@@ -4441,11 +4439,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
       // Store styleAnalysis for response
       analyzerData.styleAnalysis = styleAnalysis;
       console.log('📸 [PHOTO] styleAnalysis to be returned:', styleAnalysis ? {
-        hasPhysical: !!styleAnalysis.physical,
-        hasReferenceOutfit: !!styleAnalysis.referenceOutfit,
-        hasStyleDNA: !!styleAnalysis.styleDNA,
-        aesthetic: styleAnalysis.styleDNA?.aesthetic,
-        setting: styleAnalysis.referenceOutfit?.setting
+        hasPhysical: !!styleAnalysis.physical
       } : 'null');
 
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
@@ -4522,7 +4516,7 @@ app.post('/api/analyze-style', authenticateToken, async (req, res) => {
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
     // Use the style analysis prompt template
-    const prompt = PROMPT_TEMPLATES.styleAnalysis || `Analyze this photo for style details. Return JSON with physical, referenceOutfit, and styleDNA fields.`;
+    const prompt = PROMPT_TEMPLATES.styleAnalysis || `Analyze this photo for style details. Return JSON with physical features.`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
@@ -4569,10 +4563,7 @@ app.post('/api/analyze-style', authenticateToken, async (req, res) => {
           styleAnalysis.analyzedAt = new Date().toISOString();
 
           console.log(`👗 [STYLE] Analysis complete in ${duration}ms:`, {
-            hasPhysical: !!styleAnalysis.physical,
-            hasReferenceOutfit: !!styleAnalysis.referenceOutfit,
-            hasStyleDNA: !!styleAnalysis.styleDNA,
-            setting: styleAnalysis.referenceOutfit?.setting || 'unknown'
+            hasPhysical: !!styleAnalysis.physical
           });
 
           return res.json({ success: true, styleAnalysis });
@@ -7626,27 +7617,6 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
         face: stylePhysical.face || char.otherFeatures || 'Not analyzed',
         hair: stylePhysical.hair || char.hairColor || 'Not analyzed'
       },
-      styleDNA: char.styleAnalysis?.styleDNA || {
-        signatureColors: [],
-        signaturePatterns: [],
-        signatureDetails: [],
-        aesthetic: 'Not analyzed',
-        alwaysPresent: []
-      },
-      referenceOutfit: char.styleAnalysis?.referenceOutfit || {
-        garmentType: char.clothing || 'Not analyzed',
-        primaryColor: 'Unknown',
-        secondaryColors: [],
-        pattern: 'Unknown',
-        patternScale: 'none',
-        seamColor: 'matching',
-        seamStyle: 'none visible',
-        fabric: 'Unknown',
-        neckline: 'Unknown',
-        sleeves: 'Unknown',
-        accessories: [],
-        setting: 'neutral'
-      },
       generatedOutfits: char.generatedOutfits || {}
     };
 
@@ -7756,35 +7726,9 @@ function selectReferenceImageType(character, sceneSetting) {
 }
 
 // Build clothing prompt for a character when using face-only reference
-// Uses style DNA to generate scene-appropriate clothing description
-function buildClothingPromptFromStyleDNA(character, sceneSetting) {
-  if (!character.styleAnalysis?.styleDNA) {
-    return '';
-  }
-
-  const styleDNA = character.styleAnalysis.styleDNA;
-  const referenceOutfit = character.styleAnalysis.referenceOutfit;
-
-  let prompt = `\n**CLOTHING for ${character.name}** (generate appropriate for ${sceneSetting} scene):\n`;
-  prompt += `Style DNA (maintain these elements):\n`;
-
-  if (styleDNA.signatureColors?.length > 0) {
-    prompt += `- Signature colors: ${styleDNA.signatureColors.join(', ')}\n`;
-  }
-  if (styleDNA.signaturePatterns?.length > 0) {
-    prompt += `- Patterns: ${styleDNA.signaturePatterns.join(', ')}\n`;
-  }
-  if (styleDNA.signatureDetails?.length > 0) {
-    prompt += `- Style details: ${styleDNA.signatureDetails.join(', ')}\n`;
-  }
-  if (styleDNA.aesthetic) {
-    prompt += `- Overall aesthetic: ${styleDNA.aesthetic}\n`;
-  }
-  if (styleDNA.alwaysPresent?.length > 0) {
-    prompt += `- MUST include: ${styleDNA.alwaysPresent.join(', ')}\n`;
-  }
-
-  // Add scene-specific guidance
+// Generates scene-appropriate clothing description
+function buildClothingPromptFromScene(character, sceneSetting) {
+  // Scene-specific guidance
   const sceneGuidance = {
     'outdoor-cold': 'Winter clothing: coat, warm layers, possible hat/scarf/mittens',
     'outdoor-warm': 'Summer clothing: light fabrics, short sleeves or sleeveless, breathable',
@@ -7795,8 +7739,8 @@ function buildClothingPromptFromStyleDNA(character, sceneSetting) {
     'neutral': 'Versatile clothing suitable for the scene context'
   };
 
-  prompt += `\nScene requirement: ${sceneGuidance[sceneSetting] || sceneGuidance.neutral}\n`;
-  prompt += `Generate clothing that matches BOTH the style DNA above AND the scene requirement.\n`;
+  let prompt = `\n**CLOTHING for ${character.name}** (generate appropriate for ${sceneSetting} scene):\n`;
+  prompt += `Scene requirement: ${sceneGuidance[sceneSetting] || sceneGuidance.neutral}\n`;
 
   return prompt;
 }
@@ -7871,9 +7815,6 @@ function buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames = n
             prompt += `- Hair: ${char.physical.hair}\n`;
           }
         }
-        if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
-          prompt += `- Signature colors: ${char.styleDNA.signatureColors.join(', ')}\n`;
-        }
       }
     }
   }
@@ -7923,9 +7864,6 @@ function buildFullVisualBiblePrompt(visualBible) {
         if (char.physical.hair && char.physical.hair !== 'Not analyzed') {
           prompt += `- Hair: ${char.physical.hair}\n`;
         }
-      }
-      if (char.styleDNA && char.styleDNA.signatureColors?.length > 0) {
-        prompt += `- Signature colors: ${char.styleDNA.signatureColors.join(', ')}\n`;
       }
     }
   }

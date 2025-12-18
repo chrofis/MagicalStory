@@ -51,8 +51,8 @@ export interface StyleDNA {
 
 export interface StyleAnalysis {
   physical: PhysicalFeatures;
-  referenceOutfit: ReferenceOutfit;
-  styleDNA: StyleDNA;
+  referenceOutfit?: ReferenceOutfit;
+  styleDNA?: StyleDNA;  // Deprecated - no longer used
   analyzedAt: string;
 }
 
@@ -125,8 +125,8 @@ export interface VisualBibleMainCharacter {
   id: number;
   name: string;
   physical: PhysicalFeatures;
-  styleDNA: StyleDNA;
-  referenceOutfit: ReferenceOutfit;
+  styleDNA?: StyleDNA;  // Deprecated - no longer used
+  referenceOutfit?: ReferenceOutfit;
   generatedOutfits: Record<number, GeneratedOutfit>;
 }
 
