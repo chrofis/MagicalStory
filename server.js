@@ -373,7 +373,6 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.avatarRetryPrompt = await fs.readFile(path.join(promptsDir, 'avatar-retry-prompt.txt'), 'utf-8');
     // Visual Bible and editing prompts
     PROMPT_TEMPLATES.visualBibleAnalysis = await fs.readFile(path.join(promptsDir, 'visual-bible-analysis.txt'), 'utf-8');
-    PROMPT_TEMPLATES.coverTextEdit = await fs.readFile(path.join(promptsDir, 'cover-text-edit.txt'), 'utf-8');
     PROMPT_TEMPLATES.illustrationEdit = await fs.readFile(path.join(promptsDir, 'illustration-edit.txt'), 'utf-8');
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
@@ -8182,15 +8181,20 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       console.log(`📖 [SCENE PROMPT P${pageNumber}] Looking for "${c.name}" (id: ${c.id}) in Visual Bible...`);
       console.log(`📖 [SCENE PROMPT P${pageNumber}] Found match: ${vbChar ? vbChar.name : 'NO'}, has physical: ${vbChar?.physical ? 'YES' : 'NO'}`);
       if (vbChar?.physical) {
-        console.log(`📖 [SCENE PROMPT P${pageNumber}] Physical data: face="${vbChar.physical.face?.substring(0, 50)}...", hair="${vbChar.physical.hair}", build="${vbChar.physical.build}"`);
+        console.log(`📖 [SCENE PROMPT P${pageNumber}] Physical data: age="${vbChar.physical.age}", gender="${vbChar.physical.gender}", height="${vbChar.physical.height}", build="${vbChar.physical.build}", face="${vbChar.physical.face?.substring(0, 50)}...", hair="${vbChar.physical.hair}"`);
       }
 
       if (vbChar && vbChar.physical) {
-        // Build description from Visual Bible physical object
+        // Build description from Visual Bible physical object - include ALL traits
         const vbParts = [];
+        // Basic traits
+        if (vbChar.physical.age && vbChar.physical.age !== 'Unknown') vbParts.push(`${vbChar.physical.age} years old`);
+        if (vbChar.physical.gender && vbChar.physical.gender !== 'Unknown') vbParts.push(vbChar.physical.gender);
+        if (vbChar.physical.height && vbChar.physical.height !== 'Unknown') vbParts.push(`${vbChar.physical.height} cm tall`);
+        if (vbChar.physical.build && vbChar.physical.build !== 'Unknown') vbParts.push(`${vbChar.physical.build} build`);
+        // Detailed features
         if (vbChar.physical.face) vbParts.push(vbChar.physical.face);
         if (vbChar.physical.hair) vbParts.push(`Hair: ${vbChar.physical.hair}`);
-        if (vbChar.physical.build) vbParts.push(vbChar.physical.build);
         if (vbParts.length > 0) {
           visualBibleDesc = vbParts.join(' | ');
           console.log(`📖 [SCENE PROMPT P${pageNumber}] Using Visual Bible description for ${c.name}`);
@@ -11506,113 +11510,6 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   console.error('❌ [IMAGE GEN] No image data found in any part');
   throw new Error('No image data in response - check logs for API response structure');
-}
-
-/**
- * Edit text in a cover image using Gemini's image editing capabilities
- * Pure text correction - no character photos to avoid regeneration artifacts
- * @param {string} imageData - The original image data (base64)
- * @param {string} actualText - The text currently in the image
- * @param {string} expectedText - The correct text that should be in the image
- * @returns {Promise<{imageData: string}|null>}
- */
-async function editCoverImageText(imageData, actualText, expectedText) {
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('Gemini API key not configured');
-    }
-
-    console.log(`✏️  [TEXT EDIT] Editing cover image text...`);
-    console.log(`✏️  [TEXT EDIT] Replacing "${actualText}" with "${expectedText}"`);
-
-    // Extract base64 and mime type from the image
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
-      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
-
-    // Build the editing prompt from template
-    const editPrompt = fillTemplate(PROMPT_TEMPLATES.coverTextEdit, {
-      '{ACTUAL_TEXT}': actualText,
-      '{EXPECTED_TEXT}': expectedText
-    });
-
-    // Build parts array with the image and prompt
-    const parts = [
-      {
-        inline_data: {
-          mime_type: mimeType,
-          data: base64Data
-        }
-      },
-      { text: editPrompt }
-    ];
-
-    // Use Gemini 2.0 Flash for image editing (supports image generation/editing)
-    const modelId = 'gemini-2.0-flash-exp-image-generation';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseModalities: ['image', 'text'],
-          temperature: 0.4
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('❌ [TEXT EDIT] Gemini API error:', error);
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Log response structure for debugging
-    console.log('✏️  [TEXT EDIT] Response structure:', {
-      hasCandidates: !!data.candidates,
-      candidatesCount: data.candidates?.length || 0,
-      responseKeys: Object.keys(data)
-    });
-
-    // Extract the edited image from the response
-    if (data.candidates && data.candidates[0]?.content?.parts) {
-      const parts = data.candidates[0].content.parts;
-      console.log(`✏️  [TEXT EDIT] Found ${parts.length} parts in response`);
-
-      for (const part of parts) {
-        console.log('✏️  [TEXT EDIT] Part keys:', Object.keys(part));
-        // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API varies
-        const inlineData = part.inlineData || part.inline_data;
-        if (inlineData && inlineData.data) {
-          const mimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
-          const editedImageData = `data:${mimeType};base64,${inlineData.data}`;
-          console.log(`✅ [TEXT EDIT] Successfully edited cover image text`);
-          return { imageData: editedImageData };
-        }
-        if (part.text) {
-          console.log('✏️  [TEXT EDIT] Text response (model refused):', part.text.substring(0, 300));
-        }
-      }
-    } else if (data.candidates && data.candidates[0]) {
-      const candidate = data.candidates[0];
-      console.log('✏️  [TEXT EDIT] Candidate structure:', {
-        hasContent: !!candidate.content,
-        finishReason: candidate.finishReason,
-        finishMessage: candidate.finishMessage
-      });
-    }
-
-    console.warn('⚠️  [TEXT EDIT] No edited image in response - text editing may not be supported');
-    return null;
-  } catch (error) {
-    console.error('❌ [TEXT EDIT] Error editing cover image text:', error);
-    throw error;
-  }
 }
 
 /**
