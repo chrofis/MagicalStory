@@ -4724,31 +4724,28 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       try {
         console.log(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'})...`);
 
-        // Build the prompt with priority on face matching and style transfer
+        // Build the prompt with priority on face matching and identity preservation
         const avatarPrompt = `
-    Subject: Generate a fashion photograph of the person in the input image.
+TASK: A full-length documentary-style portrait of the EXACT individual from the reference photos.
 
-    CRITICAL PRIORITIES (in order):
-    1. FACE IDENTITY: The face MUST be an exact match to the input image - same facial features, skin tone, eye color, hair color and style. This is non-negotiable.
-    2. CLOTHING STYLE TRANSFER: Copy the EXACT pattern AND colors from the clothing in the input image. Apply these to the new outfit.
+VISUAL REQUIREMENTS:
+- Subject: 100% identical face, body type, and AGE to reference.
+- Setting: Pure clean white background (#FFFFFF).
+- Lighting: Natural, even, studio-style diffused light.
+- Framing: Full body, head to toe. Shoes visible.
 
-    COMPOSITION:
-    - Framing: Wide shot. The entire outfit must be visible from head to toe.
-    - Background: Pure solid white background (#FFFFFF).
+IDENTITY PERSISTENCE:
+- NO HATS. NO HOODS. Hair and face must be fully visible.
+- Biometric precision: The face must not be averaged or replaced. It is a direct replication.
+- Focus: Ultra-sharp focus on facial features.
 
-    WARDROBE DETAILS:
-    - Style Transfer Rule: Copy the EXACT pattern AND colors from the TOP/SHIRT in the input image. Apply these to the new top/shirt only.
-    - CRITICAL PANTS RULE: Pants/trousers MUST be DIFFERENT from the top. Use plain/solid neutral colors (black, navy, khaki, gray, brown) for pants. NEVER apply the shirt's pattern or bright colors to the pants.
-    - Outfit: ${getClothingStylePrompt(category)}
+WARDROBE DETAILS:
+- Style Transfer Rule: Copy the EXACT pattern AND colors from the TOP/SHIRT in the input image. Apply these to the new top/shirt only.
+- CRITICAL PANTS RULE: Pants/trousers MUST be DIFFERENT from the top. Use plain/solid neutral colors (black, navy, khaki, gray, brown) for pants. NEVER apply the shirt's pattern or bright colors to the pants.
+- Outfit: ${getClothingStylePrompt(category)}
 
-    PHOTOGRAPHY STYLE:
-    - Style: High-End Editorial Photography.
-    - Lighting: Soft, evenly diffused studio lighting.
-    - Details: Sharp focus on fabric textures.
-    - Presentation: Clean, professional, magazine-quality look.
-
-    Output Quality: 4k, Photorealistic.
-  `;
+Output Quality: 4k, Photorealistic.
+`;
 
         // Prepare the request with reference photo
         const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
