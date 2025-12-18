@@ -565,10 +565,10 @@ export function CharacterForm({
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             {(['winter', 'standard', 'summer', 'formal'] as const).map((category) => (
               <div key={category} className="text-center">
-                <div className="text-xs font-medium text-gray-600 mb-1 capitalize">
+                <div className="text-sm font-medium text-gray-600 mb-2 capitalize">
                   {category === 'winter' ? '❄️ ' : category === 'summer' ? '☀️ ' : category === 'formal' ? '👔 ' : '👕 '}
                   {language === 'de'
                     ? (category === 'winter' ? 'Winter' : category === 'summer' ? 'Sommer' : category === 'formal' ? 'Formal' : 'Standard')
@@ -578,10 +578,10 @@ export function CharacterForm({
                   <img
                     src={character.clothingAvatars[category]}
                     alt={`${character.name} - ${category}`}
-                    className="w-full h-48 object-contain rounded border border-teal-200 bg-white"
+                    className="w-full h-64 object-contain rounded border border-teal-200 bg-white"
                   />
                 ) : (
-                  <div className="w-full h-48 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">
+                  <div className="w-full h-64 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">
                     {character.clothingAvatars?.status === 'generating' ? '...' : 'Not generated'}
                   </div>
                 )}
