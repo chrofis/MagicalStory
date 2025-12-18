@@ -1,6 +1,6 @@
 # MagicalStory - Story & Image Generation Flow
 
-> **Last Updated**: December 2024
+> **Last Updated**: December 2024 (Updated: Character analysis prompt moved to prompts/character-analysis.txt)
 > **Purpose**: Complete documentation of how stories and images are generated
 
 ---
@@ -73,17 +73,36 @@
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Style Analysis Structure
+### 2.2 Character Analysis (prompts/character-analysis.txt)
 
-When a photo is analyzed, the server extracts:
+When a photo is analyzed during upload, the server extracts traits and physical features **without clothing**:
 
 ```javascript
+// Initial photo analysis extracts:
+traits: {
+  age: 9,
+  gender: "male",
+  height: "average",
+  build: "slim"
+}
+
 styleAnalysis: {
   physical: {
     face: "Round face, brown eyes, light skin tone, small nose",
     hair: "Medium brown, short, slightly messy, straight texture",
     build: "Slim build, appears to be around 9 years old"
-  },
+  }
+}
+```
+
+### 2.3 Separate Style Analysis (prompts/style-analysis.txt)
+
+The `/api/analyze-style` endpoint extracts detailed **clothing/outfit** info for Visual Bible:
+
+```javascript
+// Used for Visual Bible reference outfit extraction
+styleAnalysis: {
+  physical: { face, hair, build },
   referenceOutfit: {
     garmentType: "casual hoodie and jeans",
     primaryColor: "blue",
@@ -91,18 +110,14 @@ styleAnalysis: {
     pattern: "solid",
     fabric: "cotton blend",
     neckline: "crew neck",
-    sleeves: "long"
+    sleeves: "long",
+    setting: "indoor-casual"
   },
-  styleDNA: {
-    signatureColors: ["light sky blue", "royal blue", "dark navy"],
-    signaturePatterns: ["solid", "stripes"],
-    signatureDetails: ["sneakers", "backpack"],
-    aesthetic: "casual sporty"
-  }
+  styleDNA: { ... }
 }
 ```
 
-### 2.3 Character Data Storage
+### 2.4 Character Data Storage
 
 ```javascript
 character: {

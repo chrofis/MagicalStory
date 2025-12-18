@@ -12,8 +12,8 @@ IDENTITY PERSISTENCE:
 - Focus: Ultra-sharp focus on facial features.
 
 WARDROBE DETAILS:
-- Style Transfer Rule: Copy the EXACT pattern AND colors from the TOP/SHIRT in the input image. Apply these to the new top/shirt only.
-- CRITICAL PANTS RULE: Pants/trousers MUST be DIFFERENT from the top. Use plain/solid neutral colors (black, navy, khaki, gray, brown) for pants. NEVER apply the shirt's pattern or bright colors to the pants.
+- Style Transfer Rule: Copy the EXACT pattern AND colors from the input image. Just change from short to long sleave / legs, etc. 
+- If parts of the clothing are not visible in the input picture use plain/solid neutral colors (black, navy, khaki, gray, brown) to create them. Added / invented parts of the clothing MUST be DIFFERENT from  input image. NEVER apply the shirt's pattern or bright colors to the pants.
 - Outfit: {CLOTHING_STYLE}
 
 Output Quality: 4k, Photorealistic.

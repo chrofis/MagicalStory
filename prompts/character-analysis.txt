@@ -1,5 +1,5 @@
 Analyze this image of a person for a children's book illustration system.
-Extract visual attributes and style details that will maintain consistency across different scenes.
+Extract visual attributes that will maintain consistency across different scenes.
 
 Return a JSON object with this EXACT structure:
 
@@ -15,13 +15,6 @@ Return a JSON object with this EXACT structure:
       "face": "<detailed: face shape, eye color, skin tone, distinctive features like freckles, dimples, birthmarks, glasses>",
       "hair": "<exact: specific color like 'honey blonde', length, style, texture, any accessories like ribbons/clips>",
       "build": "<body type and apparent age, e.g. 'Slim build, appears to be around 9 years old'>"
-    },
-    "styleDNA": {
-      "signatureColors": ["<3-5 colors from their appearance, most dominant first>"],
-      "signaturePatterns": ["<patterns visible, or 'solid' if none>"],
-      "signatureDetails": ["<distinctive elements: 'round glasses', 'red hair ribbons', 'freckles'>"],
-      "aesthetic": "<2-3 words: 'classic feminine', 'sporty casual', 'preppy neat'>",
-      "alwaysPresent": ["<elements that should ALWAYS appear: 'glasses', 'hair bow', or empty array if none>"]
     }
   }
 }
@@ -30,7 +23,6 @@ IMPORTANT:
 - Be extremely specific about colors (not "blue" but "light sky blue")
 - Be exact about hair details (color, length, style, texture)
 - Note distinctive features that make this person recognizable
-- The styleDNA.signatureColors should reflect colors that suit this person (from hair, eyes, skin tone)
 - Do NOT describe clothing - clothing will be determined by the scene context
 - If something is not visible, use "not visible"
 
