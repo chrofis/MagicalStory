@@ -367,8 +367,6 @@ async function loadPromptTemplates() {
     // Character and style analysis prompts
     PROMPT_TEMPLATES.characterAnalysis = await fs.readFile(path.join(promptsDir, 'character-analysis.txt'), 'utf-8');
     PROMPT_TEMPLATES.styleAnalysis = await fs.readFile(path.join(promptsDir, 'style-analysis.txt'), 'utf-8');
-    PROMPT_TEMPLATES.outfitExtraction = await fs.readFile(path.join(promptsDir, 'outfit-extraction.txt'), 'utf-8');
-    PROMPT_TEMPLATES.sceneSettingAnalysis = await fs.readFile(path.join(promptsDir, 'scene-setting-analysis.txt'), 'utf-8');
     // Avatar generation prompts
     PROMPT_TEMPLATES.avatarSystemInstruction = await fs.readFile(path.join(promptsDir, 'avatar-system-instruction.txt'), 'utf-8');
     PROMPT_TEMPLATES.avatarMainPrompt = await fs.readFile(path.join(promptsDir, 'avatar-main-prompt.txt'), 'utf-8');
@@ -4598,77 +4596,6 @@ app.post('/api/analyze-style', authenticateToken, async (req, res) => {
   }
 });
 
-// Analyze scene description to determine setting category
-app.post('/api/analyze-scene-setting', authenticateToken, async (req, res) => {
-  try {
-    const { sceneDescription } = req.body;
-
-    if (!sceneDescription) {
-      return res.status(400).json({ error: 'Missing sceneDescription' });
-    }
-
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (!geminiApiKey) {
-      // Fallback to simple keyword matching
-      const setting = analyzeSceneSettingFallback(sceneDescription);
-      return res.json({ success: true, setting });
-    }
-
-    const prompt = fillTemplate(PROMPT_TEMPLATES.sceneSettingAnalysis || 'Categorize this scene: {SCENE_DESCRIPTION}', {
-      SCENE_DESCRIPTION: sceneDescription
-    });
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 50
-          }
-        }),
-        signal: AbortSignal.timeout(10000)
-      }
-    );
-
-    if (!response.ok) {
-      const setting = analyzeSceneSettingFallback(sceneDescription);
-      return res.json({ success: true, setting, fallback: true });
-    }
-
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase() || '';
-
-    const validSettings = ['outdoor-cold', 'outdoor-warm', 'indoor-casual', 'indoor-formal', 'active', 'sleep', 'neutral'];
-    const setting = validSettings.find(s => text.includes(s)) || 'neutral';
-
-    console.log(`🎬 [SCENE SETTING] "${sceneDescription.substring(0, 50)}..." -> ${setting}`);
-    res.json({ success: true, setting });
-
-  } catch (err) {
-    console.error('Error analyzing scene setting:', err);
-    const setting = analyzeSceneSettingFallback(req.body.sceneDescription || '');
-    res.json({ success: true, setting, fallback: true });
-  }
-});
-
-// Helper function for fallback scene setting analysis
-function analyzeSceneSettingFallback(sceneDescription) {
-  const desc = sceneDescription.toLowerCase();
-
-  if (desc.match(/snow|winter|cold|frost|ice|christmas|skiing|coat|scarf|mittens/)) return 'outdoor-cold';
-  if (desc.match(/summer|beach|sun|swim|garden|picnic|hot|warm weather/)) return 'outdoor-warm';
-  if (desc.match(/bed|sleep|pajama|night|dream|pillow/)) return 'sleep';
-  if (desc.match(/party|wedding|ceremony|church|formal|dinner|restaurant/)) return 'indoor-formal';
-  if (desc.match(/run|sport|play|dance|jump|active|game|soccer|basketball/)) return 'active';
-  if (desc.match(/home|house|room|kitchen|living|bedroom|couch|sofa/)) return 'indoor-casual';
-
-  return 'neutral';
-}
-
 // Generate clothing avatars for a character (4 categories: winter, standard, summer, formal)
 // This creates photorealistic avatars with different clothing for story illustration
 // Prompts based on reference implementation - see prompts/clothing-avatars.txt
@@ -4687,31 +4614,38 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
     console.log(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})`);
 
-    // Gender-aware clothing style prompts with style transfer from reference
+    // Parse clothing styles from the template file
     const isFemale = gender === 'female';
 
     const getClothingStylePrompt = (category) => {
-      switch (category) {
-        case 'winter':
-          return 'Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Layers visible underneath. Warm full-length pants or leggings. Heavy winter boots. Scarf and gloves optional.';
-        case 'standard':
-          if (isFemale) {
-            return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Full-length jeans or leggings (NO shorts).';
-          }
-          return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Full-length jeans or casual trousers (NO shorts).';
-        case 'summer':
-          if (isFemale) {
-            return 'T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.';
-          }
-          return 'T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.';
-        case 'formal':
-          if (isFemale) {
-            return 'Elegant dress, formal gown, or blouse with skirt in colors INSPIRED BY the input image (similar tones, not identical). Formal heels or dress shoes.';
-          }
-          return 'Formal suit or dress shirt with trousers in colors INSPIRED BY the input image (similar tones, not identical). Formal dress shoes.';
-        default:
-          return 'Full outfit with shoes matching the style of the reference.';
+      const template = PROMPT_TEMPLATES.avatarMainPrompt || '';
+      const styleSection = template.split('CLOTHING_STYLES:')[1] || '';
+
+      // Build the tag to look for based on category and gender
+      let tag;
+      if (category === 'winter') {
+        tag = '[WINTER]';
+      } else if (category === 'standard') {
+        tag = isFemale ? '[STANDARD_FEMALE]' : '[STANDARD_MALE]';
+      } else if (category === 'summer') {
+        tag = isFemale ? '[SUMMER_FEMALE]' : '[SUMMER_MALE]';
+      } else if (category === 'formal') {
+        tag = isFemale ? '[FORMAL_FEMALE]' : '[FORMAL_MALE]';
+      } else {
+        return 'Full outfit with shoes matching the style of the reference.';
       }
+
+      // Extract the text between this tag and the next tag (or end)
+      const tagIndex = styleSection.indexOf(tag);
+      if (tagIndex === -1) {
+        return 'Full outfit with shoes matching the style of the reference.';
+      }
+
+      const afterTag = styleSection.substring(tagIndex + tag.length);
+      const nextTagIndex = afterTag.search(/\n\[/);
+      const styleText = nextTagIndex === -1 ? afterTag : afterTag.substring(0, nextTagIndex);
+
+      return styleText.trim();
     };
 
     // Define clothing categories
@@ -4732,8 +4666,9 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       try {
         console.log(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'})...`);
 
-        // Build the prompt from template
-        const avatarPrompt = fillTemplate(PROMPT_TEMPLATES.avatarMainPrompt, {
+        // Build the prompt from template (use only the prompt part, not the CLOTHING_STYLES section)
+        const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
+        const avatarPrompt = fillTemplate(promptPart, {
           '{CLOTHING_STYLE}': getClothingStylePrompt(category)
         });
 
@@ -4887,152 +4822,6 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
   } catch (err) {
     console.error('Error generating clothing avatars:', err);
     res.status(500).json({ error: 'Failed to generate clothing avatars', details: err.message });
-  }
-});
-
-// Extract outfit from generated image for Visual Bible update
-app.post('/api/extract-outfit', authenticateToken, async (req, res) => {
-  try {
-    const { imageData, characterName } = req.body;
-
-    if (!imageData || !characterName) {
-      return res.status(400).json({ error: 'Missing imageData or characterName' });
-    }
-
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (!geminiApiKey) {
-      return res.status(503).json({ error: 'Outfit extraction service unavailable' });
-    }
-
-    console.log(`👕 [OUTFIT] Extracting outfit for "${characterName}" from generated image...`);
-
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
-      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
-
-    const prompt = fillTemplate(PROMPT_TEMPLATES.outfitExtraction || 'Extract outfit for {CHARACTER_NAME}', {
-      CHARACTER_NAME: characterName
-    });
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data,
-                },
-              },
-            ],
-          }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 1024
-          }
-        }),
-        signal: AbortSignal.timeout(20000)
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('👕 [OUTFIT] Gemini API error:', response.status);
-      return res.status(500).json({ error: 'Outfit extraction failed', details: errorText });
-    }
-
-    const data = await response.json();
-
-    if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-      const text = data.candidates[0].content.parts[0].text;
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const outfitData = JSON.parse(jsonMatch[0]);
-          console.log(`👕 [OUTFIT] Extracted for "${characterName}":`, {
-            found: outfitData.characterFound,
-            setting: outfitData.setting,
-            outfitPreview: outfitData.outfit?.substring(0, 50) + '...'
-          });
-          return res.json({ success: true, ...outfitData });
-        } catch (parseErr) {
-          console.error('👕 [OUTFIT] JSON parse error:', parseErr.message);
-          return res.status(500).json({ error: 'Failed to parse outfit data' });
-        }
-      }
-    }
-
-    return res.status(500).json({ error: 'No valid response from outfit extraction' });
-
-  } catch (err) {
-    console.error('👕 [OUTFIT] Error extracting outfit:', err);
-    res.status(500).json({ error: 'Failed to extract outfit', details: err.message });
-  }
-});
-
-// Smart reference selection - determine which photo type to use for each character based on scene
-// Returns recommendations for face-only vs full-body reference and clothing prompts
-app.post('/api/select-reference', authenticateToken, async (req, res) => {
-  try {
-    const { characters, sceneDescription, sceneSetting } = req.body;
-
-    if (!characters || !Array.isArray(characters)) {
-      return res.status(400).json({ error: 'Missing characters array' });
-    }
-
-    // First determine scene setting if not provided
-    let effectiveSceneSetting = sceneSetting;
-    if (!effectiveSceneSetting && sceneDescription) {
-      // Use fallback analysis (synchronous, fast)
-      effectiveSceneSetting = analyzeSceneSettingFallback(sceneDescription);
-    }
-    effectiveSceneSetting = effectiveSceneSetting || 'neutral';
-
-    console.log(`👗 [REF SELECT] Analyzing ${characters.length} characters for scene setting: ${effectiveSceneSetting}`);
-
-    const recommendations = characters.map(char => {
-      const referenceType = selectReferenceImageType(char, effectiveSceneSetting);
-      const clothingPrompt = referenceType === 'face'
-        ? buildClothingPromptFromStyleDNA(char, effectiveSceneSetting)
-        : '';
-
-      // Select appropriate photo URL based on reference type
-      let photoUrl;
-      if (referenceType === 'face') {
-        // Use thumbnail (face) or fall back to photo
-        photoUrl = char.thumbnailUrl || char.photoUrl;
-      } else {
-        // Use full body
-        photoUrl = char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
-      }
-
-      return {
-        characterId: char.id,
-        characterName: char.name,
-        referenceType, // 'body' or 'face'
-        photoUrl,
-        clothingPrompt, // Only set if using face-only
-        hasStyleAnalysis: !!char.styleAnalysis,
-        referenceOutfitSetting: char.styleAnalysis?.referenceOutfit?.setting || 'neutral'
-      };
-    });
-
-    console.log(`👗 [REF SELECT] Recommendations: ${recommendations.map(r => `${r.characterName}:${r.referenceType}`).join(', ')}`);
-
-    res.json({
-      success: true,
-      sceneSetting: effectiveSceneSetting,
-      recommendations
-    });
-
-  } catch (err) {
-    console.error('👗 [REF SELECT] Error:', err);
-    res.status(500).json({ error: 'Failed to select references', details: err.message });
   }
 });
 

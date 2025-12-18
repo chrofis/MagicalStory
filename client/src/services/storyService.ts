@@ -8,20 +8,6 @@ import type {
 } from '@/types/character';
 import type { SavedStory, Language, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt } from '@/types/story';
 
-// Setting categories for scene/outfit matching
-type SceneSetting = 'outdoor-cold' | 'outdoor-warm' | 'indoor-casual' | 'indoor-formal' | 'active' | 'sleep' | 'neutral';
-
-// Reference selection recommendation
-interface ReferenceRecommendation {
-  characterId: number;
-  characterName: string;
-  referenceType: 'body' | 'face';
-  photoUrl: string | null;
-  clothingPrompt: string;
-  hasStyleAnalysis: boolean;
-  referenceOutfitSetting: SceneSetting;
-}
-
 interface StoryDraft {
   storyType: string;
   artStyle: string;
@@ -610,73 +596,6 @@ export const storyService = {
     }>('/api/analyze-style', { imageData });
     return response;
   },
-
-  // Scene Setting Analysis - Categorize scene for clothing matching
-  async analyzeSceneSetting(sceneDescription: string): Promise<{
-    success: boolean;
-    setting: SceneSetting;
-    fallback?: boolean;
-  }> {
-    const response = await api.post<{
-      success: boolean;
-      setting: SceneSetting;
-      fallback?: boolean;
-    }>('/api/analyze-scene-setting', { sceneDescription });
-    return response;
-  },
-
-  // Extract outfit from generated image for Visual Bible update
-  async extractOutfit(imageData: string, characterName: string): Promise<{
-    success: boolean;
-    characterFound: boolean;
-    outfit: string | null;
-    setting: SceneSetting | null;
-    details: {
-      top?: string;
-      bottom?: string;
-      outerwear?: string;
-      footwear?: string;
-      accessories?: string[];
-    } | null;
-    error?: string;
-  }> {
-    const response = await api.post<{
-      success: boolean;
-      characterFound: boolean;
-      outfit: string | null;
-      setting: SceneSetting | null;
-      details: {
-        top?: string;
-        bottom?: string;
-        outerwear?: string;
-        footwear?: string;
-        accessories?: string[];
-      } | null;
-      error?: string;
-    }>('/api/extract-outfit', { imageData, characterName });
-    return response;
-  },
-
-  // Smart reference selection - determine which photo type to use per character
-  async selectReference(
-    characters: Character[],
-    sceneDescription?: string,
-    sceneSetting?: SceneSetting
-  ): Promise<{
-    success: boolean;
-    sceneSetting: SceneSetting;
-    recommendations: ReferenceRecommendation[];
-    error?: string;
-  }> {
-    const response = await api.post<{
-      success: boolean;
-      sceneSetting: SceneSetting;
-      recommendations: ReferenceRecommendation[];
-      error?: string;
-    }>('/api/select-reference', { characters, sceneDescription, sceneSetting });
-    return response;
-  },
 };
 
 export default storyService;
-export type { SceneSetting, ReferenceRecommendation };

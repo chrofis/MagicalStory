@@ -12,8 +12,32 @@ IDENTITY PERSISTENCE:
 - Focus: Ultra-sharp focus on facial features.
 
 WARDROBE DETAILS:
-- Style Transfer Rule: Copy the EXACT pattern AND colors from the input image. Just change from short to long sleave / legs, etc. 
-- If parts of the clothing are not visible in the input picture use plain/solid neutral colors (black, navy, khaki, gray, brown) to create them. Added / invented parts of the clothing MUST be DIFFERENT from  input image. NEVER apply the shirt's pattern or bright colors to the pants.
+- Style Transfer Rule: Copy the EXACT pattern AND colors from the input image. Just change from short to long sleeves / legs, etc.
+- If parts of the clothing are not visible in the input picture use plain/solid neutral colors (black, navy, khaki, gray, brown) to create them. Added / invented parts of the clothing MUST be DIFFERENT from input image. NEVER apply the shirt's pattern or bright colors to the pants.
 - Outfit: {CLOTHING_STYLE}
 
 Output Quality: 4k, Photorealistic.
+
+---
+CLOTHING_STYLES:
+
+[WINTER]
+Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Warm pants or leggings. Heavy winter boots and gloves.
+
+[STANDARD_FEMALE]
+Long-sleeved dress, T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or leggings. Casual shoes.
+
+[STANDARD_MALE]
+Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Casual shoes.
+
+[SUMMER_FEMALE]
+T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.
+
+[SUMMER_MALE]
+T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.
+
+[FORMAL_FEMALE]
+Elegant dress, formal gown, or blouse with skirt with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal heels or dress shoes.
+
+[FORMAL_MALE]
+Formal suit or dress shirt with trousers with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal dress shoes.
