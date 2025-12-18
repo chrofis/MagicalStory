@@ -1,0 +1,1 @@
+Generate a fashion photograph of this person wearing {OUTFIT_DESCRIPTION}. Full body shot, white background, photorealistic.

@@ -369,6 +369,14 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.styleAnalysis = await fs.readFile(path.join(promptsDir, 'style-analysis.txt'), 'utf-8');
     PROMPT_TEMPLATES.outfitExtraction = await fs.readFile(path.join(promptsDir, 'outfit-extraction.txt'), 'utf-8');
     PROMPT_TEMPLATES.sceneSettingAnalysis = await fs.readFile(path.join(promptsDir, 'scene-setting-analysis.txt'), 'utf-8');
+    // Avatar generation prompts
+    PROMPT_TEMPLATES.avatarSystemInstruction = await fs.readFile(path.join(promptsDir, 'avatar-system-instruction.txt'), 'utf-8');
+    PROMPT_TEMPLATES.avatarMainPrompt = await fs.readFile(path.join(promptsDir, 'avatar-main-prompt.txt'), 'utf-8');
+    PROMPT_TEMPLATES.avatarRetryPrompt = await fs.readFile(path.join(promptsDir, 'avatar-retry-prompt.txt'), 'utf-8');
+    // Visual Bible and editing prompts
+    PROMPT_TEMPLATES.visualBibleAnalysis = await fs.readFile(path.join(promptsDir, 'visual-bible-analysis.txt'), 'utf-8');
+    PROMPT_TEMPLATES.coverTextEdit = await fs.readFile(path.join(promptsDir, 'cover-text-edit.txt'), 'utf-8');
+    PROMPT_TEMPLATES.illustrationEdit = await fs.readFile(path.join(promptsDir, 'illustration-edit.txt'), 'utf-8');
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
     log.error('❌ Failed to load prompt templates:', err.message);
@@ -4724,28 +4732,10 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       try {
         console.log(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'})...`);
 
-        // Build the prompt with priority on face matching and identity preservation
-        const avatarPrompt = `
-TASK: A full-length documentary-style portrait of the EXACT individual from the reference photos.
-
-VISUAL REQUIREMENTS:
-- Subject: 100% identical face, body type, and AGE to reference.
-- Setting: Pure clean white background (#FFFFFF).
-- Lighting: Natural, even, studio-style diffused light.
-- Framing: Full body, head to toe. Shoes visible.
-
-IDENTITY PERSISTENCE:
-- NO HATS. NO HOODS. Hair and face must be fully visible.
-- Biometric precision: The face must not be averaged or replaced. It is a direct replication.
-- Focus: Ultra-sharp focus on facial features.
-
-WARDROBE DETAILS:
-- Style Transfer Rule: Copy the EXACT pattern AND colors from the TOP/SHIRT in the input image. Apply these to the new top/shirt only.
-- CRITICAL PANTS RULE: Pants/trousers MUST be DIFFERENT from the top. Use plain/solid neutral colors (black, navy, khaki, gray, brown) for pants. NEVER apply the shirt's pattern or bright colors to the pants.
-- Outfit: ${getClothingStylePrompt(category)}
-
-Output Quality: 4k, Photorealistic.
-`;
+        // Build the prompt from template
+        const avatarPrompt = fillTemplate(PROMPT_TEMPLATES.avatarMainPrompt, {
+          '{CLOTHING_STYLE}': getClothingStylePrompt(category)
+        });
 
         // Prepare the request with reference photo
         const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
@@ -4755,16 +4745,7 @@ Output Quality: 4k, Photorealistic.
         const requestBody = {
           systemInstruction: {
             parts: [{
-              text: `ROLE: Forensic Biometric Replication Expert.
-
-PRIMARY DIRECTIVE: ZERO DRIFT IDENTITY.
-The output MUST preserve the exact age, ethnicity, facial geometry, and unique micro-markers of the person in the provided reference photos.
-If the subject is a child, they MUST remain a child with child-like proportions and features. Do not mature the face.
-If the subject has specific facial markers (moles, scars, eye shape), these MUST be retained with 100% accuracy.
-
-CRITICAL RULE: NO "BEAUTIFICATION".
-Do not apply "Standard Fashion Model" features. The face must be a literal duplicate of the reference.
-The goal is a photographic "Documentary" level of facial realism.`
+              text: PROMPT_TEMPLATES.avatarSystemInstruction
             }]
           },
           contents: [{
@@ -4818,8 +4799,11 @@ The goal is a photographic "Documentary" level of facial realism.`
           console.warn(`⚠️ [CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
           console.log(`🔄 [CLOTHING AVATARS] Retrying ${category} with simplified prompt...`);
 
-          // Simplified retry prompt
-          const retryPrompt = `Generate a fashion photograph of this person wearing ${category === 'winter' ? 'a winter coat' : category === 'summer' ? 'a casual T-shirt and shorts' : category === 'formal' ? 'formal attire' : 'casual clothes'}. Full body shot, white background, photorealistic.`;
+          // Simplified retry prompt from template
+          const outfitDescription = category === 'winter' ? 'a winter coat' : category === 'summer' ? 'a casual T-shirt and shorts' : category === 'formal' ? 'formal attire' : 'casual clothes';
+          const retryPrompt = fillTemplate(PROMPT_TEMPLATES.avatarRetryPrompt, {
+            '{OUTFIT_DESCRIPTION}': outfitDescription
+          });
 
           const retryRequestBody = {
             ...requestBody,
@@ -8165,35 +8149,11 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
   }
 
   try {
-    // Build the analysis prompt
+    // Build the analysis prompt from template
     const elementsList = elementsToAnalyze.map(e => `- ${e.name} (${e.type})`).join('\n');
-
-    const analysisPrompt = `Analyze this children's book illustration and describe the following elements in EXACT visual detail.
-These descriptions will be used to maintain consistency in future illustrations.
-
-Elements to describe:
-${elementsList}
-
-For EACH element, provide a detailed description including:
-- Exact colors (be specific: "bright red" not just "red", "golden yellow" not just "yellow")
-- Size relative to other elements in the scene
-- Distinctive features, markings, patterns
-- For characters: clothing details, hair style, accessories
-- For animals: fur/feather patterns, collar or accessories
-- For objects: material, condition (new/worn), unique markings
-- Art style characteristics (how is it rendered?)
-
-Respond in JSON format:
-{
-  "elements": [
-    {
-      "name": "element name exactly as listed above",
-      "description": "detailed visual description, 2-3 sentences with specific details"
-    }
-  ]
-}
-
-Be extremely specific about colors and visual details - these descriptions must be precise enough to recreate the exact same appearance.`;
+    const analysisPrompt = fillTemplate(PROMPT_TEMPLATES.visualBibleAnalysis, {
+      '{ELEMENTS_LIST}': elementsList
+    });
 
     // Extract base64 and mime type
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -11751,21 +11711,11 @@ async function editCoverImageText(imageData, actualText, expectedText) {
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Build the editing prompt
-    const editPrompt = `Edit this children's storybook cover image to fix the text.
-
-CURRENT TEXT IN IMAGE: "${actualText}"
-CORRECT TEXT SHOULD BE: "${expectedText}"
-
-Instructions:
-1. Find and replace the incorrect text "${actualText}" with the correct text "${expectedText}"
-2. Keep the EXACT same artistic style, colors, and font style as the original
-3. Maintain the same text position and size
-4. Do NOT change anything else in the image - only fix the text
-5. The text should be clearly legible and properly spelled
-6. Preserve all character appearances, backgrounds, and decorative elements
-
-IMPORTANT: Only change the text, nothing else. The result should look like the original image but with the correct spelling.`;
+    // Build the editing prompt from template
+    const editPrompt = fillTemplate(PROMPT_TEMPLATES.coverTextEdit, {
+      '{ACTUAL_TEXT}': actualText,
+      '{EXPECTED_TEXT}': expectedText
+    });
 
     // Build parts array with the image and prompt
     const parts = [
@@ -11866,21 +11816,10 @@ async function editImageWithPrompt(imageData, editInstruction) {
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Build the editing prompt - pure text instruction, no character references
-    const editPrompt = `Edit this children's storybook illustration according to the following instruction:
-
-USER'S EDIT REQUEST: "${editInstruction}"
-
-Instructions:
-1. Make ONLY the changes requested by the user
-2. Keep the EXACT same artistic style, colors, and overall composition
-3. Maintain ALL character appearances EXACTLY as they are - do not change any person or character
-4. Preserve the children's book illustration style
-5. Do NOT change anything else in the image beyond what was requested
-6. Do NOT crop, resize, or remove any part of the image
-7. The result should still be appropriate for a children's storybook
-
-IMPORTANT: Only apply the specific edit requested. Keep everything else EXACTLY the same.`;
+    // Build the editing prompt from template
+    const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
+      '{EDIT_INSTRUCTION}': editInstruction
+    });
 
     // Build parts array with ONLY the image and prompt - no character references
     const parts = [

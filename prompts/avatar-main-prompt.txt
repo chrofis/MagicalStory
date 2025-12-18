@@ -1,0 +1,19 @@
+TASK: A full-length documentary-style portrait of the EXACT individual from the reference photos.
+
+VISUAL REQUIREMENTS:
+- Subject: 100% identical face, body type, and AGE to reference.
+- Setting: Pure clean white background (#FFFFFF).
+- Lighting: Natural, even, studio-style diffused light.
+- Framing: Full body, head to toe. Shoes visible.
+
+IDENTITY PERSISTENCE:
+- NO HATS. NO HOODS. Hair and face must be fully visible.
+- Biometric precision: The face must not be averaged or replaced. It is a direct replication.
+- Focus: Ultra-sharp focus on facial features.
+
+WARDROBE DETAILS:
+- Style Transfer Rule: Copy the EXACT pattern AND colors from the TOP/SHIRT in the input image. Apply these to the new top/shirt only.
+- CRITICAL PANTS RULE: Pants/trousers MUST be DIFFERENT from the top. Use plain/solid neutral colors (black, navy, khaki, gray, brown) for pants. NEVER apply the shirt's pattern or bright colors to the pants.
+- Outfit: {CLOTHING_STYLE}
+
+Output Quality: 4k, Photorealistic.

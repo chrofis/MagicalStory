@@ -1,0 +1,26 @@
+Analyze this children's book illustration and describe the following elements in EXACT visual detail.
+These descriptions will be used to maintain consistency in future illustrations.
+
+Elements to describe:
+{ELEMENTS_LIST}
+
+For EACH element, provide a detailed description including:
+- Exact colors (be specific: "bright red" not just "red", "golden yellow" not just "yellow")
+- Size relative to other elements in the scene
+- Distinctive features, markings, patterns
+- For characters: clothing details, hair style, accessories
+- For animals: fur/feather patterns, collar or accessories
+- For objects: material, condition (new/worn), unique markings
+- Art style characteristics (how is it rendered?)
+
+Respond in JSON format:
+{
+  "elements": [
+    {
+      "name": "element name exactly as listed above",
+      "description": "detailed visual description, 2-3 sentences with specific details"
+    }
+  ]
+}
+
+Be extremely specific about colors and visual details - these descriptions must be precise enough to recreate the exact same appearance.
