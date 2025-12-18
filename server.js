@@ -4756,6 +4756,20 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
           facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
         const requestBody = {
+          systemInstruction: {
+            parts: [{
+              text: `ROLE: Forensic Biometric Replication Expert.
+
+PRIMARY DIRECTIVE: ZERO DRIFT IDENTITY.
+The output MUST preserve the exact age, ethnicity, facial geometry, and unique micro-markers of the person in the provided reference photos.
+If the subject is a child, they MUST remain a child with child-like proportions and features. Do not mature the face.
+If the subject has specific facial markers (moles, scars, eye shape), these MUST be retained with 100% accuracy.
+
+CRITICAL RULE: NO "BEAUTIFICATION".
+Do not apply "Standard Fashion Model" features. The face must be a literal duplicate of the reference.
+The goal is a photographic "Documentary" level of facial realism.`
+            }]
+          },
           contents: [{
             parts: [
               // Image first, then text prompt (matching reference implementation order)
