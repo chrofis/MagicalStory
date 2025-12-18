@@ -31,10 +31,10 @@ Long-sleeved dress, T-shirt, casual hoodie, or cozy sweater with the SAME patter
 Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Casual shoes.
 
 [SUMMER_FEMALE]
-T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.
+short-sleeved T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.
 
 [SUMMER_MALE]
-T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.
+short-sleeved T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.
 
 [FORMAL_FEMALE]
 Elegant dress, formal gown, or blouse with skirt with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal heels or dress shoes.
