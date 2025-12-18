@@ -1,45 +1,103 @@
 You are an expert children's picture book author. Create a simple, heartwarming story with SHORT text and vivid scene descriptions for illustrations.
 
-# Story Parameters
+# Story Input Parameters
 
 - **Title**: {TITLE}
-- **Target Age**: {AGE_FROM}-{AGE_TO} years (early readers)
+- **Target Age**: 6 years (early readers)
 - **Length**: {PAGES} pages
 - **Language**: {LANGUAGE} (NOTE: If German, use ä, ö, ü normally. Do not use ß, use ss instead)
 - **Story Type**: {STORY_TYPE}
 - **Story Details**: {STORY_DETAILS}
-- **Dedication**: {DEDICATION}
 - **Characters**: {CHARACTERS}
 - **Relationships**: {RELATIONSHIPS}
 
-# TEXT LENGTH RULES
+
 
 This is a PICTURE BOOK. Each page has a large illustration with text below.
-
-**TEXT GUIDELINES PER PAGE:**
-- Write 4-6 sentences per page
-- Aim for 50-70 words total per page
-- Use simple vocabulary for early readers
-- Engaging sentences that tell the story and complement the illustration
-
-**GOOD EXAMPLE (Page text):**
-"Leo loved to explore new places. Today he found a hidden path in the forest! The trees were tall and green. Birds sang happy songs above him. He walked carefully, looking for adventure. His trusty brown backpack held all he needed for the journey."
-
-**BAD EXAMPLE (Too short):**
-"Leo walked. He saw trees."
-
-**FORMATTING RULE - CRITICAL:**
-- Write ALL sentences as ONE CONTINUOUS PARAGRAPH with NO line breaks
-- Do NOT put each sentence on its own line
-- The entire page text should be a single flowing paragraph
-- NEVER add line breaks between sentences
 
 # Story Structure
 
 Create a simple story arc:
 1. **Beginning** (Pages 1-2): Introduce the main character and setting
-2. **Middle** (Pages 3-{MIDDLE_PAGE}): A small challenge or adventure
+2. **Middle** (Pages 3-{MIDDLE_PAGE}): A challenge, adventure, hero's quest
 3. **End** (Pages {MIDDLE_PAGE_PLUS_1}-{PAGES}): Happy resolution with a gentle lesson
+
+
+
+# TEXT GUIDELINES
+- Write 4-6 sentences per page
+- Aim for 50-70 words total per page
+- Use simple vocabulary for early readers
+- Write ALL sentences as one continuous paragraph with NO line breaks
+- The entire page text should be a single flowing paragraph
+- Engaging sentences that tell the story and complement the illustration
+
+**GOOD EXAMPLE (Page text):**
+"Leo loved exploring the outdoors. Today, he discovered a secret trail deep in the woods. The trees were giant and full of green leaves. Birds called out from the branches high above. He walked steadily, looking for his next adventure. His brown backpack held all the important supplies for his trip."
+
+**BAD EXAMPLE (Too short):**
+"Leo walked. He saw trees."
+
+
+# Character Guidelines
+- Show character traits through actions, not descriptions. (Trait: brave = Good example: Leo approached the dangerous looking animal. Bad example: Not Leo was brave.)
+- Keep interactions simple and positive
+
+
+# Scene Guidelines
+- Focus on 1-2 characters per page for clear illustrations
+- ALWAYS refer to characters BY THEIR EXACT NAME in scene descriptions
+- NEVER use generic terms like "the family", "everyone", "the group", "the children", "the parents"
+- If the story mentions a group doing something, pick 1-2 key characters to focus on in the scene
+- Every character in a scene description MUST be named explicitly
+- Fewer characters = better illustration quality
+
+# Clothing Categories
+
+Select ONE clothing category per scene based on the context:
+- **winter** - Cold weather scenes (coats, scarves, boots, snow)
+- **summer** - Warm weather scenes (t-shirts, shorts, light dresses)
+- **formal** - Special occasions (suits, dresses, fancy attire, parties)
+- **standard** - Everyday casual scenes (regular clothes, indoor activities)
+
+
+# VISUAL BIBLE
+
+## Secondary Characters
+For each person who is NOT a main character but appears in multiple scenes:
+- **Name/Role**: (e.g., "Fireman Fred")
+- **Physical description**: Age, height, build, hair color/style, eye color, skin tone, distinguishing features
+- **Clothing**: What they wear (be specific about colors and details)
+
+## Animals & Creatures
+For any animal or creature appearing in multiple scenes:
+- **Name**: What it's called (e.g., "Whiskers" or "the family cat")
+- **Species**: Type of animal/creature
+- **Coloring**: Exact colors and patterns (e.g., "white fur with orange patches on both ears")
+- **Size**: Relative size description
+- **Distinguishing features**: Collar, markings, accessories
+
+## Important Artifacts
+For objects that appear in multiple scenes and must look consistent:
+- **Name**: (e.g., "the magic map" or "grandma's locket")
+- **Description**: Size, color, material, condition, distinctive markings
+
+## Recurring Locations (if visually distinctive)
+For specific places that appear multiple times with unique visual features:
+- **Name**: What it's called
+- **Key visual features**: Colors, shapes, distinctive elements
+
+
+
+# Important
+
+- You MUST include ALL sections: TITLE PAGE, INITIAL PAGE, PAGE 1 through PAGE {PAGES}, and BACK COVER
+- Write the COMPLETE story for ALL {PAGES} pages
+- Keep text engaging but suitable for picture book format (50-70 words per page)
+- Scene descriptions should be detailed enough for an illustrator
+- The story should feel complete with a satisfying ending
+- Write entirely in {LANGUAGE}
+
 
 # Output Format
 
@@ -49,7 +107,6 @@ You MUST provide the TITLE PAGE, INITIAL PAGE, all story pages, and BACK COVER. 
 
 ---TITLE PAGE---
 TITLE: [Creative story title]
-DEDICATION: {DEDICATION}
 
 SCENE: (visual only - do NOT mention title text)
 Setting: [Cover scene that sets the mood for the story]
@@ -90,8 +147,8 @@ TEXT:
 [Story text - 4-6 sentences, 50-70 words]
 
 SCENE:
-Setting: [Location, time of day, atmosphere]
-Characters: [Who is in this scene]
+Setting: [Indoor or Outdoor, Location, time of day, atmosphere]
+Characters: [Who is in this scene, 1-2 characters. In exceptions 3 characters not more] 
 Action: [What is happening - the key visual moment]
 Clothing: [winter/summer/formal/standard - pick ONE based on scene context]
 Mood: [Emotional tone]
@@ -101,8 +158,8 @@ TEXT:
 [Story text]
 
 SCENE:
-Setting: [Description]
-Characters: [Who is present]
+Setting: [Indoor or Outdoor, Location, time of day, atmosphere]
+Characters: [Who is in this scene, 1-2 characters. In exceptions 3 characters not more] 
 Action: [Key visual moment]
 Clothing: [winter/summer/formal/standard]
 Mood: [Emotional tone]
@@ -117,32 +174,3 @@ Action: [A peaceful group moment showing all characters together, celebrating or
 Mood: [Happy, content, peaceful, hopeful]
 **CHARACTER RULE: Include ALL characters with EQUAL visual prominence. No single character should be the focus - this is a GROUP scene where everyone matters equally.**
 
-# Clothing Categories
-
-Select ONE clothing category per scene based on the context:
-- **winter** - Cold weather scenes (coats, scarves, boots, snow)
-- **summer** - Warm weather scenes (t-shirts, shorts, light dresses)
-- **formal** - Special occasions (suits, dresses, fancy attire, parties)
-- **standard** - Everyday casual scenes (regular clothes, indoor activities)
-
-# Character Guidelines
-
-- Show character traits through simple actions, not descriptions
-- Keep interactions simple and positive
-- Focus on 1-2 characters per page for clear illustrations
-
-**CHARACTER RULES - CRITICAL:**
-- ALWAYS refer to characters BY THEIR EXACT NAME in scene descriptions
-- NEVER use generic terms like "the family", "everyone", "the group", "the children", "the parents"
-- If the story mentions a group doing something, pick 1-2 key characters to focus on in the scene
-- Every character in a scene description MUST be named explicitly
-- Fewer characters = better illustration quality
-
-# Important
-
-- You MUST include ALL sections: TITLE PAGE, INITIAL PAGE, PAGE 1 through PAGE {PAGES}, and BACK COVER
-- Write the COMPLETE story for ALL {PAGES} pages
-- Keep text engaging but suitable for picture book format (50-70 words per page)
-- Scene descriptions should be detailed enough for an illustrator
-- The story should feel complete with a satisfying ending
-- Write entirely in {LANGUAGE}
