@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { User, AuthState } from '@/types/user';
 import logger from '@/services/logger';
-import { signInWithGoogle, getIdToken, firebaseSignOut, onFirebaseAuthStateChanged, type FirebaseUser } from '@/services/firebase';
+import { signInWithGoogle, getIdToken, firebaseSignOut, onFirebaseAuthStateChanged, handleRedirectResult, type FirebaseUser } from '@/services/firebase';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>;
@@ -294,6 +294,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.configure({ isAdmin: true });
     logger.info(`Stopped impersonating, back to ${user.username}`);
   }, [state.token]);
+
+  // Handle redirect result on page load (for mobile Google sign-in)
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      try {
+        const firebaseUser = await handleRedirectResult();
+        if (firebaseUser && !state.isAuthenticated && !state.token) {
+          logger.info('Redirect result: User detected, completing login...');
+          await handleFirebaseAuth(firebaseUser);
+        }
+      } catch (err) {
+        console.error('Redirect result error:', err);
+      }
+    };
+    checkRedirectResult();
+  }, [handleFirebaseAuth, state.isAuthenticated, state.token]);
 
   // Firebase Auth State Listener - catches sign-in even if popup handling fails
   useEffect(() => {
