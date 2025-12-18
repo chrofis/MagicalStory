@@ -4668,9 +4668,12 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
         // Build the prompt from template (use only the prompt part, not the CLOTHING_STYLES section)
         const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
+        const clothingStyle = getClothingStylePrompt(category);
+        console.log(`   [CLOTHING] Style for ${category}: "${clothingStyle}"`);
         const avatarPrompt = fillTemplate(promptPart, {
-          '{CLOTHING_STYLE}': getClothingStylePrompt(category)
+          'CLOTHING_STYLE': clothingStyle
         });
+        console.log(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStyle.substring(0, 50)}..."`);
 
         // Prepare the request with reference photo
         const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');

@@ -428,54 +428,55 @@ export function CharacterForm({
         </div>
       </div>
 
-      {/* Physical Features - from Style Analysis (editable, developer only) */}
-      {developerMode && (
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
-          👤 {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
-          <span className="text-xs font-normal text-purple-500">
-            ({language === 'de' ? 'klicken zum Bearbeiten' : language === 'fr' ? 'cliquez pour modifier' : 'click to edit'})
+      {/* Physical Features - from Style Analysis (editable, visible to all) */}
+      <details className="bg-purple-50 border border-purple-200 rounded-lg">
+        <summary className="p-4 cursor-pointer hover:bg-purple-100 rounded-lg">
+          <span className="text-sm font-semibold text-purple-700 inline-flex items-center gap-2">
+            👤 {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
+            <span className="text-xs font-normal text-purple-500">
+              ({language === 'de' ? 'klicken zum Bearbeiten' : language === 'fr' ? 'cliquez pour modifier' : 'click to edit'})
+            </span>
           </span>
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <EditableStyleField
-            label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
-            value={character.styleAnalysis?.physical?.face || ''}
-            placeholder={language === 'de' ? 'z.B. rund, oval, eckig' : 'e.g. round, oval, square'}
-            isEditing={editingStyleField === 'physical.face'}
-            editValue={editStyleValue}
-            onEditValueChange={setEditStyleValue}
-            onStartEdit={() => handleStartEdit('physical.face', character.styleAnalysis?.physical?.face || '')}
-            onSave={saveStyleEdit}
-            onCancel={cancelStyleEdit}
-          />
-          <EditableStyleField
-            label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
-            value={character.styleAnalysis?.physical?.hair || ''}
-            placeholder={language === 'de' ? 'z.B. braun, kurz, lockig' : 'e.g. brown, short, curly'}
-            isEditing={editingStyleField === 'physical.hair'}
-            editValue={editStyleValue}
-            onEditValueChange={setEditStyleValue}
-            onStartEdit={() => handleStartEdit('physical.hair', character.styleAnalysis?.physical?.hair || '')}
-            onSave={saveStyleEdit}
-            onCancel={cancelStyleEdit}
-          />
-          <EditableStyleField
-            label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
-            value={character.styleAnalysis?.physical?.build || ''}
-            placeholder={language === 'de' ? 'z.B. schlank, athletisch' : 'e.g. slim, athletic'}
-            isEditing={editingStyleField === 'physical.build'}
-            editValue={editStyleValue}
-            onEditValueChange={setEditStyleValue}
-            onStartEdit={() => handleStartEdit('physical.build', character.styleAnalysis?.physical?.build || '')}
-            onSave={saveStyleEdit}
-            onCancel={cancelStyleEdit}
-          />
-        </div>
+        </summary>
+        <div className="px-4 pb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <EditableStyleField
+              label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
+              value={character.styleAnalysis?.physical?.face || ''}
+              placeholder={language === 'de' ? 'z.B. rund, oval, eckig' : 'e.g. round, oval, square'}
+              isEditing={editingStyleField === 'physical.face'}
+              editValue={editStyleValue}
+              onEditValueChange={setEditStyleValue}
+              onStartEdit={() => handleStartEdit('physical.face', character.styleAnalysis?.physical?.face || '')}
+              onSave={saveStyleEdit}
+              onCancel={cancelStyleEdit}
+            />
+            <EditableStyleField
+              label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
+              value={character.styleAnalysis?.physical?.hair || ''}
+              placeholder={language === 'de' ? 'z.B. braun, kurz, lockig' : 'e.g. brown, short, curly'}
+              isEditing={editingStyleField === 'physical.hair'}
+              editValue={editStyleValue}
+              onEditValueChange={setEditStyleValue}
+              onStartEdit={() => handleStartEdit('physical.hair', character.styleAnalysis?.physical?.hair || '')}
+              onSave={saveStyleEdit}
+              onCancel={cancelStyleEdit}
+            />
+            <EditableStyleField
+              label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
+              value={character.styleAnalysis?.physical?.build || ''}
+              placeholder={language === 'de' ? 'z.B. schlank, athletisch' : 'e.g. slim, athletic'}
+              isEditing={editingStyleField === 'physical.build'}
+              editValue={editStyleValue}
+              onEditValueChange={setEditStyleValue}
+              onStartEdit={() => handleStartEdit('physical.build', character.styleAnalysis?.physical?.build || '')}
+              onSave={saveStyleEdit}
+              onCancel={cancelStyleEdit}
+            />
+          </div>
 
-        {/* Other Features - additional details */}
-        <div className="mt-3 pt-3 border-t border-purple-200">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Other Features - additional details */}
+          <div className="mt-3 pt-3 border-t border-purple-200">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">{t.otherFeatures}</label>
               <input
@@ -486,40 +487,48 @@ export function CharacterForm({
                 placeholder={language === 'de' ? 'Brille, Bart, Sommersprossen...' : language === 'fr' ? 'Lunettes, barbe, taches de rousseur...' : 'Glasses, beard, freckles...'}
               />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">
-                {language === 'de' ? 'Style-Ästhetik' : language === 'fr' ? 'Esthétique de style' : 'Style Aesthetic'}
-              </label>
-              {editingStyleField === 'styleDNA.aesthetic' ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={editStyleValue}
-                    onChange={(e) => setEditStyleValue(e.target.value)}
-                    className="flex-1 px-2 py-1.5 text-sm border border-purple-300 rounded focus:outline-none focus:border-purple-500"
-                    autoFocus
-                    placeholder={language === 'de' ? 'z.B. casual, sportlich, elegant' : 'e.g. casual, sporty, elegant'}
-                  />
-                  <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
-                    <Check size={14} />
-                  </button>
-                  <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onClick={() => startEditingStyle('styleDNA.aesthetic', character.styleAnalysis?.styleDNA?.aesthetic || '')}
-                  className="w-full px-2 py-1.5 border border-purple-200 rounded text-sm bg-white cursor-pointer hover:border-purple-400 flex items-center justify-between group"
-                >
-                  <span className={character.styleAnalysis?.styleDNA?.aesthetic ? 'text-gray-800' : 'text-gray-400 italic'}>
-                    {character.styleAnalysis?.styleDNA?.aesthetic || (language === 'de' ? 'Klicken zum Setzen...' : 'Click to set...')}
-                  </span>
-                  <Edit3 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100" />
-                </div>
-              )}
-            </div>
           </div>
+        </div>
+      </details>
+
+      {/* Style DNA - developer only */}
+      {developerMode && (
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <h4 className="text-sm font-semibold text-purple-700 mb-3">
+          🎨 Style DNA
+        </h4>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">
+            {language === 'de' ? 'Style-Ästhetik' : language === 'fr' ? 'Esthétique de style' : 'Style Aesthetic'}
+          </label>
+          {editingStyleField === 'styleDNA.aesthetic' ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                value={editStyleValue}
+                onChange={(e) => setEditStyleValue(e.target.value)}
+                className="flex-1 px-2 py-1.5 text-sm border border-purple-300 rounded focus:outline-none focus:border-purple-500"
+                autoFocus
+                placeholder={language === 'de' ? 'z.B. casual, sportlich, elegant' : 'e.g. casual, sporty, elegant'}
+              />
+              <button onClick={saveStyleEdit} className="p-1 text-green-600 hover:bg-green-100 rounded">
+                <Check size={14} />
+              </button>
+              <button onClick={cancelStyleEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <div
+              onClick={() => startEditingStyle('styleDNA.aesthetic', character.styleAnalysis?.styleDNA?.aesthetic || '')}
+              className="w-full px-2 py-1.5 border border-purple-200 rounded text-sm bg-white cursor-pointer hover:border-purple-400 flex items-center justify-between group"
+            >
+              <span className={character.styleAnalysis?.styleDNA?.aesthetic ? 'text-gray-800' : 'text-gray-400 italic'}>
+                {character.styleAnalysis?.styleDNA?.aesthetic || (language === 'de' ? 'Klicken zum Setzen...' : 'Click to set...')}
+              </span>
+              <Edit3 size={12} className="text-gray-400 opacity-0 group-hover:opacity-100" />
+            </div>
+          )}
         </div>
       </div>
       )}
