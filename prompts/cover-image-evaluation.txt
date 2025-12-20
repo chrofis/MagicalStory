@@ -17,6 +17,10 @@ If ANY of these occur, the image MUST receive a score of 0:
 - Dedication text is WRONG or MISSPELLED (if dedication was requested)
 - REQUESTED text is ILLEGIBLE or UNREADABLE
 
+**NOT a failure:**
+- If NO TEXT was requested in the prompt and NO TEXT appears in the image → this is CORRECT
+- If NO TEXT was requested but unwanted text appears → deduct 5-15 points (not automatic 0)
+
 **NOT an automatic failure (just deduct points):**
 - Extra decorative text, watermarks, or incidental text in the background
 - Minor artistic text elements that don't interfere with the main title
@@ -91,11 +95,13 @@ Text_Error_Only: [YES/NO]
 (YES if score is low ONLY because of text issues - characters, style, composition are all acceptable)
 (NO if there are other significant issues beyond text)
 
-Expected_Text: [exact text that was requested in the prompt - extract title and/or dedication]
+Expected_Text: [exact text that was requested in the prompt, or "NONE_EXPECTED" if no text was requested]
 
-Actual_Text: [exact text you can read in the image, or "MISSING" if no text found, or "ILLEGIBLE" if unreadable]
+Actual_Text: [exact text you can read in the image, or "NONE" if no text found, or "ILLEGIBLE" if unreadable]
 
-Text_Issue: [NONE/MISSPELLED/WRONG_WORDS/MISSING/ILLEGIBLE/PARTIAL]
+Text_Issue: [NONE/MISSPELLED/WRONG_WORDS/MISSING/ILLEGIBLE/PARTIAL/UNWANTED]
+(Use NONE if Expected_Text is "NONE_EXPECTED" and no text appears - this is correct!)
+(Use UNWANTED if no text was expected but text appears in image - deduct points but not automatic 0)
 
 Reasoning:
 [List each criterion evaluated:

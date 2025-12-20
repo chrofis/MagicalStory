@@ -18,46 +18,53 @@ Include COMPLETE physical descriptions of all characters, objects, and locations
 **CHARACTER RULES - CRITICAL:**
 - Prefer scenes with 1-2 characters (easier to illustrate well)
 - Only include more characters if absolutely essential to the scene
-- ALWAYS refer to characters BY THEIR EXACT NAME - never use generic terms like "the family", "everyone", "the group"
-- For each character present, include their FULL physical description from above
+- ALWAYS refer to characters BY THEIR EXACT NAME - never use collective nouns or generic terms to describe subjects (BANNED "the family", "everyone", "the group", "the team", the "class")
+- For each character present, include their name and FULL physical description from above
 
 **OUTPUT FORMAT:**
 
-1. **Setting & Atmosphere:**
+1. **Image Summary**
+   - Defines which single element of the text you received you will create. 
+   - 2-3 sentence overview the of visual scene that will be created 
+   - the key message the scene shall convey
+
+2. **Setting & Atmosphere:**
    - Describe the location in detail (if from Visual Bible, use exact description)
    - Time of day, lighting quality, mood
    - Weather conditions if relevant
 
-2. **Composition:**
+3. **Composition:**
    - Camera angle (e.g., low angle, wide shot, medium close-up)
    - Framing and focal point
 
-3. **Clothing:** Select ONE category that best matches the scene:
+4. **Clothing:** Select ONE category that best matches the scene:
    - **winter** - Cold weather scenes (coats, scarves, boots)
    - **summer** - Warm weather scenes (t-shirts, shorts, light clothes)
    - **formal** - Special occasions (suits, dresses, fancy attire)
    - **standard** - Everyday casual scenes (casual clothes)
 
-4. **Characters:** For EACH character present, include:
+5. **Characters:** For EACH character present, include:
    * **[Character Name]:**
-     - PHYSICAL DESCRIPTION: Copy their full physical description (hair color, eye color, skin tone, build, distinguishing features) exactly as provided above
+     - PHYSICAL DESCRIPTION: Copy their full physical description (hair color, eye color, skin tone, build, distinctive markings) exactly as provided above
      - ACTION: What they are doing, their pose, body language
      - EXPRESSION: Facial expression and emotion
      - POSITION: Where they are in the frame
 
-5. **Objects & Animals:** If any recurring elements from the Visual Bible appear:
+6. **Objects & Animals:** If any recurring elements from the Visual Bible appear:
    - Copy their description VERBATIM from above
    - Describe their position and interaction with characters
 
 **EXAMPLE OUTPUT:**
 ```
-1. **Setting & Atmosphere:** A cozy kitchen with warm morning light streaming through a window. Wooden cabinets, a blue-tiled backsplash, and a round oak table in the center. Cheerful, domestic mood.
+1. **Image Summary** Emma is happy to find her dog in the kitchen
 
-2. **Composition:** Medium shot at eye level, centered on the table with characters on either side.
+2. **Setting & Atmosphere:** A cozy kitchen with warm morning light streaming through a window. Wooden cabinets, a blue-tiled backsplash, and a round oak table in the center. Cheerful, domestic mood.
 
-3. **Clothing:** standard
+3. **Composition:** Medium shot at eye level, centered on the table with characters on either side.
 
-4. **Characters:**
+4. **Clothing:** standard
+
+5. **Characters:**
    * **Emma:**
      - PHYSICAL: 8-year-old girl with long wavy auburn hair, bright green eyes, fair skin with freckles across her nose, slim build
      - ACTION: Standing on tiptoes reaching for a cookie jar on the counter

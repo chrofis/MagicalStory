@@ -253,9 +253,10 @@ function getCharacterPhotos(characters, clothingCategory = null) {
 function parseClothingCategory(sceneDescription) {
   if (!sceneDescription) return null;
 
-  // Match patterns like "Clothing: summer", "**3. Clothing:** summer", "## 3. Clothing: **summer**"
-  // Use word boundary \b to match "Clothing" regardless of what precedes it (numbers, markdown, etc.)
-  const clothingMatch = sceneDescription.match(/\bClothing\*{0,2}:\s*\*{0,2}(winter|summer|formal|standard)\b/i);
+  // Match patterns like "Clothing: summer", "**3. Clothing:** summer", "## 3. Kleidung: **winter**"
+  // Support English (Clothing), German (Kleidung), and French (Vêtements/Tenue)
+  // Use word boundary \b to match regardless of what precedes it (numbers, markdown, etc.)
+  const clothingMatch = sceneDescription.match(/\b(?:Clothing|Kleidung|Vêtements|Tenue)\*{0,2}:\s*\*{0,2}(winter|summer|formal|standard)\b/i);
   if (clothingMatch) {
     return clothingMatch[1].toLowerCase();
   }
@@ -8990,9 +8991,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Front cover - use same template as standard mode
         // Detect which characters appear in the front cover scene
         const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
+        // Parse clothing category from scene description (same as regular images)
+        const frontCoverClothing = parseClothingCategory(titlePageScene) || 'standard';
         // Use detailed photo info (with names) for labeled reference images
-        const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters);
-        console.log(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
+        const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
+        console.log(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}), clothing: ${frontCoverClothing}`);
 
         const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
           TITLE_PAGE_SCENE: titlePageScene,
@@ -9015,13 +9018,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalImage: frontCoverResult.originalImage || null,
           originalScore: frontCoverResult.originalScore || null,
           originalReasoning: frontCoverResult.originalReasoning || null,
-          referencePhotos: getCharacterPhotoDetails(frontCoverCharacters),
+          referencePhotos: frontCoverPhotos,
           modelId: frontCoverResult.modelId || null
         };
 
         // Initial page - use ALL characters (main character centered, all others around)
-        // Pass ALL character photos since this is a group scene introducing everyone
-        console.log(`📕 [STORYBOOK] Initial page: ALL ${characterPhotos.length} characters (group scene with main character centered)`);
+        // Parse clothing category from scene description
+        const initialPageClothing = parseClothingCategory(initialPageScene) || 'standard';
+        const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
+        console.log(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
 
         const initialPrompt = inputData.dedication && inputData.dedication.trim()
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
@@ -9037,7 +9042,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               VISUAL_BIBLE: visualBiblePrompt
             });
         coverPrompts.initialPage = initialPrompt;
-        const initialResult = await generateImageWithQualityRetry(initialPrompt, characterPhotos, null, 'cover');
+        const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover');
         console.log(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
         coverImages.initialPage = {
           imageData: initialResult.imageData,
@@ -9051,13 +9056,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalImage: initialResult.originalImage || null,
           originalScore: initialResult.originalScore || null,
           originalReasoning: initialResult.originalReasoning || null,
-          referencePhotos: getCharacterPhotoDetails(inputData.characters || []),
+          referencePhotos: initialPagePhotos,
           modelId: initialResult.modelId || null
         };
 
         // Back cover - use ALL characters with EQUAL prominence (no focus on main character)
-        // Pass ALL character photos since this is a group scene with everyone equal
-        console.log(`📕 [STORYBOOK] Back cover: ALL ${characterPhotos.length} characters (equal prominence group scene)`);
+        // Parse clothing category from scene description
+        const backCoverClothing = parseClothingCategory(backCoverScene) || 'standard';
+        const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
+        console.log(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
 
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
@@ -9065,7 +9072,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.backCover = backCoverPrompt;
-        const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');
+        const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover');
         console.log(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
         coverImages.backCover = {
           imageData: backCoverResult.imageData,
@@ -9079,7 +9086,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalImage: backCoverResult.originalImage || null,
           originalScore: backCoverResult.originalScore || null,
           originalReasoning: backCoverResult.originalReasoning || null,
-          referencePhotos: getCharacterPhotoDetails(inputData.characters || []),
+          referencePhotos: backCoverPhotos,
           modelId: backCoverResult.modelId || null
         };
 
@@ -9897,11 +9904,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       // Generate front cover (matches step-by-step prompt format)
       // Detect which characters appear in the front cover scene
       const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
+      // Parse clothing category from scene description (same as regular images)
+      const frontCoverClothing = parseClothingCategory(titlePageScene) || 'standard';
       // Use detailed photo info (with names) for labeled reference images
-      const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters);
+      const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
 
       try {
-        console.log(`📕 [PIPELINE] Generating front cover for job ${jobId} (${frontCoverCharacters.length} characters: ${frontCoverCharacters.map(c => c.name).join(', ') || 'none'})`);
+        console.log(`📕 [PIPELINE] Generating front cover for job ${jobId} (${frontCoverCharacters.length} characters: ${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${frontCoverClothing})`);
         const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
@@ -9919,9 +9928,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       }
 
       // Generate initial page (dedication page) - use ALL characters (main character centered)
-      // Pass ALL character photos since this is a group scene introducing everyone
+      // Parse clothing category from scene description
+      const initialPageClothing = parseClothingCategory(initialPageScene) || 'standard';
+      const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
       try {
-        console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId} - ALL ${characterPhotos.length} characters (group scene with main character centered)`);
+        console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId} - ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
         const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
@@ -9936,7 +9947,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               VISUAL_BIBLE: visualBiblePrompt
             });
         coverPrompts.initialPage = initialPagePrompt;
-        initialPageResult = await generateImageWithQualityRetry(initialPagePrompt, characterPhotos, null, 'cover');
+        initialPageResult = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover');
         console.log(`✅ [PIPELINE] Initial page generated (score: ${initialPageResult.score}${initialPageResult.wasRegenerated ? ', regenerated' : ''})`);
         // Save checkpoint: initial page cover
         await saveCheckpoint(jobId, 'cover', { type: 'initialPage', prompt: initialPagePrompt }, 1);
@@ -9946,16 +9957,18 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       }
 
       // Generate back cover - use ALL characters with EQUAL prominence (no focus on main)
-      // Pass ALL character photos since this is a group scene with everyone equal
+      // Parse clothing category from scene description
+      const backCoverClothing = parseClothingCategory(backCoverScene) || 'standard';
+      const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
       try {
-        console.log(`📕 [PIPELINE] Generating back cover for job ${jobId} - ALL ${characterPhotos.length} characters (equal prominence group scene)`);
+        console.log(`📕 [PIPELINE] Generating back cover for job ${jobId} - ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
           VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.backCover = backCoverPrompt;
-        backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, characterPhotos, null, 'cover');
+        backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover');
         console.log(`✅ [PIPELINE] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
         // Save checkpoint: back cover
         await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
@@ -9963,9 +9976,6 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         console.error(`❌ [PIPELINE] Failed to generate back cover for job ${jobId}:`, error);
         throw new Error(`Back cover generation failed: ${error.message}`);
       }
-
-      // Get reference photo details for covers (all characters)
-      const coverReferencePhotos = getCharacterPhotoDetails(inputData.characters || []);
 
       coverImages = {
         frontCover: {
@@ -9980,7 +9990,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           originalImage: frontCoverResult.originalImage || null,
           originalScore: frontCoverResult.originalScore || null,
           originalReasoning: frontCoverResult.originalReasoning || null,
-          referencePhotos: coverReferencePhotos,
+          referencePhotos: frontCoverPhotos,
           modelId: frontCoverResult.modelId || null
         },
         initialPage: {
@@ -9995,7 +10005,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           originalImage: initialPageResult.originalImage || null,
           originalScore: initialPageResult.originalScore || null,
           originalReasoning: initialPageResult.originalReasoning || null,
-          referencePhotos: coverReferencePhotos,
+          referencePhotos: initialPagePhotos,
           modelId: initialPageResult.modelId || null
         },
         backCover: {
@@ -10010,7 +10020,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           originalImage: backCoverResult.originalImage || null,
           originalScore: backCoverResult.originalScore || null,
           originalReasoning: backCoverResult.originalReasoning || null,
-          referencePhotos: coverReferencePhotos,
+          referencePhotos: backCoverPhotos,
           modelId: backCoverResult.modelId || null
         }
       };
