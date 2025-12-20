@@ -409,6 +409,11 @@ function fillTemplate(template, replacements) {
 }
 
 const app = express();
+
+// Trust first proxy (Railway, Heroku, etc.) - required for rate limiting to work correctly
+// This allows Express to trust X-Forwarded-For headers for client IP detection
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
 
@@ -8387,32 +8392,48 @@ function extractShortSceneDescriptions(outline) {
   const descriptions = {};
   const lines = outline.split('\n');
 
-  // Debug: Log first few lines of outline to understand format
+  // Debug: Log outline length and preview to understand format
+  console.log(`📋 [SCENE-EXTRACT] Outline length: ${outline.length} chars, ${lines.length} lines`);
   console.log(`📋 [SCENE-EXTRACT] Outline preview (first 500 chars): ${outline.substring(0, 500).replace(/\n/g, '\\n')}`);
+
+  // Look for the Page-by-Page Breakdown section first
+  let inPageSection = false;
+  let pagesFound = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
+
+    // Detect when we enter the page breakdown section
+    if (line.match(/page[\s-]*by[\s-]*page|seitenweise/i)) {
+      inPageSection = true;
+      console.log(`📋 [SCENE-EXTRACT] Found page breakdown section at line ${i + 1}`);
+    }
+
     // Look for various page header formats:
-    // - "Page X:" or "**Page X:**"
+    // - "Page X:" or "**Page X:**" or "Page X -"
     // - "## Page X" (markdown header)
     // - "Seite X:" (German)
-    const pageMatch = line.match(/^(?:#{1,3}\s*)?\*{0,2}(?:Page|Seite)\s+(\d+)(?::|\.|\*{0,2})/i);
+    // - More flexible: Page/Seite followed by number, with various separators
+    const pageMatch = line.match(/^(?:#{1,3}\s*)?\*{0,2}(?:Page|Seite)\s+(\d+)\s*(?::|\.|-|\*{0,2})/i);
     if (pageMatch) {
       const pageNum = parseInt(pageMatch[1]);
+      pagesFound.push(pageNum);
 
       // First check if scene is on the same line (e.g., "Page 1: Scene: description")
-      const inlineSceneMatch = line.match(/(?:Scene|Szene)(?:\s+Description)?[:\s]+(.+)/i);
+      const inlineSceneMatch = line.match(/(?:Scene|Szene|Scène)(?:\s+Description)?[:\s]+(.+)/i);
       if (inlineSceneMatch && inlineSceneMatch[1].trim().length > 10) {
         descriptions[pageNum] = inlineSceneMatch[1].trim();
         console.log(`📋 [SCENE-EXTRACT] Page ${pageNum} (inline): ${descriptions[pageNum].substring(0, 60)}...`);
         continue;
       }
 
-      // Look for Scene: in the next few lines
-      for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+      // Look for Scene: in the next 10 lines (template format has Scene after Character Focus and Clothing)
+      for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
         const sceneLine = lines[j].trim();
-        // Match various Scene formats with more flexibility
-        const sceneMatch = sceneLine.match(/^[-*•]?\s*\*{0,2}(?:Scene|Szene|Visual|Setting|Image)(?:\s+Description)?[:\s]*\*{0,2}\s*(.*)/i);
+
+        // Match various Scene formats with more flexibility (EN, DE, FR)
+        // Also match "Scène" (French) and lines starting with "Scene:" directly
+        const sceneMatch = sceneLine.match(/^[-*•]?\s*\*{0,2}(?:Scene|Szene|Scène|Visual|Setting|Image)(?:\s+Description)?[:\s]*\*{0,2}\s*(.*)/i);
         if (sceneMatch && sceneMatch[1].trim().length > 5) {
           descriptions[pageNum] = sceneMatch[1].trim();
           console.log(`📋 [SCENE-EXTRACT] Page ${pageNum}: ${descriptions[pageNum].substring(0, 60)}...`);
@@ -8422,18 +8443,27 @@ function extractShortSceneDescriptions(outline) {
         if (sceneLine.match(/^(?:#{1,3}\s*)?\*{0,2}(?:Page|Seite)\s+\d+/i)) break;
       }
 
-      // If no scene found yet, try to use the line right after the page header
-      if (!descriptions[pageNum] && i + 1 < lines.length) {
-        const nextLine = lines[i + 1].trim();
-        // Skip empty lines, titles, and short lines
-        if (nextLine.length > 20 && !nextLine.match(/^(?:Title|Titel|Text|Story)/i)) {
-          descriptions[pageNum] = nextLine.replace(/^\*{1,2}/, '').replace(/\*{1,2}$/, '').trim();
+      // If no scene found yet, try to find any descriptive text after skipping structured fields
+      if (!descriptions[pageNum]) {
+        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+          const nextLine = lines[j].trim();
+          // Skip empty lines, structured field labels, and short lines
+          if (!nextLine) continue;
+          if (nextLine.match(/^(?:Character\s*Focus|Clothing|Title|Titel|Text|Story|Personnage|Vêtements)/i)) continue;
+          if (nextLine.length < 20) continue;
+          // Stop if we hit another Page marker
+          if (nextLine.match(/^(?:#{1,3}\s*)?\*{0,2}(?:Page|Seite)\s+\d+/i)) break;
+
+          // Use this as fallback scene description (strip markdown formatting)
+          descriptions[pageNum] = nextLine.replace(/^\*{1,2}/, '').replace(/\*{1,2}$/, '').replace(/^\[|\]$/g, '').trim();
           console.log(`📋 [SCENE-EXTRACT] Page ${pageNum} (fallback): ${descriptions[pageNum].substring(0, 60)}...`);
+          break;
         }
       }
     }
   }
 
+  console.log(`📋 [SCENE-EXTRACT] Pages found: ${pagesFound.join(', ') || 'none'}`);
   console.log(`📋 [SCENE-EXTRACT] Total extracted: ${Object.keys(descriptions).length} scene descriptions`);
   return descriptions;
 }

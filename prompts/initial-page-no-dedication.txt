@@ -21,3 +21,10 @@ Create an introduction page illustration for a children's book.
 **IMPORTANT:**
 - This image should contain NO TEXT at all
 - Create a purely visual, atmospheric illustration that sets the mood for the story
+
+**VISUAL REFERENCE ELEMENTS (optional):**
+You may use elements from the visual bible below if appropriate for this scene.
+These elements are NOT required - only include them if they naturally fit the cover composition.
+If you DO include any element, describe it EXACTLY as specified below (verbatim).
+
+{VISUAL_BIBLE}
