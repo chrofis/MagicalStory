@@ -25,11 +25,11 @@ Input 3 (and onwards, if applicable): REFERENCE IMAGES - Real photos to compare 
 Start at 70 points (baseline for acceptable image), then adjust:
 
 MAJOR ISSUES (each drops score significantly):
-- Wrong number of characters (missing or duplicate): -40 points
+- Wrong number of characters (missing or duplicate): -60 points
 - Character completely unrecognizable from reference: -30 points per character
 - Inconsistent styles (mixing realistic/cartoon): -35 points
-- Severe artifacts (extra limbs, melted faces, crossed eyes): -30 points
-- Scene completely wrong (different setting/action than prompt): -25 points
+- Severe artifacts (extra limbs, melted faces, crossed eyes, floating objects): -50 points
+- Scene completely wrong (different setting/action than prompt): -50 points
 
 MODERATE ISSUES:
 - Character somewhat recognizable but key features wrong (wrong hair color, wrong age): -15 points per character
@@ -56,18 +56,25 @@ BONUSES:
 - Below 0: Severely flawed - multiple critical failures
 
 **REMEMBER:**
-- A Pixar-style child that is RECOGNIZABLE as the child in the photo is CORRECT
+- A stylized child that is RECOGNIZABLE as the child in the photo is CORRECT
 - A photo-realistic child that doesn't match the requested art style would be WRONG
 - Style transformation is the entire point - evaluate recognizability, not similarity
 
 Output strictly in this format:
-Score: [Score]/100
 
-Reasoning:
+Picture analysis:
+- Scene location: (what is shown in the scene)
+- Characters Present: (list all characters that can be identified in the image)
+- Action (what is happening in the scene, what are the characters doing)
+- Identified animals, significant objects (list any animals, creatures or significant objects)
+
+Reasoning
 [List each criterion evaluated:
-- Character Count: [✓/✗] [details]
-- Recognizability: [✓/✗] [details per character]
-- Style Consistency: [✓/✗] [details]
-- Artifacts: [✓/✗] [details]
+- Character Count: [✓/✗] [details: does amount of characters identified match with prompt]
+- Recognizability: [✓/✗] [details per character: does each character match the input picture]
+- Style Consistency: [✓/✗] [details: is style of all characters identical]
+- Artifacts: [✓/✗] [details: does any character have 3 arms or hands, is any object floating in the air]
 - Prompt Adherence: [✓/✗] [details]
 Final notes: [any other observations]]
+
+Score: [Score]/100
