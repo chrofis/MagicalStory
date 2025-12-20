@@ -7971,6 +7971,40 @@ function parseVisualBible(outline) {
   return visualBible;
 }
 
+/**
+ * Filter out main characters from Visual Bible secondary characters
+ * This is a safety net in case Claude includes main characters despite the prompt instruction
+ * @param {Object} visualBible - Parsed Visual Bible object
+ * @param {Array} mainCharacters - Array of main character objects with name property
+ * @returns {Object} Visual Bible with filtered secondary characters
+ */
+function filterMainCharactersFromVisualBible(visualBible, mainCharacters) {
+  if (!visualBible || !mainCharacters || mainCharacters.length === 0) {
+    return visualBible;
+  }
+
+  // Build set of main character names (lowercase for case-insensitive matching)
+  const mainNames = new Set(mainCharacters.map(c => c.name?.toLowerCase()).filter(Boolean));
+
+  if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
+    const originalCount = visualBible.secondaryCharacters.length;
+    visualBible.secondaryCharacters = visualBible.secondaryCharacters.filter(sc => {
+      const scName = sc.name?.toLowerCase();
+      const isMainChar = mainNames.has(scName);
+      if (isMainChar) {
+        console.log(`🚫 [VISUAL BIBLE] Filtering out "${sc.name}" - matches main character`);
+      }
+      return !isMainChar;
+    });
+    const filteredCount = originalCount - visualBible.secondaryCharacters.length;
+    if (filteredCount > 0) {
+      console.log(`🚫 [VISUAL BIBLE] Filtered ${filteredCount} main characters from secondary characters`);
+    }
+  }
+
+  return visualBible;
+}
+
 // Helper to parse individual Visual Bible entries
 function parseVisualBibleEntries(sectionText) {
   const entries = [];
@@ -8833,6 +8867,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const lang = inputData.language || 'en';
     const langText = lang === 'de' ? 'German (use ä, ö, ü normally. Do not use ß, use ss instead)' : lang === 'fr' ? 'French' : 'English';
 
+    // Build list of main character names for Visual Bible exclusion
+    const mainCharacterNames = (inputData.characters || []).map(c => c.name).join(', ');
+
     // Build the storybook combined prompt using template file
     const storybookPrompt = fillTemplate(PROMPT_TEMPLATES.storybookCombined, {
       TITLE: storyTypeName,
@@ -8846,7 +8883,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       CHARACTERS: characterDescriptions,
       RELATIONSHIPS: relationshipDescriptions || '',
       MIDDLE_PAGE: middlePage,
-      MIDDLE_PAGE_PLUS_1: middlePage + 1
+      MIDDLE_PAGE_PLUS_1: middlePage + 1,
+      MAIN_CHARACTER_NAMES: mainCharacterNames || 'None'
     });
 
     await dbPool.query(
@@ -9103,7 +9141,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const coverParser = new ProgressiveCoverParser(
       // onVisualBibleComplete
       (parsedVB, rawSection) => {
-        streamingVisualBible = parsedVB;
+        // Filter out main characters from secondary characters (safety net)
+        streamingVisualBible = filterMainCharactersFromVisualBible(parsedVB, inputData.characters);
         console.log(`📖 [STREAM-COVER] Visual Bible ready for cover generation`);
       },
       // onCoverSceneComplete
@@ -9237,6 +9276,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       console.log(`📖 [STORYBOOK] Visual Bible section found, length: ${visualBibleSection.length}`);
       console.log(`📖 [STORYBOOK] Visual Bible raw content:\n${visualBibleSection.substring(0, 500)}...`);
       visualBible = parseVisualBible('## Visual Bible\n' + visualBibleSection);
+      // Filter out main characters from secondary characters (safety net)
+      visualBible = filterMainCharactersFromVisualBible(visualBible, inputData.characters);
       const totalEntries = (visualBible.secondaryCharacters?.length || 0) +
                           (visualBible.animals?.length || 0) +
                           (visualBible.artifacts?.length || 0) +
@@ -9866,6 +9907,8 @@ async function processStoryJob(jobId) {
 
     // Parse Visual Bible for recurring elements consistency
     const visualBible = parseVisualBible(outline);
+    // Filter out main characters from secondary characters (safety net)
+    filterMainCharactersFromVisualBible(visualBible, inputData.characters);
 
     // Initialize main characters from inputData.characters with their style analysis
     initializeVisualBibleMainCharacters(visualBible, inputData.characters);

@@ -64,7 +64,8 @@ Select ONE clothing category per scene based on the context:
 # VISUAL BIBLE
 
 ## Secondary Characters
-For each person who is NOT a main character but appears in multiple scenes:
+⚠️ DO NOT include these main characters (they are already defined): {MAIN_CHARACTER_NAMES}
+For each OTHER person who appears in multiple scenes (e.g., teacher, shopkeeper, neighbor):
 - **Name/Role**: (e.g., "Fireman Fred")
 - **Physical description**: Age, height, build, hair color/style, eye color, skin tone, distinguishing features
 - **Clothing**: What they wear (be specific about colors and details)
