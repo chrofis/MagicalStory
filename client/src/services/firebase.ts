@@ -7,6 +7,7 @@ import {
   getRedirectResult,
   signOut,
   onAuthStateChanged,
+  browserPopupRedirectResolver,
   type User as FirebaseUser
 } from 'firebase/auth';
 
@@ -25,34 +26,39 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Detect iOS/iPadOS - these devices have issues with popup auth
-function isIOSDevice(): boolean {
-  const ua = navigator.userAgent;
-  // Check for iPhone, iPad, or iPod
-  // Also check for iPad on iOS 13+ which reports as Mac
-  return /iPhone|iPad|iPod/.test(ua) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
+// Add prompt to force account selection
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 export async function signInWithGoogle(): Promise<FirebaseUser> {
-  if (isIOSDevice()) {
-    // On iOS, use redirect - popup is unreliable
-    // This will navigate away, and handleRedirectResult will be called on return
-    await signInWithRedirect(auth, googleProvider);
-    // This won't be reached - page navigates away
-    throw new Error('Redirecting to Google...');
-  } else {
-    // On desktop, use popup
-    const result = await signInWithPopup(auth, googleProvider);
+  try {
+    // Try popup first - works on most browsers
+    const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
     return result.user;
+  } catch (error: unknown) {
+    const firebaseError = error as { code?: string; message?: string };
+    console.error('Popup sign-in failed:', firebaseError.code, firebaseError.message);
+
+    // If popup was blocked or failed, try redirect
+    if (firebaseError.code === 'auth/popup-blocked' ||
+        firebaseError.code === 'auth/popup-closed-by-user' ||
+        firebaseError.code === 'auth/cancelled-popup-request') {
+      console.log('Popup failed, trying redirect...');
+      await signInWithRedirect(auth, googleProvider);
+      throw new Error('Redirecting to Google...');
+    }
+
+    throw error;
   }
 }
 
 // Handle redirect result when returning from Google auth
 export async function handleRedirectResult(): Promise<FirebaseUser | null> {
   try {
-    const result = await getRedirectResult(auth);
+    const result = await getRedirectResult(auth, browserPopupRedirectResolver);
     if (result) {
+      console.log('Redirect result: user found');
       return result.user;
     }
     return null;
