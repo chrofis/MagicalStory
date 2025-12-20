@@ -530,21 +530,25 @@ export default function StoryWizard() {
             clothing: analysis.clothing || prev.clothing,
             // Reference outfit
             referenceOutfit: analysis.referenceOutfit || prev.referenceOutfit,
+            // Clear avatars when photo changes - they need to be regenerated
+            avatars: undefined,
           } : null);
         } else {
           log.warn('Photo analysis returned no data, using original photo');
-          // Fallback to original photo
+          // Fallback to original photo - also clear avatars
           setCurrentCharacter(prev => prev ? {
             ...prev,
             photos: { original: originalPhotoUrl },
+            avatars: undefined,
           } : null);
         }
       } catch (error) {
         log.error('Photo analysis error:', error);
-        // Fallback to original photo on error
+        // Fallback to original photo on error - also clear avatars
         setCurrentCharacter(prev => prev ? {
           ...prev,
           photos: { original: originalPhotoUrl },
+          avatars: undefined,
         } : null);
       } finally {
         setIsAnalyzingPhoto(false);
@@ -553,112 +557,35 @@ export default function StoryWizard() {
     reader.readAsDataURL(file);
   };
 
-  // Generate clothing avatars in the background for a character
-  // Takes current relationship data as parameters to avoid stale closures
-  // Note: We use setCharacters callback to get latest state, so allCharacters param is not needed
-  const generateAvatarsInBackground = async (
-    char: Character,
-    currentRelationships: Record<string, string>,
-    currentRelationshipTexts: Record<string, string>,
-    currentCustomRelationships: string[]
-  ) => {
-    // Only generate if character has a photo
-    if (!char.photos?.original && !char.photos?.face) {
-      log.debug(`Skipping avatar generation for ${char.name}: no photo`);
-      return;
-    }
-
-    // Skip if already generating or has avatars
-    if (char.avatars?.status === 'generating') {
-      log.debug(`Skipping avatar generation for ${char.name}: already generating`);
-      return;
-    }
-
-    // Mark as generating
-    setCharacters(prev => prev.map(c =>
-      c.id === char.id ? { ...c, avatars: { ...c.avatars, status: 'generating' as const } } : c
-    ));
-
-    try {
-      log.info(`🎨 Starting background avatar generation for ${char.name}...`);
-      const result = await characterService.generateClothingAvatars(char);
-
-      if (result.success && result.avatars) {
-        log.success(`✅ Avatars generated for ${char.name} (id: ${char.id})`);
-        // Update character with new avatars
-        const charWithAvatars = {
-          ...char,
-          avatars: {
-            ...result.avatars,
-            status: 'complete' as const,
-            generatedAt: new Date().toISOString()
-          }
-        };
-
-        // Update state and save to backend using the LATEST state (not stale allCharacters)
-        // This ensures we don't overwrite new characters added while avatars were generating
-        setCharacters(prev => {
-          const updatedCharacters = prev.map(c => c.id === char.id ? charWithAvatars : c);
-
-          // Save to backend with the fresh character list
-          log.info(`💾 Saving avatars for ${char.name} (id: ${char.id}) to backend...`);
-          characterService.saveCharacterData({
-            characters: updatedCharacters,
-            relationships: currentRelationships,
-            relationshipTexts: currentRelationshipTexts,
-            customRelationships: currentCustomRelationships,
-            customStrengths: [],
-            customWeaknesses: [],
-            customFears: [],
-          }).then(() => {
-            log.success(`💾 Avatars saved for ${char.name}`);
-          }).catch(saveErr => {
-            log.error(`Failed to save avatars for ${char.name}:`, saveErr);
-          });
-
-          return updatedCharacters;
-        });
-      } else {
-        log.error(`❌ Avatar generation failed for ${char.name}: ${result.error}`);
-        // Mark as failed
-        setCharacters(prev => prev.map(c =>
-          c.id === char.id ? { ...c, avatars: { ...c.avatars, status: 'failed' as const } } : c
-        ));
-      }
-    } catch (error) {
-      log.error(`❌ Avatar generation error for ${char.name}:`, error);
-      setCharacters(prev => prev.map(c =>
-        c.id === char.id ? { ...c, avatars: { ...c.avatars, status: 'failed' as const } } : c
-      ));
-    }
-  };
-
   // Handler for regenerating avatars from developer mode
+  // Uses the robust service function that handles generation + persistence
   const handleRegenerateAvatars = async () => {
     if (!currentCharacter) return;
 
-    // Clear existing avatars and trigger regeneration
-    const charWithoutAvatars = { ...currentCharacter, avatars: undefined };
-    setCurrentCharacter(charWithoutAvatars);
+    // Clear existing avatars in UI
+    setCurrentCharacter(prev => prev ? { ...prev, avatars: undefined } : prev);
     setIsRegeneratingAvatars(true);
 
     try {
       log.info(`🔄 Regenerating avatars for ${currentCharacter.name}...`);
-      await generateAvatarsInBackground(
-        charWithoutAvatars,
-        relationships,
-        relationshipTexts,
-        customRelationships
+
+      // Use the robust service function that handles generation + saving
+      const result = await characterService.regenerateAvatarsForCharacter(
+        currentCharacter.id,
+        (status, message) => log.info(`[${status}] ${message}`)
       );
-      // Update currentCharacter with the new avatars from state
-      setCharacters(prev => {
-        const updated = prev.find(c => c.id === currentCharacter.id);
-        if (updated?.avatars) {
-          setCurrentCharacter(curr => curr ? { ...curr, avatars: updated.avatars } : curr);
-        }
-        return prev;
-      });
-      log.success(`✅ Avatars regenerated for ${currentCharacter.name}`);
+
+      if (result.success && result.avatars) {
+        // Update local state with new avatars
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: result.avatars } : prev);
+        setCharacters(prev => prev.map(c =>
+          c.id === currentCharacter.id ? { ...c, avatars: result.avatars } : c
+        ));
+        log.success(`✅ Avatars regenerated for ${currentCharacter.name}`);
+      } else {
+        log.error(`❌ Failed to regenerate avatars: ${result.error}`);
+        alert(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
+      }
     } catch (error) {
       log.error(`❌ Failed to regenerate avatars for ${currentCharacter.name}:`, error);
       alert(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -699,15 +626,20 @@ export default function StoryWizard() {
       // Generate clothing avatars in the background (non-blocking)
       // Only if character has a photo and doesn't already have avatars
       const savedChar = updatedCharacters.find(c => c.id === currentCharacter.id);
-      if (savedChar && (savedChar.photos?.original || savedChar.photos?.face) && !savedChar.avatars?.winter) {
-        // Fire and forget - don't await
-        // Pass current relationship data to avoid stale closure issues
-        generateAvatarsInBackground(
-          savedChar,
-          relationships,
-          relationshipTexts,
-          customRelationships
-        );
+      if (savedChar && characterService.needsAvatars(savedChar)) {
+        // Fire and forget - the service handles generation + saving
+        log.info(`🎨 Starting background avatar generation for ${savedChar.name}...`);
+        characterService.generateAndSaveAvatarForCharacter(savedChar).then(result => {
+          if (result.success && result.avatars) {
+            // Update local state with new avatars
+            setCharacters(prev => prev.map(c =>
+              c.id === savedChar.id ? { ...c, avatars: result.avatars } : c
+            ));
+            log.success(`✅ Avatars saved for ${savedChar.name}`);
+          } else if (!result.skipped) {
+            log.warn(`Avatar generation failed for ${savedChar.name}: ${result.error}`);
+          }
+        });
       }
 
       setCurrentCharacter(null);

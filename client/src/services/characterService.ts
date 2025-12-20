@@ -172,6 +172,17 @@ export interface CharacterData {
   customFears: string[];
 }
 
+// Result type for avatar generation
+export interface AvatarGenerationResult {
+  characterId: number;
+  characterName: string;
+  success: boolean;
+  avatars?: CharacterAvatars;
+  error?: string;
+  skipped?: boolean;
+  skipReason?: string;
+}
+
 export const characterService = {
   async getCharacters(): Promise<Character[]> {
     const response = await api.get<CharacterDataResponse>('/api/characters');
@@ -334,6 +345,275 @@ export const characterService = {
       log.error('Photo analysis failed:', error);
       return { success: false };
     }
+  },
+
+  /**
+   * Check if a character needs avatar generation
+   * Returns true if character has a photo but no complete avatars
+   */
+  needsAvatars(character: Character): boolean {
+    // Must have a photo
+    const hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
+    if (!hasPhoto) return false;
+
+    // Check if avatars are missing or incomplete
+    const avatars = character.avatars;
+    if (!avatars) return true;
+    if (avatars.status === 'generating' || avatars.status === 'pending') return false; // Already in progress
+    if (avatars.status === 'failed') return true; // Retry failed ones
+
+    // Check if at least one avatar exists
+    const hasAnyAvatar = !!(avatars.winter || avatars.standard || avatars.summer || avatars.formal);
+    return !hasAnyAvatar;
+  },
+
+  /**
+   * Generate avatars for a single character and save to storage
+   * This is the core function that handles generation + persistence
+   */
+  async generateAndSaveAvatarForCharacter(
+    character: Character,
+    onProgress?: (status: 'starting' | 'generating' | 'saving' | 'complete' | 'error', message: string) => void
+  ): Promise<AvatarGenerationResult> {
+    const result: AvatarGenerationResult = {
+      characterId: character.id,
+      characterName: character.name,
+      success: false,
+    };
+
+    try {
+      // Check if character has a photo
+      const hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
+      if (!hasPhoto) {
+        result.skipped = true;
+        result.skipReason = 'No photo available';
+        return result;
+      }
+
+      onProgress?.('generating', `Generating avatars for ${character.name}...`);
+      log.info(`🎨 Generating avatars for ${character.name} (id: ${character.id})`);
+
+      // Generate avatars
+      const genResult = await characterService.generateClothingAvatars(character);
+
+      if (!genResult.success || !genResult.avatars) {
+        result.error = genResult.error || 'Avatar generation failed';
+        onProgress?.('error', result.error);
+        return result;
+      }
+
+      result.avatars = genResult.avatars;
+
+      // Now save back to storage
+      onProgress?.('saving', `Saving avatars for ${character.name}...`);
+
+      // Fetch current data to ensure we have latest
+      const currentData = await characterService.getCharacterData();
+
+      // Update the character with new avatars
+      const updatedCharacters = currentData.characters.map(c =>
+        c.id === character.id
+          ? { ...c, avatars: genResult.avatars }
+          : c
+      );
+
+      // Save back
+      await characterService.saveCharacterData({
+        ...currentData,
+        characters: updatedCharacters,
+      });
+
+      result.success = true;
+      onProgress?.('complete', `Avatars saved for ${character.name}`);
+      log.success(`✅ Avatars generated and saved for ${character.name}`);
+
+      return result;
+
+    } catch (error) {
+      result.error = String(error);
+      onProgress?.('error', result.error);
+      log.error(`Failed to generate/save avatars for ${character.name}:`, error);
+      return result;
+    }
+  },
+
+  /**
+   * Generate avatars for multiple characters in parallel
+   * Fetches current data, generates avatars, and saves all updates
+   *
+   * @param characterIds - Array of character IDs to generate avatars for. If empty, generates for all characters needing avatars.
+   * @param options.forceRegenerate - If true, regenerates even if avatars exist
+   * @param options.maxConcurrent - Maximum concurrent generations (default: 2)
+   * @param options.onProgress - Callback for progress updates
+   */
+  async generateAvatarsForCharacters(
+    characterIds?: number[],
+    options?: {
+      forceRegenerate?: boolean;
+      maxConcurrent?: number;
+      onProgress?: (characterId: number, status: string, message: string) => void;
+    }
+  ): Promise<{
+    results: AvatarGenerationResult[];
+    successCount: number;
+    failCount: number;
+    skipCount: number;
+  }> {
+    const { forceRegenerate = false, maxConcurrent = 2, onProgress } = options || {};
+
+    log.info(`🎨 Starting batch avatar generation...`);
+
+    // Fetch current character data
+    const currentData = await characterService.getCharacterData();
+
+    // Determine which characters to process
+    let charactersToProcess: Character[];
+    if (characterIds && characterIds.length > 0) {
+      charactersToProcess = currentData.characters.filter(c => characterIds.includes(c.id));
+    } else {
+      // All characters that need avatars
+      charactersToProcess = currentData.characters.filter(c =>
+        forceRegenerate ? !!(c.photos?.original || c.photos?.face) : characterService.needsAvatars(c)
+      );
+    }
+
+    if (charactersToProcess.length === 0) {
+      log.info('No characters need avatar generation');
+      return { results: [], successCount: 0, failCount: 0, skipCount: 0 };
+    }
+
+    log.info(`Processing ${charactersToProcess.length} characters for avatar generation`);
+
+    const results: AvatarGenerationResult[] = [];
+    const updatedCharactersMap = new Map<number, Character>();
+
+    // Process in batches to limit concurrency
+    for (let i = 0; i < charactersToProcess.length; i += maxConcurrent) {
+      const batch = charactersToProcess.slice(i, i + maxConcurrent);
+
+      const batchPromises = batch.map(async (character) => {
+        const result: AvatarGenerationResult = {
+          characterId: character.id,
+          characterName: character.name,
+          success: false,
+        };
+
+        try {
+          // Check if should skip
+          const hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
+          if (!hasPhoto) {
+            result.skipped = true;
+            result.skipReason = 'No photo available';
+            return result;
+          }
+
+          if (!forceRegenerate && character.avatars?.winter) {
+            result.skipped = true;
+            result.skipReason = 'Avatars already exist';
+            return result;
+          }
+
+          onProgress?.(character.id, 'generating', `Generating avatars for ${character.name}...`);
+          log.info(`🎨 Generating avatars for ${character.name}...`);
+
+          // Generate avatars
+          const genResult = await characterService.generateClothingAvatars(character);
+
+          if (!genResult.success || !genResult.avatars) {
+            result.error = genResult.error || 'Avatar generation failed';
+            onProgress?.(character.id, 'error', result.error);
+            return result;
+          }
+
+          result.avatars = genResult.avatars;
+          result.success = true;
+
+          // Store updated character for batch save
+          updatedCharactersMap.set(character.id, {
+            ...character,
+            avatars: genResult.avatars,
+          });
+
+          onProgress?.(character.id, 'complete', `Avatars generated for ${character.name}`);
+          log.success(`✅ Avatars generated for ${character.name}`);
+
+          return result;
+
+        } catch (error) {
+          result.error = String(error);
+          onProgress?.(character.id, 'error', result.error);
+          log.error(`Failed to generate avatars for ${character.name}:`, error);
+          return result;
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+    }
+
+    // Save all updates in one batch
+    if (updatedCharactersMap.size > 0) {
+      log.info(`💾 Saving ${updatedCharactersMap.size} character avatar updates...`);
+
+      // Fetch fresh data to avoid conflicts
+      const freshData = await characterService.getCharacterData();
+
+      const updatedCharacters = freshData.characters.map(c => {
+        const updated = updatedCharactersMap.get(c.id);
+        return updated || c;
+      });
+
+      await characterService.saveCharacterData({
+        ...freshData,
+        characters: updatedCharacters,
+      });
+
+      log.success(`💾 Saved avatar updates for ${updatedCharactersMap.size} characters`);
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success && !r.skipped).length;
+    const skipCount = results.filter(r => r.skipped).length;
+
+    log.info(`Avatar generation complete: ${successCount} success, ${failCount} failed, ${skipCount} skipped`);
+
+    return { results, successCount, failCount, skipCount };
+  },
+
+  /**
+   * Regenerate avatars for a specific character (clears existing and regenerates)
+   * Useful when photo has changed
+   */
+  async regenerateAvatarsForCharacter(
+    characterId: number,
+    onProgress?: (status: string, message: string) => void
+  ): Promise<AvatarGenerationResult> {
+    log.info(`🔄 Regenerating avatars for character ${characterId}...`);
+
+    // Fetch current data
+    const currentData = await characterService.getCharacterData();
+    const character = currentData.characters.find(c => c.id === characterId);
+
+    if (!character) {
+      return {
+        characterId,
+        characterName: 'Unknown',
+        success: false,
+        error: 'Character not found',
+      };
+    }
+
+    // Clear existing avatars first
+    const characterWithClearedAvatars = {
+      ...character,
+      avatars: { status: 'pending' as const },
+    };
+
+    // Generate and save
+    return characterService.generateAndSaveAvatarForCharacter(
+      characterWithClearedAvatars,
+      onProgress ? (status, msg) => onProgress(status, msg) : undefined
+    );
   },
 };
 
