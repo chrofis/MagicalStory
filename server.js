@@ -9956,11 +9956,23 @@ async function processStoryJob(jobId) {
     await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions, visualBible });
 
     // Extract title from outline (for cover generation that starts in parallel)
-    // The outline typically has a title in the format "# Title" or "TITLE: ..."
+    // The outline format is typically:
+    // # Title
+    // **Actual Title Here** or Title: Actual Title Here
     let storyTitle = inputData.title || 'My Story';
-    const outlineTitleMatch = outline.match(/^#\s+(.+?)$/m) || outline.match(/TITLE:\s*(.+)/i);
-    if (outlineTitleMatch) {
-      storyTitle = outlineTitleMatch[1].trim();
+    // Try multiple patterns:
+    // 1. "# Title\n**Actual Title**" - bold on next line
+    // 2. "# Title\nTitle: Actual Title" - "Title:" prefix on next line
+    // 3. "# Title\nActual Title" - plain text on next line (not "# " or "---")
+    // 4. "TITLE: Actual Title" - inline format
+    const boldTitleMatch = outline.match(/^#\s*Title\s*\n+\*\*(.+?)\*\*/im);
+    const prefixTitleMatch = outline.match(/^#\s*Title\s*\n+Title:\s*(.+?)$/im);
+    const plainTitleMatch = outline.match(/^#\s*Title\s*\n+([^#\-\n].+?)$/im);
+    const inlineTitleMatch = outline.match(/TITLE:\s*(.+)/i);
+
+    const titleMatch = boldTitleMatch || prefixTitleMatch || plainTitleMatch || inlineTitleMatch;
+    if (titleMatch) {
+      storyTitle = titleMatch[1].trim();
       console.log(`📖 [PIPELINE] Extracted title from outline: "${storyTitle}"`);
     }
 
