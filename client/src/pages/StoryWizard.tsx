@@ -1023,8 +1023,8 @@ export default function StoryWizard() {
 
       // Check for "already in progress" error (409)
       if (errorMessage.includes('already in progress')) {
-        // Extract the active job ID if present
-        const jobIdMatch = errorMessage.match(/\|ACTIVE_JOB:([a-f0-9-]+)/i);
+        // Extract the active job ID if present (format: job_<timestamp>_<random>)
+        const jobIdMatch = errorMessage.match(/\|ACTIVE_JOB:(job_[a-z0-9_]+)/i);
         const activeJobId = jobIdMatch ? jobIdMatch[1] : null;
 
         const cancelMessage = language === 'de'
