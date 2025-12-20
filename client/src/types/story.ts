@@ -85,6 +85,8 @@ export interface CoverImageData {
   referencePhotos?: ReferencePhoto[];
   // API model used (for dev mode)
   modelId?: string;
+  // Story title (sent with frontCover during streaming for early display transition)
+  storyTitle?: string;
 }
 
 export interface CoverImages {

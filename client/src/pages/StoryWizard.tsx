@@ -916,12 +916,21 @@ export default function StoryWizard() {
 
         // Update cover images progressively as they become available during streaming
         if (status.partialCovers) {
+          let shouldTransitionToDisplay = false;
           setCoverImages(prev => {
             // Merge partial covers with existing, keeping newer data
             const updated = { ...prev };
             if (status.partialCovers?.frontCover && !prev.frontCover) {
               updated.frontCover = status.partialCovers.frontCover;
               log.debug('Front cover received during streaming');
+              // Extract and set story title if available
+              const frontCover = status.partialCovers.frontCover;
+              if (typeof frontCover === 'object' && frontCover?.storyTitle) {
+                setStoryTitle(frontCover.storyTitle);
+                log.debug(`Story title from front cover: ${frontCover.storyTitle}`);
+              }
+              // Transition to story display when front cover arrives
+              shouldTransitionToDisplay = true;
             }
             if (status.partialCovers?.initialPage && !prev.initialPage) {
               updated.initialPage = status.partialCovers.initialPage;
@@ -933,6 +942,11 @@ export default function StoryWizard() {
             }
             return updated;
           });
+          // Transition to step 5 (StoryDisplay) when front cover is ready
+          if (shouldTransitionToDisplay) {
+            log.debug('Transitioning to StoryDisplay - front cover ready');
+            setStep(5);
+          }
         }
 
         // Update story text for progressive display (text available before images)
@@ -1176,8 +1190,9 @@ export default function StoryWizard() {
         );
 
       case 5:
-        // Show StoryDisplay if we have final story OR progressive data during generation
-        if (generatedStory || progressiveStoryData) {
+        // Show StoryDisplay if we have final story OR progressive data OR front cover during generation
+        // This allows transitioning to StoryDisplay as soon as front cover is ready
+        if (generatedStory || progressiveStoryData || (isGenerating && coverImages.frontCover)) {
           // Build scene images from progressive data if still generating
           const displaySceneImages = generatedStory
             ? sceneImages
@@ -1203,8 +1218,8 @@ export default function StoryWizard() {
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}
               sceneDescriptions={progressiveStoryData?.sceneDescriptions || sceneDescriptions}
-              // Progressive mode props
-              progressiveMode={isGenerating && !!progressiveStoryData}
+              // Progressive mode props - active when generating (even before story text arrives)
+              progressiveMode={isGenerating}
               progressiveData={progressiveStoryData || undefined}
               completedPageImages={completedPageImages}
               coverImages={coverImages}
@@ -1690,7 +1705,8 @@ export default function StoryWizard() {
       </div>
 
       {/* Generation Progress Modal - Full story generation */}
-      {isGenerating && (
+      {/* Hide progress modal once we transition to StoryDisplay (step 5) */}
+      {isGenerating && step !== 5 && (
         <GenerationProgress
           current={generationProgress.current}
           total={generationProgress.total}

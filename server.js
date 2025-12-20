@@ -8906,7 +8906,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     };
 
     // Helper function to generate cover image during streaming
-    const generateCoverImageDuringStream = async (coverType, sceneDescription, rawBlock = null) => {
+    const generateCoverImageDuringStream = async (coverType, sceneDescription, rawBlock = null, extractedTitle = null) => {
       if (skipImages) return null;
 
       try {
@@ -8997,7 +8997,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Save partial cover checkpoint for progressive display
         const coverKey = coverType === 'titlePage' ? 'frontCover' : coverType;
-        await saveCheckpoint(jobId, 'partial_cover', { type: coverKey, ...coverData },
+        // Include title for frontCover so client can transition to story display immediately
+        const checkpointData = { type: coverKey, ...coverData };
+        if (coverType === 'titlePage' && extractedTitle) {
+          checkpointData.storyTitle = extractedTitle;
+        }
+        await saveCheckpoint(jobId, 'partial_cover', checkpointData,
           coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? 1 : 2);
 
         console.log(`✅ [STREAM-COVER] ${coverType} cover generated during streaming (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
@@ -9018,9 +9023,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         console.log(`📖 [STREAM-COVER] Visual Bible ready for cover generation`);
       },
       // onCoverSceneComplete
-      (coverType, sceneDescription, rawBlock) => {
+      (coverType, sceneDescription, rawBlock, extractedTitle) => {
         if (shouldStreamCovers) {
-          const coverPromise = streamLimit(() => generateCoverImageDuringStream(coverType, sceneDescription, rawBlock));
+          const coverPromise = streamLimit(() => generateCoverImageDuringStream(coverType, sceneDescription, rawBlock, extractedTitle));
           streamingCoverPromises.push(coverPromise);
         }
       }
@@ -11406,9 +11411,15 @@ class ProgressiveCoverParser {
         if (sceneMatch) {
           this.emittedCovers.add('titlePage');
           const scene = sceneMatch[1].trim();
-          console.log(`🌊 [STREAM-COVER] Title Page scene complete: ${scene.substring(0, 80)}...`);
+          // Extract title from the streaming text for progressive display
+          let extractedTitle = null;
+          const titleMatch = fullText.match(/TITLE:\s*(.+)/i);
+          if (titleMatch) {
+            extractedTitle = titleMatch[1].trim();
+          }
+          console.log(`🌊 [STREAM-COVER] Title Page scene complete: ${scene.substring(0, 80)}...${extractedTitle ? ` (title: ${extractedTitle})` : ''}`);
           if (this.onCoverSceneComplete) {
-            this.onCoverSceneComplete('titlePage', scene, titlePageBlock);
+            this.onCoverSceneComplete('titlePage', scene, titlePageBlock, extractedTitle);
           }
         }
       }

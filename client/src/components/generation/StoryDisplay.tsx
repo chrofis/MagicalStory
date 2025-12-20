@@ -1171,6 +1171,29 @@ export function StoryDisplay({
         </div>
       )}
 
+      {/* Progressive Mode: Waiting for story text after cover */}
+      {progressiveMode && !story && coverImages?.frontCover && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-8 mt-6">
+          <div className="flex flex-col items-center text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
+            <h3 className="text-xl font-semibold text-indigo-700">
+              {language === 'de'
+                ? 'Geschichte wird erstellt...'
+                : language === 'fr'
+                ? 'Création de l\'histoire...'
+                : 'Creating your story...'}
+            </h3>
+            <p className="text-indigo-500 mt-2">
+              {language === 'de'
+                ? 'Die Seiten werden gleich angezeigt'
+                : language === 'fr'
+                ? 'Les pages seront bientôt affichées'
+                : 'Pages will appear shortly'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Story Pages with Images */}
       {hasImages && story && (
         <div className="space-y-8 mt-8">
