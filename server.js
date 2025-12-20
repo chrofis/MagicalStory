@@ -689,6 +689,14 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           });
 
           // Send order confirmation email to customer
+          // Get language from story data for email localization
+          let orderEmailLanguage = 'English';
+          try {
+            const parsedStoryData = typeof storyData === 'string' ? JSON.parse(storyData) : storyData;
+            orderEmailLanguage = parsedStoryData?.inputData?.language || parsedStoryData?.language || 'English';
+          } catch (e) {
+            console.warn('⚠️ Could not parse story data for language:', e.message);
+          }
           email.sendOrderConfirmationEmail(
             customerInfo.email,
             customerInfo.name,
@@ -697,7 +705,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               amount: (fullSession.amount_total / 100).toFixed(2),
               currency: fullSession.currency.toUpperCase(),
               shippingAddress: address
-            }
+            },
+            orderEmailLanguage
           ).catch(err => console.error('❌ Failed to send order confirmation email:', err));
 
           console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
@@ -4632,6 +4641,56 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
       details: err.message,
       fallback: true
     });
+  }
+});
+
+
+// Get avatar prompt for a given category and gender (for developer mode display)
+app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
+  try {
+    const { category, gender } = req.query;
+    const isFemale = gender === 'female';
+
+    // Helper to extract clothing style from template
+    const getClothingStylePrompt = (cat) => {
+      const template = PROMPT_TEMPLATES.avatarMainPrompt || '';
+      const styleSection = template.split('CLOTHING_STYLES:')[1] || '';
+
+      let tag;
+      if (cat === 'winter') {
+        tag = '[WINTER]';
+      } else if (cat === 'standard') {
+        tag = isFemale ? '[STANDARD_FEMALE]' : '[STANDARD_MALE]';
+      } else if (cat === 'summer') {
+        tag = isFemale ? '[SUMMER_FEMALE]' : '[SUMMER_MALE]';
+      } else if (cat === 'formal') {
+        tag = isFemale ? '[FORMAL_FEMALE]' : '[FORMAL_MALE]';
+      } else {
+        return 'Full outfit with shoes matching the style of the reference.';
+      }
+
+      const tagIndex = styleSection.indexOf(tag);
+      if (tagIndex === -1) {
+        return 'Full outfit with shoes matching the style of the reference.';
+      }
+
+      const afterTag = styleSection.substring(tagIndex + tag.length);
+      const nextTagIndex = afterTag.search(/\n\[/);
+      const styleText = nextTagIndex === -1 ? afterTag : afterTag.substring(0, nextTagIndex);
+      return styleText.trim();
+    };
+
+    // Build the prompt from template
+    const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
+    const clothingStyle = getClothingStylePrompt(category);
+    const avatarPrompt = fillTemplate(promptPart, {
+      'CLOTHING_STYLE': clothingStyle
+    });
+
+    res.json({ success: true, prompt: avatarPrompt });
+  } catch (error) {
+    console.error('Error getting avatar prompt:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -10029,7 +10088,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const storyTitle = inputData.storyTitle || inputData.title || 'Your Story';
         // Use shipping_first_name if available, otherwise fall back to username
         const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
-        await email.sendStoryCompleteEmail(user.email, firstName, storyTitle, storyId);
+        // Get language for email localization
+        const emailLanguage = inputData.language || 'English';
+        await email.sendStoryCompleteEmail(user.email, firstName, storyTitle, storyId, emailLanguage);
       }
     } catch (emailErr) {
       console.error('❌ Failed to send story complete email:', emailErr);
@@ -10296,7 +10357,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           // Notify customer
           if (user.email) {
             const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
-            await email.sendStoryFailedEmail(user.email, firstName);
+            // Get language for email localization
+            const emailLanguage = inputData.language || 'English';
+            await email.sendStoryFailedEmail(user.email, firstName, emailLanguage);
           }
         }
       }

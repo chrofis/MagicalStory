@@ -1,61 +1,47 @@
-import { ChangeEvent, useState, useCallback } from 'react';
+import { ChangeEvent, useState, useCallback, useEffect } from 'react';
 import { Upload, Save, ArrowRight, Edit3, X, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import type { Character, PhysicalTraits } from '@/types/character';
+import { api } from '@/services/api';
 
-// Helper function to generate the avatar prompt for display (mirrors server logic)
-function getAvatarPrompt(category: string, gender: string | undefined): string {
-  const isFemale = gender === 'female';
+// Component to fetch and display avatar prompt from server
+function AvatarPromptDisplay({ category, gender }: { category: string; gender: string | undefined }) {
+  const [prompt, setPrompt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const getClothingStyle = () => {
-    switch (category) {
-      case 'winter':
-        return 'Heavy winter coat or parka with the SAME pattern AND colors as the input image clothing. Layers visible underneath. Warm pants or leggings. Heavy winter boots. Scarf and gloves optional.';
-      case 'standard':
-        if (isFemale) {
-          return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or leggings. Sneakers.';
+  useEffect(() => {
+    const fetchPrompt = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await api.get<{ success: boolean; prompt: string }>(
+          `/api/avatar-prompt?category=${category}&gender=${gender || 'male'}`
+        );
+        if (response.success) {
+          setPrompt(response.prompt);
+        } else {
+          setError('Failed to load prompt');
         }
-        return 'Long-sleeved T-shirt, casual hoodie, or cozy sweater with the SAME pattern AND colors as the input image clothing. Jeans or casual trousers. Sneakers.';
-      case 'summer':
-        if (isFemale) {
-          return 'T-shirt, casual sundress, or tank top with the SAME pattern AND colors as the input image clothing. Shorts or skirt. Sandals or flip-flops.';
-        }
-        return 'T-shirt or tank top with the SAME pattern AND colors as the input image clothing. Shorts. Sandals or flip-flops.';
-      case 'formal':
-        if (isFemale) {
-          return 'Elegant dress, formal gown, or blouse with skirt with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal heels or dress shoes.';
-        }
-        return 'Formal suit or dress shirt with trousers with the SAME pattern AND colors as the input image clothing (adapted elegantly). Formal dress shoes.';
-      default:
-        return 'Full outfit with shoes matching the style of the input image.';
-    }
-  };
+      } catch (err) {
+        setError(String(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPrompt();
+  }, [category, gender]);
 
-  return `Subject: Generate a fashion photograph of the person in the input image.
-
-CRITICAL PRIORITIES (in order):
-1. FACE IDENTITY: The face MUST be an exact match to the input image - same facial features, skin tone, eye color, hair color and style. This is non-negotiable.
-2. CLOTHING STYLE TRANSFER: Copy the EXACT pattern AND colors from the clothing in the input image. Apply these to the new outfit.
-
-COMPOSITION:
-- Framing: Wide shot. The entire outfit must be visible from head to toe.
-- Background: Pure solid white background (#FFFFFF).
-
-WARDROBE DETAILS:
-- Style Transfer Rule: Copy the EXACT pattern AND colors from the clothing in the input image. Apply these to the new outfit.
-- Pants Rule: If trousers/pants are visible in the input image, replicate them. If NOT visible, create plain/neutral pants - do NOT match the shirt pattern.
-- Outfit: ${getClothingStyle()}
-
-PHOTOGRAPHY STYLE:
-- Style: High-End Editorial Photography.
-- Lighting: Soft, evenly diffused studio lighting.
-- Details: Sharp focus on fabric textures.
-- Presentation: Clean, professional, magazine-quality look.
-
-Output Quality: 4k, Photorealistic.`;
+  if (loading) return <div className="text-[9px] text-gray-400">Loading...</div>;
+  if (error) return <div className="text-[9px] text-red-400">{error}</div>;
+  return (
+    <pre className="mt-1 p-2 bg-gray-100 rounded text-[9px] text-gray-600 whitespace-pre-wrap overflow-auto max-h-48 border">
+      {prompt}
+    </pre>
+  );
 }
 
 // Editable field component
@@ -406,11 +392,11 @@ export function CharacterForm({
       </div>
 
       {/* Physical Features */}
-      <details className="bg-purple-50 border border-purple-200 rounded-lg">
-        <summary className="p-4 cursor-pointer hover:bg-purple-100 rounded-lg">
-          <span className="text-sm font-semibold text-purple-700 inline-flex items-center gap-2">
+      <details className="bg-gray-50 border border-gray-200 rounded-lg">
+        <summary className="p-4 cursor-pointer hover:bg-gray-100 rounded-lg">
+          <span className="text-sm font-semibold text-gray-600 inline-flex items-center gap-2">
             {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
-            <span className="text-xs font-normal text-purple-500">
+            <span className="text-xs font-normal text-gray-500">
               ({language === 'de' ? 'klicken zum Bearbeiten' : language === 'fr' ? 'cliquez pour modifier' : 'click to edit'})
             </span>
           </span>
@@ -506,9 +492,7 @@ export function CharacterForm({
                 {developerMode && (
                   <details className="mt-1 text-left">
                     <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
-                    <pre className="mt-1 p-2 bg-gray-100 rounded text-[9px] text-gray-600 whitespace-pre-wrap overflow-auto max-h-48 border">
-                      {getAvatarPrompt(category, character.gender)}
-                    </pre>
+                    <AvatarPromptDisplay category={category} gender={character.gender} />
                   </details>
                 )}
               </div>
@@ -566,7 +550,7 @@ export function CharacterForm({
 
       {/* Special Details */}
       <div>
-        <label className="block text-lg font-semibold mb-2">{t.specialDetails}</label>
+        <label className="block text-lg font-semibold mb-2 text-indigo-700">{t.specialDetails}</label>
         <textarea
           value={character.traits?.specialDetails || ''}
           onChange={(e) => updateTraits('specialDetails', e.target.value)}
