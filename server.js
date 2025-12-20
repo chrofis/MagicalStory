@@ -10349,6 +10349,27 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       );
     }
 
+    // Save story_text checkpoint so client can display text while images generate
+    // Parse all pages from the full story text and build page text map
+    const allStoryPages = parseStoryPages(fullStoryText);
+    const pageTextMap = {};
+    allStoryPages.forEach(page => {
+      pageTextMap[page.pageNumber] = page.content;
+    });
+
+    await saveCheckpoint(jobId, 'story_text', {
+      title: storyTitle,
+      dedication: inputData.dedication || '',
+      pageTexts: pageTextMap,
+      sceneDescriptions: allSceneDescriptions.map(sd => ({
+        pageNumber: sd.pageNumber,
+        description: sd.description || '',
+        outlineExtract: shortSceneDescriptions[sd.pageNumber] || ''
+      })),
+      totalPages: sceneCount
+    });
+    console.log(`💾 [STORY] Saved story_text checkpoint with ${Object.keys(pageTextMap).length} pages for progressive display`);
+
     // Wait for images only if not skipping
     if (!skipImages) {
       if (imageGenMode === 'parallel') {
@@ -12162,8 +12183,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     const score = parseInt(scoreMatch[1]);
-    const reasoningMatch = responseText.match(/Reasoning:\s*([\s\S]*)/i);
+    // Match "Reasoning:" or "Reasoning" (with or without colon) - captures until "Score:" at end
+    const reasoningMatch = responseText.match(/Reasoning:?\s*([\s\S]*?)(?=\nScore:|$)/i);
     const reasoning = reasoningMatch ? reasoningMatch[1].trim() : '';
+
+    // Also capture the new "Picture analysis" section if present
+    const pictureAnalysisMatch = responseText.match(/Picture analysis:\s*([\s\S]*?)(?=\nReasoning|$)/i);
+    const pictureAnalysis = pictureAnalysisMatch ? pictureAnalysisMatch[1].trim() : '';
 
     // Parse cover-specific fields (text error detection)
     const textErrorOnlyMatch = responseText.match(/Text_Error_Only:\s*(YES|NO)/i);
