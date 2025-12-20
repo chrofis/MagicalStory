@@ -253,8 +253,9 @@ function getCharacterPhotos(characters, clothingCategory = null) {
 function parseClothingCategory(sceneDescription) {
   if (!sceneDescription) return null;
 
-  // Match patterns like "Clothing: winter", "**Clothing:** standard", "3. **Clothing:** formal"
-  const clothingMatch = sceneDescription.match(/\*?\*?Clothing\*?\*?:?\s*\*?\*?(winter|summer|formal|standard)\*?\*?/i);
+  // Match patterns like "Clothing: summer", "**3. Clothing:** summer", "## 3. Clothing: **summer**"
+  // Use word boundary \b to match "Clothing" regardless of what precedes it (numbers, markdown, etc.)
+  const clothingMatch = sceneDescription.match(/\bClothing\*{0,2}:\s*\*{0,2}(winter|summer|formal|standard)\b/i);
   if (clothingMatch) {
     return clothingMatch[1].toLowerCase();
   }
