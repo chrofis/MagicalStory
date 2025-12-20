@@ -195,7 +195,7 @@ export function StorySettings({
 
         {/* Story Plot / Story Details */}
         <div>
-          <label className="block text-base font-semibold text-gray-800 mb-2">
+          <label className="block text-xl font-semibold mb-3">
             {t.storyDetails} <span className="text-sm font-normal text-gray-500">{t.storyDetailsOptional}</span>
           </label>
           <textarea
@@ -203,14 +203,14 @@ export function StorySettings({
             onChange={(e) => onStoryDetailsChange(e.target.value)}
             placeholder={t.storyDetailsPlaceholder}
             className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-base"
-            rows={3}
+            rows={6}
           />
         </div>
 
         {/* Dedication (Widmung) - Optional */}
         <div>
-          <label className="block text-base font-semibold text-gray-800 mb-2">
-            {language === 'de' ? 'Widmung (Optional)' : language === 'fr' ? 'Dédicace (Facultatif)' : 'Dedication (Optional)'}
+          <label className="block text-xl font-semibold mb-3">
+            {language === 'de' ? 'Widmung' : language === 'fr' ? 'Dédicace' : 'Dedication'} <span className="text-sm font-normal text-gray-500">{t.storyDetailsOptional}</span>
           </label>
           <textarea
             value={dedication}

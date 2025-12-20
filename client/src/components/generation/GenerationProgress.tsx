@@ -79,19 +79,113 @@ export function GenerationProgress({
   const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
 
-  // Get one avatar from each character (prefer standard, then any available)
-  const characterAvatars = useMemo(() => {
-    return characters
-      .map(char => {
-        const avatars = char.avatars;
-        const avatarUrl = avatars?.standard || avatars?.summer || avatars?.winter || avatars?.formal;
-        if (avatarUrl) {
-          return { name: char.name, avatar: avatarUrl };
+  // Generate funny message based on character traits
+  const generateFunnyMessage = (char: Character, lang: string): string => {
+    const name = char.name;
+    const strengths = char.traits?.strengths || [];
+    const flaws = char.traits?.flaws || [];
+    const challenges = char.traits?.challenges || [];
+
+    // Build funny messages based on traits
+    const funnyMessages: { en: string; de: string; fr: string }[] = [];
+
+    // Strength-based messages
+    if (strengths.some(s => s.toLowerCase().includes('fast') || s.toLowerCase().includes('schnell') || s.toLowerCase().includes('rapide'))) {
+      funnyMessages.push({
+        en: `${name} ran away too fast! Catching them and bringing them back to the story...`,
+        de: `${name} ist zu schnell weggerannt! Wir fangen sie ein und bringen sie zurück in die Geschichte...`,
+        fr: `${name} s'est enfui trop vite ! On le rattrape et on le ramène dans le récit...`
+      });
+    }
+    if (strengths.some(s => s.toLowerCase().includes('curious') || s.toLowerCase().includes('neugierig') || s.toLowerCase().includes('curieux'))) {
+      funnyMessages.push({
+        en: `${name} wandered off to explore something shiny. Luring them back with an even shinier adventure...`,
+        de: `${name} ist losgewandert, um etwas Glänzendes zu erkunden. Wir locken sie mit einem noch glänzenderen Abenteuer zurück...`,
+        fr: `${name} s'est égaré pour explorer quelque chose de brillant. On l'attire avec une aventure encore plus brillante...`
+      });
+    }
+    if (strengths.some(s => s.toLowerCase().includes('brave') || s.toLowerCase().includes('mutig') || s.toLowerCase().includes('courageux'))) {
+      funnyMessages.push({
+        en: `${name} bravely charged ahead! Waiting for them to scout the path...`,
+        de: `${name} ist mutig vorgestürmt! Wir warten, bis sie den Weg erkundet haben...`,
+        fr: `${name} a courageusement foncé en avant ! On attend qu'il explore le chemin...`
+      });
+    }
+
+    // Flaw/challenge-based messages
+    if (flaws.some(f => f.toLowerCase().includes('shy') || f.toLowerCase().includes('schüchtern') || f.toLowerCase().includes('timide')) ||
+        challenges.some(c => c.toLowerCase().includes('shy'))) {
+      funnyMessages.push({
+        en: `${name} is hiding behind a tree. Coaxing them out with cookies...`,
+        de: `${name} versteckt sich hinter einem Baum. Wir locken sie mit Keksen hervor...`,
+        fr: `${name} se cache derrière un arbre. On l'attire avec des biscuits...`
+      });
+    }
+    if (challenges.some(c => c.toLowerCase().includes('monster') || c.toLowerCase().includes('dark') || c.toLowerCase().includes('dunkel') || c.toLowerCase().includes('peur'))) {
+      funnyMessages.push({
+        en: `${name} got scared by a shadow! Turning on the nightlight and bringing them back...`,
+        de: `${name} hat sich vor einem Schatten erschreckt! Wir machen das Nachtlicht an und holen sie zurück...`,
+        fr: `${name} a eu peur d'une ombre ! On allume la veilleuse et on le ramène...`
+      });
+    }
+    if (flaws.some(f => f.toLowerCase().includes('stubborn') || f.toLowerCase().includes('stur') || f.toLowerCase().includes('têtu'))) {
+      funnyMessages.push({
+        en: `${name} refuses to move! Convincing them with promises of adventure...`,
+        de: `${name} weigert sich, sich zu bewegen! Wir überzeugen sie mit Abenteuerversprechungen...`,
+        fr: `${name} refuse de bouger ! On le convainc avec des promesses d'aventure...`
+      });
+    }
+
+    // Default messages if no traits match
+    if (funnyMessages.length === 0) {
+      funnyMessages.push(
+        {
+          en: `${name} is getting ready for their big adventure...`,
+          de: `${name} macht sich bereit für das grosse Abenteuer...`,
+          fr: `${name} se prépare pour sa grande aventure...`
+        },
+        {
+          en: `${name} is practicing their hero pose...`,
+          de: `${name} übt gerade die Heldenpose...`,
+          fr: `${name} s'entraîne à prendre la pose du héros...`
+        },
+        {
+          en: `${name} can't wait to see what happens next!`,
+          de: `${name} kann es kaum erwarten zu sehen, was als Nächstes passiert!`,
+          fr: `${name} a hâte de voir ce qui va se passer !`
         }
-        return null;
-      })
-      .filter((a): a is { name: string; avatar: string } => a !== null);
-  }, [characters]);
+      );
+    }
+
+    // Pick a random message
+    const msg = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+    return lang === 'de' ? msg.de : lang === 'fr' ? msg.fr : msg.en;
+  };
+
+  // Get all avatars from each character (all styles: standard, winter, summer, formal)
+  const characterAvatars = useMemo(() => {
+    const avatarList: { name: string; avatar: string; style: string; funnyMessage: string }[] = [];
+    const styles = ['standard', 'summer', 'winter', 'formal'] as const;
+
+    characters.forEach(char => {
+      const avatars = char.avatars;
+      if (!avatars) return;
+
+      styles.forEach(style => {
+        const avatarUrl = avatars[style];
+        if (avatarUrl) {
+          avatarList.push({
+            name: char.name,
+            avatar: avatarUrl,
+            style,
+            funnyMessage: generateFunnyMessage(char, language)
+          });
+        }
+      });
+    });
+
+    return avatarList;
+  }, [characters, language]);
 
   // Build rotation items: interleave messages and avatars
   const rotationItems = useMemo(() => {
@@ -105,7 +199,10 @@ export function GenerationProgress({
       { type: 'message' as const, key: 'tipArtStyle' },
     ];
 
-    const items: Array<{ type: 'message'; key: string } | { type: 'avatar'; name: string; avatar: string }> = [];
+    const items: Array<
+      { type: 'message'; key: string } |
+      { type: 'avatar'; name: string; avatar: string; style: string; funnyMessage: string }
+    > = [];
 
     // Interleave messages and avatars
     const maxLen = Math.max(messages.length, characterAvatars.length);
@@ -245,20 +342,20 @@ export function GenerationProgress({
 
         {/* Rotating display section - before covers appear */}
         {!hasAnyCovers && rotationItems.length > 0 && (
-          <div className="mb-6 min-h-[120px] flex items-center justify-center">
+          <div className="mb-6 min-h-[220px] flex items-center justify-center">
             {(() => {
               const currentItem = rotationItems[rotationIndex];
               if (currentItem.type === 'avatar') {
                 return (
-                  <div className="flex flex-col items-center gap-2 animate-fade-in">
-                    <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg">
+                  <div className="flex flex-col items-center gap-3 animate-fade-in">
+                    <div className="w-32 h-44 md:w-40 md:h-52 rounded-xl overflow-hidden border-4 border-indigo-200 shadow-lg bg-gradient-to-b from-indigo-50 to-purple-50">
                       <img
                         src={currentItem.avatar}
                         alt={currentItem.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     </div>
-                    <span className="text-sm font-medium text-indigo-700">{currentItem.name}</span>
+                    <p className="text-sm text-center text-gray-600 max-w-xs italic">{currentItem.funnyMessage}</p>
                   </div>
                 );
               } else {
