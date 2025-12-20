@@ -10189,15 +10189,139 @@ Output Format:
       const batchSceneCount = endScene - startScene + 1;
       const batchTokensNeeded = activeTextModel.maxOutputTokens; // Use full capacity (64000)
       console.log(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} max tokens for ${batchSceneCount} pages - STREAMING`);
-      const batchText = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
-      fullStoryText += batchText + '\n\n';
 
+      // Track which pages have started image generation (for progressive mode)
+      const pagesStarted = new Set();
+
+      // Helper function to start image generation for a page
+      const startPageImageGeneration = (pageNum, pageContent) => {
+        if (pagesStarted.has(pageNum)) return; // Already started
+        if (pageNum < startScene || pageNum > endScene) return; // Outside batch range
+        pagesStarted.add(pageNum);
+
+        const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
+
+        // Generate scene description using Art Director prompt (in story language)
+        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
+
+        // Start scene description + image generation (don't await)
+        const imagePromise = limit(async () => {
+          try {
+            console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
+
+            // Generate detailed scene description
+            const sceneDescription = await callTextModelStreaming(scenePrompt, 4000);
+
+            allSceneDescriptions.push({
+              pageNumber: pageNum,
+              description: sceneDescription,
+              outlineExtract: shortSceneDesc,
+              scenePrompt: scenePrompt
+            });
+
+            // Detect which characters appear in this scene
+            const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
+            const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
+            const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+            console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingCategory})...`);
+
+            // Generate image
+            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum);
+            imagePrompts[pageNum] = imagePrompt;
+
+            let imageResult = null;
+            let retries = 0;
+
+            while (retries <= MAX_RETRIES && !imageResult) {
+              try {
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null);
+              } catch (error) {
+                retries++;
+                console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
+                if (retries > MAX_RETRIES) throw error;
+                await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+              }
+            }
+
+            console.log(`✅ [PAGE ${pageNum}] Image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
+
+            const imageData = {
+              pageNumber: pageNum,
+              imageData: imageResult.imageData,
+              description: sceneDescription,
+              text: pageContent,
+              prompt: imagePrompt,
+              qualityScore: imageResult.score,
+              qualityReasoning: imageResult.reasoning || null,
+              wasRegenerated: imageResult.wasRegenerated || false,
+              totalAttempts: imageResult.totalAttempts || 1,
+              retryHistory: imageResult.retryHistory || [],
+              originalImage: imageResult.originalImage || null,
+              originalScore: imageResult.originalScore || null,
+              originalReasoning: imageResult.originalReasoning || null,
+              referencePhotos: referencePhotos,
+              modelId: imageResult.modelId || null
+            };
+
+            // Save partial result checkpoint for progressive display
+            await saveCheckpoint(jobId, 'partial_page', {
+              pageNumber: pageNum,
+              imageData: imageResult.imageData,
+              description: sceneDescription,
+              text: pageContent,
+              prompt: imagePrompt,
+              qualityScore: imageResult.score,
+              qualityReasoning: imageResult.reasoning || null,
+              wasRegenerated: imageResult.wasRegenerated || false,
+              totalAttempts: imageResult.totalAttempts || 1,
+              retryHistory: imageResult.retryHistory || [],
+              originalImage: imageResult.originalImage || null,
+              originalScore: imageResult.originalScore || null,
+              originalReasoning: imageResult.originalReasoning || null,
+              referencePhotos: referencePhotos,
+              modelId: imageResult.modelId || null
+            }, pageNum);
+            console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
+
+            return imageData;
+          } catch (error) {
+            console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
+            throw error;
+          }
+        });
+
+        activeImagePromises.push(imagePromise);
+      };
+
+      // PROGRESSIVE STREAMING: Start image generation as pages complete during text streaming
+      let batchText = '';
+      if (!skipImages && imageGenMode === 'parallel') {
+        // Create progressive parser that starts image generation as pages stream in
+        const progressiveParser = new ProgressiveStoryPageParser((page) => {
+          console.log(`🌊 [PROGRESSIVE] Page ${page.pageNumber} detected during streaming, starting image generation`);
+          startPageImageGeneration(page.pageNumber, page.content);
+        });
+
+        // Stream with progressive parsing
+        batchText = await callTextModelStreaming(batchPrompt, batchTokensNeeded, (chunk, fullText) => {
+          progressiveParser.processChunk(chunk, fullText);
+        });
+
+        // Finalize to emit the last page
+        progressiveParser.finalize(batchText);
+        console.log(`🌊 [PROGRESSIVE] Batch streaming complete, ${pagesStarted.size} pages started during stream`);
+      } else {
+        // No progressive parsing - just stream text
+        batchText = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
+      }
+
+      fullStoryText += batchText + '\n\n';
       console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
 
       // Save checkpoint: story batch (include prompt for debugging)
       await saveCheckpoint(jobId, 'story_batch', { batchNum, batchText, startScene, endScene, batchPrompt }, batchNum);
 
-      // Parse the pages from this batch
+      // Parse the pages from this batch (for validation and any pages missed by streaming)
       let batchPages = parseStoryPages(batchText);
       console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
 
@@ -10247,6 +10371,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             console.log(`✅ [RETRY] Successfully generated page ${missingPageNum}`);
             batchPages.push(...retryPages);
             fullStoryText += retryText + '\n\n';
+
+            // Start image generation for retry page too
+            if (!skipImages && imageGenMode === 'parallel') {
+              for (const retryPage of retryPages) {
+                startPageImageGeneration(retryPage.pageNumber, retryPage.content);
+              }
+            }
           } else {
             console.log(`❌ [RETRY] Failed to parse page ${missingPageNum} from retry response`);
           }
@@ -10257,112 +10388,14 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] After retry: ${batchPages.length} pages`);
       }
 
-      // IMMEDIATELY start generating scene descriptions and images for these pages (unless skipImages)
-      // In PARALLEL mode: queue all images immediately for concurrent generation
-      // In SEQUENTIAL mode: just collect page data, generate images later one at a time
+      // Start image generation for any pages that weren't caught by progressive streaming
+      // (fallback for edge cases)
       if (!skipImages && imageGenMode === 'parallel') {
         for (const page of batchPages) {
-          const pageNum = page.pageNumber;
-          const pageContent = page.content;
-          const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
-
-          // Generate scene description using Art Director prompt (in story language)
-          // Pass visualBible so recurring elements are included in scene description
-          const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
-
-          // Start scene description + image generation (don't await yet)
-          const imagePromise = limit(async () => {
-            try {
-              console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
-
-              // Generate detailed scene description (4000 tokens to avoid MAX_TOKENS cutoff)
-              const sceneDescription = await callTextModelStreaming(scenePrompt, 4000);
-
-              allSceneDescriptions.push({
-                pageNumber: pageNum,
-                description: sceneDescription,
-                outlineExtract: shortSceneDesc,  // Store the outline extract for debugging
-                scenePrompt: scenePrompt         // Store the Art Director prompt for debugging
-              });
-
-              // Detect which characters appear in this scene
-              const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
-              // Parse clothing category from scene description
-              const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
-              // Use detailed photo info (with names) for labeled reference images
-              const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
-              console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
-
-              // Generate image from scene description with scene-specific characters and visual bible
-              const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum);
-              imagePrompts[pageNum] = imagePrompt;
-
-              let imageResult = null;
-              let retries = 0;
-
-              while (retries <= MAX_RETRIES && !imageResult) {
-                try {
-                  // Pass labeled character photos (name + photoUrl) - no previous image in parallel mode
-                  // Use quality retry to regenerate if score is below threshold
-                  imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null);
-                } catch (error) {
-                  retries++;
-                  console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
-                  if (retries > MAX_RETRIES) {
-                    throw error;
-                  }
-                  await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-                }
-              }
-
-              console.log(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
-
-              const imageData = {
-                pageNumber: pageNum,
-                imageData: imageResult.imageData,
-                description: sceneDescription,
-                text: pageContent,  // Include page text for progressive display
-                prompt: imagePrompt,  // Dev mode: the actual API prompt sent to image generation
-                qualityScore: imageResult.score,
-                qualityReasoning: imageResult.reasoning || null,
-                wasRegenerated: imageResult.wasRegenerated || false,
-                totalAttempts: imageResult.totalAttempts || 1,
-                retryHistory: imageResult.retryHistory || [],
-                originalImage: imageResult.originalImage || null,
-                originalScore: imageResult.originalScore || null,
-                originalReasoning: imageResult.originalReasoning || null,
-                referencePhotos: referencePhotos,  // Dev mode: which photos were used
-                modelId: imageResult.modelId || null  // Dev mode: which API model was used
-              };
-
-              // Save partial result checkpoint for progressive display
-              await saveCheckpoint(jobId, 'partial_page', {
-                pageNumber: pageNum,
-                imageData: imageResult.imageData,
-                description: sceneDescription,
-                text: pageContent,
-                prompt: imagePrompt,
-                qualityScore: imageResult.score,
-                qualityReasoning: imageResult.reasoning || null,
-                wasRegenerated: imageResult.wasRegenerated || false,
-                totalAttempts: imageResult.totalAttempts || 1,
-                retryHistory: imageResult.retryHistory || [],
-                originalImage: imageResult.originalImage || null,
-                originalScore: imageResult.originalScore || null,
-                originalReasoning: imageResult.originalReasoning || null,
-                referencePhotos: referencePhotos,
-                modelId: imageResult.modelId || null
-              }, pageNum);
-              console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
-
-              return imageData;
-            } catch (error) {
-              console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
-              throw error;
-            }
-          });
-
-          activeImagePromises.push(imagePromise);
+          if (!pagesStarted.has(page.pageNumber)) {
+            console.log(`📝 [FALLBACK] Starting image for page ${page.pageNumber} (missed by streaming)`);
+            startPageImageGeneration(page.pageNumber, page.content);
+          }
         }
       }
 
@@ -11786,6 +11819,118 @@ class ProgressiveSceneParser {
     }
 
     return scenes.sort((a, b) => a.pageNumber - b.pageNumber);
+  }
+}
+
+/**
+ * Progressive page parser for streaming normal story text generation
+ * Detects complete pages as text streams in (format: "--- Page X ---")
+ * and triggers callbacks to start image generation early
+ */
+class ProgressiveStoryPageParser {
+  constructor(onPageComplete) {
+    this.onPageComplete = onPageComplete;
+    this.fullText = '';
+    this.emittedPages = new Set();
+    // Pattern matches "--- Page X ---" with flexible spacing
+    this.pagePattern = /---\s*Page\s+(\d+)\s*---/gi;
+  }
+
+  /**
+   * Process new text chunk and emit any newly completed pages
+   * A page is complete when we see the start of the next page
+   * @param {string} chunk - New text chunk
+   * @param {string} fullText - Complete text so far
+   */
+  processChunk(chunk, fullText) {
+    this.fullText = fullText;
+
+    // Find all page markers in the text
+    const markers = [];
+    let match;
+    const patternCopy = new RegExp(this.pagePattern.source, 'gi');
+    while ((match = patternCopy.exec(fullText)) !== null) {
+      markers.push({
+        pageNumber: parseInt(match[1], 10),
+        startIndex: match.index,
+        markerEnd: match.index + match[0].length
+      });
+    }
+
+    // For each page marker (except the last), extract and emit if not already done
+    for (let i = 0; i < markers.length - 1; i++) {
+      const current = markers[i];
+      const next = markers[i + 1];
+      const pageNum = current.pageNumber;
+
+      if (!this.emittedPages.has(pageNum)) {
+        // Extract content between this marker and the next
+        const content = fullText.substring(current.markerEnd, next.startIndex).trim();
+
+        if (content.length > 0) {
+          this.emittedPages.add(pageNum);
+          console.log(`🌊 [STREAM-PAGE] Page ${pageNum} complete (${content.length} chars), emitting...`);
+
+          if (this.onPageComplete) {
+            this.onPageComplete({
+              pageNumber: pageNum,
+              content: content
+            });
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Finalize parsing - emit the last page when stream ends
+   * @param {string} fullText - Final complete text
+   */
+  finalize(fullText) {
+    this.fullText = fullText;
+
+    // Find the last page marker
+    const markers = [];
+    let match;
+    const patternCopy = new RegExp(this.pagePattern.source, 'gi');
+    while ((match = patternCopy.exec(fullText)) !== null) {
+      markers.push({
+        pageNumber: parseInt(match[1], 10),
+        startIndex: match.index,
+        markerEnd: match.index + match[0].length
+      });
+    }
+
+    if (markers.length > 0) {
+      const lastMarker = markers[markers.length - 1];
+      const pageNum = lastMarker.pageNumber;
+
+      if (!this.emittedPages.has(pageNum)) {
+        // Extract content from last marker to end of text
+        const content = fullText.substring(lastMarker.markerEnd).trim();
+
+        if (content.length > 0) {
+          this.emittedPages.add(pageNum);
+          console.log(`🌊 [STREAM-PAGE] Final page ${pageNum} complete (${content.length} chars), emitting...`);
+
+          if (this.onPageComplete) {
+            this.onPageComplete({
+              pageNumber: pageNum,
+              content: content
+            });
+          }
+        }
+      }
+    }
+
+    return this.emittedPages.size;
+  }
+
+  /**
+   * Get set of emitted page numbers
+   */
+  getEmittedPages() {
+    return new Set(this.emittedPages);
   }
 }
 
