@@ -8945,7 +8945,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
             CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
             VISUAL_BIBLE: visualBibleText,
-            STORY_TITLE: inputData.title || storyTitle
+            STORY_TITLE: inputData.title || 'My Story'
           });
           coverPrompts.front = coverPrompt;
         } else if (coverType === 'initialPage') {
