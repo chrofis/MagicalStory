@@ -442,9 +442,11 @@ export default function StoryWizard() {
       name: '',
       gender: 'other',
       age: '8',
-      strengths: [],
-      flaws: [],
-      challenges: [],
+      traits: {
+        strengths: [],
+        flaws: [],
+        challenges: [],
+      },
     });
     setCharacterStep('photo');
     setShowCharacterCreated(false);
@@ -502,59 +504,48 @@ export default function StoryWizard() {
         const analysis = await characterService.analyzePhoto(resizedPhoto);
 
         if (analysis.success) {
-          // Update character with analyzed data
-          const photoUrl = analysis.faceThumbnail || originalPhotoUrl;
-          const bodyPhotoUrl = analysis.bodyCrop || originalPhotoUrl;
-          const bodyNoBgUrl = analysis.bodyNoBg || undefined;
-
           log.info('Photo analysis complete:', {
-            hasFaceThumbnail: !!analysis.faceThumbnail,
-            hasBodyCrop: !!analysis.bodyCrop,
-            hasBodyNoBg: !!analysis.bodyNoBg,
-            attributes: analysis.attributes,
-            hasStyleAnalysis: !!analysis.styleAnalysis,
+            hasPhotos: !!analysis.photos,
+            hasPhysical: !!analysis.physical,
+            hasClothing: !!analysis.clothing,
           });
 
           setCurrentCharacter(prev => prev ? {
             ...prev,
-            photoUrl,
-            bodyPhotoUrl,
-            bodyNoBgUrl,
-            faceBox: analysis.faceBox,
-            bodyBox: analysis.bodyBox,
-            styleAnalysis: analysis.styleAnalysis, // Style DNA from combined Gemini call
-            // Only update attributes if user hasn't already filled them in
-            gender: (!prev.gender || prev.gender === 'other') && analysis.attributes?.gender
-              ? (analysis.attributes.gender as 'male' | 'female' | 'other')
-              : prev.gender,
-            age: (!prev.age || prev.age === '8') && analysis.attributes?.age
-              ? String(analysis.attributes.age)
-              : prev.age,
-            height: !prev.height && analysis.attributes?.height
-              ? String(analysis.attributes.height)
-              : prev.height,
-            build: !prev.build && analysis.attributes?.build
-              ? analysis.attributes.build
-              : prev.build,
-            hairColor: !prev.hairColor && analysis.attributes?.hairColor
-              ? analysis.attributes.hairColor
-              : prev.hairColor,
-            clothing: !prev.clothing && analysis.attributes?.clothing
-              ? analysis.attributes.clothing
-              : prev.clothing,
-            otherFeatures: !prev.otherFeatures && analysis.attributes?.otherFeatures
-              ? analysis.attributes.otherFeatures
-              : prev.otherFeatures,
+            // Photos
+            photos: {
+              original: analysis.photos?.face || originalPhotoUrl,
+              face: analysis.photos?.face,
+              body: analysis.photos?.body || originalPhotoUrl,
+              bodyNoBg: analysis.photos?.bodyNoBg,
+              faceBox: analysis.photos?.faceBox,
+              bodyBox: analysis.photos?.bodyBox,
+            },
+            // Physical traits from analysis
+            physical: analysis.physical ? {
+              ...prev.physical,
+              ...analysis.physical,
+            } : prev.physical,
+            // Clothing from analysis
+            clothing: analysis.clothing || prev.clothing,
+            // Reference outfit
+            referenceOutfit: analysis.referenceOutfit || prev.referenceOutfit,
           } : null);
         } else {
           log.warn('Photo analysis returned no data, using original photo');
           // Fallback to original photo
-          setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
+          setCurrentCharacter(prev => prev ? {
+            ...prev,
+            photos: { original: originalPhotoUrl },
+          } : null);
         }
       } catch (error) {
         log.error('Photo analysis error:', error);
         // Fallback to original photo on error
-        setCurrentCharacter(prev => prev ? { ...prev, photoUrl: originalPhotoUrl } : null);
+        setCurrentCharacter(prev => prev ? {
+          ...prev,
+          photos: { original: originalPhotoUrl },
+        } : null);
       } finally {
         setIsAnalyzingPhoto(false);
       }
@@ -571,34 +562,34 @@ export default function StoryWizard() {
     currentRelationshipTexts: Record<string, string>,
     currentCustomRelationships: string[]
   ) => {
-    // Only generate if character has a face photo
-    if (!char.photoUrl && !char.thumbnailUrl) {
+    // Only generate if character has a photo
+    if (!char.photos?.original && !char.photos?.face) {
       log.debug(`Skipping avatar generation for ${char.name}: no photo`);
       return;
     }
 
     // Skip if already generating or has avatars
-    if (char.clothingAvatars?.status === 'generating') {
+    if (char.avatars?.status === 'generating') {
       log.debug(`Skipping avatar generation for ${char.name}: already generating`);
       return;
     }
 
     // Mark as generating
     setCharacters(prev => prev.map(c =>
-      c.id === char.id ? { ...c, clothingAvatars: { ...c.clothingAvatars, status: 'generating' as const } } : c
+      c.id === char.id ? { ...c, avatars: { ...c.avatars, status: 'generating' as const } } : c
     ));
 
     try {
       log.info(`🎨 Starting background avatar generation for ${char.name}...`);
       const result = await characterService.generateClothingAvatars(char);
 
-      if (result.success && result.clothingAvatars) {
+      if (result.success && result.avatars) {
         log.success(`✅ Avatars generated for ${char.name} (id: ${char.id})`);
         // Update character with new avatars
         const charWithAvatars = {
           ...char,
-          clothingAvatars: {
-            ...result.clothingAvatars,
+          avatars: {
+            ...result.avatars,
             status: 'complete' as const,
             generatedAt: new Date().toISOString()
           }
@@ -631,13 +622,13 @@ export default function StoryWizard() {
         log.error(`❌ Avatar generation failed for ${char.name}: ${result.error}`);
         // Mark as failed
         setCharacters(prev => prev.map(c =>
-          c.id === char.id ? { ...c, clothingAvatars: { ...c.clothingAvatars, status: 'failed' as const } } : c
+          c.id === char.id ? { ...c, avatars: { ...c.avatars, status: 'failed' as const } } : c
         ));
       }
     } catch (error) {
       log.error(`❌ Avatar generation error for ${char.name}:`, error);
       setCharacters(prev => prev.map(c =>
-        c.id === char.id ? { ...c, clothingAvatars: { ...c.clothingAvatars, status: 'failed' as const } } : c
+        c.id === char.id ? { ...c, avatars: { ...c.avatars, status: 'failed' as const } } : c
       ));
     }
   };
@@ -647,7 +638,7 @@ export default function StoryWizard() {
     if (!currentCharacter) return;
 
     // Clear existing avatars and trigger regeneration
-    const charWithoutAvatars = { ...currentCharacter, clothingAvatars: undefined };
+    const charWithoutAvatars = { ...currentCharacter, avatars: undefined };
     setCurrentCharacter(charWithoutAvatars);
     setIsRegeneratingAvatars(true);
 
@@ -662,8 +653,8 @@ export default function StoryWizard() {
       // Update currentCharacter with the new avatars from state
       setCharacters(prev => {
         const updated = prev.find(c => c.id === currentCharacter.id);
-        if (updated?.clothingAvatars) {
-          setCurrentCharacter(curr => curr ? { ...curr, clothingAvatars: updated.clothingAvatars } : curr);
+        if (updated?.avatars) {
+          setCurrentCharacter(curr => curr ? { ...curr, avatars: updated.avatars } : curr);
         }
         return prev;
       });
@@ -708,7 +699,7 @@ export default function StoryWizard() {
       // Generate clothing avatars in the background (non-blocking)
       // Only if character has a photo and doesn't already have avatars
       const savedChar = updatedCharacters.find(c => c.id === currentCharacter.id);
-      if (savedChar && (savedChar.photoUrl || savedChar.thumbnailUrl) && !savedChar.clothingAvatars?.winter) {
+      if (savedChar && (savedChar.photos?.original || savedChar.photos?.face) && !savedChar.avatars?.winter) {
         // Fire and forget - don't await
         // Pass current relationship data to avoid stale closure issues
         generateAvatarsInBackground(

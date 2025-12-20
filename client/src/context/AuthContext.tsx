@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { User, AuthState } from '@/types/user';
 import logger from '@/services/logger';
 import { signInWithGoogle, getIdToken, firebaseSignOut, onFirebaseAuthStateChanged, handleRedirectResult, type FirebaseUser } from '@/services/firebase';
@@ -28,6 +28,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     originalAdmin: null,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const redirectCheckedRef = useRef(false);
+  const authInProgressRef = useRef(false);
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -296,32 +298,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [state.token]);
 
   // Handle redirect result on page load (for mobile Google sign-in)
+  // This must only run ONCE because getRedirectResult() consumes the result
   useEffect(() => {
     const checkRedirectResult = async () => {
+      // Only check once - getRedirectResult returns null on subsequent calls
+      if (redirectCheckedRef.current) {
+        return;
+      }
+      redirectCheckedRef.current = true;
+
       try {
+        logger.info('Checking for Google redirect result...');
         const firebaseUser = await handleRedirectResult();
-        if (firebaseUser && !state.isAuthenticated && !state.token) {
-          logger.info('Redirect result: User detected, completing login...');
+        if (firebaseUser) {
+          // Prevent duplicate auth if auth state listener also fires
+          if (authInProgressRef.current) {
+            logger.info('Redirect result: Auth already in progress, skipping');
+            return;
+          }
+          authInProgressRef.current = true;
+          logger.info('Redirect result: Firebase user detected, completing login...');
           await handleFirebaseAuth(firebaseUser);
+          authInProgressRef.current = false;
+        } else {
+          logger.info('Redirect result: No pending redirect');
         }
       } catch (err) {
+        authInProgressRef.current = false;
         console.error('Redirect result error:', err);
       }
     };
     checkRedirectResult();
-  }, [handleFirebaseAuth, state.isAuthenticated, state.token]);
+  }, [handleFirebaseAuth]);
 
-  // Firebase Auth State Listener - catches sign-in even if popup handling fails
+  // Firebase Auth State Listener - catches sign-in even if redirect handling fails
   useEffect(() => {
     const unsubscribe = onFirebaseAuthStateChanged(async (firebaseUser) => {
       // Only process if we have a Firebase user but NOT already authenticated in our app
-      if (firebaseUser && !state.isAuthenticated && !state.token) {
+      // Also check authInProgressRef to avoid duplicate auth attempts
+      if (firebaseUser && !state.isAuthenticated && !state.token && !authInProgressRef.current) {
+        authInProgressRef.current = true;
         logger.info('Firebase auth state changed: User detected, completing login...');
         try {
           await handleFirebaseAuth(firebaseUser);
         } catch (err) {
           console.error('Firebase auth state change error:', err);
         }
+        authInProgressRef.current = false;
       }
     });
 

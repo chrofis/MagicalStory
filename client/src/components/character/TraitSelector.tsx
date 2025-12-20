@@ -84,7 +84,7 @@ export function TraitSelector({
 
       {/* Custom trait input */}
       {allowCustom && (
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <input
             type="text"
             value={customTrait}
@@ -97,18 +97,18 @@ export function TraitSelector({
                 ? 'Ajouter personnalisé...'
                 : 'Add custom...'
             }
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
           />
           <button
             onClick={addCustomTrait}
             disabled={!customTrait.trim()}
-            className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-1 transition-colors ${
+            className={`flex-shrink-0 w-10 h-10 rounded-lg font-semibold flex items-center justify-center transition-colors ${
               customTrait.trim()
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <Plus size={16} />
+            <Plus size={18} />
           </button>
         </div>
       )}

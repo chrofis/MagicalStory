@@ -472,6 +472,7 @@ app.use(cors(corsOptions));
 app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP as it can interfere with inline scripts/styles
   crossOriginEmbedderPolicy: false, // Allow embedding external resources
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, // Required for Google OAuth popup
 }));
 
 // Rate limiting for authentication endpoints (prevent brute force attacks)
@@ -845,8 +846,19 @@ async function initializeDatabase() {
         story_quota INT DEFAULT 2,
         stories_generated INT DEFAULT 0,
         credits INT DEFAULT 1000,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP
       )
+    `);
+
+    // Add last_login column if it doesn't exist
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='last_login') THEN
+          ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
+        END IF;
+      END $$;
     `);
 
     // Add credits column to existing users table if it doesn't exist
@@ -1329,6 +1341,11 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     await logActivity(user.id, username, 'USER_LOGIN', {});
 
+    // Update last_login timestamp
+    if (STORAGE_MODE === 'database' && dbPool) {
+      await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+    }
+
     // Generate token
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
@@ -1420,6 +1437,9 @@ app.post('/api/auth/firebase', authLimiter, async (req, res) => {
         await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
         console.log(`✅ New Firebase user registered: ${username} (role: ${role})`);
       }
+
+      // Update last_login timestamp
+      await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
       // Generate JWT token (same as regular login)
       const token = jwt.sign(
@@ -1714,7 +1734,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
       // Database mode - include order counts with JOIN
       const selectQuery = `
         SELECT
-          u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at,
+          u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at, u.last_login,
           COALESCE(order_stats.total_orders, 0) as total_orders,
           COALESCE(order_stats.failed_orders, 0) as failed_orders
         FROM users u
@@ -1738,6 +1758,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         storiesGenerated: user.stories_generated,
         credits: user.credits != null ? user.credits : 1000,
         createdAt: user.created_at,
+        lastLogin: user.last_login,
         totalOrders: parseInt(user.total_orders) || 0,
         failedOrders: parseInt(user.failed_orders) || 0
       }));
@@ -1903,6 +1924,122 @@ app.get('/api/admin/users/:userId/credits', authenticateToken, async (req, res) 
   } catch (err) {
     console.error('Error fetching credit history:', err);
     res.status(500).json({ error: 'Failed to fetch credit history' });
+  }
+});
+
+// Get detailed user info (admin only) - for user management
+app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const targetUserId = req.params.userId;
+    console.log(`👤 [ADMIN] GET /api/admin/users/${targetUserId}/details - Admin: ${req.user.username}`);
+
+    if (STORAGE_MODE !== 'database' || !dbPool) {
+      return res.status(400).json({ error: 'User details requires database mode' });
+    }
+
+    // Get user info
+    const userResult = await dbQuery(
+      'SELECT id, username, email, role, credits, story_quota, stories_generated, created_at, last_login FROM users WHERE id = $1',
+      [targetUserId]
+    );
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const user = userResult[0];
+
+    // Get story count and list
+    const storiesResult = await dbQuery(
+      `SELECT id, title, created_at,
+       COALESCE(json_array_length((story_data->'scenes')::json), 0) as page_count,
+       COALESCE(json_array_length((story_data->'images')::json), 0) as image_count
+       FROM stories WHERE user_id = $1 ORDER BY created_at DESC`,
+      [targetUserId]
+    );
+
+    // Calculate totals
+    let totalCharacters = 0;
+    let totalImages = 0;
+    const stories = storiesResult.map(s => {
+      totalImages += parseInt(s.image_count) || 0;
+      return {
+        id: s.id,
+        title: s.title || 'Untitled',
+        createdAt: s.created_at,
+        pageCount: parseInt(s.page_count) || 0,
+        imageCount: parseInt(s.image_count) || 0
+      };
+    });
+
+    // Get character count from all user's stories
+    const charResult = await dbQuery(
+      `SELECT COALESCE(SUM(json_array_length((story_data->'characters')::json)), 0) as total_chars
+       FROM stories WHERE user_id = $1`,
+      [targetUserId]
+    );
+    totalCharacters = parseInt(charResult[0]?.total_chars) || 0;
+
+    // Get purchase history (orders)
+    const ordersResult = await dbQuery(
+      `SELECT id, story_id, amount, currency, payment_status, gelato_order_id, created_at, product_variant
+       FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+      [targetUserId]
+    );
+    const purchases = ordersResult.map(o => ({
+      id: o.id,
+      storyId: o.story_id,
+      amount: o.amount,
+      currency: o.currency,
+      status: o.payment_status,
+      gelatoOrderId: o.gelato_order_id,
+      productVariant: o.product_variant,
+      createdAt: o.created_at
+    }));
+
+    // Get recent credit transactions
+    const creditsResult = await dbQuery(
+      `SELECT id, amount, balance_after, transaction_type, description, created_at
+       FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      [targetUserId]
+    );
+    const creditHistory = creditsResult.map(t => ({
+      id: t.id,
+      amount: t.amount,
+      balanceAfter: t.balance_after,
+      type: t.transaction_type,
+      description: t.description,
+      createdAt: t.created_at
+    }));
+
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        credits: user.credits,
+        storyQuota: user.story_quota,
+        storiesGenerated: user.stories_generated,
+        createdAt: user.created_at,
+        lastLogin: user.last_login
+      },
+      stats: {
+        totalStories: stories.length,
+        totalCharacters,
+        totalImages,
+        totalPurchases: purchases.filter(p => p.status === 'paid').length,
+        totalSpent: purchases.filter(p => p.status === 'paid').reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+      },
+      stories,
+      purchases,
+      creditHistory
+    });
+  } catch (err) {
+    console.error('Error fetching user details:', err);
+    res.status(500).json({ error: 'Failed to fetch user details' });
   }
 });
 

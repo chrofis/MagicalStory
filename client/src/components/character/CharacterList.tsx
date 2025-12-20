@@ -1,4 +1,5 @@
-import { Edit2, Trash2, Check } from 'lucide-react';
+import { useState } from 'react';
+import { Edit2, Trash2, Check, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
 
@@ -20,6 +21,22 @@ export function CharacterList({
   onContinue,
 }: CharacterListProps) {
   const { t, language } = useLanguage();
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
+
+  const handleDeleteClick = (char: Character) => {
+    setDeleteConfirm({ id: char.id, name: char.name });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirm) {
+      onDelete(deleteConfirm.id);
+      setDeleteConfirm(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirm(null);
+  };
 
   if (characters.length === 0) {
     return null;
@@ -54,9 +71,9 @@ export function CharacterList({
               {/* Top row: Photo/Name on left, Buttons on right */}
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {(char.thumbnailUrl || char.photoUrl) && (
+                  {(char.photos?.face || char.photos?.original) && (
                     <img
-                      src={char.thumbnailUrl || char.photoUrl}
+                      src={char.photos?.face || char.photos?.original}
                       alt={char.name}
                       className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0"
                     />
@@ -78,7 +95,7 @@ export function CharacterList({
                     {t.editCharacter}
                   </button>
                   <button
-                    onClick={() => onDelete(char.id)}
+                    onClick={() => handleDeleteClick(char)}
                     className="bg-red-500 text-white px-2 md:px-3 py-1 rounded text-xs hover:bg-red-600 flex items-center gap-1"
                   >
                     <Trash2 size={12} />
@@ -88,19 +105,19 @@ export function CharacterList({
               </div>
 
               {/* Character traits */}
-              {char.strengths && char.strengths.length > 0 && (
+              {char.traits?.strengths && char.traits.strengths.length > 0 && (
                 <p className="text-xs text-gray-800 mb-1">
-                  <strong className="text-green-600">{t.strengths}:</strong> {char.strengths.join(', ')}
+                  <strong className="text-green-600">{t.strengths}:</strong> {char.traits.strengths.join(', ')}
                 </p>
               )}
-              {char.flaws && char.flaws.length > 0 && (
+              {char.traits?.flaws && char.traits.flaws.length > 0 && (
                 <p className="text-xs text-gray-800 mb-1">
-                  <strong className="text-orange-600">{language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : 'Flaws'}:</strong> {char.flaws.join(', ')}
+                  <strong className="text-orange-600">{language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : 'Flaws'}:</strong> {char.traits.flaws.join(', ')}
                 </p>
               )}
-              {char.challenges && char.challenges.length > 0 && (
+              {char.traits?.challenges && char.traits.challenges.length > 0 && (
                 <p className="text-xs text-gray-800 mb-1">
-                  <strong className="text-purple-600">{language === 'de' ? 'Herausforderungen' : language === 'fr' ? 'Défis' : 'Challenges'}:</strong> {char.challenges.join(', ')}
+                  <strong className="text-purple-600">{language === 'de' ? 'Herausforderungen' : language === 'fr' ? 'Défis' : 'Challenges'}:</strong> {char.traits.challenges.join(', ')}
                 </p>
               )}
             </div>
@@ -140,6 +157,47 @@ export function CharacterList({
           </button>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 text-red-600 rounded-full p-2">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-gray-800">
+                {language === 'de'
+                  ? 'Charakter löschen?'
+                  : language === 'fr'
+                  ? 'Supprimer le personnage?'
+                  : 'Delete Character?'}
+              </h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              {language === 'de'
+                ? `Möchtest du "${deleteConfirm.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`
+                : language === 'fr'
+                ? `Voulez-vous vraiment supprimer "${deleteConfirm.name}"? Cette action est irréversible.`
+                : `Are you sure you want to delete "${deleteConfirm.name}"? This action cannot be undone.`}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelDelete}
+                className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium"
+              >
+                {language === 'de' ? 'Löschen' : language === 'fr' ? 'Supprimer' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

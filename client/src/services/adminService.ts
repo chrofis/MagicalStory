@@ -41,6 +41,49 @@ export interface CreditHistoryResponse {
   transactions: CreditTransaction[];
 }
 
+export interface UserStory {
+  id: number;
+  title: string;
+  createdAt: string;
+  pageCount: number;
+  imageCount: number;
+}
+
+export interface UserPurchase {
+  id: number;
+  storyId: number;
+  amount: string;
+  currency: string;
+  status: string;
+  gelatoOrderId?: string;
+  productVariant?: string;
+  createdAt: string;
+}
+
+export interface UserDetailsResponse {
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    role: 'user' | 'admin';
+    credits: number;
+    storyQuota: number;
+    storiesGenerated: number;
+    createdAt: string;
+    lastLogin: string | null;
+  };
+  stats: {
+    totalStories: number;
+    totalCharacters: number;
+    totalImages: number;
+    totalPurchases: number;
+    totalSpent: number;
+  };
+  stories: UserStory[];
+  purchases: UserPurchase[];
+  creditHistory: CreditTransaction[];
+}
+
 export const adminService = {
   async getStats(): Promise<DashboardStats> {
     return api.get<DashboardStats>('/api/admin/stats');
@@ -56,6 +99,10 @@ export const adminService = {
 
   async getCreditHistory(userId: string, limit = 50): Promise<CreditHistoryResponse> {
     return api.get<CreditHistoryResponse>(`/api/admin/users/${userId}/credits?limit=${limit}`);
+  },
+
+  async getUserDetails(userId: string): Promise<UserDetailsResponse> {
+    return api.get<UserDetailsResponse>(`/api/admin/users/${userId}/details`);
   },
 
   async updateUserRole(userId: string, role: 'user' | 'admin'): Promise<void> {

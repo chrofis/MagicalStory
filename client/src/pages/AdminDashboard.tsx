@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type AdminUser, type CreditTransaction } from '@/services';
+import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse } from '@/services';
 import {
   Users,
   BookOpen,
@@ -19,7 +19,12 @@ import {
   Download,
   FileText,
   History,
-  Eye
+  Eye,
+  Calendar,
+  CreditCard,
+  Clock,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
@@ -46,6 +51,16 @@ export default function AdminDashboard() {
   const [creditHistoryUser, setCreditHistoryUser] = useState<AdminUser | null>(null);
   const [creditHistory, setCreditHistory] = useState<CreditTransaction[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // User details state
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [userDetails, setUserDetails] = useState<UserDetailsResponse | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    stories: false,
+    purchases: false,
+    credits: false
+  });
 
   const t = {
     en: {
@@ -94,6 +109,23 @@ export default function AdminDashboard() {
       currentBalance: 'Current Balance',
       impersonate: 'View as User',
       impersonating: 'Now viewing as {username}',
+      userDetails: 'User Details',
+      memberSince: 'Member Since',
+      lastLogin: 'Last Login',
+      never: 'Never',
+      stories: 'Stories',
+      characters: 'Characters',
+      images: 'Images',
+      purchases: 'Purchases',
+      totalSpent: 'Total Spent',
+      storyTitle: 'Title',
+      pages: 'Pages',
+      purchaseHistory: 'Purchase History',
+      status: 'Status',
+      product: 'Product',
+      noStories: 'No stories yet',
+      noPurchases: 'No purchases yet',
+      close: 'Close',
     },
     de: {
       title: 'Admin-Dashboard',
@@ -141,6 +173,23 @@ export default function AdminDashboard() {
       date: 'Datum',
       noTransactions: 'Keine Transaktionen gefunden',
       currentBalance: 'Aktuelles Guthaben',
+      userDetails: 'Benutzerdetails',
+      memberSince: 'Mitglied seit',
+      lastLogin: 'Letzter Login',
+      never: 'Nie',
+      stories: 'Geschichten',
+      characters: 'Charaktere',
+      images: 'Bilder',
+      purchases: 'Kaeufe',
+      totalSpent: 'Gesamtausgaben',
+      storyTitle: 'Titel',
+      pages: 'Seiten',
+      purchaseHistory: 'Kaufhistorie',
+      status: 'Status',
+      product: 'Produkt',
+      noStories: 'Noch keine Geschichten',
+      noPurchases: 'Noch keine Kaeufe',
+      close: 'Schliessen',
     },
     fr: {
       title: 'Tableau de bord Admin',
@@ -188,6 +237,23 @@ export default function AdminDashboard() {
       date: 'Date',
       noTransactions: 'Aucune transaction trouvee',
       currentBalance: 'Solde actuel',
+      userDetails: 'Details utilisateur',
+      memberSince: 'Membre depuis',
+      lastLogin: 'Derniere connexion',
+      never: 'Jamais',
+      stories: 'Histoires',
+      characters: 'Personnages',
+      images: 'Images',
+      purchases: 'Achats',
+      totalSpent: 'Total depense',
+      storyTitle: 'Titre',
+      pages: 'Pages',
+      purchaseHistory: 'Historique des achats',
+      status: 'Statut',
+      product: 'Produit',
+      noStories: 'Pas encore d\'histoires',
+      noPurchases: 'Pas encore d\'achats',
+      close: 'Fermer',
     },
   };
 
@@ -333,6 +399,31 @@ export default function AdminDashboard() {
     } finally {
       setIsLoadingHistory(false);
     }
+  };
+
+  const handleViewUserDetails = async (targetUser: AdminUser) => {
+    setSelectedUser(targetUser);
+    setIsLoadingDetails(true);
+    setUserDetails(null);
+    setExpandedSections({ stories: false, purchases: false, credits: false });
+    try {
+      const result = await adminService.getUserDetails(targetUser.id);
+      setUserDetails(result);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to load user details' });
+      setSelectedUser(null);
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return texts.never;
+    return new Date(dateStr).toLocaleDateString() + ' ' + new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   if (!isAuthenticated || user?.role !== 'admin') {
@@ -518,9 +609,19 @@ export default function AdminDashboard() {
                 <tbody className="divide-y">
                   {users.map((u) => (
                     <tr key={u.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">{u.username}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
-                      <td className="px-4 py-3">
+                      <td
+                        className="px-4 py-3 text-sm cursor-pointer hover:text-indigo-600 hover:underline"
+                        onClick={() => handleViewUserDetails(u)}
+                      >
+                        {u.username}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm text-gray-600 cursor-pointer hover:text-indigo-600"
+                        onClick={() => handleViewUserDetails(u)}
+                      >
+                        {u.email}
+                      </td>
+                      <td className="px-4 py-3 cursor-pointer" onClick={() => handleViewUserDetails(u)}>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           u.role === 'admin'
                             ? 'bg-purple-100 text-purple-700'
@@ -529,7 +630,10 @@ export default function AdminDashboard() {
                           {u.role}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm">
+                      <td
+                        className="px-4 py-3 text-sm cursor-pointer hover:text-indigo-600"
+                        onClick={() => handleViewUserDetails(u)}
+                      >
                         {u.credits === -1 ? texts.unlimited : u.credits}
                       </td>
                       <td className="px-4 py-3">
@@ -692,6 +796,270 @@ export default function AdminDashboard() {
           <div className="flex justify-end">
             <Button variant="secondary" onClick={() => setCreditHistoryUser(null)}>
               {texts.cancel || 'Close'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* User Details Modal */}
+      <Modal
+        isOpen={!!selectedUser}
+        onClose={() => {
+          setSelectedUser(null);
+          setUserDetails(null);
+        }}
+        title={`${texts.userDetails}: ${selectedUser?.username || ''}`}
+      >
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+          {isLoadingDetails ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+            </div>
+          ) : userDetails ? (
+            <>
+              {/* User Info Section */}
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">{texts.email}</p>
+                    <p className="font-medium text-gray-800">{userDetails.user.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">{texts.role}</p>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      userDetails.user.role === 'admin'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {userDetails.user.role}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-500">{texts.memberSince}</p>
+                      <p className="font-medium text-gray-800 text-sm">{formatDate(userDetails.user.createdAt)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock size={14} className="text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-500">{texts.lastLogin}</p>
+                      <p className="font-medium text-gray-800 text-sm">{formatDate(userDetails.user.lastLogin)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Summary */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-pink-50 rounded-lg p-3 text-center">
+                  <BookOpen size={20} className="mx-auto text-pink-600 mb-1" />
+                  <p className="text-2xl font-bold text-pink-700">{userDetails.stats.totalStories}</p>
+                  <p className="text-xs text-pink-600">{texts.stories}</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 text-center">
+                  <Users size={20} className="mx-auto text-blue-600 mb-1" />
+                  <p className="text-2xl font-bold text-blue-700">{userDetails.stats.totalCharacters}</p>
+                  <p className="text-xs text-blue-600">{texts.characters}</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-3 text-center">
+                  <Image size={20} className="mx-auto text-green-600 mb-1" />
+                  <p className="text-2xl font-bold text-green-700">{userDetails.stats.totalImages}</p>
+                  <p className="text-xs text-green-600">{texts.images}</p>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-3 text-center">
+                  <CreditCard size={20} className="mx-auto text-amber-600 mb-1" />
+                  <p className="text-2xl font-bold text-amber-700">{userDetails.stats.totalPurchases}</p>
+                  <p className="text-xs text-amber-600">{texts.purchases}</p>
+                </div>
+              </div>
+
+              {/* Credits Info */}
+              <div className="bg-indigo-50 rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-indigo-600 font-medium">{texts.currentBalance}</p>
+                  <p className="text-xl font-bold text-indigo-800">
+                    {userDetails.user.credits === -1 ? texts.unlimited : userDetails.user.credits}
+                  </p>
+                </div>
+                {userDetails.stats.totalSpent > 0 && (
+                  <div className="text-right">
+                    <p className="text-sm text-indigo-600 font-medium">{texts.totalSpent}</p>
+                    <p className="text-xl font-bold text-indigo-800">
+                      ${userDetails.stats.totalSpent.toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Stories Section (Collapsible) */}
+              <div className="border rounded-lg">
+                <button
+                  onClick={() => toggleSection('stories')}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <span className="font-medium text-gray-700 flex items-center gap-2">
+                    <BookOpen size={16} />
+                    {texts.stories} ({userDetails.stories.length})
+                  </span>
+                  {expandedSections.stories ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+                {expandedSections.stories && (
+                  <div className="border-t px-4 py-3 max-h-48 overflow-y-auto">
+                    {userDetails.stories.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-2">{texts.noStories}</p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-gray-500">
+                            <th className="pb-2">{texts.storyTitle}</th>
+                            <th className="pb-2">{texts.pages}</th>
+                            <th className="pb-2">{texts.images}</th>
+                            <th className="pb-2">{texts.date}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {userDetails.stories.map(story => (
+                            <tr key={story.id} className="border-t">
+                              <td className="py-2 font-medium">{story.title}</td>
+                              <td className="py-2">{story.pageCount}</td>
+                              <td className="py-2">{story.imageCount}</td>
+                              <td className="py-2 text-gray-500">
+                                {new Date(story.createdAt).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Purchases Section (Collapsible) */}
+              <div className="border rounded-lg">
+                <button
+                  onClick={() => toggleSection('purchases')}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <span className="font-medium text-gray-700 flex items-center gap-2">
+                    <CreditCard size={16} />
+                    {texts.purchaseHistory} ({userDetails.purchases.length})
+                  </span>
+                  {expandedSections.purchases ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+                {expandedSections.purchases && (
+                  <div className="border-t px-4 py-3 max-h-48 overflow-y-auto">
+                    {userDetails.purchases.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-2">{texts.noPurchases}</p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-gray-500">
+                            <th className="pb-2">{texts.date}</th>
+                            <th className="pb-2">{texts.amount}</th>
+                            <th className="pb-2">{texts.status}</th>
+                            <th className="pb-2">{texts.product}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {userDetails.purchases.map(purchase => (
+                            <tr key={purchase.id} className="border-t">
+                              <td className="py-2 text-gray-500">
+                                {new Date(purchase.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-2 font-medium">
+                                {purchase.currency} {purchase.amount}
+                              </td>
+                              <td className="py-2">
+                                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                  purchase.status === 'paid' ? 'bg-green-100 text-green-700' :
+                                  purchase.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {purchase.status}
+                                </span>
+                              </td>
+                              <td className="py-2 text-gray-600 text-xs">
+                                {purchase.productVariant || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Credit History Section (Collapsible) */}
+              <div className="border rounded-lg">
+                <button
+                  onClick={() => toggleSection('credits')}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <span className="font-medium text-gray-700 flex items-center gap-2">
+                    <History size={16} />
+                    {texts.creditHistory} ({userDetails.creditHistory.length})
+                  </span>
+                  {expandedSections.credits ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+                {expandedSections.credits && (
+                  <div className="border-t px-4 py-3 max-h-48 overflow-y-auto">
+                    {userDetails.creditHistory.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-2">{texts.noTransactions}</p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-gray-500">
+                            <th className="pb-2">{texts.date}</th>
+                            <th className="pb-2">{texts.type}</th>
+                            <th className="pb-2 text-right">{texts.amount}</th>
+                            <th className="pb-2 text-right">{texts.balance}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {userDetails.creditHistory.map(tx => (
+                            <tr key={tx.id} className="border-t">
+                              <td className="py-2 text-gray-500">
+                                {new Date(tx.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-2">
+                                <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                  tx.type === 'admin_add' ? 'bg-purple-100 text-purple-700' :
+                                  tx.type === 'story_complete' ? 'bg-green-100 text-green-700' :
+                                  tx.type === 'story_refund' ? 'bg-blue-100 text-blue-700' :
+                                  tx.type === 'story_reserve' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {tx.type.replace(/_/g, ' ')}
+                                </span>
+                              </td>
+                              <td className={`py-2 text-right font-medium ${
+                                tx.amount > 0 ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {tx.amount > 0 ? '+' : ''}{tx.amount}
+                              </td>
+                              <td className="py-2 text-right font-medium">
+                                {tx.balanceAfter}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-gray-500 py-4">Failed to load user details</p>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <Button variant="secondary" onClick={() => setSelectedUser(null)}>
+              {texts.close}
             </Button>
           </div>
         </div>

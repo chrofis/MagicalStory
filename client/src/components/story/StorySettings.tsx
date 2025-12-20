@@ -113,9 +113,9 @@ export function StorySettings({
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  {(char.thumbnailUrl || char.photoUrl) && (
+                  {(char.photos?.face || char.photos?.original) && (
                     <img
-                      src={char.thumbnailUrl || char.photoUrl}
+                      src={char.photos?.face || char.photos?.original}
                       alt={char.name}
                       className="w-12 h-12 rounded-full object-cover"
                     />

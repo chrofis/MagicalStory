@@ -5,27 +5,51 @@ export interface BoundingBox {
   height: number;
 }
 
+// Physical traits from photo analysis
+export interface PhysicalTraits {
+  height?: string;
+  build?: string;
+  face?: string;
+  hair?: string;
+}
+
+// Psychological traits
+export interface PsychologicalTraits {
+  strengths: string[];
+  flaws: string[];
+  challenges: string[];
+  specialDetails?: string;
+}
+
+// Photo URLs
+export interface CharacterPhotos {
+  original?: string;      // Uploaded photo
+  face?: string;          // Cropped face thumbnail
+  body?: string;          // Cropped body
+  bodyNoBg?: string;      // Body with background removed
+  faceBox?: BoundingBox;  // Face detection box
+  bodyBox?: BoundingBox;  // Body detection box
+}
+
 // Clothing categories for scene-appropriate avatars
 export type ClothingCategory = 'winter' | 'standard' | 'summer' | 'formal';
 
 // Generated avatars for each clothing category
-export interface ClothingAvatars {
-  winter?: string;   // Warm clothing (coats, scarves, boots)
-  standard?: string; // Casual everyday clothing
-  summer?: string;   // Light clothing (t-shirts, shorts, dresses)
-  formal?: string;   // Formal attire (suits, dresses)
+export interface CharacterAvatars {
+  winter?: string;
+  standard?: string;
+  summer?: string;
+  formal?: string;
   generatedAt?: string;
   status?: 'pending' | 'generating' | 'complete' | 'failed';
 }
 
-// Style Analysis types for Visual Bible integration
-
-export interface PhysicalFeatures {
-  face: string;
-  hair: string;
-  build: string;
+// Clothing information (for future use)
+export interface CharacterClothing {
+  current?: string;  // What they're wearing in the reference photo
 }
 
+// Reference outfit details (extracted from photo)
 export interface ReferenceOutfit {
   garmentType: string;
   primaryColor: string;
@@ -41,21 +65,7 @@ export interface ReferenceOutfit {
   setting: 'outdoor-warm' | 'outdoor-cold' | 'indoor-casual' | 'indoor-formal' | 'active' | 'sleep' | 'neutral';
 }
 
-export interface StyleDNA {
-  signatureColors: string[];
-  signaturePatterns: string[];
-  signatureDetails: string[];
-  aesthetic: string;
-  alwaysPresent: string[];
-}
-
-export interface StyleAnalysis {
-  physical: PhysicalFeatures;
-  referenceOutfit?: ReferenceOutfit;
-  styleDNA?: StyleDNA;  // Deprecated - no longer used
-  analyzedAt: string;
-}
-
+// Generated outfit for a specific page
 export interface GeneratedOutfit {
   setting: string;
   outfit: string;
@@ -70,36 +80,37 @@ export interface GeneratedOutfit {
   };
 }
 
+// Main Character interface - clean structure
 export interface Character {
+  // Identity
   id: number;
   name: string;
   gender: 'male' | 'female' | 'other';
   age: string;
-  height?: string;
-  build?: string;
-  hairColor?: string;
-  otherFeatures?: string;
-  clothing?: string;
-  specialDetails?: string;
-  strengths: string[];
-  flaws: string[];
-  challenges: string[];
-  // Legacy fields (for backward compatibility)
-  weaknesses?: string[];
-  fears?: string[];
-  photoUrl?: string;
-  thumbnailUrl?: string;  // Smaller cropped face photo for lists
-  bodyPhotoUrl?: string;
-  bodyNoBgUrl?: string;
-  faceBox?: BoundingBox;
-  bodyBox?: BoundingBox;
-  // Style analysis from photo (for Visual Bible integration)
-  styleAnalysis?: StyleAnalysis;
+
+  // Physical traits (from photo analysis)
+  physical?: PhysicalTraits;
+
+  // Psychological traits
+  traits: PsychologicalTraits;
+
+  // Photos
+  photos?: CharacterPhotos;
+
+  // Clothing avatars (4 seasonal variations)
+  avatars?: CharacterAvatars;
+
+  // Clothing (for future use)
+  clothing?: CharacterClothing;
+
+  // Reference outfit from photo (for Visual Bible)
+  referenceOutfit?: ReferenceOutfit;
+
+  // Generated outfits per page (during story generation)
   generatedOutfits?: Record<number, GeneratedOutfit>;
-  // Generated avatars for different clothing categories (admin only)
-  clothingAvatars?: ClothingAvatars;
 }
 
+// Relationship types
 export interface RelationshipMap {
   [key: string]: string; // "charId1-charId2" -> relationship type
 }
@@ -120,12 +131,10 @@ export interface LocalizedString {
 }
 
 // Visual Bible types
-
 export interface VisualBibleMainCharacter {
   id: number;
   name: string;
-  physical: PhysicalFeatures;
-  styleDNA?: StyleDNA;  // Deprecated - no longer used
+  physical: PhysicalTraits;
   referenceOutfit?: ReferenceOutfit;
   generatedOutfits: Record<number, GeneratedOutfit>;
 }
@@ -156,4 +165,15 @@ export interface VisualBible {
   artifacts: VisualBibleEntry[];
   locations: VisualBibleEntry[];
   changeLog: VisualBibleChangeLogEntry[];
+}
+
+// Legacy type aliases for backward compatibility during migration
+// TODO: Remove these after full migration
+export type ClothingAvatars = CharacterAvatars;
+export type PhysicalFeatures = PhysicalTraits;
+export interface StyleAnalysis {
+  physical: PhysicalTraits;
+  referenceOutfit?: ReferenceOutfit;
+  styleDNA?: unknown;
+  analyzedAt?: string;
 }
