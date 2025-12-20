@@ -8179,65 +8179,56 @@ function getVisualBibleEntriesForPage(visualBible, pageNumber) {
 }
 
 // Build Visual Bible prompt section for image generation
-// sceneCharacterNames: optional array of character names that appear in this scene (for filtering)
-function buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames = null) {
+// Includes ALL visual bible elements (not filtered by page) with optional intro text
+function buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames = null, language = 'en') {
   console.log(`📖 [VISUAL BIBLE PROMPT] Building prompt for page ${pageNumber}`);
-  const entries = getVisualBibleEntriesForPage(visualBible, pageNumber);
-  console.log(`📖 [VISUAL BIBLE PROMPT] Found ${entries.length} entries for page ${pageNumber}: ${entries.map(e => e.name).join(', ') || 'none'}`);
 
-  let prompt = '';
+  if (!visualBible) return '';
 
-  // Add main characters (filtered to those in scene if specified)
-  if (visualBible.mainCharacters && visualBible.mainCharacters.length > 0) {
-    let charsToInclude = visualBible.mainCharacters;
-
-    // Filter to only characters in the scene if scene character names provided
-    if (sceneCharacterNames && sceneCharacterNames.length > 0) {
-      const sceneNamesLower = sceneCharacterNames.map(n => n.toLowerCase());
-      charsToInclude = visualBible.mainCharacters.filter(char =>
-        sceneNamesLower.some(sceneName => char.name.toLowerCase().includes(sceneName) || sceneName.includes(char.name.toLowerCase()))
-      );
-      console.log(`📖 [VISUAL BIBLE PROMPT] Filtered to ${charsToInclude.length} characters in scene: ${charsToInclude.map(c => c.name).join(', ')}`);
-    }
-
-    if (charsToInclude.length > 0) {
-      prompt += '\n\n**MAIN CHARACTERS - Must match reference photos:**\n';
-      for (const char of charsToInclude) {
-        prompt += `**${char.name}:**\n`;
-        if (char.physical) {
-          // Basic traits
-          if (char.physical.age && char.physical.age !== 'Unknown') {
-            prompt += `- Age: ${char.physical.age} years old\n`;
-          }
-          if (char.physical.gender && char.physical.gender !== 'Unknown') {
-            prompt += `- Gender: ${char.physical.gender}\n`;
-          }
-          if (char.physical.height && char.physical.height !== 'Unknown') {
-            prompt += `- Height: ${char.physical.height} cm\n`;
-          }
-          if (char.physical.build && char.physical.build !== 'Unknown' && char.physical.build !== 'Not analyzed') {
-            prompt += `- Build: ${char.physical.build}\n`;
-          }
-          // Detailed features
-          if (char.physical.face && char.physical.face !== 'Not analyzed') {
-            prompt += `- Face: ${char.physical.face}\n`;
-          }
-          if (char.physical.hair && char.physical.hair !== 'Not analyzed') {
-            prompt += `- Hair: ${char.physical.hair}\n`;
-          }
-        }
-      }
-    }
+  // Collect all entries (not filtered by page)
+  const allEntries = [];
+  for (const entry of visualBible.secondaryCharacters || []) {
+    allEntries.push({ ...entry, type: 'character' });
+  }
+  for (const entry of visualBible.animals || []) {
+    allEntries.push({ ...entry, type: 'animal' });
+  }
+  for (const entry of visualBible.artifacts || []) {
+    allEntries.push({ ...entry, type: 'artifact' });
+  }
+  for (const entry of visualBible.locations || []) {
+    allEntries.push({ ...entry, type: 'location' });
   }
 
-  // Add page-specific recurring elements
-  if (entries.length > 0) {
-    prompt += '\n**RECURRING ELEMENTS - MUST MATCH EXACTLY:**\n';
+  console.log(`📖 [VISUAL BIBLE PROMPT] Total entries: ${allEntries.length} (${allEntries.map(e => e.name).join(', ') || 'none'})`);
 
-    for (const entry of entries) {
-      const description = entry.extractedDescription || entry.description;
-      prompt += `**${entry.name}** (${entry.type}): ${description}\n`;
-    }
+  // If no entries, return empty
+  if (allEntries.length === 0) {
+    return '';
+  }
+
+  // Build intro text based on language
+  let introText;
+  if (language === 'de') {
+    introText = `**VISUELLE REFERENZELEMENTE (optional):**
+Du kannst Elemente aus der visuellen Bibel unten verwenden, wenn sie für diese Szene passend sind.
+Diese Elemente sind NICHT erforderlich - füge sie nur hinzu, wenn sie natürlich ins Bild passen.`;
+  } else if (language === 'fr') {
+    introText = `**ÉLÉMENTS DE RÉFÉRENCE VISUELS (optionnel):**
+Vous pouvez utiliser les éléments de la bible visuelle ci-dessous s'ils sont appropriés pour cette scène.
+Ces éléments ne sont PAS obligatoires - incluez-les uniquement s'ils s'intègrent naturellement dans l'image.`;
+  } else {
+    introText = `**VISUAL REFERENCE ELEMENTS (optional):**
+You may use elements from the visual bible below if appropriate for this scene.
+These elements are NOT required - only include them if they naturally fit the image.`;
+  }
+
+  let prompt = `\n${introText}\n\n`;
+
+  // Add all recurring elements
+  for (const entry of allEntries) {
+    const description = entry.extractedDescription || entry.description;
+    prompt += `**${entry.name}** (${entry.type}): ${description}\n`;
   }
 
   return prompt;
@@ -11332,11 +11323,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     }
   }
 
-  // Build Visual Bible section for page-specific recurring elements (animals, artifacts, locations)
+  // Build Visual Bible section with ALL recurring elements (animals, artifacts, locations)
   let visualBibleSection = '';
   if (visualBible && pageNumber !== null) {
     const sceneCharacterNames = sceneCharacters ? sceneCharacters.map(c => c.name) : null;
-    visualBibleSection = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames);
+    visualBibleSection = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames, language);
     if (visualBibleSection) {
       console.log(`📖 [IMAGE PROMPT] Added Visual Bible section for page ${pageNumber}`);
     }
