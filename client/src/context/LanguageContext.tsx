@@ -33,6 +33,31 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = language;
   }, [language]);
 
+  // Listen for language changes from other parts of the app (e.g., after login)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue && ['en', 'de', 'fr'].includes(e.newValue)) {
+        setLanguageState(e.newValue as Language);
+      }
+    };
+
+    // Also listen for custom event for same-tab updates
+    const handleLanguageUpdate = () => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved && ['en', 'de', 'fr'].includes(saved) && saved !== language) {
+        setLanguageState(saved as Language);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('languageUpdated', handleLanguageUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('languageUpdated', handleLanguageUpdate);
+    };
+  }, [language]);
+
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
   };

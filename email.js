@@ -1,6 +1,8 @@
 // email.js - Email utility module for MagicalStory
 
 const { Resend } = require('resend');
+const fs = require('fs');
+const path = require('path');
 
 // Initialize Resend client
 const resend = process.env.RESEND_API_KEY
@@ -11,16 +13,93 @@ const EMAIL_FROM = process.env.EMAIL_FROM || 'MagicalStory <noreply@magicalstory
 const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO || 'info@magicalstory.ch';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@magicalstory.ch';
 
-// Common footer for all customer emails
-const EMAIL_FOOTER = `
-  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-  <p style="color: #666; font-size: 12px;">
-    MagicalStory - Personalized AI-Generated Children's Books<br>
-    <a href="https://www.magicalstory.ch">www.magicalstory.ch</a><br><br>
-    Questions? Reply to this email or contact us at <a href="mailto:info@magicalstory.ch">info@magicalstory.ch</a><br>
-    MagicalStory, Switzerland
-  </p>
-`;
+// ===========================================
+// EMAIL TEMPLATES
+// ===========================================
+
+// Load email templates from emails/ folder
+const EMAIL_TEMPLATES = {};
+
+function loadEmailTemplates() {
+  const emailsDir = path.join(__dirname, 'emails');
+  const templateFiles = ['story-complete.html', 'story-failed.html', 'order-confirmation.html'];
+
+  for (const file of templateFiles) {
+    const filePath = path.join(emailsDir, file);
+    try {
+      if (fs.existsSync(filePath)) {
+        const templateName = file.replace('.html', '');
+        EMAIL_TEMPLATES[templateName] = fs.readFileSync(filePath, 'utf8');
+        console.log(`📧 Loaded email template: ${templateName}`);
+      }
+    } catch (err) {
+      console.error(`❌ Failed to load email template ${file}:`, err.message);
+    }
+  }
+}
+
+// Load templates on startup
+loadEmailTemplates();
+
+// Map language values to template markers
+function normalizeLanguage(language) {
+  if (!language) return 'ENGLISH';
+  const lang = language.toUpperCase();
+  if (lang === 'GERMAN' || lang === 'DE' || lang === 'DEUTSCH') return 'GERMAN';
+  if (lang === 'FRENCH' || lang === 'FR' || lang === 'FRANCAIS' || lang === 'FRANÇAIS') return 'FRENCH';
+  return 'ENGLISH';
+}
+
+// Parse a specific language section from template
+function getTemplateSection(templateName, language) {
+  const template = EMAIL_TEMPLATES[templateName];
+  if (!template) {
+    console.error(`❌ Email template not found: ${templateName}`);
+    return null;
+  }
+
+  const langMarker = `[${normalizeLanguage(language)}]`;
+  const languages = ['[ENGLISH]', '[GERMAN]', '[FRENCH]'];
+
+  // Find the start of the requested language section
+  const startIdx = template.indexOf(langMarker);
+  if (startIdx === -1) {
+    console.warn(`⚠️ Language ${language} not found in ${templateName}, falling back to English`);
+    return getTemplateSection(templateName, 'English');
+  }
+
+  // Find the end (next language marker or end of file)
+  let endIdx = template.length;
+  for (const marker of languages) {
+    if (marker === langMarker) continue;
+    const idx = template.indexOf(marker, startIdx + langMarker.length);
+    if (idx !== -1 && idx < endIdx) {
+      endIdx = idx;
+    }
+  }
+
+  const section = template.substring(startIdx + langMarker.length, endIdx).trim();
+
+  // Parse subject, text, and html from section
+  const subjectMatch = section.match(/^Subject:\s*(.+)$/m);
+  const textMatch = section.match(/Text:\s*([\s\S]*?)(?=---\s*\nHtml:)/);
+  const htmlMatch = section.match(/Html:\s*([\s\S]*?)$/);
+
+  return {
+    subject: subjectMatch ? subjectMatch[1].trim() : '',
+    text: textMatch ? textMatch[1].trim() : '',
+    html: htmlMatch ? htmlMatch[1].trim() : ''
+  };
+}
+
+// Fill placeholders in template string
+function fillTemplate(template, values) {
+  let result = template;
+  for (const [key, value] of Object.entries(values)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value || '');
+  }
+  return result;
+}
 
 // Extract first name from full name for greeting
 function getGreetingName(fullName) {
@@ -47,49 +126,41 @@ function isEmailConfigured() {
  * @param {string} firstName - Customer's first name (from shipping info or username)
  * @param {string} storyTitle - Title of the completed story
  * @param {string} storyId - ID of the story for direct link
+ * @param {string} language - Language for email content (English, German, French)
  */
-async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId) {
+async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId, language = 'English') {
   if (!resend) {
     console.log('📧 Email not configured - skipping story complete notification');
     return null;
   }
 
-  // Use first name directly, fallback to 'there' if empty
-  const greeting = firstName || 'there';
+  // Get template for the specified language
+  const template = getTemplateSection('story-complete', language);
+  if (!template) {
+    console.error('❌ Failed to get story-complete template');
+    return null;
+  }
 
   // Build direct story URL (uses /create?storyId= format)
   const storyUrl = storyId
     ? `https://www.magicalstory.ch/create?storyId=${storyId}`
     : 'https://www.magicalstory.ch';
 
+  // Fill in placeholders
+  const values = {
+    greeting: firstName || 'there',
+    title: storyTitle,
+    storyUrl: storyUrl
+  };
+
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
-      subject: `Your magical story "${storyTitle}" is ready!`,
-      text: `Hello ${greeting},\n\nGreat news! Your personalized story "${storyTitle}" has been created and is waiting for you.\n\nView your story: ${storyUrl}\n\nYou can now:\n- Preview your complete story with illustrations\n- Order a printed hardcover book\n- Download as PDF\n\nThank you for using MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #6366f1;">Your Story is Ready!</h1>
-          <p>Hello ${greeting},</p>
-          <p>Great news! Your personalized story <strong>"${storyTitle}"</strong> has been created and is waiting for you.</p>
-          <p>
-            <a href="${storyUrl}"
-               style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-              View Your Story
-            </a>
-          </p>
-          <p>You can now:</p>
-          <ul>
-            <li>Preview your complete story with illustrations</li>
-            <li>Order a printed hardcover book</li>
-            <li>Download as PDF</li>
-          </ul>
-          <p>Thank you for using MagicalStory!</p>
-          ${EMAIL_FOOTER}
-        </div>
-      `,
+      subject: fillTemplate(template.subject, values),
+      text: fillTemplate(template.text, values),
+      html: fillTemplate(template.html, values),
     });
 
     if (error) {
@@ -97,7 +168,7 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId)
       return null;
     }
 
-    console.log(`📧 Story complete email sent to ${userEmail}, id: ${data.id}`);
+    console.log(`📧 Story complete email sent to ${userEmail} (${language}), id: ${data.id}`);
     return data;
   } catch (err) {
     console.error('❌ Email send error:', err);
@@ -109,39 +180,34 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId)
  * Send story generation failure notification to customer
  * @param {string} userEmail - Customer email address
  * @param {string} firstName - Customer's first name
+ * @param {string} language - Language for email content (English, German, French)
  */
-async function sendStoryFailedEmail(userEmail, firstName) {
+async function sendStoryFailedEmail(userEmail, firstName, language = 'English') {
   if (!resend) {
     console.log('📧 Email not configured - skipping story failed notification');
     return null;
   }
 
-  const greeting = firstName || 'there';
+  // Get template for the specified language
+  const template = getTemplateSection('story-failed', language);
+  if (!template) {
+    console.error('❌ Failed to get story-failed template');
+    return null;
+  }
+
+  // Fill in placeholders
+  const values = {
+    greeting: firstName || 'there'
+  };
 
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
-      subject: 'We encountered an issue with your story',
-      text: `Hello ${greeting},\n\nWe're sorry, but we encountered a problem while creating your story.\n\nOur team has been notified and is looking into this. You can try creating your story again at https://www.magicalstory.ch, or contact us if the problem persists.\n\nWe apologize for any inconvenience.\n\nBest regards,\nThe MagicalStory Team\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #ef4444;">Story Generation Issue</h1>
-          <p>Hello ${greeting},</p>
-          <p>We're sorry, but we encountered a problem while creating your story.</p>
-          <p>Our team has been notified and is looking into this. You can try creating your story again, or contact us if the problem persists.</p>
-          <p>
-            <a href="https://www.magicalstory.ch"
-               style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-              Try Again
-            </a>
-          </p>
-          <p>We apologize for any inconvenience.</p>
-          <p>Best regards,<br>The MagicalStory Team</p>
-          ${EMAIL_FOOTER}
-        </div>
-      `,
+      subject: fillTemplate(template.subject, values),
+      text: fillTemplate(template.text, values),
+      html: fillTemplate(template.html, values),
     });
 
     if (error) {
@@ -149,7 +215,7 @@ async function sendStoryFailedEmail(userEmail, firstName) {
       return null;
     }
 
-    console.log(`📧 Story failed email sent to ${userEmail}, id: ${data.id}`);
+    console.log(`📧 Story failed email sent to ${userEmail} (${language}), id: ${data.id}`);
     return data;
   } catch (err) {
     console.error('❌ Email send error:', err);
@@ -159,46 +225,44 @@ async function sendStoryFailedEmail(userEmail, firstName) {
 
 /**
  * Send order confirmation email
+ * @param {string} customerEmail - Customer email address
+ * @param {string} customerName - Customer's full name
+ * @param {object} orderDetails - Order details including orderId, amount, currency, shippingAddress
+ * @param {string} language - Language for email content (English, German, French)
  */
-async function sendOrderConfirmationEmail(customerEmail, customerName, orderDetails) {
+async function sendOrderConfirmationEmail(customerEmail, customerName, orderDetails, language = 'English') {
   if (!resend) {
     console.log('📧 Email not configured - skipping order confirmation');
     return null;
   }
 
-  const greeting = getGreetingName(customerName);
+  // Get template for the specified language
+  const template = getTemplateSection('order-confirmation', language);
+  if (!template) {
+    console.error('❌ Failed to get order-confirmation template');
+    return null;
+  }
+
+  // Fill in placeholders
+  const values = {
+    greeting: getGreetingName(customerName),
+    orderId: orderDetails.orderId,
+    amount: orderDetails.amount,
+    currency: orderDetails.currency,
+    addressLine1: orderDetails.shippingAddress?.line1 || '',
+    city: orderDetails.shippingAddress?.city || '',
+    postalCode: orderDetails.shippingAddress?.postal_code || '',
+    country: orderDetails.shippingAddress?.country || ''
+  };
 
   try {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: customerEmail,
-      subject: `Order Confirmed - Your MagicalStory Book is Being Printed!`,
-      text: `Hello ${greeting},\n\nThank you for your order! Your personalized storybook is now being printed.\n\nOrder Details:\n- Order ID: ${orderDetails.orderId}\n- Amount: ${orderDetails.amount} ${orderDetails.currency}\n- Shipping to: ${orderDetails.shippingAddress.line1}, ${orderDetails.shippingAddress.city}, ${orderDetails.shippingAddress.postal_code}, ${orderDetails.shippingAddress.country}\n\nYou'll receive another email when your book ships with tracking information.\nEstimated delivery: 5-10 business days\n\nThank you for choosing MagicalStory!\n\n--\nMagicalStory - Personalized AI-Generated Children's Books\nwww.magicalstory.ch`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #22c55e;">Order Confirmed!</h1>
-          <p>Hello ${greeting},</p>
-          <p>Thank you for your order! Your personalized storybook is now being printed.</p>
-
-          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin-top: 0;">Order Details</h3>
-            <p><strong>Order ID:</strong> ${orderDetails.orderId}</p>
-            <p><strong>Amount:</strong> ${orderDetails.amount} ${orderDetails.currency}</p>
-            <p><strong>Shipping to:</strong><br>
-              ${orderDetails.shippingAddress.line1}<br>
-              ${orderDetails.shippingAddress.city}, ${orderDetails.shippingAddress.postal_code}<br>
-              ${orderDetails.shippingAddress.country}
-            </p>
-          </div>
-
-          <p>You'll receive another email when your book ships with tracking information.</p>
-          <p>Estimated delivery: 5-10 business days</p>
-
-          <p>Thank you for choosing MagicalStory!</p>
-          ${EMAIL_FOOTER}
-        </div>
-      `,
+      subject: fillTemplate(template.subject, values),
+      text: fillTemplate(template.text, values),
+      html: fillTemplate(template.html, values),
     });
 
     if (error) {
@@ -206,7 +270,7 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
       return null;
     }
 
-    console.log(`📧 Order confirmation email sent to ${customerEmail}, id: ${data.id}`);
+    console.log(`📧 Order confirmation email sent to ${customerEmail} (${language}), id: ${data.id}`);
     return data;
   } catch (err) {
     console.error('❌ Email send error:', err);

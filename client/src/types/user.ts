@@ -6,6 +6,7 @@ export interface User {
   credits: number;
   storyQuota?: number;
   storiesGenerated?: number;
+  preferredLanguage?: 'English' | 'German' | 'French';
 }
 
 export interface AuthState {

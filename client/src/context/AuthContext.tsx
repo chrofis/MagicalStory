@@ -98,11 +98,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.user.email,
       role: data.user.role,
       credits: data.user.credits,
+      preferredLanguage: data.user.preferredLanguage,
     };
 
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('current_user', JSON.stringify(user));
     localStorage.removeItem('impersonation_state'); // Clear any impersonation state on fresh login
+
+    // Set UI language based on user's preferred language
+    if (data.user.preferredLanguage) {
+      const langMap: Record<string, string> = { 'English': 'en', 'German': 'de', 'French': 'fr' };
+      const langCode = langMap[data.user.preferredLanguage] || 'en';
+      localStorage.setItem('magicalstory_language', langCode);
+      // Dispatch event to notify LanguageContext
+      window.dispatchEvent(new Event('languageUpdated'));
+    }
 
     setState({
       isAuthenticated: true,
@@ -155,11 +165,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.user.email,
       role: data.user.role,
       credits: data.user.credits,
+      preferredLanguage: data.user.preferredLanguage,
     };
 
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('current_user', JSON.stringify(user));
     localStorage.removeItem('impersonation_state');
+
+    // Set UI language based on user's preferred language
+    if (data.user.preferredLanguage) {
+      const langMap: Record<string, string> = { 'English': 'en', 'German': 'de', 'French': 'fr' };
+      const langCode = langMap[data.user.preferredLanguage] || 'en';
+      localStorage.setItem('magicalstory_language', langCode);
+      // Dispatch event to notify LanguageContext
+      window.dispatchEvent(new Event('languageUpdated'));
+    }
 
     setState({
       isAuthenticated: true,
