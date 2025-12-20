@@ -9014,15 +9014,30 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const coverPrompts = { front: null, initialPage: null, backCover: null };
 
     // Helper to build character reference list for cover prompts
-    const buildCharacterReferenceList = (photos) => {
+    const buildCharacterReferenceList = (photos, characters = null) => {
       if (!photos || photos.length === 0) return '';
       const charDescriptions = photos.map((photo, index) => {
-        const age = photo.age ? `${photo.age} years old` : '';
-        const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
+        // Find the original character to get age/gender
+        const char = characters?.find(c => c.name === photo.name);
+        const age = char?.age ? `${char.age} years old` : '';
+        const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
         const brief = [photo.name, age, gender].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
-      return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+      let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+
+      // Add relative height description if characters data is available
+      if (characters && characters.length >= 2) {
+        // Filter to only characters in this scene (matching photo names)
+        const sceneCharacters = characters.filter(c => photos.some(p => p.name === c.name));
+        const heightDescription = buildRelativeHeightDescription(sceneCharacters);
+        if (heightDescription) {
+          result += `\n${heightDescription}\n`;
+          console.log(`📏 [COVER] Added relative heights: ${heightDescription}`);
+        }
+      }
+
+      return result;
     };
 
     // Helper function to generate cover image during streaming
@@ -9068,7 +9083,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
             TITLE_PAGE_SCENE: sceneDescription,
             STYLE_DESCRIPTION: styleDescription,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
             VISUAL_BIBLE: visualBibleText,
             STORY_TITLE: storyTitleForCover
           });
@@ -9078,14 +9093,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
                 INITIAL_PAGE_SCENE: sceneDescription,
                 STYLE_DESCRIPTION: styleDescription,
-                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
                 VISUAL_BIBLE: visualBibleText,
                 DEDICATION: inputData.dedication
               })
             : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
                 INITIAL_PAGE_SCENE: sceneDescription,
                 STYLE_DESCRIPTION: styleDescription,
-                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
                 VISUAL_BIBLE: visualBibleText
               });
           coverPrompts.initialPage = coverPrompt;
@@ -9093,7 +9108,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
             BACK_COVER_SCENE: sceneDescription,
             STYLE_DESCRIPTION: styleDescription,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
             VISUAL_BIBLE: visualBibleText
           });
           coverPrompts.backCover = coverPrompt;
@@ -9554,7 +9569,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             TITLE_PAGE_SCENE: titlePageScene,
             STYLE_DESCRIPTION: styleDescription,
             STORY_TITLE: storyTitle,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos),
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos, frontCoverCharacters),
             VISUAL_BIBLE: visualBiblePrompt
           });
           coverPrompts.frontCover = frontCoverPrompt;
@@ -9591,14 +9606,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                 INITIAL_PAGE_SCENE: initialPageScene,
                 STYLE_DESCRIPTION: styleDescription,
                 DEDICATION: inputData.dedication,
-                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos, inputData.characters),
                 VISUAL_BIBLE: visualBiblePrompt
               })
             : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
                 INITIAL_PAGE_SCENE: initialPageScene,
                 STYLE_DESCRIPTION: styleDescription,
                 STORY_TITLE: storyTitle,
-                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos, inputData.characters),
                 VISUAL_BIBLE: visualBiblePrompt
               });
           coverPrompts.initialPage = initialPrompt;
@@ -9633,7 +9648,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
             BACK_COVER_SCENE: backCoverScene,
             STYLE_DESCRIPTION: styleDescription,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos),
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos, inputData.characters),
             VISUAL_BIBLE: visualBiblePrompt
           });
           coverPrompts.backCover = backCoverPrompt;
@@ -9971,15 +9986,30 @@ async function processStoryJob(jobId) {
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
       // Helper to build character reference list for cover prompts
-      const buildCharacterReferenceList = (photos) => {
+      const buildCharacterReferenceList = (photos, characters = null) => {
         if (!photos || photos.length === 0) return '';
         const charDescriptions = photos.map((photo, index) => {
-          const age = photo.age ? `${photo.age} years old` : '';
-          const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
+          // Find the original character to get age/gender
+          const char = characters?.find(c => c.name === photo.name);
+          const age = char?.age ? `${char.age} years old` : '';
+          const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
           const brief = [photo.name, age, gender].filter(Boolean).join(', ');
           return `${index + 1}. ${brief}`;
         });
-        return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+        let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+
+        // Add relative height description if characters data is available
+        if (characters && characters.length >= 2) {
+          // Filter to only characters in this scene (matching photo names)
+          const sceneCharacters = characters.filter(c => photos.some(p => p.name === c.name));
+          const heightDescription = buildRelativeHeightDescription(sceneCharacters);
+          if (heightDescription) {
+            result += `\n${heightDescription}\n`;
+            console.log(`📏 [COVER] Added relative heights: ${heightDescription}`);
+          }
+        }
+
+        return result;
       };
 
       // Prepare all cover generation promises
@@ -9991,7 +10021,7 @@ async function processStoryJob(jobId) {
         TITLE_PAGE_SCENE: titlePageScene,
         STYLE_DESCRIPTION: styleDescription,
         STORY_TITLE: storyTitle,
-        CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos),
+        CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos, frontCoverCharacters),
         VISUAL_BIBLE: visualBiblePrompt
       });
       coverPrompts.frontCover = frontCoverPrompt;
@@ -10004,14 +10034,14 @@ async function processStoryJob(jobId) {
             INITIAL_PAGE_SCENE: initialPageScene,
             STYLE_DESCRIPTION: styleDescription,
             DEDICATION: inputData.dedication,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos, inputData.characters),
             VISUAL_BIBLE: visualBiblePrompt
           })
         : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
             INITIAL_PAGE_SCENE: initialPageScene,
             STYLE_DESCRIPTION: styleDescription,
             STORY_TITLE: storyTitle,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos, inputData.characters),
             VISUAL_BIBLE: visualBiblePrompt
           });
       coverPrompts.initialPage = initialPagePrompt;
@@ -10022,7 +10052,7 @@ async function processStoryJob(jobId) {
       const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
         BACK_COVER_SCENE: backCoverScene,
         STYLE_DESCRIPTION: styleDescription,
-        CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos),
+        CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos, inputData.characters),
         VISUAL_BIBLE: visualBiblePrompt
       });
       coverPrompts.backCover = backCoverPrompt;
