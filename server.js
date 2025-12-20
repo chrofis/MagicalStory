@@ -11850,12 +11850,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const textErrorOnlyMatch = responseText.match(/Text_Error_Only:\s*(YES|NO)/i);
     const expectedTextMatch = responseText.match(/Expected_Text:\s*([^\n]+)/i);
     const actualTextMatch = responseText.match(/Actual_Text:\s*([^\n]+)/i);
-    const textIssueMatch = responseText.match(/Text_Issue:\s*(NONE|MISSPELLED|WRONG_WORDS|MISSING|ILLEGIBLE|PARTIAL)/i);
+    const textIssueMatch = responseText.match(/Text_Issue:\s*(NONE|MISSPELLED|WRONG_WORDS|MISSING|ILLEGIBLE|PARTIAL|UNWANTED)/i);
 
     const textErrorOnly = textErrorOnlyMatch ? textErrorOnlyMatch[1].toUpperCase() === 'YES' : false;
     const expectedText = expectedTextMatch ? expectedTextMatch[1].trim() : null;
     const actualText = actualTextMatch ? actualTextMatch[1].trim() : null;
     const textIssue = textIssueMatch ? textIssueMatch[1].toUpperCase() : null;
+
+    // Debug logging for quality parsing
+    if (evaluationType === 'cover') {
+      log.verbose(`⭐ [QUALITY PARSE] Raw score: ${score}, Text_Issue: ${textIssue || 'not found'}, Expected_Text: ${expectedText || 'not found'}, Actual_Text: ${actualText || 'not found'}`);
+      // If score is 0 but no text issue detected, log full response for debugging
+      if (score === 0 && (!textIssue || textIssue === 'NONE')) {
+        log.warn(`⚠️  [QUALITY] AI returned score 0 but no text issue detected! Full response (first 500 chars):\n${responseText.substring(0, 500)}`);
+      }
+    }
 
     // ENFORCE text error = score 0 for covers (Gemini sometimes ignores this instruction)
     let finalScore = score;
