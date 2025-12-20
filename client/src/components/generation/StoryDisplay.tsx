@@ -920,7 +920,7 @@ export function StoryDisplay({
 
       {/* Cover Images Display */}
       {coverImages && (getCoverImageData(coverImages.frontCover) || getCoverImageData(coverImages.initialPage) || getCoverImageData(coverImages.backCover)) && (
-        <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mt-6">
+        <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mt-6 max-w-2xl mx-auto">
           <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <BookOpen size={24} /> {language === 'de' ? 'Buchcover' : language === 'fr' ? 'Couvertures' : 'Book Covers'}
           </h3>
