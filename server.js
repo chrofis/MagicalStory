@@ -260,6 +260,14 @@ function parseClothingCategory(sceneDescription) {
   if (clothingMatch) {
     return clothingMatch[1].toLowerCase();
   }
+
+  // Also try multiline pattern where clothing value is on the next line:
+  // "## 4. **Clothing:**\nwinter"
+  const multilineMatch = sceneDescription.match(/\b(?:Clothing|Kleidung|Vêtements|Tenue)\*{0,2}:\s*\*{0,2}\s*\n\s*(winter|summer|formal|standard)\b/i);
+  if (multilineMatch) {
+    return multilineMatch[1].toLowerCase();
+  }
+
   return null;
 }
 
