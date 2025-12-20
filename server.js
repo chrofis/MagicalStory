@@ -3481,12 +3481,20 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       console.log(`🗑️ [REGEN] Cleared cache for page ${pageNumber} to force new generation`);
     }
 
+    // Get the current image before regenerating (to store as previous version)
+    let sceneImages = storyData.sceneImages || [];
+    const existingImage = sceneImages.find(img => img.pageNumber === pageNumber);
+    const previousImageData = existingImage?.imageData || null;
+    const previousScore = existingImage?.qualityScore || null;
+    const previousReasoning = existingImage?.qualityReasoning || null;
+
+    console.log(`📸 [REGEN] Capturing previous image (${previousImageData ? 'has data' : 'none'}, score: ${previousScore})`);
+
     // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
     const imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos);
 
     // Update the image in story data
-    let sceneImages = storyData.sceneImages || [];
     const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
 
     const newImageData = {
@@ -3495,13 +3503,14 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       description: sceneDesc?.description || customPrompt,
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning || null,
-      wasRegenerated: imageResult.wasRegenerated || false,
+      wasRegenerated: true,
       totalAttempts: imageResult.totalAttempts || 1,
       retryHistory: imageResult.retryHistory || [],
-      originalImage: imageResult.originalImage || null,
-      originalScore: imageResult.originalScore || null,
-      originalReasoning: imageResult.originalReasoning || null,
-      referencePhotos
+      originalImage: previousImageData,
+      originalScore: previousScore,
+      originalReasoning: previousReasoning,
+      referencePhotos,
+      regeneratedAt: new Date().toISOString()
     };
 
     if (existingIndex >= 0) {
@@ -3531,7 +3540,10 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning,
       totalAttempts: imageResult.totalAttempts || 1,
-      retryHistory: imageResult.retryHistory || []
+      retryHistory: imageResult.retryHistory || [],
+      originalImage: previousImageData,
+      originalScore: previousScore,
+      originalReasoning: previousReasoning
     });
 
   } catch (err) {

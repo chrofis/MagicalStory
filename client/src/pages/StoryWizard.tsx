@@ -1291,7 +1291,7 @@ export default function StoryWizard() {
                     log.error('No imageData in response!', result);
                     throw new Error('No image data returned from server');
                   }
-                  // Update the scene images array with all returned data (including quality evaluation)
+                  // Update the scene images array with all returned data (including quality evaluation and previous image)
                   setSceneImages(prev => prev.map(img =>
                     img.pageNumber === pageNumber ? {
                       ...img,
@@ -1300,7 +1300,10 @@ export default function StoryWizard() {
                       qualityReasoning: result.qualityReasoning,
                       totalAttempts: result.totalAttempts,
                       retryHistory: result.retryHistory,
-                      wasRegenerated: true
+                      wasRegenerated: true,
+                      originalImage: result.originalImage,
+                      originalScore: result.originalScore,
+                      originalReasoning: result.originalReasoning
                     } : img
                   ));
                   log.info('Image regenerated successfully, updated state');

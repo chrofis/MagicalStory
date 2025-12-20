@@ -304,6 +304,9 @@ export const storyService = {
     qualityReasoning?: string;
     totalAttempts?: number;
     retryHistory?: RetryAttempt[];
+    originalImage?: string;
+    originalScore?: number;
+    originalReasoning?: string;
   }> {
     const response = await api.post<{
       imageData: string;
@@ -311,6 +314,9 @@ export const storyService = {
       qualityReasoning?: string;
       totalAttempts?: number;
       retryHistory?: RetryAttempt[];
+      originalImage?: string;
+      originalScore?: number;
+      originalReasoning?: string;
     }>(
       `/api/stories/${storyId}/regenerate/image/${pageNum}`
     );
