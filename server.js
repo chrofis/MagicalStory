@@ -8326,6 +8326,21 @@ function extractCoverScenes(outline) {
       continue;
     }
 
+    // Stop collecting if we hit section separators or new sections
+    if (line === '---' || line.match(/^#{1,3}\s*(Visual Bible|Page-by-Page|Characters|Animals|Locations)/i)) {
+      if (currentCoverType && sceneBuffer) {
+        coverScenes[currentCoverType] = sceneBuffer.trim();
+      }
+      currentCoverType = null;
+      sceneBuffer = '';
+      continue;
+    }
+
+    // Skip Clothing lines - not part of scene description
+    if (line.match(/^\*{0,2}Clothing\*{0,2}:/i)) {
+      continue;
+    }
+
     // Look for "Scene:" pattern
     const sceneMatch = line.match(/^(?:\*\*)?Scene(?:\*\*)?:\s*(.+)/i);
     if (sceneMatch) {
