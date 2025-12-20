@@ -250,6 +250,41 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
           </div>
         </div>
       </div>
+
+      {/* Buy Credits Modal */}
+      {showCreditsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreditsModal(false)}>
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              {language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : 'Buy Credits'}
+            </h2>
+            <p className="text-gray-600 mb-4">
+              {language === 'de'
+                ? 'Diese Funktion kommt bald. Bitte kontaktieren Sie uns für weitere Credits.'
+                : language === 'fr'
+                ? 'Cette fonctionnalité arrive bientôt. Veuillez nous contacter pour obtenir plus de crédits.'
+                : 'This feature is coming soon. Please contact us to get more credits.'}
+            </p>
+            <div className="bg-indigo-50 rounded-lg p-4 mb-4">
+              <p className="text-indigo-900 font-medium">
+                {language === 'de' ? 'Kontakt:' : language === 'fr' ? 'Contact:' : 'Contact:'}
+              </p>
+              <a
+                href="mailto:info@magicalstory.ch"
+                className="text-indigo-600 hover:underline font-semibold"
+              >
+                info@magicalstory.ch
+              </a>
+            </div>
+            <button
+              onClick={() => setShowCreditsModal(false)}
+              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 font-semibold"
+            >
+              {language === 'de' ? 'Schließen' : language === 'fr' ? 'Fermer' : 'Close'}
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

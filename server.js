@@ -2793,6 +2793,87 @@ app.put('/api/user/shipping-address', authenticateToken, async (req, res) => {
   }
 });
 
+// Get user's orders
+app.get('/api/user/orders', authenticateToken, async (req, res) => {
+  try {
+    console.log(`📦 [USER] GET /api/user/orders - User: ${req.user.username}`);
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const query = `
+        SELECT
+          o.id,
+          o.story_id,
+          o.customer_name,
+          o.shipping_name,
+          o.shipping_address_line1,
+          o.shipping_city,
+          o.shipping_postal_code,
+          o.shipping_country,
+          o.amount_total,
+          o.currency,
+          o.payment_status,
+          o.gelato_status,
+          o.tracking_number,
+          o.tracking_url,
+          o.created_at,
+          o.shipped_at,
+          o.delivered_at,
+          s.data as story_data
+        FROM orders o
+        LEFT JOIN stories s ON o.story_id = s.id
+        WHERE o.user_id = $1
+        ORDER BY o.created_at DESC
+      `;
+      const rows = await dbQuery(query, [req.user.id]);
+
+      // Parse story data to get title
+      const orders = rows.map(order => {
+        let storyTitle = 'Untitled Story';
+        if (order.story_data) {
+          try {
+            const storyData = JSON.parse(order.story_data);
+            storyTitle = storyData.title || storyData.storyTitle || 'Untitled Story';
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+
+        return {
+          id: order.id,
+          storyId: order.story_id,
+          storyTitle,
+          customerName: order.customer_name,
+          shippingName: order.shipping_name,
+          shippingAddress: {
+            line1: order.shipping_address_line1,
+            city: order.shipping_city,
+            postalCode: order.shipping_postal_code,
+            country: order.shipping_country
+          },
+          amount: order.amount_total,
+          currency: order.currency,
+          paymentStatus: order.payment_status,
+          orderStatus: order.gelato_status || 'processing',
+          trackingNumber: order.tracking_number,
+          trackingUrl: order.tracking_url,
+          createdAt: order.created_at,
+          shippedAt: order.shipped_at,
+          deliveredAt: order.delivered_at
+        };
+      });
+
+      console.log(`📦 [USER] Found ${orders.length} orders for user ${req.user.username}`);
+      res.json({ orders });
+    } else {
+      // File mode - not implemented for orders
+      res.json({ orders: [] });
+    }
+  } catch (err) {
+    console.error('Error fetching user orders:', err);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
 // Update user's email address
 app.put('/api/user/update-email', authenticateToken, async (req, res) => {
   try {
@@ -11047,6 +11128,59 @@ function parseSceneDescriptions(text, expectedCount) {
   return scenes;
 }
 
+/**
+ * Build relative height description for characters
+ * Instead of absolute cm values, describes relative heights which AI understands better
+ * @param {Array} characters - Array of character objects with name and height properties
+ * @returns {string} Description like "Height order: Emma (shortest), Max (much taller), Dad (slightly taller)"
+ */
+function buildRelativeHeightDescription(characters) {
+  if (!characters || characters.length < 2) return '';
+
+  // Filter characters that have height and sort by height
+  const withHeight = characters
+    .filter(c => c.height && !isNaN(parseInt(c.height)))
+    .map(c => ({ name: c.name, height: parseInt(c.height) }))
+    .sort((a, b) => a.height - b.height);
+
+  if (withHeight.length < 2) return '';
+
+  // Build relative description
+  const descriptions = [];
+
+  for (let i = 0; i < withHeight.length; i++) {
+    const char = withHeight[i];
+
+    if (i === 0) {
+      // First (shortest) character
+      descriptions.push(`${char.name} (shortest)`);
+    } else {
+      // Compare to previous character
+      const prev = withHeight[i - 1];
+      const diff = char.height - prev.height;
+
+      let descriptor;
+      if (diff <= 3) {
+        descriptor = 'about the same height';
+      } else if (diff <= 8) {
+        descriptor = 'slightly taller';
+      } else if (diff <= 15) {
+        descriptor = 'a bit taller';
+      } else if (diff <= 25) {
+        descriptor = 'taller';
+      } else if (diff <= 40) {
+        descriptor = 'much taller';
+      } else {
+        descriptor = 'a lot taller';
+      }
+
+      descriptions.push(`${char.name} (${descriptor})`);
+    }
+  }
+
+  return `**HEIGHT ORDER (shortest to tallest):** ${descriptions.join(' → ')}`;
+}
+
 function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null) {
   // Build image generation prompt (matches step-by-step format)
   // For storybook mode: visualBible entries are added here since there's no separate scene description step
@@ -11068,7 +11202,15 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       return `${index + 1}. ${brief}`;
     });
 
+    // Build relative height description (AI understands this better than cm values)
+    const heightDescription = buildRelativeHeightDescription(sceneCharacters);
+
     characterReferenceList = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+
+    if (heightDescription) {
+      characterReferenceList += `\n${heightDescription}\n`;
+      console.log(`📏 [IMAGE PROMPT] Added relative heights: ${heightDescription}`);
+    }
   }
 
   // Build Visual Bible section for page-specific recurring elements (animals, artifacts, locations)

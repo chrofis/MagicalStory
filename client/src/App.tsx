@@ -7,6 +7,7 @@ import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const StoryWizard = lazy(() => import('./pages/StoryWizard'));
 const MyStories = lazy(() => import('./pages/MyStories'));
+const MyOrders = lazy(() => import('./pages/MyOrders'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/create/*" element={<StoryWizard />} />
           <Route path="/stories" element={<MyStories />} />
+          <Route path="/orders" element={<MyOrders />} />
           <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
       </Suspense>
