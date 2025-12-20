@@ -10,7 +10,7 @@ Create a front cover illustration for a children's book.
 - Transform these people into the requested art style
 - Characters must be RECOGNIZABLE but styled artistically
 - ALL characters must have the SAME consistent art style
-
+{CHARACTER_REFERENCE_LIST}
 **COMPOSITION GUIDELINES:**
 - The MAIN CHARACTER should be the focal point - prominent, centered, and clearly the star
 - Supporting characters (if present in scene) should be smaller or positioned to the sides/background

@@ -10,7 +10,7 @@ Create a back cover illustration for a children's book.
 - Transform these people into the requested art style
 - Characters must be RECOGNIZABLE but styled artistically
 - ALL characters must have the SAME consistent art style
-
+{CHARACTER_REFERENCE_LIST}
 **COMPOSITION GUIDELINES:**
 - This is a GROUP scene - include all characters together
 - Give EQUAL visual prominence to all characters - like a family/group photo

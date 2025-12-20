@@ -3489,6 +3489,18 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const visualBible = storyData.visualBible || null;
     const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
+    // Helper to build character reference list for cover prompts
+    const buildCharRefList = (photos) => {
+      if (!photos || photos.length === 0) return '';
+      const charDescriptions = photos.map((photo, index) => {
+        const age = photo.age ? `${photo.age} years old` : '';
+        const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
+        const brief = [photo.name, age, gender].filter(Boolean).join(', ');
+        return `${index + 1}. ${brief}`;
+      });
+      return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+    };
+
     // Build cover prompt
     let coverPrompt;
     if (customPrompt) {
@@ -3503,6 +3515,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
           STORY_TITLE: storyTitle,
+          CHARACTER_REFERENCE_LIST: buildCharRefList(characterPhotos),
           VISUAL_BIBLE: visualBiblePrompt
         });
       } else if (normalizedCoverType === 'initialPage') {
@@ -3512,12 +3525,14 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               DEDICATION: storyData.dedication,
+              CHARACTER_REFERENCE_LIST: buildCharRefList(characterPhotos),
               VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               STORY_TITLE: storyTitle,
+              CHARACTER_REFERENCE_LIST: buildCharRefList(characterPhotos),
               VISUAL_BIBLE: visualBiblePrompt
             });
       } else {
@@ -3525,6 +3540,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
         coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_REFERENCE_LIST: buildCharRefList(characterPhotos),
           VISUAL_BIBLE: visualBiblePrompt
         });
       }
@@ -9167,6 +9183,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
         const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
+        // Helper to build character reference list for cover prompts
+        const buildCharacterReferenceList = (photos) => {
+          if (!photos || photos.length === 0) return '';
+          const charDescriptions = photos.map((photo, index) => {
+            const age = photo.age ? `${photo.age} years old` : '';
+            const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
+            const brief = [photo.name, age, gender].filter(Boolean).join(', ');
+            return `${index + 1}. ${brief}`;
+          });
+          return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+        };
+
         // Front cover - use same template as standard mode
         // Detect which characters appear in the front cover scene
         const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
@@ -9180,6 +9208,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
           STORY_TITLE: storyTitle,
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos),
           VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.frontCover = frontCoverPrompt;
@@ -9212,12 +9241,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               DEDICATION: inputData.dedication,
+              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
               VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               STORY_TITLE: storyTitle,
+              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
               VISUAL_BIBLE: visualBiblePrompt
             });
         coverPrompts.initialPage = initialPrompt;
@@ -9248,6 +9279,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos),
           VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.backCover = backCoverPrompt;
@@ -10078,6 +10110,18 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
+      // Helper to build character reference list for cover prompts
+      const buildCharacterReferenceList = (photos) => {
+        if (!photos || photos.length === 0) return '';
+        const charDescriptions = photos.map((photo, index) => {
+          const age = photo.age ? `${photo.age} years old` : '';
+          const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
+          const brief = [photo.name, age, gender].filter(Boolean).join(', ');
+          return `${index + 1}. ${brief}`;
+        });
+        return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+      };
+
       let frontCoverResult, initialPageResult, backCoverResult;
 
       // Generate front cover (matches step-by-step prompt format)
@@ -10094,6 +10138,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           TITLE_PAGE_SCENE: titlePageScene,
           STYLE_DESCRIPTION: styleDescription,
           STORY_TITLE: storyTitle,
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos),
           VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.frontCover = frontCoverPrompt;
@@ -10117,12 +10162,14 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               DEDICATION: inputData.dedication,
+              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
               VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: initialPageScene,
               STYLE_DESCRIPTION: styleDescription,
               STORY_TITLE: storyTitle,
+              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
               VISUAL_BIBLE: visualBiblePrompt
             });
         coverPrompts.initialPage = initialPagePrompt;
@@ -10144,6 +10191,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: backCoverScene,
           STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos),
           VISUAL_BIBLE: visualBiblePrompt
         });
         coverPrompts.backCover = backCoverPrompt;

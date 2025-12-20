@@ -10,7 +10,7 @@ Create a dedication page illustration for a children's book.
 - Transform these people into the requested art style
 - Characters must be RECOGNIZABLE but styled artistically
 - ALL characters must have the SAME consistent art style
-
+{CHARACTER_REFERENCE_LIST}
 **COMPOSITION GUIDELINES:**
 - This is a GROUP scene introducing all the story's characters
 - The MAIN CHARACTER should be positioned in the CENTER
