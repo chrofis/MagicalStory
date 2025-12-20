@@ -3,8 +3,6 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signOut,
   onAuthStateChanged,
   type User as FirebaseUser
@@ -25,56 +23,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Detect mobile/tablet devices
-function isMobileDevice(): boolean {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
-// Detect iOS specifically (Safari has different auth behavior)
-function isIOS(): boolean {
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
 export async function signInWithGoogle(): Promise<FirebaseUser> {
-  // On iOS: Try popup first (works better with Safari ITP), fall back to redirect
-  // On Android: Use redirect (popup often blocked)
-  // On Desktop: Use popup (faster UX)
-
-  if (isMobileDevice() && !isIOS()) {
-    // Android - use redirect (popup usually blocked)
-    await signInWithRedirect(auth, googleProvider);
-    throw new Error('Redirecting to Google...');
-  }
-
-  // iOS and Desktop - try popup first
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error: unknown) {
-    const firebaseError = error as { code?: string };
-    console.log('Popup auth error:', firebaseError.code);
-
-    // If popup fails, fall back to redirect
-    if (firebaseError.code === 'auth/popup-closed-by-user' ||
-        firebaseError.code === 'auth/popup-blocked' ||
-        firebaseError.code === 'auth/cancelled-popup-request') {
-      console.log('Popup failed, falling back to redirect...');
-      await signInWithRedirect(auth, googleProvider);
-      throw new Error('Redirecting to Google...');
-    }
-    throw error;
-  }
+  const result = await signInWithPopup(auth, googleProvider);
+  return result.user;
 }
 
-// Handle redirect result on page load
+// Kept for backwards compatibility - returns null since we don't use redirect
 export async function handleRedirectResult(): Promise<FirebaseUser | null> {
-  try {
-    const result = await getRedirectResult(auth);
-    return result?.user || null;
-  } catch (error) {
-    console.error('Error handling redirect result:', error);
-    return null;
-  }
+  return null;
 }
 
 export async function getIdToken(user: FirebaseUser): Promise<string> {
