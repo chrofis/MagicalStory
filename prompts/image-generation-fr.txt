@@ -7,14 +7,13 @@ ILLUSTRATION DE LIVRE POUR ENFANTS - Contenu sûr et familial.
 - Les personnages doivent rester RECONNAISSABLES (couleur de cheveux, forme du visage, âge, genre)
 - Rendre dans le style artistique - PAS de copies photo-réalistes
 - TOUS les personnages dans le MÊME style cohérent
+- VÊTEMENTS des personnages: Utiliser les vêtements décrits dans la scène. Si non spécifié, EXACTEMENT comme sur les images de référence
 
 ---
 
 {CHARACTER_REFERENCE_LIST}
 
 **SCÈNE:** {SCENE_DESCRIPTION}
-
-{VISUAL_BIBLE}
 
 ---
 

@@ -1496,7 +1496,7 @@ export function StoryDisplay({
                     )}
 
                     {/* Text on the right */}
-                    <div className="flex items-center">
+                    <div className="flex items-start">
                       <div className="prose max-w-none">
                         <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl">
                           {pageText.trim()}

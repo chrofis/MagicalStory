@@ -7,14 +7,13 @@ KINDERBUCH-ILLUSTRATION - Sichere, familienfreundliche Inhalte.
 - Charaktere müssen ERKENNBAR bleiben (Haarfarbe, Gesichtsform, Alter, Geschlecht)
 - Im künstlerischen Stil rendern - KEINE fotorealistischen Kopien
 - ALLE Charaktere im GLEICHEN konsistenten Stil
+- KLEIDUNG der Charaktere: Verwende die in der Szene beschriebene Kleidung. Falls nicht angegeben, EXAKT wie in den Referenzbildern
 
 ---
 
 {CHARACTER_REFERENCE_LIST}
 
 **SZENE:** {SCENE_DESCRIPTION}
-
-{VISUAL_BIBLE}
 
 ---
 
