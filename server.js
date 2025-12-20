@@ -253,26 +253,45 @@ function getCharacterPhotos(characters, clothingCategory = null) {
 function parseClothingCategory(sceneDescription) {
   if (!sceneDescription) return null;
 
-  // Match patterns like "Clothing: summer", "**3. Clothing:** summer", "## 3. Kleidung: **winter**"
-  // Support English (Clothing), German (Kleidung), and French (Vêtements/Tenue)
-  // Use word boundary \b to match regardless of what precedes it (numbers, markdown, etc.)
-  const clothingMatch = sceneDescription.match(/\b(?:Clothing|Kleidung|Vêtements|Tenue)\*{0,2}:\s*\*{0,2}(winter|summer|formal|standard)\b/i);
-  if (clothingMatch) {
-    return clothingMatch[1].toLowerCase();
+  // Generic approach: find "Clothing" keyword (in any language) and look for value nearby
+  // Handles any markdown: **, *, --, __, ##, etc.
+
+  // Markdown chars that might wrap keywords or values
+  const md = '[\\*_\\-#\\s\\.\\d]*';
+
+  // Clothing keywords in multiple languages
+  const keywords = '(?:Clothing|Kleidung|Vêtements|Tenue)';
+
+  // Valid clothing values
+  const values = '(winter|summer|formal|standard)';
+
+  // Pattern 1: Same line - keyword and value on same line with any markdown/separators
+  // Handles: **Clothing:** winter, *Clothing*: **winter**, --Clothing--: winter, ## 4. Clothing: winter
+  const sameLineMatch = sceneDescription.match(
+    new RegExp(keywords + md + ':?' + md + values, 'i')
+  );
+  if (sameLineMatch) {
+    return sameLineMatch[1].toLowerCase();
   }
 
-  // Try multiline pattern where clothing value is on the next line with colon:
-  // "## 4. **Clothing:**\nwinter"
-  const multilineMatch = sceneDescription.match(/\b(?:Clothing|Kleidung|Vêtements|Tenue)\*{0,2}:\s*\*{0,2}\s*\n\s*\*{0,2}(winter|summer|formal|standard)\*{0,2}\b/i);
+  // Pattern 2: Value on next line - handles any markdown formatting
+  // Handles: **Clothing:**\n**winter**, ## Clothing\n*winter*, Clothing:\nwinter
+  const multilineMatch = sceneDescription.match(
+    new RegExp(keywords + md + ':?' + md + '\\n' + md + values + md, 'i')
+  );
   if (multilineMatch) {
     return multilineMatch[1].toLowerCase();
   }
 
-  // Try markdown header format (no colon) with value on next line:
-  // "## 4. Clothing\n**winter**"
-  const headerMatch = sceneDescription.match(/\b(?:Clothing|Kleidung|Vêtements|Tenue)\s*\n\s*\*{0,2}(winter|summer|formal|standard)\*{0,2}\b/i);
-  if (headerMatch) {
-    return headerMatch[1].toLowerCase();
+  // Pattern 3: Fallback - find keyword and look for value within next 100 chars
+  const keywordMatch = sceneDescription.match(new RegExp(keywords, 'i'));
+  if (keywordMatch) {
+    const startIndex = keywordMatch.index;
+    const nearbyText = sceneDescription.substring(startIndex, startIndex + 100);
+    const valueMatch = nearbyText.match(/\b(winter|summer|formal|standard)\b/i);
+    if (valueMatch) {
+      return valueMatch[1].toLowerCase();
+    }
   }
 
   return null;
@@ -8842,6 +8861,121 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const shouldStreamImages = false; // Was: !skipImages && imageGenMode === 'parallel'
     let scenesEmittedCount = 0;
 
+    // Track cover image generation promises
+    const streamingCoverPromises = [];
+    let streamingVisualBible = null;
+    let coverImages = { frontCover: null, initialPage: null, backCover: null };
+    const coverPrompts = { front: null, initialPage: null, backCover: null };
+
+    // Helper function to generate cover image during streaming
+    const generateCoverImageDuringStream = async (coverType, sceneDescription) => {
+      if (skipImages) return null;
+
+      try {
+        const clothing = parseClothingCategory(sceneDescription) || 'standard';
+
+        // Determine character selection based on cover type
+        let referencePhotos;
+        if (coverType === 'titlePage') {
+          // Front cover: Main character prominently, maybe 1-2 supporting
+          const frontCoverCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
+          referencePhotos = getCharacterPhotoDetails(frontCoverCharacters.length > 0 ? frontCoverCharacters : inputData.characters || [], clothing);
+          console.log(`📕 [STREAM-COVER] Generating front cover: ${referencePhotos.length} characters, clothing: ${clothing}`);
+        } else {
+          // Initial page and back cover: ALL characters
+          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing);
+          console.log(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}`);
+        }
+
+        // Build the prompt
+        let coverPrompt;
+        const visualBibleText = streamingVisualBible ? formatVisualBibleForPrompt(streamingVisualBible) : '';
+
+        if (coverType === 'titlePage') {
+          coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+            TITLE_PAGE_SCENE: sceneDescription,
+            STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
+            VISUAL_BIBLE: visualBibleText,
+            STORY_TITLE: inputData.title || storyTitle
+          });
+          coverPrompts.front = coverPrompt;
+        } else if (coverType === 'initialPage') {
+          coverPrompt = inputData.dedication && inputData.dedication.trim()
+            ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+                INITIAL_PAGE_SCENE: sceneDescription,
+                STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
+                VISUAL_BIBLE: visualBibleText,
+                DEDICATION: inputData.dedication
+              })
+            : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+                INITIAL_PAGE_SCENE: sceneDescription,
+                STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
+                VISUAL_BIBLE: visualBibleText
+              });
+          coverPrompts.initialPage = coverPrompt;
+        } else if (coverType === 'backCover') {
+          coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+            BACK_COVER_SCENE: sceneDescription,
+            STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
+            VISUAL_BIBLE: visualBibleText
+          });
+          coverPrompts.backCover = coverPrompt;
+        }
+
+        // Generate the image
+        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover');
+
+        const coverData = {
+          imageData: result.imageData,
+          description: sceneDescription,
+          prompt: coverPrompt,
+          qualityScore: result.score,
+          qualityReasoning: result.reasoning || null,
+          wasRegenerated: result.wasRegenerated || false,
+          totalAttempts: result.totalAttempts || 1,
+          retryHistory: result.retryHistory || [],
+          originalImage: result.originalImage || null,
+          originalScore: result.originalScore || null,
+          originalReasoning: result.originalReasoning || null,
+          referencePhotos: referencePhotos,
+          modelId: result.modelId || null
+        };
+
+        // Save partial cover checkpoint for progressive display
+        const coverKey = coverType === 'titlePage' ? 'frontCover' : coverType;
+        await saveCheckpoint(jobId, 'partial_cover', { type: coverKey, ...coverData },
+          coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? 1 : 2);
+
+        console.log(`✅ [STREAM-COVER] ${coverType} cover generated during streaming (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+
+        return { type: coverKey, data: coverData };
+      } catch (error) {
+        console.error(`❌ [STREAM-COVER] Failed to generate ${coverType} cover:`, error.message);
+        return null;
+      }
+    };
+
+    // Set up cover parser to start cover image generation during streaming
+    const shouldStreamCovers = !skipImages;
+    const coverParser = new ProgressiveCoverParser(
+      // onVisualBibleComplete
+      (parsedVB, rawSection) => {
+        streamingVisualBible = parsedVB;
+        console.log(`📖 [STREAM-COVER] Visual Bible ready for cover generation`);
+      },
+      // onCoverSceneComplete
+      (coverType, sceneDescription, rawBlock) => {
+        if (shouldStreamCovers) {
+          const coverPromise = streamLimit(() => generateCoverImageDuringStream(coverType, sceneDescription));
+          streamingCoverPromises.push(coverPromise);
+        }
+      }
+    );
+
     const sceneParser = new ProgressiveSceneParser((completedScene) => {
       // Called when a scene is detected as complete during streaming
       const { pageNumber, text, sceneDescription } = completedScene;
@@ -8867,14 +9001,28 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     try {
       // Use streaming API call
       response = await callTextModelStreaming(storybookPrompt, 16000, (chunk, fullText) => {
-        // Process each chunk to detect complete scenes
+        // Process each chunk to detect complete scenes AND cover scenes
+        coverParser.processChunk(chunk, fullText);
         sceneParser.processChunk(chunk, fullText);
       });
       console.log(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
-      console.log(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} images started`);
+      console.log(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
+      console.log(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
     } catch (apiError) {
       console.error(`❌ [STORYBOOK] Claude API streaming call failed:`, apiError.message);
       throw apiError;
+    }
+
+    // Wait for any cover images started during streaming
+    if (streamingCoverPromises.length > 0) {
+      console.log(`⚡ [STORYBOOK] Waiting for ${streamingCoverPromises.length} cover images started during streaming...`);
+      const coverResults = await Promise.all(streamingCoverPromises);
+      coverResults.forEach(result => {
+        if (result && result.type && result.data) {
+          coverImages[result.type] = result.data;
+        }
+      });
+      console.log(`✅ [STORYBOOK] ${coverResults.filter(r => r).length} cover images complete from streaming`);
     }
 
     // Save checkpoint
@@ -9162,48 +9310,19 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       allImages.sort((a, b) => a.pageNumber - b.pageNumber);
     }
 
+    // Count how many covers were already generated during streaming
+    const coversFromStreaming = Object.values(coverImages).filter(c => c !== null).length;
+
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [85, 'Generating cover images...', jobId]
+      [85, coversFromStreaming > 0 ? `${coversFromStreaming} cover images ready. Generating remaining covers...` : 'Generating cover images...', jobId]
     );
 
-    // Generate cover images using AI-generated cover scenes
-    let coverImages = { frontCover: null, initialPage: null, backCover: null };
-
-    // Store cover prompts for dev mode display
-    const coverPrompts = {};
-
+    // Generate any cover images not generated during streaming
     if (!skipImages && !skipCovers) {
       try {
         const artStyleId = inputData.artStyle || 'pixar';
         const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
-
-        // Build character info with main character emphasis (matching server pipeline format)
-        let characterInfo = '';
-        if (inputData.characters && inputData.characters.length > 0) {
-          const mainCharIds = inputData.mainCharacters || [];
-          const mainChars = (inputData.characters || []).filter(c => mainCharIds.includes(c.id));
-          const supportingChars = (inputData.characters || []).filter(c => !mainCharIds.includes(c.id));
-
-          characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
-
-          // List main characters first with full physical description
-          mainChars.forEach((char) => {
-            const physicalDesc = buildCharacterPhysicalDescription(char);
-            characterInfo += `⭐ MAIN: ${physicalDesc}\n`;
-          });
-
-          // Then supporting characters
-          if (supportingChars.length > 0) {
-            characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
-            supportingChars.forEach((char) => {
-              const physicalDesc = buildCharacterPhysicalDescription(char);
-              characterInfo += `Supporting: ${physicalDesc}\n`;
-            });
-          }
-
-          characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
-        }
 
         // Use AI-generated cover scenes (or fallbacks)
         const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
@@ -9213,125 +9332,125 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
         const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
-        // Helper to build character reference list for cover prompts
-        const buildCharacterReferenceList = (photos) => {
-          if (!photos || photos.length === 0) return '';
-          const charDescriptions = photos.map((photo, index) => {
-            const age = photo.age ? `${photo.age} years old` : '';
-            const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
-            const brief = [photo.name, age, gender].filter(Boolean).join(', ');
-            return `${index + 1}. ${brief}`;
+        // Front cover - only generate if not already done during streaming
+        if (!coverImages.frontCover) {
+          // Detect which characters appear in the front cover scene
+          const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
+          // Parse clothing category from scene description (same as regular images)
+          const frontCoverClothing = parseClothingCategory(titlePageScene) || 'standard';
+          // Use detailed photo info (with names) for labeled reference images
+          const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
+          console.log(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}), clothing: ${frontCoverClothing}`);
+
+          const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+            TITLE_PAGE_SCENE: titlePageScene,
+            STYLE_DESCRIPTION: styleDescription,
+            STORY_TITLE: storyTitle,
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos),
+            VISUAL_BIBLE: visualBiblePrompt
           });
-          return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
-        };
+          coverPrompts.frontCover = frontCoverPrompt;
+          const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
+          console.log(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
+          coverImages.frontCover = {
+            imageData: frontCoverResult.imageData,
+            description: titlePageScene,
+            prompt: frontCoverPrompt,
+            qualityScore: frontCoverResult.score,
+            qualityReasoning: frontCoverResult.reasoning || null,
+            wasRegenerated: frontCoverResult.wasRegenerated || false,
+            totalAttempts: frontCoverResult.totalAttempts || 1,
+            retryHistory: frontCoverResult.retryHistory || [],
+            originalImage: frontCoverResult.originalImage || null,
+            originalScore: frontCoverResult.originalScore || null,
+            originalReasoning: frontCoverResult.originalReasoning || null,
+            referencePhotos: frontCoverPhotos,
+            modelId: frontCoverResult.modelId || null
+          };
+        } else {
+          console.log(`⚡ [STORYBOOK] Front cover already generated during streaming (skipping)`);
+        }
 
-        // Front cover - use same template as standard mode
-        // Detect which characters appear in the front cover scene
-        const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
-        // Parse clothing category from scene description (same as regular images)
-        const frontCoverClothing = parseClothingCategory(titlePageScene) || 'standard';
-        // Use detailed photo info (with names) for labeled reference images
-        const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
-        console.log(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}), clothing: ${frontCoverClothing}`);
+        // Initial page - only generate if not already done during streaming
+        if (!coverImages.initialPage) {
+          // Parse clothing category from scene description
+          const initialPageClothing = parseClothingCategory(initialPageScene) || 'standard';
+          const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
+          console.log(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
 
-        const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-          TITLE_PAGE_SCENE: titlePageScene,
-          STYLE_DESCRIPTION: styleDescription,
-          STORY_TITLE: storyTitle,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos),
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-        coverPrompts.frontCover = frontCoverPrompt;
-        const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
-        console.log(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
-        coverImages.frontCover = {
-          imageData: frontCoverResult.imageData,
-          description: titlePageScene,
-          prompt: frontCoverPrompt,
-          qualityScore: frontCoverResult.score,
-          qualityReasoning: frontCoverResult.reasoning || null,
-          wasRegenerated: frontCoverResult.wasRegenerated || false,
-          totalAttempts: frontCoverResult.totalAttempts || 1,
-          retryHistory: frontCoverResult.retryHistory || [],
-          originalImage: frontCoverResult.originalImage || null,
-          originalScore: frontCoverResult.originalScore || null,
-          originalReasoning: frontCoverResult.originalReasoning || null,
-          referencePhotos: frontCoverPhotos,
-          modelId: frontCoverResult.modelId || null
-        };
+          const initialPrompt = inputData.dedication && inputData.dedication.trim()
+            ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+                INITIAL_PAGE_SCENE: initialPageScene,
+                STYLE_DESCRIPTION: styleDescription,
+                DEDICATION: inputData.dedication,
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
+                VISUAL_BIBLE: visualBiblePrompt
+              })
+            : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+                INITIAL_PAGE_SCENE: initialPageScene,
+                STYLE_DESCRIPTION: styleDescription,
+                STORY_TITLE: storyTitle,
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
+                VISUAL_BIBLE: visualBiblePrompt
+              });
+          coverPrompts.initialPage = initialPrompt;
+          const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover');
+          console.log(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
+          coverImages.initialPage = {
+            imageData: initialResult.imageData,
+            description: initialPageScene,
+            prompt: initialPrompt,
+            qualityScore: initialResult.score,
+            qualityReasoning: initialResult.reasoning || null,
+            wasRegenerated: initialResult.wasRegenerated || false,
+            totalAttempts: initialResult.totalAttempts || 1,
+            retryHistory: initialResult.retryHistory || [],
+            originalImage: initialResult.originalImage || null,
+            originalScore: initialResult.originalScore || null,
+            originalReasoning: initialResult.originalReasoning || null,
+            referencePhotos: initialPagePhotos,
+            modelId: initialResult.modelId || null
+          };
+        } else {
+          console.log(`⚡ [STORYBOOK] Initial page already generated during streaming (skipping)`);
+        }
 
-        // Initial page - use ALL characters (main character centered, all others around)
-        // Parse clothing category from scene description
-        const initialPageClothing = parseClothingCategory(initialPageScene) || 'standard';
-        const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
-        console.log(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
+        // Back cover - only generate if not already done during streaming
+        if (!coverImages.backCover) {
+          // Parse clothing category from scene description
+          const backCoverClothing = parseClothingCategory(backCoverScene) || 'standard';
+          const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
+          console.log(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
 
-        const initialPrompt = inputData.dedication && inputData.dedication.trim()
-          ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
-              INITIAL_PAGE_SCENE: initialPageScene,
-              STYLE_DESCRIPTION: styleDescription,
-              DEDICATION: inputData.dedication,
-              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
-              VISUAL_BIBLE: visualBiblePrompt
-            })
-          : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
-              INITIAL_PAGE_SCENE: initialPageScene,
-              STYLE_DESCRIPTION: styleDescription,
-              STORY_TITLE: storyTitle,
-              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
-              VISUAL_BIBLE: visualBiblePrompt
-            });
-        coverPrompts.initialPage = initialPrompt;
-        const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover');
-        console.log(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
-        coverImages.initialPage = {
-          imageData: initialResult.imageData,
-          description: initialPageScene,
-          prompt: initialPrompt,
-          qualityScore: initialResult.score,
-          qualityReasoning: initialResult.reasoning || null,
-          wasRegenerated: initialResult.wasRegenerated || false,
-          totalAttempts: initialResult.totalAttempts || 1,
-          retryHistory: initialResult.retryHistory || [],
-          originalImage: initialResult.originalImage || null,
-          originalScore: initialResult.originalScore || null,
-          originalReasoning: initialResult.originalReasoning || null,
-          referencePhotos: initialPagePhotos,
-          modelId: initialResult.modelId || null
-        };
+          const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+            BACK_COVER_SCENE: backCoverScene,
+            STYLE_DESCRIPTION: styleDescription,
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos),
+            VISUAL_BIBLE: visualBiblePrompt
+          });
+          coverPrompts.backCover = backCoverPrompt;
+          const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover');
+          console.log(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
+          coverImages.backCover = {
+            imageData: backCoverResult.imageData,
+            description: backCoverScene,
+            prompt: backCoverPrompt,
+            qualityScore: backCoverResult.score,
+            qualityReasoning: backCoverResult.reasoning || null,
+            wasRegenerated: backCoverResult.wasRegenerated || false,
+            totalAttempts: backCoverResult.totalAttempts || 1,
+            retryHistory: backCoverResult.retryHistory || [],
+            originalImage: backCoverResult.originalImage || null,
+            originalScore: backCoverResult.originalScore || null,
+            originalReasoning: backCoverResult.originalReasoning || null,
+            referencePhotos: backCoverPhotos,
+            modelId: backCoverResult.modelId || null
+          };
+        } else {
+          console.log(`⚡ [STORYBOOK] Back cover already generated during streaming (skipping)`);
+        }
 
-        // Back cover - use ALL characters with EQUAL prominence (no focus on main character)
-        // Parse clothing category from scene description
-        const backCoverClothing = parseClothingCategory(backCoverScene) || 'standard';
-        const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
-        console.log(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
-
-        const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
-          BACK_COVER_SCENE: backCoverScene,
-          STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos),
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-        coverPrompts.backCover = backCoverPrompt;
-        const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover');
-        console.log(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
-        coverImages.backCover = {
-          imageData: backCoverResult.imageData,
-          description: backCoverScene,
-          prompt: backCoverPrompt,
-          qualityScore: backCoverResult.score,
-          qualityReasoning: backCoverResult.reasoning || null,
-          wasRegenerated: backCoverResult.wasRegenerated || false,
-          totalAttempts: backCoverResult.totalAttempts || 1,
-          retryHistory: backCoverResult.retryHistory || [],
-          originalImage: backCoverResult.originalImage || null,
-          originalScore: backCoverResult.originalScore || null,
-          originalReasoning: backCoverResult.originalReasoning || null,
-          referencePhotos: backCoverPhotos,
-          modelId: backCoverResult.modelId || null
-        };
-
-        console.log(`✅ [STORYBOOK] Cover images generated using AI scene descriptions`);
+        console.log(`✅ [STORYBOOK] Cover images complete (${coversFromStreaming} from streaming, ${3 - coversFromStreaming} generated after)`);
       } catch (error) {
         console.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
       }
@@ -11164,6 +11283,106 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null) 
 }
 
 /**
+ * Progressive cover parser for streaming story generation
+ * Detects Visual Bible and cover scenes as they complete during streaming
+ * and triggers callbacks to start cover image generation early
+ */
+class ProgressiveCoverParser {
+  constructor(onVisualBibleComplete, onCoverSceneComplete) {
+    this.onVisualBibleComplete = onVisualBibleComplete;
+    this.onCoverSceneComplete = onCoverSceneComplete;
+    this.fullText = '';
+    this.visualBibleEmitted = false;
+    this.emittedCovers = new Set();  // 'titlePage', 'initialPage', 'backCover'
+  }
+
+  /**
+   * Process new text chunk and emit Visual Bible and cover scenes as they complete
+   * @param {string} chunk - New text chunk
+   * @param {string} fullText - Complete text so far
+   */
+  processChunk(chunk, fullText) {
+    this.fullText = fullText;
+
+    // Check for Visual Bible completion
+    // Visual Bible is complete when we see ---TITLE PAGE--- after ---VISUAL BIBLE---
+    if (!this.visualBibleEmitted && fullText.includes('---VISUAL BIBLE---') && fullText.includes('---TITLE PAGE---')) {
+      const visualBibleMatch = fullText.match(/---VISUAL BIBLE---\s*([\s\S]*?)(?=---TITLE PAGE---|$)/i);
+      if (visualBibleMatch) {
+        this.visualBibleEmitted = true;
+        const visualBibleSection = visualBibleMatch[1].trim();
+        console.log(`🌊 [STREAM-COVER] Visual Bible section complete (${visualBibleSection.length} chars)`);
+        if (this.onVisualBibleComplete) {
+          const parsedVB = parseVisualBible('## Visual Bible\n' + visualBibleSection);
+          this.onVisualBibleComplete(parsedVB, visualBibleSection);
+        }
+      }
+    }
+
+    // Check for Title Page scene completion
+    // Title Page is complete when we see ---INITIAL PAGE--- after ---TITLE PAGE---
+    if (!this.emittedCovers.has('titlePage') && fullText.includes('---TITLE PAGE---') && fullText.includes('---INITIAL PAGE---')) {
+      const titlePageMatch = fullText.match(/---TITLE PAGE---\s*([\s\S]*?)(?=---INITIAL PAGE---|$)/i);
+      if (titlePageMatch) {
+        const titlePageBlock = titlePageMatch[1];
+        const sceneMatch = titlePageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+        if (sceneMatch) {
+          this.emittedCovers.add('titlePage');
+          const scene = sceneMatch[1].trim();
+          console.log(`🌊 [STREAM-COVER] Title Page scene complete: ${scene.substring(0, 80)}...`);
+          if (this.onCoverSceneComplete) {
+            this.onCoverSceneComplete('titlePage', scene, titlePageBlock);
+          }
+        }
+      }
+    }
+
+    // Check for Initial Page scene completion
+    // Initial Page is complete when we see ---BACK COVER--- after ---INITIAL PAGE---
+    if (!this.emittedCovers.has('initialPage') && fullText.includes('---INITIAL PAGE---') && fullText.includes('---BACK COVER---')) {
+      const initialPageMatch = fullText.match(/---INITIAL PAGE---\s*([\s\S]*?)(?=---BACK COVER---|$)/i);
+      if (initialPageMatch) {
+        const initialPageBlock = initialPageMatch[1];
+        const sceneMatch = initialPageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+        if (sceneMatch) {
+          this.emittedCovers.add('initialPage');
+          const scene = sceneMatch[1].trim();
+          console.log(`🌊 [STREAM-COVER] Initial Page scene complete: ${scene.substring(0, 80)}...`);
+          if (this.onCoverSceneComplete) {
+            this.onCoverSceneComplete('initialPage', scene, initialPageBlock);
+          }
+        }
+      }
+    }
+
+    // Check for Back Cover scene completion
+    // Back Cover is complete when we see ---PAGE 1--- after ---BACK COVER---
+    if (!this.emittedCovers.has('backCover') && fullText.includes('---BACK COVER---') && fullText.includes('---PAGE 1---')) {
+      const backCoverMatch = fullText.match(/---BACK COVER---\s*([\s\S]*?)(?=---PAGE 1---|$)/i);
+      if (backCoverMatch) {
+        const backCoverBlock = backCoverMatch[1];
+        const sceneMatch = backCoverBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+        if (sceneMatch) {
+          this.emittedCovers.add('backCover');
+          const scene = sceneMatch[1].trim();
+          console.log(`🌊 [STREAM-COVER] Back Cover scene complete: ${scene.substring(0, 80)}...`);
+          if (this.onCoverSceneComplete) {
+            this.onCoverSceneComplete('backCover', scene, backCoverBlock);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if all cover scenes have been emitted
+   */
+  allCoversEmitted() {
+    return this.emittedCovers.size === 3;
+  }
+}
+
+/**
  * Progressive scene parser for streaming story generation
  * Detects complete scenes as text streams in and triggers callbacks
  */
@@ -12230,17 +12449,35 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
 
       const job = result.rows[0];
 
-      // Fetch partial results (completed pages) if job is still processing
+      // Fetch partial results (completed pages and covers) if job is still processing
       let partialPages = [];
+      let partialCovers = {};
       if (job.status === 'processing') {
-        const partialResult = await dbPool.query(
+        // Fetch partial pages
+        const partialPagesResult = await dbPool.query(
           `SELECT step_index, step_data
            FROM story_job_checkpoints
            WHERE job_id = $1 AND step_name = 'partial_page'
            ORDER BY step_index ASC`,
           [jobId]
         );
-        partialPages = partialResult.rows.map(row => row.step_data);
+        partialPages = partialPagesResult.rows.map(row => row.step_data);
+
+        // Fetch partial covers (generated during streaming)
+        const partialCoversResult = await dbPool.query(
+          `SELECT step_index, step_data
+           FROM story_job_checkpoints
+           WHERE job_id = $1 AND step_name = 'partial_cover'
+           ORDER BY step_index ASC`,
+          [jobId]
+        );
+        // Convert to object: { frontCover: {...}, initialPage: {...}, backCover: {...} }
+        partialCoversResult.rows.forEach(row => {
+          const coverData = row.step_data;
+          if (coverData && coverData.type) {
+            partialCovers[coverData.type] = coverData;
+          }
+        });
       }
 
       res.json({
@@ -12252,7 +12489,8 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
         errorMessage: job.error_message,
         createdAt: job.created_at,
         completedAt: job.completed_at,
-        partialPages: partialPages  // Array of completed pages with text + image
+        partialPages: partialPages,  // Array of completed pages with text + image
+        partialCovers: Object.keys(partialCovers).length > 0 ? partialCovers : undefined  // Partial cover images
       });
     } else {
       return res.status(503).json({ error: 'Background jobs require database mode' });

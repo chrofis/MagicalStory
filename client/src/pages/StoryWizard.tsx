@@ -900,6 +900,27 @@ export default function StoryWizard() {
           setGenerationProgress(status.progress);
         }
 
+        // Update cover images progressively as they become available during streaming
+        if (status.partialCovers) {
+          setCoverImages(prev => {
+            // Merge partial covers with existing, keeping newer data
+            const updated = { ...prev };
+            if (status.partialCovers?.frontCover && !prev.frontCover) {
+              updated.frontCover = status.partialCovers.frontCover;
+              log.debug('Front cover received during streaming');
+            }
+            if (status.partialCovers?.initialPage && !prev.initialPage) {
+              updated.initialPage = status.partialCovers.initialPage;
+              log.debug('Initial page cover received during streaming');
+            }
+            if (status.partialCovers?.backCover && !prev.backCover) {
+              updated.backCover = status.partialCovers.backCover;
+              log.debug('Back cover received during streaming');
+            }
+            return updated;
+          });
+        }
+
         if (status.status === 'completed' && status.result) {
           // Job completed successfully
           setStoryId(status.result.storyId);
@@ -1612,6 +1633,7 @@ export default function StoryWizard() {
           current={generationProgress.current}
           total={generationProgress.total}
           message={generationProgress.message}
+          coverImages={coverImages}
         />
       )}
 

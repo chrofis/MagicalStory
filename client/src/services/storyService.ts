@@ -453,6 +453,7 @@ export const storyService = {
       sceneImages: SceneImage[];
       coverImages?: CoverImages;
     };
+    partialCovers?: CoverImages; // Cover images generated during streaming (before job completion)
     error?: string;
   }> {
     const response = await api.get<{
@@ -473,6 +474,7 @@ export const storyService = {
         coverImages?: CoverImages;
       };
       errorMessage?: string;
+      partialCovers?: CoverImages; // Cover images generated during streaming
     }>(`/api/jobs/${jobId}/status`);
 
     // Map server response to client format
@@ -496,6 +498,7 @@ export const storyService = {
         sceneImages: resultData.sceneImages || [],
         coverImages: resultData.coverImages,
       } : undefined,
+      partialCovers: response.partialCovers, // Cover images generated during streaming
       error: response.errorMessage,
     };
   },
