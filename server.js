@@ -2031,7 +2031,7 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
 
     // Get purchase history (orders)
     const ordersResult = await dbQuery(
-      `SELECT id, story_id, amount_total, currency, payment_status, gelato_order_id, created_at, product_variant
+      `SELECT id, story_id, amount_total, currency, payment_status, gelato_order_id, created_at
        FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
       [targetUserId]
     );
@@ -2042,7 +2042,6 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
       currency: o.currency,
       status: o.payment_status,
       gelatoOrderId: o.gelato_order_id,
-      productVariant: o.product_variant,
       createdAt: o.created_at
     }));
 
