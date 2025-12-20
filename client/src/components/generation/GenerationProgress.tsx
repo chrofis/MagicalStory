@@ -103,7 +103,7 @@ export function GenerationProgress({
   const translations = {
     en: {
       title: 'Creating Your Story!',
-      timeInfo: 'This typically takes about 10 minutes.',
+      timeInfo: 'Your story will start to display in about 1 minute. The full story can take up to 10 minutes.',
       emailInfo: 'You will receive an email when your story is ready.',
       canClose: 'You can wait here or close the browser - your story will keep generating.',
       noEmailInfo: 'You can close this page and come back later.',
@@ -117,7 +117,7 @@ export function GenerationProgress({
     },
     de: {
       title: 'Geschichte wird erstellt!',
-      timeInfo: 'Dies dauert normalerweise etwa 10 Minuten.',
+      timeInfo: 'Deine Geschichte wird in etwa 1 Minute angezeigt. Die vollständige Geschichte kann bis zu 10 Minuten dauern.',
       emailInfo: 'Du erhältst eine E-Mail, wenn deine Geschichte bereit ist.',
       canClose: 'Du kannst hier warten oder den Browser schließen - deine Geschichte wird weiter generiert.',
       noEmailInfo: 'Du kannst diese Seite schließen und später zurückkommen.',
@@ -131,7 +131,7 @@ export function GenerationProgress({
     },
     fr: {
       title: 'Création de votre histoire!',
-      timeInfo: 'Cela prend généralement environ 10 minutes.',
+      timeInfo: 'Votre histoire commencera à s\'afficher dans environ 1 minute. L\'histoire complète peut prendre jusqu\'à 10 minutes.',
       emailInfo: 'Vous recevrez un email quand votre histoire sera prête.',
       canClose: 'Vous pouvez attendre ici ou fermer le navigateur - votre histoire continuera à être générée.',
       noEmailInfo: 'Vous pouvez fermer cette page et revenir plus tard.',
