@@ -31,6 +31,5 @@ The image MUST include this exact dedication text: "{DEDICATION}"
 **VISUAL REFERENCE ELEMENTS (optional):**
 You may use elements from the visual bible below if appropriate for this scene.
 These elements are NOT required - only include them if they naturally fit the cover composition.
-If you DO include any element, describe it EXACTLY as specified below (verbatim).
 
 {VISUAL_BIBLE}

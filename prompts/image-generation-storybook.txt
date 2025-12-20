@@ -1,0 +1,28 @@
+CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
+
+**STYLE: {STYLE_DESCRIPTION}**
+
+**STYLE TRANSFORMATION:**
+- Reference images show REAL PHOTOGRAPHS - transform into the art style
+- Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
+- Render in artistic style - NOT photo-realistic copies
+- ALL characters in the SAME consistent style
+- Character CLOTHING: Use clothing described in the scene below. If not specified, use EXACTLY as shown in the reference images
+
+---
+
+{CHARACTER_REFERENCE_LIST}
+
+**SCENE:** {SCENE_DESCRIPTION}
+
+**VISUAL REFERENCE ELEMENTS (optional):**
+You may use elements from the visual bible below if appropriate for this scene.
+These elements are NOT required - only include them if they naturally fit the scene composition.
+If you DO include any element, describe it EXACTLY as specified below (verbatim).
+
+{VISUAL_BIBLE}
+
+---
+
+Show appropriate emotions. Clean, clear composition. No text or watermarks.
+This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.

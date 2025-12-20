@@ -408,6 +408,7 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.imageGenerationSequential = await fs.readFile(path.join(promptsDir, 'image-generation-sequential.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGenerationSequentialDe = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-de.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGenerationSequentialFr = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-fr.txt'), 'utf-8');
+    PROMPT_TEMPLATES.imageGenerationStorybook = await fs.readFile(path.join(promptsDir, 'image-generation-storybook.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
     PROMPT_TEMPLATES.coverImageEvaluation = await fs.readFile(path.join(promptsDir, 'cover-image-evaluation.txt'), 'utf-8');
     PROMPT_TEMPLATES.frontCover = await fs.readFile(path.join(promptsDir, 'front-cover.txt'), 'utf-8');
@@ -8946,7 +8947,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           console.log(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} characters)...`);
         }
 
-        const imagePrompt = buildImagePrompt(sceneDesc, inputData, sceneCharacters, false, vBible, pageNum);
+        const imagePrompt = buildImagePrompt(sceneDesc, inputData, sceneCharacters, false, vBible, pageNum, true); // isStorybook = true
         imagePrompts[pageNum] = imagePrompt;
 
         let imageResult = null;
@@ -9397,7 +9398,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           }
 
           // Build image prompt with only scene-specific characters and visual bible
-          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters, isSequential, vBible, pageNum);
+          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters, isSequential, vBible, pageNum, true); // isStorybook = true
           imagePrompts[pageNum] = imagePrompt;
 
           let imageResult = null;
@@ -9939,6 +9940,121 @@ async function processStoryJob(jobId) {
     // Save checkpoint: scene hints and visual bible
     await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions, visualBible });
 
+    // Extract title from outline (for cover generation that starts in parallel)
+    // The outline typically has a title in the format "# Title" or "TITLE: ..."
+    let storyTitle = inputData.title || 'My Story';
+    const outlineTitleMatch = outline.match(/^#\s+(.+?)$/m) || outline.match(/TITLE:\s*(.+)/i);
+    if (outlineTitleMatch) {
+      storyTitle = outlineTitleMatch[1].trim();
+      console.log(`📖 [PIPELINE] Extracted title from outline: "${storyTitle}"`);
+    }
+
+    // START COVER GENERATION IN PARALLEL (optimization: don't wait for page images)
+    // Covers only need: outline (for scenes), character photos, art style - all available now
+    let coverGenerationPromise = null;
+    const coverPrompts = {};  // Store cover prompts for dev mode
+
+    if (!skipImages && !skipCovers) {
+      console.log(`📕 [PIPELINE] Starting PARALLEL cover generation for job ${jobId}`);
+
+      // Get art style description
+      const artStyleId = inputData.artStyle || 'pixar';
+      const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+
+      // Extract cover scene descriptions from outline
+      const coverScenes = extractCoverScenes(outline);
+      const titlePageScene = coverScenes.titlePage?.scene || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+      const initialPageScene = coverScenes.initialPage?.scene || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+      const backCoverScene = coverScenes.backCover?.scene || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
+
+      // Build visual bible prompt for covers
+      const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
+
+      // Helper to build character reference list for cover prompts
+      const buildCharacterReferenceList = (photos) => {
+        if (!photos || photos.length === 0) return '';
+        const charDescriptions = photos.map((photo, index) => {
+          const age = photo.age ? `${photo.age} years old` : '';
+          const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
+          const brief = [photo.name, age, gender].filter(Boolean).join(', ');
+          return `${index + 1}. ${brief}`;
+        });
+        return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+      };
+
+      // Prepare all cover generation promises
+      // Front cover
+      const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
+      const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
+      const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
+      const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+        TITLE_PAGE_SCENE: titlePageScene,
+        STYLE_DESCRIPTION: styleDescription,
+        STORY_TITLE: storyTitle,
+        CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos),
+        VISUAL_BIBLE: visualBiblePrompt
+      });
+      coverPrompts.frontCover = frontCoverPrompt;
+
+      // Initial page
+      const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
+      const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
+      const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
+        ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+            INITIAL_PAGE_SCENE: initialPageScene,
+            STYLE_DESCRIPTION: styleDescription,
+            DEDICATION: inputData.dedication,
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
+            VISUAL_BIBLE: visualBiblePrompt
+          })
+        : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+            INITIAL_PAGE_SCENE: initialPageScene,
+            STYLE_DESCRIPTION: styleDescription,
+            STORY_TITLE: storyTitle,
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
+            VISUAL_BIBLE: visualBiblePrompt
+          });
+      coverPrompts.initialPage = initialPagePrompt;
+
+      // Back cover
+      const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
+      const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
+      const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+        BACK_COVER_SCENE: backCoverScene,
+        STYLE_DESCRIPTION: styleDescription,
+        CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos),
+        VISUAL_BIBLE: visualBiblePrompt
+      });
+      coverPrompts.backCover = backCoverPrompt;
+
+      // Start all 3 covers in parallel (don't await yet)
+      coverGenerationPromise = Promise.all([
+        (async () => {
+          console.log(`📕 [COVER-PARALLEL] Starting front cover (${frontCoverCharacters.length} chars, clothing: ${frontCoverClothing})`);
+          const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
+          console.log(`✅ [COVER-PARALLEL] Front cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          await saveCheckpoint(jobId, 'partial_cover', { type: 'frontCover', imageData: result.imageData, storyTitle }, 0);
+          return { type: 'frontCover', result, photos: frontCoverPhotos, scene: titlePageScene, prompt: frontCoverPrompt };
+        })(),
+        (async () => {
+          console.log(`📕 [COVER-PARALLEL] Starting initial page (${initialPagePhotos.length} chars, clothing: ${initialPageClothing})`);
+          const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover');
+          console.log(`✅ [COVER-PARALLEL] Initial page complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          await saveCheckpoint(jobId, 'partial_cover', { type: 'initialPage', imageData: result.imageData }, 1);
+          return { type: 'initialPage', result, photos: initialPagePhotos, scene: initialPageScene, prompt: initialPagePrompt };
+        })(),
+        (async () => {
+          console.log(`📕 [COVER-PARALLEL] Starting back cover (${backCoverPhotos.length} chars, clothing: ${backCoverClothing})`);
+          const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover');
+          console.log(`✅ [COVER-PARALLEL] Back cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          await saveCheckpoint(jobId, 'partial_cover', { type: 'backCover', imageData: result.imageData }, 2);
+          return { type: 'backCover', result, photos: backCoverPhotos, scene: backCoverScene, prompt: backCoverPrompt };
+        })()
+      ]);
+
+      console.log(`📕 [PIPELINE] Cover generation started in background (3 covers in parallel)`);
+    }
+
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [10, 'Writing story...', jobId]
@@ -10406,214 +10522,95 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       console.log(`📝 [STREAMING] Text-only mode - skipping image wait`);
     }
 
-    // Extract title from generated story text (AI-generated title, not user input)
-    let storyTitle = inputData.title || 'My Story';
+    // Update title from story text if we found a better one (optional refinement)
     if (fullStoryText) {
-      const titleMatch = fullStoryText.match(/^#\s+(.+?)$/m);
-      if (titleMatch) {
-        storyTitle = titleMatch[1].trim();
-        console.log(`📖 [PIPELINE] Extracted AI-generated title from storyText: "${storyTitle}"`);
+      const storyTitleMatch = fullStoryText.match(/^#\s+(.+?)$/m);
+      if (storyTitleMatch) {
+        const storyTextTitle = storyTitleMatch[1].trim();
+        if (storyTextTitle !== storyTitle) {
+          console.log(`📖 [PIPELINE] Story text has different title: "${storyTextTitle}" (outline had: "${storyTitle}")`);
+          // Keep the outline title since covers already used it
+        }
       }
     }
 
+    // Wait for parallel cover generation to complete
     let coverImages = null;
-    const coverPrompts = {};  // Store cover prompts for dev mode
 
-    // Step 5: Generate cover images (unless skipImages or skipCovers)
-    if (!skipImages && !skipCovers) {
+    if (coverGenerationPromise) {
+      console.log(`📕 [PIPELINE] Waiting for parallel cover generation to complete...`);
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [95, 'Creating covers...', jobId]
+        [95, 'Finishing covers...', jobId]
       );
 
-      console.log(`📕 [PIPELINE] Generating cover images for job ${jobId}`);
-
-      // Get art style description
-      const artStyleId = inputData.artStyle || 'pixar';
-      const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
-
-      // Build character info with main character emphasis
-      let characterInfo = '';
-      if (inputData.characters && inputData.characters.length > 0) {
-        const mainCharacterIds = inputData.mainCharacters || [];
-        const mainChars = inputData.characters.filter(c => mainCharacterIds.includes(c.id));
-        const supportingChars = inputData.characters.filter(c => !mainCharacterIds.includes(c.id));
-
-        characterInfo = '\n\n**MAIN CHARACTER(S) - Must be prominently featured in the CENTER of the image:**\n';
-
-        // List main characters first
-        mainChars.forEach((char) => {
-          const physicalDesc = buildCharacterPhysicalDescription(char);
-          characterInfo += `⭐ MAIN: ${physicalDesc}\n`;
-        });
-
-        // Then supporting characters
-        if (supportingChars.length > 0) {
-          characterInfo += '\n**Supporting characters (can appear in background or sides):**\n';
-          supportingChars.forEach((char) => {
-            const physicalDesc = buildCharacterPhysicalDescription(char);
-            characterInfo += `Supporting: ${physicalDesc}\n`;
-          });
-        }
-
-        characterInfo += '\n**CRITICAL: Main character(s) must be the LARGEST and most CENTRAL figures in the composition.**\n';
-      }
-
-      // Extract cover scene descriptions from outline (matches step-by-step)
-      const coverScenes = extractCoverScenes(outline);
-      const titlePageScene = coverScenes.titlePage?.scene || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-      const initialPageScene = coverScenes.initialPage?.scene || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
-      const backCoverScene = coverScenes.backCover?.scene || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
-
-      // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
-      const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
-
-      // Helper to build character reference list for cover prompts
-      const buildCharacterReferenceList = (photos) => {
-        if (!photos || photos.length === 0) return '';
-        const charDescriptions = photos.map((photo, index) => {
-          const age = photo.age ? `${photo.age} years old` : '';
-          const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
-          const brief = [photo.name, age, gender].filter(Boolean).join(', ');
-          return `${index + 1}. ${brief}`;
-        });
-        return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
-      };
-
-      let frontCoverResult, initialPageResult, backCoverResult;
-
-      // Generate front cover (matches step-by-step prompt format)
-      // Detect which characters appear in the front cover scene
-      const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
-      // Use extracted clothing or parse from scene description
-      const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
-      // Use detailed photo info (with names) for labeled reference images
-      const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
-
       try {
-        console.log(`📕 [PIPELINE] Generating front cover for job ${jobId} (${frontCoverCharacters.length} characters: ${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${frontCoverClothing})`);
-        const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-          TITLE_PAGE_SCENE: titlePageScene,
-          STYLE_DESCRIPTION: styleDescription,
-          STORY_TITLE: storyTitle,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(frontCoverPhotos),
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-        coverPrompts.frontCover = frontCoverPrompt;
-        frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
-        console.log(`✅ [PIPELINE] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
-        // Save checkpoint: front cover
-        await saveCheckpoint(jobId, 'cover', { type: 'front', prompt: frontCoverPrompt }, 0);
+        const coverResults = await coverGenerationPromise;
+        console.log(`✅ [PIPELINE] All 3 covers completed in parallel!`);
+
+        // Build coverImages object from results
+        const frontCover = coverResults.find(r => r.type === 'frontCover');
+        const initialPage = coverResults.find(r => r.type === 'initialPage');
+        const backCover = coverResults.find(r => r.type === 'backCover');
+
+        coverImages = {
+          frontCover: {
+            imageData: frontCover.result.imageData,
+            description: frontCover.scene,
+            prompt: frontCover.prompt,
+            qualityScore: frontCover.result.score,
+            qualityReasoning: frontCover.result.reasoning || null,
+            wasRegenerated: frontCover.result.wasRegenerated || false,
+            totalAttempts: frontCover.result.totalAttempts || 1,
+            retryHistory: frontCover.result.retryHistory || [],
+            originalImage: frontCover.result.originalImage || null,
+            originalScore: frontCover.result.originalScore || null,
+            originalReasoning: frontCover.result.originalReasoning || null,
+            referencePhotos: frontCover.photos,
+            modelId: frontCover.result.modelId || null
+          },
+          initialPage: {
+            imageData: initialPage.result.imageData,
+            description: initialPage.scene,
+            prompt: initialPage.prompt,
+            qualityScore: initialPage.result.score,
+            qualityReasoning: initialPage.result.reasoning || null,
+            wasRegenerated: initialPage.result.wasRegenerated || false,
+            totalAttempts: initialPage.result.totalAttempts || 1,
+            retryHistory: initialPage.result.retryHistory || [],
+            originalImage: initialPage.result.originalImage || null,
+            originalScore: initialPage.result.originalScore || null,
+            originalReasoning: initialPage.result.originalReasoning || null,
+            referencePhotos: initialPage.photos,
+            modelId: initialPage.result.modelId || null
+          },
+          backCover: {
+            imageData: backCover.result.imageData,
+            description: backCover.scene,
+            prompt: backCover.prompt,
+            qualityScore: backCover.result.score,
+            qualityReasoning: backCover.result.reasoning || null,
+            wasRegenerated: backCover.result.wasRegenerated || false,
+            totalAttempts: backCover.result.totalAttempts || 1,
+            retryHistory: backCover.result.retryHistory || [],
+            originalImage: backCover.result.originalImage || null,
+            originalScore: backCover.result.originalScore || null,
+            originalReasoning: backCover.result.originalReasoning || null,
+            referencePhotos: backCover.photos,
+            modelId: backCover.result.modelId || null
+          }
+        };
+
+        const frontRegen = frontCover.result.wasRegenerated ? ' (regenerated)' : '';
+        const initialRegen = initialPage.result.wasRegenerated ? ' (regenerated)' : '';
+        const backRegen = backCover.result.wasRegenerated ? ' (regenerated)' : '';
+        console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCover.result.score}${frontRegen}, Initial: ${initialPage.result.score}${initialRegen}, Back: ${backCover.result.score}${backRegen}`);
       } catch (error) {
-        console.error(`❌ [PIPELINE] Failed to generate front cover for job ${jobId}:`, error);
-        throw new Error(`Front cover generation failed: ${error.message}`);
+        console.error(`❌ [PIPELINE] Cover generation failed:`, error);
+        throw new Error(`Cover generation failed: ${error.message}`);
       }
-
-      // Generate initial page (dedication page) - use ALL characters (main character centered)
-      // Use extracted clothing or parse from scene description
-      const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
-      const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
-      try {
-        console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId} - ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
-        const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
-          ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
-              INITIAL_PAGE_SCENE: initialPageScene,
-              STYLE_DESCRIPTION: styleDescription,
-              DEDICATION: inputData.dedication,
-              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
-              VISUAL_BIBLE: visualBiblePrompt
-            })
-          : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
-              INITIAL_PAGE_SCENE: initialPageScene,
-              STYLE_DESCRIPTION: styleDescription,
-              STORY_TITLE: storyTitle,
-              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos),
-              VISUAL_BIBLE: visualBiblePrompt
-            });
-        coverPrompts.initialPage = initialPagePrompt;
-        initialPageResult = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover');
-        console.log(`✅ [PIPELINE] Initial page generated (score: ${initialPageResult.score}${initialPageResult.wasRegenerated ? ', regenerated' : ''})`);
-        // Save checkpoint: initial page cover
-        await saveCheckpoint(jobId, 'cover', { type: 'initialPage', prompt: initialPagePrompt }, 1);
-      } catch (error) {
-        console.error(`❌ [PIPELINE] Failed to generate initial page for job ${jobId}:`, error);
-        throw new Error(`Initial page generation failed: ${error.message}`);
-      }
-
-      // Generate back cover - use ALL characters with EQUAL prominence (no focus on main)
-      // Use extracted clothing or parse from scene description
-      const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
-      const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
-      try {
-        console.log(`📕 [PIPELINE] Generating back cover for job ${jobId} - ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
-        const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
-          BACK_COVER_SCENE: backCoverScene,
-          STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos),
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-        coverPrompts.backCover = backCoverPrompt;
-        backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover');
-        console.log(`✅ [PIPELINE] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
-        // Save checkpoint: back cover
-        await saveCheckpoint(jobId, 'cover', { type: 'back', prompt: backCoverPrompt }, 2);
-      } catch (error) {
-        console.error(`❌ [PIPELINE] Failed to generate back cover for job ${jobId}:`, error);
-        throw new Error(`Back cover generation failed: ${error.message}`);
-      }
-
-      coverImages = {
-        frontCover: {
-          imageData: frontCoverResult.imageData,
-          description: titlePageScene,
-          prompt: coverPrompts.frontCover,
-          qualityScore: frontCoverResult.score,
-          qualityReasoning: frontCoverResult.reasoning || null,
-          wasRegenerated: frontCoverResult.wasRegenerated || false,
-          totalAttempts: frontCoverResult.totalAttempts || 1,
-          retryHistory: frontCoverResult.retryHistory || [],
-          originalImage: frontCoverResult.originalImage || null,
-          originalScore: frontCoverResult.originalScore || null,
-          originalReasoning: frontCoverResult.originalReasoning || null,
-          referencePhotos: frontCoverPhotos,
-          modelId: frontCoverResult.modelId || null
-        },
-        initialPage: {
-          imageData: initialPageResult.imageData,
-          description: initialPageScene,
-          prompt: coverPrompts.initialPage,
-          qualityScore: initialPageResult.score,
-          qualityReasoning: initialPageResult.reasoning || null,
-          wasRegenerated: initialPageResult.wasRegenerated || false,
-          totalAttempts: initialPageResult.totalAttempts || 1,
-          retryHistory: initialPageResult.retryHistory || [],
-          originalImage: initialPageResult.originalImage || null,
-          originalScore: initialPageResult.originalScore || null,
-          originalReasoning: initialPageResult.originalReasoning || null,
-          referencePhotos: initialPagePhotos,
-          modelId: initialPageResult.modelId || null
-        },
-        backCover: {
-          imageData: backCoverResult.imageData,
-          description: backCoverScene,
-          prompt: coverPrompts.backCover,
-          qualityScore: backCoverResult.score,
-          qualityReasoning: backCoverResult.reasoning || null,
-          wasRegenerated: backCoverResult.wasRegenerated || false,
-          totalAttempts: backCoverResult.totalAttempts || 1,
-          retryHistory: backCoverResult.retryHistory || [],
-          originalImage: backCoverResult.originalImage || null,
-          originalScore: backCoverResult.originalScore || null,
-          originalReasoning: backCoverResult.originalReasoning || null,
-          referencePhotos: backCoverPhotos,
-          modelId: backCoverResult.modelId || null
-        }
-      };
-
-      const frontRegen = frontCoverResult.wasRegenerated ? ' (regenerated)' : '';
-      const initialRegen = initialPageResult.wasRegenerated ? ' (regenerated)' : '';
-      const backRegen = backCoverResult.wasRegenerated ? ' (regenerated)' : '';
-      console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCoverResult.score}${frontRegen}, Initial: ${initialPageResult.score}${initialRegen}, Back: ${backCoverResult.score}${backRegen}`);
+    } else if (!skipImages && !skipCovers) {
+      console.log(`⚠️ [PIPELINE] No cover generation promise found - covers may have been skipped`);
     } else {
       console.log(`📝 [PIPELINE] Text-only mode - skipping cover image generation`);
     }
@@ -11224,7 +11221,7 @@ function buildRelativeHeightDescription(characters) {
   return `**HEIGHT ORDER (shortest to tallest):** ${descriptions.join(' → ')}`;
 }
 
-function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null) {
+function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null, isStorybook = false) {
   // Build image generation prompt (matches step-by-step format)
   // For storybook mode: visualBible entries are added here since there's no separate scene description step
   // For parallel/sequential modes: Visual Bible is also in scene description, but adding here ensures consistency
@@ -11266,9 +11263,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     }
   }
 
-  // Select the correct template based on language and sequential mode
+  // Select the correct template based on mode and language
   let template = null;
-  if (isSequential) {
+  let templateName = '';
+  if (isStorybook && PROMPT_TEMPLATES.imageGenerationStorybook) {
+    // Storybook mode template (includes Visual Bible section)
+    template = PROMPT_TEMPLATES.imageGenerationStorybook;
+    templateName = 'storybook';
+  } else if (isSequential) {
     // Sequential mode templates (with visual continuity instructions)
     if (language === 'de' && PROMPT_TEMPLATES.imageGenerationSequentialDe) {
       template = PROMPT_TEMPLATES.imageGenerationSequentialDe;
@@ -11277,6 +11279,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     } else if (PROMPT_TEMPLATES.imageGenerationSequential) {
       template = PROMPT_TEMPLATES.imageGenerationSequential;
     }
+    templateName = 'sequential';
   } else {
     // Parallel mode templates
     if (language === 'de' && PROMPT_TEMPLATES.imageGenerationDe) {
@@ -11286,11 +11289,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     } else if (PROMPT_TEMPLATES.imageGeneration) {
       template = PROMPT_TEMPLATES.imageGeneration;
     }
+    templateName = 'parallel';
   }
 
   // Use template if available, otherwise fall back to hardcoded prompt
   if (template) {
-    console.log(`📝 [IMAGE PROMPT] Using ${isSequential ? 'sequential' : 'parallel'} template for language: ${language}`);
+    console.log(`📝 [IMAGE PROMPT] Using ${templateName} template for language: ${language}`);
     // Fill all placeholders in template
     return fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
