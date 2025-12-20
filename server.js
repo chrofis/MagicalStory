@@ -11178,9 +11178,13 @@ function buildRelativeHeightDescription(characters) {
   if (!characters || characters.length < 2) return '';
 
   // Filter characters that have height and sort by height
+  // Support both new structure (char.physical.height) and legacy (char.height)
   const withHeight = characters
-    .filter(c => c.height && !isNaN(parseInt(c.height)))
-    .map(c => ({ name: c.name, height: parseInt(c.height) }))
+    .map(c => {
+      const height = c.height || c.physical?.height;
+      return { name: c.name, height: height ? parseInt(height) : NaN };
+    })
+    .filter(c => !isNaN(c.height))
     .sort((a, b) => a.height - b.height);
 
   if (withHeight.length < 2) return '';
