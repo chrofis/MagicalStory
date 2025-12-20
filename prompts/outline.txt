@@ -172,7 +172,46 @@ For specific places that appear multiple times with unique visual features:
 
 # Format Your Response
 
+**IMPORTANT: Output MUST be in this EXACT order: Title → Visual Bible → Cover Scenes → Plot Structure → Character Arcs → Pages**
 
+## Title
+Title: [Story title]
+
+## Visual Bible
+
+### Secondary Characters
+**[Name/Role]** (pages X, Y, Z)
+- Physical: [age, height, build, hair, eyes, distinguishing features]
+- Clothing: [specific colors and details]
+
+### Animals & Creatures
+**[Name]** (pages X, Y, Z)
+- Species: [type]
+- Coloring: [exact colors and patterns]
+- Size: [relative size]
+- Features: [collar, markings, etc.]
+
+### Artifacts
+**[Name]** (pages X, Y, Z)
+- Type: [what it is]
+- Description: [size, color, material, distinctive details]
+
+### Locations
+**[Name]** (pages X, Y, Z)
+- Features: [distinctive visual elements]
+
+(Include only elements appearing in 2+ scenes. Write "None" for any category with no recurring elements.)
+
+## Cover Scenes
+
+Title Page Scene: [2-3 sentences: Main character doing something that captures the story's spirit. Simple setting description. Mood/atmosphere.]
+Clothing: [winter|summer|formal|standard]
+
+Initial Page Scene: [2-3 sentences: All characters together in a warm, welcoming moment. Simple group scene with positive atmosphere.]
+Clothing: [winter|summer|formal|standard]
+
+Back Cover Scene: [2-3 sentences: Characters together at the story's happy conclusion. Focus on emotional satisfaction and togetherness.]
+Clothing: [winter|summer|formal|standard]
 
 ## Plot Structure
 Inciting Incident: [Description]
@@ -201,9 +240,6 @@ Key Moments: Pages [X], [Y], [Z]
 ### [Character 2 Name]
 [Same format...]
 
-## Title
-Title: [Story title]
-
 ## Page-by-Page Breakdown
 
 Page 1: [Key Action/Plot Point]
@@ -217,42 +253,6 @@ Clothing: [winter|summer|formal|standard]
 Scene: [Short visual description]
 
 ...and so on for all {PAGES} pages.
-
-## Cover Scenes
-
-Title Page Scene: [2-3 sentences: Main character doing something that captures the story's spirit. Simple setting description. Mood/atmosphere.]
-Clothing: [winter|summer|formal|standard]
-
-Initial Page Scene: [2-3 sentences: All characters together in a warm, welcoming moment. Simple group scene with positive atmosphere.]
-Clothing: [winter|summer|formal|standard]
-
-Back Cover Scene: [2-3 sentences: Characters together at the story's happy conclusion. Focus on emotional satisfaction and togetherness.]
-Clothing: [winter|summer|formal|standard]
-
-## Visual Bible
-
-### Secondary Characters
-**[Name/Role]** (pages X, Y, Z)
-- Physical: [age, height, build, hair, eyes, distinguishing features]
-- Clothing: [specific colors and details]
-
-### Animals & Creatures
-**[Name]** (pages X, Y, Z)
-- Species: [type]
-- Coloring: [exact colors and patterns]
-- Size: [relative size]
-- Features: [collar, markings, etc.]
-
-### Artifacts
-**[Name]** (pages X, Y, Z)
-- Type: [what it is]
-- Description: [size, color, material, distinctive details]
-
-### Locations
-**[Name]** (pages X, Y, Z)
-- Features: [distinctive visual elements]
-
-(Include only elements appearing in 2+ scenes. Write "None" for any category with no recurring elements.)
 
 ---
 

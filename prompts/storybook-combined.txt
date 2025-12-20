@@ -101,27 +101,12 @@ For specific places that appear multiple times with unique visual features:
 
 # Output Format
 
-You MUST provide the TITLE PAGE, INITIAL PAGE, all story pages, and BACK COVER. Use this exact format:
+You MUST provide output in this EXACT order: TITLE, VISUAL BIBLE, COVER SCENES, then all story pages.
 
 **IMPORTANT: All SCENE descriptions must be VISUAL ONLY. Do NOT include any text instructions in scenes (no title text, no dedication text, no website text). Text will be added separately to the images.**
 
----TITLE PAGE---
+---TITLE---
 TITLE: [Creative story title]
-
-SCENE: (visual only - do NOT mention title text)
-Setting: [Cover scene that sets the mood for the story]
-Characters: [MAIN CHARACTER ONLY or with 1-2 supporting characters maximum - main character must be the STAR of this image, large and center]
-Action: [An inviting cover moment featuring primarily the main character]
-Mood: [Welcoming, magical, exciting, etc.]
-**CHARACTER RULE: Feature the MAIN CHARACTER prominently in the CENTER. Include few or no other characters - this is the main character's spotlight moment.**
-
----INITIAL PAGE---
-SCENE: (visual only - do NOT mention dedication text)
-Setting: [A warm, inviting scene that welcomes readers into the story world]
-Characters: [ALL characters from the story gathered together, with the MAIN CHARACTER positioned in the CENTER]
-Action: [A group moment showing all characters together, main character central]
-Mood: [Warm, welcoming, cozy]
-**CHARACTER RULE: Include ALL characters in this scene. The main character should be in the CENTER, with all other characters arranged around them.**
 
 ---VISUAL BIBLE---
 (Track recurring visual elements for consistency across illustrations. Skip any category that doesn't apply.)
@@ -141,6 +126,33 @@ Mood: [Warm, welcoming, cozy]
 ### Locations
 (Settings that appear multiple times)
 - **[Name]** (pages X, Y, Z): [Key visual features, colors, atmosphere]
+
+---TITLE PAGE---
+SCENE: (visual only - do NOT mention title text)
+Setting: [Cover scene that sets the mood for the story]
+Characters: [MAIN CHARACTER ONLY or with 1-2 supporting characters maximum - main character must be the STAR of this image, large and center]
+Action: [An inviting cover moment featuring primarily the main character]
+Mood: [Welcoming, magical, exciting, etc.]
+Clothing: [winter/summer/formal/standard]
+**CHARACTER RULE: Feature the MAIN CHARACTER prominently in the CENTER. Include few or no other characters - this is the main character's spotlight moment.**
+
+---INITIAL PAGE---
+SCENE: (visual only - do NOT mention dedication text)
+Setting: [A warm, inviting scene that welcomes readers into the story world]
+Characters: [ALL characters from the story gathered together, with the MAIN CHARACTER positioned in the CENTER]
+Action: [A group moment showing all characters together, main character central]
+Mood: [Warm, welcoming, cozy]
+Clothing: [winter/summer/formal/standard]
+**CHARACTER RULE: Include ALL characters in this scene. The main character should be in the CENTER, with all other characters arranged around them.**
+
+---BACK COVER---
+SCENE: (visual only - do NOT mention "magicalstory.ch" or any text)
+Setting: [A satisfying concluding scene that provides closure]
+Characters: [ALL characters from the story together as a group, with EQUAL prominence - no character should dominate]
+Action: [A peaceful group moment showing all characters together, celebrating or content]
+Mood: [Happy, content, peaceful, hopeful]
+Clothing: [winter/summer/formal/standard]
+**CHARACTER RULE: Include ALL characters with EQUAL visual prominence. No single character should be the focus - this is a GROUP scene where everyone matters equally.**
 
 ---PAGE 1---
 TEXT:
@@ -165,12 +177,3 @@ Clothing: [winter/summer/formal/standard]
 Mood: [Emotional tone]
 
 ... continue for all {PAGES} pages ...
-
----BACK COVER---
-SCENE: (visual only - do NOT mention "magicalstory.ch" or any text)
-Setting: [A satisfying concluding scene that provides closure]
-Characters: [ALL characters from the story together as a group, with EQUAL prominence - no character should dominate]
-Action: [A peaceful group moment showing all characters together, celebrating or content]
-Mood: [Happy, content, peaceful, hopeful]
-**CHARACTER RULE: Include ALL characters with EQUAL visual prominence. No single character should be the focus - this is a GROUP scene where everyone matters equally.**
-

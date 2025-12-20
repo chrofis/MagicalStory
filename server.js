@@ -261,11 +261,18 @@ function parseClothingCategory(sceneDescription) {
     return clothingMatch[1].toLowerCase();
   }
 
-  // Also try multiline pattern where clothing value is on the next line:
+  // Try multiline pattern where clothing value is on the next line with colon:
   // "## 4. **Clothing:**\nwinter"
-  const multilineMatch = sceneDescription.match(/\b(?:Clothing|Kleidung|Vêtements|Tenue)\*{0,2}:\s*\*{0,2}\s*\n\s*(winter|summer|formal|standard)\b/i);
+  const multilineMatch = sceneDescription.match(/\b(?:Clothing|Kleidung|Vêtements|Tenue)\*{0,2}:\s*\*{0,2}\s*\n\s*\*{0,2}(winter|summer|formal|standard)\*{0,2}\b/i);
   if (multilineMatch) {
     return multilineMatch[1].toLowerCase();
+  }
+
+  // Try markdown header format (no colon) with value on next line:
+  // "## 4. Clothing\n**winter**"
+  const headerMatch = sceneDescription.match(/\b(?:Clothing|Kleidung|Vêtements|Tenue)\s*\n\s*\*{0,2}(winter|summer|formal|standard)\*{0,2}\b/i);
+  if (headerMatch) {
+    return headerMatch[1].toLowerCase();
   }
 
   return null;
