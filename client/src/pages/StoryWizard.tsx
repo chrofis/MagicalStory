@@ -858,7 +858,11 @@ export default function StoryWizard() {
   const generateStory = async (overrides?: { skipImages?: boolean }) => {
     setIsGenerating(true);
     setStep(5);
-    // Reset progressive state for new generation
+    // Reset ALL story state for new generation - must clear old story to show popup
+    setGeneratedStory('');
+    setStoryTitle('');
+    setSceneImages([]);
+    setSceneDescriptions([]);
     setProgressiveStoryData(null);
     setCompletedPageImages({});
     setCoverImages({ frontCover: null, initialPage: null, backCover: null });
