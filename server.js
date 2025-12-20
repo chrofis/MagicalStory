@@ -12654,6 +12654,60 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
   }
 });
 
+// Cancel a running job
+app.post('/api/jobs/:jobId/cancel', authenticateToken, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const userId = req.user.id;
+
+    if (STORAGE_MODE !== 'database') {
+      return res.status(503).json({ error: 'Background jobs require database mode' });
+    }
+
+    // Verify job belongs to user and is cancellable
+    const result = await dbPool.query(
+      `SELECT id, status, created_at FROM story_jobs
+       WHERE id = $1 AND user_id = $2`,
+      [jobId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const job = result.rows[0];
+
+    if (job.status === 'completed' || job.status === 'failed') {
+      return res.status(400).json({
+        error: 'Job already finished',
+        status: job.status,
+        message: `Cannot cancel a job that is already ${job.status}`
+      });
+    }
+
+    // Mark job as failed (cancelled)
+    await dbPool.query(
+      `UPDATE story_jobs
+       SET status = 'failed',
+           error_message = 'Cancelled by user',
+           updated_at = NOW()
+       WHERE id = $1`,
+      [jobId]
+    );
+
+    console.log(`🛑 Job ${jobId} cancelled by user ${req.user.username}`);
+
+    res.json({
+      success: true,
+      message: 'Job cancelled successfully',
+      jobId: jobId
+    });
+  } catch (err) {
+    console.error('Error cancelling job:', err);
+    res.status(500).json({ error: 'Failed to cancel job' });
+  }
+});
+
 // Get user's story jobs
 app.get('/api/jobs/my-jobs', authenticateToken, async (req, res) => {
   try {

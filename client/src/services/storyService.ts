@@ -521,6 +521,11 @@ export const storyService = {
     };
   },
 
+  async cancelJob(jobId: string): Promise<{ success: boolean; message: string }> {
+    const response = await api.post<{ success: boolean; message: string; error?: string }>(`/api/jobs/${jobId}/cancel`);
+    return response;
+  },
+
   // PDF generation
   async generatePdf(storyId: string): Promise<Blob> {
     const token = localStorage.getItem('auth_token');

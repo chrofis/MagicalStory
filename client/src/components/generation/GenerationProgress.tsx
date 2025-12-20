@@ -1,4 +1,5 @@
-import { Loader2, Mail, Clock, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
@@ -10,6 +11,8 @@ interface GenerationProgressProps {
   message?: string;
   isGenerating?: boolean;
   coverImages?: CoverImages;  // Optional partial cover images to display
+  jobId?: string;  // Job ID for cancellation
+  onCancel?: () => void;  // Callback when job is cancelled
 }
 
 // Translate server messages to user language
@@ -64,10 +67,14 @@ export function GenerationProgress({
   message,
   isGenerating = true,
   coverImages,
+  jobId,
+  onCancel,
 }: GenerationProgressProps) {
   const { language } = useLanguage();
   const { user } = useAuth();
   const hasEmail = !!user?.email;
+  const isAdmin = user?.role === 'admin';
+  const [isCancelling, setIsCancelling] = useState(false);
 
   if (!isGenerating || total === 0) {
     return null;
@@ -105,6 +112,8 @@ export function GenerationProgress({
       initialPage: 'Inside',
       backCover: 'Back',
       pending: 'Generating...',
+      cancelJob: 'Cancel Generation',
+      cancelling: 'Cancelling...',
     },
     de: {
       title: 'Geschichte wird erstellt!',
@@ -117,6 +126,8 @@ export function GenerationProgress({
       initialPage: 'Innen',
       backCover: 'Hinten',
       pending: 'Wird erstellt...',
+      cancelJob: 'Generierung abbrechen',
+      cancelling: 'Wird abgebrochen...',
     },
     fr: {
       title: 'Création de votre histoire!',
@@ -129,6 +140,8 @@ export function GenerationProgress({
       initialPage: 'Intérieur',
       backCover: 'Arrière',
       pending: 'En cours...',
+      cancelJob: 'Annuler la génération',
+      cancelling: 'Annulation...',
     },
   };
 
@@ -225,6 +238,30 @@ export function GenerationProgress({
             </div>
           )}
         </div>
+
+        {/* Cancel button - admin only */}
+        {isAdmin && jobId && onCancel && (
+          <button
+            onClick={async () => {
+              if (isCancelling) return;
+              setIsCancelling(true);
+              try {
+                onCancel();
+              } finally {
+                setIsCancelling(false);
+              }
+            }}
+            disabled={isCancelling}
+            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+          >
+            {isCancelling ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <XCircle size={16} />
+            )}
+            {isCancelling ? t.cancelling : t.cancelJob}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -118,7 +118,7 @@ export default function StoryWizard() {
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
   const [storyId, setStoryId] = useState<string | null>(null);
-  const [, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
+  const [jobId, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
 
   // Partial story state (for stories that failed during generation)
   const [isPartialStory, setIsPartialStory] = useState(false);
@@ -1015,11 +1015,22 @@ export default function StoryWizard() {
       });
     } catch (error) {
       log.error('Generation failed:', error);
-      alert(language === 'de'
-        ? `Generierung fehlgeschlagen: ${error}`
-        : language === 'fr'
-        ? `Échec de la génération: ${error}`
-        : `Generation failed: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Check for "already in progress" error (409)
+      if (errorMessage.includes('already in progress')) {
+        alert(language === 'de'
+          ? 'Eine Geschichte wird bereits erstellt. Bitte warte, bis sie fertig ist, bevor du eine neue startest.'
+          : language === 'fr'
+          ? 'Une histoire est déjà en cours de création. Veuillez attendre qu\'elle soit terminée avant d\'en commencer une nouvelle.'
+          : 'A story is already being generated. Please wait for it to finish before starting a new one.');
+      } else {
+        alert(language === 'de'
+          ? `Generierung fehlgeschlagen: ${errorMessage}`
+          : language === 'fr'
+          ? `Échec de la génération: ${errorMessage}`
+          : `Generation failed: ${errorMessage}`);
+      }
     } finally {
       setTimeout(() => setIsGenerating(false), 500);
     }
@@ -1716,6 +1727,28 @@ export default function StoryWizard() {
           total={generationProgress.total}
           message={generationProgress.message}
           coverImages={coverImages}
+          jobId={jobId || undefined}
+          onCancel={jobId ? async () => {
+            try {
+              await storyService.cancelJob(jobId);
+              log.info('Job cancelled by user');
+              setIsGenerating(false);
+              setJobId(null);
+              setGenerationProgress({ current: 0, total: 0, message: '' });
+              alert(language === 'de'
+                ? 'Generierung abgebrochen'
+                : language === 'fr'
+                ? 'Génération annulée'
+                : 'Generation cancelled');
+            } catch (error) {
+              log.error('Failed to cancel job:', error);
+              alert(language === 'de'
+                ? 'Abbruch fehlgeschlagen'
+                : language === 'fr'
+                ? 'Échec de l\'annulation'
+                : 'Failed to cancel');
+            }
+          } : undefined}
         />
       )}
 

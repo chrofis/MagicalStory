@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, LogOut, BookOpen, Settings, Users, Code } from 'lucide-react';
+import { Menu, LogOut, BookOpen, Settings, Users, Code, Package, CreditCard } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Language } from '@/types/story';
@@ -18,6 +18,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   const { t, language, setLanguage } = useLanguage();
   const { isAuthenticated, user, logout, isImpersonating } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
@@ -169,6 +170,30 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                   >
                     <BookOpen size={16} />
                     <span>{language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : 'My Stories'}</span>
+                  </button>
+
+                  {/* My Orders */}
+                  <button
+                    onClick={() => {
+                      navigate('/orders');
+                      setShowMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
+                  >
+                    <Package size={16} />
+                    <span>{language === 'de' ? 'Meine Bestellungen' : language === 'fr' ? 'Mes commandes' : 'My Orders'}</span>
+                  </button>
+
+                  {/* Buy Credits */}
+                  <button
+                    onClick={() => {
+                      setShowCreditsModal(true);
+                      setShowMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
+                  >
+                    <CreditCard size={16} />
+                    <span>{language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : 'Buy Credits'}</span>
                   </button>
 
                   {/* Admin Panel (Admin or impersonating) */}

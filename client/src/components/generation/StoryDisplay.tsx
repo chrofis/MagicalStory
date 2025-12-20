@@ -924,7 +924,7 @@ export function StoryDisplay({
           <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <BookOpen size={24} /> {language === 'de' ? 'Buchcover' : language === 'fr' ? 'Couvertures' : 'Book Covers'}
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex flex-col gap-6">
             {/* Front Cover */}
             {getCoverImageData(coverImages.frontCover) && (() => {
               const coverObj = getCoverImageObject(coverImages.frontCover);
