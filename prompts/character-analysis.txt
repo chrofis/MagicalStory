@@ -1,3 +1,5 @@
+You are an expert Image Prompt Engineer specializing in character consistenc
+
 Analyze this image of a person.
 Extract visual attributes that will maintain consistency across different scenes.
 
@@ -5,13 +7,13 @@ Return a JSON object with this EXACT structure:
 
 {
   "traits": {
-    "age": "<estimated age as a number, e.g. 8, 25, 45>",
+    "age": "<estimated age as a number (e.g. 8, 25, 45)>",
     "gender": "<male, female, or other>",
-    "height": "<height in cm as a number, e.g. 120 for child, 170 for adult>",
+    "height": "<height in cm as a number (e.g. 120 for child, 170 for adult)>",
     "build": "<slim, average, athletic, stocky>",
-    "face": "<face shape, eye color, skin tone>",
-    "hair": "<specific color, length, style, texture>",
-    "other": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces that are ALWAYS present, or 'none'>",
+    "face": "<facial structure and shape, eye color, skin tone (e.g round face with soft cheeks, angular jaw, freckled complexion)>",
+    "hair": "<specific color, length, specific hairstyle, texture (e.g., long, brown, ponytail)>",
+    "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>",
     "clothing": "<brief description of what they are wearing in the photo>"
   }
 }

@@ -4616,9 +4616,11 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.hair) {
           analyzerData.attributes.hair_color = traits.hair;
         }
-        // Other features (glasses, birthmarks, always-present items)
-        if (traits.other && traits.other !== 'none') {
-          analyzerData.attributes.other_features = traits.other;
+        // Distinctive markings (glasses, facial hair, scars, moles, jewelry, etc.)
+        // Support both new "distinctive markings" field and legacy "other" field
+        const distinctiveMarkings = traits["distinctive markings"] || traits.distinctiveMarkings || traits.other;
+        if (distinctiveMarkings && distinctiveMarkings !== 'none') {
+          analyzerData.attributes.other_features = distinctiveMarkings;
         }
         // Clothing description
         if (traits.clothing) {
