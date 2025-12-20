@@ -3725,7 +3725,16 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     storyData.coverImages = storyData.coverImages || {};
     const coverKey = normalizedCoverType === 'front' ? 'frontCover' : normalizedCoverType === 'initialPage' ? 'initialPage' : 'backCover';
     const previousCover = storyData.coverImages[coverKey];
-    const previousImageData = previousCover?.imageData || previousCover || null;
+    const previousImageData = previousCover?.imageData || (typeof previousCover === 'string' ? previousCover : null);
+    const previousScore = previousCover?.qualityScore || null;
+    const previousReasoning = previousCover?.qualityReasoning || null;
+    const previousPrompt = previousCover?.prompt || null;
+    // Keep the true original if this was already regenerated before
+    const trueOriginalImage = previousCover?.originalImage || previousImageData;
+    const trueOriginalScore = previousCover?.originalScore || previousScore;
+    const trueOriginalReasoning = previousCover?.originalReasoning || previousReasoning;
+
+    console.log(`📸 [COVER REGEN] Capturing previous ${normalizedCoverType} cover (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!previousCover?.originalImage})`);
 
     // Clear the image cache for this prompt to force a new generation
     const cacheKey = generateImageCacheKey(coverPrompt, coverCharacterPhotos, null);
@@ -3744,13 +3753,24 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       prompt: coverPrompt,
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning || null,
+      modelId: coverResult.modelId || null,
       wasRegenerated: true,
       totalAttempts: coverResult.totalAttempts || 1,
       retryHistory: coverResult.retryHistory || [],
-      originalImage: previousImageData,
-      originalScore: previousCover?.qualityScore || null,
-      regeneratedAt: new Date().toISOString()
+      // Store previous version (for undo/comparison)
+      previousImage: previousImageData,
+      previousScore: previousScore,
+      previousReasoning: previousReasoning,
+      previousPrompt: previousPrompt,
+      // Keep the true original across multiple regenerations
+      originalImage: trueOriginalImage,
+      originalScore: trueOriginalScore,
+      originalReasoning: trueOriginalReasoning,
+      regeneratedAt: new Date().toISOString(),
+      regenerationCount: (previousCover?.regenerationCount || 0) + 1
     };
+
+    console.log(`📸 [COVER REGEN] New ${normalizedCoverType} cover generated - score: ${coverResult.score}, attempts: ${coverResult.totalAttempts}, model: ${coverResult.modelId}`);
 
     if (normalizedCoverType === 'front') {
       storyData.coverImages.frontCover = coverData;
@@ -3760,15 +3780,13 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       storyData.coverImages.backCover = coverData;
     }
 
-    console.log(`📸 [COVER REGEN] Previous image stored (${previousImageData ? 'has data' : 'none'})`)
-
     // Save updated story
     await dbPool.query(
       'UPDATE stories SET data = $1 WHERE id = $2',
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score})`);
+    console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, regeneration #${coverData.regenerationCount})`);
 
     res.json({
       success: true,
@@ -3778,8 +3796,19 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       prompt: coverPrompt,
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning,
+      modelId: coverResult.modelId || null,
       totalAttempts: coverResult.totalAttempts || 1,
-      retryHistory: coverResult.retryHistory || []
+      retryHistory: coverResult.retryHistory || [],
+      wasRegenerated: true,
+      regenerationCount: coverData.regenerationCount,
+      // Previous version (immediate predecessor)
+      previousImage: previousImageData,
+      previousScore: previousScore,
+      previousReasoning: previousReasoning,
+      // True original (from initial generation)
+      originalImage: trueOriginalImage,
+      originalScore: trueOriginalScore,
+      originalReasoning: trueOriginalReasoning
     });
 
   } catch (err) {
