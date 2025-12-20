@@ -8888,11 +8888,32 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         let imageResult = null;
         let retries = 0;
+        const pageTextContent = pageText || pageTexts[pageNum] || '';
+
+        // Callback for immediate display - saves image before quality evaluation completes
+        const onImageReady = async (imgData, modelId) => {
+          const partialData = {
+            pageNumber: pageNum,
+            imageData: imgData,
+            description: sceneDesc,
+            prompt: imagePrompt,
+            text: pageTextContent,
+            qualityScore: null,  // Not yet evaluated
+            qualityReasoning: null,
+            wasRegenerated: false,
+            totalAttempts: 1,
+            retryHistory: [],
+            referencePhotos,
+            modelId: modelId || null
+          };
+          await saveCheckpoint(jobId, 'partial_page', partialData, pageNum);
+          console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum} (immediate, quality pending)`);
+        };
 
         while (retries <= MAX_RETRIES && !imageResult) {
           try {
             // Use quality retry with labeled character photos (name + photoUrl)
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null);
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady);
           } catch (error) {
             retries++;
             console.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -8908,7 +8929,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           imageData: imageResult.imageData,
           description: sceneDesc,
           prompt: imagePrompt,
-          text: pageText || pageTexts[pageNum] || '',
+          text: pageTextContent,
           qualityScore: imageResult.score,
           qualityReasoning: imageResult.reasoning || null,
           wasRegenerated: imageResult.wasRegenerated || false,
@@ -8920,9 +8941,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           referencePhotos  // Dev mode: which photos were used
         };
 
-        // Save partial result checkpoint for progressive display
+        // Save final result with quality score (overwrites immediate save)
         await saveCheckpoint(jobId, 'partial_page', pageData, pageNum);
-        console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
+        console.log(`💾 [PARTIAL] Saved final result for page ${pageNum} (score: ${imageResult.score})`);
 
         return pageData;
       } catch (error) {
@@ -10168,9 +10189,29 @@ Output Format:
             let imageResult = null;
             let retries = 0;
 
+            // Callback for immediate display - saves image before quality evaluation completes
+            const onImageReady = async (imgData, modelId) => {
+              const partialData = {
+                pageNumber: pageNum,
+                imageData: imgData,
+                description: sceneDescription,
+                text: pageContent,
+                prompt: imagePrompt,
+                qualityScore: null,  // Not yet evaluated
+                qualityReasoning: null,
+                wasRegenerated: false,
+                totalAttempts: 1,
+                retryHistory: [],
+                referencePhotos: referencePhotos,
+                modelId: modelId || null
+              };
+              await saveCheckpoint(jobId, 'partial_page', partialData, pageNum);
+              console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum} (immediate, quality pending)`);
+            };
+
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null);
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady);
               } catch (error) {
                 retries++;
                 console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -10199,7 +10240,7 @@ Output Format:
               modelId: imageResult.modelId || null
             };
 
-            // Save partial result checkpoint for progressive display
+            // Save final result with quality score (overwrites immediate save)
             await saveCheckpoint(jobId, 'partial_page', {
               pageNumber: pageNum,
               imageData: imageResult.imageData,
@@ -10217,7 +10258,7 @@ Output Format:
               referencePhotos: referencePhotos,
               modelId: imageResult.modelId || null
             }, pageNum);
-            console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
+            console.log(`💾 [PARTIAL] Saved final result for page ${pageNum} (score: ${imageResult.score})`);
 
             return imageData;
           } catch (error) {
@@ -10474,11 +10515,31 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             let imageResult = null;
             let retries = 0;
 
+            // Callback for immediate display - saves image before quality evaluation completes
+            const onImageReady = async (imgData, modelId) => {
+              const partialData = {
+                pageNumber: pageNum,
+                imageData: imgData,
+                description: sceneDescription,
+                prompt: imagePrompt,
+                text: pageContent,
+                qualityScore: null,  // Not yet evaluated
+                qualityReasoning: null,
+                wasRegenerated: false,
+                totalAttempts: 1,
+                retryHistory: [],
+                referencePhotos: referencePhotos,
+                modelId: modelId || null
+              };
+              await saveCheckpoint(jobId, 'partial_page', partialData, pageNum);
+              console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum} (immediate, quality pending)`);
+            };
+
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
                 // Use quality retry to regenerate if score is below threshold
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage);
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady);
               } catch (error) {
                 retries++;
                 console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -10511,7 +10572,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               referencePhotos: referencePhotos  // Dev mode: which photos were used
             };
 
-            // Save partial result checkpoint for progressive display
+            // Save final result with quality score (overwrites immediate save)
             await saveCheckpoint(jobId, 'partial_page', {
               pageNumber: pageNum,
               imageData: imageResult.imageData,
@@ -10528,7 +10589,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               originalReasoning: imageResult.originalReasoning || null,
               referencePhotos: referencePhotos
             }, pageNum);
-            console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum}`);
+            console.log(`💾 [PARTIAL] Saved final result for page ${pageNum} (score: ${imageResult.score})`);
 
             allImages.push(imageData);
 
@@ -12275,7 +12336,7 @@ async function rewriteBlockedScene(sceneDescription) {
   }
 }
 
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene') {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null) {
   // Check cache first (include previousImage presence in cache key for sequential mode)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
@@ -12283,7 +12344,17 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     log.verbose('💾 [IMAGE CACHE] Cache HIT - reusing previously generated image');
     log.debug('💾 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
     log.debug('💾 [IMAGE CACHE] Cache size:', imageCache.size, 'images');
-    return imageCache.get(cacheKey);
+    const cachedResult = imageCache.get(cacheKey);
+    // Call onImageReady for cache hits too (for progressive display)
+    if (onImageReady && cachedResult.imageData) {
+      try {
+        await onImageReady(cachedResult.imageData, cachedResult.modelId);
+        console.log('📤 [IMAGE CACHE] Cached image sent for immediate display');
+      } catch (callbackError) {
+        console.error('⚠️ [IMAGE CACHE] onImageReady callback error:', callbackError.message);
+      }
+    }
+    return cachedResult;
   }
 
   log.verbose('🆕 [IMAGE CACHE] Cache MISS - generating new image');
@@ -12457,6 +12528,16 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         console.log('🗜️  [COMPRESSION] Compressing image to JPEG...');
         const compressedImageData = await compressImageToJPEG(pngImageData);
 
+        // Call onImageReady callback immediately (before quality eval) for progressive display
+        if (onImageReady) {
+          try {
+            await onImageReady(compressedImageData, modelId);
+            console.log('📤 [IMAGE GEN] Image sent for immediate display (quality eval pending)');
+          } catch (callbackError) {
+            console.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
+          }
+        }
+
         // Evaluate image quality with prompt and reference images
         console.log(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...`);
         const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType);
@@ -12619,9 +12700,10 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @param {string[]} characterPhotos - Character reference photos
  * @param {string|null} previousImage - Previous image for sequential mode
  * @param {string} evaluationType - Type of evaluation ('scene' or 'cover')
+ * @param {Function|null} onImageReady - Optional callback called immediately when image is generated (before quality eval)
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
-async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene') {
+async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null) {
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   let bestResult = null;
@@ -12645,7 +12727,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
     let result;
     try {
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady);
     } catch (error) {
       // Check if this is a safety/content block error
       const errorMsg = error.message.toLowerCase();
