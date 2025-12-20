@@ -1037,8 +1037,8 @@ export default function StoryWizard() {
           try {
             await storyService.cancelJob(activeJobId);
             log.info('Cancelled existing job:', activeJobId);
-            // Retry the generation after a short delay
-            setTimeout(() => generateStory(overrides), 500);
+            // Retry the generation - await to prevent finally from resetting state
+            await generateStory(overrides);
             return;
           } catch (cancelError) {
             log.error('Failed to cancel existing job:', cancelError);
@@ -1049,6 +1049,9 @@ export default function StoryWizard() {
               : 'Failed to cancel. Please try again later.');
           }
         }
+        // User chose not to cancel - reset generating state
+        setIsGenerating(false);
+        return;
       } else {
         alert(language === 'de'
           ? `Generierung fehlgeschlagen: ${errorMessage}`
