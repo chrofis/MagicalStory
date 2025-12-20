@@ -9174,19 +9174,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
     console.log(`📖 [STORYBOOK] Found ${pageMatches.length} page markers`);
 
-    // Find where BACK COVER starts (to not include it in last page)
-    const backCoverStart = response.search(/---BACK COVER---/i);
-
     // Extract content for each page using the markers
+    // Note: BACK COVER comes BEFORE pages in the prompt format, so no need to check for it
     for (let i = 0; i < pageMatches.length && i < sceneCount; i++) {
       const match = pageMatches[i];
       const pageNum = parseInt(match[1], 10); // Use the actual page number from the marker
       const startIndex = match.index + match[0].length;
-      // End at next page, or BACK COVER, or end of response
-      let endIndex = pageMatches[i + 1] ? pageMatches[i + 1].index : response.length;
-      if (backCoverStart > 0 && endIndex > backCoverStart) {
-        endIndex = backCoverStart;
-      }
+      // End at next page or end of response
+      const endIndex = pageMatches[i + 1] ? pageMatches[i + 1].index : response.length;
       const block = response.substring(startIndex, endIndex);
 
       // Extract TEXT section
