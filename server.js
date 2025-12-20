@@ -8893,6 +8893,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     let coverImages = { frontCover: null, initialPage: null, backCover: null };
     const coverPrompts = { front: null, initialPage: null, backCover: null };
 
+    // Helper to build character reference list for cover prompts
+    const buildCharacterReferenceList = (photos) => {
+      if (!photos || photos.length === 0) return '';
+      const charDescriptions = photos.map((photo, index) => {
+        const age = photo.age ? `${photo.age} years old` : '';
+        const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
+        const brief = [photo.name, age, gender].filter(Boolean).join(', ');
+        return `${index + 1}. ${brief}`;
+      });
+      return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+    };
+
     // Helper function to generate cover image during streaming
     const generateCoverImageDuringStream = async (coverType, sceneDescription, rawBlock = null) => {
       if (skipImages) return null;
@@ -8925,7 +8937,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Build the prompt
         let coverPrompt;
-        const visualBibleText = streamingVisualBible ? formatVisualBibleForPrompt(streamingVisualBible) : '';
+        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible) : '';
 
         if (coverType === 'titlePage') {
           coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {

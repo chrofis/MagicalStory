@@ -126,6 +126,16 @@ export default function StoryWizard() {
   const [generatedPages, setGeneratedPages] = useState<number | undefined>();
   const [totalPages, setTotalPages] = useState<number | undefined>();
 
+  // Progressive story display state (show story while images are generating)
+  const [progressiveStoryData, setProgressiveStoryData] = useState<{
+    title: string;
+    dedication?: string;
+    pageTexts: Record<number, string>;
+    sceneDescriptions: SceneDescription[];
+    totalPages: number;
+  } | null>(null);
+  const [completedPageImages, setCompletedPageImages] = useState<Record<number, string>>({}); // pageNumber -> imageData
+
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<{ type: 'image' | 'cover'; pageNumber?: number; coverType?: 'front' | 'back' | 'initial' } | null>(null);
@@ -848,6 +858,10 @@ export default function StoryWizard() {
   const generateStory = async (overrides?: { skipImages?: boolean }) => {
     setIsGenerating(true);
     setStep(5);
+    // Reset progressive state for new generation
+    setProgressiveStoryData(null);
+    setCompletedPageImages({});
+    setCoverImages({ frontCover: null, initialPage: null, backCover: null });
     // Use 0-100 scale to match server progress
     setGenerationProgress({
       current: 5,
@@ -921,6 +935,31 @@ export default function StoryWizard() {
           });
         }
 
+        // Update story text for progressive display (text available before images)
+        if (status.storyText && !progressiveStoryData) {
+          setProgressiveStoryData(status.storyText);
+          setStoryTitle(status.storyText.title);
+          log.debug(`Story text received: ${status.storyText.totalPages} pages ready for display`);
+        }
+
+        // Update completed page images as they become available
+        if (status.partialPages && status.partialPages.length > 0) {
+          setCompletedPageImages(prev => {
+            const updated = { ...prev };
+            let newCount = 0;
+            status.partialPages?.forEach(page => {
+              if (page.imageData && !prev[page.pageNumber]) {
+                updated[page.pageNumber] = page.imageData;
+                newCount++;
+              }
+            });
+            if (newCount > 0) {
+              log.debug(`${newCount} new page images received (total: ${Object.keys(updated).length})`);
+            }
+            return updated;
+          });
+        }
+
         if (status.status === 'completed' && status.result) {
           // Job completed successfully
           setStoryId(status.result.storyId);
@@ -945,6 +984,9 @@ export default function StoryWizard() {
           setSceneDescriptions(status.result.sceneDescriptions || []);
           setSceneImages(status.result.sceneImages || []);
           setCoverImages(status.result.coverImages || { frontCover: null, initialPage: null, backCover: null });
+          // Clear progressive state now that we have final data
+          setProgressiveStoryData(null);
+          setCompletedPageImages({});
           completed = true;
           log.success('Story generation completed!');
         } else if (status.status === 'failed') {
@@ -1134,17 +1176,37 @@ export default function StoryWizard() {
         );
 
       case 5:
-        if (generatedStory) {
+        // Show StoryDisplay if we have final story OR progressive data during generation
+        if (generatedStory || progressiveStoryData) {
+          // Build scene images from progressive data if still generating
+          const displaySceneImages = generatedStory
+            ? sceneImages
+            : Object.entries(completedPageImages).map(([pageNum, imageData]) => ({
+                pageNumber: parseInt(pageNum),
+                imageData,
+                description: progressiveStoryData?.sceneDescriptions.find(s => s.pageNumber === parseInt(pageNum))?.description || ''
+              }));
+
+          // Build story text from progressive data if still generating
+          const displayStory = generatedStory || Object.entries(progressiveStoryData?.pageTexts || {})
+            .sort(([a], [b]) => parseInt(a) - parseInt(b))
+            .map(([pageNum, text]) => `--- Page ${pageNum} ---\n${text}`)
+            .join('\n\n');
+
           return (
             <StoryDisplay
               title={storyTitle}
-              story={generatedStory}
+              story={displayStory}
               outline={storyOutline}
               outlinePrompt={outlinePrompt}
               storyTextPrompts={storyTextPrompts}
               visualBible={visualBible || undefined}
-              sceneImages={sceneImages}
-              sceneDescriptions={sceneDescriptions}
+              sceneImages={displaySceneImages}
+              sceneDescriptions={progressiveStoryData?.sceneDescriptions || sceneDescriptions}
+              // Progressive mode props
+              progressiveMode={isGenerating && !!progressiveStoryData}
+              progressiveData={progressiveStoryData || undefined}
+              completedPageImages={completedPageImages}
               coverImages={coverImages}
               languageLevel={languageLevel}
               isGenerating={isGenerating}

@@ -233,6 +233,16 @@ interface StoryDisplayProps {
   failureReason?: string;
   generatedPages?: number;
   totalPages?: number;
+  // Progressive mode (show story while images generate)
+  progressiveMode?: boolean;
+  progressiveData?: {
+    title: string;
+    dedication?: string;
+    pageTexts: Record<number, string>;
+    sceneDescriptions: SceneDescription[];
+    totalPages: number;
+  };
+  completedPageImages?: Record<number, string>;
 }
 
 export function StoryDisplay({
@@ -263,6 +273,9 @@ export function StoryDisplay({
   failureReason,
   generatedPages,
   totalPages,
+  progressiveMode = false,
+  progressiveData,
+  completedPageImages = {},
 }: StoryDisplayProps) {
   const { t, language } = useLanguage();
   const isPictureBook = languageLevel === '1st-grade';
@@ -337,6 +350,33 @@ export function StoryDisplay({
 
   const storyPages = parseStoryPages(story);
   const hasImages = sceneImages.length > 0;
+
+  // Progressive mode: Calculate max viewable page
+  // User can see page N if page N-1 has an image (or if N is page 1)
+  const getMaxViewablePage = (): number => {
+    if (!progressiveMode) return storyPages.length;
+    if (storyPages.length === 0) return 0;
+
+    // Page 1 is always viewable if we have story text
+    let maxPage = 1;
+
+    // Check each subsequent page
+    for (let i = 2; i <= storyPages.length; i++) {
+      const prevPageNum = i - 1;
+      // Check if previous page has an image (from sceneImages or completedPageImages)
+      const prevHasImage = sceneImages.some(img => img.pageNumber === prevPageNum && img.imageData) ||
+                          !!completedPageImages[prevPageNum];
+      if (prevHasImage) {
+        maxPage = i;
+      } else {
+        break;
+      }
+    }
+    return maxPage;
+  };
+
+  const maxViewablePage = getMaxViewablePage();
+  const totalProgressivePages = progressiveData?.totalPages || storyPages.length;
 
   // Helper to get cover image data (handles both string and object formats)
   const getCoverImageData = (img: string | CoverImageData | null | undefined): string | null => {
@@ -1138,9 +1178,13 @@ export function StoryDisplay({
             {title || (language === 'de' ? 'Ihre Geschichte' : language === 'fr' ? 'Votre histoire' : 'Your Story')}
           </h3>
 
-          {storyPages.map((pageText, index) => {
+          {storyPages.slice(0, progressiveMode ? maxViewablePage : storyPages.length).map((pageText, index) => {
             const pageNumber = index + 1;
             const image = sceneImages.find(img => img.pageNumber === pageNumber);
+            // In progressive mode, also check completedPageImages for the image
+            const progressiveImageData = progressiveMode ? completedPageImages[pageNumber] : undefined;
+            const hasPageImage = !!(image?.imageData || progressiveImageData);
+            const isWaitingForImage = progressiveMode && pageNumber === maxViewablePage && !hasPageImage;
 
             return (
               <div key={pageNumber} className="p-4 md:p-6">
@@ -1151,11 +1195,21 @@ export function StoryDisplay({
                 {/* Picture Book Layout: Image on top, text below */}
                 {isPictureBook ? (
                   <div className="flex flex-col items-center max-w-2xl mx-auto">
-                    {/* Image on top */}
-                    {image && image.imageData ? (
+                    {/* Image on top - show placeholder if waiting for image */}
+                    {isWaitingForImage ? (
+                      <div className="w-full mb-4 aspect-[4/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg shadow-md flex flex-col items-center justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
+                        <p className="text-indigo-600 font-medium">
+                          {language === 'de' ? 'Bild wird erstellt...' : language === 'fr' ? 'Création de l\'image...' : 'Creating image...'}
+                        </p>
+                        <p className="text-indigo-400 text-sm mt-1">
+                          {language === 'de' ? 'Die nächste Seite erscheint bald' : language === 'fr' ? 'La page suivante arrive bientôt' : 'Next page coming soon'}
+                        </p>
+                      </div>
+                    ) : (image?.imageData || progressiveImageData) ? (
                       <div className="w-full mb-4">
                         <img
-                          src={image.imageData}
+                          src={image?.imageData || progressiveImageData}
                           alt={`Scene for page ${pageNumber}`}
                           className="w-full rounded-lg shadow-md object-cover"
                         />
@@ -1225,20 +1279,20 @@ export function StoryDisplay({
                             )}
 
                             {/* 4. API Prompt (Image Generation) */}
-                            {image.prompt && (
+                            {image?.prompt && (
                               <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
                                   {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                                  {image.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
+                                  {image?.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
-                                  {image.prompt}
+                                  {image?.prompt}
                                 </pre>
                               </details>
                             )}
 
                             {/* Reference Photos */}
-                            {image.referencePhotos && image.referencePhotos.length > 0 && (
+                            {image?.referencePhotos && image.referencePhotos.length > 0 && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos}
                                 language={language}
@@ -1246,19 +1300,19 @@ export function StoryDisplay({
                             )}
 
                             {/* Quality Score with Reasoning */}
-                            {image.qualityScore !== undefined && (
+                            {image?.qualityScore !== undefined && (
                               <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                                   <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
                                   <span className={`text-lg font-bold ${
-                                    image.qualityScore >= 70 ? 'text-green-600' :
-                                    image.qualityScore >= 50 ? 'text-yellow-600' :
+                                    (image?.qualityScore ?? 0) >= 70 ? 'text-green-600' :
+                                    (image?.qualityScore ?? 0) >= 50 ? 'text-yellow-600' :
                                     'text-red-600'
                                   }`}>
-                                    {Math.round(image.qualityScore)}%
+                                    {Math.round(image?.qualityScore ?? 0)}%
                                   </span>
                                 </summary>
-                                {image.qualityReasoning && (
+                                {image?.qualityReasoning && (
                                   <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
                                     <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
                                     <p className="whitespace-pre-wrap">{image.qualityReasoning}</p>
@@ -1268,20 +1322,20 @@ export function StoryDisplay({
                             )}
 
                             {/* Retry History (shows all attempts with images) */}
-                            {image.retryHistory && image.retryHistory.length > 0 && (
+                            {image?.retryHistory && image.retryHistory.length > 0 && (
                               <RetryHistoryDisplay
                                 retryHistory={image.retryHistory}
-                                totalAttempts={image.totalAttempts || image.retryHistory.length}
+                                totalAttempts={image?.totalAttempts || image.retryHistory.length}
                                 language={language}
                               />
                             )}
 
                             {/* Regeneration Info (fallback for older data without retryHistory) */}
-                            {image.wasRegenerated && (!image.retryHistory || image.retryHistory.length === 0) && (
+                            {image?.wasRegenerated && (!image?.retryHistory || image.retryHistory.length === 0) && (
                               <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-orange-700 flex items-center justify-between">
                                   <span>🔄 {language === 'de' ? 'Bild regeneriert' : language === 'fr' ? 'Image régénérée' : 'Image Regenerated'}</span>
-                                  {image.originalScore !== undefined && (
+                                  {image?.originalScore !== undefined && (
                                     <span className="text-red-600">Original: {Math.round(image.originalScore)}%</span>
                                   )}
                                 </summary>
@@ -1291,7 +1345,7 @@ export function StoryDisplay({
                                      language === 'fr' ? "L'image a été automatiquement régénérée car la première version avait une qualité faible." :
                                      'Image was automatically regenerated because the first version had low quality.'}
                                   </p>
-                                  {image.originalImage && (
+                                  {image?.originalImage && (
                                     <div className="mt-2">
                                       <p className="text-xs font-semibold text-gray-700 mb-1">
                                         {language === 'de' ? 'Originalbild:' : language === 'fr' ? 'Image originale:' : 'Original Image:'}
@@ -1301,7 +1355,7 @@ export function StoryDisplay({
                                         alt="Original (lower quality)"
                                         className="w-full rounded border-2 border-orange-200 opacity-75"
                                       />
-                                      {image.originalReasoning && (
+                                      {image?.originalReasoning && (
                                         <div className="mt-2 text-xs text-gray-600 bg-white p-2 rounded border">
                                           <div className="font-semibold mb-1">{language === 'de' ? 'Original Feedback:' : language === 'fr' ? 'Retour original:' : 'Original Feedback:'}</div>
                                           <p className="whitespace-pre-wrap">{image.originalReasoning}</p>
@@ -1518,6 +1572,29 @@ export function StoryDisplay({
               </div>
             );
           })}
+
+          {/* Progressive mode: Show loading indicator for remaining pages */}
+          {progressiveMode && maxViewablePage < totalProgressivePages && (
+            <div className="p-6 text-center">
+              <div className="inline-flex flex-col items-center bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 shadow-sm">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
+                <p className="text-indigo-700 font-semibold">
+                  {language === 'de'
+                    ? `Seite ${maxViewablePage} von ${totalProgressivePages}`
+                    : language === 'fr'
+                    ? `Page ${maxViewablePage} sur ${totalProgressivePages}`
+                    : `Page ${maxViewablePage} of ${totalProgressivePages}`}
+                </p>
+                <p className="text-indigo-500 text-sm mt-1">
+                  {language === 'de'
+                    ? 'Weitere Seiten werden geladen...'
+                    : language === 'fr'
+                    ? 'Chargement des pages suivantes...'
+                    : 'Loading more pages...'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

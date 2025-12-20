@@ -454,6 +454,14 @@ export const storyService = {
       coverImages?: CoverImages;
     };
     partialCovers?: CoverImages; // Cover images generated during streaming (before job completion)
+    storyText?: {  // Story text for progressive display while images generate
+      title: string;
+      dedication?: string;
+      pageTexts: Record<number, string>;
+      sceneDescriptions: SceneDescription[];
+      totalPages: number;
+    };
+    partialPages?: Array<{ pageNumber: number; imageData: string; text?: string }>;  // Completed page images
     error?: string;
   }> {
     const response = await api.get<{
@@ -475,6 +483,14 @@ export const storyService = {
       };
       errorMessage?: string;
       partialCovers?: CoverImages; // Cover images generated during streaming
+      storyText?: {  // Story text checkpoint for progressive display
+        title: string;
+        dedication?: string;
+        pageTexts: Record<number, string>;
+        sceneDescriptions: SceneDescription[];
+        totalPages: number;
+      };
+      partialPages?: Array<{ pageNumber: number; imageData: string; text?: string }>;  // Completed page images
     }>(`/api/jobs/${jobId}/status`);
 
     // Map server response to client format
@@ -499,6 +515,8 @@ export const storyService = {
         coverImages: resultData.coverImages,
       } : undefined,
       partialCovers: response.partialCovers, // Cover images generated during streaming
+      storyText: response.storyText, // Story text for progressive display
+      partialPages: response.partialPages, // Completed page images
       error: response.errorMessage,
     };
   },
