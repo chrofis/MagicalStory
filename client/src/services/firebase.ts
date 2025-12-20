@@ -3,6 +3,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged,
   type User as FirebaseUser
@@ -23,14 +25,41 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-export async function signInWithGoogle(): Promise<FirebaseUser> {
-  const result = await signInWithPopup(auth, googleProvider);
-  return result.user;
+// Detect iOS/iPadOS - these devices have issues with popup auth
+function isIOSDevice(): boolean {
+  const ua = navigator.userAgent;
+  // Check for iPhone, iPad, or iPod
+  // Also check for iPad on iOS 13+ which reports as Mac
+  return /iPhone|iPad|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// Kept for backwards compatibility - returns null since we don't use redirect
+export async function signInWithGoogle(): Promise<FirebaseUser> {
+  if (isIOSDevice()) {
+    // On iOS, use redirect - popup is unreliable
+    // This will navigate away, and handleRedirectResult will be called on return
+    await signInWithRedirect(auth, googleProvider);
+    // This won't be reached - page navigates away
+    throw new Error('Redirecting to Google...');
+  } else {
+    // On desktop, use popup
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
+  }
+}
+
+// Handle redirect result when returning from Google auth
 export async function handleRedirectResult(): Promise<FirebaseUser | null> {
-  return null;
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      return result.user;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error handling redirect result:', error);
+    return null;
+  }
 }
 
 export async function getIdToken(user: FirebaseUser): Promise<string> {
