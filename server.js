@@ -286,19 +286,23 @@ function getCharacterPhotoDetails(characters, clothingCategory = null) {
       let photoType = 'none';
       let photoUrl = null;
 
+      // Support both new structure (char.avatars, char.photos) and legacy (char.clothingAvatars, char.bodyNoBgUrl, etc.)
+      const avatars = char.avatars || char.clothingAvatars;
+      const photos = char.photos || {};
+
       // Check for clothing avatar first
-      if (clothingCategory && char.clothingAvatars && char.clothingAvatars[clothingCategory]) {
+      if (clothingCategory && avatars && avatars[clothingCategory]) {
         photoType = `clothing-${clothingCategory}`;
-        photoUrl = char.clothingAvatars[clothingCategory];
-      } else if (char.bodyNoBgUrl) {
+        photoUrl = avatars[clothingCategory];
+      } else if (photos.bodyNoBg || char.bodyNoBgUrl) {
         photoType = 'bodyNoBg';
-        photoUrl = char.bodyNoBgUrl;
-      } else if (char.bodyPhotoUrl) {
+        photoUrl = photos.bodyNoBg || char.bodyNoBgUrl;
+      } else if (photos.body || char.bodyPhotoUrl) {
         photoType = 'body';
-        photoUrl = char.bodyPhotoUrl;
-      } else if (char.photoUrl) {
+        photoUrl = photos.body || char.bodyPhotoUrl;
+      } else if (photos.face || photos.original || char.photoUrl) {
         photoType = 'face';
-        photoUrl = char.photoUrl;
+        photoUrl = photos.face || photos.original || char.photoUrl;
       }
       return {
         name: char.name,
@@ -7741,19 +7745,21 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
 
   visualBible.mainCharacters = characters.map(char => {
     // Build physical description from character data
-    // Support both snake_case (from API) and camelCase (from frontend)
+    // Support both new structure (char.physical.*) and legacy (char.height, char.build, etc.)
+    const physical = char.physical || {};
     const mainChar = {
       id: char.id,
       name: char.name,
       physical: {
         age: char.age || 'Unknown',
         gender: char.gender || 'Unknown',
-        height: char.height || 'Unknown',
-        build: char.build || 'Unknown',
-        face: char.other_features || char.otherFeatures || 'Not analyzed',
-        hair: char.hair_color || char.hairColor || 'Not analyzed',
-        other: char.other || ''
+        height: physical.height || char.height || 'Unknown',
+        build: physical.build || char.build || 'Unknown',
+        face: physical.face || char.other_features || char.otherFeatures || 'Not analyzed',
+        hair: physical.hair || char.hair_color || char.hairColor || 'Not analyzed',
+        other: physical.other || char.other || ''
       },
+      referenceOutfit: char.referenceOutfit || char.reference_outfit || null,
       generatedOutfits: char.generatedOutfits || char.generated_outfits || {}
     };
 
@@ -10414,14 +10420,16 @@ function buildBasePrompt(inputData, textPageCount = null) {
 
   // For story text generation, we use BASIC character info (no strengths/weaknesses)
   // Strengths/weaknesses are only used in outline generation to avoid repetitive trait mentions
+  // Support both new structure (char.traits.*) and legacy (char.specialDetails)
   const characterSummary = (inputData.characters || []).map(char => {
     const isMain = mainCharacterIds.includes(char.id);
+    const traits = char.traits || {};
     return {
       name: char.name,
       isMainCharacter: isMain,
       gender: char.gender,
       age: char.age,
-      specialDetails: char.specialDetails  // Includes hobbies, hopes, fears, favorite animals
+      specialDetails: traits.specialDetails || char.specialDetails || ''  // Includes hobbies, hopes, fears, favorite animals
     };
   });
 
@@ -10474,19 +10482,25 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   // Use sceneCount if provided (for standard mode where print pages != scenes)
   const pageCount = sceneCount || inputData.pages || 15;
   const readingLevel = getReadingLevel(inputData.languageLevel);
+  const mainCharacterIds = inputData.mainCharacters || [];
 
   // Extract only essential character info (NO PHOTOS to avoid token limit)
-  const characterSummary = (inputData.characters || []).map(char => ({
-    name: char.name,
-    gender: char.gender,
-    age: char.age,
-    personality: char.personality,
-    strengths: char.strengths,
-    weaknesses: char.weaknesses,
-    fears: char.fears,
-    specialDetails: char.specialDetails
-    // Explicitly exclude photoUrl and other large fields
-  }));
+  // Support both new structure (char.traits.*) and legacy (char.strengths, etc.)
+  const characterSummary = (inputData.characters || []).map(char => {
+    const traits = char.traits || {};
+    return {
+      name: char.name,
+      isMainCharacter: mainCharacterIds.includes(char.id),
+      gender: char.gender,
+      age: char.age,
+      personality: char.personality,
+      strengths: traits.strengths || char.strengths || [],
+      flaws: traits.flaws || char.weaknesses || [],
+      challenges: traits.challenges || char.fears || [],
+      specialDetails: traits.specialDetails || char.specialDetails || ''
+      // Explicitly exclude photoUrl and other large fields
+    };
+  });
 
   // Log the prompt parameters for debugging
   console.log(`📝 [PROMPT] Building outline prompt:`);
