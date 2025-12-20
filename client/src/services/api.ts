@@ -48,6 +48,10 @@ class ApiClient {
         else if (details.error) errorMessage += `: ${details.error}`;
         else if (typeof details === 'string') errorMessage += `: ${details}`;
       }
+      // Include activeJobId for 409 conflicts (job already in progress)
+      if (errorData.activeJobId) {
+        errorMessage += `|ACTIVE_JOB:${errorData.activeJobId}`;
+      }
       throw new Error(errorMessage);
     }
 

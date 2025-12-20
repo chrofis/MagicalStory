@@ -1023,11 +1023,32 @@ export default function StoryWizard() {
 
       // Check for "already in progress" error (409)
       if (errorMessage.includes('already in progress')) {
-        alert(language === 'de'
-          ? 'Eine Geschichte wird bereits erstellt. Bitte warte, bis sie fertig ist, bevor du eine neue startest.'
+        // Extract the active job ID if present
+        const jobIdMatch = errorMessage.match(/\|ACTIVE_JOB:([a-f0-9-]+)/i);
+        const activeJobId = jobIdMatch ? jobIdMatch[1] : null;
+
+        const cancelMessage = language === 'de'
+          ? 'Eine Geschichte wird bereits erstellt. Möchtest du diese abbrechen und eine neue starten?'
           : language === 'fr'
-          ? 'Une histoire est déjà en cours de création. Veuillez attendre qu\'elle soit terminée avant d\'en commencer une nouvelle.'
-          : 'A story is already being generated. Please wait for it to finish before starting a new one.');
+          ? 'Une histoire est déjà en cours de création. Voulez-vous l\'annuler et en commencer une nouvelle?'
+          : 'A story is already being generated. Would you like to cancel it and start a new one?';
+
+        if (activeJobId && window.confirm(cancelMessage)) {
+          try {
+            await storyService.cancelJob(activeJobId);
+            log.info('Cancelled existing job:', activeJobId);
+            // Retry the generation after a short delay
+            setTimeout(() => generateStory(overrides), 500);
+            return;
+          } catch (cancelError) {
+            log.error('Failed to cancel existing job:', cancelError);
+            alert(language === 'de'
+              ? 'Abbrechen fehlgeschlagen. Bitte versuche es später erneut.'
+              : language === 'fr'
+              ? 'Échec de l\'annulation. Veuillez réessayer plus tard.'
+              : 'Failed to cancel. Please try again later.');
+          }
+        }
       } else {
         alert(language === 'de'
           ? `Generierung fehlgeschlagen: ${errorMessage}`
