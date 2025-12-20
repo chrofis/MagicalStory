@@ -689,13 +689,23 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           });
 
           // Send order confirmation email to customer
-          // Get language from story data for email localization
+          // Get language for email localization - prefer user's preference, fall back to story language
           let orderEmailLanguage = 'English';
           try {
-            const parsedStoryData = typeof storyData === 'string' ? JSON.parse(storyData) : storyData;
-            orderEmailLanguage = parsedStoryData?.inputData?.language || parsedStoryData?.language || 'English';
+            // First try user's preferred language
+            const userLangResult = await dbPool.query(
+              'SELECT preferred_language FROM users WHERE id = $1',
+              [userId]
+            );
+            if (userLangResult.rows.length > 0 && userLangResult.rows[0].preferred_language) {
+              orderEmailLanguage = userLangResult.rows[0].preferred_language;
+            } else {
+              // Fall back to story language
+              const parsedStoryData = typeof storyData === 'string' ? JSON.parse(storyData) : storyData;
+              orderEmailLanguage = parsedStoryData?.inputData?.language || parsedStoryData?.language || 'English';
+            }
           } catch (e) {
-            console.warn('⚠️ Could not parse story data for language:', e.message);
+            console.warn('⚠️ Could not get language for order email:', e.message);
           }
           email.sendOrderConfirmationEmail(
             customerInfo.email,
@@ -856,7 +866,8 @@ async function initializeDatabase() {
         stories_generated INT DEFAULT 0,
         credits INT DEFAULT 1000,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_login TIMESTAMP
+        last_login TIMESTAMP,
+        preferred_language VARCHAR(20) DEFAULT 'English'
       )
     `);
 
@@ -866,6 +877,16 @@ async function initializeDatabase() {
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='last_login') THEN
           ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
+        END IF;
+      END $$;
+    `);
+
+    // Add preferred_language column if it doesn't exist
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='preferred_language') THEN
+          ALTER TABLE users ADD COLUMN preferred_language VARCHAR(20) DEFAULT 'English';
         END IF;
       END $$;
     `);
@@ -1330,7 +1351,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         role: dbUser.role,
         storyQuota: dbUser.story_quota,
         storiesGenerated: dbUser.stories_generated,
-        credits: dbUser.credits !== undefined ? dbUser.credits : 1000
+        credits: dbUser.credits !== undefined ? dbUser.credits : 1000,
+        preferredLanguage: dbUser.preferred_language || 'English'
       };
     } else {
       // File mode
@@ -1374,7 +1396,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         role: user.role,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits != null ? user.credits : 1000
+        credits: user.credits != null ? user.credits : 1000,
+        preferredLanguage: user.preferredLanguage || 'English'
       }
     });
   } catch (err) {
@@ -1468,7 +1491,8 @@ app.post('/api/auth/firebase', authLimiter, async (req, res) => {
           role: user.role,
           storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
           storiesGenerated: user.stories_generated || 0,
-          credits: user.credits != null ? user.credits : 1000
+          credits: user.credits != null ? user.credits : 1000,
+          preferredLanguage: user.preferred_language || 'English'
         }
       });
     } else {
@@ -1997,14 +2021,14 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
 
     // Get purchase history (orders)
     const ordersResult = await dbQuery(
-      `SELECT id, story_id, amount, currency, payment_status, gelato_order_id, created_at, product_variant
+      `SELECT id, story_id, amount_total, currency, payment_status, gelato_order_id, created_at, product_variant
        FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
       [targetUserId]
     );
     const purchases = ordersResult.map(o => ({
       id: o.id,
       storyId: o.story_id,
-      amount: o.amount,
+      amount: o.amount_total,
       currency: o.currency,
       status: o.payment_status,
       gelatoOrderId: o.gelato_order_id,
@@ -2429,10 +2453,11 @@ app.delete('/api/admin/print-products/:id', authenticateToken, async (req, res) 
 app.get('/api/user/quota', authenticateToken, async (req, res) => {
   try {
     let credits;
+    let preferredLanguage = 'English';
 
     if (STORAGE_MODE === 'database' && dbPool) {
       // Database mode
-      const selectQuery = 'SELECT credits FROM users WHERE id = $1';
+      const selectQuery = 'SELECT credits, preferred_language FROM users WHERE id = $1';
       const rows = await dbQuery(selectQuery, [req.user.id]);
 
       if (rows.length === 0) {
@@ -2440,6 +2465,7 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
       }
 
       credits = rows[0].credits !== undefined ? rows[0].credits : 1000;
+      preferredLanguage = rows[0].preferred_language || 'English';
     } else {
       // File mode
       const users = await readJSON(USERS_FILE);
@@ -2450,11 +2476,13 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
       }
 
       credits = user.credits != null ? user.credits : 1000;
+      preferredLanguage = user.preferredLanguage || 'English';
     }
 
     res.json({
       credits: credits,
-      unlimited: credits === -1
+      unlimited: credits === -1,
+      preferredLanguage: preferredLanguage
     });
   } catch (err) {
     console.error('Error fetching user credits:', err);
@@ -10080,7 +10108,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     // Send story completion email to customer
     try {
       const userResult = await dbPool.query(
-        'SELECT email, username, shipping_first_name FROM users WHERE id = $1',
+        'SELECT email, username, shipping_first_name, preferred_language FROM users WHERE id = $1',
         [job.user_id]
       );
       if (userResult.rows.length > 0 && userResult.rows[0].email) {
@@ -10088,8 +10116,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const storyTitle = inputData.storyTitle || inputData.title || 'Your Story';
         // Use shipping_first_name if available, otherwise fall back to username
         const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
-        // Get language for email localization
-        const emailLanguage = inputData.language || 'English';
+        // Get language for email localization - prefer user's preference, fall back to story language
+        const emailLanguage = user.preferred_language || inputData.language || 'English';
         await email.sendStoryCompleteEmail(user.email, firstName, storyTitle, storyId, emailLanguage);
       }
     } catch (emailErr) {
@@ -10347,7 +10375,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       if (jobResult.rows.length > 0) {
         const userId = jobResult.rows[0].user_id;
         const userResult = await dbPool.query(
-          'SELECT email, username, shipping_first_name FROM users WHERE id = $1',
+          'SELECT email, username, shipping_first_name, preferred_language FROM users WHERE id = $1',
           [userId]
         );
         if (userResult.rows.length > 0) {
@@ -10357,8 +10385,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           // Notify customer
           if (user.email) {
             const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
-            // Get language for email localization
-            const emailLanguage = inputData.language || 'English';
+            // Get language for email localization - prefer user's preference, fall back to story language
+            const emailLanguage = user.preferred_language || inputData.language || 'English';
             await email.sendStoryFailedEmail(user.email, firstName, emailLanguage);
           }
         }
@@ -11867,6 +11895,15 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', userCredits === -1 ? 0 : creditsNeeded]
       );
+
+      // Update user's preferred language based on their story language choice
+      if (inputData.language) {
+        await dbPool.query(
+          'UPDATE users SET preferred_language = $1 WHERE id = $2',
+          [inputData.language, userId]
+        );
+        console.log(`🌐 Updated preferred language for user ${userId}: ${inputData.language}`);
+      }
     } else {
       // File mode fallback - not supported for background jobs
       return res.status(503).json({
