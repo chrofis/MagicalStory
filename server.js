@@ -8562,57 +8562,43 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     return `* **${c.name}:**\n  PHYSICAL: ${physicalDesc}`;
   }).join('\n\n');
 
-  // Build Visual Bible recurring elements section (animals, objects, locations)
+  // Build Visual Bible recurring elements section - include ALL entries (not filtered by page)
   let recurringElements = '';
   if (visualBible) {
-    const entries = getVisualBibleEntriesForPage(visualBible, pageNumber);
-    if (entries.length > 0) {
-      for (const entry of entries) {
-        const description = entry.extractedDescription || entry.description;
-        recurringElements += `* **${entry.name}** (${entry.type}): ${description}\n`;
-      }
-    }
-    // Add secondary characters if any appear on this page
+    // Add ALL secondary characters
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
-      const secondaryInScene = visualBible.secondaryCharacters.filter(sc =>
-        sc.appearsOnPages && sc.appearsOnPages.includes(pageNumber)
-      );
-      for (const sc of secondaryInScene) {
-        recurringElements += `* **${sc.name}** (secondary character): ${sc.description}\n`;
+      for (const sc of visualBible.secondaryCharacters) {
+        const description = sc.extractedDescription || sc.description;
+        recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
       }
     }
-    // Add locations if any appear on this page
+    // Add ALL locations
     if (visualBible.locations && visualBible.locations.length > 0) {
-      const locationsInScene = visualBible.locations.filter(loc =>
-        loc.appearsOnPages && loc.appearsOnPages.includes(pageNumber)
-      );
-      for (const loc of locationsInScene) {
-        recurringElements += `* **${loc.name}** (location): ${loc.description}\n`;
+      for (const loc of visualBible.locations) {
+        const description = loc.extractedDescription || loc.description;
+        recurringElements += `* **${loc.name}** (location): ${description}\n`;
       }
     }
-    // Add animals if any appear on this page
+    // Add ALL animals
     if (visualBible.animals && visualBible.animals.length > 0) {
-      const animalsInScene = visualBible.animals.filter(animal =>
-        animal.appearsOnPages && animal.appearsOnPages.includes(pageNumber)
-      );
-      for (const animal of animalsInScene) {
-        recurringElements += `* **${animal.name}** (animal): ${animal.description}\n`;
+      for (const animal of visualBible.animals) {
+        const description = animal.extractedDescription || animal.description;
+        recurringElements += `* **${animal.name}** (animal): ${description}\n`;
       }
     }
-    // Add artifacts if any appear on this page
+    // Add ALL artifacts
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
-      const artifactsInScene = visualBible.artifacts.filter(artifact =>
-        artifact.appearsOnPages && artifact.appearsOnPages.includes(pageNumber)
-      );
-      for (const artifact of artifactsInScene) {
-        recurringElements += `* **${artifact.name}** (object): ${artifact.description}\n`;
+      for (const artifact of visualBible.artifacts) {
+        const description = artifact.extractedDescription || artifact.description;
+        recurringElements += `* **${artifact.name}** (object): ${description}\n`;
       }
     }
+    console.log(`📖 [SCENE PROMPT P${pageNumber}] Including ALL Visual Bible entries in scene description`);
   }
 
   // Default message if no recurring elements
   if (!recurringElements) {
-    recurringElements = '(None for this page)';
+    recurringElements = '(None available)';
   }
 
   // Use template from file if available

@@ -18,7 +18,6 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 **VISUAL REFERENCE ELEMENTS (optional):**
 You may use elements from the visual bible below if appropriate for this scene.
 These elements are NOT required - only include them if they naturally fit the scene composition.
-If you DO include any element, describe it EXACTLY as specified below (verbatim).
 
 {VISUAL_BIBLE}
 
