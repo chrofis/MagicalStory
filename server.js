@@ -3487,9 +3487,6 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       ? JSON.parse(story.data)
       : story.data;
 
-    // Get labeled character photos for reference (with names)
-    const characterPhotos = getCharacterPhotoDetails(storyData.characters || []);
-
     // Get art style
     const artStyleId = storyData.artStyle || 'pixar';
     const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
@@ -3535,60 +3532,74 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
     };
 
+    // Extract cover scenes with clothing info
+    const coverScenes = extractCoverScenes(storyData.outline || '');
+    const storyTitle = storyData.title || 'My Story';
+
+    // Determine scene description and clothing for this cover type
+    let sceneDescription;
+    let coverClothing;
+    if (normalizedCoverType === 'front') {
+      sceneDescription = coverScenes.titlePage?.scene || 'A beautiful, magical title page featuring the main characters.';
+      coverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+    } else if (normalizedCoverType === 'initialPage') {
+      sceneDescription = coverScenes.initialPage?.scene || 'A warm, inviting dedication/introduction page.';
+      coverClothing = coverScenes.initialPage?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+    } else {
+      sceneDescription = coverScenes.backCover?.scene || 'A satisfying, conclusive ending scene.';
+      coverClothing = coverScenes.backCover?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+    }
+
+    // Get character photos with correct clothing variant
+    let coverCharacterPhotos;
+    if (normalizedCoverType === 'front') {
+      // Front cover: detect which characters appear in the scene
+      const frontCoverCharacters = getCharactersInScene(sceneDescription, storyData.characters || []);
+      coverCharacterPhotos = getCharacterPhotoDetails(frontCoverCharacters, coverClothing);
+      console.log(`📕 [COVER REGEN] Front cover: ${frontCoverCharacters.length} characters, clothing: ${coverClothing}`);
+    } else {
+      // Initial/Back covers: use ALL characters
+      coverCharacterPhotos = getCharacterPhotoDetails(storyData.characters || [], coverClothing);
+      console.log(`📕 [COVER REGEN] ${normalizedCoverType}: ALL ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
+    }
+
     // Build cover prompt
     let coverPrompt;
     if (customPrompt) {
       coverPrompt = customPrompt;
     } else {
-      const storyTitle = storyData.title || 'My Story';
-      const coverScenes = extractCoverScenes(storyData.outline || '');
-
       if (normalizedCoverType === 'front') {
-        const titlePageScene = coverScenes.titlePage || 'A beautiful, magical title page featuring the main characters.';
         coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-          TITLE_PAGE_SCENE: titlePageScene,
+          TITLE_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
           STORY_TITLE: storyTitle,
-          CHARACTER_REFERENCE_LIST: buildCharRefList(characterPhotos),
+          CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos),
           VISUAL_BIBLE: visualBiblePrompt
         });
       } else if (normalizedCoverType === 'initialPage') {
-        const initialPageScene = coverScenes.initialPage || 'A warm, inviting dedication/introduction page.';
         coverPrompt = storyData.dedication
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
-              INITIAL_PAGE_SCENE: initialPageScene,
+              INITIAL_PAGE_SCENE: sceneDescription,
               STYLE_DESCRIPTION: styleDescription,
               DEDICATION: storyData.dedication,
-              CHARACTER_REFERENCE_LIST: buildCharRefList(characterPhotos),
+              CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos),
               VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
-              INITIAL_PAGE_SCENE: initialPageScene,
+              INITIAL_PAGE_SCENE: sceneDescription,
               STYLE_DESCRIPTION: styleDescription,
               STORY_TITLE: storyTitle,
-              CHARACTER_REFERENCE_LIST: buildCharRefList(characterPhotos),
+              CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos),
               VISUAL_BIBLE: visualBiblePrompt
             });
       } else {
-        const backCoverScene = coverScenes.backCover || 'A satisfying, conclusive ending scene.';
         coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
-          BACK_COVER_SCENE: backCoverScene,
+          BACK_COVER_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_REFERENCE_LIST: buildCharRefList(characterPhotos),
+          CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos),
           VISUAL_BIBLE: visualBiblePrompt
         });
       }
-    }
-
-    // Get the scene description for this cover type
-    const coverScenes2 = extractCoverScenes(storyData.outline || '');
-    let sceneDescription;
-    if (normalizedCoverType === 'front') {
-      sceneDescription = coverScenes2.titlePage || 'A beautiful, magical title page featuring the main characters.';
-    } else if (normalizedCoverType === 'initialPage') {
-      sceneDescription = coverScenes2.initialPage || 'A warm, inviting dedication/introduction page.';
-    } else {
-      sceneDescription = coverScenes2.backCover || 'A satisfying, conclusive ending scene.';
     }
 
     // Get the current cover image before regenerating (to store as previous version)
@@ -3598,14 +3609,14 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const previousImageData = previousCover?.imageData || previousCover || null;
 
     // Clear the image cache for this prompt to force a new generation
-    const cacheKey = generateImageCacheKey(coverPrompt, characterPhotos, null);
+    const cacheKey = generateImageCacheKey(coverPrompt, coverCharacterPhotos, null);
     if (imageCache.has(cacheKey)) {
       imageCache.delete(cacheKey);
       console.log(`🗑️ [REGEN] Cleared cache for ${normalizedCoverType} cover to force new generation`);
     }
 
     // Generate new cover with quality retry (automatically retries on text errors)
-    const coverResult = await generateImageWithQualityRetry(coverPrompt, characterPhotos, null, 'cover');
+    const coverResult = await generateImageWithQualityRetry(coverPrompt, coverCharacterPhotos, null, 'cover');
 
     // Update the cover in story data with new structure including quality, description, prompt, and previous version
     const coverData = {
@@ -8313,17 +8324,25 @@ function getElementsNeedingAnalysis(visualBible, pageNumber) {
   return needsAnalysis;
 }
 
-// Helper function to extract cover scene descriptions from outline
+// Helper function to extract cover scene descriptions and clothing from outline
+// Returns: { titlePage: { scene, clothing }, initialPage: { scene, clothing }, backCover: { scene, clothing } }
 function extractCoverScenes(outline) {
   const coverScenes = {
-    titlePage: '',
-    initialPage: '',
-    backCover: ''
+    titlePage: { scene: '', clothing: null },
+    initialPage: { scene: '', clothing: null },
+    backCover: { scene: '', clothing: null }
   };
 
   const lines = outline.split('\n');
   let currentCoverType = null;
   let sceneBuffer = '';
+
+  // Helper to save current buffer and extract clothing
+  const saveCurrentScene = () => {
+    if (currentCoverType && sceneBuffer) {
+      coverScenes[currentCoverType].scene = sceneBuffer.trim();
+    }
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -8331,9 +8350,7 @@ function extractCoverScenes(outline) {
     // Look for cover page patterns
     const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
     if (titlePageMatch) {
-      if (currentCoverType && sceneBuffer) {
-        coverScenes[currentCoverType] = sceneBuffer.trim();
-      }
+      saveCurrentScene();
       currentCoverType = 'titlePage';
       sceneBuffer = titlePageMatch[1].trim();
       continue;
@@ -8342,9 +8359,7 @@ function extractCoverScenes(outline) {
     // Match both "Initial Page" and legacy "Page 0" for backward compatibility
     const initialPageMatch = line.match(/(?:\*\*)?(?:Initial\s+Page|Page\s+0)(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
     if (initialPageMatch) {
-      if (currentCoverType && sceneBuffer) {
-        coverScenes[currentCoverType] = sceneBuffer.trim();
-      }
+      saveCurrentScene();
       currentCoverType = 'initialPage';
       sceneBuffer = initialPageMatch[1].trim();
       continue;
@@ -8352,26 +8367,37 @@ function extractCoverScenes(outline) {
 
     const backCoverMatch = line.match(/(?:\*\*)?Back\s+Cover(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
     if (backCoverMatch) {
-      if (currentCoverType && sceneBuffer) {
-        coverScenes[currentCoverType] = sceneBuffer.trim();
-      }
+      saveCurrentScene();
       currentCoverType = 'backCover';
       sceneBuffer = backCoverMatch[1].trim();
       continue;
     }
 
     // Stop collecting if we hit section separators or new sections
-    if (line === '---' || line.match(/^#{1,3}\s*(Visual Bible|Page-by-Page|Characters|Animals|Locations)/i)) {
-      if (currentCoverType && sceneBuffer) {
-        coverScenes[currentCoverType] = sceneBuffer.trim();
-      }
+    if (line === '---' || line.match(/^#{1,3}\s*(Visual Bible|Page-by-Page|Characters|Animals|Locations|Plot)/i)) {
+      saveCurrentScene();
       currentCoverType = null;
       sceneBuffer = '';
       continue;
     }
 
-    // Skip Clothing lines - not part of scene description
-    if (line.match(/^\*{0,2}Clothing\*{0,2}:/i)) {
+    // Extract Clothing for current cover type (handles various markdown formats)
+    const clothingMatch = line.match(/^[\*_\-#\s\d\.]*(?:Clothing|Kleidung|Vêtements|Tenue)[\*_\-#\s]*:?\s*[\*_\-#\s]*(winter|summer|formal|standard)?/i);
+    if (clothingMatch && currentCoverType) {
+      if (clothingMatch[1]) {
+        // Clothing value on same line
+        coverScenes[currentCoverType].clothing = clothingMatch[1].toLowerCase();
+      } else {
+        // Clothing value might be on next line
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          const valueMatch = nextLine.match(/^[\*_\-#\s]*(winter|summer|formal|standard)[\*_\-#\s]*$/i);
+          if (valueMatch) {
+            coverScenes[currentCoverType].clothing = valueMatch[1].toLowerCase();
+            i++; // Skip the value line
+          }
+        }
+      }
       continue;
     }
 
@@ -8386,18 +8412,18 @@ function extractCoverScenes(outline) {
 
     // If we hit a regular page number, stop collecting cover scenes
     if (line.match(/^(?:\*\*)?Page\s+\d+(?:\*\*)?[\s:]/i)) {
-      if (currentCoverType && sceneBuffer) {
-        coverScenes[currentCoverType] = sceneBuffer.trim();
-      }
+      saveCurrentScene();
       currentCoverType = null;
       sceneBuffer = '';
     }
   }
 
   // Save last buffer
-  if (currentCoverType && sceneBuffer) {
-    coverScenes[currentCoverType] = sceneBuffer.trim();
-  }
+  saveCurrentScene();
+
+  console.log(`📋 [COVER-EXTRACT] Title Page: clothing=${coverScenes.titlePage.clothing || 'not found'}, scene=${coverScenes.titlePage.scene.substring(0, 50)}...`);
+  console.log(`📋 [COVER-EXTRACT] Initial Page: clothing=${coverScenes.initialPage.clothing || 'not found'}, scene=${coverScenes.initialPage.scene.substring(0, 50)}...`);
+  console.log(`📋 [COVER-EXTRACT] Back Cover: clothing=${coverScenes.backCover.clothing || 'not found'}, scene=${coverScenes.backCover.scene.substring(0, 50)}...`);
 
   return coverScenes;
 }
@@ -8868,11 +8894,21 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const coverPrompts = { front: null, initialPage: null, backCover: null };
 
     // Helper function to generate cover image during streaming
-    const generateCoverImageDuringStream = async (coverType, sceneDescription) => {
+    const generateCoverImageDuringStream = async (coverType, sceneDescription, rawBlock = null) => {
       if (skipImages) return null;
 
       try {
-        const clothing = parseClothingCategory(sceneDescription) || 'standard';
+        // Extract clothing from block first (more reliable), fallback to parsing scene
+        let clothing = null;
+        if (rawBlock) {
+          const clothingMatch = rawBlock.match(/CLOTHING:\s*(winter|summer|formal|standard)/i);
+          if (clothingMatch) {
+            clothing = clothingMatch[1].toLowerCase();
+          }
+        }
+        if (!clothing) {
+          clothing = parseClothingCategory(sceneDescription) || 'standard';
+        }
 
         // Determine character selection based on cover type
         let referencePhotos;
@@ -8970,7 +9006,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       // onCoverSceneComplete
       (coverType, sceneDescription, rawBlock) => {
         if (shouldStreamCovers) {
-          const coverPromise = streamLimit(() => generateCoverImageDuringStream(coverType, sceneDescription));
+          const coverPromise = streamLimit(() => generateCoverImageDuringStream(coverType, sceneDescription, rawBlock));
           streamingCoverPromises.push(coverPromise);
         }
       }
@@ -9056,14 +9092,23 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       backCover: ''
     };
 
+    // Helper to extract clothing from a block
+    const extractClothingFromBlock = (block) => {
+      const clothingMatch = block.match(/CLOTHING:\s*(winter|summer|formal|standard)/i);
+      return clothingMatch ? clothingMatch[1].toLowerCase() : null;
+    };
+
     // Extract TITLE PAGE scene (for front cover)
     const titlePageMatch = response.match(/---TITLE PAGE---\s*([\s\S]*?)(?=---(?:INITIAL PAGE|PAGE\s+\d+)---|$)/i);
     if (titlePageMatch) {
       const titlePageBlock = titlePageMatch[1];
-      const sceneMatch = titlePageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+      const sceneMatch = titlePageBlock.match(/SCENE:\s*([\s\S]*?)(?=CLOTHING:|---|$)/i);
       if (sceneMatch) {
-        coverScenes.titlePage = sceneMatch[1].trim();
-        console.log(`📖 [STORYBOOK] Extracted Title Page scene: ${coverScenes.titlePage.substring(0, 100)}...`);
+        coverScenes.titlePage = {
+          scene: sceneMatch[1].trim(),
+          clothing: extractClothingFromBlock(titlePageBlock)
+        };
+        console.log(`📖 [STORYBOOK] Extracted Title Page: scene=${coverScenes.titlePage.scene.substring(0, 80)}..., clothing=${coverScenes.titlePage.clothing || 'not found'}`);
       }
     }
 
@@ -9071,10 +9116,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const initialPageMatch = response.match(/---INITIAL PAGE---\s*([\s\S]*?)(?=---VISUAL BIBLE---|---PAGE\s+\d+---|$)/i);
     if (initialPageMatch) {
       const initialPageBlock = initialPageMatch[1];
-      const sceneMatch = initialPageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+      const sceneMatch = initialPageBlock.match(/SCENE:\s*([\s\S]*?)(?=CLOTHING:|---|$)/i);
       if (sceneMatch) {
-        coverScenes.initialPage = sceneMatch[1].trim();
-        console.log(`📖 [STORYBOOK] Extracted Initial Page scene: ${coverScenes.initialPage.substring(0, 100)}...`);
+        coverScenes.initialPage = {
+          scene: sceneMatch[1].trim(),
+          clothing: extractClothingFromBlock(initialPageBlock)
+        };
+        console.log(`📖 [STORYBOOK] Extracted Initial Page: scene=${coverScenes.initialPage.scene.substring(0, 80)}..., clothing=${coverScenes.initialPage.clothing || 'not found'}`);
       }
     }
 
@@ -9100,10 +9148,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const backCoverMatch = response.match(/---BACK COVER---\s*([\s\S]*?)$/i);
     if (backCoverMatch) {
       const backCoverBlock = backCoverMatch[1];
-      const sceneMatch = backCoverBlock.match(/SCENE:\s*([\s\S]*?)$/i);
+      const sceneMatch = backCoverBlock.match(/SCENE:\s*([\s\S]*?)(?=CLOTHING:|$)/i);
       if (sceneMatch) {
-        coverScenes.backCover = sceneMatch[1].trim();
-        console.log(`📖 [STORYBOOK] Extracted Back Cover scene: ${coverScenes.backCover.substring(0, 100)}...`);
+        coverScenes.backCover = {
+          scene: sceneMatch[1].trim(),
+          clothing: extractClothingFromBlock(backCoverBlock)
+        };
+        console.log(`📖 [STORYBOOK] Extracted Back Cover: scene=${coverScenes.backCover.scene.substring(0, 80)}..., clothing=${coverScenes.backCover.clothing || 'not found'}`);
       }
     }
 
@@ -9143,6 +9194,23 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
       console.log(`📖 [STORYBOOK] Page ${pageNum}: ${pageText.substring(0, 50)}...`);
     }
+
+    // Save story text checkpoint so client can display text while images generate
+    const pageTextMap = {};
+    allSceneDescriptions.forEach(scene => {
+      // Extract text from fullStoryText for each page
+      const pageMatch = fullStoryText.match(new RegExp(`--- Page ${scene.pageNumber} ---\\n([\\s\\S]*?)(?=--- Page \\d+ ---|$)`));
+      pageTextMap[scene.pageNumber] = pageMatch ? pageMatch[1].trim() : '';
+    });
+
+    await saveCheckpoint(jobId, 'story_text', {
+      title: storyTitle,
+      dedication: dedication,
+      pageTexts: pageTextMap,
+      sceneDescriptions: allSceneDescriptions,
+      totalPages: sceneCount
+    });
+    console.log(`💾 [STORYBOOK] Saved story text checkpoint with ${Object.keys(pageTextMap).length} pages`);
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -9324,10 +9392,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const artStyleId = inputData.artStyle || 'pixar';
         const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
-        // Use AI-generated cover scenes (or fallbacks)
-        const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-        const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
-        const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
+        // Use AI-generated cover scenes (or fallbacks) - handle both new format {scene, clothing} and legacy string
+        const titlePageScene = coverScenes.titlePage?.scene || (typeof coverScenes.titlePage === 'string' ? coverScenes.titlePage : null) || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+        const initialPageScene = coverScenes.initialPage?.scene || (typeof coverScenes.initialPage === 'string' ? coverScenes.initialPage : null) || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+        const backCoverScene = coverScenes.backCover?.scene || (typeof coverScenes.backCover === 'string' ? coverScenes.backCover : null) || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
         // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
         const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
@@ -9336,8 +9404,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (!coverImages.frontCover) {
           // Detect which characters appear in the front cover scene
           const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
-          // Parse clothing category from scene description (same as regular images)
-          const frontCoverClothing = parseClothingCategory(titlePageScene) || 'standard';
+          // Use extracted clothing or parse from scene description
+          const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
           // Use detailed photo info (with names) for labeled reference images
           const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
           console.log(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}), clothing: ${frontCoverClothing}`);
@@ -9373,8 +9441,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Initial page - only generate if not already done during streaming
         if (!coverImages.initialPage) {
-          // Parse clothing category from scene description
-          const initialPageClothing = parseClothingCategory(initialPageScene) || 'standard';
+          // Use extracted clothing or parse from scene description
+          const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
           const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
           console.log(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
 
@@ -9417,8 +9485,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Back cover - only generate if not already done during streaming
         if (!coverImages.backCover) {
-          // Parse clothing category from scene description
-          const backCoverClothing = parseClothingCategory(backCoverScene) || 'standard';
+          // Use extracted clothing or parse from scene description
+          const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
           const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
           console.log(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
 
@@ -10252,9 +10320,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
       // Extract cover scene descriptions from outline (matches step-by-step)
       const coverScenes = extractCoverScenes(outline);
-      const titlePageScene = coverScenes.titlePage || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
-      const initialPageScene = coverScenes.initialPage || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
-      const backCoverScene = coverScenes.backCover || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
+      const titlePageScene = coverScenes.titlePage?.scene || `A beautiful, magical title page featuring the main characters. Decorative elements that reflect the story's theme with space for the title text.`;
+      const initialPageScene = coverScenes.initialPage?.scene || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
+      const backCoverScene = coverScenes.backCover?.scene || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
       // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
@@ -10276,8 +10344,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       // Generate front cover (matches step-by-step prompt format)
       // Detect which characters appear in the front cover scene
       const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
-      // Parse clothing category from scene description (same as regular images)
-      const frontCoverClothing = parseClothingCategory(titlePageScene) || 'standard';
+      // Use extracted clothing or parse from scene description
+      const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
       // Use detailed photo info (with names) for labeled reference images
       const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
 
@@ -10301,8 +10369,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       }
 
       // Generate initial page (dedication page) - use ALL characters (main character centered)
-      // Parse clothing category from scene description
-      const initialPageClothing = parseClothingCategory(initialPageScene) || 'standard';
+      // Use extracted clothing or parse from scene description
+      const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
       const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
       try {
         console.log(`📕 [PIPELINE] Generating initial page (dedication) for job ${jobId} - ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
@@ -10332,8 +10400,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       }
 
       // Generate back cover - use ALL characters with EQUAL prominence (no focus on main)
-      // Parse clothing category from scene description
-      const backCoverClothing = parseClothingCategory(backCoverScene) || 'standard';
+      // Use extracted clothing or parse from scene description
+      const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
       const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
       try {
         console.log(`📕 [PIPELINE] Generating back cover for job ${jobId} - ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
@@ -12449,9 +12517,10 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
 
       const job = result.rows[0];
 
-      // Fetch partial results (completed pages and covers) if job is still processing
+      // Fetch partial results (completed pages, covers, and story text) if job is still processing
       let partialPages = [];
       let partialCovers = {};
+      let storyText = null;
       if (job.status === 'processing') {
         // Fetch partial pages
         const partialPagesResult = await dbPool.query(
@@ -12478,6 +12547,18 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
             partialCovers[coverData.type] = coverData;
           }
         });
+
+        // Fetch story text checkpoint (contains page texts for progressive display)
+        const storyTextResult = await dbPool.query(
+          `SELECT step_data
+           FROM story_job_checkpoints
+           WHERE job_id = $1 AND step_name = 'story_text'
+           LIMIT 1`,
+          [jobId]
+        );
+        if (storyTextResult.rows.length > 0) {
+          storyText = storyTextResult.rows[0].step_data;
+        }
       }
 
       res.json({
@@ -12490,7 +12571,8 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
         createdAt: job.created_at,
         completedAt: job.completed_at,
         partialPages: partialPages,  // Array of completed pages with text + image
-        partialCovers: Object.keys(partialCovers).length > 0 ? partialCovers : undefined  // Partial cover images
+        partialCovers: Object.keys(partialCovers).length > 0 ? partialCovers : undefined,  // Partial cover images
+        storyText: storyText  // Story text with page texts for progressive display
       });
     } else {
       return res.status(503).json({ error: 'Background jobs require database mode' });
