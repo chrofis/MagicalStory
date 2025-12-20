@@ -914,22 +914,37 @@ export function StoryDisplay({
                           </button>
                         )}
                       </div>
+                      {/* 1. Outline Extract (from cover scenes in outline) */}
                       {coverObj?.description && (
-                        <details className="bg-green-50 border border-green-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-green-800">{language === 'de' ? 'Szenenbeschreibung' : 'Scene Description'}</summary>
+                        <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
+                            {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
+                          </summary>
                           <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
                         </details>
                       )}
+                      {/* 2. API Prompt (final prompt to image generation) */}
                       {coverObj?.prompt && (
                         <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-blue-800">{language === 'de' ? 'API-Prompt' : 'API Prompt'}</summary>
+                          <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
+                            {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                            {coverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({coverObj.modelId})</span>}
+                          </summary>
                           <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
                         </details>
                       )}
+                      {/* Reference Photos */}
+                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
+                        <ReferencePhotosDisplay
+                          referencePhotos={coverObj.referencePhotos}
+                          language={language}
+                        />
+                      )}
+                      {/* Quality Score */}
                       {coverObj?.qualityScore !== undefined && (
                         <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                           <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
-                            <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
+                            <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
                             <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
                               {Math.round(coverObj.qualityScore)}%
                             </span>
@@ -937,16 +952,11 @@ export function StoryDisplay({
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
                         </details>
                       )}
+                      {/* Retry History */}
                       {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
                         <RetryHistoryDisplay
                           retryHistory={coverObj.retryHistory}
                           totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
-                          language={language}
-                        />
-                      )}
-                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
-                        <ReferencePhotosDisplay
-                          referencePhotos={coverObj.referencePhotos}
                           language={language}
                         />
                       )}
@@ -985,22 +995,37 @@ export function StoryDisplay({
                           </button>
                         )}
                       </div>
+                      {/* 1. Outline Extract (from cover scenes in outline) */}
                       {coverObj?.description && (
-                        <details className="bg-green-50 border border-green-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-green-800">{language === 'de' ? 'Szenenbeschreibung' : 'Scene Description'}</summary>
+                        <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
+                            {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
+                          </summary>
                           <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
                         </details>
                       )}
+                      {/* 2. API Prompt (final prompt to image generation) */}
                       {coverObj?.prompt && (
                         <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-blue-800">{language === 'de' ? 'API-Prompt' : 'API Prompt'}</summary>
+                          <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
+                            {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                            {coverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({coverObj.modelId})</span>}
+                          </summary>
                           <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
                         </details>
                       )}
+                      {/* Reference Photos */}
+                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
+                        <ReferencePhotosDisplay
+                          referencePhotos={coverObj.referencePhotos}
+                          language={language}
+                        />
+                      )}
+                      {/* Quality Score */}
                       {coverObj?.qualityScore !== undefined && (
                         <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                           <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
-                            <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
+                            <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
                             <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
                               {Math.round(coverObj.qualityScore)}%
                             </span>
@@ -1008,16 +1033,11 @@ export function StoryDisplay({
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
                         </details>
                       )}
+                      {/* Retry History */}
                       {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
                         <RetryHistoryDisplay
                           retryHistory={coverObj.retryHistory}
                           totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
-                          language={language}
-                        />
-                      )}
-                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
-                        <ReferencePhotosDisplay
-                          referencePhotos={coverObj.referencePhotos}
                           language={language}
                         />
                       )}
@@ -1056,22 +1076,37 @@ export function StoryDisplay({
                           </button>
                         )}
                       </div>
+                      {/* 1. Outline Extract (from cover scenes in outline) */}
                       {coverObj?.description && (
-                        <details className="bg-green-50 border border-green-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-green-800">{language === 'de' ? 'Szenenbeschreibung' : 'Scene Description'}</summary>
+                        <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
+                            {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
+                          </summary>
                           <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
                         </details>
                       )}
+                      {/* 2. API Prompt (final prompt to image generation) */}
                       {coverObj?.prompt && (
                         <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-blue-800">{language === 'de' ? 'API-Prompt' : 'API Prompt'}</summary>
+                          <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
+                            {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                            {coverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({coverObj.modelId})</span>}
+                          </summary>
                           <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
                         </details>
                       )}
+                      {/* Reference Photos */}
+                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
+                        <ReferencePhotosDisplay
+                          referencePhotos={coverObj.referencePhotos}
+                          language={language}
+                        />
+                      )}
+                      {/* Quality Score */}
                       {coverObj?.qualityScore !== undefined && (
                         <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                           <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
-                            <span>{language === 'de' ? 'Qualität' : 'Quality'}</span>
+                            <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
                             <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
                               {Math.round(coverObj.qualityScore)}%
                             </span>
@@ -1079,16 +1114,11 @@ export function StoryDisplay({
                           {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
                         </details>
                       )}
+                      {/* Retry History */}
                       {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
                         <RetryHistoryDisplay
                           retryHistory={coverObj.retryHistory}
                           totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
-                          language={language}
-                        />
-                      )}
-                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
-                        <ReferencePhotosDisplay
-                          referencePhotos={coverObj.referencePhotos}
                           language={language}
                         />
                       )}
