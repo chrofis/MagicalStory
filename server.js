@@ -8942,12 +8942,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
         if (coverType === 'titlePage') {
+          // Use extracted title from Claude response, fallback to input title
+          const storyTitleForCover = extractedTitle || inputData.title || 'My Story';
+          console.log(`📕 [STREAM-COVER] Using title for front cover: "${storyTitleForCover}"`);
           coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
             TITLE_PAGE_SCENE: sceneDescription,
             STYLE_DESCRIPTION: styleDescription,
             CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
             VISUAL_BIBLE: visualBibleText,
-            STORY_TITLE: inputData.title || 'My Story'
+            STORY_TITLE: storyTitleForCover
           });
           coverPrompts.front = coverPrompt;
         } else if (coverType === 'initialPage') {
@@ -12437,6 +12440,45 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
     const inputData = req.body;
 
     console.log(`📝 Creating story job ${jobId} for user ${req.user.username}`);
+
+    // Check if user already has a story generation in progress
+    if (STORAGE_MODE === 'database') {
+      const activeJobResult = await dbPool.query(
+        `SELECT id, status, created_at FROM story_jobs
+         WHERE user_id = $1 AND status IN ('pending', 'processing')
+         ORDER BY created_at DESC LIMIT 1`,
+        [userId]
+      );
+
+      if (activeJobResult.rows.length > 0) {
+        const activeJob = activeJobResult.rows[0];
+        const jobAgeMinutes = (Date.now() - new Date(activeJob.created_at).getTime()) / (1000 * 60);
+
+        // If job is older than 30 minutes, consider it stale and mark as failed
+        const STALE_JOB_TIMEOUT_MINUTES = 30;
+        if (jobAgeMinutes > STALE_JOB_TIMEOUT_MINUTES) {
+          console.log(`⏰ Job ${activeJob.id} is stale (${Math.round(jobAgeMinutes)} minutes old), marking as failed`);
+          await dbPool.query(
+            `UPDATE story_jobs
+             SET status = 'failed',
+                 error_message = 'Job timed out after 30 minutes',
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [activeJob.id]
+          );
+          // Continue with creating new job
+        } else {
+          console.log(`⚠️ User ${req.user.username} already has active job ${activeJob.id} (status: ${activeJob.status}, age: ${Math.round(jobAgeMinutes)} min)`);
+          return res.status(409).json({
+            error: 'Story generation already in progress',
+            activeJobId: activeJob.id,
+            activeJobStatus: activeJob.status,
+            jobAgeMinutes: Math.round(jobAgeMinutes),
+            message: 'Please wait for your current story to finish before starting a new one.'
+          });
+        }
+      }
+    }
 
     if (STORAGE_MODE === 'database') {
       // Calculate credits needed: 10 credits per page
