@@ -2,8 +2,6 @@ You are an expert children's picture book author. Create a simple, heartwarming 
 
 # Story Input Parameters
 
-- **Title**: {TITLE}
-- **Target Age**: 6 years (early readers)
 - **Length**: {PAGES} pages
 - **Language**: {LANGUAGE} (NOTE: If German, use ä, ö, ü normally. Do not use ß, use ss instead)
 - **Story Type**: {STORY_TYPE}
@@ -16,6 +14,8 @@ You are an expert children's picture book author. Create a simple, heartwarming 
 This is a PICTURE BOOK. Each page has a large illustration with text below.
 
 # Story Structure
+
+Target Age: 6 years (early readers)
 
 Create a simple story arc:
 1. **Beginning** (Pages 1-2): Introduce the main character and setting

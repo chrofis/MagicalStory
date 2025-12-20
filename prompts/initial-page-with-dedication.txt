@@ -1,4 +1,5 @@
-Create a dedication page illustration for a children's book.
+CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
+Create an introduction page illustration for a children's book.
 
 **SCENE:**
 {INITIAL_PAGE_SCENE}
@@ -6,11 +7,14 @@ Create a dedication page illustration for a children's book.
 **ART STYLE:** {STYLE_DESCRIPTION}
 
 **STYLE TRANSFORMATION:**
-- Reference images show REAL PHOTOGRAPHS of people
-- Transform these people into the requested art style
-- Characters must be RECOGNIZABLE but styled artistically
-- ALL characters must have the SAME consistent art style
+- Reference images show REAL PHOTOGRAPHS - transform into the art style
+- Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
+- Render in artistic style - NOT photo-realistic copies
+- ALL characters in the SAME consistent style
+- Character CLOTHING: Use clothing described in the scene below. If not specified, use EXACTLY as shown in the reference images
+
 {CHARACTER_REFERENCE_LIST}
+
 **COMPOSITION GUIDELINES:**
 - This is a GROUP scene introducing all the story's characters
 - The MAIN CHARACTER should be positioned in the CENTER
