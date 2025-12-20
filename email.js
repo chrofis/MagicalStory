@@ -22,7 +22,7 @@ const EMAIL_TEMPLATES = {};
 
 function loadEmailTemplates() {
   const emailsDir = path.join(__dirname, 'emails');
-  const templateFiles = ['story-complete.html', 'story-failed.html', 'order-confirmation.html'];
+  const templateFiles = ['story-complete.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html'];
 
   for (const file of templateFiles) {
     const filePath = path.join(emailsDir, file);
@@ -278,6 +278,57 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
   }
 }
 
+/**
+ * Send order shipped notification email
+ * @param {string} customerEmail - Customer email address
+ * @param {string} customerName - Customer's full name
+ * @param {object} trackingDetails - Tracking info including orderId, trackingNumber, trackingUrl
+ * @param {string} language - Language for email content (English, German, French)
+ */
+async function sendOrderShippedEmail(customerEmail, customerName, trackingDetails, language = 'English') {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping order shipped notification');
+    return null;
+  }
+
+  // Get template for the specified language
+  const template = getTemplateSection('order-shipped', language);
+  if (!template) {
+    console.error('❌ Failed to get order-shipped template');
+    return null;
+  }
+
+  // Fill in placeholders
+  const values = {
+    greeting: getGreetingName(customerName),
+    orderId: trackingDetails.orderId || 'N/A',
+    trackingNumber: trackingDetails.trackingNumber || 'N/A',
+    trackingUrl: trackingDetails.trackingUrl || '#'
+  };
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      replyTo: EMAIL_REPLY_TO,
+      to: customerEmail,
+      subject: fillTemplate(template.subject, values),
+      text: fillTemplate(template.text, values),
+      html: fillTemplate(template.html, values),
+    });
+
+    if (error) {
+      console.error('❌ Failed to send order shipped email:', error);
+      return null;
+    }
+
+    console.log(`📧 Order shipped email sent to ${customerEmail} (${language}), id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error('❌ Email send error:', err);
+    return null;
+  }
+}
+
 // ===========================================
 // ADMIN EMAILS
 // ===========================================
@@ -408,6 +459,7 @@ module.exports = {
   sendStoryCompleteEmail,
   sendStoryFailedEmail,
   sendOrderConfirmationEmail,
+  sendOrderShippedEmail,
   sendAdminStoryFailureAlert,
   sendAdminOrderFailureAlert,
 };

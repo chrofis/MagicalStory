@@ -753,6 +753,146 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   }
 });
 
+// Gelato webhook endpoint for order status updates
+// IMPORTANT: This MUST be defined BEFORE express.json() middleware
+app.post('/api/gelato/webhook', express.json(), async (req, res) => {
+  try {
+    // Verify webhook authorization
+    const webhookSecret = process.env.GELATO_WEBHOOK_SECRET;
+    const receivedSecret = req.headers['x-gelato-webhook-secret'];
+
+    if (webhookSecret && receivedSecret !== webhookSecret) {
+      console.warn('⚠️ [GELATO WEBHOOK] Invalid or missing authorization header');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const event = req.body;
+
+    console.log('📦 [GELATO WEBHOOK] Received event:', event.event);
+    console.log('   Order ID:', event.orderId);
+    console.log('   Order Reference:', event.orderReferenceId);
+    console.log('   Status:', event.fulfillmentStatus);
+
+    // Handle different event types
+    if (event.event === 'order_status_updated') {
+      const { orderId, orderReferenceId, fulfillmentStatus, items } = event;
+
+      // Find the order in our database using Gelato order ID
+      const orderResult = await dbPool.query(
+        'SELECT id, user_id, customer_email, customer_name, story_id FROM orders WHERE gelato_order_id = $1',
+        [orderId]
+      );
+
+      if (orderResult.rows.length === 0) {
+        console.warn('⚠️ [GELATO WEBHOOK] Order not found for Gelato ID:', orderId);
+        // Still return 200 to prevent retries
+        return res.status(200).json({ received: true, warning: 'Order not found' });
+      }
+
+      const order = orderResult.rows[0];
+      console.log('   Found order ID:', order.id);
+      console.log('   Customer:', order.customer_email);
+
+      // Map Gelato status to our status
+      const statusMap = {
+        'created': 'processing',
+        'passed': 'processing',
+        'in_production': 'printing',
+        'printed': 'printed',
+        'shipped': 'shipped',
+        'delivered': 'delivered',
+        'canceled': 'cancelled',
+        'failed': 'failed'
+      };
+
+      const newStatus = statusMap[fulfillmentStatus] || fulfillmentStatus;
+
+      // Extract tracking info if shipped
+      let trackingNumber = null;
+      let trackingUrl = null;
+
+      if (items && items.length > 0 && items[0].fulfillments && items[0].fulfillments.length > 0) {
+        const fulfillment = items[0].fulfillments[0];
+        trackingNumber = fulfillment.trackingCode || null;
+        trackingUrl = fulfillment.trackingUrl || null;
+        console.log('   Tracking:', trackingNumber);
+        console.log('   Tracking URL:', trackingUrl);
+      }
+
+      // Update order status in database
+      if (trackingNumber) {
+        await dbPool.query(`
+          UPDATE orders
+          SET gelato_status = $1,
+              tracking_number = $2,
+              tracking_url = $3,
+              shipped_at = CASE WHEN $1 = 'shipped' AND shipped_at IS NULL THEN NOW() ELSE shipped_at END,
+              delivered_at = CASE WHEN $1 = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
+              updated_at = NOW()
+          WHERE gelato_order_id = $4
+        `, [newStatus, trackingNumber, trackingUrl, orderId]);
+      } else {
+        await dbPool.query(`
+          UPDATE orders
+          SET gelato_status = $1,
+              delivered_at = CASE WHEN $1 = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
+              updated_at = NOW()
+          WHERE gelato_order_id = $2
+        `, [newStatus, orderId]);
+      }
+
+      console.log('✅ [GELATO WEBHOOK] Order status updated to:', newStatus);
+
+      // Send email notification for shipped orders
+      if (fulfillmentStatus === 'shipped' && order.customer_email) {
+        try {
+          // Get user's preferred language
+          let language = 'English';
+          if (order.user_id) {
+            const userResult = await dbPool.query(
+              'SELECT preferred_language FROM users WHERE id = $1',
+              [order.user_id]
+            );
+            if (userResult.rows.length > 0 && userResult.rows[0].preferred_language) {
+              language = userResult.rows[0].preferred_language;
+            }
+          }
+
+          await email.sendOrderShippedEmail(
+            order.customer_email,
+            order.customer_name,
+            {
+              orderId: order.id,
+              trackingNumber,
+              trackingUrl
+            },
+            language
+          );
+          console.log('📧 [GELATO WEBHOOK] Shipped notification sent to:', order.customer_email);
+        } catch (emailErr) {
+          console.error('❌ [GELATO WEBHOOK] Failed to send shipped email:', emailErr.message);
+        }
+      }
+
+      // Log activity
+      await logActivity(order.user_id, null, 'ORDER_STATUS_UPDATED', {
+        orderId: order.id,
+        gelatoOrderId: orderId,
+        status: newStatus,
+        trackingNumber
+      });
+    }
+
+    // Always return 200 to acknowledge receipt
+    res.status(200).json({ received: true });
+
+  } catch (err) {
+    console.error('❌ [GELATO WEBHOOK] Error processing webhook:', err);
+    // Still return 200 to prevent infinite retries
+    res.status(200).json({ received: true, error: err.message });
+  }
+});
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
@@ -1023,12 +1163,17 @@ async function initializeDatabase() {
         payment_status VARCHAR(50),
         gelato_order_id VARCHAR(255),
         gelato_status VARCHAR(50),
+        tracking_number VARCHAR(255),
+        tracking_url VARCHAR(500),
+        shipped_at TIMESTAMP,
+        delivered_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_orders_stripe_session_id ON orders(stripe_session_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_orders_gelato_order_id ON orders(gelato_order_id)`);
 
     // Credit transactions table for tracking credit history
     await dbPool.query(`
