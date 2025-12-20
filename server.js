@@ -8938,11 +8938,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Build the prompt
         let coverPrompt;
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible) : '';
+        const artStyleId = inputData.artStyle || 'pixar';
+        const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
         if (coverType === 'titlePage') {
           coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
             TITLE_PAGE_SCENE: sceneDescription,
-            STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
+            STYLE_DESCRIPTION: styleDescription,
             CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
             VISUAL_BIBLE: visualBibleText,
             STORY_TITLE: inputData.title || 'My Story'
@@ -8952,14 +8954,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           coverPrompt = inputData.dedication && inputData.dedication.trim()
             ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
                 INITIAL_PAGE_SCENE: sceneDescription,
-                STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
+                STYLE_DESCRIPTION: styleDescription,
                 CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
                 VISUAL_BIBLE: visualBibleText,
                 DEDICATION: inputData.dedication
               })
             : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
                 INITIAL_PAGE_SCENE: sceneDescription,
-                STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
+                STYLE_DESCRIPTION: styleDescription,
                 CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
                 VISUAL_BIBLE: visualBibleText
               });
@@ -8967,7 +8969,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         } else if (coverType === 'backCover') {
           coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
             BACK_COVER_SCENE: sceneDescription,
-            STYLE_DESCRIPTION: inputData.style || 'Children\'s book illustration style',
+            STYLE_DESCRIPTION: styleDescription,
             CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos),
             VISUAL_BIBLE: visualBibleText
           });
