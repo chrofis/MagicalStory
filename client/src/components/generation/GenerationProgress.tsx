@@ -97,8 +97,12 @@ export function GenerationProgress({
   const rotationItems = useMemo(() => {
     const messages = [
       { type: 'message' as const, key: 'timeInfo' },
+      { type: 'message' as const, key: 'tipCharacters' },
       { type: 'message' as const, key: 'emailInfo' },
+      { type: 'message' as const, key: 'tipStoryPlot' },
       { type: 'message' as const, key: 'canClose' },
+      { type: 'message' as const, key: 'tipLocations' },
+      { type: 'message' as const, key: 'tipArtStyle' },
     ];
 
     const items: Array<{ type: 'message'; key: string } | { type: 'avatar'; name: string; avatar: string }> = [];
@@ -163,6 +167,10 @@ export function GenerationProgress({
       timeInfo: 'Your story will start to display in about 1 minute. The full story can take up to 10 minutes.',
       emailInfo: 'You will receive an email when your story is ready.',
       canClose: 'You can wait here or close the browser - your story will keep generating.',
+      tipCharacters: 'The better you describe your characters, the more fun the story becomes!',
+      tipStoryPlot: '"Story Plot / Story Details" lets you craft your own personal adventure.',
+      tipLocations: 'Add your hometown and favorite places to "Story Plot / Story Details" for a personal touch.',
+      tipArtStyle: 'What\'s your favorite art style? For picture books, watercolor works great!',
       coversPreview: 'Cover Preview',
       frontCover: 'Front',
       initialPage: 'Inside',
@@ -172,9 +180,13 @@ export function GenerationProgress({
     },
     de: {
       title: 'Geschichte wird erstellt!',
-      timeInfo: 'Deine Geschichte wird in etwa 1 Minute angezeigt. Die vollständige Geschichte kann bis zu 10 Minuten dauern.',
+      timeInfo: 'Deine Geschichte wird in etwa 1 Minute angezeigt. Die Erstellung der vollständigen Geschichte kann bis zu 10 Minuten dauern.',
       emailInfo: 'Du erhältst eine E-Mail, wenn deine Geschichte bereit ist.',
-      canClose: 'Du kannst hier warten oder den Browser schließen - deine Geschichte wird weiter generiert.',
+      canClose: 'Du kannst hier warten oder den Browser schliessen - deine Geschichte wird weiter generiert.',
+      tipCharacters: 'Je besser du deine Charaktere beschreibst, desto lustiger wird die Geschichte!',
+      tipStoryPlot: 'Mit "Handlung / Angaben zur Geschichte" kannst du dein ganz persönliches Abenteuer gestalten.',
+      tipLocations: 'Füge deinen Heimatort und Lieblingsorte zu "Handlung / Angaben zur Geschichte" hinzu für eine persönliche Note.',
+      tipArtStyle: 'Was ist dein Lieblings-Kunststil? Für Bilderbücher funktioniert Aquarell besonders gut!',
       coversPreview: 'Cover-Vorschau',
       frontCover: 'Vorne',
       initialPage: 'Innen',
@@ -184,9 +196,13 @@ export function GenerationProgress({
     },
     fr: {
       title: 'Création de votre histoire!',
-      timeInfo: 'Votre histoire commencera à s\'afficher dans environ 1 minute. L\'histoire complète peut prendre jusqu\'à 10 minutes.',
-      emailInfo: 'Vous recevrez un email quand votre histoire sera prête.',
-      canClose: 'Vous pouvez attendre ici ou fermer le navigateur - votre histoire continuera à être générée.',
+      timeInfo: 'Votre récit commencera à s\'afficher dans environ 1 minute. Le récit complet peut prendre jusqu\'à 10 minutes.',
+      emailInfo: 'Vous recevrez un email quand votre récit sera prêt.',
+      canClose: 'Vous pouvez attendre ici ou fermer le navigateur - votre récit continuera à être généré.',
+      tipCharacters: 'Mieux vous décrivez vos personnages, plus le récit sera amusant !',
+      tipStoryPlot: '"Intrigue / Contexte du récit" vous permet de créer votre propre aventure personnelle.',
+      tipLocations: 'Ajoutez votre ville et vos endroits préférés à "Intrigue / Contexte du récit" pour une touche personnelle.',
+      tipArtStyle: 'Quel est votre style artistique préféré ? Pour les livres d\'images, l\'aquarelle fonctionne très bien !',
       coversPreview: 'Aperçu des couvertures',
       frontCover: 'Avant',
       initialPage: 'Intérieur',

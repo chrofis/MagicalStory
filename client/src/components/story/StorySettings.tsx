@@ -193,9 +193,11 @@ export function StorySettings({
           </div>
         )}
 
-        {/* Additional Story Details */}
+        {/* Story Plot / Story Details */}
         <div>
-          <label className="block text-base font-semibold text-gray-800 mb-2">{t.storyDetails}</label>
+          <label className="block text-base font-semibold text-gray-800 mb-2">
+            {t.storyDetails} <span className="text-sm font-normal text-gray-500">{t.storyDetailsOptional}</span>
+          </label>
           <textarea
             value={storyDetails}
             onChange={(e) => onStoryDetailsChange(e.target.value)}

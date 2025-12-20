@@ -3487,12 +3487,17 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const previousImageData = existingImage?.imageData || null;
     const previousScore = existingImage?.qualityScore || null;
     const previousReasoning = existingImage?.qualityReasoning || null;
+    const previousPrompt = existingImage?.prompt || null;
+    // Keep the true original if this was already regenerated before
+    const trueOriginalImage = existingImage?.originalImage || previousImageData;
+    const trueOriginalScore = existingImage?.originalScore || previousScore;
+    const trueOriginalReasoning = existingImage?.originalReasoning || previousReasoning;
 
-    console.log(`📸 [REGEN] Capturing previous image (${previousImageData ? 'has data' : 'none'}, score: ${previousScore})`);
+    console.log(`📸 [REGEN] Capturing previous image (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!existingImage?.originalImage})`);
 
     // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
-    const imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos);
+    const imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene');
 
     // Update the image in story data
     const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
@@ -3501,17 +3506,28 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       pageNumber,
       imageData: imageResult.imageData,
       description: sceneDesc?.description || customPrompt,
+      prompt: imagePrompt,  // Store the prompt used for this regeneration
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning || null,
       wasRegenerated: true,
       totalAttempts: imageResult.totalAttempts || 1,
       retryHistory: imageResult.retryHistory || [],
-      originalImage: previousImageData,
-      originalScore: previousScore,
-      originalReasoning: previousReasoning,
+      // Store previous version (for undo/comparison)
+      previousImage: previousImageData,
+      previousScore: previousScore,
+      previousReasoning: previousReasoning,
+      previousPrompt: previousPrompt,
+      // Keep the true original across multiple regenerations
+      originalImage: trueOriginalImage,
+      originalScore: trueOriginalScore,
+      originalReasoning: trueOriginalReasoning,
       referencePhotos,
-      regeneratedAt: new Date().toISOString()
+      modelId: imageResult.modelId || null,
+      regeneratedAt: new Date().toISOString(),
+      regenerationCount: (existingImage?.regenerationCount || 0) + 1
     };
+
+    console.log(`📸 [REGEN] New image generated - score: ${imageResult.score}, attempts: ${imageResult.totalAttempts}, model: ${imageResult.modelId}`);
 
     if (existingIndex >= 0) {
       sceneImages[existingIndex] = newImageData;
@@ -3531,19 +3547,28 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score})`);
+    console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, regeneration #${newImageData.regenerationCount})`);
 
     res.json({
       success: true,
       pageNumber,
       imageData: imageResult.imageData,
+      prompt: imagePrompt,
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning,
+      modelId: imageResult.modelId || null,
       totalAttempts: imageResult.totalAttempts || 1,
       retryHistory: imageResult.retryHistory || [],
-      originalImage: previousImageData,
-      originalScore: previousScore,
-      originalReasoning: previousReasoning
+      wasRegenerated: true,
+      regenerationCount: newImageData.regenerationCount,
+      // Previous version (immediate predecessor)
+      previousImage: previousImageData,
+      previousScore: previousScore,
+      previousReasoning: previousReasoning,
+      // True original (from initial generation)
+      originalImage: trueOriginalImage,
+      originalScore: trueOriginalScore,
+      originalReasoning: trueOriginalReasoning
     });
 
   } catch (err) {

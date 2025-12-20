@@ -115,6 +115,7 @@ export interface TranslationStrings {
   editPrompt: string;
   resetPrompt: string;
   storyDetails: string;
+  storyDetailsOptional: string;
   storyDetailsPlaceholder: string;
   generateOutline: string;
   generatingOutline: string;
@@ -274,7 +275,8 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     hidePromptPreview: 'Hide Prompt',
     editPrompt: 'Edit Prompt',
     resetPrompt: 'Reset to Default',
-    storyDetails: 'Additional Story Details (Optional)',
+    storyDetails: 'Story Plot / Story Details',
+    storyDetailsOptional: '(optional)',
     storyDetailsPlaceholder: 'e.g., Location: Enchanted forest, Special elements: Magical talking animals, Time period: Medieval times...',
     generateOutline: 'Generate Outline',
     generatingOutline: 'Generating Outline...',
@@ -432,7 +434,8 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     hidePromptPreview: 'Prompt ausblenden',
     editPrompt: 'Prompt bearbeiten',
     resetPrompt: 'Auf Standard zurücksetzen',
-    storyDetails: 'Zusätzliche Story-Details (Optional)',
+    storyDetails: 'Handlung / Angaben zur Geschichte',
+    storyDetailsOptional: '(optional)',
     storyDetailsPlaceholder: 'z.B. Ort: Verzauberter Wald, Besondere Elemente: Magische sprechende Tiere, Zeitperiode: Mittelalter...',
     generateOutline: 'Gliederung erstellen',
     generatingOutline: 'Gliederung wird erstellt...',
@@ -590,7 +593,8 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     hidePromptPreview: 'Masquer le Prompt',
     editPrompt: 'Modifier le Prompt',
     resetPrompt: 'Réinitialiser par Défaut',
-    storyDetails: 'Détails Supplémentaires de l\'Histoire (Optionnel)',
+    storyDetails: 'Intrigue / Contexte du récit',
+    storyDetailsOptional: '(facultatif)',
     storyDetailsPlaceholder: 'ex. Lieu : Forêt enchantée, Éléments spéciaux : Animaux magiques parlants, Période : Moyen Âge...',
     generateOutline: 'Générer le Plan',
     generatingOutline: 'Génération du Plan...',
