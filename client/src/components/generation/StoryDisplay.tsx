@@ -928,7 +928,6 @@ export function StoryDisplay({
                   <details key={scene.pageNumber} className="bg-white border border-green-200 rounded-lg p-3">
                     <summary className="cursor-pointer text-sm font-semibold text-green-700 hover:text-green-800">
                       {language === 'de' ? `Seite ${scene.pageNumber}` : language === 'fr' ? `Page ${scene.pageNumber}` : `Page ${scene.pageNumber}`}
-                      {scene.setting && <span className="ml-2 text-xs text-gray-500">({scene.setting})</span>}
                     </summary>
                     <div className="mt-2 space-y-2">
                       {/* Outline Extract */}
@@ -950,26 +949,6 @@ export function StoryDisplay({
                         <span className="font-semibold text-green-700">Scene Description:</span>
                         <p className="text-gray-700 mt-1 whitespace-pre-wrap">{scene.description}</p>
                       </div>
-                      {/* Characters in Scene */}
-                      {scene.characters && scene.characters.length > 0 && (
-                        <div className="bg-blue-50 p-2 rounded text-xs">
-                          <span className="font-semibold text-blue-700">Characters:</span>
-                          <p className="text-gray-700 mt-1">{scene.characters.join(', ')}</p>
-                        </div>
-                      )}
-                      {/* Clothing */}
-                      {scene.clothing && Object.keys(scene.clothing).length > 0 && (
-                        <div className="bg-pink-50 p-2 rounded text-xs">
-                          <span className="font-semibold text-pink-700">Clothing:</span>
-                          <div className="mt-1 space-y-1">
-                            {Object.entries(scene.clothing).map(([charName, outfit]) => (
-                              <p key={charName} className="text-gray-700">
-                                <span className="font-medium">{charName}:</span> {outfit}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </details>
                 ))}
