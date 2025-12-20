@@ -1505,6 +1505,10 @@ export default function StoryWizard() {
             </div>
           );
         }
+        // If generating but no content yet, show nothing (popup overlay handles this)
+        if (isGenerating) {
+          return null;
+        }
         return (
           <div className="text-center py-12">
             <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -1705,8 +1709,8 @@ export default function StoryWizard() {
       </div>
 
       {/* Generation Progress Modal - Full story generation */}
-      {/* Hide progress modal once we transition to StoryDisplay (step 5) */}
-      {isGenerating && step !== 5 && (
+      {/* Show until we have content to display (front cover, story data, or final story) */}
+      {isGenerating && !generatedStory && !progressiveStoryData && !coverImages.frontCover && (
         <GenerationProgress
           current={generationProgress.current}
           total={generationProgress.total}
