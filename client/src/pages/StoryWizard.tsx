@@ -1758,6 +1758,7 @@ export default function StoryWizard() {
           total={generationProgress.total}
           message={generationProgress.message}
           coverImages={coverImages}
+          characters={characters}
           jobId={jobId || undefined}
           onCancel={jobId ? async () => {
             try {

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Loader2, Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
+import type { Character } from '@/types/character';
 
 interface GenerationProgressProps {
   current: number;
@@ -13,6 +14,7 @@ interface GenerationProgressProps {
   coverImages?: CoverImages;  // Optional partial cover images to display
   jobId?: string;  // Job ID for cancellation
   onCancel?: () => void;  // Callback when job is cancelled
+  characters?: Character[];  // Characters to show avatars from
 }
 
 // Translate server messages to user language
@@ -69,12 +71,67 @@ export function GenerationProgress({
   coverImages,
   jobId,
   onCancel,
+  characters = [],
 }: GenerationProgressProps) {
   const { language } = useLanguage();
   const { user } = useAuth();
-  const hasEmail = !!user?.email;
   const isAdmin = user?.role === 'admin';
   const [isCancelling, setIsCancelling] = useState(false);
+  const [rotationIndex, setRotationIndex] = useState(0);
+
+  // Get one avatar from each character (prefer standard, then any available)
+  const characterAvatars = useMemo(() => {
+    return characters
+      .map(char => {
+        const avatars = char.avatars;
+        const avatarUrl = avatars?.standard || avatars?.summer || avatars?.winter || avatars?.formal;
+        if (avatarUrl) {
+          return { name: char.name, avatar: avatarUrl };
+        }
+        return null;
+      })
+      .filter((a): a is { name: string; avatar: string } => a !== null);
+  }, [characters]);
+
+  // Build rotation items: interleave messages and avatars
+  const rotationItems = useMemo(() => {
+    const messages = [
+      { type: 'message' as const, key: 'timeInfo' },
+      { type: 'message' as const, key: 'emailInfo' },
+      { type: 'message' as const, key: 'canClose' },
+    ];
+
+    const items: Array<{ type: 'message'; key: string } | { type: 'avatar'; name: string; avatar: string }> = [];
+
+    // Interleave messages and avatars
+    const maxLen = Math.max(messages.length, characterAvatars.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < messages.length) {
+        items.push(messages[i]);
+      }
+      if (i < characterAvatars.length) {
+        items.push({ type: 'avatar', ...characterAvatars[i] });
+      }
+    }
+
+    // If no avatars, just use messages
+    if (characterAvatars.length === 0) {
+      return messages;
+    }
+
+    return items;
+  }, [characterAvatars]);
+
+  // Rotate every 5 seconds
+  useEffect(() => {
+    if (rotationItems.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setRotationIndex(prev => (prev + 1) % rotationItems.length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [rotationItems.length]);
 
   if (!isGenerating || total === 0) {
     return null;
@@ -106,12 +163,10 @@ export function GenerationProgress({
       timeInfo: 'Your story will start to display in about 1 minute. The full story can take up to 10 minutes.',
       emailInfo: 'You will receive an email when your story is ready.',
       canClose: 'You can wait here or close the browser - your story will keep generating.',
-      noEmailInfo: 'You can close this page and come back later.',
       coversPreview: 'Cover Preview',
       frontCover: 'Front',
       initialPage: 'Inside',
       backCover: 'Back',
-      pending: 'Generating...',
       cancelJob: 'Cancel Generation',
       cancelling: 'Cancelling...',
     },
@@ -120,12 +175,10 @@ export function GenerationProgress({
       timeInfo: 'Deine Geschichte wird in etwa 1 Minute angezeigt. Die vollständige Geschichte kann bis zu 10 Minuten dauern.',
       emailInfo: 'Du erhältst eine E-Mail, wenn deine Geschichte bereit ist.',
       canClose: 'Du kannst hier warten oder den Browser schließen - deine Geschichte wird weiter generiert.',
-      noEmailInfo: 'Du kannst diese Seite schließen und später zurückkommen.',
       coversPreview: 'Cover-Vorschau',
       frontCover: 'Vorne',
       initialPage: 'Innen',
       backCover: 'Hinten',
-      pending: 'Wird erstellt...',
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
     },
@@ -134,12 +187,10 @@ export function GenerationProgress({
       timeInfo: 'Votre histoire commencera à s\'afficher dans environ 1 minute. L\'histoire complète peut prendre jusqu\'à 10 minutes.',
       emailInfo: 'Vous recevrez un email quand votre histoire sera prête.',
       canClose: 'Vous pouvez attendre ici ou fermer le navigateur - votre histoire continuera à être générée.',
-      noEmailInfo: 'Vous pouvez fermer cette page et revenir plus tard.',
       coversPreview: 'Aperçu des couvertures',
       frontCover: 'Avant',
       initialPage: 'Intérieur',
       backCover: 'Arrière',
-      pending: 'En cours...',
       cancelJob: 'Annuler la génération',
       cancelling: 'Annulation...',
     },
@@ -175,6 +226,41 @@ export function GenerationProgress({
           </div>
           <h2 className="text-xl md:text-2xl font-bold text-gray-800">{t.title}</h2>
         </div>
+
+        {/* Rotating display section - before covers appear */}
+        {!hasAnyCovers && rotationItems.length > 0 && (
+          <div className="mb-6 min-h-[120px] flex items-center justify-center">
+            {(() => {
+              const currentItem = rotationItems[rotationIndex];
+              if (currentItem.type === 'avatar') {
+                return (
+                  <div className="flex flex-col items-center gap-2 animate-fade-in">
+                    <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden border-4 border-indigo-200 shadow-lg">
+                      <img
+                        src={currentItem.avatar}
+                        alt={currentItem.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-indigo-700">{currentItem.name}</span>
+                  </div>
+                );
+              } else {
+                const messageKey = currentItem.key as keyof typeof t;
+                const messageText = t[messageKey] || '';
+                const icon = messageKey === 'timeInfo' ? <Clock size={20} className="text-indigo-500 shrink-0" /> :
+                             messageKey === 'emailInfo' ? <Mail size={20} className="text-indigo-500 shrink-0" /> :
+                             <CheckCircle size={20} className="text-indigo-500 shrink-0" />;
+                return (
+                  <div className="flex items-start gap-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 max-w-sm animate-fade-in">
+                    {icon}
+                    <p className="text-sm text-gray-700">{messageText}</p>
+                  </div>
+                );
+              }
+            })()}
+          </div>
+        )}
 
         {/* Cover preview section */}
         {hasAnyCovers && (
@@ -214,30 +300,6 @@ export function GenerationProgress({
         {translatedMessage && (
           <p className="text-indigo-600 text-sm text-center font-medium mb-4">{translatedMessage}</p>
         )}
-
-        {/* Info section - single unified box */}
-        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-          <div className="flex items-center gap-2 text-gray-700">
-            <Clock size={16} className="text-gray-500 shrink-0" />
-            <p className="text-sm">{t.timeInfo}</p>
-          </div>
-          {hasEmail ? (
-            <>
-              <div className="flex items-center gap-2 text-gray-700">
-                <Mail size={16} className="text-gray-500 shrink-0" />
-                <p className="text-sm">
-                  {t.emailInfo} <span className="text-gray-500">({user?.email})</span>
-                </p>
-              </div>
-              <p className="text-sm text-gray-600 pl-6">{t.canClose}</p>
-            </>
-          ) : (
-            <div className="flex items-center gap-2 text-gray-700">
-              <Mail size={16} className="text-gray-500 shrink-0" />
-              <p className="text-sm">{t.noEmailInfo}</p>
-            </div>
-          )}
-        </div>
 
         {/* Cancel button - admin only */}
         {isAdmin && jobId && onCancel && (
