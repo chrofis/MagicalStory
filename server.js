@@ -8127,35 +8127,23 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       }
     }
 
-    // Fallback: Build comprehensive physical description from character data
+    // Build comprehensive physical description from character data
     const physicalParts = [];
 
     // Basic info
     if (c.age) physicalParts.push(`${c.age} years old`);
     if (c.gender) physicalParts.push(c.gender === 'male' ? 'male' : c.gender === 'female' ? 'female' : 'non-binary');
 
-    // From style analysis (most detailed)
-    if (c.styleAnalysis && c.styleAnalysis.physical) {
-      const sa = c.styleAnalysis.physical;
-      if (sa.face) physicalParts.push(sa.face);
-      if (sa.hair) physicalParts.push(`Hair: ${sa.hair}`);
-      if (sa.build) physicalParts.push(sa.build);
-    } else if (c.styleAnalysis) {
-      // Legacy format
-      const sa = c.styleAnalysis;
-      if (sa.face) physicalParts.push(`Face: ${sa.face}`);
-      if (sa.hair) physicalParts.push(`Hair: ${sa.hair}`);
-      if (sa.build) physicalParts.push(`Build: ${sa.build}`);
-      if (sa.skinTone) physicalParts.push(`Skin: ${sa.skinTone}`);
-      if (sa.distinguishingFeatures) physicalParts.push(`Features: ${sa.distinguishingFeatures}`);
-    } else {
-      // Fallback to individual fields
-      if (c.hairColor) physicalParts.push(`Hair: ${c.hairColor}`);
-      if (c.hairStyle) physicalParts.push(`Hair style: ${c.hairStyle}`);
-      if (c.eyeColor) physicalParts.push(`Eyes: ${c.eyeColor}`);
-      if (c.skinTone) physicalParts.push(`Skin: ${c.skinTone}`);
-      if (c.build) physicalParts.push(`Build: ${c.build}`);
-    }
+    // Physical traits (support both snake_case and camelCase)
+    const face = c.other_features || c.otherFeatures || c.face;
+    const hair = c.hair_color || c.hairColor;
+    const build = c.build;
+    const other = c.other;
+
+    if (face) physicalParts.push(`Face: ${face}`);
+    if (hair) physicalParts.push(`Hair: ${hair}`);
+    if (build) physicalParts.push(`Build: ${build}`);
+    if (other && other !== 'none') physicalParts.push(`Other: ${other}`);
 
     // Additional features
     if (c.otherFeatures) physicalParts.push(c.otherFeatures);

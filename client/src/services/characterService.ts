@@ -1,5 +1,5 @@
 import api from './api';
-import type { Character, CharacterAvatars, ReferenceOutfit, GeneratedOutfit } from '@/types/character';
+import type { Character, CharacterAvatars, GeneratedOutfit } from '@/types/character';
 import { createLogger } from './logger';
 
 const log = createLogger('CharacterService');
@@ -17,6 +17,7 @@ interface CharacterApiResponse {
   hairColor?: string;
   other_features?: string;
   otherFeatures?: string;
+  other?: string;  // New: glasses, birthmarks, always-present accessories
   // Photos (snake_case + camelCase legacy)
   photo_url?: string;
   photoUrl?: string;
@@ -43,19 +44,7 @@ interface CharacterApiResponse {
   clothing?: string;
   clothing_avatars?: CharacterAvatars;
   clothingAvatars?: CharacterAvatars;
-  // Style analysis (snake_case + camelCase legacy)
-  style_analysis?: {
-    physical?: { face?: string; hair?: string; build?: string };
-    referenceOutfit?: ReferenceOutfit;
-    analyzedAt?: string;
-  };
-  styleAnalysis?: {
-    physical?: { face?: string; hair?: string; build?: string };
-    referenceOutfit?: ReferenceOutfit;
-    analyzedAt?: string;
-  };
-  reference_outfit?: ReferenceOutfit;
-  referenceOutfit?: ReferenceOutfit;
+  // Generated outfits per page
   generated_outfits?: Record<number, unknown>;
   generatedOutfits?: Record<number, unknown>;
 }

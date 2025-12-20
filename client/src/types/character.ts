@@ -66,6 +66,17 @@ export interface ReferenceOutfit {
   setting: 'neutral' | 'outdoor-warm' | 'outdoor-cold' | 'indoor-casual' | 'indoor-formal' | 'active' | 'sleep';
 }
 
+// Style analysis result from photo analysis
+export interface StyleAnalysis {
+  physical?: {
+    face?: string;
+    hair?: string;
+    build?: string;
+  };
+  referenceOutfit?: ReferenceOutfit;
+  analyzedAt?: string;
+}
+
 // Generated outfit for a specific page
 export interface GeneratedOutfit {
   setting: string;
@@ -136,6 +147,7 @@ export interface VisualBibleMainCharacter {
   id: number;
   name: string;
   physical: PhysicalTraits;
+  referenceOutfit?: ReferenceOutfit;
   generatedOutfits: Record<number, GeneratedOutfit>;
 }
 
