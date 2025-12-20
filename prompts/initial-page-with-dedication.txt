@@ -17,7 +17,6 @@ Create a dedication page illustration for a children's book.
 - Other characters should be arranged AROUND the main character
 - Everyone should be clearly visible and recognizable
 - Create a warm, inviting atmosphere that welcomes readers
-{VISUAL_BIBLE}
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact dedication text: "{DEDICATION}"

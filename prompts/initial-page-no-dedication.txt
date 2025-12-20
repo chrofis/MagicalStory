@@ -17,7 +17,6 @@ Create an introduction page illustration for a children's book.
 - Other characters should be arranged AROUND the main character
 - Everyone should be clearly visible and recognizable
 - Create a warm, inviting atmosphere that draws readers in
-{VISUAL_BIBLE}
 
 **IMPORTANT:**
 - This image should contain NO TEXT at all
