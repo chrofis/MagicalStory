@@ -4162,38 +4162,31 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'Story not found' });
       }
 
-      // Check if PDF file exists in files table (database mode only)
-      if (STORAGE_MODE === 'database' && dbPool) {
-        console.log(`🖨️ [PRINT] Checking for PDF with story_id: ${storyId}`);
-        const pdfFileResult = await dbQuery(
-          "SELECT id FROM files WHERE story_id = $1 AND file_type = 'story_pdf' ORDER BY created_at DESC LIMIT 1",
-          [storyId]
+      // Generate fresh PDF using the shared print function (same as Buy Book)
+      console.log(`🖨️ [PRINT] Generating fresh print PDF for story: ${storyId}`);
+      try {
+        const { pdfBuffer, pageCount: generatedPageCount } = await generatePrintPdf(storyData);
+        pageCount = generatedPageCount;
+
+        // Save PDF temporarily to database for Gelato to fetch
+        const pdfFileId = `pdf-print-${storyId}-${Date.now()}`;
+        const pdfBase64 = pdfBuffer.toString('base64');
+
+        // Delete any existing print PDFs for this story first
+        await dbQuery("DELETE FROM files WHERE story_id = $1 AND file_type = 'print_pdf'", [storyId]);
+
+        await dbQuery(
+          'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+          [pdfFileId, req.user.id, 'print_pdf', storyId, 'application/pdf', pdfBase64, pdfBuffer.length, `story-${storyId}-print.pdf`]
         );
-        console.log(`🖨️ [PRINT] PDF query result: ${pdfFileResult.length} files found`);
 
-        if (pdfFileResult.length > 0) {
-          const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
-          pdfUrl = `${baseUrl}/api/files/${pdfFileResult[0].id}`;
-          console.log(`🖨️ [PRINT] Using PDF URL: ${pdfUrl}`);
-        } else {
-          // Debug: Check what files exist for this story
-          const allFilesResult = await dbQuery(
-            "SELECT id, file_type, created_at FROM files WHERE story_id = $1",
-            [storyId]
-          );
-          console.log(`🖨️ [PRINT] All files for story ${storyId}:`, allFilesResult.map(f => `${f.file_type} (${f.id})`).join(', ') || 'NONE');
-          return res.status(400).json({ error: 'Story does not have a PDF. Please download the PDF first to generate it.' });
-        }
-      } else {
-        // File mode - check for pdfUrl in story data
-        pdfUrl = storyData.pdfUrl;
-        if (!pdfUrl) {
-          return res.status(400).json({ error: 'Story does not have a PDF. Please download the PDF first to generate it.' });
-        }
+        const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
+        pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
+        console.log(`🖨️ [PRINT] PDF generated and saved with URL: ${pdfUrl}, pageCount: ${pageCount}`);
+      } catch (pdfErr) {
+        console.error(`🖨️ [PRINT] Error generating PDF:`, pdfErr.message);
+        return res.status(500).json({ error: 'Failed to generate print PDF', details: pdfErr.message });
       }
-
-      // Get page count from story data
-      pageCount = storyData.pages || storyData.sceneImages?.length || 30;
     }
 
     // Default productUid for hardcover photobook if not provided
@@ -5476,13 +5469,226 @@ app.delete('/api/files/:fileId', authenticateToken, async (req, res) => {
   }
 });
 
-// GET PDF for a story - fetches story from database and generates PDF
+// ========================================
+// SHARED PDF GENERATION FUNCTION FOR PRINTING
+// Used by both Buy Book (processBookOrder) and Print Book endpoints
+// Creates print-ready PDF with back+front cover concatenated
+// ========================================
+async function generatePrintPdf(storyData) {
+  const PDFDocument = require('pdfkit');
+
+  // Helper function to extract image data from cover images
+  const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
+
+  const mmToPoints = (mm) => mm * 2.83465;
+  const coverWidth = mmToPoints(290.27);
+  const coverHeight = mmToPoints(146.0);
+  const pageSize = mmToPoints(140);
+
+  const doc = new PDFDocument({
+    size: [coverWidth, coverHeight],
+    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    autoFirstPage: false
+  });
+
+  const buffers = [];
+  doc.on('data', buffers.push.bind(buffers));
+
+  const pdfPromise = new Promise((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+  });
+
+  // Add cover page (back cover on left + front cover on right - for print binding)
+  doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+  const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+  const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+
+  if (backCoverImageData && frontCoverImageData) {
+    const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+
+    doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
+    doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
+  }
+
+  // Add initial page (dedication/intro page)
+  const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+  if (initialPageImageData) {
+    doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
+    const initialPageBuffer = Buffer.from(initialPageData, 'base64');
+    doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
+  }
+
+  // Parse story pages
+  const generatedStoryText = storyData.storyText || storyData.generatedStory || storyData.story || storyData.text || '';
+  if (!generatedStoryText) {
+    throw new Error('Story text not found in story data. Available keys: ' + Object.keys(storyData).join(', '));
+  }
+
+  const pageMatches = generatedStoryText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
+  const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
+
+  console.log(`📄 [PRINT PDF] Found ${storyPages.length} story pages`);
+
+  // Determine layout
+  const isPictureBook = storyData.languageLevel === '1st-grade';
+  console.log(`📄 [PRINT PDF] Layout: ${isPictureBook ? 'Picture Book (combined)' : 'Standard (separate pages)'}`);
+
+  // Add content pages based on layout type
+  if (isPictureBook) {
+    // PICTURE BOOK LAYOUT: Combined image on top (~85%), text below (~15%)
+    storyPages.forEach((pageText, index) => {
+      const pageNumber = index + 1;
+      const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+      const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+      const margin = mmToPoints(5);
+
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+      const imageHeight = pageSize * 0.85;
+      const textAreaHeight = pageSize * 0.15;
+      const textAreaY = imageHeight;
+
+      if (image && image.imageData) {
+        try {
+          const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          doc.image(imageBuffer, margin, margin, {
+            fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+            align: 'center',
+            valign: 'center'
+          });
+        } catch (imgErr) {
+          console.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+        }
+      }
+
+      // Add text in bottom portion with vertical centering
+      const textMargin = mmToPoints(3);
+      const availableTextWidth = pageSize - (textMargin * 2);
+      const availableTextHeight = textAreaHeight - textMargin;
+
+      const lineGap = -2;
+      let fontSize = 10;
+      doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+      let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center', lineGap });
+
+      // Auto-reduce font size if text doesn't fit
+      while (textHeight > availableTextHeight && fontSize > 4) {
+        fontSize -= 0.5;
+        doc.fontSize(fontSize);
+        textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center', lineGap });
+      }
+
+      // Check if text still doesn't fit
+      if (textHeight > availableTextHeight) {
+        const errorMsg = `Text too long on page ${pageNumber}. Please shorten the story text for this page.`;
+        console.error(`❌ [PRINT PDF] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      // Vertically center text in text area
+      const textY = textAreaY + (availableTextHeight - textHeight) / 2;
+      doc.text(cleanText, textMargin, textY, { width: availableTextWidth, align: 'center', lineGap });
+    });
+  } else {
+    // STANDARD/ADVANCED LAYOUT: Separate pages for text and image
+    storyPages.forEach((pageText, index) => {
+      const pageNumber = index + 1;
+      const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+      const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+
+      // Add text page
+      const margin = 28;
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
+
+      const availableWidth = pageSize - (margin * 2);
+      const availableHeight = pageSize - (margin * 2);
+
+      const lineGap = -2;
+      let fontSize = 9;
+      doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+      const safeAvailableHeight = availableHeight * 0.9;
+      let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+
+      // Auto-reduce font size if text doesn't fit
+      while (textHeight > safeAvailableHeight && fontSize > 4) {
+        fontSize -= 0.5;
+        doc.fontSize(fontSize);
+        textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+      }
+
+      if (fontSize < 9) {
+        console.log(`📄 [PRINT PDF] Page ${pageNumber}: Font reduced 9pt → ${fontSize}pt`);
+      }
+
+      // Check if text still doesn't fit
+      if (textHeight > safeAvailableHeight) {
+        const errorMsg = `Text too long on page ${pageNumber}. Please shorten the story text for this page.`;
+        console.error(`❌ [PRINT PDF] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      // Vertically center text
+      const yPosition = margin + (availableHeight - textHeight) / 2;
+      doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
+
+      // Add image page if available
+      if (image && image.imageData) {
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        try {
+          const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          const imgMargin = mmToPoints(5);
+          doc.image(imageBuffer, imgMargin, imgMargin, {
+            fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
+            align: 'center',
+            valign: 'center'
+          });
+        } catch (imgErr) {
+          console.error('Error adding image to PDF:', imgErr);
+        }
+      }
+    });
+  }
+
+  // Calculate page count and add blank pages if needed (must be even for print)
+  let actualPdfPages;
+  if (isPictureBook) {
+    actualPdfPages = storyPages.length;
+  } else {
+    actualPdfPages = storyPages.length * 2;
+  }
+
+  const targetPageCount = actualPdfPages % 2 === 0 ? actualPdfPages : actualPdfPages + 1;
+  const blankPagesToAdd = targetPageCount - actualPdfPages;
+
+  if (blankPagesToAdd > 0) {
+    console.log(`📄 [PRINT PDF] Adding ${blankPagesToAdd} blank page(s) to reach even count ${targetPageCount}`);
+  }
+
+  for (let i = 0; i < blankPagesToAdd; i++) {
+    doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  }
+
+  doc.end();
+  const pdfBuffer = await pdfPromise;
+
+  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${targetPageCount} interior pages`);
+
+  return { pdfBuffer, pageCount: targetPageCount };
+}
+
+// GET PDF for a story - for DOWNLOAD/VIEWING (different sequence than print)
+// Sequence: Front cover, Initial page, Story pages, Back cover (all separate pages)
+// This is for viewing/download, NOT for printing - no database storage
 app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
   try {
     const storyId = req.params.id;
     const userId = req.user.id;
 
-    console.log(`📄 [PDF GET] Generating PDF for story: ${storyId}`);
+    console.log(`📄 [PDF DOWNLOAD] Generating viewable PDF for story: ${storyId}`);
 
     // Fetch story from database
     const storyResult = await dbPool.query(
@@ -5491,14 +5697,14 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     );
 
     if (storyResult.rows.length === 0) {
-      console.log(`📄 [PDF GET] Story not found: ${storyId}`);
+      console.log(`📄 [PDF DOWNLOAD] Story not found: ${storyId}`);
       return res.status(404).json({ error: 'Story not found' });
     }
 
     const storyData = typeof storyResult.rows[0].data === 'string'
       ? JSON.parse(storyResult.rows[0].data)
       : storyResult.rows[0].data;
-    console.log(`📄 [PDF GET] Story found: ${storyData.title}`);
+    console.log(`📄 [PDF DOWNLOAD] Story found: ${storyData.title}`);
 
     // Parse story into pages
     const storyText = storyData.storyText || storyData.story || '';
@@ -5506,36 +5712,27 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
 
     if (storyPages.length === 0) {
-      console.log(`📄 [PDF GET] No story pages found. Story text preview: ${storyText.substring(0, 200)}`);
+      console.log(`📄 [PDF DOWNLOAD] No story pages found. Story text preview: ${storyText.substring(0, 200)}`);
       return res.status(400).json({ error: 'No story pages found' });
     }
 
-    // Forward to POST endpoint with story data
     const isPictureBook = storyData.languageLevel === '1st-grade';
-    console.log(`📄 [PDF GET] Generating PDF with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
+    console.log(`📄 [PDF DOWNLOAD] Generating PDF with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
 
     // Helper function to extract image data
     const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
 
     const PDFDocument = require('pdfkit');
-    const stream = require('stream');
-
-    // Convert mm to points (1mm = 2.83465 points)
     const mmToPoints = (mm) => mm * 2.83465;
-
-    // Page dimensions for 14x14cm photobook
-    const coverWidth = mmToPoints(290.27);
-    const coverHeight = mmToPoints(146.0);
     const pageSize = mmToPoints(140);
 
-    // Create PDF document
+    // Create PDF document - start with square pages for viewing
     const doc = new PDFDocument({
-      size: [coverWidth, coverHeight],
+      size: [pageSize, pageSize],
       margins: { top: 0, bottom: 0, left: 0, right: 0 },
       autoFirstPage: false
     });
 
-    // Collect PDF data in a buffer
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
     const pdfPromise = new Promise((resolve, reject) => {
@@ -5543,36 +5740,19 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
       doc.on('error', reject);
     });
 
-    // Add cover page (back cover + front cover)
-    doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    const backCoverWidth = coverWidth / 2;
-    const frontCoverWidth = coverWidth / 2;
-
-    // Back cover (left half)
-    const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
-    if (backCoverImageData) {
-      try {
-        const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(backCoverBuffer, 0, 0, { width: backCoverWidth, height: coverHeight });
-      } catch (err) {
-        console.error('Error adding back cover:', err.message);
-      }
-    }
-
-    // Front cover (right half)
+    // 1. FRONT COVER (first page)
     const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
     if (frontCoverImageData) {
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       try {
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(frontCoverBuffer, backCoverWidth, 0, { width: frontCoverWidth, height: coverHeight });
+        doc.image(frontCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
       } catch (err) {
         console.error('Error adding front cover:', err.message);
       }
     }
 
-    // Title is already part of the AI-generated cover image, no need to add text overlay
-
-    // Add initial page if exists
+    // 2. INITIAL PAGE (dedication/intro)
     const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
     if (initialPageImageData) {
       doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -5584,41 +5764,16 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
       }
     }
 
-    // Add story pages
+    // 3. STORY PAGES
     if (isPictureBook) {
       // Picture Book: combined image + text on same page
       const margin = mmToPoints(5);
       const imageHeight = pageSize * 0.85;
       const textAreaHeight = pageSize * 0.15;
       const textWidth = pageSize - (margin * 2);
-      const maxTextHeight = textAreaHeight - 10;
-      const startFontSize = 10;
-      const minFontSize = 4;
+      const availableTextHeight = textAreaHeight - margin;
+      const lineGap = -2;
 
-      // First pass: Calculate minimum font size needed across all pages
-      let globalFontSize = startFontSize;
-      storyPages.forEach((pageText) => {
-        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-        let fontSize = startFontSize;
-        doc.fontSize(fontSize).font('Helvetica');
-        let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center' });
-
-        while (textHeight > maxTextHeight && fontSize > minFontSize) {
-          fontSize -= 0.5;
-          doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center' });
-        }
-
-        if (fontSize < globalFontSize) {
-          globalFontSize = fontSize;
-        }
-      });
-
-      if (globalFontSize < startFontSize) {
-        console.log(`📄 [PDF GET PictureBook] Using consistent font size ${globalFontSize}pt for all pages (reduced from ${startFontSize}pt)`);
-      }
-
-      // Second pass: Render all pages with consistent font size
       storyPages.forEach((pageText, index) => {
         const pageNumber = index + 1;
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
@@ -5639,57 +5794,48 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
           }
         }
 
-        // Add text at bottom with consistent font size
-        const textY = imageHeight + 5;
-        doc.fontSize(globalFontSize).font('Helvetica').fillColor('#333');
-        doc.text(cleanText, margin, textY, {
-          width: textWidth,
-          height: maxTextHeight,
-          align: 'center',
-          ellipsis: true
-        });
+        // Add text with vertical centering in text area
+        let fontSize = 10;
+        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+
+        while (textHeight > availableTextHeight && fontSize > 4) {
+          fontSize -= 0.5;
+          doc.fontSize(fontSize);
+          textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+        }
+
+        const textY = imageHeight + (availableTextHeight - textHeight) / 2;
+        doc.text(cleanText, margin, textY, { width: textWidth, align: 'center', lineGap });
       });
     } else {
       // Standard: separate text and image pages
       const margin = 28;
       const availableWidth = pageSize - (margin * 2);
       const availableHeight = pageSize - (margin * 2);
-      const startFontSize = 9;
-      const minFontSize = 5;
+      const lineGap = -2;
 
-      // First pass: Calculate minimum font size needed across all pages
-      let globalFontSize = startFontSize;
-      storyPages.forEach((pageText) => {
-        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-        let fontSize = startFontSize;
-        doc.fontSize(fontSize).font('Helvetica');
-        let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
-
-        while (textHeight > availableHeight && fontSize > minFontSize) {
-          fontSize -= 0.5;
-          doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left' });
-        }
-
-        if (fontSize < globalFontSize) {
-          globalFontSize = fontSize;
-        }
-      });
-
-      if (globalFontSize < startFontSize) {
-        console.log(`📄 [PDF GET] Using consistent font size ${globalFontSize}pt for all pages (reduced from ${startFontSize}pt)`);
-      }
-
-      // Second pass: Render all pages with consistent font size
       storyPages.forEach((pageText, index) => {
         const pageNumber = index + 1;
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-        // Text page
+        // Text page with vertical centering
         doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
-        doc.fontSize(globalFontSize).font('Helvetica').fillColor('#333');
-        doc.text(cleanText, margin, margin, { width: availableWidth, align: 'left' });
+
+        let fontSize = 9;
+        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+
+        while (textHeight > availableHeight * 0.9 && fontSize > 4) {
+          fontSize -= 0.5;
+          doc.fontSize(fontSize);
+          textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+        }
+
+        // Vertically center text
+        const yPosition = margin + (availableHeight - textHeight) / 2;
+        doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
 
         // Image page
         if (image && image.imageData) {
@@ -5709,40 +5855,31 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
       });
     }
 
-    doc.end();
-    const pdfBuffer = await pdfPromise;
-
-    console.log(`📄 [PDF GET] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
-
-    // Save PDF to database so it can be used for print orders
-    if (STORAGE_MODE === 'database' && dbPool) {
-      const fileId = `file-pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const filename = `${storyData.title || 'story'}.pdf`;
-      console.log(`📄 [PDF GET] Saving PDF to database with story_id: ${storyId}, file_id: ${fileId}`);
-
+    // 4. BACK COVER (last page)
+    const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+    if (backCoverImageData) {
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       try {
-        // Delete any existing PDFs for this story first (keep only latest)
-        await dbQuery("DELETE FROM files WHERE story_id = $1 AND file_type = 'story_pdf'", [storyId]);
-
-        await dbQuery(
-          'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-          [fileId, userId, 'story_pdf', storyId, 'application/pdf', pdfBuffer, pdfBuffer.length, filename]
-        );
-        console.log(`📄 [PDF GET] PDF saved to database successfully`);
-      } catch (saveErr) {
-        console.error(`📄 [PDF GET] Failed to save PDF to database:`, saveErr.message);
-        // Continue - still send PDF to user even if save fails
+        const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(backCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
+      } catch (err) {
+        console.error('Error adding back cover:', err.message);
       }
     }
 
+    doc.end();
+    const pdfBuffer = await pdfPromise;
+
+    console.log(`📄 [PDF DOWNLOAD] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+
+    // NO database storage - just send directly to user
     res.setHeader('Content-Type', 'application/pdf');
-    // Sanitize filename: remove special chars, replace dashes/spaces, keep ASCII only
     const safeFilename = (storyData.title || 'story')
-      .replace(/[–—]/g, '-')  // Replace en-dash and em-dash with hyphen
+      .replace(/[–—]/g, '-')
       .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
-      .replace(/[^a-zA-Z0-9\s\-_.]/g, '')  // Remove non-ASCII chars
-      .replace(/\s+/g, '_')  // Replace spaces with underscores
-      .substring(0, 100);  // Limit length
+      .replace(/[^a-zA-Z0-9\s\-_.]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 100);
     res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}.pdf"`);
     res.send(pdfBuffer);
 
@@ -7353,257 +7490,10 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     console.log('✅ [BACKGROUND] Story data fetched');
     console.log('📊 [BACKGROUND] Story data keys:', Object.keys(storyData));
 
-    // Determine layout based on languageLevel
-    // '1st-grade' = Picture Book = combined layout (image + text on same page)
-    // 'standard' or 'advanced' = separate pages for text and image
-    const isPictureBook = storyData.languageLevel === '1st-grade';
-    console.log(`📄 [BACKGROUND] Layout: ${isPictureBook ? 'Picture Book (combined)' : 'Standard (separate pages)'}, languageLevel: ${storyData.languageLevel}`);
-
-    // Step 3: Generate PDF using PDFKit
-    console.log('📄 [BACKGROUND] Generating PDF...');
-    const PDFDocument = require('pdfkit');
-
-    // Helper function to extract image data from cover images
-    // Supports both old format (base64 string) and new format (object with imageData property)
-    const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
-
-    const mmToPoints = (mm) => mm * 2.83465;
-    const coverWidth = mmToPoints(290.27);
-    const coverHeight = mmToPoints(146.0);
-    const pageSize = mmToPoints(140);
-
-    const doc = new PDFDocument({
-      size: [coverWidth, coverHeight],
-      margins: { top: 0, bottom: 0, left: 0, right: 0 },
-      autoFirstPage: false
-    });
-
-    const buffers = [];
-    doc.on('data', buffers.push.bind(buffers));
-
-    const pdfPromise = new Promise((resolve, reject) => {
-      doc.on('end', () => resolve(Buffer.concat(buffers)));
-      doc.on('error', reject);
-    });
-
-    // Add cover page
-    doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-
-    const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
-    const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
-
-    if (backCoverImageData && frontCoverImageData) {
-      const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-
-      doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
-      doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
-    }
-
-    // Add initial page (dedication/intro page)
-    const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
-    if (initialPageImageData) {
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
-      const initialPageBuffer = Buffer.from(initialPageData, 'base64');
-      doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
-    }
-
-    // Add story pages (text + images alternating)
-    // The generated story might be in different fields depending on how it was saved
-    const generatedStoryText = storyData.storyText || storyData.generatedStory || storyData.story || storyData.text || '';
-    if (!generatedStoryText) {
-      throw new Error('Story text not found in story data. Available keys: ' + Object.keys(storyData).join(', '));
-    }
-
-    // Parse pages using same pattern as frontend: ## Seite X, ## Page X, or --- Page X ---
-    const pageMatches = generatedStoryText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
-    const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
-
-    console.log(`📄 [BACKGROUND] Found ${storyPages.length} story pages to add to PDF`);
-    if (storyPages.length === 0) {
-      console.log(`📄 [BACKGROUND] Story text preview (first 500 chars): ${generatedStoryText.substring(0, 500)}`);
-    }
-
-    // Add content pages based on layout type
-    if (isPictureBook) {
-      // PICTURE BOOK LAYOUT: Combined image on top (~90%), text below (~10%)
-      storyPages.forEach((pageText, index) => {
-        const pageNumber = index + 1;
-        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
-        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-        const margin = mmToPoints(5);
-
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-
-        const imageHeight = pageSize * 0.85;
-        const textAreaHeight = pageSize * 0.15;
-        const textAreaY = imageHeight;
-
-        if (image && image.imageData) {
-          try {
-            const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            doc.image(imageBuffer, margin, margin, {
-              fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
-              align: 'center',
-              valign: 'center'
-            });
-          } catch (imgErr) {
-            console.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
-          }
-        }
-
-        // Add text in bottom portion (small area for Picture Book)
-        const textMargin = mmToPoints(3);  // Smaller margin for compact text area
-        const availableTextWidth = pageSize - (textMargin * 2);
-        const availableTextHeight = textAreaHeight - (textMargin);
-
-        const lineGap = -2; // Tighter line spacing (40-50% less gap)
-        let fontSize = 10;  // Start with 10pt, auto-reduce if needed
-        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center', lineGap });
-
-        // Auto-reduce font size if text doesn't fit
-        while (textHeight > availableTextHeight && fontSize > 4) {
-          fontSize -= 0.5;
-          doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center', lineGap });
-        }
-
-        let textToRender = cleanText;
-        // If still doesn't fit at minimum font size, truncate with ellipsis
-        if (textHeight > availableTextHeight) {
-          const words = cleanText.split(' ');
-          textToRender = '';
-          for (let i = 0; i < words.length; i++) {
-            const testText = textToRender + (textToRender ? ' ' : '') + words[i];
-            const testHeight = doc.heightOfString(testText + '...', { width: availableTextWidth, align: 'center', lineGap });
-            if (testHeight <= availableTextHeight) {
-              textToRender = testText;
-            } else {
-              break;
-            }
-          }
-          textToRender += '...';
-          // Text truncation is not allowed - throw error to stop print process
-          const errorMsg = `Text too long on page ${index + 1}. Original: ${cleanText.length} chars, max that fits: ${textToRender.length - 3} chars. Please shorten the story text for this page.`;
-          console.error(`❌ [PDF] ${errorMsg}`);
-          throw new Error(errorMsg);
-        }
-
-        textHeight = doc.heightOfString(textToRender, { width: availableTextWidth, align: 'center', lineGap });
-        const textY = textAreaY + (availableTextHeight - textHeight) / 2;
-
-        doc.text(textToRender, textMargin, textY, { width: availableTextWidth, align: 'center', lineGap });
-      });
-    } else {
-      // STANDARD/ADVANCED LAYOUT: Separate pages for text and image
-      storyPages.forEach((pageText, index) => {
-        const pageNumber = index + 1;
-        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
-        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-
-        // Add text page
-        const margin = 28;
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
-
-        const availableWidth = pageSize - (margin * 2);
-        const availableHeight = pageSize - (margin * 2);
-
-        const lineGap = -2; // Tighter line spacing (40-50% less gap)
-        let fontSize = 9;
-        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        // Add 10% safety margin to prevent overflow due to rendering differences
-        const safeAvailableHeight = availableHeight * 0.9;
-        let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
-
-        // Auto-reduce font size if text doesn't fit (go down to 4pt if needed)
-        while (textHeight > safeAvailableHeight && fontSize > 4) {
-          fontSize -= 0.5;
-          doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
-        }
-
-        if (fontSize < 9) {
-          console.log(`📄 [PDF-BACKGROUND] Page ${pageNumber}: Font reduced 9pt → ${fontSize}pt (text: ${cleanText.length} chars, height: ${Math.round(textHeight)}, available: ${Math.round(safeAvailableHeight)})`);
-        }
-
-        let textToRender = cleanText;
-        // If still doesn't fit at minimum font size, truncate with ellipsis
-        if (textHeight > safeAvailableHeight) {
-          const words = cleanText.split(' ');
-          textToRender = '';
-          for (let i = 0; i < words.length; i++) {
-            const testText = textToRender + (textToRender ? ' ' : '') + words[i];
-            const testHeight = doc.heightOfString(testText + '...', { width: availableWidth, align: 'left', lineGap });
-            if (testHeight <= safeAvailableHeight) {
-              textToRender = testText;
-            } else {
-              break;
-            }
-          }
-          textToRender += '...';
-          // Text truncation is not allowed - throw error to stop print process
-          const errorMsg = `Text too long on page ${pageNumber}. Original: ${cleanText.length} chars, max that fits: ${textToRender.length - 3} chars. Please shorten the story text for this page.`;
-          console.error(`❌ [PDF] ${errorMsg}`);
-          throw new Error(errorMsg);
-        }
-
-        textHeight = doc.heightOfString(textToRender, { width: availableWidth, align: 'left', lineGap });
-        const yPosition = margin + (availableHeight - textHeight) / 2;
-
-        doc.text(textToRender, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
-
-        // Add image page if available
-        if (image && image.imageData) {
-          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-          try {
-            const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            const imgMargin = mmToPoints(5);
-            doc.image(imageBuffer, imgMargin, imgMargin, {
-              fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
-              align: 'center',
-              valign: 'center'
-            });
-          } catch (imgErr) {
-            console.error('Error adding image to PDF:', imgErr);
-          }
-        }
-      });
-    }
-
-    // Calculate actual INTERIOR pages for Gelato page count
-    // Note: Covers (front, back, initial) are NOT counted - they are printed separately
-    // Gelato page count = interior story pages only
-    let actualPdfPages;
-    if (isPictureBook) {
-      actualPdfPages = storyPages.length; // 1 page per scene
-    } else {
-      actualPdfPages = storyPages.length * 2; // text + image pages
-    }
-    console.log(`📄 [BACKGROUND] Story has ${storyPages.length} scenes, layout=${isPictureBook ? 'Picture Book (1 page/scene)' : 'Standard (2 pages/scene)'}, interior pages=${actualPdfPages}`);
-
-    // Calculate target page count for Gelato (must be even)
-    // Gelato accepts any even page count - just round up to next even if odd
-    const targetPageCount = actualPdfPages % 2 === 0 ? actualPdfPages : actualPdfPages + 1;
-
-    // Add blank pages only if needed (odd page count)
-    const blankPagesToAdd = targetPageCount - actualPdfPages;
-    if (blankPagesToAdd > 0) {
-      console.log(`📄 [BACKGROUND] PDF has ${actualPdfPages} content pages, adding ${blankPagesToAdd} blank page to reach even count ${targetPageCount}`);
-    } else {
-      console.log(`📄 [BACKGROUND] PDF has ${actualPdfPages} content pages (already even, no padding needed)`);
-    }
-
-    for (let i = 0; i < blankPagesToAdd; i++) {
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      // Blank page - just white
-    }
-
-    doc.end();
-    const pdfBuffer = await pdfPromise;
+    // Step 3: Generate PDF using shared print function (same code as Print Book)
+    console.log('📄 [BACKGROUND] Generating PDF using shared print function...');
+    const { pdfBuffer, pageCount: targetPageCount } = await generatePrintPdf(storyData);
     const pdfBase64 = pdfBuffer.toString('base64');
-    console.log(`✅ [BACKGROUND] PDF generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${targetPageCount} total pages`);
 
     // Step 3.5: Save PDF to database and get public URL
     console.log('💾 [BACKGROUND] Saving PDF to database...');
@@ -7617,7 +7507,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     await dbPool.query(pdfInsertQuery, [
       pdfFileId,
       userId,
-      'story_pdf',
+      'order_pdf',
       storyId,
       'application/pdf',
       pdfBase64,
