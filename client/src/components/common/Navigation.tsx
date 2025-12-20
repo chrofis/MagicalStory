@@ -121,15 +121,14 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                   <div className="text-white font-semibold text-sm mb-1">
                     {user.username} {user.role === 'admin' && '👑'}
                   </div>
-                  {!isUnlimited && (
-                    <div className={`text-xs px-2 py-1 rounded inline-block ${
-                      credits === 0 ? 'bg-red-600 text-white' :
-                      credits < 50 ? 'bg-yellow-600 text-white' :
-                      'bg-green-600 text-white'
-                    }`}>
-                      {credits} {language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits'}
-                    </div>
-                  )}
+                  <div className={`text-xs px-2 py-1 rounded inline-block ${
+                    isUnlimited ? 'bg-purple-600 text-white' :
+                    credits === 0 ? 'bg-red-600 text-white' :
+                    credits < 50 ? 'bg-yellow-600 text-white' :
+                    'bg-green-600 text-white'
+                  }`}>
+                    {isUnlimited ? '∞' : credits} {language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits'}
+                  </div>
                 </div>
               )}
 
