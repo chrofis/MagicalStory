@@ -52,15 +52,13 @@ interface CharacterApiResponse {
 // Convert API response to frontend Character
 // Handles both snake_case (new format) and camelCase (legacy format) for backward compatibility
 function mapCharacterFromApi(api: CharacterApiResponse): Character {
-  // Get style analysis from either format
-  const styleAnalysis = api.style_analysis || api.styleAnalysis;
-
-  // Extract physical traits from style_analysis or direct fields (with legacy fallbacks)
+  // Extract physical traits from direct fields (with legacy fallbacks)
   const physical = {
     height: api.height,
-    build: styleAnalysis?.physical?.build || api.build,
-    face: styleAnalysis?.physical?.face || api.other_features || api.otherFeatures,
-    hair: styleAnalysis?.physical?.hair || api.hair_color || api.hairColor,
+    build: api.build,
+    face: api.other_features || api.otherFeatures,
+    hair: api.hair_color || api.hairColor,
+    other: api.other,  // Glasses, birthmarks, always-present accessories
   };
 
   return {
@@ -69,7 +67,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     gender: api.gender as 'male' | 'female' | 'other',
     age: api.age,
 
-    physical: (physical.height || physical.build || physical.face || physical.hair) ? physical : undefined,
+    physical: (physical.height || physical.build || physical.face || physical.hair || physical.other) ? physical : undefined,
 
     traits: {
       strengths: api.strengths || [],
@@ -91,8 +89,6 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
 
     clothing: api.clothing ? { current: api.clothing } : undefined,
 
-    referenceOutfit: styleAnalysis?.referenceOutfit || api.reference_outfit || api.referenceOutfit,
-
     generatedOutfits: (api.generated_outfits || api.generatedOutfits) as Record<number, GeneratedOutfit> | undefined,
   };
 }
@@ -109,6 +105,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     build: char.physical?.build,
     hair_color: char.physical?.hair,
     other_features: char.physical?.face,
+    other: char.physical?.other,  // Glasses, birthmarks, always-present accessories
     // Photos
     photo_url: char.photos?.original,
     thumbnail_url: char.photos?.face,
@@ -127,16 +124,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     // Clothing
     clothing: char.clothing?.current,
     clothing_avatars: char.avatars,
-    // Style analysis (legacy format for backend)
-    style_analysis: char.physical ? {
-      physical: {
-        face: char.physical.face,
-        hair: char.physical.hair,
-        build: char.physical.build,
-      },
-      referenceOutfit: char.referenceOutfit,
-    } : undefined,
-    reference_outfit: char.referenceOutfit,
+    // Generated outfits per page
     generated_outfits: char.generatedOutfits,
   };
 }
@@ -232,6 +220,7 @@ export const characterService = {
         if (character.physical.hair) physicalDescription += `, ${character.physical.hair}`;
         if (character.physical.face) physicalDescription += `, ${character.physical.face}`;
         if (character.physical.build) physicalDescription += `, ${character.physical.build}`;
+        if (character.physical.other) physicalDescription += `, ${character.physical.other}`;
       }
 
       // Prefer body with no background for best avatar generation results
@@ -278,11 +267,11 @@ export const characterService = {
       build?: string;
       face?: string;
       hair?: string;
+      other?: string;  // Glasses, birthmarks, always-present accessories
     };
     clothing?: {
       current?: string;
     };
-    referenceOutfit?: ReferenceOutfit;
   }> {
     try {
       const response = await api.post<{
@@ -300,21 +289,19 @@ export const characterService = {
           hair_color?: string;
           clothing?: string;
           other_features?: string;
-        };
-        styleAnalysis?: {
-          physical?: { face?: string; hair?: string; build?: string };
-          referenceOutfit?: ReferenceOutfit;
+          other?: string;  // Glasses, birthmarks, always-present accessories
         };
         error?: string;
         fallback?: boolean;
       }>('/api/analyze-photo', { imageData });
 
-      // Merge physical from attributes and styleAnalysis
+      // Extract physical traits from attributes
       const physical = {
         height: response.attributes?.height,
-        build: response.styleAnalysis?.physical?.build || response.attributes?.build,
-        face: response.styleAnalysis?.physical?.face || response.attributes?.other_features,
-        hair: response.styleAnalysis?.physical?.hair || response.attributes?.hair_color,
+        build: response.attributes?.build,
+        face: response.attributes?.other_features,
+        hair: response.attributes?.hair_color,
+        other: response.attributes?.other,
       };
 
       return {
@@ -326,9 +313,8 @@ export const characterService = {
           faceBox: response.faceBox,
           bodyBox: response.bodyBox,
         },
-        physical: (physical.height || physical.build || physical.face || physical.hair) ? physical : undefined,
+        physical: (physical.height || physical.build || physical.face || physical.hair || physical.other) ? physical : undefined,
         clothing: response.attributes?.clothing ? { current: response.attributes.clothing } : undefined,
-        referenceOutfit: response.styleAnalysis?.referenceOutfit,
       };
     } catch (error) {
       log.error('Photo analysis failed:', error);

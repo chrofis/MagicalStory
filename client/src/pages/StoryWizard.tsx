@@ -528,8 +528,6 @@ export default function StoryWizard() {
             } : prev.physical,
             // Clothing from analysis
             clothing: analysis.clothing || prev.clothing,
-            // Reference outfit
-            referenceOutfit: analysis.referenceOutfit || prev.referenceOutfit,
             // Clear avatars when photo changes - they need to be regenerated
             avatars: undefined,
           } : null);

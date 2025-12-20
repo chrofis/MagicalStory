@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
-import type { Character, PhysicalTraits, ReferenceOutfit } from '@/types/character';
+import type { Character, PhysicalTraits } from '@/types/character';
 
 // Helper function to generate the avatar prompt for display (mirrors server logic)
 function getAvatarPrompt(category: string, gender: string | undefined): string {
@@ -188,30 +188,11 @@ export function CharacterForm({
   const [editingStyleField, setEditingStyleField] = useState<string | null>(null);
   const [editStyleValue, setEditStyleValue] = useState('');
 
-  // Helper to update referenceOutfit fields
-  const updateReferenceOutfit = (field: string, value: string) => {
-    const currentOutfit = character.referenceOutfit || {
-      garmentType: '', primaryColor: '', secondaryColors: [], pattern: '',
-      patternScale: '', seamColor: '', seamStyle: '', fabric: '',
-      neckline: '', sleeves: '', accessories: [], setting: 'neutral' as const
-    };
-
-    const updated: ReferenceOutfit = { ...currentOutfit };
-    if (field === 'garmentType') updated.garmentType = value;
-    else if (field === 'primaryColor') updated.primaryColor = value;
-    else if (field === 'pattern') updated.pattern = value;
-    else if (field === 'setting') updated.setting = value as ReferenceOutfit['setting'];
-
-    onChange({ ...character, referenceOutfit: updated });
-  };
-
   const saveStyleEdit = () => {
     if (editingStyleField) {
       const parts = editingStyleField.split('.');
       if (parts[0] === 'physical') {
         updatePhysical(parts[1] as keyof PhysicalTraits, editStyleValue);
-      } else if (parts[0] === 'referenceOutfit') {
-        updateReferenceOutfit(parts[1], editStyleValue);
       }
     }
     setEditingStyleField(null);
@@ -435,7 +416,7 @@ export function CharacterForm({
           </span>
         </summary>
         <div className="px-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <EditableStyleField
               label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
               value={character.physical?.face || ''}
@@ -466,6 +447,17 @@ export function CharacterForm({
               editValue={editStyleValue}
               onEditValueChange={setEditStyleValue}
               onStartEdit={() => handleStartEdit('physical.build', character.physical?.build || '')}
+              onSave={saveStyleEdit}
+              onCancel={cancelStyleEdit}
+            />
+            <EditableStyleField
+              label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
+              value={character.physical?.other || ''}
+              placeholder={language === 'de' ? 'z.B. Brille, Muttermal' : language === 'fr' ? 'ex. lunettes, grain de beauté' : 'e.g. glasses, birthmark'}
+              isEditing={editingStyleField === 'physical.other'}
+              editValue={editStyleValue}
+              onEditValueChange={setEditStyleValue}
+              onStartEdit={() => handleStartEdit('physical.other', character.physical?.other || '')}
               onSave={saveStyleEdit}
               onCancel={cancelStyleEdit}
             />
@@ -546,73 +538,6 @@ export function CharacterForm({
             )}
           </div>
         </div>
-      )}
-
-      {/* Reference Outfit (developer only) */}
-      {developerMode && (
-        <details className="bg-indigo-50 border border-indigo-200 rounded-lg">
-          <summary className="p-4 cursor-pointer text-sm font-semibold text-indigo-700 flex items-center gap-2 hover:bg-indigo-100 rounded-lg transition-colors">
-            {language === 'de' ? 'Referenz-Outfit (aus Foto)' : language === 'fr' ? 'Tenue de référence (de la photo)' : 'Reference Outfit (from photo)'}
-            <span className="text-xs font-normal text-indigo-500">
-              ({language === 'de' ? 'klicken zum Erweitern' : language === 'fr' ? 'cliquez pour développer' : 'click to expand'})
-            </span>
-          </summary>
-          <div className="px-4 pb-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <EditableStyleField
-                label={language === 'de' ? 'Kleidungsart' : language === 'fr' ? 'Type de vêtement' : 'Garment Type'}
-                value={character.referenceOutfit?.garmentType || ''}
-                placeholder="e.g. t-shirt, dress"
-                isEditing={editingStyleField === 'referenceOutfit.garmentType'}
-                editValue={editStyleValue}
-                onEditValueChange={setEditStyleValue}
-                onStartEdit={() => handleStartEdit('referenceOutfit.garmentType', character.referenceOutfit?.garmentType || '')}
-                onSave={saveStyleEdit}
-                onCancel={cancelStyleEdit}
-              />
-              <EditableStyleField
-                label={language === 'de' ? 'Hauptfarbe' : language === 'fr' ? 'Couleur principale' : 'Primary Color'}
-                value={character.referenceOutfit?.primaryColor || ''}
-                placeholder="e.g. blue, red"
-                isEditing={editingStyleField === 'referenceOutfit.primaryColor'}
-                editValue={editStyleValue}
-                onEditValueChange={setEditStyleValue}
-                onStartEdit={() => handleStartEdit('referenceOutfit.primaryColor', character.referenceOutfit?.primaryColor || '')}
-                onSave={saveStyleEdit}
-                onCancel={cancelStyleEdit}
-              />
-              <EditableStyleField
-                label={language === 'de' ? 'Muster' : language === 'fr' ? 'Motif' : 'Pattern'}
-                value={character.referenceOutfit?.pattern || ''}
-                placeholder="e.g. stripes, solid"
-                isEditing={editingStyleField === 'referenceOutfit.pattern'}
-                editValue={editStyleValue}
-                onEditValueChange={setEditStyleValue}
-                onStartEdit={() => handleStartEdit('referenceOutfit.pattern', character.referenceOutfit?.pattern || '')}
-                onSave={saveStyleEdit}
-                onCancel={cancelStyleEdit}
-              />
-              <div>
-                <span className="font-medium text-gray-600 text-xs">
-                  {language === 'de' ? 'Umgebung' : language === 'fr' ? 'Contexte' : 'Setting'}:
-                </span>
-                <select
-                  value={character.referenceOutfit?.setting || 'neutral'}
-                  onChange={(e) => updateReferenceOutfit('setting', e.target.value)}
-                  className="w-full mt-0.5 px-2 py-1 text-xs border rounded focus:outline-none bg-gray-100 border-gray-300 text-gray-800"
-                >
-                  <option value="neutral">Neutral</option>
-                  <option value="outdoor-warm">{language === 'de' ? 'Draussen (warm)' : 'Outdoor (warm)'}</option>
-                  <option value="outdoor-cold">{language === 'de' ? 'Draussen (kalt)' : 'Outdoor (cold)'}</option>
-                  <option value="indoor-casual">{language === 'de' ? 'Drinnen (casual)' : 'Indoor (casual)'}</option>
-                  <option value="indoor-formal">{language === 'de' ? 'Drinnen (formal)' : 'Indoor (formal)'}</option>
-                  <option value="active">{language === 'de' ? 'Aktiv/Sport' : 'Active/Sports'}</option>
-                  <option value="sleep">{language === 'de' ? 'Schlaf' : 'Sleep'}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </details>
       )}
 
       {/* Trait Selectors */}

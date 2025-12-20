@@ -50,33 +50,6 @@ export interface CharacterClothing {
   current?: string;  // What they're wearing in the reference photo
 }
 
-// Reference outfit extracted from photo analysis
-export interface ReferenceOutfit {
-  garmentType: string;
-  primaryColor: string;
-  secondaryColors: string[];
-  pattern: string;
-  patternScale: string;
-  seamColor: string;
-  seamStyle: string;
-  fabric: string;
-  neckline: string;
-  sleeves: string;
-  accessories: string[];
-  setting: 'neutral' | 'outdoor-warm' | 'outdoor-cold' | 'indoor-casual' | 'indoor-formal' | 'active' | 'sleep';
-}
-
-// Style analysis result from photo analysis
-export interface StyleAnalysis {
-  physical?: {
-    face?: string;
-    hair?: string;
-    build?: string;
-  };
-  referenceOutfit?: ReferenceOutfit;
-  analyzedAt?: string;
-}
-
 // Generated outfit for a specific page
 export interface GeneratedOutfit {
   setting: string;
@@ -115,9 +88,6 @@ export interface Character {
   // Clothing (what they're wearing in reference photo)
   clothing?: CharacterClothing;
 
-  // Reference outfit from photo analysis (developer feature)
-  referenceOutfit?: ReferenceOutfit;
-
   // Generated outfits per page (during story generation)
   generatedOutfits?: Record<number, GeneratedOutfit>;
 }
@@ -147,7 +117,6 @@ export interface VisualBibleMainCharacter {
   id: number;
   name: string;
   physical: PhysicalTraits;
-  referenceOutfit?: ReferenceOutfit;
   generatedOutfits: Record<number, GeneratedOutfit>;
 }
 

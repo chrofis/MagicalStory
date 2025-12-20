@@ -564,19 +564,8 @@ export function StoryDisplay({
                         <details key={char.id} className="bg-purple-50 p-2 rounded text-sm">
                           <summary className="cursor-pointer font-semibold text-purple-800 hover:text-purple-900">
                             {char.name}
-                            <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
-                              char.referenceOutfit?.setting === 'outdoor-cold' ? 'bg-blue-100 text-blue-800' :
-                              char.referenceOutfit?.setting === 'outdoor-warm' ? 'bg-yellow-100 text-yellow-800' :
-                              char.referenceOutfit?.setting === 'indoor-casual' ? 'bg-green-100 text-green-800' :
-                              char.referenceOutfit?.setting === 'indoor-formal' ? 'bg-purple-100 text-purple-800' :
-                              char.referenceOutfit?.setting === 'active' ? 'bg-orange-100 text-orange-800' :
-                              char.referenceOutfit?.setting === 'sleep' ? 'bg-indigo-100 text-indigo-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {char.referenceOutfit?.setting || 'neutral'}
-                            </span>
                             {Object.keys(char.generatedOutfits || {}).length > 0 && (
-                              <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                              <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
                                 {Object.keys(char.generatedOutfits).length} {language === 'de' ? 'Outfits' : language === 'fr' ? 'tenues' : 'outfits'}
                               </span>
                             )}
@@ -587,18 +576,9 @@ export function StoryDisplay({
                               <span className="font-medium text-gray-600">Physical:</span>
                               <span className="text-gray-700 ml-1">
                                 {char.physical?.face || 'Not analyzed'} | {char.physical?.hair || 'N/A'} | {char.physical?.build || 'N/A'}
+                                {char.physical?.other && ` | ${char.physical.other}`}
                               </span>
                             </div>
-                            {/* Reference Outfit */}
-                            {char.referenceOutfit && (
-                              <div className="text-xs">
-                                <span className="font-medium text-gray-600">Reference:</span>
-                                <span className="text-gray-700 ml-1">
-                                  {char.referenceOutfit.garmentType} in {char.referenceOutfit.primaryColor}
-                                  {char.referenceOutfit.pattern && char.referenceOutfit.pattern !== 'solid' && char.referenceOutfit.pattern !== 'none' && ` (${char.referenceOutfit.pattern})`}
-                                </span>
-                              </div>
-                            )}
                             {/* Generated Outfits */}
                             {char.generatedOutfits && Object.keys(char.generatedOutfits).length > 0 && (
                               <div className="mt-2 pt-2 border-t border-purple-200">

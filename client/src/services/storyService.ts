@@ -3,7 +3,6 @@ import type {
   Character,
   RelationshipMap,
   RelationshipTextMap,
-  StyleAnalysis,
   VisualBible
 } from '@/types/character';
 import type { SavedStory, Language, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt } from '@/types/story';
@@ -583,19 +582,6 @@ export const storyService = {
     return response;
   },
 
-  // Style Analysis API - Analyze photo for Visual Bible integration
-  async analyzeStyle(imageData: string): Promise<{
-    success: boolean;
-    styleAnalysis?: StyleAnalysis;
-    error?: string;
-  }> {
-    const response = await api.post<{
-      success: boolean;
-      styleAnalysis?: StyleAnalysis;
-      error?: string;
-    }>('/api/analyze-style', { imageData });
-    return response;
-  },
 };
 
 export default storyService;
