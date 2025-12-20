@@ -377,9 +377,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
     PROMPT_TEMPLATES.storybookCombined = await fs.readFile(path.join(promptsDir, 'storybook-combined.txt'), 'utf-8');
     PROMPT_TEMPLATES.rewriteBlockedScene = await fs.readFile(path.join(promptsDir, 'rewrite-blocked-scene.txt'), 'utf-8');
-    // Character and style analysis prompts
+    // Character analysis prompt
     PROMPT_TEMPLATES.characterAnalysis = await fs.readFile(path.join(promptsDir, 'character-analysis.txt'), 'utf-8');
-    PROMPT_TEMPLATES.styleAnalysis = await fs.readFile(path.join(promptsDir, 'style-analysis.txt'), 'utf-8');
     // Avatar generation prompts
     PROMPT_TEMPLATES.avatarSystemInstruction = await fs.readFile(path.join(promptsDir, 'avatar-system-instruction.txt'), 'utf-8');
     PROMPT_TEMPLATES.avatarMainPrompt = await fs.readFile(path.join(promptsDir, 'avatar-main-prompt.txt'), 'utf-8');
@@ -1952,36 +1951,40 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
     }
     const user = userResult[0];
 
-    // Get story count and list
+    // Get story count and list - data is stored as TEXT containing JSON
     const storiesResult = await dbQuery(
-      `SELECT id, title, created_at,
-       COALESCE(json_array_length((story_data->'scenes')::json), 0) as page_count,
-       COALESCE(json_array_length((story_data->'images')::json), 0) as image_count
-       FROM stories WHERE user_id = $1 ORDER BY created_at DESC`,
+      `SELECT id, data, created_at FROM stories WHERE user_id = $1 ORDER BY created_at DESC`,
       [targetUserId]
     );
 
-    // Calculate totals
+    // Calculate totals by parsing JSON data
     let totalCharacters = 0;
     let totalImages = 0;
     const stories = storiesResult.map(s => {
-      totalImages += parseInt(s.image_count) || 0;
-      return {
-        id: s.id,
-        title: s.title || 'Untitled',
-        createdAt: s.created_at,
-        pageCount: parseInt(s.page_count) || 0,
-        imageCount: parseInt(s.image_count) || 0
-      };
+      try {
+        const storyData = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
+        const pageCount = storyData?.scenes?.length || storyData?.images?.length || 0;
+        const imageCount = storyData?.images?.length || 0;
+        const charCount = storyData?.characters?.length || 0;
+        totalImages += imageCount;
+        totalCharacters += charCount;
+        return {
+          id: s.id,
+          title: storyData?.title || storyData?.storyTitle || 'Untitled',
+          createdAt: s.created_at,
+          pageCount,
+          imageCount
+        };
+      } catch {
+        return {
+          id: s.id,
+          title: 'Untitled',
+          createdAt: s.created_at,
+          pageCount: 0,
+          imageCount: 0
+        };
+      }
     });
-
-    // Get character count from all user's stories
-    const charResult = await dbQuery(
-      `SELECT COALESCE(SUM(json_array_length((story_data->'characters')::json)), 0) as total_chars
-       FROM stories WHERE user_id = $1`,
-      [targetUserId]
-    );
-    totalCharacters = parseInt(charResult[0]?.total_chars) || 0;
 
     // Get purchase history (orders)
     const ordersResult = await dbQuery(
@@ -4480,21 +4483,14 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
           const jsonMatch = text.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const result = JSON.parse(jsonMatch[0]);
-            // Handle both old format (flat traits) and new format (nested traits + styleAnalysis)
+            // Handle nested traits format or flat format
             if (result.traits) {
-              // Ensure analyzedAt is set
-              if (result.styleAnalysis) {
-                result.styleAnalysis.analyzedAt = new Date().toISOString();
-              }
-              console.log('📸 [GEMINI] Extracted traits + styleAnalysis:', {
-                traits: result.traits,
-                hasStyleAnalysis: !!result.styleAnalysis
-              });
-              return result; // New format: { traits, styleAnalysis }
+              console.log('📸 [GEMINI] Extracted traits:', result.traits);
+              return result;
             } else {
-              // Old format fallback (flat traits object)
-              console.log('📸 [GEMINI] Extracted traits (legacy format):', result);
-              return { traits: result, styleAnalysis: null };
+              // Flat traits object - wrap in traits
+              console.log('📸 [GEMINI] Extracted traits (flat format):', result);
+              return { traits: result };
             }
           } else {
             console.error('📸 [GEMINI] No JSON found in response:', text.substring(0, 200));
@@ -4554,9 +4550,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
       }
 
       // Merge Gemini traits into attributes (only fill if not already set)
-      // geminiTraits is now { traits, styleAnalysis } format
       const traits = geminiTraits?.traits || geminiTraits; // Handle both formats
-      const styleAnalysis = geminiTraits?.styleAnalysis || null;
 
       if (traits) {
         analyzerData.attributes = analyzerData.attributes || {};
@@ -4573,29 +4567,30 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.build && !analyzerData.attributes.build) {
           analyzerData.attributes.build = traits.build;
         }
-        // Hair and distinctive features - always set from Gemini (more accurate)
+        // Face description
+        if (traits.face) {
+          analyzerData.attributes.face = traits.face;
+        }
+        // Hair - always set from Gemini (more accurate)
         if (traits.hair) {
           analyzerData.attributes.hair_color = traits.hair;
         }
-        // Support distinctiveFeatures (new), features (old), and face field names
-        if (traits.distinctiveFeatures || traits.features || traits.face) {
-          analyzerData.attributes.other_features = traits.distinctiveFeatures || traits.features || traits.face;
+        // Other features (glasses, birthmarks, always-present items)
+        if (traits.other && traits.other !== 'none') {
+          analyzerData.attributes.other_features = traits.other;
+        }
+        // Clothing description
+        if (traits.clothing) {
+          analyzerData.attributes.clothing = traits.clothing;
         }
       }
-
-      // Store styleAnalysis for response
-      analyzerData.styleAnalysis = styleAnalysis;
-      console.log('📸 [PHOTO] styleAnalysis to be returned:', styleAnalysis ? {
-        hasPhysical: !!styleAnalysis.physical
-      } : 'null');
 
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
         age: analyzerData.attributes?.age,
         gender: analyzerData.attributes?.gender,
         hasFace: !!analyzerData.face_thumbnail || !!analyzerData.faceThumbnail,
         hasBody: !!analyzerData.body_crop || !!analyzerData.bodyCrop,
-        hasGeminiTraits: !!geminiTraits,
-        hasStyleAnalysis: !!styleAnalysis
+        hasGeminiTraits: !!geminiTraits
       });
 
       // Convert snake_case to camelCase for frontend compatibility
@@ -4606,11 +4601,13 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         bodyNoBg: analyzerData.body_no_bg || analyzerData.bodyNoBg,
         faceBox: analyzerData.face_box || analyzerData.faceBox,
         bodyBox: analyzerData.body_box || analyzerData.bodyBox,
-        attributes: analyzerData.attributes,
-        styleAnalysis: analyzerData.styleAnalysis // Style DNA for Visual Bible
+        attributes: analyzerData.attributes
       };
 
-      console.log('📸 [PHOTO] Sending response with styleAnalysis:', !!analyzerData.styleAnalysis);
+      console.log('📸 [PHOTO] Sending response:', {
+        hasAttributes: !!analyzerData.attributes,
+        clothing: analyzerData.attributes?.clothing
+      });
       res.json(response);
 
     } catch (fetchErr) {
@@ -4638,101 +4635,6 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
   }
 });
 
-// Analyze photo style for Visual Bible integration
-// Called after body photo upload to extract clothing/style details
-app.post('/api/analyze-style', authenticateToken, async (req, res) => {
-  try {
-    const { imageData } = req.body;
-
-    if (!imageData) {
-      console.log('👗 [STYLE] Missing imageData in request');
-      return res.status(400).json({ error: 'Missing imageData' });
-    }
-
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (!geminiApiKey) {
-      console.log('👗 [STYLE] No Gemini API key, cannot analyze style');
-      return res.status(503).json({ error: 'Style analysis service unavailable' });
-    }
-
-    console.log('👗 [STYLE] Analyzing photo style with Gemini...');
-    const startTime = Date.now();
-
-    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
-      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
-
-    // Use the style analysis prompt template
-    const prompt = PROMPT_TEMPLATES.styleAnalysis || `Analyze this photo for style details. Return JSON with physical features.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data,
-                },
-              },
-            ],
-          }],
-          generationConfig: {
-            temperature: 0.2, // Low temperature for consistent, accurate extraction
-            maxOutputTokens: 2048
-          }
-        }),
-        signal: AbortSignal.timeout(30000) // 30 second timeout
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('👗 [STYLE] Gemini API error:', response.status, errorText);
-      return res.status(500).json({ error: 'Style analysis failed', details: errorText });
-    }
-
-    const data = await response.json();
-    const duration = Date.now() - startTime;
-
-    if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-      const text = data.candidates[0].content.parts[0].text;
-      // Extract JSON from response (may have markdown wrapping)
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const styleAnalysis = JSON.parse(jsonMatch[0]);
-          styleAnalysis.analyzedAt = new Date().toISOString();
-
-          console.log(`👗 [STYLE] Analysis complete in ${duration}ms:`, {
-            hasPhysical: !!styleAnalysis.physical
-          });
-
-          return res.json({ success: true, styleAnalysis });
-        } catch (parseErr) {
-          console.error('👗 [STYLE] JSON parse error:', parseErr.message);
-          console.error('👗 [STYLE] Raw response:', text.substring(0, 500));
-          return res.status(500).json({ error: 'Failed to parse style analysis', details: parseErr.message });
-        }
-      }
-    }
-
-    console.error('👗 [STYLE] No valid response from Gemini');
-    return res.status(500).json({ error: 'No valid response from style analysis' });
-
-  } catch (err) {
-    console.error('👗 [STYLE] Error analyzing style:', err);
-    res.status(500).json({
-      error: 'Failed to analyze style',
-      details: err.message
-    });
-  }
-});
 
 // Generate clothing avatars for a character (4 categories: winter, standard, summer, formal)
 // This creates photorealistic avatars with different clothing for story illustration
@@ -7563,7 +7465,7 @@ function getTokensPerPage(languageLevel) {
 // Now includes mainCharacters (populated separately) and changeLog
 function parseVisualBible(outline) {
   const visualBible = {
-    mainCharacters: [],      // Populated from inputData.characters with styleAnalysis
+    mainCharacters: [],      // Populated from inputData.characters
     secondaryCharacters: [], // Parsed from outline
     animals: [],             // Parsed from outline
     artifacts: [],           // Parsed from outline
@@ -7751,32 +7653,32 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
   console.log(`📖 [VISUAL BIBLE] Initializing ${characters.length} main characters...`);
 
   visualBible.mainCharacters = characters.map(char => {
-    // Build physical description from all available sources
-    const stylePhysical = char.styleAnalysis?.physical || {};
+    // Build physical description from character data
+    // Support both snake_case (from API) and camelCase (from frontend)
     const mainChar = {
       id: char.id,
       name: char.name,
       physical: {
-        age: char.age || stylePhysical.age || 'Unknown',
-        gender: char.gender || stylePhysical.gender || 'Unknown',
-        height: char.height || stylePhysical.height || 'Unknown',
-        build: stylePhysical.build || char.build || 'Unknown',
-        face: stylePhysical.face || char.otherFeatures || 'Not analyzed',
-        hair: stylePhysical.hair || char.hairColor || 'Not analyzed'
+        age: char.age || 'Unknown',
+        gender: char.gender || 'Unknown',
+        height: char.height || 'Unknown',
+        build: char.build || 'Unknown',
+        face: char.other_features || char.otherFeatures || 'Not analyzed',
+        hair: char.hair_color || char.hairColor || 'Not analyzed',
+        other: char.other || ''
       },
-      generatedOutfits: char.generatedOutfits || {}
+      generatedOutfits: char.generatedOutfits || char.generated_outfits || {}
     };
 
     // Debug: Log what physical data we're using
-    const hasStylePhysical = !!char.styleAnalysis?.physical;
     console.log(`📖 [VISUAL BIBLE] Added main character: ${char.name} (id: ${char.id})`);
-    console.log(`📖 [VISUAL BIBLE]   - hasStyleAnalysis: ${!!char.styleAnalysis}, hasStyleAnalysis.physical: ${hasStylePhysical}`);
     console.log(`📖 [VISUAL BIBLE]   - physical.age: "${mainChar.physical.age}"`);
     console.log(`📖 [VISUAL BIBLE]   - physical.gender: "${mainChar.physical.gender}"`);
     console.log(`📖 [VISUAL BIBLE]   - physical.height: "${mainChar.physical.height}"`);
     console.log(`📖 [VISUAL BIBLE]   - physical.build: "${mainChar.physical.build}"`);
     console.log(`📖 [VISUAL BIBLE]   - physical.face: "${mainChar.physical.face?.substring(0, 60)}..."`);
     console.log(`📖 [VISUAL BIBLE]   - physical.hair: "${mainChar.physical.hair}"`);
+    console.log(`📖 [VISUAL BIBLE]   - physical.other: "${mainChar.physical.other}"`);
     return mainChar;
   });
 
@@ -7825,71 +7727,6 @@ function updateMainCharacterOutfit(visualBible, characterId, pageNumber, outfit)
   );
 
   console.log(`📖 [VISUAL BIBLE] Updated outfit for ${mainChar.name} on page ${pageNumber}`);
-}
-
-// Determine if reference outfit matches scene setting
-// Returns true if the outfit is appropriate for the scene
-function isOutfitAppropriateForScene(referenceOutfitSetting, sceneSetting) {
-  // Define which settings are compatible
-  const compatibility = {
-    'outdoor-cold': ['outdoor-cold', 'neutral'],
-    'outdoor-warm': ['outdoor-warm', 'active', 'neutral'],
-    'indoor-casual': ['indoor-casual', 'indoor-formal', 'neutral'],
-    'indoor-formal': ['indoor-casual', 'indoor-formal', 'neutral'],
-    'active': ['active', 'outdoor-warm', 'neutral'],
-    'sleep': ['sleep', 'indoor-casual', 'neutral'],
-    'neutral': ['outdoor-cold', 'outdoor-warm', 'indoor-casual', 'indoor-formal', 'active', 'sleep', 'neutral']
-  };
-
-  const compatibleSettings = compatibility[sceneSetting] || ['neutral'];
-  const isCompatible = compatibleSettings.includes(referenceOutfitSetting);
-
-  console.log(`👗 [OUTFIT MATCH] Reference: ${referenceOutfitSetting}, Scene: ${sceneSetting} -> ${isCompatible ? 'MATCH' : 'NO MATCH'}`);
-  return isCompatible;
-}
-
-// Get the best reference image type for a character based on scene
-// Returns 'body' (full body), 'face' (face only), or null
-function selectReferenceImageType(character, sceneSetting) {
-  if (!character) return null;
-
-  // If no style analysis, always use full body (best we have)
-  if (!character.styleAnalysis) {
-    console.log(`👗 [REF SELECT] ${character.name}: No style analysis, using full body`);
-    return 'body';
-  }
-
-  const referenceOutfitSetting = character.styleAnalysis.referenceOutfit?.setting || 'neutral';
-
-  // Check if reference outfit matches scene
-  if (isOutfitAppropriateForScene(referenceOutfitSetting, sceneSetting)) {
-    console.log(`👗 [REF SELECT] ${character.name}: Outfit matches scene, using full body`);
-    return 'body';
-  }
-
-  // Outfit doesn't match - use face only, let Visual Bible provide clothing guidance
-  console.log(`👗 [REF SELECT] ${character.name}: Outfit doesn't match scene (${referenceOutfitSetting} vs ${sceneSetting}), using face only`);
-  return 'face';
-}
-
-// Build clothing prompt for a character when using face-only reference
-// Generates scene-appropriate clothing description
-function buildClothingPromptFromScene(character, sceneSetting) {
-  // Scene-specific guidance
-  const sceneGuidance = {
-    'outdoor-cold': 'Winter clothing: coat, warm layers, possible hat/scarf/mittens',
-    'outdoor-warm': 'Summer clothing: light fabrics, short sleeves or sleeveless, breathable',
-    'indoor-casual': 'Casual indoor wear: comfortable, relaxed fit',
-    'indoor-formal': 'Formal/dressy: neat, presentable, possibly festive',
-    'active': 'Active wear: movement-friendly, sporty, practical',
-    'sleep': 'Sleepwear: pajamas, nightgown, cozy and soft',
-    'neutral': 'Versatile clothing suitable for the scene context'
-  };
-
-  let prompt = `\n**CLOTHING for ${character.name}** (generate appropriate for ${sceneSetting} scene):\n`;
-  prompt += `Scene requirement: ${sceneGuidance[sceneSetting] || sceneGuidance.neutral}\n`;
-
-  return prompt;
 }
 
 // Get Visual Bible entries relevant to a specific page

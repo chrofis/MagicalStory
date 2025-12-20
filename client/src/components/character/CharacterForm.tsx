@@ -474,20 +474,20 @@ export function CharacterForm({
       </details>
 
       {/* Clothing Avatars (developer only) */}
-      {developerMode && character.avatars && (
+      {developerMode && (
         <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-2">
             {language === 'de' ? 'Kleidungs-Avatare' : language === 'fr' ? 'Avatars vestimentaires' : 'Clothing Avatars'}
-            {character.avatars.status === 'generating' && (
+            {character.avatars?.status === 'generating' && (
               <span className="text-xs font-normal text-teal-500 flex items-center gap-1">
                 <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
                 {language === 'de' ? 'Generierung läuft...' : 'Generating...'}
               </span>
             )}
-            {character.avatars.status === 'complete' && (
+            {character.avatars?.status === 'complete' && (
               <span className="text-xs font-normal text-green-600">Complete</span>
             )}
-            {character.avatars.status === 'failed' && (
+            {character.avatars?.status === 'failed' && (
               <span className="text-xs font-normal text-red-600">Failed</span>
             )}
           </h4>
@@ -523,7 +523,7 @@ export function CharacterForm({
             ))}
           </div>
           <div className="mt-3 flex items-center justify-between">
-            {character.avatars.generatedAt && (
+            {character.avatars?.generatedAt && (
               <div className="text-xs text-teal-500">
                 Generated: {new Date(character.avatars.generatedAt).toLocaleString()}
               </div>

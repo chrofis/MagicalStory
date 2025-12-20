@@ -11,6 +11,7 @@ export interface PhysicalTraits {
   build?: string;
   face?: string;
   hair?: string;
+  other?: string;  // Glasses, birthmarks, always-present accessories
 }
 
 // Psychological traits
@@ -44,12 +45,12 @@ export interface CharacterAvatars {
   status?: 'pending' | 'generating' | 'complete' | 'failed';
 }
 
-// Clothing information (for future use)
+// Clothing information
 export interface CharacterClothing {
   current?: string;  // What they're wearing in the reference photo
 }
 
-// Reference outfit details (extracted from photo)
+// Reference outfit extracted from photo analysis
 export interface ReferenceOutfit {
   garmentType: string;
   primaryColor: string;
@@ -62,7 +63,7 @@ export interface ReferenceOutfit {
   neckline: string;
   sleeves: string;
   accessories: string[];
-  setting: 'outdoor-warm' | 'outdoor-cold' | 'indoor-casual' | 'indoor-formal' | 'active' | 'sleep' | 'neutral';
+  setting: 'neutral' | 'outdoor-warm' | 'outdoor-cold' | 'indoor-casual' | 'indoor-formal' | 'active' | 'sleep';
 }
 
 // Generated outfit for a specific page
@@ -100,10 +101,10 @@ export interface Character {
   // Clothing avatars (4 seasonal variations)
   avatars?: CharacterAvatars;
 
-  // Clothing (for future use)
+  // Clothing (what they're wearing in reference photo)
   clothing?: CharacterClothing;
 
-  // Reference outfit from photo (for Visual Bible)
+  // Reference outfit from photo analysis (developer feature)
   referenceOutfit?: ReferenceOutfit;
 
   // Generated outfits per page (during story generation)
@@ -135,7 +136,6 @@ export interface VisualBibleMainCharacter {
   id: number;
   name: string;
   physical: PhysicalTraits;
-  referenceOutfit?: ReferenceOutfit;
   generatedOutfits: Record<number, GeneratedOutfit>;
 }
 
@@ -171,9 +171,3 @@ export interface VisualBible {
 // TODO: Remove these after full migration
 export type ClothingAvatars = CharacterAvatars;
 export type PhysicalFeatures = PhysicalTraits;
-export interface StyleAnalysis {
-  physical: PhysicalTraits;
-  referenceOutfit?: ReferenceOutfit;
-  styleDNA?: unknown;
-  analyzedAt?: string;
-}

@@ -11,6 +11,7 @@ Return a JSON object with this EXACT structure:
     "build": "<slim, average, athletic, stocky>",
     "face": "<face shape, eye color, skin tone>",
     "hair": "<specific color, length, style, texture>",
-    "distinctiveFeatures": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces, or 'none'>"
+    "other": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces that are ALWAYS present, or 'none'>",
+    "clothing": "<brief description of what they are wearing in the photo>"
   }
 }
