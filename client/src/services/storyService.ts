@@ -364,21 +364,49 @@ export const storyService = {
   },
 
   // Edit image with user prompt
-  async editImage(storyId: string, pageNumber: number, editPrompt: string): Promise<{ imageData: string }> {
-    const response = await api.post<{ imageData: string }>(
+  async editImage(storyId: string, pageNumber: number, editPrompt: string): Promise<{
+    imageData: string;
+    qualityScore?: number;
+    qualityReasoning?: string;
+    originalImage?: string;
+    originalScore?: number;
+    originalReasoning?: string;
+  }> {
+    const response = await api.post<{
+      imageData: string;
+      qualityScore?: number;
+      qualityReasoning?: string;
+      originalImage?: string;
+      originalScore?: number;
+      originalReasoning?: string;
+    }>(
       `/api/stories/${storyId}/edit/image/${pageNumber}`,
       { editPrompt }
     );
-    return { imageData: response.imageData };
+    return response;
   },
 
   // Edit cover with user prompt
-  async editCover(storyId: string, coverType: 'front' | 'back' | 'initial', editPrompt: string): Promise<{ imageData: string }> {
-    const response = await api.post<{ imageData: string }>(
+  async editCover(storyId: string, coverType: 'front' | 'back' | 'initial', editPrompt: string): Promise<{
+    imageData: string;
+    qualityScore?: number;
+    qualityReasoning?: string;
+    originalImage?: string;
+    originalScore?: number;
+    originalReasoning?: string;
+  }> {
+    const response = await api.post<{
+      imageData: string;
+      qualityScore?: number;
+      qualityReasoning?: string;
+      originalImage?: string;
+      originalScore?: number;
+      originalReasoning?: string;
+    }>(
       `/api/stories/${storyId}/edit/cover/${coverType}`,
       { editPrompt }
     );
-    return { imageData: response.imageData };
+    return response;
   },
 
   // AI Generation

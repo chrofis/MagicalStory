@@ -3800,6 +3800,12 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
       return res.status(404).json({ error: 'No image found for this page' });
     }
 
+    // Capture previous image info before editing
+    const previousImageData = currentImage.imageData;
+    const previousScore = currentImage.qualityScore || null;
+    const previousReasoning = currentImage.qualityReasoning || null;
+    console.log(`📸 [EDIT] Capturing previous image (score: ${previousScore})`);
+
     // Edit the image (pure text/instruction based - no character photos to avoid regeneration artifacts)
     const editResult = await editImageWithPrompt(currentImage.imageData, editPrompt);
 
@@ -3807,15 +3813,34 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
       return res.status(500).json({ error: 'Failed to edit image - no result returned' });
     }
 
+    // Evaluate the edited image quality
+    console.log(`⭐ [EDIT] Evaluating edited image quality...`);
+    let qualityScore = null;
+    let qualityReasoning = null;
+    try {
+      const evaluation = await evaluateImageQuality(editResult.imageData, 'scene');
+      qualityScore = evaluation.score;
+      qualityReasoning = evaluation.reasoning;
+      console.log(`⭐ [EDIT] Edited image score: ${qualityScore}%`);
+    } catch (evalErr) {
+      console.error(`⚠️ [EDIT] Quality evaluation failed:`, evalErr.message);
+    }
+
     // Update the image in story data
     const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
     if (existingIndex >= 0) {
-      // Store original before edit if not already stored
-      if (!sceneImages[existingIndex].originalBeforeEdit) {
-        sceneImages[existingIndex].originalBeforeEdit = currentImage.imageData;
-      }
-      sceneImages[existingIndex].imageData = editResult.imageData;
-      sceneImages[existingIndex].lastEditPrompt = editPrompt;
+      sceneImages[existingIndex] = {
+        ...sceneImages[existingIndex],
+        imageData: editResult.imageData,
+        qualityScore,
+        qualityReasoning,
+        wasEdited: true,
+        lastEditPrompt: editPrompt,
+        originalImage: previousImageData,
+        originalScore: previousScore,
+        originalReasoning: previousReasoning,
+        editedAt: new Date().toISOString()
+      };
     }
 
     // Save updated story
@@ -3825,12 +3850,17 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ Image edited for story ${id}, page ${pageNumber}`);
+    console.log(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore})`);
 
     res.json({
       success: true,
       pageNumber,
-      imageData: editResult.imageData
+      imageData: editResult.imageData,
+      qualityScore,
+      qualityReasoning,
+      originalImage: previousImageData,
+      originalScore: previousScore,
+      originalReasoning: previousReasoning
     });
 
   } catch (err) {
@@ -3889,6 +3919,12 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
       return res.status(404).json({ error: 'No cover image data found' });
     }
 
+    // Capture previous image info before editing
+    const previousImageData = currentImageData;
+    const previousScore = typeof currentCover === 'object' ? currentCover.qualityScore || null : null;
+    const previousReasoning = typeof currentCover === 'object' ? currentCover.qualityReasoning || null : null;
+    console.log(`📸 [COVER EDIT] Capturing previous image (score: ${previousScore})`);
+
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
     const editResult = await editImageWithPrompt(currentImageData, editPrompt);
 
@@ -3896,21 +3932,37 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
       return res.status(500).json({ error: 'Failed to edit cover - no result returned' });
     }
 
-    // Update the cover image in story data
-    if (typeof currentCover === 'string') {
-      coverImages[coverKey] = {
-        imageData: editResult.imageData,
-        originalBeforeEdit: currentCover,
-        lastEditPrompt: editPrompt
-      };
-    } else {
-      if (!currentCover.originalBeforeEdit) {
-        currentCover.originalBeforeEdit = currentImageData;
-      }
-      currentCover.imageData = editResult.imageData;
-      currentCover.lastEditPrompt = editPrompt;
-      coverImages[coverKey] = currentCover;
+    // Evaluate the edited cover quality
+    console.log(`⭐ [COVER EDIT] Evaluating edited cover quality...`);
+    let qualityScore = null;
+    let qualityReasoning = null;
+    try {
+      const evaluation = await evaluateImageQuality(editResult.imageData, 'cover');
+      qualityScore = evaluation.score;
+      qualityReasoning = evaluation.reasoning;
+      console.log(`⭐ [COVER EDIT] Edited cover score: ${qualityScore}%`);
+    } catch (evalErr) {
+      console.error(`⚠️ [COVER EDIT] Quality evaluation failed:`, evalErr.message);
     }
+
+    // Update the cover image in story data
+    const updatedCover = {
+      imageData: editResult.imageData,
+      qualityScore,
+      qualityReasoning,
+      wasEdited: true,
+      lastEditPrompt: editPrompt,
+      originalImage: previousImageData,
+      originalScore: previousScore,
+      originalReasoning: previousReasoning,
+      editedAt: new Date().toISOString(),
+      // Preserve other existing fields
+      ...(typeof currentCover === 'object' ? {
+        description: currentCover.description,
+        prompt: currentCover.prompt
+      } : {})
+    };
+    coverImages[coverKey] = updatedCover;
 
     // Save updated story
     storyData.coverImages = coverImages;
@@ -3919,12 +3971,17 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ Cover edited for story ${id}, type: ${normalizedCoverType}`);
+    console.log(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
 
     res.json({
       success: true,
       coverType: normalizedCoverType,
-      imageData: editResult.imageData
+      imageData: editResult.imageData,
+      qualityScore,
+      qualityReasoning,
+      originalImage: previousImageData,
+      originalScore: previousScore,
+      originalReasoning: previousReasoning
     });
 
   } catch (err) {

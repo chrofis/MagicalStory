@@ -1847,17 +1847,26 @@ export default function StoryWizard() {
                   try {
                     if (editTarget.type === 'image' && editTarget.pageNumber) {
                       const result = await storyService.editImage(storyId, editTarget.pageNumber, editPromptText);
-                      log.info('Edit result:', { hasImageData: !!result?.imageData, length: result?.imageData?.length });
+                      log.info('Edit result:', { hasImageData: !!result?.imageData, score: result?.qualityScore });
                       if (!result?.imageData) {
                         log.error('No imageData in edit response!', result);
                         throw new Error('No image data returned from server');
                       }
                       setSceneImages(prev => prev.map(img =>
                         img.pageNumber === editTarget.pageNumber
-                          ? { ...img, imageData: result.imageData }
+                          ? {
+                              ...img,
+                              imageData: result.imageData,
+                              qualityScore: result.qualityScore,
+                              qualityReasoning: result.qualityReasoning,
+                              wasEdited: true,
+                              originalImage: result.originalImage,
+                              originalScore: result.originalScore,
+                              originalReasoning: result.originalReasoning
+                            }
                           : img
                       ));
-                      log.info('Image edited successfully, updated state');
+                      log.info('Image edited successfully, updated state with quality info');
                     } else if (editTarget.type === 'cover' && editTarget.coverType) {
                       const result = await storyService.editCover(storyId, editTarget.coverType, editPromptText);
                       setCoverImages(prev => {
@@ -1865,12 +1874,19 @@ export default function StoryWizard() {
                         const key = editTarget.coverType === 'front' ? 'frontCover'
                           : editTarget.coverType === 'back' ? 'backCover' : 'initialPage';
                         const current = prev[key];
-                        if (typeof current === 'string' || !current) {
-                          return { ...prev, [key]: { imageData: result.imageData } };
-                        }
-                        return { ...prev, [key]: { ...current, imageData: result.imageData } };
+                        const updatedCover = {
+                          ...(typeof current === 'object' ? current : {}),
+                          imageData: result.imageData,
+                          qualityScore: result.qualityScore,
+                          qualityReasoning: result.qualityReasoning,
+                          wasEdited: true,
+                          originalImage: result.originalImage,
+                          originalScore: result.originalScore,
+                          originalReasoning: result.originalReasoning
+                        };
+                        return { ...prev, [key]: updatedCover };
                       });
-                      log.info('Cover edited successfully');
+                      log.info('Cover edited successfully with quality info');
                     }
                   } catch (error) {
                     log.error('Edit failed:', error);
