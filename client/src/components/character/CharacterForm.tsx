@@ -462,11 +462,20 @@ export function CharacterForm({
                 {language === 'de' ? 'Generierung läuft...' : 'Generating...'}
               </span>
             )}
-            {character.avatars?.status === 'complete' && (
-              <span className="text-xs font-normal text-green-600">Complete</span>
+            {character.avatars?.status === 'complete' && !character.avatars?.stale && (
+              <span className="text-xs font-normal text-green-600">
+                {language === 'de' ? 'Fertig' : language === 'fr' ? 'Terminé' : 'Complete'}
+              </span>
+            )}
+            {character.avatars?.stale && (
+              <span className="text-xs font-normal text-amber-600">
+                ⚠️ {language === 'de' ? 'Von altem Foto' : language === 'fr' ? 'De l\'ancienne photo' : 'From previous photo'}
+              </span>
             )}
             {character.avatars?.status === 'failed' && (
-              <span className="text-xs font-normal text-red-600">Failed</span>
+              <span className="text-xs font-normal text-red-600">
+                {language === 'de' ? 'Fehlgeschlagen' : language === 'fr' ? 'Échoué' : 'Failed'}
+              </span>
             )}
           </h4>
           <div className="grid grid-cols-2 gap-4">
@@ -479,11 +488,18 @@ export function CharacterForm({
                     : category}
                 </div>
                 {character.avatars?.[category] ? (
-                  <img
-                    src={character.avatars[category]}
-                    alt={`${character.name} - ${category}`}
-                    className="w-full h-64 object-contain rounded border border-teal-200 bg-white"
-                  />
+                  <div className="relative">
+                    <img
+                      src={character.avatars[category]}
+                      alt={`${character.name} - ${category}`}
+                      className={`w-full h-64 object-contain rounded border bg-white ${character.avatars?.stale ? 'border-amber-400 opacity-75' : 'border-teal-200'}`}
+                    />
+                    {character.avatars?.stale && (
+                      <div className="absolute top-1 right-1 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded">
+                        {language === 'de' ? 'Altes Foto' : language === 'fr' ? 'Ancienne' : 'Old photo'}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="w-full h-64 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">
                     {character.avatars?.status === 'generating' ? '...' : 'Not generated'}

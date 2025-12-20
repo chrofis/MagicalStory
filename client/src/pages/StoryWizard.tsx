@@ -508,45 +508,63 @@ export default function StoryWizard() {
             hasPhotos: !!analysis.photos,
             hasPhysical: !!analysis.physical,
             hasClothing: !!analysis.clothing,
+            age: analysis.age,
+            gender: analysis.gender,
           });
 
-          setCurrentCharacter(prev => prev ? {
-            ...prev,
-            // Photos
-            photos: {
-              original: analysis.photos?.face || originalPhotoUrl,
-              face: analysis.photos?.face,
-              body: analysis.photos?.body || originalPhotoUrl,
-              bodyNoBg: analysis.photos?.bodyNoBg,
-              faceBox: analysis.photos?.faceBox,
-              bodyBox: analysis.photos?.bodyBox,
-            },
-            // Physical traits from analysis
-            physical: analysis.physical ? {
-              ...prev.physical,
-              ...analysis.physical,
-            } : prev.physical,
-            // Clothing from analysis
-            clothing: analysis.clothing || prev.clothing,
-            // Clear avatars when photo changes - they need to be regenerated
-            avatars: undefined,
-          } : null);
+          setCurrentCharacter(prev => {
+            if (!prev) return null;
+
+            // Physical traits: always overwrite with new values (except height)
+            const newPhysical = analysis.physical ? {
+              // Keep height only if already set, otherwise use analysis
+              height: prev.physical?.height || analysis.physical.height,
+              // Always overwrite other physical traits from photo analysis
+              build: analysis.physical.build || prev.physical?.build,
+              face: analysis.physical.face || prev.physical?.face,
+              hair: analysis.physical.hair || prev.physical?.hair,
+              other: analysis.physical.other || prev.physical?.other,
+            } : prev.physical;
+
+            return {
+              ...prev,
+              // Gender: only update if not already set
+              gender: prev.gender || (analysis.gender as 'male' | 'female' | 'other') || prev.gender,
+              // Age: only update if not already set
+              age: prev.age || analysis.age || prev.age,
+              // Photos
+              photos: {
+                original: analysis.photos?.face || originalPhotoUrl,
+                face: analysis.photos?.face,
+                body: analysis.photos?.body || originalPhotoUrl,
+                bodyNoBg: analysis.photos?.bodyNoBg,
+                faceBox: analysis.photos?.faceBox,
+                bodyBox: analysis.photos?.bodyBox,
+              },
+              // Physical traits (merged above)
+              physical: newPhysical,
+              // Clothing from analysis
+              clothing: analysis.clothing || prev.clothing,
+              // Keep avatars but mark as stale when photo changes (from previous photo)
+              avatars: prev.avatars ? { ...prev.avatars, stale: true } : undefined,
+            };
+          });
         } else {
           log.warn('Photo analysis returned no data, using original photo');
-          // Fallback to original photo - also clear avatars
+          // Fallback to original photo - mark avatars as stale
           setCurrentCharacter(prev => prev ? {
             ...prev,
             photos: { original: originalPhotoUrl },
-            avatars: undefined,
+            avatars: prev.avatars ? { ...prev.avatars, stale: true } : undefined,
           } : null);
         }
       } catch (error) {
         log.error('Photo analysis error:', error);
-        // Fallback to original photo on error - also clear avatars
+        // Fallback to original photo on error - mark avatars as stale
         setCurrentCharacter(prev => prev ? {
           ...prev,
           photos: { original: originalPhotoUrl },
-          avatars: undefined,
+          avatars: prev.avatars ? { ...prev.avatars, stale: true } : undefined,
         } : null);
       } finally {
         setIsAnalyzingPhoto(false);
@@ -574,10 +592,11 @@ export default function StoryWizard() {
       );
 
       if (result.success && result.avatars) {
-        // Update local state with new avatars
-        setCurrentCharacter(prev => prev ? { ...prev, avatars: result.avatars } : prev);
+        // Update local state with new avatars (explicitly clear stale flag)
+        const freshAvatars = { ...result.avatars, stale: false };
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
         setCharacters(prev => prev.map(c =>
-          c.id === currentCharacter.id ? { ...c, avatars: result.avatars } : c
+          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
         ));
         log.success(`✅ Avatars regenerated for ${currentCharacter.name}`);
       } else {

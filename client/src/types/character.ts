@@ -43,6 +43,7 @@ export interface CharacterAvatars {
   formal?: string;
   generatedAt?: string;
   status?: 'pending' | 'generating' | 'complete' | 'failed';
+  stale?: boolean; // True when avatars were generated from a previous photo
 }
 
 // Clothing information

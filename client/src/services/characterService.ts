@@ -262,6 +262,9 @@ export const characterService = {
       faceBox?: { x: number; y: number; width: number; height: number };
       bodyBox?: { x: number; y: number; width: number; height: number };
     };
+    // Basic info extracted from photo
+    age?: string;
+    gender?: string;
     physical?: {
       height?: string;
       build?: string;
@@ -286,10 +289,10 @@ export const characterService = {
           gender?: string;
           height?: string;
           build?: string;
+          face?: string;  // Face description
           hair_color?: string;
           clothing?: string;
-          other_features?: string;
-          other?: string;  // Glasses, birthmarks, always-present accessories
+          other_features?: string;  // Distinctive markings (glasses, etc.)
         };
         error?: string;
         fallback?: boolean;
@@ -299,9 +302,9 @@ export const characterService = {
       const physical = {
         height: response.attributes?.height,
         build: response.attributes?.build,
-        face: response.attributes?.other_features,
+        face: response.attributes?.face,  // Face description
         hair: response.attributes?.hair_color,
-        other: response.attributes?.other,
+        other: response.attributes?.other_features,  // Distinctive markings
       };
 
       return {
@@ -313,6 +316,9 @@ export const characterService = {
           faceBox: response.faceBox,
           bodyBox: response.bodyBox,
         },
+        // Basic info from analysis
+        age: response.attributes?.age,
+        gender: response.attributes?.gender,
         physical: (physical.height || physical.build || physical.face || physical.hair || physical.other) ? physical : undefined,
         clothing: response.attributes?.clothing ? { current: response.attributes.clothing } : undefined,
       };
