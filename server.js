@@ -3576,16 +3576,23 @@ app.delete('/api/story-draft', authenticateToken, async (req, res) => {
 // Story management endpoints
 app.get('/api/stories', authenticateToken, async (req, res) => {
   try {
-    log.debug(`📚 GET/api/stories - User: ${req.user.username} (ID: ${req.user.id}), Mode: ${STORAGE_MODE}`);
+    // Pagination: limit (default 6, max 50) and offset
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 6, 1), 50);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    log.debug(`📚 GET/api/stories - User: ${req.user.username}, limit: ${limit}, offset: ${offset}`);
     let userStories = [];
+    let totalCount = 0;
 
     if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC';
+      // Database mode - get total count first
+      const countResult = await dbQuery('SELECT COUNT(*) as count FROM stories WHERE user_id = $1', [req.user.id]);
+      totalCount = parseInt(countResult[0]?.count || 0);
 
-      log.trace(`📚 Executing query: ${selectQuery} with user_id: ${req.user.id}`);
-      const rows = await dbQuery(selectQuery, [req.user.id]);
-      log.trace(`📚 Query returned ${rows.length} rows`);
+      // Then get paginated data
+      const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3';
+      const rows = await dbQuery(selectQuery, [req.user.id, limit, offset]);
+      log.trace(`📚 Query returned ${rows.length} rows (total: ${totalCount})`);
 
       // Parse the JSON data from each row - return metadata only (no images for performance)
       userStories = rows.map(row => {
@@ -3616,9 +3623,16 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       // File mode
       const allStories = await readJSON(STORIES_FILE);
       const fullStories = allStories[req.user.id] || [];
+      totalCount = fullStories.length;
+
+      // Sort by createdAt descending, then paginate
+      const sortedStories = [...fullStories].sort((a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+      const paginatedStories = sortedStories.slice(offset, offset + limit);
 
       // Return metadata only (no images for performance)
-      userStories = fullStories.map(story => {
+      userStories = paginatedStories.map(story => {
         const hasThumbnail = !!(story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail);
         return {
           id: story.id,
@@ -3629,19 +3643,27 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
           pageCount: story.sceneImages?.length || 0,
-          hasThumbnail, // Boolean flag - fetch actual thumbnail via /api/stories/:id/thumbnail
+          hasThumbnail, // Boolean flag - fetch actual cover via /api/stories/:id/cover
           // Partial story fields
           isPartial: story.isPartial || false,
           generatedPages: story.generatedPages,
           totalPages: story.totalPages
         };
       });
-      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (metadata only)`);
+      console.log(`📚 File mode: Returning ${userStories.length} of ${totalCount} stories`);
     }
 
     console.log(`📚 Returning ${userStories.length} stories (total size: ${JSON.stringify(userStories).length} bytes)`);
     await logActivity(req.user.id, req.user.username, 'STORIES_LOADED', { count: userStories.length });
-    res.json(userStories);
+    res.json({
+      stories: userStories,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + userStories.length < totalCount
+      }
+    });
   } catch (err) {
     console.error('❌ Error fetching stories:', err);
     console.error('Error stack:', err.stack);
@@ -3679,6 +3701,41 @@ app.get('/api/stories/:id', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('❌ Error fetching story:', err);
     res.status(500).json({ error: 'Failed to fetch story', details: err.message });
+  }
+});
+
+// Get story cover image only (for lazy loading in story list)
+app.get('/api/stories/:id/cover', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    let coverImage = null;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const result = await dbPool.query(
+        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+      if (result.rows.length > 0) {
+        const story = JSON.parse(result.rows[0].data);
+        coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
+      }
+    } else {
+      const allStories = await readJSON(STORIES_FILE);
+      const userStories = allStories[req.user.id] || [];
+      const story = userStories.find(s => s.id === id);
+      if (story) {
+        coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
+      }
+    }
+
+    if (!coverImage) {
+      return res.status(404).json({ error: 'Cover image not found' });
+    }
+
+    res.json({ coverImage });
+  } catch (err) {
+    console.error('❌ Error fetching cover image:', err);
+    res.status(500).json({ error: 'Failed to fetch cover image' });
   }
 });
 

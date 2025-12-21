@@ -100,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: data.user.role,
       credits: data.user.credits,
       preferredLanguage: data.user.preferredLanguage,
+      emailVerified: data.user.emailVerified,
     };
 
     localStorage.setItem('auth_token', data.token);
@@ -167,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: data.user.role,
       credits: data.user.credits,
       preferredLanguage: data.user.preferredLanguage,
+      emailVerified: data.user.emailVerified,
     };
 
     localStorage.setItem('auth_token', data.token);
@@ -254,6 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.user.email,
       role: data.user.role,
       credits: data.user.credits || 0,
+      emailVerified: data.user.emailVerified,
     };
 
     // Store impersonation state
@@ -300,6 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.user.email,
       role: data.user.role,
       credits: data.user.credits || 0,
+      emailVerified: data.user.emailVerified,
     };
 
     localStorage.setItem('auth_token', data.token);

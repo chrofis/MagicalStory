@@ -11,8 +11,9 @@ import { createLogger } from '@/services/logger';
 const log = createLogger('MyStories');
 
 // Simple cache for stories to prevent reload on navigation
-let storiesCache: { data: StoryListItem[] | null; timestamp: number } = { data: null, timestamp: 0 };
+let storiesCache: { data: StoryListItem[] | null; total: number; timestamp: number } = { data: null, total: 0, timestamp: 0 };
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const STORIES_PER_PAGE = 6;
 
 interface StoryListItem {
   id: string;
@@ -23,7 +24,8 @@ interface StoryListItem {
   pages: number;
   created_at: string;
   createdAt?: string;
-  thumbnail?: string;
+  thumbnail?: string; // Loaded lazily via getStoryCover
+  hasThumbnail?: boolean; // Indicates if cover image is available
   isPartial?: boolean;
   generatedPages?: number;
   totalPages?: number;
@@ -38,6 +40,7 @@ function StoryCard({
   formatDate,
   isSelected,
   onToggleSelect,
+  onLoadCover,
   t,
 }: {
   story: StoryListItem;
@@ -47,11 +50,13 @@ function StoryCard({
   formatDate: (date: string | undefined) => string;
   isSelected: boolean;
   onToggleSelect: () => void;
+  onLoadCover: (storyId: string) => void;
   t: { add: string; remove: string };
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [coverLoading, setCoverLoading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Lazy load images using IntersectionObserver
@@ -72,6 +77,14 @@ function StoryCard({
 
     return () => observer.disconnect();
   }, []);
+
+  // Load cover image when visible and hasThumbnail but no thumbnail yet
+  useEffect(() => {
+    if (isVisible && story.hasThumbnail && !story.thumbnail && !coverLoading) {
+      setCoverLoading(true);
+      onLoadCover(story.id);
+    }
+  }, [isVisible, story.hasThumbnail, story.thumbnail, story.id, coverLoading, onLoadCover]);
 
   return (
     <div
@@ -99,11 +112,13 @@ function StoryCard({
               onError={() => setImageError(true)}
             />
           </div>
-        ) : !isVisible ? (
+        ) : !isVisible || (story.hasThumbnail && !story.thumbnail && !imageError) ? (
+          // Show loading spinner while not visible or while loading cover
           <div className="relative w-full h-48 bg-gray-100 flex items-center justify-center">
             <div className="w-8 h-8 spinner" />
           </div>
         ) : (
+          // No cover image available
           <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
             <Book className="w-12 h-12 text-indigo-300" />
           </div>
@@ -175,6 +190,9 @@ export default function MyStories() {
   const { isAuthenticated } = useAuth();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalStories, setTotalStories] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const translations = {
@@ -190,6 +208,7 @@ export default function MyStories() {
       tooManyPages: 'Too many pages (max 100)',
       add: 'Add',
       remove: 'Remove',
+      loadMore: 'Load More',
     },
     de: {
       myStories: 'Meine Geschichten',
@@ -203,6 +222,7 @@ export default function MyStories() {
       tooManyPages: 'Zu viele Seiten (max. 100)',
       add: 'Hinzufügen',
       remove: 'Entfernen',
+      loadMore: 'Mehr laden',
     },
     fr: {
       myStories: 'Mes histoires',
@@ -216,6 +236,7 @@ export default function MyStories() {
       tooManyPages: 'Trop de pages (max 100)',
       add: 'Ajouter',
       remove: 'Retirer',
+      loadMore: 'Charger plus',
     },
   };
 
@@ -229,32 +250,75 @@ export default function MyStories() {
     loadStories();
   }, [isAuthenticated, navigate]);
 
-  const loadStories = async () => {
-    log.debug('Loading stories...');
+  const loadStories = async (loadMore = false) => {
+    log.debug('Loading stories...', { loadMore });
     try {
-      // Check cache first
+      // Check cache first (only for initial load)
       const now = Date.now();
-      if (storiesCache.data && (now - storiesCache.timestamp) < CACHE_DURATION) {
+      if (!loadMore && storiesCache.data && (now - storiesCache.timestamp) < CACHE_DURATION) {
         log.debug('Using cached stories');
         setStories(storiesCache.data);
+        setTotalStories(storiesCache.total);
+        setHasMore(storiesCache.data.length < storiesCache.total);
         setIsLoading(false);
         return;
       }
 
-      setIsLoading(true);
-      const data = await storyService.getStories();
-      log.info('Loaded stories:', data.length);
-      const storyList = data as unknown as StoryListItem[];
-      setStories(storyList);
+      if (loadMore) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoading(true);
+      }
 
-      // Update cache
-      storiesCache = { data: storyList, timestamp: now };
+      const offset = loadMore ? stories.length : 0;
+      const { stories: newStories, pagination } = await storyService.getStories({
+        limit: STORIES_PER_PAGE,
+        offset,
+      });
+      log.info('Loaded stories:', newStories.length, 'total:', pagination.total);
+
+      const storyList = newStories as unknown as StoryListItem[];
+
+      if (loadMore) {
+        const updatedStories = [...stories, ...storyList];
+        setStories(updatedStories);
+        // Update cache
+        storiesCache = { data: updatedStories, total: pagination.total, timestamp: now };
+      } else {
+        setStories(storyList);
+        // Update cache
+        storiesCache = { data: storyList, total: pagination.total, timestamp: now };
+      }
+
+      setTotalStories(pagination.total);
+      setHasMore(pagination.hasMore);
     } catch (error) {
       log.error('Failed to load stories:', error);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
+
+  // Load cover image for a story
+  const loadCover = useCallback(async (storyId: string) => {
+    try {
+      const coverImage = await storyService.getStoryCover(storyId);
+      if (coverImage) {
+        setStories(prev => prev.map(s =>
+          s.id === storyId ? { ...s, thumbnail: coverImage } : s
+        ));
+        // Update cache
+        if (storiesCache.data) {
+          storiesCache.data = storiesCache.data.map(s =>
+            s.id === storyId ? { ...s, thumbnail: coverImage } : s
+          );
+        }
+      }
+    } catch (error) {
+      log.error('Failed to load cover for story:', storyId, error);
+    }
+  }, []);
 
   const deleteStory = async (id: string) => {
     const confirmMsg = language === 'de'
@@ -269,8 +333,9 @@ export default function MyStories() {
       await storyService.deleteStory(id);
       const updatedStories = stories.filter(s => s.id !== id);
       setStories(updatedStories);
+      setTotalStories(prev => Math.max(0, prev - 1));
       // Invalidate cache
-      storiesCache = { data: updatedStories, timestamp: Date.now() };
+      storiesCache = { data: updatedStories, total: Math.max(0, totalStories - 1), timestamp: Date.now() };
       // Remove from selection if selected
       setSelectedIds(prev => {
         const newSet = new Set(prev);
@@ -421,21 +486,46 @@ export default function MyStories() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {stories.map((story) => (
-              <StoryCard
-                key={story.id}
-                story={story}
-                language={language}
-                onView={() => navigate(`/create?storyId=${story.id}`)}
-                onDelete={() => deleteStory(story.id)}
-                formatDate={formatDate}
-                isSelected={selectedIds.has(story.id)}
-                onToggleSelect={() => toggleSelect(story.id)}
-                t={{ add: t.add, remove: t.remove }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {stories.map((story) => (
+                <StoryCard
+                  key={story.id}
+                  story={story}
+                  language={language}
+                  onView={() => navigate(`/create?storyId=${story.id}`)}
+                  onDelete={() => deleteStory(story.id)}
+                  formatDate={formatDate}
+                  isSelected={selectedIds.has(story.id)}
+                  onToggleSelect={() => toggleSelect(story.id)}
+                  onLoadCover={loadCover}
+                  t={{ add: t.add, remove: t.remove }}
+                />
+              ))}
+            </div>
+
+            {/* Load More button */}
+            {hasMore && (
+              <div className="flex justify-center mt-8">
+                <button
+                  onClick={() => loadStories(true)}
+                  disabled={isLoadingMore}
+                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <div className="w-5 h-5 spinner" />
+                      {language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : 'Loading...'}
+                    </>
+                  ) : (
+                    <>
+                      {t.loadMore} ({stories.length}/{totalStories})
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Add padding at bottom to account for sticky bar */}

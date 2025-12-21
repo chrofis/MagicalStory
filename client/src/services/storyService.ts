@@ -30,13 +30,23 @@ interface StoryListItemServer {
   language: Language;
   characters?: { name: string; id: number }[];
   pageCount?: number;
-  thumbnail?: string;
+  hasThumbnail?: boolean; // Changed from thumbnail to hasThumbnail
   isPartial?: boolean;
   generatedPages?: number;
   totalPages?: number;
 }
 
-interface StoryListItem {
+interface PaginatedStoriesResponse {
+  stories: StoryListItemServer[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
+export interface StoryListItem {
   id: string;
   title: string;
   story_type: string;
@@ -44,7 +54,8 @@ interface StoryListItem {
   language: Language;
   pages: number;
   created_at: string;
-  thumbnail?: string;
+  hasThumbnail?: boolean; // Changed from thumbnail
+  thumbnail?: string; // Loaded lazily via getStoryCover
   isPartial?: boolean;
   generatedPages?: number;
   totalPages?: number;
@@ -101,11 +112,21 @@ export const storyService = {
   },
 
   // Story CRUD
-  async getStories(): Promise<StoryListItem[]> {
-    // Server returns array directly, not { stories: [...] }
-    const response = await api.get<StoryListItemServer[]>('/api/stories');
+  async getStories(options?: { limit?: number; offset?: number }): Promise<{
+    stories: StoryListItem[];
+    pagination: { total: number; limit: number; offset: number; hasMore: boolean };
+  }> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set('limit', String(options.limit));
+    if (options?.offset) params.set('offset', String(options.offset));
+
+    const queryString = params.toString();
+    const url = `/api/stories${queryString ? `?${queryString}` : ''}`;
+
+    const response = await api.get<PaginatedStoriesResponse>(url);
+
     // Map server format to client format
-    return (response || []).map(s => ({
+    const stories = (response.stories || []).map(s => ({
       id: s.id,
       title: s.title,
       story_type: '', // Not returned in list view
@@ -113,11 +134,26 @@ export const storyService = {
       language: s.language,
       pages: s.pageCount || s.pages || 0,
       created_at: s.createdAt,
-      thumbnail: s.thumbnail,
+      hasThumbnail: s.hasThumbnail,
       isPartial: s.isPartial,
       generatedPages: s.generatedPages,
       totalPages: s.totalPages,
     }));
+
+    return {
+      stories,
+      pagination: response.pagination,
+    };
+  },
+
+  // Get cover image for a story (lazy loading)
+  async getStoryCover(storyId: string): Promise<string | null> {
+    try {
+      const response = await api.get<{ coverImage: string | null }>(`/api/stories/${storyId}/cover`);
+      return response.coverImage;
+    } catch {
+      return null;
+    }
   },
 
   async getStory(id: string): Promise<SavedStory | null> {

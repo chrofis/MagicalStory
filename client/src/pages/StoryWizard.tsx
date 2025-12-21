@@ -872,8 +872,8 @@ export default function StoryWizard() {
   };
 
   const generateStory = async (overrides?: { skipImages?: boolean }) => {
-    // Check email verification before generating
-    if (user && user.emailVerified === false) {
+    // Check email verification before generating (emailVerified could be false or undefined)
+    if (user && user.emailVerified !== true) {
       // Store flag so we can auto-generate after email verification
       localStorage.setItem('pendingStoryGeneration', 'true');
       setShowEmailVerificationModal(true);
