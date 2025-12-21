@@ -51,6 +51,8 @@ export default function BookBuilder() {
       hardcoverSize: '20 × 20 cm',
       price: 'Price',
       includesShipping: 'Includes shipping & taxes (Switzerland)',
+      shippingTime: 'Delivery in approx. 2 weeks',
+      creditsRefund: 'All credits used to generate the stories will be refunded',
       orderBook: 'Order Book',
       tooManyPages: 'Too many pages',
       tooManyPagesDesc: 'Maximum is 100 pages. Please remove some stories.',
@@ -78,6 +80,8 @@ export default function BookBuilder() {
       hardcoverSize: '20 × 20 cm',
       price: 'Preis',
       includesShipping: 'Inkl. Versand & Steuern (Schweiz)',
+      shippingTime: 'Lieferung in ca. 2 Wochen',
+      creditsRefund: 'Alle Credits für die Geschichten werden zurückerstattet',
       orderBook: 'Buch bestellen',
       tooManyPages: 'Zu viele Seiten',
       tooManyPagesDesc: 'Maximal 100 Seiten erlaubt. Bitte entferne einige Geschichten.',
@@ -105,6 +109,8 @@ export default function BookBuilder() {
       hardcoverSize: '20 × 20 cm',
       price: 'Prix',
       includesShipping: 'Livraison & taxes incluses (Suisse)',
+      shippingTime: 'Livraison en env. 2 semaines',
+      creditsRefund: 'Tous les crédits utilisés pour les histoires seront remboursés',
       orderBook: 'Commander le livre',
       tooManyPages: 'Trop de pages',
       tooManyPagesDesc: 'Maximum 100 pages. Veuillez retirer quelques histoires.',
@@ -438,6 +444,8 @@ export default function BookBuilder() {
                   <span className="text-3xl font-bold text-indigo-700">CHF {price}.-</span>
                 </div>
                 <p className="text-sm text-gray-500">{t.includesShipping}</p>
+                <p className="text-sm text-gray-500">{t.shippingTime}</p>
+                <p className="text-sm text-green-600 mt-2 font-medium">{t.creditsRefund}</p>
               </div>
             )}
 
