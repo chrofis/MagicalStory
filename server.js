@@ -2594,7 +2594,9 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
     const stories = storiesResult.map(s => {
       try {
         const storyData = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
-        const pageCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
+        const scenePageCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
+        // Add 3 pages for front cover, back cover, and initial page (title page)
+        const pageCount = scenePageCount > 0 ? scenePageCount + 3 : 0;
         // Count scene images + cover images (front, back, spine)
         const sceneImageCount = storyData?.sceneImages?.length || 0;
         const coverImageCount = storyData?.coverImages ?
