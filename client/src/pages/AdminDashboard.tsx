@@ -24,7 +24,9 @@ import {
   CreditCard,
   Clock,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Mail,
+  MailX
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
@@ -373,6 +375,25 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleToggleEmailVerified = async (targetUser: AdminUser) => {
+    const newStatus = !targetUser.emailVerified;
+    setIsActionLoading(true);
+    try {
+      await adminService.toggleEmailVerified(targetUser.id, newStatus);
+      setUsers(users.map(u =>
+        u.id === targetUser.id ? { ...u, emailVerified: newStatus } : u
+      ));
+      setActionMessage({
+        type: 'success',
+        text: `Email ${newStatus ? 'verified' : 'unverified'} for ${targetUser.username}`
+      });
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const handleImpersonate = async (targetUser: AdminUser) => {
     setIsActionLoading(true);
     try {
@@ -664,6 +685,15 @@ export default function AdminDashboard() {
                             title={texts.viewHistory || 'View History'}
                           >
                             <History size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleToggleEmailVerified(u)}
+                            className={`p-1 rounded hover:bg-gray-100 ${
+                              u.emailVerified ? 'text-emerald-600' : 'text-orange-500'
+                            }`}
+                            title={u.emailVerified ? 'Email verified - click to unverify' : 'Email NOT verified - click to verify'}
+                          >
+                            {u.emailVerified ? <Mail size={16} /> : <MailX size={16} />}
                           </button>
                           <button
                             onClick={() => handleImpersonate(u)}

@@ -2310,7 +2310,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
       // Database mode - include order counts with JOIN
       const selectQuery = `
         SELECT
-          u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at, u.last_login,
+          u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at, u.last_login, u.email_verified,
           COALESCE(order_stats.total_orders, 0) as total_orders,
           COALESCE(order_stats.failed_orders, 0) as failed_orders
         FROM users u
@@ -2335,6 +2335,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         credits: user.credits != null ? user.credits : 500,
         createdAt: user.created_at,
         lastLogin: user.last_login,
+        emailVerified: user.email_verified !== false,
         totalOrders: parseInt(user.total_orders) || 0,
         failedOrders: parseInt(user.failed_orders) || 0
       }));

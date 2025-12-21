@@ -19,6 +19,7 @@ export interface AdminUser {
   storiesGenerated?: number;
   createdAt: string;
   lastLogin?: string;
+  emailVerified?: boolean;
 }
 
 export interface CreditTransaction {
@@ -111,6 +112,10 @@ export const adminService = {
 
   async deleteUser(userId: string): Promise<void> {
     return api.delete(`/api/admin/users/${userId}`);
+  },
+
+  async toggleEmailVerified(userId: string, emailVerified: boolean): Promise<{ user: { emailVerified: boolean } }> {
+    return api.post(`/api/admin/users/${userId}/email-verified`, { emailVerified });
   },
 
   async cleanOrphanedFiles(): Promise<{ cleaned: number }> {
