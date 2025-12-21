@@ -374,20 +374,32 @@ function buildCharacterPhysicalDescription(char) {
 
   let description = `${char.name} is a ${age}-year-old ${genderLabel}`;
 
-  if (char.height) {
-    description += `, ${char.height} cm tall`;
+  // Support both legacy fields and new physical object structure
+  const height = char.physical?.height || char.height;
+  const build = char.physical?.build || char.build;
+  const hair = char.physical?.hair || char.hairColor;
+  const face = char.physical?.face || char.otherFeatures;
+  const other = char.physical?.other;
+  const clothing = char.clothing?.current || char.clothing;
+
+  if (height) {
+    description += `, ${height} cm tall`;
   }
-  if (char.build) {
-    description += `, ${char.build} build`;
+  if (build) {
+    description += `, ${build} build`;
   }
-  if (char.hairColor) {
-    description += `, with ${char.hairColor} hair`;
+  if (hair) {
+    description += `, with ${hair} hair`;
   }
-  if (char.otherFeatures) {
-    description += `, ${char.otherFeatures}`;
+  if (face) {
+    description += `, ${face}`;
   }
-  if (char.clothing) {
-    description += `. Wearing: ${char.clothing}`;
+  // Add other physical traits (glasses, birthmarks, always-present accessories)
+  if (other && other !== 'none') {
+    description += `, ${other}`;
+  }
+  if (clothing) {
+    description += `. Wearing: ${clothing}`;
   }
 
   return description;
@@ -8279,6 +8291,10 @@ function buildFullVisualBiblePrompt(visualBible) {
         if (char.physical.hair && char.physical.hair !== 'Not analyzed') {
           prompt += `- Hair: ${char.physical.hair}\n`;
         }
+        // Include other physical traits (glasses, birthmarks, always-present accessories)
+        if (char.physical.other && char.physical.other !== 'Not analyzed' && char.physical.other !== 'none') {
+          prompt += `- Other features: ${char.physical.other}\n`;
+        }
       }
     }
   }
@@ -8567,7 +8583,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       console.log(`📖 [SCENE PROMPT P${pageNumber}] Looking for "${c.name}" (id: ${c.id}) in Visual Bible...`);
       console.log(`📖 [SCENE PROMPT P${pageNumber}] Found match: ${vbChar ? vbChar.name : 'NO'}, has physical: ${vbChar?.physical ? 'YES' : 'NO'}`);
       if (vbChar?.physical) {
-        console.log(`📖 [SCENE PROMPT P${pageNumber}] Physical data: age="${vbChar.physical.age}", gender="${vbChar.physical.gender}", height="${vbChar.physical.height}", build="${vbChar.physical.build}", face="${vbChar.physical.face?.substring(0, 50)}...", hair="${vbChar.physical.hair}"`);
+        console.log(`📖 [SCENE PROMPT P${pageNumber}] Physical data: age="${vbChar.physical.age}", gender="${vbChar.physical.gender}", height="${vbChar.physical.height}", build="${vbChar.physical.build}", face="${vbChar.physical.face?.substring(0, 50)}...", hair="${vbChar.physical.hair}", other="${vbChar.physical.other}"`);
       }
 
       if (vbChar && vbChar.physical) {
@@ -8581,6 +8597,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         // Detailed features
         if (vbChar.physical.face) vbParts.push(vbChar.physical.face);
         if (vbChar.physical.hair) vbParts.push(`Hair: ${vbChar.physical.hair}`);
+        // Other physical traits (glasses, birthmarks, always-present accessories)
+        if (vbChar.physical.other && vbChar.physical.other !== 'none') vbParts.push(`Other: ${vbChar.physical.other}`);
         if (vbParts.length > 0) {
           visualBibleDesc = vbParts.join(' | ');
           console.log(`📖 [SCENE PROMPT P${pageNumber}] Using Visual Bible description for ${c.name}`);
