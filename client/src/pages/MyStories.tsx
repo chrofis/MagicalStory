@@ -274,7 +274,16 @@ export default function MyStories() {
 
     try {
       await storyService.deleteStory(id);
-      setStories(stories.filter(s => s.id !== id));
+      const updatedStories = stories.filter(s => s.id !== id);
+      setStories(updatedStories);
+      // Invalidate cache
+      storiesCache = { data: updatedStories, timestamp: Date.now() };
+      // Remove from selection if selected
+      setSelectedIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
     } catch (error) {
       log.error('Failed to delete story:', error);
       alert(language === 'de'
@@ -323,18 +332,6 @@ export default function MyStories() {
 
   const isOverLimit = totalSelectedPages > MAX_BOOK_PAGES;
 
-  // Enter selection mode
-  const enterSelectionMode = () => {
-    setSelectionMode(true);
-    setSelectedIds(new Set());
-  };
-
-  // Exit selection mode
-  const exitSelectionMode = () => {
-    setSelectionMode(false);
-    setSelectedIds(new Set());
-  };
-
   // Proceed to book builder
   const goToBookBuilder = () => {
     const selectedData = selectedStories.map(s => ({
@@ -360,60 +357,60 @@ export default function MyStories() {
 
       <div className="px-4 md:px-8 py-8 max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
             <Book size={28} />
             {t.myStories}
           </h1>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* See Pricing link */}
+            {/* See Pricing button */}
             <button
               onClick={() => navigate('/pricing')}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-colors"
             >
               <Tag size={18} />
               {t.seePricing}
             </button>
 
-            {/* Selection mode toggle */}
-            {!selectionMode && canSelectForBook && (
+            {/* Create Book button */}
+            {canSelectForBook && (
               <button
-                onClick={enterSelectionMode}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 font-semibold transition-colors"
+                onClick={goToBookBuilder}
+                disabled={selectedIds.size === 0 || isOverLimit}
+                className="flex items-center gap-2 px-4 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <BookOpen size={18} />
-                {t.selectForBook}
-              </button>
-            )}
-
-            {selectionMode && (
-              <button
-                onClick={exitSelectionMode}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 font-semibold transition-colors"
-              >
-                <X size={18} />
-                {t.cancel}
+                {t.createBook}
+                {selectedIds.size > 0 && (
+                  <span className="bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">
+                    {selectedIds.size}
+                  </span>
+                )}
               </button>
             )}
 
             {/* Create Story button */}
-            {!selectionMode && (
-              <button
-                onClick={() => navigate('/create')}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
-              >
-                {t.createStory}
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/create')}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
+            >
+              {t.createStory}
+            </button>
           </div>
         </div>
 
-        {/* Selection mode hint */}
-        {selectionMode && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6 flex items-center gap-3">
-            <CheckSquare size={24} className="text-indigo-600" />
-            <p className="text-indigo-800 font-medium">{t.selectHint}</p>
+        {/* Instructions hint */}
+        {stories.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 flex items-center gap-3">
+            <BookOpen size={20} className="text-blue-600 flex-shrink-0" />
+            <p className="text-blue-800 text-sm">{t.selectHint}</p>
+            {selectedIds.size > 0 && (
+              <span className={`ml-auto text-sm font-medium ${isOverLimit ? 'text-red-600' : 'text-blue-600'}`}>
+                {selectedIds.size} {t.selected} • {totalSelectedPages} {t.pages}
+                {isOverLimit && ` (${t.tooManyPages})`}
+              </span>
+            )}
           </div>
         )}
 
@@ -440,46 +437,14 @@ export default function MyStories() {
                 onView={() => navigate(`/create?storyId=${story.id}`)}
                 onDelete={() => deleteStory(story.id)}
                 formatDate={formatDate}
-                selectionMode={selectionMode}
                 isSelected={selectedIds.has(story.id)}
                 onToggleSelect={() => toggleSelect(story.id)}
+                t={{ add: t.add, remove: t.remove }}
               />
             ))}
           </div>
         )}
       </div>
-
-      {/* Floating action bar for selection mode */}
-      {selectionMode && selectedIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-indigo-200 shadow-lg p-4 z-50">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="text-gray-800">
-                <span className="font-bold text-lg">{selectedIds.size}</span>{' '}
-                <span className="text-gray-600">{t.selected}</span>
-              </div>
-              <div className={`text-sm ${isOverLimit ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-                {totalSelectedPages} {t.pages}
-                {isOverLimit && (
-                  <span className="ml-2 flex items-center gap-1 inline-flex">
-                    <AlertTriangle size={14} />
-                    {t.tooManyPages}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <button
-              onClick={goToBookBuilder}
-              disabled={isOverLimit || selectedIds.size === 0}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-bold hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <BookOpen size={20} />
-              {t.createBook}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
