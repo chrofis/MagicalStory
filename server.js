@@ -1896,6 +1896,63 @@ app.post('/api/auth/reset-password/confirm', async (req, res) => {
   }
 });
 
+// Change password (authenticated user)
+app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    if (STORAGE_MODE === 'database') {
+      // Get current user with password
+      const result = await dbPool.query(
+        'SELECT id, password, firebase_uid FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = result.rows[0];
+
+      // Check if user signed up with Google (no password set)
+      if (user.firebase_uid && !user.password) {
+        return res.status(400).json({ error: 'Cannot change password for Google accounts. Please use Google to sign in.' });
+      }
+
+      // Verify current password
+      const validPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!validPassword) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password
+      await dbPool.query(
+        'UPDATE users SET password = $1 WHERE id = $2',
+        [hashedPassword, userId]
+      );
+
+      res.json({ success: true, message: 'Password changed successfully' });
+    } else {
+      res.status(400).json({ error: 'Password change requires database mode' });
+    }
+  } catch (err) {
+    console.error('Password change error:', err);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
 // Send email verification
 app.post('/api/auth/send-verification', authenticateToken, async (req, res) => {
   try {

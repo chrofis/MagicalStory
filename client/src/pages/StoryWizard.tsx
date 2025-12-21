@@ -145,8 +145,16 @@ export default function StoryWizard() {
 
   // Redirect if not authenticated, preserving the current URL for after login
   // Wait for auth loading to complete before checking authentication
+  // Also check localStorage as backup - state might not have propagated yet after login
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) {
+      // Check if there's a token in localStorage - auth state might just be slow to update
+      const hasToken = !!localStorage.getItem('auth_token');
+      if (hasToken) {
+        // Token exists but isAuthenticated is false - wait for state to sync
+        log.debug('Token found but not authenticated yet, waiting for state sync...');
+        return;
+      }
       const currentUrl = window.location.pathname + window.location.search;
       const redirectParam = encodeURIComponent(currentUrl);
       navigate(`/?login=true&redirect=${redirectParam}`);
@@ -301,6 +309,22 @@ export default function StoryWizard() {
     const autoGenerate = searchParams.get('autoGenerate');
     if (autoGenerate === 'true' && !pendingAutoGenerate.current) {
       pendingAutoGenerate.current = true;
+
+      // Restore story state from localStorage
+      const savedStoryType = localStorage.getItem('pending_story_type');
+      const savedArtStyle = localStorage.getItem('pending_art_style');
+      if (savedStoryType) {
+        setStoryType(savedStoryType);
+        localStorage.removeItem('pending_story_type');
+      }
+      if (savedArtStyle) {
+        setArtStyle(savedArtStyle);
+        localStorage.removeItem('pending_art_style');
+      }
+
+      // Navigate to step 4 (will trigger auto-generate once characters are loaded)
+      setStep(4);
+
       // Clear the URL param
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('autoGenerate');
@@ -874,8 +898,10 @@ export default function StoryWizard() {
   const generateStory = async (overrides?: { skipImages?: boolean }) => {
     // Check email verification before generating (emailVerified could be false or undefined)
     if (user && user.emailVerified !== true) {
-      // Store flag so we can auto-generate after email verification
+      // Store all story state so we can auto-generate after email verification
       localStorage.setItem('pendingStoryGeneration', 'true');
+      localStorage.setItem('pending_story_type', storyType);
+      localStorage.setItem('pending_art_style', artStyle);
       setShowEmailVerificationModal(true);
       return;
     }

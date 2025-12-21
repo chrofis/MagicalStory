@@ -8,6 +8,7 @@ interface AuthContextType extends AuthState {
   register: (username: string, password: string, email?: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   logout: () => void;
   updateCredits: (credits: number) => void;
   refreshUser: () => Promise<void>;
@@ -197,8 +198,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
+    // Store intended redirect URL in case we need to do a redirect flow (mobile)
+    sessionStorage.setItem('auth_redirect_after_login', '/create');
     const firebaseUser = await signInWithGoogle();
     await handleFirebaseAuth(firebaseUser);
+    // Clear redirect URL since we completed login without redirect
+    sessionStorage.removeItem('auth_redirect_after_login');
   }, [handleFirebaseAuth]);
 
   const resetPassword = useCallback(async (email: string) => {
@@ -212,6 +217,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const error = await response.json();
       throw new Error(error.error || 'Password reset failed');
     }
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_URL}/api/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Password change failed');
+    }
+
+    logger.success('Password changed successfully');
   }, []);
 
   const logout = useCallback(() => {
@@ -345,6 +373,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           logger.info('Redirect result: Firebase user detected, completing login...');
           await handleFirebaseAuth(firebaseUser);
           authInProgressRef.current = false;
+
+          // Check if we have a stored redirect URL and navigate there
+          const redirectUrl = sessionStorage.getItem('auth_redirect_after_login');
+          if (redirectUrl) {
+            sessionStorage.removeItem('auth_redirect_after_login');
+            logger.info('Redirect result: Navigating to stored redirect URL:', redirectUrl);
+            window.location.href = redirectUrl;
+          }
         } else {
           logger.info('Redirect result: No pending redirect');
         }
@@ -431,6 +467,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         loginWithGoogle,
         resetPassword,
+        changePassword,
         logout,
         updateCredits,
         refreshUser,

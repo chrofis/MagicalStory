@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, LogOut, BookOpen, Settings, Users, Code, Package, CreditCard } from 'lucide-react';
+import { Menu, LogOut, BookOpen, Settings, Users, Code, Package, CreditCard, KeyRound } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import type { Language } from '@/types/story';
 
 interface NavigationProps {
@@ -19,6 +20,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   const { isAuthenticated, user, logout, isImpersonating } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
