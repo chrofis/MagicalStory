@@ -14,6 +14,7 @@ const log = createLogger('MyStories');
 let storiesCache: { data: StoryListItem[] | null; total: number; timestamp: number } = { data: null, total: 0, timestamp: 0 };
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const STORIES_PER_PAGE = 6;
+const AUTO_LOAD_LIMIT = 18; // Auto-load first 18 stories, then show "Load All"
 
 interface StoryListItem {
   id: string;
@@ -208,7 +209,7 @@ export default function MyStories() {
       tooManyPages: 'Too many pages (max 100)',
       add: 'Add',
       remove: 'Remove',
-      loadMore: 'Load More',
+      loadAll: 'Load All',
     },
     de: {
       myStories: 'Meine Geschichten',
@@ -222,7 +223,7 @@ export default function MyStories() {
       tooManyPages: 'Zu viele Seiten (max. 100)',
       add: 'Hinzufügen',
       remove: 'Entfernen',
-      loadMore: 'Mehr laden',
+      loadAll: 'Alle laden',
     },
     fr: {
       myStories: 'Mes histoires',
@@ -236,7 +237,7 @@ export default function MyStories() {
       tooManyPages: 'Trop de pages (max 100)',
       add: 'Ajouter',
       remove: 'Retirer',
-      loadMore: 'Charger plus',
+      loadAll: 'Tout charger',
     },
   };
 
@@ -250,12 +251,13 @@ export default function MyStories() {
     loadStories();
   }, [isAuthenticated, navigate]);
 
-  const loadStories = async (loadMore = false) => {
-    log.debug('Loading stories...', { loadMore });
+  const loadStories = async (options: { loadMore?: boolean; loadAll?: boolean } = {}) => {
+    const { loadMore = false, loadAll = false } = options;
+    log.debug('Loading stories...', { loadMore, loadAll });
     try {
       // Check cache first (only for initial load)
       const now = Date.now();
-      if (!loadMore && storiesCache.data && (now - storiesCache.timestamp) < CACHE_DURATION) {
+      if (!loadMore && !loadAll && storiesCache.data && (now - storiesCache.timestamp) < CACHE_DURATION) {
         log.debug('Using cached stories');
         setStories(storiesCache.data);
         setTotalStories(storiesCache.total);
@@ -264,22 +266,24 @@ export default function MyStories() {
         return;
       }
 
-      if (loadMore) {
+      if (loadMore || loadAll) {
         setIsLoadingMore(true);
       } else {
         setIsLoading(true);
       }
 
-      const offset = loadMore ? stories.length : 0;
+      const offset = (loadMore || loadAll) ? stories.length : 0;
+      // If loadAll, fetch all remaining stories at once
+      const limit = loadAll ? 1000 : STORIES_PER_PAGE;
       const { stories: newStories, pagination } = await storyService.getStories({
-        limit: STORIES_PER_PAGE,
+        limit,
         offset,
       });
       log.info('Loaded stories:', newStories.length, 'total:', pagination.total);
 
       const storyList = newStories as unknown as StoryListItem[];
 
-      if (loadMore) {
+      if (loadMore || loadAll) {
         const updatedStories = [...stories, ...storyList];
         setStories(updatedStories);
         // Update cache
@@ -299,6 +303,13 @@ export default function MyStories() {
       setIsLoadingMore(false);
     }
   };
+
+  // Auto-load more stories until we reach AUTO_LOAD_LIMIT
+  useEffect(() => {
+    if (!isLoading && !isLoadingMore && hasMore && stories.length < AUTO_LOAD_LIMIT && stories.length > 0) {
+      loadStories({ loadMore: true });
+    }
+  }, [stories.length, hasMore, isLoading, isLoadingMore]);
 
   // Load cover image for a story
   const loadCover = useCallback(async (storyId: string) => {
@@ -504,11 +515,11 @@ export default function MyStories() {
               ))}
             </div>
 
-            {/* Load More button */}
-            {hasMore && (
+            {/* Load All button - only shown after auto-loading first 18 stories */}
+            {hasMore && stories.length >= AUTO_LOAD_LIMIT && (
               <div className="flex justify-center mt-8">
                 <button
-                  onClick={() => loadStories(true)}
+                  onClick={() => loadStories({ loadAll: true })}
                   disabled={isLoadingMore}
                   className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50"
                 >
@@ -519,7 +530,7 @@ export default function MyStories() {
                     </>
                   ) : (
                     <>
-                      {t.loadMore} ({stories.length}/{totalStories})
+                      {t.loadAll} ({totalStories - stories.length} {language === 'de' ? 'weitere' : language === 'fr' ? 'autres' : 'more'})
                     </>
                   )}
                 </button>
