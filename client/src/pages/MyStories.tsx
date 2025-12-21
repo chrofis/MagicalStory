@@ -79,7 +79,7 @@ function StoryCard({
       className={`bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ${
         story.isPartial ? 'ring-2 ring-amber-400' : ''
       } ${
-        isSelected ? 'ring-4 ring-green-500' : ''
+        isSelected ? 'ring-8 ring-green-500' : ''
       }`}
     >
       {/* Thumbnail */}
@@ -371,12 +371,12 @@ export default function MyStories() {
               <button
                 onClick={goToBookBuilder}
                 disabled={selectedIds.size === 0 || isOverLimit}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <BookOpen size={18} />
                 {t.createBook}
                 {selectedIds.size > 0 && (
-                  <span className="bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">
+                  <span className="bg-white text-indigo-600 text-xs px-2 py-0.5 rounded-full">
                     {selectedIds.size}
                   </span>
                 )}
@@ -460,10 +460,10 @@ export default function MyStories() {
               className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-colors ${
                 isOverLimit
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
               }`}
             >
-              <Tag size={20} />
+              <BookOpen size={20} />
               {t.createBook}
             </button>
           </div>

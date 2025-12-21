@@ -6437,11 +6437,13 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
   try {
     // Admin only
     if (req.user.role !== 'admin') {
+      console.log(`🖨️ [ADMIN PRINT PDF] Access denied - user ${req.user.username} is not admin (role: ${req.user.role})`);
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     const storyId = req.params.id;
-    log.info(`🖨️ [ADMIN PRINT PDF] Admin ${req.user.username} requesting print PDF for story: ${storyId}`);
+    console.log(`🖨️ [ADMIN PRINT PDF] Admin ${req.user.username} requesting print PDF for story: ${storyId}`);
+    console.log(`🖨️ [ADMIN PRINT PDF] Storage mode: ${STORAGE_MODE}, dbPool exists: ${!!dbPool}`);
 
     // Fetch story from database (admin can access any story)
     let storyData = null;
@@ -6465,10 +6467,12 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
     }
 
     if (!storyData) {
+      console.log(`🖨️ [ADMIN PRINT PDF] Story not found: ${storyId}`);
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    log.debug(`🖨️ [ADMIN PRINT PDF] Generating print PDF for: ${storyData.title}`);
+    console.log(`🖨️ [ADMIN PRINT PDF] Story found: ${storyData.title}`);
+    console.log(`🖨️ [ADMIN PRINT PDF] Story has: coverImages=${!!storyData.coverImages}, sceneImages=${storyData.sceneImages?.length || 0}, storyText=${!!storyData.storyText || !!storyData.generatedStory}`);
 
     // Generate print PDF using the shared function (same as Buy Book / Print Book)
     const { pdfBuffer, pageCount } = await generatePrintPdf(storyData);

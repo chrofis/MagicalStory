@@ -187,7 +187,7 @@ export default function BookBuilder() {
     try {
       // Use the first story for now (TODO: implement combined stories PDF)
       const storyId = stories[0].id;
-      log.debug('Downloading print PDF for story:', storyId);
+      log.info('Downloading print PDF for story:', storyId);
 
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/stories/${storyId}/print-pdf`, {
@@ -195,7 +195,15 @@ export default function BookBuilder() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        // Try to get error details from response
+        let errorDetails = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorDetails = errorData.details || errorData.error || errorDetails;
+        } catch {
+          // Response wasn't JSON
+        }
+        throw new Error(errorDetails);
       }
 
       const blob = await response.blob();
@@ -207,13 +215,15 @@ export default function BookBuilder() {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
+      log.info('Print PDF downloaded successfully');
     } catch (error) {
       log.error('Failed to download print PDF:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       alert(language === 'de'
-        ? 'PDF konnte nicht heruntergeladen werden.'
+        ? `PDF konnte nicht heruntergeladen werden: ${errorMsg}`
         : language === 'fr'
-        ? 'Impossible de télécharger le PDF.'
-        : 'Failed to download PDF.');
+        ? `Impossible de télécharger le PDF: ${errorMsg}`
+        : `Failed to download PDF: ${errorMsg}`);
     } finally {
       setIsPrintingPdf(false);
     }
