@@ -1570,7 +1570,7 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
           [verificationToken, verificationExpires, newUser.id]
         );
 
-        const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/verify-email/${verificationToken}`;
+        const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
         await email.sendEmailVerificationEmail(username, username, verifyUrl);
         console.log(`📧 Verification email sent to: ${username}`);
       } catch (emailErr) {
@@ -1928,7 +1928,7 @@ app.post('/api/auth/send-verification', authenticateToken, async (req, res) => {
       );
 
       // Send verification email
-      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/verify-email/${verificationToken}`;
+      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
       await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
 
       res.json({ success: true, message: 'Verification email sent' });
@@ -2038,7 +2038,7 @@ app.post('/api/auth/change-email', authenticateToken, async (req, res) => {
       );
 
       // Send verification email to new address
-      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/verify-email/${verificationToken}`;
+      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
       await email.sendEmailVerificationEmail(newEmail, user.username, verifyUrl);
 
       res.json({
@@ -14307,7 +14307,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
               [verificationToken, verificationExpires, user.id]
             );
 
-            const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/verify-email/${verificationToken}`;
+            const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
             await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
             console.log(`📧 Verification email resent to: ${user.email}`);
           }
