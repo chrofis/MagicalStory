@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Book, Trash2, Eye, AlertTriangle, Plus, Minus, BookOpen, Tag } from 'lucide-react';
+import { Book, Trash2, Eye, AlertTriangle, Plus, Minus, BookOpen, Tag, Printer } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { storyService } from '@/services';
@@ -35,18 +35,22 @@ function StoryCard({
   language,
   onView,
   onDelete,
+  onPrintPdf,
   formatDate,
   isSelected,
   onToggleSelect,
+  isAdmin,
   t,
 }: {
   story: StoryListItem;
   language: string;
   onView: () => void;
   onDelete: () => void;
+  onPrintPdf?: () => void;
   formatDate: (date: string | undefined) => string;
   isSelected: boolean;
   onToggleSelect: () => void;
+  isAdmin: boolean;
   t: { add: string; remove: string };
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -164,6 +168,17 @@ function StoryCard({
             </button>
           )}
 
+          {/* Print PDF button - admin only */}
+          {isAdmin && onPrintPdf && !story.isPartial && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPrintPdf(); }}
+              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
+              title={language === 'de' ? 'Druck-PDF' : language === 'fr' ? 'PDF impression' : 'Print PDF'}
+            >
+              <Printer size={18} />
+            </button>
+          )}
+
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
@@ -179,7 +194,8 @@ function StoryCard({
 export default function MyStories() {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -291,6 +307,40 @@ export default function MyStories() {
         : language === 'fr'
         ? 'Impossible de supprimer l\'histoire. Veuillez réessayer.'
         : 'Failed to delete story. Please try again.');
+    }
+  };
+
+  // Download print PDF (admin only) - uses same format as Buy Book / Print Book
+  const handlePrintPdf = async (id: string) => {
+    if (!isAdmin) return;
+
+    try {
+      log.debug('Downloading print PDF for story:', id);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/stories/${id}/print-pdf`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'story-print.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      log.error('Failed to download print PDF:', error);
+      alert(language === 'de'
+        ? 'PDF konnte nicht heruntergeladen werden.'
+        : language === 'fr'
+        ? 'Impossible de télécharger le PDF.'
+        : 'Failed to download PDF.');
     }
   };
 
@@ -436,9 +486,11 @@ export default function MyStories() {
                 language={language}
                 onView={() => navigate(`/create?storyId=${story.id}`)}
                 onDelete={() => deleteStory(story.id)}
+                onPrintPdf={isAdmin ? () => handlePrintPdf(story.id) : undefined}
                 formatDate={formatDate}
                 isSelected={selectedIds.has(story.id)}
                 onToggleSelect={() => toggleSelect(story.id)}
+                isAdmin={isAdmin}
                 t={{ add: t.add, remove: t.remove }}
               />
             ))}

@@ -6408,6 +6408,67 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
   }
 });
 
+// GET PRINT PDF for a story - ADMIN ONLY - uses same format as Buy Book/Print Book
+// This allows admins to preview the exact PDF that would be sent to Gelato for printing
+app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
+  try {
+    // Admin only
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const storyId = req.params.id;
+    log.info(`🖨️ [ADMIN PRINT PDF] Admin ${req.user.username} requesting print PDF for story: ${storyId}`);
+
+    // Fetch story from database (admin can access any story)
+    let storyData = null;
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const storyResult = await dbQuery('SELECT data FROM stories WHERE id = $1', [storyId]);
+      if (storyResult.length > 0) {
+        storyData = typeof storyResult[0].data === 'string'
+          ? JSON.parse(storyResult[0].data)
+          : storyResult[0].data;
+      }
+    } else {
+      // File mode - search all users
+      const allStories = await readJSON(STORIES_FILE);
+      for (const userId in allStories) {
+        const story = allStories[userId].find(s => s.id === storyId);
+        if (story) {
+          storyData = story;
+          break;
+        }
+      }
+    }
+
+    if (!storyData) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    log.debug(`🖨️ [ADMIN PRINT PDF] Generating print PDF for: ${storyData.title}`);
+
+    // Generate print PDF using the shared function (same as Buy Book / Print Book)
+    const { pdfBuffer, pageCount } = await generatePrintPdf(storyData);
+
+    log.info(`🖨️ [ADMIN PRINT PDF] PDF generated: ${pageCount} pages, ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
+
+    // Return PDF for download
+    res.setHeader('Content-Type', 'application/pdf');
+    const safeFilename = (storyData.title || 'story')
+      .replace(/[–—]/g, '-')
+      .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/[^a-zA-Z0-9\s\-_.]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 100);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}-print.pdf"`);
+    res.send(pdfBuffer);
+
+  } catch (err) {
+    console.error('Error generating print PDF:', err);
+    res.status(500).json({ error: 'Failed to generate print PDF', details: err.message });
+  }
+});
+
 // Generate PDF from story (POST - with data in body)
 app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
   try {
@@ -9895,9 +9956,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         };
 
         // Usage tracker for page images
-        const pageUsageTracker = (imgUsage, qualUsage) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images');
-          if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality');
+        const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+          if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+          if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
         };
 
         while (retries <= MAX_RETRIES && !imageResult) {
@@ -10062,9 +10123,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         }
 
         // Usage tracker for streaming cover images
-        const streamCoverUsageTracker = (imgUsage, qualUsage) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images');
-          if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality');
+        const streamCoverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+          if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
         // Generate the image
@@ -10372,9 +10433,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           imagePrompts[pageNum] = imagePrompt;
 
           // Usage tracker for page images
-          const pageUsageTracker = (imgUsage, qualUsage) => {
-            if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images');
-            if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality');
+          const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+            if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+            if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
           };
 
           let imageResult = null;
@@ -10517,9 +10578,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
         // Usage tracker for cover images
-        const coverUsageTracker = (imgUsage, qualUsage) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images');
-          if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality');
+        const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+          if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
         // Front cover - only generate if not already done during streaming
@@ -11134,9 +11195,9 @@ async function processStoryJob(jobId) {
       coverPrompts.backCover = backCoverPrompt;
 
       // Usage tracker for cover images
-      const coverUsageTracker = (imgUsage, qualUsage) => {
-        if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images');
-        if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality');
+      const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+        if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+        if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
       };
 
       // Start all 3 covers in parallel (don't await yet)
@@ -11325,9 +11386,9 @@ Output Format:
             };
 
             // Usage tracker for page images
-            const pageUsageTracker = (imgUsage, qualUsage) => {
-              if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images');
-              if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality');
+            const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+              if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+              if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
             };
 
             while (retries <= MAX_RETRIES && !imageResult) {
@@ -11665,9 +11726,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             };
 
             // Usage tracker for page images
-            const pageUsageTracker = (imgUsage, qualUsage) => {
-              if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images');
-              if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality');
+            const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+              if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+              if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
             };
 
             while (retries <= MAX_RETRIES && !imageResult) {
@@ -13540,7 +13601,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning.substring(0, 150)}...`);
     }
 
-    // Return score, full raw response, text-specific info, and usage for covers
+    // Return score, full raw response, text-specific info, usage, and model for covers
     return {
       score: finalScore,
       reasoning: responseText, // Return full raw API response for transparency
@@ -13548,7 +13609,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       expectedText,
       actualText,
       textIssue,
-      usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens }
+      usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+      modelId: modelId  // Include quality model for usage tracking
     };
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
@@ -13803,6 +13865,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const expectedText = qualityResult ? qualityResult.expectedText : null;
         const actualText = qualityResult ? qualityResult.actualText : null;
         const qualityUsage = qualityResult ? qualityResult.usage : null;
+        const qualityModelId = qualityResult ? qualityResult.modelId : null;
 
         // Store in cache (include text error info for covers)
         const result = {
@@ -13813,7 +13876,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           textErrorOnly,
           expectedText,
           actualText,
-          modelId,  // Include which model was used for dev mode
+          modelId,  // Include which model was used for image generation
+          qualityModelId,  // Include which model was used for quality evaluation
           imageUsage: imageUsage,  // Token usage for image generation
           qualityUsage: qualityUsage  // Token usage for quality evaluation
         };
@@ -13987,7 +14051,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady);
       // Track usage if tracker provided
       if (usageTracker && result) {
-        usageTracker(result.imageUsage, result.qualityUsage);
+        usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);
       }
     } catch (error) {
       // Check if this is a safety/content block error
