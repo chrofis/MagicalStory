@@ -576,9 +576,10 @@ export const storyService = {
   },
 
   // Stripe checkout for book purchase
-  async createCheckoutSession(storyId: string): Promise<{ url: string }> {
+  async createCheckoutSession(storyId: string, coverType?: 'softcover' | 'hardcover'): Promise<{ url: string }> {
     const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', {
       storyId,
+      coverType: coverType || 'softcover',
     });
     return response;
   },

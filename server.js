@@ -734,7 +734,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
           // Trigger background PDF generation and print provider order (don't await - fire and forget)
           // Pass isTestPayment so Gelato knows whether to create draft or real order
-          processBookOrder(fullSession.id, userId, storyId, customerInfo, address, isTestPayment).catch(async (err) => {
+          const orderCoverType = fullSession.metadata?.coverType || 'softcover';
+          processBookOrder(fullSession.id, userId, storyId, customerInfo, address, isTestPayment, orderCoverType).catch(async (err) => {
             console.error('❌ [BACKGROUND] Error processing book order:', err);
             console.error('   Error stack:', err.stack);
             console.error('   Session ID:', fullSession.id);
@@ -3586,9 +3587,10 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const rows = await dbQuery(selectQuery, [req.user.id]);
       log.trace(`📚 Query returned ${rows.length} rows`);
 
-      // Parse the JSON data from each row - return metadata with full-quality thumbnails
+      // Parse the JSON data from each row - return metadata only (no images for performance)
       userStories = rows.map(row => {
         const story = JSON.parse(row.data);
+        const hasThumbnail = !!(story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail);
         return {
           id: story.id,
           title: story.title,
@@ -3598,14 +3600,14 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
           pageCount: story.sceneImages?.length || 0,
-          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null),
+          hasThumbnail, // Boolean flag - fetch actual thumbnail via /api/stories/:id/thumbnail
           // Partial story fields
           isPartial: story.isPartial || false,
           generatedPages: story.generatedPages,
           totalPages: story.totalPages
         };
       });
-      log.trace(`📚 Parsed ${userStories.length} stories with full-quality thumbnails`);
+      log.trace(`📚 Parsed ${userStories.length} stories (metadata only, no images)`);
 
       if (userStories.length > 0) {
         log.trace(`📚 First story: ${userStories[0].title} (ID: ${userStories[0].id})`);
@@ -3615,23 +3617,26 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
       const allStories = await readJSON(STORIES_FILE);
       const fullStories = allStories[req.user.id] || [];
 
-      // Return full-quality thumbnails
-      userStories = fullStories.map(story => ({
-        id: story.id,
-        title: story.title,
-        createdAt: story.createdAt,
-        updatedAt: story.updatedAt,
-        pages: story.pages,
-        language: story.language,
-        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: story.sceneImages?.length || 0,
-        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null),
-        // Partial story fields
-        isPartial: story.isPartial || false,
-        generatedPages: story.generatedPages,
-        totalPages: story.totalPages
-      }));
-      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} with full-quality thumbnails`);
+      // Return metadata only (no images for performance)
+      userStories = fullStories.map(story => {
+        const hasThumbnail = !!(story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail);
+        return {
+          id: story.id,
+          title: story.title,
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          pages: story.pages,
+          language: story.language,
+          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+          pageCount: story.sceneImages?.length || 0,
+          hasThumbnail, // Boolean flag - fetch actual thumbnail via /api/stories/:id/thumbnail
+          // Partial story fields
+          isPartial: story.isPartial || false,
+          generatedPages: story.generatedPages,
+          totalPages: story.totalPages
+        };
+      });
+      console.log(`📚 File mode: Found ${userStories.length} stories for user ${req.user.id} (metadata only)`);
     }
 
     console.log(`📚 Returning ${userStories.length} stories (total size: ${JSON.stringify(userStories).length} bytes)`);
@@ -4788,10 +4793,14 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
         }
       }
 
-      // Fallback to hardcoded default if no database product found
+      // Fallback to environment variable or error if no database product found
       if (!productUid) {
-        productUid = 'photobook-hardcover_pf_210x210-mm-8x8-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matte-lamination_prt_1-0';
-        console.log(`🖨️ [PRINT] Using fallback hardcoded product: ${productUid}`);
+        productUid = process.env.GELATO_PHOTOBOOK_UID;
+        if (productUid) {
+          console.log(`🖨️ [PRINT] Using environment fallback product`);
+        } else {
+          return res.status(500).json({ error: 'No active products configured. Please add products in admin dashboard.' });
+        }
       }
     }
 
@@ -7451,23 +7460,32 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
     const printPageCount = interiorPages % 2 === 0 ? interiorPages : interiorPages + 1;
     log.debug(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, layout=${isPictureBook ? 'Picture Book' : 'Standard'}, interior=${interiorPages}, printPageCount=${printPageCount}`);
 
-    // Get print product UID
+    // Get print product UID - prefer softcover for retry (can be changed in admin UI)
     const productsResult = await dbPool.query(
-      'SELECT product_uid, product_name FROM gelato_products WHERE is_active = true'
+      'SELECT product_uid, product_name, cover_type, min_pages, max_pages FROM gelato_products WHERE is_active = true ORDER BY cover_type ASC'
     );
 
     let printProductUid = null;
     if (productsResult.rows.length > 0) {
-      const sortedProducts = productsResult.rows.sort((a, b) => {
-        const aMin = parseInt(a.product_uid.match(/\d+/)?.[0] || 0);
-        const bMin = parseInt(b.product_uid.match(/\d+/)?.[0] || 0);
-        return aMin - bMin;
-      });
-      printProductUid = sortedProducts[0].product_uid;
+      // Find product matching the page count (prefer softcover)
+      const matchingProduct = productsResult.rows.find(p =>
+        printPageCount >= (p.min_pages || 0) && printPageCount <= (p.max_pages || 999)
+      );
+      if (matchingProduct) {
+        printProductUid = matchingProduct.product_uid;
+        log.debug(`📦 [ADMIN RETRY] Using product: ${matchingProduct.product_name} (${matchingProduct.cover_type})`);
+      } else {
+        // Use first product if no page count match
+        printProductUid = productsResult.rows[0].product_uid;
+        log.warn(`📦 [ADMIN RETRY] No product matches page count ${printPageCount}, using first: ${productsResult.rows[0].product_name}`);
+      }
     }
 
     if (!printProductUid) {
-      printProductUid = 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
+      printProductUid = process.env.GELATO_PHOTOBOOK_UID;
+      if (!printProductUid) {
+        return res.status(500).json({ error: 'No active products configured. Please add products in admin dashboard.' });
+      }
     }
 
     const printApiKey = process.env.GELATO_API_KEY;
@@ -8463,7 +8481,7 @@ app.post('/api/log-error', (req, res) => {
 // Create Stripe checkout session for book purchase
 app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
-    const { storyId } = req.body;
+    const { storyId, coverType = 'softcover' } = req.body;
     const userId = req.user.id;
 
     // Get the appropriate Stripe client for this user (test for admins, live for regular users)
@@ -8507,7 +8525,8 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
       metadata: {
         userId: userId.toString(),
         storyId: storyId.toString(),
-        storyTitle: story.title
+        storyTitle: story.title,
+        coverType: coverType
       },
       shipping_address_collection: {
         allowed_countries: ['DE', 'AT', 'CH', 'FR', 'IT', 'NL', 'BE', 'LU']
@@ -8604,9 +8623,11 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
 
 // Background function to process book orders after payment
 // isTestPayment: true = admin/developer (Gelato draft), false = real user (Gelato real order)
-async function processBookOrder(sessionId, userId, storyId, customerInfo, shippingAddress, isTestPayment = false) {
+// coverType: 'softcover' or 'hardcover' - determines which product to use
+async function processBookOrder(sessionId, userId, storyId, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover') {
   console.log(`📚 [BACKGROUND] Starting book order processing for session ${sessionId}`);
   console.log(`   Payment mode: ${isTestPayment ? 'TEST (Gelato draft)' : 'LIVE (real Gelato order)'}`);
+  console.log(`   Cover type: ${coverType}`);
 
   // Determine Gelato order type based on payment mode
   const gelatoOrderType = isTestPayment ? 'draft' : 'order';
@@ -8678,11 +8699,12 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     const printPageCount = targetPageCount;
     log.debug(`📊 [BACKGROUND] Using PDF page count for Gelato: ${printPageCount}`);
 
-    // Fetch product UID from database based on page count (same logic as frontend)
+    // Fetch product UID from database based on page count and cover type
     let printProductUid = null;
     try {
       const productsResult = await dbPool.query(
-        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts FROM gelato_products WHERE is_active = true'
+        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND cover_type = $1',
+        [coverType]
       );
 
       if (productsResult.rows.length > 0) {
@@ -8698,19 +8720,41 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
 
         if (matchingProduct) {
           printProductUid = matchingProduct.product_uid;
-          console.log(`✅ [BACKGROUND] Found matching product: ${matchingProduct.product_name}`);
+          console.log(`✅ [BACKGROUND] Found matching ${coverType} product: ${matchingProduct.product_name}`);
         } else {
-          log.warn(`[BACKGROUND] No product matches page count ${printPageCount}`);
+          log.warn(`[BACKGROUND] No ${coverType} product matches page count ${printPageCount}`);
         }
+      } else {
+        log.warn(`[BACKGROUND] No active ${coverType} products found in database`);
       }
     } catch (err) {
       console.error('❌ [BACKGROUND] Error fetching products:', err.message);
     }
 
-    // Fallback to environment variable or hardcoded default
+    // Fallback to environment variable or first active product of any type
     if (!printProductUid) {
-      printProductUid = process.env.GELATO_PHOTOBOOK_UID || 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
-      log.warn(`[BACKGROUND] Using fallback product UID: ${printProductUid}`);
+      // Try to get any active product as fallback
+      try {
+        const fallbackResult = await dbPool.query(
+          'SELECT product_uid, product_name FROM gelato_products WHERE is_active = true LIMIT 1'
+        );
+        if (fallbackResult.rows.length > 0) {
+          printProductUid = fallbackResult.rows[0].product_uid;
+          log.warn(`[BACKGROUND] Using fallback product: ${fallbackResult.rows[0].product_name}`);
+        }
+      } catch (err) {
+        console.error('❌ [BACKGROUND] Error fetching fallback product:', err.message);
+      }
+    }
+
+    // Final fallback to environment variable
+    if (!printProductUid) {
+      printProductUid = process.env.GELATO_PHOTOBOOK_UID;
+      if (printProductUid) {
+        log.warn(`[BACKGROUND] Using environment fallback product UID`);
+      } else {
+        throw new Error('No active products configured. Please add products in admin dashboard.');
+      }
     }
 
     // Use gelatoOrderType determined from isTestPayment parameter

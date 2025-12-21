@@ -165,7 +165,7 @@ export default function BookBuilder() {
 
       // TODO: Implement combined book checkout API
       // For now, we'll use the first story's checkout as a placeholder
-      const { url } = await storyService.createCheckoutSession(stories[0].id);
+      const { url } = await storyService.createCheckoutSession(stories[0].id, coverType);
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);

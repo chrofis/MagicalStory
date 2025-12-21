@@ -380,7 +380,7 @@ export function GenerationProgress({
 
         {/* Cover preview section */}
         {hasAnyCovers && (
-          <div className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4">
+          <div className="mb-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4">
             <h3 className="text-sm font-medium text-indigo-700 text-center mb-3">{t.coversPreview}</h3>
             <div className="flex justify-center gap-4">
               <CoverThumbnail
@@ -399,6 +399,27 @@ export function GenerationProgress({
                 isReady={hasBackCover}
               />
             </div>
+          </div>
+        )}
+
+        {/* Status message when covers are showing - let user know pages are being generated */}
+        {hasAnyCovers && (
+          <div className="mb-4 text-center">
+            <p className="text-sm text-gray-600 flex items-center justify-center gap-2">
+              <Loader2 size={14} className="animate-spin text-indigo-500" />
+              {language === 'de'
+                ? 'Bilder für die Seiten werden jetzt erstellt...'
+                : language === 'fr'
+                ? 'Création des images pour les pages en cours...'
+                : 'Now generating images for the pages...'}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              {language === 'de'
+                ? 'Dies kann einige Minuten dauern. Du kannst den Browser schliessen.'
+                : language === 'fr'
+                ? 'Cela peut prendre quelques minutes. Vous pouvez fermer le navigateur.'
+                : 'This may take a few minutes. You can close the browser.'}
+            </p>
           </div>
         )}
 
