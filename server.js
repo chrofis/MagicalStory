@@ -115,22 +115,28 @@ const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
 // Image quality threshold - regenerate if score below this value (0-100 scale)
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
 
-// Verbose logging mode - set VERBOSE_LOGGING=true for detailed debug output
-const VERBOSE_LOGGING = process.env.VERBOSE_LOGGING === 'true';
+// LOG_LEVEL controls verbosity: error < warn < info < debug < trace
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3, trace: 4 };
+const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
+const CURRENT_LOG_LEVEL = LOG_LEVELS[LOG_LEVEL] !== undefined ? LOG_LEVELS[LOG_LEVEL] : LOG_LEVELS.info;
 
-// Logging helper functions
 const log = {
-  info: (msg, ...args) => console.log(msg, ...args),
-  error: (msg, ...args) => console.error(msg, ...args),
-  warn: (msg, ...args) => console.warn(msg, ...args),
-  // Verbose logs only show when VERBOSE_LOGGING is enabled
-  verbose: (msg, ...args) => VERBOSE_LOGGING && console.log(`[VERBOSE] ${msg}`, ...args),
-  // Debug logs for development
-  debug: (msg, ...args) => VERBOSE_LOGGING && console.log(`[DEBUG] ${msg}`, ...args)
+  // ERROR: Something failed, needs immediate attention
+  error: (msg, ...args) => console.error(`[ERROR] ${msg}`, ...args),
+  // WARN: Something unexpected but not broken
+  warn: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.warn && console.warn(`[WARN] ${msg}`, ...args),
+  // INFO: Key business events (startup, user actions, completions)
+  info: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.info && console.log(msg, ...args),
+  // DEBUG: Developer troubleshooting (API calls, DB queries, flow tracing)
+  debug: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && log.trace(` ${msg}`, ...args),
+  // TRACE: Super detailed (request/response bodies, token counts, internal state)
+  trace: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.trace && log.trace(` ${msg}`, ...args),
+  // Backwards compatibility alias
+  verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && log.trace(` ${msg}`, ...args)
 };
 
 log.info(`📚 Story batch size: ${STORY_BATCH_SIZE === 0 ? 'DISABLED (generate all at once)' : STORY_BATCH_SIZE + ' pages per batch'}`);
-log.info(`🔊 Verbose logging: ${VERBOSE_LOGGING ? 'ENABLED' : 'DISABLED'}`);
+log.info(`📊 Log level: ${LOG_LEVEL.toUpperCase()}`);
 
 // =============================================================================
 // TEXT MODEL CONFIGURATION
@@ -479,7 +485,7 @@ const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' && DATABASE_URL)
                      ? 'database'
                      : 'file';
 
-console.log(`📦 Storage mode: ${STORAGE_MODE}`);
+log.debug(`📦 Storage mode: ${STORAGE_MODE}`);
 if (STORAGE_MODE === 'database') {
   console.log(`🗄️  Database: PostgreSQL (Railway)`);
 }
@@ -1642,7 +1648,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     );
 
     console.log(`✅ User logged in: ${user.username} (role: ${user.role})`);
-    console.log(`⚠️  TEST LOG - If you see this, logs are working!`);
+    log.warn(`TEST LOG - If you see this, logs are working!`);
 
     res.json({
       token,
@@ -2084,7 +2090,7 @@ app.post('/api/auth/dev-login', async (req, res) => {
       { expiresIn: '30d' }  // Longer expiration for dev
     );
 
-    console.log(`🔧 Dev auto-login: ${user.username} (role: ${user.role})`);
+    log.debug(`🔧 Dev auto-login: ${user.username} (role: ${user.role})`);
 
     res.json({
       token,
@@ -2433,6 +2439,53 @@ app.post('/api/admin/users/:userId/quota', authenticateToken, async (req, res) =
   } catch (err) {
     console.error('Error updating user credits:', err);
     res.status(500).json({ error: 'Failed to update user credits' });
+  }
+});
+
+// ADMIN: Toggle user email verification status (for testing)
+app.post('/api/admin/users/:userId/email-verified', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId } = req.params;
+    const { emailVerified } = req.body;
+
+    if (typeof emailVerified !== 'boolean') {
+      return res.status(400).json({ error: 'emailVerified must be a boolean' });
+    }
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const selectQuery = 'SELECT id, username, email_verified FROM users WHERE id = $1';
+      const rows = await dbQuery(selectQuery, [userId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = rows[0];
+      const previousStatus = user.email_verified;
+
+      await dbQuery('UPDATE users SET email_verified = $1 WHERE id = $2', [emailVerified, userId]);
+
+      console.log(`🔧 [ADMIN] Email verification for user ${user.username} changed: ${previousStatus} -> ${emailVerified}`);
+
+      res.json({
+        message: `Email verification status updated`,
+        user: {
+          id: user.id,
+          username: user.username,
+          emailVerified: emailVerified,
+          previousStatus: previousStatus
+        }
+      });
+    } else {
+      return res.status(503).json({ error: 'This feature requires database mode' });
+    }
+  } catch (err) {
+    console.error('Error updating email verification status:', err);
+    res.status(500).json({ error: 'Failed to update email verification status' });
   }
 });
 
@@ -3139,7 +3192,7 @@ app.put('/api/user/shipping-address', authenticateToken, async (req, res) => {
 // Get user's orders
 app.get('/api/user/orders', authenticateToken, async (req, res) => {
   try {
-    console.log(`📦 [USER] GET /api/user/orders - User: ${req.user.username}`);
+    log.debug(`📦 [USER] GET /api/user/orders - User: ${req.user.username}`);
 
     if (STORAGE_MODE === 'database' && dbPool) {
       const query = `
@@ -3205,7 +3258,7 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
         };
       });
 
-      console.log(`📦 [USER] Found ${orders.length} orders for user ${req.user.username}`);
+      log.debug(`📦 [USER] Found ${orders.length} orders for user ${req.user.username}`);
       res.json({ orders });
     } else {
       // File mode - not implemented for orders
@@ -3643,7 +3696,7 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
 
       // Check if any rows were deleted using rowCount
       if (!result.rowCount || result.rowCount === 0) {
-        console.log(`⚠️  Story ${id} not found for user ${req.user.id}`);
+        log.warn(`Story ${id} not found for user ${req.user.id}`);
         return res.status(404).json({ error: 'Story not found or you do not have permission to delete it' });
       }
 
@@ -3657,7 +3710,7 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
           console.log(`🗑️  Also deleted story_job ${id}`);
         }
       } catch (jobErr) {
-        console.warn(`⚠️  Could not delete story_job ${id}:`, jobErr.message);
+        log.warn(`Could not delete story_job ${id}:`, jobErr.message);
       }
 
       console.log(`✅ Successfully deleted story ${id}`);
@@ -3836,7 +3889,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const trueOriginalScore = existingImage?.originalScore || previousScore;
     const trueOriginalReasoning = existingImage?.originalReasoning || previousReasoning;
 
-    console.log(`📸 [REGEN] Capturing previous image (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!existingImage?.originalImage})`);
+    log.debug(`📸 [REGEN] Capturing previous image (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!existingImage?.originalImage})`);
 
     // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
@@ -3870,7 +3923,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       regenerationCount: (existingImage?.regenerationCount || 0) + 1
     };
 
-    console.log(`📸 [REGEN] New image generated - score: ${imageResult.score}, attempts: ${imageResult.totalAttempts}, model: ${imageResult.modelId}`);
+    log.debug(`📸 [REGEN] New image generated - score: ${imageResult.score}, attempts: ${imageResult.totalAttempts}, model: ${imageResult.modelId}`);
 
     if (existingIndex >= 0) {
       sceneImages[existingIndex] = newImageData;
@@ -4077,7 +4130,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const trueOriginalScore = previousCover?.originalScore || previousScore;
     const trueOriginalReasoning = previousCover?.originalReasoning || previousReasoning;
 
-    console.log(`📸 [COVER REGEN] Capturing previous ${normalizedCoverType} cover (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!previousCover?.originalImage})`);
+    log.debug(`📸 [COVER REGEN] Capturing previous ${normalizedCoverType} cover (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!previousCover?.originalImage})`);
 
     // Clear the image cache for this prompt to force a new generation
     const cacheKey = generateImageCacheKey(coverPrompt, coverCharacterPhotos, null);
@@ -4113,7 +4166,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       regenerationCount: (previousCover?.regenerationCount || 0) + 1
     };
 
-    console.log(`📸 [COVER REGEN] New ${normalizedCoverType} cover generated - score: ${coverResult.score}, attempts: ${coverResult.totalAttempts}, model: ${coverResult.modelId}`);
+    log.debug(`📸 [COVER REGEN] New ${normalizedCoverType} cover generated - score: ${coverResult.score}, attempts: ${coverResult.totalAttempts}, model: ${coverResult.modelId}`);
 
     if (normalizedCoverType === 'front') {
       storyData.coverImages.frontCover = coverData;
@@ -4201,7 +4254,7 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
     const previousImageData = currentImage.imageData;
     const previousScore = currentImage.qualityScore || null;
     const previousReasoning = currentImage.qualityReasoning || null;
-    console.log(`📸 [EDIT] Capturing previous image (score: ${previousScore})`);
+    log.debug(`📸 [EDIT] Capturing previous image (score: ${previousScore})`);
 
     // Edit the image (pure text/instruction based - no character photos to avoid regeneration artifacts)
     const editResult = await editImageWithPrompt(currentImage.imageData, editPrompt);
@@ -4320,7 +4373,7 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
     const previousImageData = currentImageData;
     const previousScore = typeof currentCover === 'object' ? currentCover.qualityScore || null : null;
     const previousReasoning = typeof currentCover === 'object' ? currentCover.qualityReasoning || null : null;
-    console.log(`📸 [COVER EDIT] Capturing previous image (score: ${previousScore})`);
+    log.debug(`📸 [COVER EDIT] Capturing previous image (score: ${previousScore})`);
 
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
     const editResult = await editImageWithPrompt(currentImageData, editPrompt);
@@ -4724,7 +4777,7 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(`📦 [GELATO] Creating ${orderType} (user role: ${req.user.role})`);
+    log.debug(`📦 [GELATO] Creating ${orderType} (user role: ${req.user.role})`);
 
     // Prepare print provider order payload
     const orderPayload = {
@@ -4869,7 +4922,7 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
 
     for (const catalogUid of photobookCatalogs) {
       try {
-        console.log(`🔍 Searching photobook catalog: ${catalogUid}`);
+        log.debug(`🔍 Searching photobook catalog: ${catalogUid}`);
         // Search for products in this catalog
         const searchResponse = await fetch(`https://product.gelatoapis.com/v3/catalogs/${catalogUid}/products:search`, {
           method: 'POST',
@@ -4892,7 +4945,7 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
         }
 
         const searchData = await searchResponse.json();
-        console.log(`📦 ${catalogUid} response:`, {
+        log.debug(`📦 ${catalogUid} response:`, {
           hasProducts: !!searchData.products,
           productCount: searchData.products?.length || 0,
           responseKeys: Object.keys(searchData)
@@ -4908,7 +4961,7 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
             console.log(`  ${i+1}. ${p.name || p.productName || 'Unnamed'} (UID: ${p.productUid || p.uid})`);
           });
         } else {
-          console.log(`⚠️  No products found in ${catalogUid}!`);
+          log.warn(`No products found in ${catalogUid}!`);
         }
 
         allPhotobooks = allPhotobooks.concat(photobooks);
@@ -5218,12 +5271,12 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
     // Log image info
     const imageSize = imageData.length;
     const imageType = imageData.substring(0, 30);
-    console.log(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}...`);
+    log.debug(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}...`);
 
     // Run Python analysis and Gemini trait extraction in parallel
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-    console.log(`📸 [PHOTO] Calling Python service at: ${photoAnalyzerUrl}/analyze`);
-    console.log(`📸 [PHOTO] Calling Gemini for visual trait extraction...`);
+    log.debug(`📸 [PHOTO] Calling Python service at: ${photoAnalyzerUrl}/analyze`);
+    log.debug(`📸 [PHOTO] Calling Gemini for visual trait extraction...`);
 
     const startTime = Date.now();
 
@@ -5324,7 +5377,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
       const duration = Date.now() - startTime;
 
       // VERBOSE LOGGING
-      console.log(`📸 [PHOTO] Analysis complete in ${duration}ms:`, {
+      log.debug(`📸 [PHOTO] Analysis complete in ${duration}ms:`, {
         pythonSuccess: analyzerData.success,
         hasError: !!analyzerData.error,
         error: analyzerData.error || null,
@@ -5502,7 +5555,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       return res.status(503).json({ error: 'Avatar generation service unavailable' });
     }
 
-    console.log(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})`);
+    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})`);
 
     // Parse clothing styles from the template file
     const isFemale = gender === 'female';
@@ -5624,7 +5677,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
         // Check if blocked by safety filters - retry once with simplified prompt
         if (data.promptFeedback?.blockReason) {
-          console.warn(`⚠️ [CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
+          log.warn(`[CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
           console.log(`🔄 [CLOTHING AVATARS] Retrying ${category} with simplified prompt...`);
 
           // Simplified retry prompt from template
@@ -5655,7 +5708,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
           if (retryResponse.ok) {
             data = await retryResponse.json();
             if (data.promptFeedback?.blockReason) {
-              console.warn(`⚠️ [CLOTHING AVATARS] ${category} retry also blocked:`, data.promptFeedback.blockReason);
+              log.warn(`[CLOTHING AVATARS] ${category} retry also blocked:`, data.promptFeedback.blockReason);
               continue;
             }
           } else {
@@ -5685,11 +5738,11 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
             console.log(`✅ [CLOTHING AVATARS] ${category} avatar generated and compressed (${originalSize}KB -> ${compressedSize}KB)`);
           } catch (compressErr) {
             // If compression fails, use original
-            console.warn(`⚠️ [CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
+            log.warn(`[CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
             results[category] = imageData;
           }
         } else {
-          console.log(`⚠️ [CLOTHING AVATARS] No image in ${category} response`);
+          log.warn(`[CLOTHING AVATARS] No image in ${category} response`);
         }
 
         // Small delay between generations to avoid rate limits
@@ -5997,11 +6050,11 @@ async function generatePrintPdf(storyData) {
   const pageMatches = generatedStoryText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
   const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
 
-  console.log(`📄 [PRINT PDF] Found ${storyPages.length} story pages`);
+  log.debug(`📄 [PRINT PDF] Found ${storyPages.length} story pages`);
 
   // Determine layout
   const isPictureBook = storyData.languageLevel === '1st-grade';
-  console.log(`📄 [PRINT PDF] Layout: ${isPictureBook ? 'Picture Book (combined)' : 'Standard (separate pages)'}`);
+  log.debug(`📄 [PRINT PDF] Layout: ${isPictureBook ? 'Picture Book (combined)' : 'Standard (separate pages)'}`);
 
   // Add content pages based on layout type
   if (isPictureBook) {
@@ -6087,7 +6140,7 @@ async function generatePrintPdf(storyData) {
       }
 
       if (fontSize < 9) {
-        console.log(`📄 [PRINT PDF] Page ${pageNumber}: Font reduced 9pt → ${fontSize}pt`);
+        log.debug(`📄 [PRINT PDF] Page ${pageNumber}: Font reduced 9pt → ${fontSize}pt`);
       }
 
       // Check if text still doesn't fit
@@ -6131,7 +6184,7 @@ async function generatePrintPdf(storyData) {
   const blankPagesToAdd = targetPageCount - actualPdfPages;
 
   if (blankPagesToAdd > 0) {
-    console.log(`📄 [PRINT PDF] Adding ${blankPagesToAdd} blank page(s) to reach even count ${targetPageCount}`);
+    log.debug(`📄 [PRINT PDF] Adding ${blankPagesToAdd} blank page(s) to reach even count ${targetPageCount}`);
   }
 
   for (let i = 0; i < blankPagesToAdd; i++) {
@@ -6154,7 +6207,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     const storyId = req.params.id;
     const userId = req.user.id;
 
-    console.log(`📄 [PDF DOWNLOAD] Generating viewable PDF for story: ${storyId}`);
+    log.debug(`📄 [PDF DOWNLOAD] Generating viewable PDF for story: ${storyId}`);
 
     // Fetch story from database
     const storyResult = await dbPool.query(
@@ -6163,14 +6216,14 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     );
 
     if (storyResult.rows.length === 0) {
-      console.log(`📄 [PDF DOWNLOAD] Story not found: ${storyId}`);
+      log.debug(`📄 [PDF DOWNLOAD] Story not found: ${storyId}`);
       return res.status(404).json({ error: 'Story not found' });
     }
 
     const storyData = typeof storyResult.rows[0].data === 'string'
       ? JSON.parse(storyResult.rows[0].data)
       : storyResult.rows[0].data;
-    console.log(`📄 [PDF DOWNLOAD] Story found: ${storyData.title}`);
+    log.debug(`📄 [PDF DOWNLOAD] Story found: ${storyData.title}`);
 
     // Parse story into pages
     const storyText = storyData.storyText || storyData.story || '';
@@ -6178,12 +6231,12 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
 
     if (storyPages.length === 0) {
-      console.log(`📄 [PDF DOWNLOAD] No story pages found. Story text preview: ${storyText.substring(0, 200)}`);
+      log.debug(`📄 [PDF DOWNLOAD] No story pages found. Story text preview: ${storyText.substring(0, 200)}`);
       return res.status(400).json({ error: 'No story pages found' });
     }
 
     const isPictureBook = storyData.languageLevel === '1st-grade';
-    console.log(`📄 [PDF DOWNLOAD] Generating PDF with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
+    log.debug(`📄 [PDF DOWNLOAD] Generating PDF with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
 
     // Helper function to extract image data
     const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
@@ -6336,7 +6389,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     doc.end();
     const pdfBuffer = await pdfPromise;
 
-    console.log(`📄 [PDF DOWNLOAD] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+    log.debug(`📄 [PDF DOWNLOAD] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 
     // NO database storage - just send directly to user
     res.setHeader('Content-Type', 'application/pdf');
@@ -6368,7 +6421,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
     // '1st-grade' = Picture Book = combined layout (image + text on same page)
     // 'standard' or 'advanced' = separate pages for text and image
     const isPictureBook = languageLevel === '1st-grade';
-    console.log(`📄 [PDF] Generating PDF with layout: ${isPictureBook ? 'Picture Book (combined)' : 'Standard (separate pages)'}`);
+    log.debug(`📄 [PDF] Generating PDF with layout: ${isPictureBook ? 'Picture Book (combined)' : 'Standard (separate pages)'}`);
 
     // Helper function to extract image data from cover images
     // Supports both old format (base64 string) and new format (object with imageData property)
@@ -6486,13 +6539,13 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         }
 
         if (fontSize < startFontSize) {
-          console.log(`📄 [PDF-PictureBook] Page ${index + 1}: Font reduced ${startFontSize}pt → ${fontSize}pt (text: ${page.text.length} chars, height: ${Math.round(initialHeight)} → ${Math.round(textHeight)}, available: ${Math.round(availableTextHeight)})`);
+          log.debug(`📄 [PDF-PictureBook] Page ${index + 1}: Font reduced ${startFontSize}pt → ${fontSize}pt (text: ${page.text.length} chars, height: ${Math.round(initialHeight)} → ${Math.round(textHeight)}, available: ${Math.round(availableTextHeight)})`);
         }
 
         let textToRender = page.text;
         if (textHeight > availableTextHeight) {
           // Truncate text to fit
-          console.warn(`⚠️ [PDF-PictureBook] Page ${index + 1}: Text still too long at ${fontSize}pt, truncating...`);
+          log.warn(`[PDF-PictureBook] Page ${index + 1}: Text still too long at ${fontSize}pt, truncating...`);
           const words = page.text.split(' ');
           textToRender = '';
           for (let i = 0; i < words.length; i++) {
@@ -6576,7 +6629,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         }
 
         if (fontSize < startFontSize) {
-          console.log(`📄 [PDF] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (text: ${page.text.length} chars, height: ${Math.round(initialHeight)} → ${Math.round(textHeight)}, available: ${Math.round(safeAvailableHeight)})`);
+          log.debug(`📄 [PDF] Page ${pageNumber}: Font reduced ${startFontSize}pt → ${fontSize}pt (text: ${page.text.length} chars, height: ${Math.round(initialHeight)} → ${Math.round(textHeight)}, available: ${Math.round(safeAvailableHeight)})`);
         }
 
         textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
@@ -6617,7 +6670,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 
     // Store PDF in database
     if (STORAGE_MODE === 'database' && dbPool) {
-      console.log(`📄 [PDF SAVE] Saving PDF with story_id: ${storyId}, file_id: ${fileId}`);
+      log.debug(`📄 [PDF SAVE] Saving PDF with story_id: ${storyId}, file_id: ${fileId}`);
       const insertQuery = 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
 
       await dbQuery(insertQuery, [
@@ -6630,7 +6683,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         fileSize,
         filename
       ]);
-      console.log(`📄 [PDF SAVE] PDF saved successfully`);
+      log.debug(`📄 [PDF SAVE] PDF saved successfully`);
     } else {
       // File mode
       const fs = require('fs').promises;
@@ -7246,7 +7299,7 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
 
     // Round up to even page count for Gelato (accepts any even number)
     const printPageCount = interiorPages % 2 === 0 ? interiorPages : interiorPages + 1;
-    console.log(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, layout=${isPictureBook ? 'Picture Book' : 'Standard'}, interior=${interiorPages}, printPageCount=${printPageCount}`);
+    log.debug(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, layout=${isPictureBook ? 'Picture Book' : 'Standard'}, interior=${interiorPages}, printPageCount=${printPageCount}`);
 
     // Get print product UID
     const productsResult = await dbPool.query(
@@ -7275,7 +7328,7 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
     // Admin retry: Use user role to determine Gelato order type
     // Admins get draft for testing, but can force real order if needed
     const orderType = isUserTestMode(req.user) ? 'draft' : 'order';
-    console.log(`📦 [GELATO] Retry: Creating ${orderType} (user role: ${req.user.role})`);
+    log.debug(`📦 [GELATO] Retry: Creating ${orderType} (user role: ${req.user.role})`);
 
     const printOrderPayload = {
       orderType: orderType,
@@ -7307,7 +7360,7 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
       }
     };
 
-    console.log(`📦 [ADMIN] Retry print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, pdfUrl=${pdfUrl}`);
+    log.debug(`📦 [ADMIN] Retry print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, pdfUrl=${pdfUrl}`);
 
     const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
       method: 'POST',
@@ -7868,7 +7921,7 @@ app.get('/api/admin/database-size', authenticateToken, async (req, res) => {
         const result = await dbPool.query(`SELECT COUNT(*) as row_count FROM ${table.tablename}`);
         rowCountMap[table.tablename] = parseInt(result.rows[0].row_count);
       } catch (err) {
-        console.warn(`⚠️  Could not get row count for table ${table.tablename}:`, err.message);
+        log.warn(`Could not get row count for table ${table.tablename}:`, err.message);
         rowCountMap[table.tablename] = 0;
       }
     }
@@ -8326,7 +8379,7 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
 
-    console.log(`🔍 Checking order status for session: ${sessionId}`);
+    log.debug(`🔍 Checking order status for session: ${sessionId}`);
 
     // Check database for order with retries (webhook might still be processing)
     if (STORAGE_MODE === 'database') {
@@ -8352,14 +8405,14 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
-      console.log(`⚠️ Order not in database after ${maxRetries} attempts, checking Stripe directly`);
+      log.warn(`Order not in database after ${maxRetries} attempts, checking Stripe directly`);
     }
 
     // If not in database yet, check Stripe and return full session data
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['customer_details', 'shipping_details']
     });
-    console.log(`📋 Stripe session status: ${session.payment_status}`);
+    log.debug(`📋 Stripe session status: ${session.payment_status}`);
 
     // If payment was successful, construct order-like response from Stripe data
     if (session.payment_status === 'paid') {
@@ -8367,7 +8420,7 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
       const shippingDetails = session.shipping_details || {};
       const shippingAddress = shippingDetails.address || {};
 
-      console.log(`📦 Constructing order from Stripe session data`);
+      log.debug(`📦 Constructing order from Stripe session data`);
       return res.json({
         status: 'processing', // Webhook hasn't completed yet but payment succeeded
         order: {
@@ -8473,7 +8526,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
 
     // Use the same targetPageCount calculated during PDF generation (already added blank pages)
     const printPageCount = targetPageCount;
-    console.log(`📊 [BACKGROUND] Using PDF page count for Gelato: ${printPageCount}`);
+    log.debug(`📊 [BACKGROUND] Using PDF page count for Gelato: ${printPageCount}`);
 
     // Fetch product UID from database based on page count (same logic as frontend)
     let printProductUid = null;
@@ -8497,7 +8550,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
           printProductUid = matchingProduct.product_uid;
           console.log(`✅ [BACKGROUND] Found matching product: ${matchingProduct.product_name}`);
         } else {
-          console.warn(`⚠️ [BACKGROUND] No product matches page count ${printPageCount}`);
+          log.warn(`[BACKGROUND] No product matches page count ${printPageCount}`);
         }
       }
     } catch (err) {
@@ -8507,11 +8560,11 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     // Fallback to environment variable or hardcoded default
     if (!printProductUid) {
       printProductUid = process.env.GELATO_PHOTOBOOK_UID || 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver';
-      console.log(`⚠️ [BACKGROUND] Using fallback product UID: ${printProductUid}`);
+      log.warn(`[BACKGROUND] Using fallback product UID: ${printProductUid}`);
     }
 
     // Use gelatoOrderType determined from isTestPayment parameter
-    console.log(`📦 [BACKGROUND] Creating Gelato ${gelatoOrderType} order`);
+    log.debug(`📦 [BACKGROUND] Creating Gelato ${gelatoOrderType} order`);
 
     // Use CHF currency for print orders
     const currency = 'CHF';
@@ -8546,7 +8599,7 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
       }
     };
 
-    console.log(`📦 [BACKGROUND] Print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, orderType=${gelatoOrderType}`);
+    log.debug(`📦 [BACKGROUND] Print order payload: productUid=${printProductUid}, pageCount=${printPageCount}, orderType=${gelatoOrderType}`);
 
     const printResponse = await fetch('https://order.gelatoapis.com/v4/orders', {
       method: 'POST',
@@ -9187,7 +9240,7 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
     });
 
     if (!response.ok) {
-      console.log(`⚠️  [VISUAL BIBLE] Gemini API error: ${response.status}`);
+      log.warn(`[VISUAL BIBLE] Gemini API error: ${response.status}`);
       return [];
     }
 
@@ -9365,9 +9418,9 @@ function extractCoverScenes(outline) {
   // Save last buffer
   saveCurrentScene();
 
-  console.log(`📋 [COVER-EXTRACT] Title Page: clothing=${coverScenes.titlePage.clothing || 'not found'}, scene=${coverScenes.titlePage.scene.substring(0, 50)}...`);
-  console.log(`📋 [COVER-EXTRACT] Initial Page: clothing=${coverScenes.initialPage.clothing || 'not found'}, scene=${coverScenes.initialPage.scene.substring(0, 50)}...`);
-  console.log(`📋 [COVER-EXTRACT] Back Cover: clothing=${coverScenes.backCover.clothing || 'not found'}, scene=${coverScenes.backCover.scene.substring(0, 50)}...`);
+  log.debug(`📋 [COVER-EXTRACT] Title Page: clothing=${coverScenes.titlePage.clothing || 'not found'}, scene=${coverScenes.titlePage.scene.substring(0, 50)}...`);
+  log.debug(`📋 [COVER-EXTRACT] Initial Page: clothing=${coverScenes.initialPage.clothing || 'not found'}, scene=${coverScenes.initialPage.scene.substring(0, 50)}...`);
+  log.debug(`📋 [COVER-EXTRACT] Back Cover: clothing=${coverScenes.backCover.clothing || 'not found'}, scene=${coverScenes.backCover.scene.substring(0, 50)}...`);
 
   return coverScenes;
 }
@@ -9565,8 +9618,8 @@ function extractShortSceneDescriptions(outline) {
   const lines = outline.split('\n');
 
   // Debug: Log outline length and preview to understand format
-  console.log(`📋 [SCENE-EXTRACT] Outline length: ${outline.length} chars, ${lines.length} lines`);
-  console.log(`📋 [SCENE-EXTRACT] Outline preview (first 500 chars): ${outline.substring(0, 500).replace(/\n/g, '\\n')}`);
+  log.debug(`📋 [SCENE-EXTRACT] Outline length: ${outline.length} chars, ${lines.length} lines`);
+  log.debug(`📋 [SCENE-EXTRACT] Outline preview (first 500 chars): ${outline.substring(0, 500).replace(/\n/g, '\\n')}`);
 
   // Look for the Page-by-Page Breakdown section first
   let inPageSection = false;
@@ -9578,7 +9631,7 @@ function extractShortSceneDescriptions(outline) {
     // Detect when we enter the page breakdown section
     if (line.match(/page[\s-]*by[\s-]*page|seitenweise/i)) {
       inPageSection = true;
-      console.log(`📋 [SCENE-EXTRACT] Found page breakdown section at line ${i + 1}`);
+      log.debug(`📋 [SCENE-EXTRACT] Found page breakdown section at line ${i + 1}`);
     }
 
     // Look for various page header formats:
@@ -9595,7 +9648,7 @@ function extractShortSceneDescriptions(outline) {
       const inlineSceneMatch = line.match(/(?:Scene|Szene|Scène)(?:\s+Description)?[:\s]+(.+)/i);
       if (inlineSceneMatch && inlineSceneMatch[1].trim().length > 10) {
         descriptions[pageNum] = inlineSceneMatch[1].trim();
-        console.log(`📋 [SCENE-EXTRACT] Page ${pageNum} (inline): ${descriptions[pageNum].substring(0, 60)}...`);
+        log.debug(`📋 [SCENE-EXTRACT] Page ${pageNum} (inline): ${descriptions[pageNum].substring(0, 60)}...`);
         continue;
       }
 
@@ -9608,7 +9661,7 @@ function extractShortSceneDescriptions(outline) {
         const sceneMatch = sceneLine.match(/^[-*•]?\s*\*{0,2}(?:Scene|Szene|Scène|Visual|Setting|Image)(?:\s+Description)?[:\s]*\*{0,2}\s*(.*)/i);
         if (sceneMatch && sceneMatch[1].trim().length > 5) {
           descriptions[pageNum] = sceneMatch[1].trim();
-          console.log(`📋 [SCENE-EXTRACT] Page ${pageNum}: ${descriptions[pageNum].substring(0, 60)}...`);
+          log.debug(`📋 [SCENE-EXTRACT] Page ${pageNum}: ${descriptions[pageNum].substring(0, 60)}...`);
           break;
         }
         // Stop if we hit another Page marker
@@ -9628,15 +9681,15 @@ function extractShortSceneDescriptions(outline) {
 
           // Use this as fallback scene description (strip markdown formatting)
           descriptions[pageNum] = nextLine.replace(/^\*{1,2}/, '').replace(/\*{1,2}$/, '').replace(/^\[|\]$/g, '').trim();
-          console.log(`📋 [SCENE-EXTRACT] Page ${pageNum} (fallback): ${descriptions[pageNum].substring(0, 60)}...`);
+          log.debug(`📋 [SCENE-EXTRACT] Page ${pageNum} (fallback): ${descriptions[pageNum].substring(0, 60)}...`);
           break;
         }
       }
     }
   }
 
-  console.log(`📋 [SCENE-EXTRACT] Pages found: ${pagesFound.join(', ') || 'none'}`);
-  console.log(`📋 [SCENE-EXTRACT] Total extracted: ${Object.keys(descriptions).length} scene descriptions`);
+  log.debug(`📋 [SCENE-EXTRACT] Pages found: ${pagesFound.join(', ') || 'none'}`);
+  log.debug(`📋 [SCENE-EXTRACT] Total extracted: ${Object.keys(descriptions).length} scene descriptions`);
   return descriptions;
 }
 
@@ -9783,7 +9836,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       try {
         // DEBUG: Log available characters before filtering
         const allCharacters = inputData.characters || [];
-        console.log(`🔍 [DEBUG PAGE ${pageNum}] Total available characters: ${allCharacters.length}`);
+        log.debug(`🔍 [DEBUG PAGE ${pageNum}] Total available characters: ${allCharacters.length}`);
         allCharacters.forEach(char => {
           const hasPhoto = char.photoUrl?.startsWith('data:image');
           const hasBody = char.bodyPhotoUrl?.startsWith('data:image');
@@ -9793,22 +9846,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         });
 
         const sceneCharacters = getCharactersInScene(sceneDesc, inputData.characters || []);
-        console.log(`🔍 [DEBUG PAGE ${pageNum}] Characters found in scene: ${sceneCharacters.map(c => c.name).join(', ') || 'NONE'}`);
+        log.debug(`🔍 [DEBUG PAGE ${pageNum}] Characters found in scene: ${sceneCharacters.map(c => c.name).join(', ') || 'NONE'}`);
 
         // Parse clothing category from scene description
         const clothingCategory = parseClothingCategory(sceneDesc) || 'standard';
-        console.log(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
+        log.debug(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
 
         // Use detailed photo info (with names) for labeled reference images
         const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
-        console.log(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
+        log.debug(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
         // Log with visual bible info if available
         if (vBible) {
           const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
-          console.log(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} chars, ${relevantEntries.length} visual bible entries)...`);
+          log.debug(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} chars, ${relevantEntries.length} visual bible entries)...`);
         } else {
-          console.log(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} characters)...`);
+          log.debug(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} characters)...`);
         }
 
         const imagePrompt = buildImagePrompt(sceneDesc, inputData, sceneCharacters, false, vBible, pageNum, true); // isStorybook = true
@@ -10103,7 +10156,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           coverImages[result.type] = result.data;
         }
       });
-      console.log(`✅ [STORYBOOK] ${coverResults.filter(r => r).length} cover images complete from streaming`);
+      log.debug(`✅ [STORYBOOK] ${coverResults.filter(r => r).length} cover images complete from streaming`);
     }
 
     // Save checkpoint
@@ -10252,7 +10305,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       sceneDescriptions: allSceneDescriptions,
       totalPages: sceneCount
     });
-    console.log(`💾 [STORYBOOK] Saved story text checkpoint with ${Object.keys(pageTextMap).length} pages`);
+    log.debug(`💾 [STORYBOOK] Saved story text checkpoint with ${Object.keys(pageTextMap).length} pages`);
 
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -10262,7 +10315,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Generate images if not skipped
     if (!skipImages) {
       // Note: imageGenMode and MAX_RETRIES already defined above for streaming
-      console.log(`🖼️  [STORYBOOK] Image generation mode: ${imageGenMode.toUpperCase()}`);
+      log.debug(`🖼️  [STORYBOOK] Image generation mode: ${imageGenMode.toUpperCase()}`);
 
       // Helper function to generate a single image (used for sequential mode)
       const generateImage = async (scene, idx, previousImage = null, isSequential = false, vBible = null) => {
@@ -10270,7 +10323,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         try {
           // DEBUG: Log available characters before filtering
           const allChars = inputData.characters || [];
-          console.log(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Total characters: ${allChars.length}`);
+          log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Total characters: ${allChars.length}`);
           allChars.forEach(char => {
             const hasPhoto = char.photoUrl?.startsWith('data:image');
             const hasBody = char.bodyPhotoUrl?.startsWith('data:image');
@@ -10281,22 +10334,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
           // Detect which characters appear in this scene
           const sceneCharacters = getCharactersInScene(scene.description, inputData.characters || []);
-          console.log(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Characters found in scene: ${sceneCharacters.map(c => c.name).join(', ') || 'NONE'}`);
+          log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Characters found in scene: ${sceneCharacters.map(c => c.name).join(', ') || 'NONE'}`);
 
           // Parse clothing category from scene description
           const clothingCategory = parseClothingCategory(scene.description) || 'standard';
-          console.log(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
+          log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
 
           // Use detailed photo info (with names) for labeled reference images
           const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
-          console.log(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Reference photos: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
+          log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Reference photos: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
           // Log visual bible usage
           if (vBible) {
             const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
-            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, clothing: ${clothingCategory}, ${relevantEntries.length} visual bible entries)...`);
+            log.debug(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, clothing: ${clothingCategory}, ${relevantEntries.length} visual bible entries)...`);
           } else {
-            console.log(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
+            log.debug(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
           }
 
           // Build image prompt with only scene-specific characters and visual bible
@@ -10320,7 +10373,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             }
           }
 
-          console.log(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
+          log.debug(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
           // Update progress
           const progressPercent = 30 + Math.floor((idx + 1) / sceneCount * 50);
@@ -10389,7 +10442,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           streamingResults.forEach(img => {
             if (img) allImages.push(img);
           });
-          console.log(`✅ [STORYBOOK] ${allImages.length} streaming images complete`);
+          log.debug(`✅ [STORYBOOK] ${allImages.length} streaming images complete`);
         }
 
         // Find any scenes that weren't processed during streaming (last scene might be missed)
@@ -10461,7 +10514,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           });
           coverPrompts.frontCover = frontCoverPrompt;
           const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover');
-          console.log(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
+          log.debug(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.frontCover = {
             imageData: frontCoverResult.imageData,
             description: titlePageScene,
@@ -10505,7 +10558,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               });
           coverPrompts.initialPage = initialPrompt;
           const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover');
-          console.log(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
+          log.debug(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.initialPage = {
             imageData: initialResult.imageData,
             description: initialPageScene,
@@ -10540,7 +10593,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           });
           coverPrompts.backCover = backCoverPrompt;
           const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover');
-          console.log(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
+          log.debug(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.backCover = {
             imageData: backCoverResult.imageData,
             description: backCoverScene,
@@ -10560,7 +10613,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           console.log(`⚡ [STORYBOOK] Back cover already generated during streaming (skipping)`);
         }
 
-        console.log(`✅ [STORYBOOK] Cover images complete (${coversFromStreaming} from streaming, ${3 - coversFromStreaming} generated after)`);
+        log.debug(`✅ [STORYBOOK] Cover images complete (${coversFromStreaming} from streaming, ${3 - coversFromStreaming} generated after)`);
       } catch (error) {
         console.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
       }
@@ -10622,7 +10675,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens);
     const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens);
     const totalCost = anthropicCost.total + geminiImageCost.total + geminiQualityCost.total;
-    console.log(`📊 [STORYBOOK] Token usage & cost summary:`);
+    log.debug(`📊 [STORYBOOK] Token usage & cost summary:`);
     console.log(`   ─────────────────────────────────────────────────────────────`);
     console.log(`   BY PROVIDER:`);
     console.log(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
@@ -10661,7 +10714,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
       [storyId, userId, JSON.stringify(storyData)]
     );
-    console.log(`📚 [STORYBOOK] Story ${storyId} saved to stories table`);
+    log.debug(`📚 [STORYBOOK] Story ${storyId} saved to stories table`);
 
     // Log credit completion (credits were already reserved at job creation)
     try {
@@ -10679,7 +10732,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [userId, 0, currentBalance, 'story_complete', jobId, `Story completed - ${creditsUsed} credits used`]
         );
-        console.log(`💳 [STORYBOOK] Story completed, ${creditsUsed} credits used for job ${jobId}`);
+        log.info(`💳 [STORYBOOK] Story completed, ${creditsUsed} credits used for job ${jobId}`);
       }
     } catch (creditErr) {
       console.error('❌ [STORYBOOK] Failed to log credit completion:', creditErr.message);
@@ -10701,7 +10754,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       [JSON.stringify(resultData), jobId]
     );
 
-    console.log(`✅ [STORYBOOK] Job ${jobId} completed successfully`);
+    log.debug(`✅ [STORYBOOK] Job ${jobId} completed successfully`);
     return resultData;
 
   } catch (error) {
@@ -10746,7 +10799,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             [jobId]
           );
 
-          console.log(`💳 [STORYBOOK] Refunded ${creditsToRefund} credits for failed job ${jobId}`);
+          log.info(`💳 [STORYBOOK] Refunded ${creditsToRefund} credits for failed job ${jobId}`);
         }
       }
     } catch (refundErr) {
@@ -10861,12 +10914,12 @@ async function processStoryJob(jobId) {
     // Determine image generation mode: sequential (consistent) or parallel (fast)
     // Sequential passes previous image to next for better character consistency
     const imageGenMode = inputData.imageGenMode || IMAGE_GEN_MODE || 'parallel';
-    console.log(`🖼️  [PIPELINE] Image generation mode: ${imageGenMode.toUpperCase()}`);
+    log.debug(`🖼️  [PIPELINE] Image generation mode: ${imageGenMode.toUpperCase()}`);
 
     // Extract character photos for reference images (with names for labeling)
     // Use getCharacterPhotoDetails for labeled references
     const characterPhotos = getCharacterPhotoDetails(inputData.characters || []);
-    console.log(`📸 [PIPELINE] Found ${characterPhotos.length} labeled character photos for reference`);
+    log.debug(`📸 [PIPELINE] Found ${characterPhotos.length} labeled character photos for reference`);
 
     // Update status to processing
     await dbPool.query(
@@ -10890,7 +10943,7 @@ async function processStoryJob(jobId) {
     const outlinePrompt = buildStoryPrompt(inputData, sceneCount);
     // Claude can handle up to 64,000 output tokens - use generous limit for outlines
     const outlineTokens = 16000;
-    console.log(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
+    log.debug(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
     const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens);
     const outline = outlineResult.text;
     addUsage('anthropic', outlineResult.usage, 'outline');
@@ -10900,7 +10953,7 @@ async function processStoryJob(jobId) {
 
     // Extract short scene descriptions from outline for better image generation
     const shortSceneDescriptions = extractShortSceneDescriptions(outline);
-    console.log(`📋 [PIPELINE] Extracted ${Object.keys(shortSceneDescriptions).length} short scene descriptions from outline`);
+    log.debug(`📋 [PIPELINE] Extracted ${Object.keys(shortSceneDescriptions).length} short scene descriptions from outline`);
 
     // Parse Visual Bible for recurring elements consistency
     const visualBible = parseVisualBible(outline);
@@ -11118,7 +11171,7 @@ async function processStoryJob(jobId) {
       const startScene = batchNum * BATCH_SIZE + 1;
       const endScene = Math.min((batchNum + 1) * BATCH_SIZE, sceneCount);
 
-      console.log(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating scenes ${startScene}-${endScene}`);
+      log.debug(`📖 [BATCH ${batchNum + 1}/${numBatches}] Generating scenes ${startScene}-${endScene}`);
 
       // Generate story text for this batch
       const basePrompt = buildBasePrompt(inputData, sceneCount);
@@ -11188,7 +11241,7 @@ Output Format:
         // Start scene description + image generation (don't await)
         const imagePromise = limit(async () => {
           try {
-            console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
+            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
 
             // Generate detailed scene description
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
@@ -11206,7 +11259,7 @@ Output Format:
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
             const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
             const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
-            console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingCategory})...`);
+            log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingCategory})...`);
 
             // Generate image
             const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum);
@@ -11235,9 +11288,15 @@ Output Format:
               console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum} (immediate, quality pending)`);
             };
 
+            // Usage tracker for page images
+            const pageUsageTracker = (imgUsage, qualUsage) => {
+              if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images');
+              if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality');
+            };
+
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady);
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker);
               } catch (error) {
                 retries++;
                 console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -11330,13 +11389,13 @@ Output Format:
 
       // Parse the pages from this batch (for validation and any pages missed by streaming)
       let batchPages = parseStoryPages(batchText);
-      console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
+      log.debug(`📄 [BATCH ${batchNum + 1}/${numBatches}] Parsed ${batchPages.length} pages`);
 
       // Filter to only include pages in the expected range (Claude sometimes generates extra)
       const unfilteredCount = batchPages.length;
       batchPages = batchPages.filter(p => p.pageNumber >= startScene && p.pageNumber <= endScene);
       if (batchPages.length < unfilteredCount) {
-        console.log(`⚠️ [BATCH ${batchNum + 1}] Filtered out ${unfilteredCount - batchPages.length} pages outside range ${startScene}-${endScene}`);
+        log.warn(`[BATCH ${batchNum + 1}] Filtered out ${unfilteredCount - batchPages.length} pages outside range ${startScene}-${endScene}`);
       }
 
       // VALIDATION: Check if all expected pages were generated
@@ -11351,7 +11410,7 @@ Output Format:
 
       // RETRY: If pages are missing, request them explicitly
       if (missingPages.length > 0) {
-        console.log(`⚠️ [BATCH ${batchNum + 1}] Missing pages: ${missingPages.join(', ')}. Retrying for missing pages...`);
+        log.warn(`[BATCH ${batchNum + 1}] Missing pages: ${missingPages.join(', ')}. Retrying for missing pages...`);
 
         for (const missingPageNum of missingPages) {
           const retryPrompt = `${basePrompt}
@@ -11369,7 +11428,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 --- Page ${missingPageNum} ---
 [Write the story text for page ${missingPageNum} here, following the outline and maintaining continuity with other pages]`;
 
-          console.log(`🔄 [RETRY] Generating missing page ${missingPageNum}...`);
+          log.debug(` Generating missing page ${missingPageNum}...`);
           const retryResult = await callTextModelStreaming(retryPrompt, 1500);
           const retryText = retryResult.text;
           addUsage('anthropic', retryResult.usage, 'story_text');
@@ -11388,13 +11447,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               }
             }
           } else {
-            console.log(`❌ [RETRY] Failed to parse page ${missingPageNum} from retry response`);
+            log.error(`[RETRY] Failed to parse page ${missingPageNum} from retry response`);
           }
         }
 
         // Sort pages by page number after adding retried pages
         batchPages.sort((a, b) => a.pageNumber - b.pageNumber);
-        console.log(`📄 [BATCH ${batchNum + 1}/${numBatches}] After retry: ${batchPages.length} pages`);
+        log.debug(`📄 [BATCH ${batchNum + 1}/${numBatches}] After retry: ${batchPages.length} pages`);
       }
 
       // Start image generation for any pages that weren't caught by progressive streaming
@@ -11441,7 +11500,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       })),
       totalPages: sceneCount
     });
-    console.log(`💾 [STORY] Saved story_text checkpoint with ${Object.keys(pageTextMap).length} pages for progressive display`);
+    log.debug(`💾 [STORY] Saved story_text checkpoint with ${Object.keys(pageTextMap).length} pages for progressive display`);
 
     // Wait for images only if not skipping
     if (!skipImages) {
@@ -11490,17 +11549,17 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const beforeDedup = allPages.length;
         allPages = allPages.filter(page => {
           if (seenPages.has(page.pageNumber)) {
-            console.log(`⚠️ [SEQUENTIAL] Removing duplicate page ${page.pageNumber}`);
+            log.warn(`[SEQUENTIAL] Removing duplicate page ${page.pageNumber}`);
             return false;
           }
           seenPages.add(page.pageNumber);
           return true;
         });
         if (allPages.length < beforeDedup) {
-          console.log(`⚠️ [SEQUENTIAL] Removed ${beforeDedup - allPages.length} duplicate pages`);
+          log.warn(`[SEQUENTIAL] Removed ${beforeDedup - allPages.length} duplicate pages`);
         }
 
-        console.log(`📄 [SEQUENTIAL] Found ${allPages.length} pages to generate images for`);
+        log.debug(`📄 [SEQUENTIAL] Found ${allPages.length} pages to generate images for`);
 
         await dbPool.query(
           'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -11522,7 +11581,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Pass visualBible so recurring elements are included in scene description
             const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
 
-            console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
+            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
             const sceneDescription = sceneDescResult.text;
             addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions');
@@ -11540,7 +11599,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
             // Use detailed photo info (with names) for labeled reference images
             const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
-            console.log(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
+            log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
 
             // Generate image from scene description with scene-specific characters and visual bible
             const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, true, visualBible, pageNum);
@@ -11569,11 +11628,17 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               console.log(`💾 [PARTIAL] Saved partial result for page ${pageNum} (immediate, quality pending)`);
             };
 
+            // Usage tracker for page images
+            const pageUsageTracker = (imgUsage, qualUsage) => {
+              if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images');
+              if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality');
+            };
+
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
                 // Use quality retry to regenerate if score is below threshold
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady);
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker);
               } catch (error) {
                 retries++;
                 console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -11731,13 +11796,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const frontRegen = frontCover.result.wasRegenerated ? ' (regenerated)' : '';
         const initialRegen = initialPage.result.wasRegenerated ? ' (regenerated)' : '';
         const backRegen = backCover.result.wasRegenerated ? ' (regenerated)' : '';
-        console.log(`📊 [PIPELINE] Cover quality scores - Front: ${frontCover.result.score}${frontRegen}, Initial: ${initialPage.result.score}${initialRegen}, Back: ${backCover.result.score}${backRegen}`);
+        log.debug(`📊 [PIPELINE] Cover quality scores - Front: ${frontCover.result.score}${frontRegen}, Initial: ${initialPage.result.score}${initialRegen}, Back: ${backCover.result.score}${backRegen}`);
       } catch (error) {
         console.error(`❌ [PIPELINE] Cover generation failed:`, error);
         throw new Error(`Cover generation failed: ${error.message}`);
       }
     } else if (!skipImages && !skipCovers) {
-      console.log(`⚠️ [PIPELINE] No cover generation promise found - covers may have been skipped`);
+      log.warn(`[PIPELINE] No cover generation promise found - covers may have been skipped`);
     } else {
       console.log(`📝 [PIPELINE] Text-only mode - skipping cover image generation`);
     }
@@ -11798,7 +11863,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens);
     const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens);
     const totalCost = anthropicCost.total + geminiImageCost.total + geminiQualityCost.total;
-    console.log(`📊 [PIPELINE] Token usage & cost summary:`);
+    log.debug(`📊 [PIPELINE] Token usage & cost summary:`);
     console.log(`   ─────────────────────────────────────────────────────────────`);
     console.log(`   BY PROVIDER:`);
     console.log(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
@@ -11948,13 +12013,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             console.log('  Batch prompt:', data.batchPrompt?.substring(0, 500) + '...');
           }
         } else if (cp.step_name === 'partial_page') {
-          console.log(`🖼️  [PAGE ${cp.step_index}]:`);
+          log.debug(`🖼️  [PAGE ${cp.step_index}]:`);
           console.log('  Scene description:', (data.description || data.sceneDescription?.description)?.substring(0, 200) + '...');
           console.log('  Image prompt:', (data.prompt || data.imagePrompt)?.substring(0, 200) + '...');
           console.log('  Has image:', !!data.imageData);
           console.log('  Quality score:', data.qualityScore || data.score);
         } else if (cp.step_name === 'cover') {
-          console.log(`🎨 [COVER ${data.type}]:`);
+          log.debug(`🎨 [COVER ${data.type}]:`);
           console.log('  Prompt:', data.prompt?.substring(0, 200) + '...');
         } else if (cp.step_name === 'storybook_combined') {
           console.log('📚 [STORYBOOK COMBINED]:', data.response?.substring(0, 500) + '...');
@@ -12323,23 +12388,23 @@ function parseSceneDescriptions(text, expectedCount) {
       return true;
     });
 
-  console.log(`📋 [PARSE] Found ${scenes.length} valid scenes (expected ${expectedCount})`);
+  log.debug(`📋 [PARSE] Found ${scenes.length} valid scenes (expected ${expectedCount})`);
 
   // Log each scene for debugging
   scenes.forEach((scene, i) => {
     const preview = scene.substring(0, 80) + (scene.length > 80 ? '...' : '');
-    console.log(`📋 [PARSE] Scene ${i + 1}: ${preview}`);
+    log.debug(`📋 [PARSE] Scene ${i + 1}: ${preview}`);
   });
 
   // If we have more scenes than expected, take only the first expectedCount
   if (scenes.length > expectedCount) {
-    console.warn(`⚠️  [PARSE] Got ${scenes.length} scenes but expected ${expectedCount}, trimming excess`);
+    log.warn(`[PARSE] Got ${scenes.length} scenes but expected ${expectedCount}, trimming excess`);
     return scenes.slice(0, expectedCount);
   }
 
   // If we have fewer scenes than expected, warn but continue
   if (scenes.length < expectedCount) {
-    console.warn(`⚠️  [PARSE] Got only ${scenes.length} scenes but expected ${expectedCount}`);
+    log.warn(`[PARSE] Got only ${scenes.length} scenes but expected ${expectedCount}`);
   }
 
   return scenes;
@@ -12570,7 +12635,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
   const outputTokens = data.usage?.output_tokens || 0;
 
   if (inputTokens > 0 || outputTokens > 0) {
-    console.log(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
   }
 
   return {
@@ -12677,12 +12742,12 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
         // Log when streaming completes
         if (event.type === 'message_stop') {
           console.log(`🌊 [STREAM] Streaming complete, received ${fullText.length} chars, stop_reason: ${stopReason}`);
-          console.log(`📊 [STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+          log.debug(`📊 [STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
         }
       } catch (parseError) {
         // Log parse errors for debugging (but don't fail on empty lines)
         if (data && data !== '[DONE]') {
-          console.warn(`⚠️ [STREAM] Failed to parse SSE data: ${data.substring(0, 100)}`);
+          log.warn(`[STREAM] Failed to parse SSE data: ${data.substring(0, 100)}`);
         }
       }
     }
@@ -12727,7 +12792,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
 
   // Warn if response was truncated due to max_tokens
   if (stopReason === 'max_tokens') {
-    console.warn(`⚠️ [STREAM] Response was TRUNCATED due to max_tokens limit (${maxTokens})! Text may be incomplete.`);
+    log.warn(`[STREAM] Response was TRUNCATED due to max_tokens limit (${maxTokens})! Text may be incomplete.`);
   }
 
   // Warn if response is empty (possible API issue)
@@ -12764,7 +12829,7 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null) 
       return await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
     case 'google':
       // Fallback to non-streaming for Gemini (streaming implementation can be added later)
-      console.log(`⚠️ [TEXT-STREAM] Gemini streaming not implemented, falling back to non-streaming`);
+      log.warn(`[TEXT-STREAM] Gemini streaming not implemented, falling back to non-streaming`);
       const result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
       // callGeminiTextAPI returns { text, usage } - pass through
       return result;
@@ -13134,7 +13199,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
   const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
 
   if (inputTokens > 0 || outputTokens > 0) {
-    console.log(`📊 [GEMINI-TEXT] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    log.debug(`📊 [GEMINI-TEXT] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
   }
 
   return {
@@ -13439,14 +13504,15 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning.substring(0, 150)}...`);
     }
 
-    // Return score, full raw response, and text-specific info for covers
+    // Return score, full raw response, text-specific info, and usage for covers
     return {
       score: finalScore,
       reasoning: responseText, // Return full raw API response for transparency
       textErrorOnly,
       expectedText,
       actualText,
-      textIssue
+      textIssue,
+      usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens }
     };
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
@@ -13529,7 +13595,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         data: base64Data
       }
     });
-    console.log(`🖼️  [IMAGE GEN] Added cropped previous scene image for visual continuity (SEQUENTIAL MODE)`);
+    log.debug(`🖼️  [IMAGE GEN] Added cropped previous scene image for visual continuity (SEQUENTIAL MODE)`);
   }
 
   // Add character photos as reference images
@@ -13576,7 +13642,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         skippedCount++;
         // Log warning for skipped photos to help diagnose issues
         const preview = photoUrl ? photoUrl.substring(0, 50) : 'null/undefined';
-        console.warn(`⚠️ [IMAGE GEN] Skipping character photo ${index + 1}: not a valid data URL (starts with: ${preview}...)`);
+        log.warn(`[IMAGE GEN] Skipping character photo ${index + 1}: not a valid data URL (starts with: ${preview}...)`);
       }
     });
 
@@ -13586,12 +13652,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
 
     if (characterNames.length > 0) {
-      console.log(`🖼️  [IMAGE GEN] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')}`);
+      log.debug(`🖼️  [IMAGE GEN] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')}`);
     } else {
-      console.log(`🖼️  [IMAGE GEN] Added ${addedCount}/${characterPhotos.length} character reference images (unlabeled)`);
+      log.debug(`🖼️  [IMAGE GEN] Added ${addedCount}/${characterPhotos.length} character reference images (unlabeled)`);
     }
     if (skippedCount > 0) {
-      console.warn(`⚠️ [IMAGE GEN] WARNING: ${skippedCount} photos were SKIPPED (not base64 data URLs)`);
+      log.warn(`[IMAGE GEN] WARNING: ${skippedCount} photos were SKIPPED (not base64 data URLs)`);
     }
   }
 
@@ -13612,7 +13678,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   };
 
   console.log('🖼️  [IMAGE GEN] Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
-  console.log(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8`);
+  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8`);
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
@@ -13639,7 +13705,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     output_tokens: data.usageMetadata?.candidatesTokenCount || 0
   };
   if (imageUsage.input_tokens > 0 || imageUsage.output_tokens > 0) {
-    console.log(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}`);
+    log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}`);
   }
 
   // Log response structure (without base64 data to avoid massive logs)
@@ -13700,6 +13766,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const textErrorOnly = qualityResult ? qualityResult.textErrorOnly : false;
         const expectedText = qualityResult ? qualityResult.expectedText : null;
         const actualText = qualityResult ? qualityResult.actualText : null;
+        const qualityUsage = qualityResult ? qualityResult.usage : null;
 
         // Store in cache (include text error info for covers)
         const result = {
@@ -13711,7 +13778,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           expectedText,
           actualText,
           modelId,  // Include which model was used for dev mode
-          usage: imageUsage  // Token usage for cost tracking
+          imageUsage: imageUsage,  // Token usage for image generation
+          qualityUsage: qualityUsage  // Token usage for quality evaluation
         };
         imageCache.set(cacheKey, result);
         log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
@@ -13853,9 +13921,10 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @param {string|null} previousImage - Previous image for sequential mode
  * @param {string} evaluationType - Type of evaluation ('scene' or 'cover')
  * @param {Function|null} onImageReady - Optional callback called immediately when image is generated (before quality eval)
+ * @param {Function|null} usageTracker - Optional callback to track token usage: (imageUsage, qualityUsage) => void
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
-async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null) {
+async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null) {
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   let bestResult = null;
@@ -13869,7 +13938,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
   while (attempts < MAX_ATTEMPTS) {
     attempts++;
-    console.log(`🎨 [QUALITY RETRY] Attempt ${attempts}/${MAX_ATTEMPTS} (threshold: ${IMAGE_QUALITY_THRESHOLD}%)...`);
+    log.debug(`🎨 [QUALITY RETRY] Attempt ${attempts}/${MAX_ATTEMPTS} (threshold: ${IMAGE_QUALITY_THRESHOLD}%)...`);
 
     // Clear cache for retries to force new generation
     if (attempts > 1) {
@@ -13880,6 +13949,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     let result;
     try {
       result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady);
+      // Track usage if tracker provided
+      if (usageTracker && result) {
+        usageTracker(result.imageUsage, result.qualityUsage);
+      }
     } catch (error) {
       // Check if this is a safety/content block error
       const errorMsg = error.message.toLowerCase();
@@ -13921,7 +13994,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             console.error(`❌ [QUALITY RETRY] Scene rewrite failed:`, rewriteError.message);
           }
         } else {
-          console.log(`⚠️ [QUALITY RETRY] Could not extract scene from prompt for rewriting. First 500 chars: ${currentPrompt.substring(0, 500)}`);
+          log.warn(`[QUALITY RETRY] Could not extract scene from prompt for rewriting. First 500 chars: ${currentPrompt.substring(0, 500)}`);
         }
       }
 
@@ -13951,8 +14024,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       !isExpectedNoText;
 
     if (hasTextError) {
-      console.log(`🔤 [QUALITY RETRY] Text error: ${result.textIssue}`);
-      console.log(`🔤 [QUALITY RETRY] Expected: "${result.expectedText}" | Actual: "${result.actualText}"`);
+      log.debug(` RETRY] Text error: ${result.textIssue}`);
+      log.debug(` RETRY] Expected: "${result.expectedText}" | Actual: "${result.actualText}"`);
     } else if (isExpectedNoText) {
       console.log(`✅ [QUALITY RETRY] No text expected and none found - correct`);
     }
@@ -13994,7 +14067,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   }
 
   // Exhausted all attempts - return best result we got
-  console.log(`⚠️  [QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Best score: ${bestScore}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}`);
+  log.warn(`[QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Best score: ${bestScore}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}`);
   return {
     imageData: bestResult.imageData,
     score: bestResult.score,
@@ -14025,7 +14098,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
       );
 
       if (emailCheckResult.rows.length > 0 && !emailCheckResult.rows[0].email_verified) {
-        console.log(`⚠️ User ${req.user.username} attempted story generation without verified email`);
+        log.warn(`User ${req.user.username} attempted story generation without verified email`);
         return res.status(403).json({
           error: 'Email verification required',
           code: 'EMAIL_NOT_VERIFIED',
@@ -14061,7 +14134,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
           );
           // Continue with creating new job
         } else {
-          console.log(`⚠️ User ${req.user.username} already has active job ${activeJob.id} (status: ${activeJob.status}, age: ${Math.round(jobAgeMinutes)} min)`);
+          log.warn(`User ${req.user.username} already has active job ${activeJob.id} (status: ${activeJob.status}, age: ${Math.round(jobAgeMinutes)} min)`);
           return res.status(409).json({
             error: 'Story generation already in progress',
             activeJobId: activeJob.id,
@@ -14092,7 +14165,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
 
       // Handle null credits - set default based on role (this shouldn't happen after migration)
       if (userCredits === null || userCredits === undefined) {
-        console.log(`⚠️ User ${userId} has null credits, defaulting based on role`);
+        log.warn(`User ${userId} has null credits, defaulting based on role`);
         userCredits = req.user.role === 'admin' ? -1 : 1000;
       }
 
