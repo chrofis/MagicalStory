@@ -93,7 +93,7 @@ export default function Pricing() {
       <div className="px-4 md:px-8 py-8 max-w-4xl mx-auto">
         {/* Back button */}
         <button
-          onClick={() => navigate('/my-stories')}
+          onClick={() => navigate('/stories')}
           className="flex items-center gap-2 text-gray-600 hover:text-indigo-600 mb-6 transition-colors"
         >
           <ArrowLeft size={20} />
