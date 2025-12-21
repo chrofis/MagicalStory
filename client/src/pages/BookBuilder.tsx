@@ -65,7 +65,7 @@ export default function BookBuilder() {
       subtitle: 'Wähle die Reihenfolge der Geschichten und das Buchformat',
       noStories: 'Keine Geschichten ausgewählt',
       noStoriesDesc: 'Bitte geh zurück und wähle Geschichten zum Kombinieren aus.',
-      backToStories: 'Zurück zu Meine Geschichten',
+      backToStories: 'Zurück zu meinen Geschichten',
       storyOrder: 'Reihenfolge der Geschichten',
       storyOrderHint: 'Verschiebe Geschichten, um die Reihenfolge zu ändern. Das Cover der ersten Geschichte wird als Buchcover verwendet.',
       coverNote: 'Das Cover der ersten Geschichte wird als Buchcover verwendet.',
