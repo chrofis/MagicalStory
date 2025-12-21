@@ -387,6 +387,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const user: User = {
+        id: data.user.id,
+        username: data.user.username,
+        email: data.user.email,
+        role: data.user.role,
+        credits: data.user.credits,
+        preferredLanguage: data.user.preferredLanguage,
+        emailVerified: data.user.emailVerified,
+      };
+
+      localStorage.setItem('current_user', JSON.stringify(user));
+      setState(prev => ({
+        ...prev,
+        user,
+      }));
+    } catch (error) {
+      logger.error('Failed to refresh user:', error);
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -397,6 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resetPassword,
         logout,
         updateCredits,
+        refreshUser,
         impersonate,
         stopImpersonating,
         isLoading,

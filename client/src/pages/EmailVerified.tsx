@@ -33,22 +33,28 @@ const translations = {
 export default function EmailVerified() {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  useAuth(); // Keep auth context active
+  const { refreshUser } = useAuth();
   const t = translations[language as keyof typeof translations] || translations.en;
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Check if there's a pending story generation and auto-redirect
+  // Refresh user data and check for pending story generation
   useEffect(() => {
-    const pendingGeneration = localStorage.getItem('pendingStoryGeneration');
-    if (pendingGeneration === 'true') {
-      setIsRedirecting(true);
-      localStorage.removeItem('pendingStoryGeneration');
-      // Small delay so user sees the success message
-      setTimeout(() => {
-        navigate('/create?autoGenerate=true');
-      }, 1500);
-    }
-  }, [navigate]);
+    const handleVerification = async () => {
+      // Refresh user data to get updated emailVerified status
+      await refreshUser();
+
+      const pendingGeneration = localStorage.getItem('pendingStoryGeneration');
+      if (pendingGeneration === 'true') {
+        setIsRedirecting(true);
+        localStorage.removeItem('pendingStoryGeneration');
+        // Small delay so user sees the success message
+        setTimeout(() => {
+          navigate('/create?autoGenerate=true');
+        }, 1500);
+      }
+    };
+    handleVerification();
+  }, [navigate, refreshUser]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

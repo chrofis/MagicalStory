@@ -40,11 +40,12 @@ export function StorySettings({
   const { t, language } = useLanguage();
 
   // Available page options based on developer mode
-  const availablePageOptions = developerMode ? [4, 10, 15, 20, 25, 30, 35, 40, 45, 50] : [10, 15, 20, 25, 30, 35, 40, 45, 50];
+  // Only even numbers so text/image split works (pageCount / 2 must be whole number)
+  const availablePageOptions = developerMode ? [4, 10, 14, 20, 24, 30, 34, 40, 44, 50] : [10, 14, 20, 24, 30, 34, 40, 44, 50];
 
   // If current pages value is not in available options, reset to default (10)
   useEffect(() => {
-    const validOptions = developerMode ? [4, 10, 15, 20, 25, 30, 35, 40, 45, 50] : [10, 15, 20, 25, 30, 35, 40, 45, 50];
+    const validOptions = developerMode ? [4, 10, 14, 20, 24, 30, 34, 40, 44, 50] : [10, 14, 20, 24, 30, 34, 40, 44, 50];
     if (!validOptions.includes(pages)) {
       onPagesChange(10);
     }
