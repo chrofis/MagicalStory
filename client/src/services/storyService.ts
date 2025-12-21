@@ -496,6 +496,7 @@ export const storyService = {
       totalPages: number;
     };
     partialPages?: Array<{ pageNumber: number; imageData: string; text?: string }>;  // Completed page images
+    currentCredits?: number | null;  // User's updated credits balance after job completion
     error?: string;
   }> {
     const response = await api.get<{
@@ -525,6 +526,7 @@ export const storyService = {
         totalPages: number;
       };
       partialPages?: Array<{ pageNumber: number; imageData: string; text?: string }>;  // Completed page images
+      currentCredits?: number | null;  // User's updated credits after job completion
     }>(`/api/jobs/${jobId}/status`);
 
     // Map server response to client format
@@ -551,6 +553,7 @@ export const storyService = {
       partialCovers: response.partialCovers, // Cover images generated during streaming
       storyText: response.storyText, // Story text for progressive display
       partialPages: response.partialPages, // Completed page images
+      currentCredits: response.currentCredits, // User's updated credits after job completion
       error: response.errorMessage,
     };
   },

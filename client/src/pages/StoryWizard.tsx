@@ -29,7 +29,7 @@ export default function StoryWizard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, updateCredits } = useAuth();
   const { showSuccess, showInfo } = useToast();
 
   // Wizard state - start at step 5 with loading if we have a storyId in URL
@@ -1014,6 +1014,12 @@ export default function StoryWizard() {
           setProgressiveStoryData(null);
           setCompletedPageImages({});
           completed = true;
+
+          // Update user's credits in the UI with the new balance
+          if (status.currentCredits !== null && status.currentCredits !== undefined) {
+            updateCredits(status.currentCredits);
+          }
+
           log.success('Story generation completed!');
         } else if (status.status === 'failed') {
           throw new Error(status.error || 'Story generation failed');

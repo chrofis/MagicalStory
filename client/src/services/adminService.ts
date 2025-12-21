@@ -61,6 +61,33 @@ export interface UserPurchase {
   createdAt: string;
 }
 
+export interface PrintProduct {
+  id: number;
+  product_uid: string;
+  product_name: string;
+  description?: string;
+  size?: string;
+  cover_type?: string;
+  min_pages: number;
+  max_pages: number;
+  available_page_counts: number[];
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface GelatoProduct {
+  productUid: string;
+  uid?: string;
+  name?: string;
+  productName?: string;
+  description?: string;
+  pageCount?: {
+    min: number;
+    max: number;
+  };
+}
+
 export interface UserDetailsResponse {
   user: {
     id: string;
@@ -146,5 +173,30 @@ export const adminService = {
       },
     });
     return response.blob();
+  },
+
+  // Print Products Management
+  async getPrintProducts(): Promise<{ products: PrintProduct[] }> {
+    return api.get<{ products: PrintProduct[] }>('/api/admin/print-products');
+  },
+
+  async fetchGelatoProducts(): Promise<{ products: GelatoProduct[]; count: number }> {
+    return api.get<{ products: GelatoProduct[]; count: number }>('/api/admin/print-provider/fetch-products');
+  },
+
+  async createPrintProduct(product: Omit<PrintProduct, 'id' | 'created_at' | 'updated_at'>): Promise<{ product: PrintProduct }> {
+    return api.post<{ product: PrintProduct }>('/api/admin/print-products', product);
+  },
+
+  async updatePrintProduct(id: number, product: Partial<PrintProduct>): Promise<{ product: PrintProduct }> {
+    return api.put<{ product: PrintProduct }>(`/api/admin/print-products/${id}`, product);
+  },
+
+  async togglePrintProduct(id: number): Promise<{ product: PrintProduct }> {
+    return api.put<{ product: PrintProduct }>(`/api/admin/print-products/${id}/toggle`);
+  },
+
+  async deletePrintProduct(id: number): Promise<void> {
+    return api.delete(`/api/admin/print-products/${id}`);
   },
 };

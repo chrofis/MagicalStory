@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse } from '@/services';
+import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct } from '@/services';
 import {
   Users,
   BookOpen,
@@ -26,7 +26,13 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
-  MailX
+  MailX,
+  Printer,
+  Plus,
+  Search,
+  Check,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
@@ -41,7 +47,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'stats' | 'users'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products'>('stats');
 
   // Modal states
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
@@ -63,6 +69,12 @@ export default function AdminDashboard() {
     purchases: false,
     credits: false
   });
+
+  // Print Products state
+  const [printProducts, setPrintProducts] = useState<PrintProduct[]>([]);
+  const [gelatoProducts, setGelatoProducts] = useState<GelatoProduct[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [isFetchingGelato, setIsFetchingGelato] = useState(false);
 
   const t = {
     en: {
@@ -133,6 +145,27 @@ export default function AdminDashboard() {
       inputTokens: 'Input',
       outputTokens: 'Output',
       apiCalls: 'API Calls',
+      // Print Products
+      printProducts: 'Print Products',
+      fetchFromGelato: 'Fetch from Gelato',
+      savedProducts: 'Saved Products',
+      gelatoProducts: 'Gelato Products',
+      productUid: 'Product UID',
+      productName: 'Product Name',
+      size: 'Size',
+      coverType: 'Cover Type',
+      minPages: 'Min Pages',
+      maxPages: 'Max Pages',
+      active: 'Active',
+      inactive: 'Inactive',
+      addProduct: 'Add Product',
+      noProducts: 'No products configured yet',
+      noGelatoProducts: 'Click "Fetch from Gelato" to load available products',
+      selectProduct: 'Select a product from Gelato to add it',
+      softcover: 'Softcover',
+      hardcover: 'Hardcover',
+      fetching: 'Fetching products...',
+      confirmDeleteProduct: 'Are you sure you want to delete this product?',
     },
     de: {
       title: 'Admin-Dashboard',
@@ -202,6 +235,27 @@ export default function AdminDashboard() {
       inputTokens: 'Eingabe',
       outputTokens: 'Ausgabe',
       apiCalls: 'API-Aufrufe',
+      // Print Products
+      printProducts: 'Druckprodukte',
+      fetchFromGelato: 'Von Gelato laden',
+      savedProducts: 'Gespeicherte Produkte',
+      gelatoProducts: 'Gelato Produkte',
+      productUid: 'Produkt-UID',
+      productName: 'Produktname',
+      size: 'Groesse',
+      coverType: 'Einbandtyp',
+      minPages: 'Min. Seiten',
+      maxPages: 'Max. Seiten',
+      active: 'Aktiv',
+      inactive: 'Inaktiv',
+      addProduct: 'Produkt hinzufuegen',
+      noProducts: 'Noch keine Produkte konfiguriert',
+      noGelatoProducts: 'Klicken Sie auf "Von Gelato laden" um verfuegbare Produkte zu laden',
+      selectProduct: 'Waehlen Sie ein Produkt von Gelato aus um es hinzuzufuegen',
+      softcover: 'Softcover',
+      hardcover: 'Hardcover',
+      fetching: 'Lade Produkte...',
+      confirmDeleteProduct: 'Sind Sie sicher, dass Sie dieses Produkt loeschen moechten?',
     },
     fr: {
       title: 'Tableau de bord Admin',
@@ -271,6 +325,27 @@ export default function AdminDashboard() {
       inputTokens: 'Entree',
       outputTokens: 'Sortie',
       apiCalls: 'Appels API',
+      // Print Products
+      printProducts: 'Produits d\'impression',
+      fetchFromGelato: 'Charger depuis Gelato',
+      savedProducts: 'Produits enregistres',
+      gelatoProducts: 'Produits Gelato',
+      productUid: 'UID Produit',
+      productName: 'Nom du produit',
+      size: 'Taille',
+      coverType: 'Type de couverture',
+      minPages: 'Pages min',
+      maxPages: 'Pages max',
+      active: 'Actif',
+      inactive: 'Inactif',
+      addProduct: 'Ajouter un produit',
+      noProducts: 'Aucun produit configure',
+      noGelatoProducts: 'Cliquez sur "Charger depuis Gelato" pour charger les produits disponibles',
+      selectProduct: 'Selectionnez un produit Gelato pour l\'ajouter',
+      softcover: 'Couverture souple',
+      hardcover: 'Couverture rigide',
+      fetching: 'Chargement des produits...',
+      confirmDeleteProduct: 'Etes-vous sur de vouloir supprimer ce produit?',
     },
   };
 
@@ -462,6 +537,95 @@ export default function AdminDashboard() {
     return new Date(dateStr).toLocaleDateString() + ' ' + new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Print Products handlers
+  const fetchPrintProducts = async () => {
+    setIsLoadingProducts(true);
+    try {
+      const result = await adminService.getPrintProducts();
+      setPrintProducts(result.products || []);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to load products' });
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  const fetchGelatoProducts = async () => {
+    setIsFetchingGelato(true);
+    try {
+      const result = await adminService.fetchGelatoProducts();
+      setGelatoProducts(result.products || []);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to fetch from Gelato' });
+    } finally {
+      setIsFetchingGelato(false);
+    }
+  };
+
+  const handleAddProduct = async (gelatoProduct: GelatoProduct) => {
+    setIsActionLoading(true);
+    try {
+      const sizeMatch = (gelatoProduct.name || gelatoProduct.productName || '').match(/(\d+)x(\d+)/i);
+      const size = sizeMatch ? `${sizeMatch[1]}x${sizeMatch[2]}mm` : '';
+      const productUid = gelatoProduct.productUid || gelatoProduct.uid || '';
+      const coverType = productUid.toLowerCase().includes('hardcover') ? 'hardcover' : 'softcover';
+
+      const newProduct = {
+        product_uid: productUid,
+        product_name: gelatoProduct.name || gelatoProduct.productName || 'Unknown Product',
+        description: gelatoProduct.description || '',
+        size,
+        cover_type: coverType,
+        min_pages: gelatoProduct.pageCount?.min || 24,
+        max_pages: gelatoProduct.pageCount?.max || 100,
+        available_page_counts: [],
+        is_active: true,
+      };
+
+      await adminService.createPrintProduct(newProduct);
+      setActionMessage({ type: 'success', text: 'Product added successfully' });
+      fetchPrintProducts();
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to add product' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleToggleProduct = async (product: PrintProduct) => {
+    setIsActionLoading(true);
+    try {
+      await adminService.togglePrintProduct(product.id);
+      setPrintProducts(products =>
+        products.map(p => p.id === product.id ? { ...p, is_active: !p.is_active } : p)
+      );
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to toggle product' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (product: PrintProduct) => {
+    if (!confirm(texts.confirmDeleteProduct)) return;
+    setIsActionLoading(true);
+    try {
+      await adminService.deletePrintProduct(product.id);
+      setPrintProducts(products => products.filter(p => p.id !== product.id));
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to delete product' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // Load products when products tab is selected
+  useEffect(() => {
+    if (activeTab === 'products' && printProducts.length === 0) {
+      fetchPrintProducts();
+    }
+  }, [activeTab]);
+
   if (!isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
@@ -548,6 +712,17 @@ export default function AdminDashboard() {
             }`}
           >
             {texts.users}
+          </button>
+          <button
+            onClick={() => setActiveTab('products')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              activeTab === 'products'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <Printer size={18} />
+            {texts.printProducts}
           </button>
         </div>
 
@@ -733,6 +908,173 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Print Products Tab */}
+        {activeTab === 'products' && (
+          <div className="space-y-6">
+            {/* Actions Bar */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">{texts.printProducts}</h2>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={fetchPrintProducts}
+                  disabled={isLoadingProducts}
+                >
+                  <RefreshCw size={16} className={isLoadingProducts ? 'animate-spin' : ''} />
+                  {texts.refreshStats}
+                </Button>
+                <Button
+                  onClick={fetchGelatoProducts}
+                  disabled={isFetchingGelato}
+                >
+                  <Search size={16} className={isFetchingGelato ? 'animate-spin' : ''} />
+                  {texts.fetchFromGelato}
+                </Button>
+              </div>
+            </div>
+
+            {/* Saved Products */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">{texts.savedProducts}</h3>
+              {isLoadingProducts ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                </div>
+              ) : printProducts.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">{texts.noProducts}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.productName}</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.size}</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.coverType}</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.pages}</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.status}</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">{texts.actions}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {printProducts.map((product) => (
+                        <tr key={product.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div>
+                              <div className="font-medium text-gray-800">{product.product_name}</div>
+                              <div className="text-xs text-gray-500 font-mono truncate max-w-xs" title={product.product_uid}>
+                                {product.product_uid.substring(0, 40)}...
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{product.size || '-'}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              product.cover_type === 'hardcover'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {product.cover_type === 'hardcover' ? texts.hardcover : texts.softcover}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{product.min_pages} - {product.max_pages}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              product.is_active
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {product.is_active ? texts.active : texts.inactive}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleToggleProduct(product)}
+                                className={`p-1.5 rounded hover:bg-gray-100 ${product.is_active ? 'text-green-600' : 'text-gray-400'}`}
+                                title={product.is_active ? texts.active : texts.inactive}
+                                disabled={isActionLoading}
+                              >
+                                {product.is_active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProduct(product)}
+                                className="p-1.5 rounded hover:bg-gray-100 text-red-600"
+                                title={texts.deleteUser}
+                                disabled={isActionLoading}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Gelato Products */}
+            {gelatoProducts.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  {texts.gelatoProducts} ({gelatoProducts.length})
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">{texts.selectProduct}</p>
+                <div className="grid gap-3 max-h-96 overflow-y-auto">
+                  {gelatoProducts.map((product) => {
+                    const productUid = product.productUid || product.uid || '';
+                    const productName = product.name || product.productName || 'Unknown';
+                    const isHardcover = productUid.toLowerCase().includes('hardcover');
+                    const sizeMatch = productName.match(/(\d+)x(\d+)/i);
+                    const size = sizeMatch ? `${sizeMatch[1]}x${sizeMatch[2]}mm` : '';
+                    const alreadyAdded = printProducts.some(p => p.product_uid === productUid);
+
+                    return (
+                      <div
+                        key={productUid}
+                        className={`p-4 border rounded-lg ${alreadyAdded ? 'bg-gray-50 opacity-60' : 'hover:border-indigo-300 cursor-pointer'}`}
+                        onClick={() => !alreadyAdded && handleAddProduct(product)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-800">{productName}</div>
+                            <div className="text-xs text-gray-500 font-mono mt-1 truncate" title={productUid}>
+                              {productUid.substring(0, 60)}...
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              {size && (
+                                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">{size}</span>
+                              )}
+                              <span className={`px-2 py-0.5 text-xs rounded ${
+                                isHardcover ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {isHardcover ? texts.hardcover : texts.softcover}
+                              </span>
+                            </div>
+                          </div>
+                          {alreadyAdded ? (
+                            <Check size={20} className="text-green-600" />
+                          ) : (
+                            <Plus size={20} className="text-indigo-600" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {isFetchingGelato && (
+              <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-2" />
+                <p className="text-gray-600">{texts.fetching}</p>
+              </div>
+            )}
           </div>
         )}
       </div>

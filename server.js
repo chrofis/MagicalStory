@@ -14418,6 +14418,18 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
 
       const job = result.rows[0];
 
+      // Fetch user's current credits when job is completed
+      let currentCredits = null;
+      if (job.status === 'completed') {
+        const creditsResult = await dbPool.query(
+          'SELECT credits FROM users WHERE id = $1',
+          [userId]
+        );
+        if (creditsResult.rows.length > 0) {
+          currentCredits = creditsResult.rows[0].credits;
+        }
+      }
+
       // Fetch partial results (completed pages, covers, and story text) if job is still processing
       let partialPages = [];
       let partialCovers = {};
@@ -14473,7 +14485,8 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
         completedAt: job.completed_at,
         partialPages: partialPages,  // Array of completed pages with text + image
         partialCovers: Object.keys(partialCovers).length > 0 ? partialCovers : undefined,  // Partial cover images
-        storyText: storyText  // Story text with page texts for progressive display
+        storyText: storyText,  // Story text with page texts for progressive display
+        currentCredits: currentCredits  // User's updated credits balance after completion
       });
     } else {
       return res.status(503).json({ error: 'Background jobs require database mode' });

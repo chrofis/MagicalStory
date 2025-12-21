@@ -180,18 +180,23 @@ export default function BookBuilder() {
   };
 
   // Handle print PDF download (admin only) - uses same format as Gelato print
+  // Combines all stories in the book with proper page order and black separator pages
   const handlePrintPdf = async () => {
     if (stories.length === 0) return;
 
     setIsPrintingPdf(true);
     try {
-      // Use the first story for now (TODO: implement combined stories PDF)
-      const storyId = stories[0].id;
-      log.info('Downloading print PDF for story:', storyId);
+      const storyIds = stories.map(s => s.id);
+      log.info('Downloading print PDF for stories:', storyIds);
 
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/stories/${storyId}/print-pdf`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await fetch('/api/generate-book-pdf', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ storyIds })
       });
 
       if (!response.ok) {
