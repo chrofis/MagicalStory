@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Book, Trash2, Eye, AlertTriangle, Plus, Minus, BookOpen, Tag, Printer } from 'lucide-react';
+import { Book, Trash2, Eye, AlertTriangle, BookOpen, Tag } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { storyService } from '@/services';
@@ -35,22 +35,18 @@ function StoryCard({
   language,
   onView,
   onDelete,
-  onPrintPdf,
   formatDate,
   isSelected,
   onToggleSelect,
-  isAdmin,
   t,
 }: {
   story: StoryListItem;
   language: string;
   onView: () => void;
   onDelete: () => void;
-  onPrintPdf?: () => void;
   formatDate: (date: string | undefined) => string;
   isSelected: boolean;
   onToggleSelect: () => void;
-  isAdmin: boolean;
   t: { add: string; remove: string };
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -83,7 +79,7 @@ function StoryCard({
       className={`bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ${
         story.isPartial ? 'ring-2 ring-amber-400' : ''
       } ${
-        isSelected ? 'ring-3 ring-green-500 bg-green-50' : ''
+        isSelected ? 'ring-4 ring-green-500' : ''
       }`}
     >
       {/* Thumbnail */}
@@ -113,20 +109,21 @@ function StoryCard({
           </div>
         )}
 
-        {/* Partial badge (top-right) */}
+        {/* Partial badge (top-left) */}
         {story.isPartial && (
-          <div className="absolute top-2 right-2 bg-amber-500 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
+          <div className="absolute top-2 left-2 bg-amber-500 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
             <AlertTriangle size={12} />
             {language === 'de' ? 'Teilweise' : language === 'fr' ? 'Partiel' : 'Partial'}
           </div>
         )}
 
-        {/* Selected indicator (top-left) */}
-        {isSelected && (
-          <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded-md text-xs font-bold">
-            ✓
-          </div>
-        )}
+        {/* Delete button (top-right) */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute top-2 right-2 p-2 bg-white/90 text-red-600 hover:bg-red-100 rounded-lg shadow-sm"
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
 
       <div className="p-4 flex flex-col flex-1">
@@ -153,38 +150,19 @@ function StoryCard({
             {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : 'View'}
           </button>
 
-          {/* Add/Remove button for book selection */}
+          {/* Add/Remove button for book selection - same style as View button */}
           {!story.isPartial && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
-              className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg font-medium transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                 isSelected
-                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                  : 'bg-green-100 text-green-600 hover:bg-green-200'
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'bg-green-600 text-white hover:bg-green-700'
               }`}
             >
-              {isSelected ? <Minus size={18} /> : <Plus size={18} />}
               {isSelected ? t.remove : t.add}
             </button>
           )}
-
-          {/* Print PDF button - admin only */}
-          {isAdmin && onPrintPdf && !story.isPartial && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onPrintPdf(); }}
-              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
-              title={language === 'de' ? 'Druck-PDF' : language === 'fr' ? 'PDF impression' : 'Print PDF'}
-            >
-              <Printer size={18} />
-            </button>
-          )}
-
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-          >
-            <Trash2 size={18} />
-          </button>
         </div>
       </div>
     </div>
@@ -194,8 +172,7 @@ function StoryCard({
 export default function MyStories() {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { isAuthenticated, user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const { isAuthenticated } = useAuth();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -307,40 +284,6 @@ export default function MyStories() {
         : language === 'fr'
         ? 'Impossible de supprimer l\'histoire. Veuillez réessayer.'
         : 'Failed to delete story. Please try again.');
-    }
-  };
-
-  // Download print PDF (admin only) - uses same format as Buy Book / Print Book
-  const handlePrintPdf = async (id: string) => {
-    if (!isAdmin) return;
-
-    try {
-      log.debug('Downloading print PDF for story:', id);
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/stories/${id}/print-pdf`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'story-print.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      log.error('Failed to download print PDF:', error);
-      alert(language === 'de'
-        ? 'PDF konnte nicht heruntergeladen werden.'
-        : language === 'fr'
-        ? 'Impossible de télécharger le PDF.'
-        : 'Failed to download PDF.');
     }
   };
 
@@ -486,17 +429,46 @@ export default function MyStories() {
                 language={language}
                 onView={() => navigate(`/create?storyId=${story.id}`)}
                 onDelete={() => deleteStory(story.id)}
-                onPrintPdf={isAdmin ? () => handlePrintPdf(story.id) : undefined}
                 formatDate={formatDate}
                 isSelected={selectedIds.has(story.id)}
                 onToggleSelect={() => toggleSelect(story.id)}
-                isAdmin={isAdmin}
                 t={{ add: t.add, remove: t.remove }}
               />
             ))}
           </div>
         )}
+
+        {/* Add padding at bottom to account for sticky bar */}
+        {selectedIds.size > 0 && <div className="h-24" />}
       </div>
+
+      {/* Sticky bottom bar for Create Book */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="font-medium text-gray-700">
+                {selectedIds.size} {t.selected} • {totalSelectedPages} {t.pages}
+              </span>
+              {isOverLimit && (
+                <span className="text-red-600 font-medium">({t.tooManyPages})</span>
+              )}
+            </div>
+            <button
+              onClick={goToBookBuilder}
+              disabled={isOverLimit}
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-colors ${
+                isOverLimit
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              <Tag size={20} />
+              {t.createBook}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

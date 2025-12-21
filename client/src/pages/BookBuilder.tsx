@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowUp, ArrowDown, Book, BookOpen, ShoppingCart, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, Book, BookOpen, ShoppingCart, AlertTriangle, Info, Printer } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
@@ -21,12 +21,14 @@ export default function BookBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const [stories, setStories] = useState<SelectedStory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isPrintingPdf, setIsPrintingPdf] = useState(false);
 
   const translations = {
     en: {
@@ -53,6 +55,8 @@ export default function BookBuilder() {
       tooManyPages: 'Too many pages',
       tooManyPagesDesc: 'Maximum is 100 pages. Please remove some stories.',
       processing: 'Processing...',
+      printPdf: 'Print PDF (Test)',
+      generatingPdf: 'Generating PDF...',
     },
     de: {
       title: 'Dein Buch erstellen',
@@ -78,6 +82,8 @@ export default function BookBuilder() {
       tooManyPages: 'Zu viele Seiten',
       tooManyPagesDesc: 'Maximal 100 Seiten erlaubt. Bitte entferne einige Geschichten.',
       processing: 'Wird verarbeitet...',
+      printPdf: 'Druck-PDF (Test)',
+      generatingPdf: 'PDF wird erstellt...',
     },
     fr: {
       title: 'Créer votre livre',
@@ -103,6 +109,8 @@ export default function BookBuilder() {
       tooManyPages: 'Trop de pages',
       tooManyPagesDesc: 'Maximum 100 pages. Veuillez retirer quelques histoires.',
       processing: 'Traitement en cours...',
+      printPdf: 'PDF impression (Test)',
+      generatingPdf: 'Génération du PDF...',
     },
   };
 
@@ -168,6 +176,46 @@ export default function BookBuilder() {
         : 'Checkout failed. Please try again.');
     } finally {
       setIsCheckingOut(false);
+    }
+  };
+
+  // Handle print PDF download (admin only) - uses same format as Gelato print
+  const handlePrintPdf = async () => {
+    if (stories.length === 0) return;
+
+    setIsPrintingPdf(true);
+    try {
+      // Use the first story for now (TODO: implement combined stories PDF)
+      const storyId = stories[0].id;
+      log.debug('Downloading print PDF for story:', storyId);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/stories/${storyId}/print-pdf`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'story-print.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      log.error('Failed to download print PDF:', error);
+      alert(language === 'de'
+        ? 'PDF konnte nicht heruntergeladen werden.'
+        : language === 'fr'
+        ? 'Impossible de télécharger le PDF.'
+        : 'Failed to download PDF.');
+    } finally {
+      setIsPrintingPdf(false);
     }
   };
 
@@ -396,6 +444,27 @@ export default function BookBuilder() {
                 </>
               )}
             </button>
+
+            {/* Print PDF button - admin only */}
+            {isAdmin && (
+              <button
+                onClick={handlePrintPdf}
+                disabled={isPrintingPdf || stories.length === 0}
+                className="w-full mt-3 py-3 bg-purple-100 text-purple-700 border-2 border-purple-300 rounded-xl font-semibold hover:bg-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isPrintingPdf ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-700 border-t-transparent" />
+                    {t.generatingPdf}
+                  </>
+                ) : (
+                  <>
+                    <Printer size={20} />
+                    {t.printPdf}
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

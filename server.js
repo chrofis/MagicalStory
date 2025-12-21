@@ -5327,6 +5327,15 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         }
 
         const data = await response.json();
+
+        // Extract and log token usage for character analysis
+        const modelId = 'gemini-2.0-flash-exp';
+        const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+        const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+        if (inputTokens > 0 || outputTokens > 0) {
+          console.log(`📊 [CHARACTER ANALYSIS] Token usage - model: ${modelId}, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+        }
+
         if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
           const text = data.candidates[0].content.parts[0].text;
           console.log('📸 [GEMINI] Raw response length:', text.length);
@@ -5675,6 +5684,14 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
         let data = await response.json();
 
+        // Extract and log token usage for avatar generation
+        const avatarModelId = 'gemini-2.5-flash-image';
+        const avatarInputTokens = data.usageMetadata?.promptTokenCount || 0;
+        const avatarOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+        if (avatarInputTokens > 0 || avatarOutputTokens > 0) {
+          console.log(`📊 [AVATAR GENERATION] ${category} - model: ${avatarModelId}, input: ${avatarInputTokens.toLocaleString()}, output: ${avatarOutputTokens.toLocaleString()}`);
+        }
+
         // Check if blocked by safety filters - retry once with simplified prompt
         if (data.promptFeedback?.blockReason) {
           log.warn(`[CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
@@ -5707,6 +5724,12 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
           if (retryResponse.ok) {
             data = await retryResponse.json();
+            // Log token usage for retry attempt
+            const retryInputTokens = data.usageMetadata?.promptTokenCount || 0;
+            const retryOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+            if (retryInputTokens > 0 || retryOutputTokens > 0) {
+              console.log(`📊 [AVATAR GENERATION] ${category} retry - model: ${avatarModelId}, input: ${retryInputTokens.toLocaleString()}, output: ${retryOutputTokens.toLocaleString()}`);
+            }
             if (data.promptFeedback?.blockReason) {
               log.warn(`[CLOTHING AVATARS] ${category} retry also blocked:`, data.promptFeedback.blockReason);
               continue;
@@ -10214,7 +10237,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         sceneParser.processChunk(chunk, fullText);
       });
       response = streamResult.text;
-      addUsage('anthropic', streamResult.usage, 'storybook_combined');
+      addUsage('anthropic', streamResult.usage, 'storybook_combined', activeTextModel.modelId);
       log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
       console.log(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
       console.log(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
@@ -10772,25 +10795,26 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY FUNCTION:`);
     const byFunc = tokenUsage.byFunction;
+    const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
     if (byFunc.storybook_combined.calls > 0) {
       const cost = calculateCost(byFunc.storybook_combined.provider, byFunc.storybook_combined.input_tokens, byFunc.storybook_combined.output_tokens);
-      console.log(`   Story+Scenes:  ${byFunc.storybook_combined.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.storybook_combined.output_tokens.toLocaleString().padStart(8)} out (${byFunc.storybook_combined.calls} calls)  $${cost.total.toFixed(4)}`);
+      console.log(`   Story+Scenes:  ${byFunc.storybook_combined.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.storybook_combined.output_tokens.toLocaleString().padStart(8)} out (${byFunc.storybook_combined.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.storybook_combined)}]`);
     }
     if (byFunc.cover_images.calls > 0) {
       const cost = calculateCost(byFunc.cover_images.provider, byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
-      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}`);
+      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_images)}]`);
     }
     if (byFunc.cover_quality.calls > 0) {
       const cost = calculateCost(byFunc.cover_quality.provider, byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens);
-      log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}`);
+      log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
     }
     if (byFunc.page_images.calls > 0) {
       const cost = calculateCost(byFunc.page_images.provider, byFunc.page_images.input_tokens, byFunc.page_images.output_tokens);
-      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}`);
+      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_images)}]`);
     }
     if (byFunc.page_quality.calls > 0) {
       const cost = calculateCost(byFunc.page_quality.provider, byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens);
-      log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}`);
+      log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output tokens`);
@@ -11037,7 +11061,7 @@ async function processStoryJob(jobId) {
     log.debug(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
     const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens);
     const outline = outlineResult.text;
-    addUsage('anthropic', outlineResult.usage, 'outline');
+    addUsage('anthropic', outlineResult.usage, 'outline', activeTextModel.modelId);
 
     // Save checkpoint: outline (include prompt for debugging)
     await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt });
@@ -11343,7 +11367,7 @@ Output Format:
             // Generate detailed scene description
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
             const sceneDescription = sceneDescResult.text;
-            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions');
+            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', activeTextModel.modelId);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -11466,7 +11490,7 @@ Output Format:
           progressiveParser.processChunk(chunk, fullText);
         });
         batchText = batchResult.text;
-        addUsage('anthropic', batchResult.usage, 'story_text');
+        addUsage('anthropic', batchResult.usage, 'story_text', activeTextModel.modelId);
 
         // Finalize to emit the last page
         progressiveParser.finalize(batchText);
@@ -11475,7 +11499,7 @@ Output Format:
         // No progressive parsing - just stream text
         const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
         batchText = batchResult.text;
-        addUsage('anthropic', batchResult.usage, 'story_text');
+        addUsage('anthropic', batchResult.usage, 'story_text', activeTextModel.modelId);
       }
 
       fullStoryText += batchText + '\n\n';
@@ -11528,7 +11552,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           log.debug(` Generating missing page ${missingPageNum}...`);
           const retryResult = await callTextModelStreaming(retryPrompt, 1500);
           const retryText = retryResult.text;
-          addUsage('anthropic', retryResult.usage, 'story_text');
+          addUsage('anthropic', retryResult.usage, 'story_text', activeTextModel.modelId);
 
           // Parse the retry response
           const retryPages = parseStoryPages(retryText);
@@ -11681,7 +11705,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
             const sceneDescription = sceneDescResult.text;
-            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions');
+            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', activeTextModel.modelId);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -11969,33 +11993,34 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY FUNCTION:`);
     const byFunc = tokenUsage.byFunction;
+    const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
     if (byFunc.outline.calls > 0) {
       const cost = calculateCost(byFunc.outline.provider, byFunc.outline.input_tokens, byFunc.outline.output_tokens);
-      console.log(`   Outline:       ${byFunc.outline.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.outline.output_tokens.toLocaleString().padStart(8)} out (${byFunc.outline.calls} calls)  $${cost.total.toFixed(4)}`);
+      console.log(`   Outline:       ${byFunc.outline.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.outline.output_tokens.toLocaleString().padStart(8)} out (${byFunc.outline.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.outline)}]`);
     }
     if (byFunc.scene_descriptions.calls > 0) {
       const cost = calculateCost(byFunc.scene_descriptions.provider, byFunc.scene_descriptions.input_tokens, byFunc.scene_descriptions.output_tokens);
-      console.log(`   Scene Desc:    ${byFunc.scene_descriptions.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_descriptions.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_descriptions.calls} calls)  $${cost.total.toFixed(4)}`);
+      console.log(`   Scene Desc:    ${byFunc.scene_descriptions.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_descriptions.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_descriptions.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_descriptions)}]`);
     }
     if (byFunc.story_text.calls > 0) {
       const cost = calculateCost(byFunc.story_text.provider, byFunc.story_text.input_tokens, byFunc.story_text.output_tokens);
-      console.log(`   Story Text:    ${byFunc.story_text.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.story_text.output_tokens.toLocaleString().padStart(8)} out (${byFunc.story_text.calls} calls)  $${cost.total.toFixed(4)}`);
+      console.log(`   Story Text:    ${byFunc.story_text.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.story_text.output_tokens.toLocaleString().padStart(8)} out (${byFunc.story_text.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.story_text)}]`);
     }
     if (byFunc.cover_images.calls > 0) {
       const cost = calculateCost(byFunc.cover_images.provider, byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
-      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}`);
+      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_images)}]`);
     }
     if (byFunc.cover_quality.calls > 0) {
       const cost = calculateCost(byFunc.cover_quality.provider, byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens);
-      log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}`);
+      log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
     }
     if (byFunc.page_images.calls > 0) {
       const cost = calculateCost(byFunc.page_images.provider, byFunc.page_images.input_tokens, byFunc.page_images.output_tokens);
-      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}`);
+      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_images)}]`);
     }
     if (byFunc.page_quality.calls > 0) {
       const cost = calculateCost(byFunc.page_quality.provider, byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens);
-      log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}`);
+      log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output tokens`);
