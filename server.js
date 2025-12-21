@@ -2584,14 +2584,40 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
     // Calculate totals by parsing JSON data
     let totalCharacters = 0;
     let totalImages = 0;
+    // Token usage aggregation
+    const totalTokens = {
+      anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
+      gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
+      gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
+      gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+    };
     const stories = storiesResult.map(s => {
       try {
         const storyData = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
-        const pageCount = storyData?.scenes?.length || storyData?.images?.length || 0;
-        const imageCount = storyData?.images?.length || 0;
+        const pageCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
+        // Count scene images + cover images (front, back, spine)
+        const sceneImageCount = storyData?.sceneImages?.length || 0;
+        const coverImageCount = storyData?.coverImages ?
+          (storyData.coverImages.frontCover ? 1 : 0) +
+          (storyData.coverImages.backCover ? 1 : 0) +
+          (storyData.coverImages.spine ? 1 : 0) : 0;
+        const imageCount = sceneImageCount + coverImageCount;
         const charCount = storyData?.characters?.length || 0;
         totalImages += imageCount;
         totalCharacters += charCount;
+
+        // Aggregate token usage
+        if (storyData?.tokenUsage) {
+          const tu = storyData.tokenUsage;
+          for (const provider of ['anthropic', 'gemini_text', 'gemini_image', 'gemini_quality']) {
+            if (tu[provider]) {
+              totalTokens[provider].input_tokens += tu[provider].input_tokens || 0;
+              totalTokens[provider].output_tokens += tu[provider].output_tokens || 0;
+              totalTokens[provider].calls += tu[provider].calls || 0;
+            }
+          }
+        }
+
         return {
           id: s.id,
           title: storyData?.title || storyData?.storyTitle || 'Untitled',
@@ -2658,7 +2684,13 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
         totalCharacters,
         totalImages,
         totalPurchases: purchases.filter(p => p.status === 'paid').length,
-        totalSpent: purchases.filter(p => p.status === 'paid').reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+        totalSpent: purchases.filter(p => p.status === 'paid').reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
+        tokenUsage: {
+          ...totalTokens,
+          totalInputTokens: Object.values(totalTokens).reduce((sum, p) => sum + p.input_tokens, 0),
+          totalOutputTokens: Object.values(totalTokens).reduce((sum, p) => sum + p.output_tokens, 0),
+          totalCalls: Object.values(totalTokens).reduce((sum, p) => sum + p.calls, 0)
+        }
       },
       stories,
       purchases,

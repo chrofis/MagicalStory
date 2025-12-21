@@ -128,6 +128,11 @@ export default function AdminDashboard() {
       noStories: 'No stories yet',
       noPurchases: 'No purchases yet',
       close: 'Close',
+      tokens: 'Tokens',
+      totalTokens: 'Total Tokens',
+      inputTokens: 'Input',
+      outputTokens: 'Output',
+      apiCalls: 'API Calls',
     },
     de: {
       title: 'Admin-Dashboard',
@@ -192,6 +197,11 @@ export default function AdminDashboard() {
       noStories: 'Noch keine Geschichten',
       noPurchases: 'Noch keine Kaeufe',
       close: 'Schliessen',
+      tokens: 'Tokens',
+      totalTokens: 'Tokens gesamt',
+      inputTokens: 'Eingabe',
+      outputTokens: 'Ausgabe',
+      apiCalls: 'API-Aufrufe',
     },
     fr: {
       title: 'Tableau de bord Admin',
@@ -256,6 +266,11 @@ export default function AdminDashboard() {
       noStories: 'Pas encore d\'histoires',
       noPurchases: 'Pas encore d\'achats',
       close: 'Fermer',
+      tokens: 'Tokens',
+      totalTokens: 'Tokens totaux',
+      inputTokens: 'Entree',
+      outputTokens: 'Sortie',
+      apiCalls: 'Appels API',
     },
   };
 
@@ -922,6 +937,37 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+
+              {/* Token Usage Section */}
+              {userDetails.stats.tokenUsage && userDetails.stats.tokenUsage.totalInputTokens > 0 && (
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <p className="text-sm text-orange-600 font-medium mb-2">{texts.totalTokens}</p>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xl font-bold text-orange-700">
+                        {(userDetails.stats.tokenUsage.totalInputTokens / 1000).toFixed(1)}K
+                      </p>
+                      <p className="text-xs text-orange-600">{texts.inputTokens}</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-orange-700">
+                        {(userDetails.stats.tokenUsage.totalOutputTokens / 1000).toFixed(1)}K
+                      </p>
+                      <p className="text-xs text-orange-600">{texts.outputTokens}</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-orange-700">
+                        {userDetails.stats.tokenUsage.totalCalls}
+                      </p>
+                      <p className="text-xs text-orange-600">{texts.apiCalls}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-orange-200 text-xs text-orange-600 grid grid-cols-2 gap-1">
+                    <span>Anthropic: {((userDetails.stats.tokenUsage.anthropic?.input_tokens || 0) / 1000).toFixed(1)}K in / {((userDetails.stats.tokenUsage.anthropic?.output_tokens || 0) / 1000).toFixed(1)}K out</span>
+                    <span>Gemini: {((userDetails.stats.tokenUsage.gemini_image?.input_tokens || 0) / 1000).toFixed(1)}K in / {((userDetails.stats.tokenUsage.gemini_image?.output_tokens || 0) / 1000).toFixed(1)}K out</span>
+                  </div>
+                </div>
+              )}
 
               {/* Stories Section (Collapsible) */}
               <div className="border rounded-lg">

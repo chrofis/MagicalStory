@@ -79,6 +79,15 @@ export interface UserDetailsResponse {
     totalImages: number;
     totalPurchases: number;
     totalSpent: number;
+    tokenUsage?: {
+      anthropic: { input_tokens: number; output_tokens: number; calls: number };
+      gemini_text: { input_tokens: number; output_tokens: number; calls: number };
+      gemini_image: { input_tokens: number; output_tokens: number; calls: number };
+      gemini_quality: { input_tokens: number; output_tokens: number; calls: number };
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCalls: number;
+    };
   };
   stories: UserStory[];
   purchases: UserPurchase[];
