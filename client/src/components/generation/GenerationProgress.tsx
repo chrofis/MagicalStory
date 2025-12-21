@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Loader2, Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -79,115 +79,89 @@ export function GenerationProgress({
   const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
 
-  // Generate funny message based on character traits
-  const generateFunnyMessage = (char: Character, lang: string): string => {
-    const name = char.name;
-    const strengths = char.traits?.strengths || [];
-    const flaws = char.traits?.flaws || [];
-    const challenges = char.traits?.challenges || [];
+  // 10 funny messages per character - uses {name} placeholder
+  const funnyMessageTemplates = [
+    {
+      en: '{name} is getting ready for their big adventure...',
+      de: '{name} macht sich bereit für das grosse Abenteuer...',
+      fr: '{name} se prépare pour sa grande aventure...'
+    },
+    {
+      en: '{name} is practicing their hero pose...',
+      de: '{name} übt gerade die Heldenpose...',
+      fr: '{name} s\'entraîne à prendre la pose du héros...'
+    },
+    {
+      en: '{name} can\'t wait to see what happens next!',
+      de: '{name} kann es kaum erwarten zu sehen, was als Nächstes passiert!',
+      fr: '{name} a hâte de voir ce qui va se passer !'
+    },
+    {
+      en: '{name} is warming up for the adventure ahead...',
+      de: '{name} wärmt sich für das bevorstehende Abenteuer auf...',
+      fr: '{name} s\'échauffe pour l\'aventure à venir...'
+    },
+    {
+      en: '{name} just found a magic feather! Adding it to the story...',
+      de: '{name} hat gerade eine Zauberfeder gefunden! Wir fügen sie der Geschichte hinzu...',
+      fr: '{name} vient de trouver une plume magique ! On l\'ajoute au récit...'
+    },
+    {
+      en: '{name} is whispering secrets to the story wizard...',
+      de: '{name} flüstert dem Geschichtenzauberer Geheimnisse zu...',
+      fr: '{name} chuchote des secrets au magicien des histoires...'
+    },
+    {
+      en: '{name} is peeking around the corner to see what\'s coming...',
+      de: '{name} schaut um die Ecke, um zu sehen, was kommt...',
+      fr: '{name} jette un coup d\'œil au coin pour voir ce qui arrive...'
+    },
+    {
+      en: '{name} is doing a little happy dance!',
+      de: '{name} macht einen kleinen Freudentanz!',
+      fr: '{name} fait une petite danse de joie !'
+    },
+    {
+      en: '{name} is collecting stars for the story...',
+      de: '{name} sammelt Sterne für die Geschichte...',
+      fr: '{name} collectionne des étoiles pour le récit...'
+    },
+    {
+      en: '{name} just met a friendly dragon! Making friends...',
+      de: '{name} hat gerade einen freundlichen Drachen getroffen! Sie werden Freunde...',
+      fr: '{name} vient de rencontrer un dragon amical ! Ils deviennent amis...'
+    }
+  ];
 
-    // Build funny messages based on traits
-    const funnyMessages: { en: string; de: string; fr: string }[] = [];
+  // Track which message was shown for each character to avoid repeats (useRef to avoid dependency issues)
+  const messageIndicesRef = useRef<Record<number, number>>({});
 
-    // Strength-based messages
-    if (strengths.some(s => s.toLowerCase().includes('fast') || s.toLowerCase().includes('schnell') || s.toLowerCase().includes('rapide'))) {
-      funnyMessages.push({
-        en: `${name} ran away too fast! Catching them and bringing them back to the story...`,
-        de: `${name} ist zu schnell weggerannt! Wir fangen sie ein und bringen sie zurück in die Geschichte...`,
-        fr: `${name} s'est enfui trop vite ! On le rattrape et on le ramène dans le récit...`
-      });
-    }
-    if (strengths.some(s => s.toLowerCase().includes('curious') || s.toLowerCase().includes('neugierig') || s.toLowerCase().includes('curieux'))) {
-      funnyMessages.push({
-        en: `${name} wandered off to explore something shiny. Luring them back with an even shinier adventure...`,
-        de: `${name} ist losgewandert, um etwas Glänzendes zu erkunden. Wir locken sie mit einem noch glänzenderen Abenteuer zurück...`,
-        fr: `${name} s'est égaré pour explorer quelque chose de brillant. On l'attire avec une aventure encore plus brillante...`
-      });
-    }
-    if (strengths.some(s => s.toLowerCase().includes('brave') || s.toLowerCase().includes('mutig') || s.toLowerCase().includes('courageux'))) {
-      funnyMessages.push({
-        en: `${name} bravely charged ahead! Waiting for them to scout the path...`,
-        de: `${name} ist mutig vorgestürmt! Wir warten, bis sie den Weg erkundet haben...`,
-        fr: `${name} a courageusement foncé en avant ! On attend qu'il explore le chemin...`
-      });
-    }
+  // Current character display state (computed on rotation change)
+  const [currentCharDisplay, setCurrentCharDisplay] = useState<{ avatarUrl: string; message: string } | null>(null);
 
-    // Flaw/challenge-based messages
-    if (flaws.some(f => f.toLowerCase().includes('shy') || f.toLowerCase().includes('schüchtern') || f.toLowerCase().includes('timide')) ||
-        challenges.some(c => c.toLowerCase().includes('shy'))) {
-      funnyMessages.push({
-        en: `${name} is hiding behind a tree. Coaxing them out with cookies...`,
-        de: `${name} versteckt sich hinter einem Baum. Wir locken sie mit Keksen hervor...`,
-        fr: `${name} se cache derrière un arbre. On l'attire avec des biscuits...`
-      });
-    }
-    if (challenges.some(c => c.toLowerCase().includes('monster') || c.toLowerCase().includes('dark') || c.toLowerCase().includes('dunkel') || c.toLowerCase().includes('peur'))) {
-      funnyMessages.push({
-        en: `${name} got scared by a shadow! Turning on the nightlight and bringing them back...`,
-        de: `${name} hat sich vor einem Schatten erschreckt! Wir machen das Nachtlicht an und holen sie zurück...`,
-        fr: `${name} a eu peur d'une ombre ! On allume la veilleuse et on le ramène...`
-      });
-    }
-    if (flaws.some(f => f.toLowerCase().includes('stubborn') || f.toLowerCase().includes('stur') || f.toLowerCase().includes('têtu'))) {
-      funnyMessages.push({
-        en: `${name} refuses to move! Convincing them with promises of adventure...`,
-        de: `${name} weigert sich, sich zu bewegen! Wir überzeugen sie mit Abenteuerversprechungen...`,
-        fr: `${name} refuse de bouger ! On le convainc avec des promesses d'aventure...`
-      });
-    }
+  // Get characters with available avatars (one entry per character)
+  const charactersWithAvatars = useMemo(() => {
+    return characters.filter(char => {
+      const avatars = char.avatars;
+      return avatars && (avatars.standard || avatars.summer || avatars.winter || avatars.formal);
+    });
+  }, [characters]);
 
-    // Default messages if no traits match
-    if (funnyMessages.length === 0) {
-      funnyMessages.push(
-        {
-          en: `${name} is getting ready for their big adventure...`,
-          de: `${name} macht sich bereit für das grosse Abenteuer...`,
-          fr: `${name} se prépare pour sa grande aventure...`
-        },
-        {
-          en: `${name} is practicing their hero pose...`,
-          de: `${name} übt gerade die Heldenpose...`,
-          fr: `${name} s'entraîne à prendre la pose du héros...`
-        },
-        {
-          en: `${name} can't wait to see what happens next!`,
-          de: `${name} kann es kaum erwarten zu sehen, was als Nächstes passiert!`,
-          fr: `${name} a hâte de voir ce qui va se passer !`
-        }
-      );
-    }
+  // Get a random avatar for a character
+  const getRandomAvatar = (char: Character): string => {
+    const avatars = char.avatars;
+    if (!avatars) return '';
 
-    // Pick a random message
-    const msg = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
-    return lang === 'de' ? msg.de : lang === 'fr' ? msg.fr : msg.en;
+    const available: string[] = [];
+    if (avatars.standard) available.push(avatars.standard);
+    if (avatars.summer) available.push(avatars.summer);
+    if (avatars.winter) available.push(avatars.winter);
+    if (avatars.formal) available.push(avatars.formal);
+
+    return available[Math.floor(Math.random() * available.length)] || '';
   };
 
-  // Get all avatars from each character (all styles: standard, winter, summer, formal)
-  const characterAvatars = useMemo(() => {
-    const avatarList: { name: string; avatar: string; style: string; funnyMessage: string }[] = [];
-    const styles = ['standard', 'summer', 'winter', 'formal'] as const;
-
-    characters.forEach(char => {
-      const avatars = char.avatars;
-      if (!avatars) return;
-
-      styles.forEach(style => {
-        const avatarUrl = avatars[style];
-        if (avatarUrl) {
-          avatarList.push({
-            name: char.name,
-            avatar: avatarUrl,
-            style,
-            funnyMessage: generateFunnyMessage(char, language)
-          });
-        }
-      });
-    });
-
-    return avatarList;
-  }, [characters, language]);
-
-  // Build rotation items: interleave messages and avatars
+  // Build rotation items: interleave messages and characters (one per character, not per avatar)
   const rotationItems = useMemo(() => {
     const messages = [
       { type: 'message' as const, key: 'timeInfo' },
@@ -201,27 +175,27 @@ export function GenerationProgress({
 
     const items: Array<
       { type: 'message'; key: string } |
-      { type: 'avatar'; name: string; avatar: string; style: string; funnyMessage: string }
+      { type: 'character'; char: Character }
     > = [];
 
-    // Interleave messages and avatars
-    const maxLen = Math.max(messages.length, characterAvatars.length);
+    // Interleave messages and characters (always alternate between different characters)
+    const maxLen = Math.max(messages.length, charactersWithAvatars.length);
     for (let i = 0; i < maxLen; i++) {
       if (i < messages.length) {
         items.push(messages[i]);
       }
-      if (i < characterAvatars.length) {
-        items.push({ type: 'avatar', ...characterAvatars[i] });
+      if (i < charactersWithAvatars.length) {
+        items.push({ type: 'character', char: charactersWithAvatars[i] });
       }
     }
 
-    // If no avatars, just use messages
-    if (characterAvatars.length === 0) {
+    // If no characters with avatars, just use messages
+    if (charactersWithAvatars.length === 0) {
       return messages;
     }
 
     return items;
-  }, [characterAvatars]);
+  }, [charactersWithAvatars]);
 
   // Rotate every 5 seconds
   useEffect(() => {
@@ -233,6 +207,34 @@ export function GenerationProgress({
 
     return () => clearInterval(interval);
   }, [rotationItems.length]);
+
+  // Update character display when rotation changes to a character
+  useEffect(() => {
+    if (rotationItems.length === 0) return;
+
+    const currentItem = rotationItems[rotationIndex];
+    if (currentItem.type === 'character') {
+      const char = currentItem.char;
+      const avatarUrl = getRandomAvatar(char);
+
+      // Get next message index for this character (using ref to avoid dependency issues)
+      const currentIndex = messageIndicesRef.current[char.id] ?? -1;
+      const nextIndex = (currentIndex + 1) % funnyMessageTemplates.length;
+
+      // Update message index for next time
+      messageIndicesRef.current[char.id] = nextIndex;
+
+      // Get the message text
+      const template = funnyMessageTemplates[nextIndex];
+      const msg = language === 'de' ? template.de : language === 'fr' ? template.fr : template.en;
+      const message = msg.replace('{name}', char.name);
+
+      setCurrentCharDisplay({ avatarUrl, message });
+    } else {
+      setCurrentCharDisplay(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rotationIndex, rotationItems, language]);
 
   if (!isGenerating || total === 0) {
     return null;
@@ -345,20 +347,20 @@ export function GenerationProgress({
           <div className="mb-6 min-h-[220px] flex items-center justify-center">
             {(() => {
               const currentItem = rotationItems[rotationIndex];
-              if (currentItem.type === 'avatar') {
+              if (currentItem.type === 'character' && currentCharDisplay) {
                 return (
-                  <div className="flex flex-col items-center gap-3 animate-fade-in">
+                  <div key={`char-${currentItem.char.id}-${rotationIndex}`} className="flex flex-col items-center gap-3 animate-fade-in">
                     <div className="w-32 h-44 md:w-40 md:h-52 rounded-xl overflow-hidden border-4 border-indigo-200 shadow-lg bg-gradient-to-b from-indigo-50 to-purple-50">
                       <img
-                        src={currentItem.avatar}
-                        alt={currentItem.name}
+                        src={currentCharDisplay.avatarUrl}
+                        alt={currentItem.char.name}
                         className="w-full h-full object-contain"
                       />
                     </div>
-                    <p className="text-sm text-center text-gray-600 max-w-xs italic">{currentItem.funnyMessage}</p>
+                    <p className="text-sm text-center text-gray-600 max-w-xs italic">{currentCharDisplay.message}</p>
                   </div>
                 );
-              } else {
+              } else if (currentItem.type === 'message') {
                 const messageKey = currentItem.key as keyof typeof t;
                 const messageText = t[messageKey] || '';
                 const icon = messageKey === 'timeInfo' ? <Clock size={20} className="text-indigo-500 shrink-0" /> :
@@ -371,6 +373,7 @@ export function GenerationProgress({
                   </div>
                 );
               }
+              return null; // Fallback while character display is being computed
             })()}
           </div>
         )}
