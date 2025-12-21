@@ -7,6 +7,7 @@ export interface User {
   storyQuota?: number;
   storiesGenerated?: number;
   preferredLanguage?: 'English' | 'German' | 'French';
+  emailVerified?: boolean;
 }
 
 export interface AuthState {

@@ -22,7 +22,7 @@ const EMAIL_TEMPLATES = {};
 
 function loadEmailTemplates() {
   const emailsDir = path.join(__dirname, 'emails');
-  const templateFiles = ['story-complete.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html'];
+  const templateFiles = ['story-complete.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html', 'email-verification.html', 'password-reset.html'];
 
   for (const file of templateFiles) {
     const filePath = path.join(emailsDir, file);
@@ -330,6 +330,106 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
 }
 
 // ===========================================
+// AUTHENTICATION EMAILS
+// ===========================================
+
+/**
+ * Send email verification link
+ * @param {string} userEmail - User's email address
+ * @param {string} userName - User's name or username
+ * @param {string} verifyUrl - Verification URL with token
+ * @param {string} language - Language for email content (English, German, French)
+ */
+async function sendEmailVerificationEmail(userEmail, userName, verifyUrl, language = 'English') {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping email verification');
+    return null;
+  }
+
+  // Get template for the specified language
+  const template = getTemplateSection('email-verification', language);
+  if (!template) {
+    console.error('❌ Failed to get email-verification template');
+    return null;
+  }
+
+  // Fill in placeholders
+  const values = {
+    verifyUrl: verifyUrl
+  };
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      replyTo: EMAIL_REPLY_TO,
+      to: userEmail,
+      subject: fillTemplate(template.subject, values),
+      text: fillTemplate(template.text, values),
+      html: fillTemplate(template.html, values),
+    });
+
+    if (error) {
+      console.error('❌ Failed to send email verification email:', error);
+      return null;
+    }
+
+    console.log(`📧 Email verification sent to ${userEmail} (${language}), id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error('❌ Email send error:', err);
+    return null;
+  }
+}
+
+/**
+ * Send password reset link
+ * @param {string} userEmail - User's email address
+ * @param {string} userName - User's name or username
+ * @param {string} resetUrl - Password reset URL with token
+ * @param {string} language - Language for email content (English, German, French)
+ */
+async function sendPasswordResetEmail(userEmail, userName, resetUrl, language = 'English') {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping password reset email');
+    return null;
+  }
+
+  // Get template for the specified language
+  const template = getTemplateSection('password-reset', language);
+  if (!template) {
+    console.error('❌ Failed to get password-reset template');
+    return null;
+  }
+
+  // Fill in placeholders
+  const values = {
+    resetUrl: resetUrl
+  };
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      replyTo: EMAIL_REPLY_TO,
+      to: userEmail,
+      subject: fillTemplate(template.subject, values),
+      text: fillTemplate(template.text, values),
+      html: fillTemplate(template.html, values),
+    });
+
+    if (error) {
+      console.error('❌ Failed to send password reset email:', error);
+      return null;
+    }
+
+    console.log(`📧 Password reset email sent to ${userEmail} (${language}), id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error('❌ Email send error:', err);
+    return null;
+  }
+}
+
+// ===========================================
 // ADMIN EMAILS
 // ===========================================
 
@@ -460,6 +560,8 @@ module.exports = {
   sendStoryFailedEmail,
   sendOrderConfirmationEmail,
   sendOrderShippedEmail,
+  sendEmailVerificationEmail,
+  sendPasswordResetEmail,
   sendAdminStoryFailureAlert,
   sendAdminOrderFailureAlert,
 };

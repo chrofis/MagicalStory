@@ -9,6 +9,10 @@ const StoryWizard = lazy(() => import('./pages/StoryWizard'));
 const MyStories = lazy(() => import('./pages/MyStories'));
 const MyOrders = lazy(() => import('./pages/MyOrders'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+const BookBuilder = lazy(() => import('./pages/BookBuilder'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const EmailVerified = lazy(() => import('./pages/EmailVerified'));
 
 function App() {
   return (
@@ -20,7 +24,11 @@ function App() {
           <Route path="/create/*" element={<StoryWizard />} />
           <Route path="/stories" element={<MyStories />} />
           <Route path="/orders" element={<MyOrders />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/book-builder" element={<BookBuilder />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+          <Route path="/email-verified" element={<EmailVerified />} />
         </Routes>
       </Suspense>
     </>

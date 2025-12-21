@@ -10,6 +10,7 @@ import { Button, LoadingSpinner, Navigation } from '@/components/common';
 import { StoryTypeSelector, ArtStyleSelector, RelationshipEditor, StorySettings } from '@/components/story';
 import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
 import { GenerationProgress, StoryDisplay } from '@/components/generation';
+import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible } from '@/types/character';
@@ -28,7 +29,7 @@ export default function StoryWizard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { showSuccess, showInfo } = useToast();
 
   // Wizard state - start at step 5 with loading if we have a storyId in URL
@@ -107,6 +108,7 @@ export default function StoryWizard() {
   // Step 5: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
   const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
+  const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
@@ -856,6 +858,12 @@ export default function StoryWizard() {
   };
 
   const generateStory = async (overrides?: { skipImages?: boolean }) => {
+    // Check email verification before generating
+    if (user && user.emailVerified === false) {
+      setShowEmailVerificationModal(true);
+      return;
+    }
+
     setIsGenerating(true);
     setStep(5);
     // Reset ALL story state for new generation - must clear old story to show popup
@@ -1911,6 +1919,12 @@ export default function StoryWizard() {
           </div>
         </div>
       )}
+
+      {/* Email Verification Modal */}
+      <EmailVerificationModal
+        isOpen={showEmailVerificationModal}
+        onClose={() => setShowEmailVerificationModal(false)}
+      />
     </div>
   );
 }

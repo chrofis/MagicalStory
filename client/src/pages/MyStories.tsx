@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Book, Trash2, Eye, AlertTriangle } from 'lucide-react';
+import { Book, Trash2, Eye, AlertTriangle, CheckSquare, Square, X, BookOpen, Tag } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { storyService } from '@/services';
 import { LoadingSpinner, Navigation } from '@/components/common';
+import { MAX_BOOK_PAGES } from './Pricing';
 import { createLogger } from '@/services/logger';
 
 const log = createLogger('MyStories');
@@ -30,51 +31,97 @@ function StoryCard({
   language,
   onView,
   onDelete,
-  formatDate
+  formatDate,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: {
   story: StoryListItem;
   language: string;
   onView: () => void;
   onDelete: () => void;
   formatDate: (date: string | undefined) => string;
+  selectionMode: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
+  // In selection mode, clicking the card toggles selection
+  const handleCardClick = () => {
+    if (selectionMode && !story.isPartial) {
+      onToggleSelect();
+    }
+  };
+
   return (
-    <div className={`bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col ${story.isPartial ? 'ring-2 ring-amber-400' : ''}`}>
-      {story.thumbnail && !imageError ? (
-        <div className="relative w-full h-48 bg-gray-100">
-          {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-8 h-8 spinner" />
+    <div
+      className={`bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col ${
+        story.isPartial ? 'ring-2 ring-amber-400' : ''
+      } ${
+        selectionMode && !story.isPartial ? 'cursor-pointer hover:ring-2 hover:ring-indigo-400' : 'hover:shadow-lg'
+      } ${
+        isSelected ? 'ring-2 ring-indigo-600 bg-indigo-50' : ''
+      }`}
+      onClick={handleCardClick}
+    >
+      {/* Thumbnail with selection checkbox overlay */}
+      <div className="relative">
+        {story.thumbnail && !imageError ? (
+          <div className="relative w-full h-48 bg-gray-100">
+            {!imageLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 spinner" />
+              </div>
+            )}
+            <img
+              src={story.thumbnail}
+              alt={story.title}
+              className={`w-full h-48 object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+            />
+          </div>
+        ) : (
+          <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+            <Book className="w-12 h-12 text-indigo-300" />
+          </div>
+        )}
+
+        {/* Selection checkbox (top-left) */}
+        {selectionMode && !story.isPartial && (
+          <div className="absolute top-2 left-2">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+              isSelected ? 'bg-indigo-600' : 'bg-white/90 border-2 border-gray-300'
+            }`}>
+              {isSelected ? (
+                <CheckSquare size={18} className="text-white" />
+              ) : (
+                <Square size={18} className="text-gray-400" />
+              )}
             </div>
-          )}
-          <img
-            src={story.thumbnail}
-            alt={story.title}
-            className={`w-full h-48 object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
-          />
-          {story.isPartial && (
-            <div className="absolute top-2 right-2 bg-amber-500 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
-              <AlertTriangle size={12} />
-              {language === 'de' ? 'Teilweise' : language === 'fr' ? 'Partiel' : 'Partial'}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-          <Book className="w-12 h-12 text-indigo-300" />
-          {story.isPartial && (
-            <div className="absolute top-2 right-2 bg-amber-500 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
-              <AlertTriangle size={12} />
-              {language === 'de' ? 'Teilweise' : language === 'fr' ? 'Partiel' : 'Partial'}
-            </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+        {/* Partial badge (top-right) */}
+        {story.isPartial && (
+          <div className="absolute top-2 right-2 bg-amber-500 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
+            <AlertTriangle size={12} />
+            {language === 'de' ? 'Teilweise' : language === 'fr' ? 'Partiel' : 'Partial'}
+          </div>
+        )}
+
+        {/* Selection mode: can't select partial stories */}
+        {selectionMode && story.isPartial && (
+          <div className="absolute inset-0 bg-gray-900/50 flex items-center justify-center">
+            <span className="text-white text-sm font-medium px-3 py-1 bg-gray-800/80 rounded-lg">
+              {language === 'de' ? 'Nicht verfügbar' : language === 'fr' ? 'Non disponible' : 'Not available'}
+            </span>
+          </div>
+        )}
+      </div>
+
       <div className="p-4 flex flex-col flex-1">
         <div className="flex-1">
           <h3 className="font-bold text-lg text-gray-800 mb-2">{story.title}</h3>
@@ -88,21 +135,25 @@ function StoryCard({
             </p>
           )}
         </div>
-        <div className="flex gap-2 mt-auto">
-          <button
-            onClick={onView}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-          >
-            <Eye size={18} />
-            {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : 'View'}
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-          >
-            <Trash2 size={18} />
-          </button>
-        </div>
+
+        {/* Action buttons - hidden in selection mode */}
+        {!selectionMode && (
+          <div className="flex gap-2 mt-auto">
+            <button
+              onClick={(e) => { e.stopPropagation(); onView(); }}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            >
+              <Eye size={18} />
+              {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : 'View'}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -114,6 +165,52 @@ export default function MyStories() {
   const { isAuthenticated } = useAuth();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const translations = {
+    en: {
+      myStories: 'My Stories',
+      createStory: 'Create Story',
+      noStories: 'No stories created yet',
+      selectForBook: 'Select for Book',
+      cancel: 'Cancel',
+      seePricing: 'See Pricing',
+      selectHint: 'Select stories to combine into one book',
+      selected: 'selected',
+      pages: 'pages',
+      createBook: 'Create Book',
+      tooManyPages: 'Too many pages (max 100)',
+    },
+    de: {
+      myStories: 'Meine Geschichten',
+      createStory: 'Geschichte erstellen',
+      noStories: 'Noch keine Geschichten erstellt',
+      selectForBook: 'Für Buch auswählen',
+      cancel: 'Abbrechen',
+      seePricing: 'Preise ansehen',
+      selectHint: 'Wähle Geschichten, um sie zu einem Buch zu kombinieren',
+      selected: 'ausgewählt',
+      pages: 'Seiten',
+      createBook: 'Buch erstellen',
+      tooManyPages: 'Zu viele Seiten (max. 100)',
+    },
+    fr: {
+      myStories: 'Mes histoires',
+      createStory: 'Créer une histoire',
+      noStories: 'Aucune histoire créée',
+      selectForBook: 'Sélectionner pour livre',
+      cancel: 'Annuler',
+      seePricing: 'Voir les tarifs',
+      selectHint: 'Sélectionnez des histoires à combiner en un livre',
+      selected: 'sélectionné(s)',
+      pages: 'pages',
+      createBook: 'Créer le livre',
+      tooManyPages: 'Trop de pages (max 100)',
+    },
+  };
+
+  const t = translations[language as keyof typeof translations] || translations.en;
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -173,46 +270,135 @@ export default function MyStories() {
     }
   }, [language]);
 
+  // Toggle story selection
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // Calculate total pages of selected stories
+  const selectedStories = useMemo(() => {
+    return stories.filter(s => selectedIds.has(s.id));
+  }, [stories, selectedIds]);
+
+  const totalSelectedPages = useMemo(() => {
+    return selectedStories.reduce((sum, s) => sum + s.pages, 0);
+  }, [selectedStories]);
+
+  const isOverLimit = totalSelectedPages > MAX_BOOK_PAGES;
+
+  // Enter selection mode
+  const enterSelectionMode = () => {
+    setSelectionMode(true);
+    setSelectedIds(new Set());
+  };
+
+  // Exit selection mode
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  // Proceed to book builder
+  const goToBookBuilder = () => {
+    const selectedData = selectedStories.map(s => ({
+      id: s.id,
+      title: s.title,
+      pages: s.pages,
+      thumbnail: s.thumbnail,
+    }));
+    navigate('/book-builder', { state: { selectedStories: selectedData } });
+  };
+
   if (!isAuthenticated) {
     return <LoadingSpinner fullScreen />;
   }
 
+  // Check if there are complete (non-partial) stories for selection
+  const completeStories = stories.filter(s => !s.isPartial);
+  const canSelectForBook = completeStories.length >= 1;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-24">
       <Navigation currentStep={0} />
 
       <div className="px-4 md:px-8 py-8 max-w-6xl mx-auto">
-        {/* Header: Title and Create Button */}
-        <div className="flex items-center justify-between mb-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
             <Book size={28} />
-            {language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : 'My Stories'}
+            {t.myStories}
           </h1>
-          <button
-            onClick={() => navigate('/create')}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
-          >
-            {language === 'de' ? 'Geschichte erstellen' : language === 'fr' ? 'Créer une histoire' : 'Create Story'}
-          </button>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* See Pricing link */}
+            <button
+              onClick={() => navigate('/pricing')}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            >
+              <Tag size={18} />
+              {t.seePricing}
+            </button>
+
+            {/* Selection mode toggle */}
+            {!selectionMode && canSelectForBook && (
+              <button
+                onClick={enterSelectionMode}
+                className="flex items-center gap-2 px-4 py-2 border-2 border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 font-semibold transition-colors"
+              >
+                <BookOpen size={18} />
+                {t.selectForBook}
+              </button>
+            )}
+
+            {selectionMode && (
+              <button
+                onClick={exitSelectionMode}
+                className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 font-semibold transition-colors"
+              >
+                <X size={18} />
+                {t.cancel}
+              </button>
+            )}
+
+            {/* Create Story button */}
+            {!selectionMode && (
+              <button
+                onClick={() => navigate('/create')}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
+              >
+                {t.createStory}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Selection mode hint */}
+        {selectionMode && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+            <CheckSquare size={24} className="text-indigo-600" />
+            <p className="text-indigo-800 font-medium">{t.selectHint}</p>
+          </div>
+        )}
 
         {isLoading ? (
           <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : 'Loading...'} />
         ) : stories.length === 0 ? (
           <div className="text-center py-12">
             <Book className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">
-              {language === 'de'
-                ? 'Noch keine Geschichten erstellt'
-                : language === 'fr'
-                ? 'Aucune histoire créée'
-                : 'No stories created yet'}
-            </p>
+            <p className="text-gray-500 text-lg">{t.noStories}</p>
             <button
               onClick={() => navigate('/create')}
               className="mt-4 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
             >
-              {language === 'de' ? 'Geschichte erstellen' : language === 'fr' ? 'Créer une histoire' : 'Create Story'}
+              {t.createStory}
             </button>
           </div>
         ) : (
@@ -225,11 +411,46 @@ export default function MyStories() {
                 onView={() => navigate(`/create?storyId=${story.id}`)}
                 onDelete={() => deleteStory(story.id)}
                 formatDate={formatDate}
+                selectionMode={selectionMode}
+                isSelected={selectedIds.has(story.id)}
+                onToggleSelect={() => toggleSelect(story.id)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Floating action bar for selection mode */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-indigo-200 shadow-lg p-4 z-50">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-gray-800">
+                <span className="font-bold text-lg">{selectedIds.size}</span>{' '}
+                <span className="text-gray-600">{t.selected}</span>
+              </div>
+              <div className={`text-sm ${isOverLimit ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                {totalSelectedPages} {t.pages}
+                {isOverLimit && (
+                  <span className="ml-2 flex items-center gap-1 inline-flex">
+                    <AlertTriangle size={14} />
+                    {t.tooManyPages}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={goToBookBuilder}
+              disabled={isOverLimit || selectedIds.size === 0}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-bold hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <BookOpen size={20} />
+              {t.createBook}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
