@@ -189,7 +189,7 @@ export default function BookBuilder() {
       const storyId = stories[0].id;
       log.info('Downloading print PDF for story:', storyId);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`/api/stories/${storyId}/print-pdf`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
