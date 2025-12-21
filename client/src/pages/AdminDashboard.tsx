@@ -70,7 +70,7 @@ export default function AdminDashboard() {
     credits: false
   });
 
-  // Print Products state
+  // Print Products state (for future product management feature)
   const [printProducts, setPrintProducts] = useState<PrintProduct[]>([]);
   const [gelatoProducts, setGelatoProducts] = useState<GelatoProduct[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);

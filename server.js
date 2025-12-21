@@ -1558,6 +1558,33 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
 
     await logActivity(newUser.id, username, 'USER_REGISTERED', { email });
 
+    // Send verification email for new users (non-admin)
+    let emailVerified = false;
+    if (STORAGE_MODE === 'database' && newUser.role !== 'admin') {
+      try {
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        await dbQuery(
+          'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
+          [verificationToken, verificationExpires, newUser.id]
+        );
+
+        const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/verify-email/${verificationToken}`;
+        await email.sendEmailVerificationEmail(username, username, verifyUrl);
+        console.log(`📧 Verification email sent to: ${username}`);
+      } catch (emailErr) {
+        console.error('Failed to send verification email:', emailErr.message);
+        // Don't fail registration if email fails - user can request resend
+      }
+    } else if (newUser.role === 'admin') {
+      // First user (admin) is auto-verified
+      emailVerified = true;
+      if (STORAGE_MODE === 'database') {
+        await dbQuery('UPDATE users SET email_verified = TRUE WHERE id = $1', [newUser.id]);
+      }
+    }
+
     // Generate token
     const token = jwt.sign(
       { id: newUser.id, username: newUser.username, role: newUser.role },
@@ -14263,10 +14290,35 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
 
       if (emailCheckResult.rows.length > 0 && !emailCheckResult.rows[0].email_verified) {
         log.warn(`User ${req.user.username} attempted story generation without verified email`);
+
+        // Send/resend verification email
+        try {
+          const userResult = await dbPool.query(
+            'SELECT id, username, email FROM users WHERE id = $1',
+            [userId]
+          );
+          if (userResult.rows.length > 0) {
+            const user = userResult.rows[0];
+            const verificationToken = crypto.randomBytes(32).toString('hex');
+            const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+            await dbPool.query(
+              'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
+              [verificationToken, verificationExpires, user.id]
+            );
+
+            const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/verify-email/${verificationToken}`;
+            await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
+            console.log(`📧 Verification email resent to: ${user.email}`);
+          }
+        } catch (emailErr) {
+          console.error('Failed to send verification email:', emailErr.message);
+        }
+
         return res.status(403).json({
           error: 'Email verification required',
           code: 'EMAIL_NOT_VERIFIED',
-          message: 'Please verify your email address before generating stories.'
+          message: 'Please verify your email first. We just sent you a verification link - story generation will start as soon as you verify your email.'
         });
       }
     }
