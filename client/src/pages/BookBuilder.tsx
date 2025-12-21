@@ -59,8 +59,8 @@ export default function BookBuilder() {
       generatingPdf: 'Generating PDF...',
     },
     de: {
-      title: 'Dein Buch erstellen',
-      subtitle: 'Ordne deine Geschichten an und wähle deinen Einband',
+      title: 'Erstelle dein Buch',
+      subtitle: 'Wähle die Reihenfolge der Geschichten und das Buchformat',
       noStories: 'Keine Geschichten ausgewählt',
       noStoriesDesc: 'Bitte geh zurück und wähle Geschichten zum Kombinieren aus.',
       backToStories: 'Zurück zu Meine Geschichten',
