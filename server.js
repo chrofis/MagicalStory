@@ -1061,7 +1061,7 @@ async function initializeDatabase() {
         role VARCHAR(50) DEFAULT 'user',
         story_quota INT DEFAULT 2,
         stories_generated INT DEFAULT 0,
-        credits INT DEFAULT 1000,
+        credits INT DEFAULT 500,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP,
         preferred_language VARCHAR(20) DEFAULT 'English'
@@ -1093,7 +1093,7 @@ async function initializeDatabase() {
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='credits') THEN
-          ALTER TABLE users ADD COLUMN credits INT DEFAULT 1000;
+          ALTER TABLE users ADD COLUMN credits INT DEFAULT 500;
         END IF;
       END $$;
     `);
@@ -1501,7 +1501,7 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
       const userId = Date.now().toString();
       const role = isFirstUser ? 'admin' : 'user';
       const storyQuota = isFirstUser ? -1 : 2;
-      const initialCredits = isFirstUser ? -1 : 1000;
+      const initialCredits = isFirstUser ? -1 : 500;
 
       const insertQuery = 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
       await dbQuery(insertQuery, [userId, username, username, hashedPassword, role, storyQuota, 0, initialCredits]);
@@ -1543,7 +1543,7 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
         role: isFirstUser ? 'admin' : 'user',
         storyQuota: isFirstUser ? -1 : 2,
         storiesGenerated: 0,
-        credits: isFirstUser ? -1 : 1000
+        credits: isFirstUser ? -1 : 500
       };
 
       users.push(newUser);
@@ -1607,7 +1607,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         role: dbUser.role,
         storyQuota: dbUser.story_quota,
         storiesGenerated: dbUser.stories_generated,
-        credits: dbUser.credits !== undefined ? dbUser.credits : 1000,
+        credits: dbUser.credits !== undefined ? dbUser.credits : 500,
         preferredLanguage: dbUser.preferred_language || 'English',
         emailVerified: dbUser.email_verified !== false
       };
@@ -1653,7 +1653,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         role: user.role,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits != null ? user.credits : 1000,
+        credits: user.credits != null ? user.credits : 500,
         preferredLanguage: user.preferredLanguage || 'English',
         emailVerified: user.emailVerified !== false
       }
@@ -1701,7 +1701,7 @@ app.post('/api/auth/firebase', authLimiter, async (req, res) => {
         const isFirstUser = parseInt(userCount[0].count) === 0;
         const role = isFirstUser ? 'admin' : 'user';
         const storyQuota = isFirstUser ? 999 : 2;
-        const initialCredits = isFirstUser ? -1 : 1000;
+        const initialCredits = isFirstUser ? -1 : 500;
 
         // Generate a random password (user won't need it - they use Firebase)
         const randomPassword = crypto.randomBytes(32).toString('hex');
@@ -1749,7 +1749,7 @@ app.post('/api/auth/firebase', authLimiter, async (req, res) => {
           role: user.role,
           storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
           storiesGenerated: user.stories_generated || 0,
-          credits: user.credits != null ? user.credits : 1000,
+          credits: user.credits != null ? user.credits : 500,
           preferredLanguage: user.preferred_language || 'English',
           emailVerified: user.email_verified !== false // Firebase users are considered verified
         }
@@ -2326,7 +2326,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         role: user.role,
         storyQuota: user.story_quota,
         storiesGenerated: user.stories_generated,
-        credits: user.credits != null ? user.credits : 1000,
+        credits: user.credits != null ? user.credits : 500,
         createdAt: user.created_at,
         lastLogin: user.last_login,
         totalOrders: parseInt(user.total_orders) || 0,
@@ -2339,7 +2339,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         ...user,
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits != null ? user.credits : 1000,
+        credits: user.credits != null ? user.credits : 500,
         totalOrders: 0,
         failedOrders: 0
       }));
@@ -3000,7 +3000,7 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      credits = rows[0].credits !== undefined ? rows[0].credits : 1000;
+      credits = rows[0].credits !== undefined ? rows[0].credits : 500;
       preferredLanguage = rows[0].preferred_language || 'English';
     } else {
       // File mode
@@ -3011,7 +3011,7 @@ app.get('/api/user/quota', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      credits = user.credits != null ? user.credits : 1000;
+      credits = user.credits != null ? user.credits : 500;
       preferredLanguage = user.preferredLanguage || 'English';
     }
 
@@ -9644,21 +9644,52 @@ function extractShortSceneDescriptions(outline) {
 async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId) {
   console.log(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
-  // Token usage tracker - accumulates usage from all API calls
+  // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {
+    // By provider (for backwards compatibility)
     anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
     gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-    gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+    gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    // By function (for detailed breakdown)
+    byFunction: {
+      storybook_combined: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic' },
+      cover_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image' },
+      cover_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality' },
+      page_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image' },
+      page_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality' }
+    }
   };
 
-  // Helper to add usage
-  const addUsage = (provider, usage) => {
+  // Pricing per million tokens (as of Dec 2024)
+  const PRICING = {
+    anthropic: { input: 3.00, output: 15.00 },      // Claude Sonnet 4
+    gemini_image: { input: 0.075, output: 0.30 },   // Gemini Flash
+    gemini_quality: { input: 0.075, output: 0.30 }, // Gemini Flash
+    gemini_text: { input: 0.075, output: 0.30 }     // Gemini Flash
+  };
+
+  // Helper to add usage - now supports function-level tracking
+  const addUsage = (provider, usage, functionName = null) => {
     if (usage && tokenUsage[provider]) {
       tokenUsage[provider].input_tokens += usage.input_tokens || 0;
       tokenUsage[provider].output_tokens += usage.output_tokens || 0;
       tokenUsage[provider].calls += 1;
     }
+    // Also track by function if specified
+    if (functionName && tokenUsage.byFunction[functionName]) {
+      tokenUsage.byFunction[functionName].input_tokens += usage.input_tokens || 0;
+      tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
+      tokenUsage.byFunction[functionName].calls += 1;
+    }
+  };
+
+  // Helper to calculate cost for a usage entry
+  const calculateCost = (provider, inputTokens, outputTokens) => {
+    const pricing = PRICING[provider] || { input: 0, output: 0 };
+    const inputCost = (inputTokens / 1000000) * pricing.input;
+    const outputCost = (outputTokens / 1000000) * pricing.output;
+    return { input: inputCost, output: outputCost, total: inputCost + outputCost };
   };
 
   // For Picture Book: pages = scenes (each page has image + text)
@@ -10054,7 +10085,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         sceneParser.processChunk(chunk, fullText);
       });
       response = streamResult.text;
-      addUsage('anthropic', streamResult.usage);
+      addUsage('anthropic', streamResult.usage, 'storybook_combined');
       console.log(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
       console.log(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
       console.log(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
@@ -10584,15 +10615,46 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       updatedAt: new Date().toISOString()
     };
 
-    // Log token usage summary
-    const totalInputTokens = Object.values(tokenUsage).reduce((sum, p) => sum + p.input_tokens, 0);
-    const totalOutputTokens = Object.values(tokenUsage).reduce((sum, p) => sum + p.output_tokens, 0);
-    console.log(`📊 [STORYBOOK] Token usage summary:`);
-    console.log(`   Anthropic: ${tokenUsage.anthropic.input_tokens.toLocaleString()} in / ${tokenUsage.anthropic.output_tokens.toLocaleString()} out (${tokenUsage.anthropic.calls} calls)`);
-    console.log(`   Gemini Text: ${tokenUsage.gemini_text.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_text.output_tokens.toLocaleString()} out (${tokenUsage.gemini_text.calls} calls)`);
-    console.log(`   Gemini Image: ${tokenUsage.gemini_image.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString()} out (${tokenUsage.gemini_image.calls} calls)`);
-    console.log(`   Gemini Quality: ${tokenUsage.gemini_quality.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString()} out (${tokenUsage.gemini_quality.calls} calls)`);
+    // Log token usage summary with costs
+    const totalInputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].input_tokens, 0);
+    const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].output_tokens, 0);
+    const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens);
+    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens);
+    const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens);
+    const totalCost = anthropicCost.total + geminiImageCost.total + geminiQualityCost.total;
+    console.log(`📊 [STORYBOOK] Token usage & cost summary:`);
+    console.log(`   ─────────────────────────────────────────────────────────────`);
+    console.log(`   BY PROVIDER:`);
+    console.log(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
+    console.log(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_image.calls} calls)  $${geminiImageCost.total.toFixed(4)}`);
+    console.log(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
+    console.log(`   ─────────────────────────────────────────────────────────────`);
+    console.log(`   BY FUNCTION:`);
+    const byFunc = tokenUsage.byFunction;
+    if (byFunc.storybook_combined.calls > 0) {
+      const cost = calculateCost(byFunc.storybook_combined.provider, byFunc.storybook_combined.input_tokens, byFunc.storybook_combined.output_tokens);
+      console.log(`   Story+Scenes:  ${byFunc.storybook_combined.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.storybook_combined.output_tokens.toLocaleString().padStart(8)} out (${byFunc.storybook_combined.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.cover_images.calls > 0) {
+      const cost = calculateCost(byFunc.cover_images.provider, byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
+      console.log(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.cover_quality.calls > 0) {
+      const cost = calculateCost(byFunc.cover_quality.provider, byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens);
+      console.log(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.page_images.calls > 0) {
+      const cost = calculateCost(byFunc.page_images.provider, byFunc.page_images.input_tokens, byFunc.page_images.output_tokens);
+      console.log(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.page_quality.calls > 0) {
+      const cost = calculateCost(byFunc.page_quality.provider, byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens);
+      console.log(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    console.log(`   ─────────────────────────────────────────────────────────────`);
     console.log(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output tokens`);
+    console.log(`   💰 TOTAL COST: $${totalCost.toFixed(4)}`);
+    console.log(`   ─────────────────────────────────────────────────────────────`);
 
     // Insert into stories table
     await dbPool.query(
@@ -10709,21 +10771,54 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 async function processStoryJob(jobId) {
   console.log(`🎬 Starting processing for job ${jobId}`);
 
-  // Token usage tracker - accumulates usage from all API calls
+  // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {
+    // By provider (for backwards compatibility)
     anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
     gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-    gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+    gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    // By function (for detailed breakdown)
+    byFunction: {
+      outline: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic' },
+      scene_descriptions: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic' },
+      story_text: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic' },
+      cover_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image' },
+      cover_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality' },
+      page_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image' },
+      page_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality' }
+    }
   };
 
-  // Helper to add usage
-  const addUsage = (provider, usage) => {
+  // Pricing per million tokens (as of Dec 2024)
+  const PRICING = {
+    anthropic: { input: 3.00, output: 15.00 },      // Claude Sonnet 4
+    gemini_image: { input: 0.075, output: 0.30 },   // Gemini Flash
+    gemini_quality: { input: 0.075, output: 0.30 }, // Gemini Flash
+    gemini_text: { input: 0.075, output: 0.30 }     // Gemini Flash
+  };
+
+  // Helper to add usage - now supports function-level tracking
+  const addUsage = (provider, usage, functionName = null) => {
     if (usage && tokenUsage[provider]) {
       tokenUsage[provider].input_tokens += usage.input_tokens || 0;
       tokenUsage[provider].output_tokens += usage.output_tokens || 0;
       tokenUsage[provider].calls += 1;
     }
+    // Also track by function if specified
+    if (functionName && tokenUsage.byFunction[functionName]) {
+      tokenUsage.byFunction[functionName].input_tokens += usage.input_tokens || 0;
+      tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
+      tokenUsage.byFunction[functionName].calls += 1;
+    }
+  };
+
+  // Helper to calculate cost for a usage entry
+  const calculateCost = (provider, inputTokens, outputTokens) => {
+    const pricing = PRICING[provider] || { input: 0, output: 0 };
+    const inputCost = (inputTokens / 1000000) * pricing.input;
+    const outputCost = (outputTokens / 1000000) * pricing.output;
+    return { input: inputCost, output: outputCost, total: inputCost + outputCost };
   };
 
   try {
@@ -10798,7 +10893,7 @@ async function processStoryJob(jobId) {
     console.log(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
     const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens);
     const outline = outlineResult.text;
-    addUsage('anthropic', outlineResult.usage);
+    addUsage('anthropic', outlineResult.usage, 'outline');
 
     // Save checkpoint: outline (include prompt for debugging)
     await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt });
@@ -11098,7 +11193,7 @@ Output Format:
             // Generate detailed scene description
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
             const sceneDescription = sceneDescResult.text;
-            addUsage('anthropic', sceneDescResult.usage);
+            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions');
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -11215,7 +11310,7 @@ Output Format:
           progressiveParser.processChunk(chunk, fullText);
         });
         batchText = batchResult.text;
-        addUsage('anthropic', batchResult.usage);
+        addUsage('anthropic', batchResult.usage, 'story_text');
 
         // Finalize to emit the last page
         progressiveParser.finalize(batchText);
@@ -11224,7 +11319,7 @@ Output Format:
         // No progressive parsing - just stream text
         const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
         batchText = batchResult.text;
-        addUsage('anthropic', batchResult.usage);
+        addUsage('anthropic', batchResult.usage, 'story_text');
       }
 
       fullStoryText += batchText + '\n\n';
@@ -11277,7 +11372,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           console.log(`🔄 [RETRY] Generating missing page ${missingPageNum}...`);
           const retryResult = await callTextModelStreaming(retryPrompt, 1500);
           const retryText = retryResult.text;
-          addUsage('anthropic', retryResult.usage);
+          addUsage('anthropic', retryResult.usage, 'story_text');
 
           // Parse the retry response
           const retryPages = parseStoryPages(retryText);
@@ -11430,7 +11525,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
             const sceneDescription = sceneDescResult.text;
-            addUsage('anthropic', sceneDescResult.usage);
+            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions');
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -11696,15 +11791,54 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       updatedAt: new Date().toISOString()
     };
 
-    // Log token usage summary
-    const totalInputTokens = Object.values(tokenUsage).reduce((sum, p) => sum + p.input_tokens, 0);
-    const totalOutputTokens = Object.values(tokenUsage).reduce((sum, p) => sum + p.output_tokens, 0);
-    console.log(`📊 [PIPELINE] Token usage summary:`);
-    console.log(`   Anthropic: ${tokenUsage.anthropic.input_tokens.toLocaleString()} in / ${tokenUsage.anthropic.output_tokens.toLocaleString()} out (${tokenUsage.anthropic.calls} calls)`);
-    console.log(`   Gemini Text: ${tokenUsage.gemini_text.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_text.output_tokens.toLocaleString()} out (${tokenUsage.gemini_text.calls} calls)`);
-    console.log(`   Gemini Image: ${tokenUsage.gemini_image.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString()} out (${tokenUsage.gemini_image.calls} calls)`);
-    console.log(`   Gemini Quality: ${tokenUsage.gemini_quality.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString()} out (${tokenUsage.gemini_quality.calls} calls)`);
+    // Log token usage summary with costs
+    const totalInputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].input_tokens, 0);
+    const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].output_tokens, 0);
+    const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens);
+    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens);
+    const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens);
+    const totalCost = anthropicCost.total + geminiImageCost.total + geminiQualityCost.total;
+    console.log(`📊 [PIPELINE] Token usage & cost summary:`);
+    console.log(`   ─────────────────────────────────────────────────────────────`);
+    console.log(`   BY PROVIDER:`);
+    console.log(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
+    console.log(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_image.calls} calls)  $${geminiImageCost.total.toFixed(4)}`);
+    console.log(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
+    console.log(`   ─────────────────────────────────────────────────────────────`);
+    console.log(`   BY FUNCTION:`);
+    const byFunc = tokenUsage.byFunction;
+    if (byFunc.outline.calls > 0) {
+      const cost = calculateCost(byFunc.outline.provider, byFunc.outline.input_tokens, byFunc.outline.output_tokens);
+      console.log(`   Outline:       ${byFunc.outline.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.outline.output_tokens.toLocaleString().padStart(8)} out (${byFunc.outline.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.scene_descriptions.calls > 0) {
+      const cost = calculateCost(byFunc.scene_descriptions.provider, byFunc.scene_descriptions.input_tokens, byFunc.scene_descriptions.output_tokens);
+      console.log(`   Scene Desc:    ${byFunc.scene_descriptions.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_descriptions.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_descriptions.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.story_text.calls > 0) {
+      const cost = calculateCost(byFunc.story_text.provider, byFunc.story_text.input_tokens, byFunc.story_text.output_tokens);
+      console.log(`   Story Text:    ${byFunc.story_text.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.story_text.output_tokens.toLocaleString().padStart(8)} out (${byFunc.story_text.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.cover_images.calls > 0) {
+      const cost = calculateCost(byFunc.cover_images.provider, byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
+      console.log(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.cover_quality.calls > 0) {
+      const cost = calculateCost(byFunc.cover_quality.provider, byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens);
+      console.log(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.page_images.calls > 0) {
+      const cost = calculateCost(byFunc.page_images.provider, byFunc.page_images.input_tokens, byFunc.page_images.output_tokens);
+      console.log(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    if (byFunc.page_quality.calls > 0) {
+      const cost = calculateCost(byFunc.page_quality.provider, byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens);
+      console.log(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}`);
+    }
+    console.log(`   ─────────────────────────────────────────────────────────────`);
     console.log(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output tokens`);
+    console.log(`   💰 TOTAL COST: $${totalCost.toFixed(4)}`);
+    console.log(`   ─────────────────────────────────────────────────────────────`);
 
     // Insert into stories table
     await dbPool.query(
@@ -13882,6 +14016,23 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
     const inputData = req.body;
 
     console.log(`📝 Creating story job ${jobId} for user ${req.user.username}`);
+
+    // Check email verification (skip for admins)
+    if (req.user.role !== 'admin' && STORAGE_MODE === 'database') {
+      const emailCheckResult = await dbPool.query(
+        'SELECT email_verified FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (emailCheckResult.rows.length > 0 && !emailCheckResult.rows[0].email_verified) {
+        console.log(`⚠️ User ${req.user.username} attempted story generation without verified email`);
+        return res.status(403).json({
+          error: 'Email verification required',
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Please verify your email address before generating stories.'
+        });
+      }
+    }
 
     // Check if user already has a story generation in progress
     if (STORAGE_MODE === 'database') {
