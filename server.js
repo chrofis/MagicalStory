@@ -9706,11 +9706,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 },
     // By function (for detailed breakdown)
     byFunction: {
-      storybook_combined: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic' },
-      cover_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image' },
-      cover_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality' },
-      page_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image' },
-      page_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality' }
+      storybook_combined: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
+      cover_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      cover_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      page_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      page_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() }
     }
   };
 
@@ -9722,8 +9722,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     gemini_text: { input: 0.075, output: 0.30 }     // Gemini Flash
   };
 
-  // Helper to add usage - now supports function-level tracking
-  const addUsage = (provider, usage, functionName = null) => {
+  // Helper to add usage - now supports function-level tracking with model names
+  const addUsage = (provider, usage, functionName = null, modelName = null) => {
     if (usage && tokenUsage[provider]) {
       tokenUsage[provider].input_tokens += usage.input_tokens || 0;
       tokenUsage[provider].output_tokens += usage.output_tokens || 0;
@@ -9734,6 +9734,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       tokenUsage.byFunction[functionName].input_tokens += usage.input_tokens || 0;
       tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
       tokenUsage.byFunction[functionName].calls += 1;
+      if (modelName) {
+        tokenUsage.byFunction[functionName].models.add(modelName);
+      }
     }
   };
 
