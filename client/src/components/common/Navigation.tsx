@@ -223,6 +223,18 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                     </>
                   )}
 
+                  {/* Change Password */}
+                  <button
+                    onClick={() => {
+                      setShowChangePasswordModal(true);
+                      setShowMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
+                  >
+                    <KeyRound size={16} />
+                    <span>{language === 'de' ? 'Passwort aendern' : language === 'fr' ? 'Changer le mot de passe' : 'Change Password'}</span>
+                  </button>
+
                   {/* Logout */}
                   <button
                     onClick={handleLogout}
@@ -286,6 +298,12 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
           </div>
         </div>
       )}
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+      />
     </nav>
   );
 }

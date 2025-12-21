@@ -3017,51 +3017,45 @@ app.put('/api/admin/print-products/:id', authenticateToken, async (req, res) => 
     }
 
     const { id } = req.params;
-    const {
-      product_uid,
-      product_name,
-      description,
-      size,
-      cover_type,
-      min_pages,
-      max_pages,
-      available_page_counts,
-      is_active
-    } = req.body;
+    const updates = req.body;
 
-    // Validate JSON format for available_page_counts
-    let pageCounts;
-    try {
-      pageCounts = typeof available_page_counts === 'string'
-        ? JSON.parse(available_page_counts)
-        : available_page_counts;
-      if (!Array.isArray(pageCounts)) {
-        throw new Error('Must be an array');
+    // Build dynamic update query based on provided fields
+    const allowedFields = ['product_uid', 'product_name', 'description', 'size', 'cover_type', 'min_pages', 'max_pages', 'available_page_counts', 'is_active'];
+    const setClauses = [];
+    const params = [];
+    let paramIndex = 1;
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        let value = updates[field];
+
+        // Handle available_page_counts JSON validation
+        if (field === 'available_page_counts') {
+          try {
+            const pageCounts = typeof value === 'string' ? JSON.parse(value) : value;
+            if (!Array.isArray(pageCounts)) {
+              throw new Error('Must be an array');
+            }
+            value = JSON.stringify(pageCounts);
+          } catch (err) {
+            return res.status(400).json({ error: 'available_page_counts must be a valid JSON array' });
+          }
+        }
+
+        setClauses.push(`${field} = $${paramIndex}`);
+        params.push(value);
+        paramIndex++;
       }
-    } catch (err) {
-      return res.status(400).json({ error: 'available_page_counts must be a valid JSON array' });
     }
 
-    const updateQuery = `UPDATE gelato_products
-         SET product_uid = $1, product_name = $2, description = $3, size = $4,
-             cover_type = $5, min_pages = $6, max_pages = $7,
-             available_page_counts = $8, is_active = $9
-         WHERE id = $10
-         RETURNING *`;
+    if (setClauses.length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
 
-    const pageCountsJson = JSON.stringify(pageCounts);
-    const params = [
-      product_uid,
-      product_name,
-      description || null,
-      size || null,
-      cover_type || null,
-      min_pages,
-      max_pages,
-      pageCountsJson,
-      is_active !== false,
-      id
-    ];
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+
+    const updateQuery = `UPDATE gelato_products SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
 
     const result = await dbQuery(updateQuery, params);
 
@@ -3073,7 +3067,7 @@ app.put('/api/admin/print-products/:id', authenticateToken, async (req, res) => 
 
     await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_UPDATED', {
       productId: id,
-      productName: product_name
+      productName: updatedProduct.product_name
     });
 
     res.json({ product: updatedProduct, message: 'Product updated successfully' });
