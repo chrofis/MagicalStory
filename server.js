@@ -7258,6 +7258,10 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
             }
           }
 
+          // Calculate book pages for this story (+3 for title, initial, back cover)
+          const storyPages = storyData.pages || 0;
+          const bookPages = storyPages + 3;
+
           // Aggregate by user
           const userKey = row.user_email || row.user_id || 'unknown';
           if (!byUser[userKey]) {
@@ -7266,6 +7270,7 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
               email: row.user_email,
               name: row.user_name,
               storyCount: 0,
+              totalBookPages: 0,
               anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
               gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
@@ -7273,6 +7278,7 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
             };
           }
           byUser[userKey].storyCount++;
+          byUser[userKey].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
               byUser[userKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
@@ -7286,6 +7292,7 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
           if (!byStoryType[storyType]) {
             byStoryType[storyType] = {
               storyCount: 0,
+              totalBookPages: 0,
               anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
               gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
@@ -7293,6 +7300,7 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
             };
           }
           byStoryType[storyType].storyCount++;
+          byStoryType[storyType].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
               byStoryType[storyType][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
@@ -7306,6 +7314,7 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
           if (!byMonth[monthKey]) {
             byMonth[monthKey] = {
               storyCount: 0,
+              totalBookPages: 0,
               anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
               gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
@@ -7313,6 +7322,7 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
             };
           }
           byMonth[monthKey].storyCount++;
+          byMonth[monthKey].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
               byMonth[monthKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
@@ -7323,11 +7333,15 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
 
           // Add to detailed list (last 50 stories)
           if (storiesWithUsage.length < 50) {
+            // Book pages = story pages + 3 (title page, initial page, back cover)
+            const storyPages = storyData.pages || 0;
+            const bookPages = storyPages + 3;
             storiesWithUsage.push({
               id: row.id,
               title: storyData.title,
               storyType: storyData.storyType,
-              pages: storyData.pages,
+              storyPages: storyPages,
+              bookPages: bookPages,  // +3 for title, initial, back cover
               userId: row.user_id,
               userEmail: row.user_email,
               createdAt: row.created_at,
@@ -7371,11 +7385,15 @@ app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
     costs.gemini_quality.total = costs.gemini_quality.input + costs.gemini_quality.output;
     costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total;
 
+    // Calculate total book pages across all stories
+    const totalBookPages = Object.values(byUser).reduce((sum, u) => sum + u.totalBookPages, 0);
+
     const response = {
       summary: {
         totalStories: storiesResult.rows.length,
         storiesWithTokenData,
-        storiesWithoutTokenData: storiesResult.rows.length - storiesWithTokenData
+        storiesWithoutTokenData: storiesResult.rows.length - storiesWithTokenData,
+        totalBookPages  // Total pages across all books (+3 per story for title, initial, back cover)
       },
       totals,
       costs,
