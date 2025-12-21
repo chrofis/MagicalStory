@@ -1106,6 +1106,55 @@ async function initializeDatabase() {
       UPDATE users SET credits = 1000 WHERE credits IS NULL AND role = 'user';
     `);
 
+    // Add email verification columns
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email_verified') THEN
+          ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
+        END IF;
+      END $$;
+    `);
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email_verification_token') THEN
+          ALTER TABLE users ADD COLUMN email_verification_token VARCHAR(255);
+        END IF;
+      END $$;
+    `);
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email_verification_expires') THEN
+          ALTER TABLE users ADD COLUMN email_verification_expires TIMESTAMP;
+        END IF;
+      END $$;
+    `);
+
+    // Add password reset columns
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password_reset_token') THEN
+          ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(255);
+        END IF;
+      END $$;
+    `);
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password_reset_expires') THEN
+          ALTER TABLE users ADD COLUMN password_reset_expires TIMESTAMP;
+        END IF;
+      END $$;
+    `);
+
+    // Mark existing users as email verified (they registered before this feature)
+    await dbPool.query(`
+      UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;
+    `);
+
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS config (
         id SERIAL PRIMARY KEY,
@@ -1559,7 +1608,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         storyQuota: dbUser.story_quota,
         storiesGenerated: dbUser.stories_generated,
         credits: dbUser.credits !== undefined ? dbUser.credits : 1000,
-        preferredLanguage: dbUser.preferred_language || 'English'
+        preferredLanguage: dbUser.preferred_language || 'English',
+        emailVerified: dbUser.email_verified !== false
       };
     } else {
       // File mode
@@ -1604,7 +1654,8 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
         storiesGenerated: user.storiesGenerated || 0,
         credits: user.credits != null ? user.credits : 1000,
-        preferredLanguage: user.preferredLanguage || 'English'
+        preferredLanguage: user.preferredLanguage || 'English',
+        emailVerified: user.emailVerified !== false
       }
     });
   } catch (err) {
@@ -1699,7 +1750,8 @@ app.post('/api/auth/firebase', authLimiter, async (req, res) => {
           storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
           storiesGenerated: user.stories_generated || 0,
           credits: user.credits != null ? user.credits : 1000,
-          preferredLanguage: user.preferred_language || 'English'
+          preferredLanguage: user.preferred_language || 'English',
+          emailVerified: user.email_verified !== false // Firebase users are considered verified
         }
       });
     } else {
@@ -1715,6 +1767,284 @@ app.post('/api/auth/firebase', authLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Invalid token' });
     }
     res.status(500).json({ error: 'Firebase authentication failed' });
+  }
+});
+
+// Password reset - request reset link
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    if (STORAGE_MODE === 'database') {
+      // Find user by email
+      const result = await dbPool.query(
+        'SELECT id, username, email FROM users WHERE email = $1 OR username = $1',
+        [email.toLowerCase()]
+      );
+
+      // Always return success to prevent email enumeration
+      if (result.rows.length === 0) {
+        return res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
+      }
+
+      const user = result.rows[0];
+
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // Store token in database
+      await dbPool.query(
+        'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $3',
+        [resetToken, resetExpires, user.id]
+      );
+
+      // Send reset email
+      const resetUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
+      await email.sendPasswordResetEmail(user.email, user.username, resetUrl);
+
+      res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
+    } else {
+      res.status(400).json({ error: 'Password reset requires database mode' });
+    }
+  } catch (err) {
+    console.error('Password reset error:', err);
+    res.status(500).json({ error: 'Failed to process password reset' });
+  }
+});
+
+// Password reset - confirm new password
+app.post('/api/auth/reset-password/confirm', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    if (STORAGE_MODE === 'database') {
+      // Find user by reset token
+      const result = await dbPool.query(
+        'SELECT id, email FROM users WHERE password_reset_token = $1 AND password_reset_expires > NOW()',
+        [token]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid or expired reset token' });
+      }
+
+      const user = result.rows[0];
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Update password and clear reset token
+      await dbPool.query(
+        'UPDATE users SET password = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2',
+        [hashedPassword, user.id]
+      );
+
+      res.json({ success: true, message: 'Password has been reset successfully' });
+    } else {
+      res.status(400).json({ error: 'Password reset requires database mode' });
+    }
+  } catch (err) {
+    console.error('Password reset confirm error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Send email verification
+app.post('/api/auth/send-verification', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (STORAGE_MODE === 'database') {
+      // Get user
+      const result = await dbPool.query(
+        'SELECT id, username, email, email_verified FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = result.rows[0];
+
+      if (user.email_verified) {
+        return res.json({ success: true, message: 'Email already verified' });
+      }
+
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Store token in database
+      await dbPool.query(
+        'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
+        [verificationToken, verificationExpires, user.id]
+      );
+
+      // Send verification email
+      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/verify-email/${verificationToken}`;
+      await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
+
+      res.json({ success: true, message: 'Verification email sent' });
+    } else {
+      res.status(400).json({ error: 'Email verification requires database mode' });
+    }
+  } catch (err) {
+    console.error('Send verification error:', err);
+    res.status(500).json({ error: 'Failed to send verification email' });
+  }
+});
+
+// Verify email with token
+app.get('/api/auth/verify-email/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    if (STORAGE_MODE === 'database') {
+      // Find user by verification token
+      const result = await dbPool.query(
+        'SELECT id, email FROM users WHERE email_verification_token = $1 AND email_verification_expires > NOW()',
+        [token]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid or expired verification token' });
+      }
+
+      const user = result.rows[0];
+
+      // Mark email as verified and clear token
+      await dbPool.query(
+        'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
+        [user.id]
+      );
+
+      // Redirect to success page
+      res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
+    } else {
+      res.status(400).json({ error: 'Email verification requires database mode' });
+    }
+  } catch (err) {
+    console.error('Verify email error:', err);
+    res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
+// Change email (requires re-verification)
+app.post('/api/auth/change-email', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { newEmail, password } = req.body;
+
+    if (!newEmail || !password) {
+      return res.status(400).json({ error: 'New email and current password are required' });
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    if (STORAGE_MODE === 'database') {
+      // Get current user with password
+      const result = await dbPool.query(
+        'SELECT id, username, email, password FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const user = result.rows[0];
+
+      // Verify current password
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      // Check if new email is already taken
+      const existingEmail = await dbPool.query(
+        'SELECT id FROM users WHERE (email = $1 OR username = $1) AND id != $2',
+        [newEmail.toLowerCase(), userId]
+      );
+
+      if (existingEmail.rows.length > 0) {
+        return res.status(400).json({ error: 'This email is already registered' });
+      }
+
+      // Generate new verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Update email and set to unverified
+      await dbPool.query(
+        `UPDATE users SET
+          email = $1,
+          username = $1,
+          email_verified = FALSE,
+          email_verification_token = $2,
+          email_verification_expires = $3
+        WHERE id = $4`,
+        [newEmail.toLowerCase(), verificationToken, verificationExpires, userId]
+      );
+
+      // Send verification email to new address
+      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/verify-email/${verificationToken}`;
+      await email.sendEmailVerificationEmail(newEmail, user.username, verifyUrl);
+
+      res.json({
+        success: true,
+        message: 'Email changed. Please verify your new email address.',
+        newEmail: newEmail.toLowerCase()
+      });
+    } else {
+      res.status(400).json({ error: 'Email change requires database mode' });
+    }
+  } catch (err) {
+    console.error('Change email error:', err);
+    res.status(500).json({ error: 'Failed to change email' });
+  }
+});
+
+// Get email verification status
+app.get('/api/auth/verification-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (STORAGE_MODE === 'database') {
+      const result = await dbPool.query(
+        'SELECT email_verified FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ emailVerified: result.rows[0].email_verified });
+    } else {
+      // In file mode, assume verified
+      res.json({ emailVerified: true });
+    }
+  } catch (err) {
+    console.error('Verification status error:', err);
+    res.status(500).json({ error: 'Failed to check verification status' });
   }
 });
 
@@ -3401,7 +3731,8 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
 
     // Generate new scene description (includes Visual Bible recurring elements)
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible);
-    const newSceneDescription = await callClaudeAPI(scenePrompt, 2048);
+    const sceneResult = await callClaudeAPI(scenePrompt, 2048);
+    const newSceneDescription = sceneResult.text;
 
     // Update the scene description in story data
     let sceneDescriptions = storyData.sceneDescriptions || [];
@@ -6872,6 +7203,202 @@ app.get('/api/admin/stats', authenticateToken, async (req, res) => {
   }
 });
 
+// Admin Dashboard - Get token usage statistics
+app.get('/api/admin/token-usage', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    console.log('📊 [ADMIN] Fetching token usage statistics...');
+
+    // Get all stories with their token usage data
+    const storiesResult = await dbPool.query(`
+      SELECT
+        s.id,
+        s.user_id,
+        s.data,
+        s.created_at,
+        u.email as user_email,
+        u.username as user_name
+      FROM stories s
+      LEFT JOIN users u ON s.user_id = u.id
+      ORDER BY s.created_at DESC
+    `);
+
+    // Aggregate token usage
+    const totals = {
+      anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
+      gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
+      gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
+      gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+    };
+
+    const byUser = {};
+    const byStoryType = {};
+    const byMonth = {};
+    const storiesWithUsage = [];
+    let storiesWithTokenData = 0;
+
+    for (const row of storiesResult.rows) {
+      try {
+        const storyData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+        const tokenUsage = storyData.tokenUsage;
+
+        if (tokenUsage) {
+          storiesWithTokenData++;
+
+          // Add to totals
+          for (const provider of Object.keys(totals)) {
+            if (tokenUsage[provider]) {
+              totals[provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+              totals[provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+              totals[provider].calls += tokenUsage[provider].calls || 0;
+            }
+          }
+
+          // Aggregate by user
+          const userKey = row.user_email || row.user_id || 'unknown';
+          if (!byUser[userKey]) {
+            byUser[userKey] = {
+              userId: row.user_id,
+              email: row.user_email,
+              name: row.user_name,
+              storyCount: 0,
+              anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+            };
+          }
+          byUser[userKey].storyCount++;
+          for (const provider of Object.keys(totals)) {
+            if (tokenUsage[provider]) {
+              byUser[userKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+              byUser[userKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+              byUser[userKey][provider].calls += tokenUsage[provider].calls || 0;
+            }
+          }
+
+          // Aggregate by story type
+          const storyType = storyData.storyType || 'unknown';
+          if (!byStoryType[storyType]) {
+            byStoryType[storyType] = {
+              storyCount: 0,
+              anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+            };
+          }
+          byStoryType[storyType].storyCount++;
+          for (const provider of Object.keys(totals)) {
+            if (tokenUsage[provider]) {
+              byStoryType[storyType][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+              byStoryType[storyType][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+              byStoryType[storyType][provider].calls += tokenUsage[provider].calls || 0;
+            }
+          }
+
+          // Aggregate by month
+          const monthKey = row.created_at ? new Date(row.created_at).toISOString().substring(0, 7) : 'unknown';
+          if (!byMonth[monthKey]) {
+            byMonth[monthKey] = {
+              storyCount: 0,
+              anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
+              gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+            };
+          }
+          byMonth[monthKey].storyCount++;
+          for (const provider of Object.keys(totals)) {
+            if (tokenUsage[provider]) {
+              byMonth[monthKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+              byMonth[monthKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+              byMonth[monthKey][provider].calls += tokenUsage[provider].calls || 0;
+            }
+          }
+
+          // Add to detailed list (last 50 stories)
+          if (storiesWithUsage.length < 50) {
+            storiesWithUsage.push({
+              id: row.id,
+              title: storyData.title,
+              storyType: storyData.storyType,
+              pages: storyData.pages,
+              userId: row.user_id,
+              userEmail: row.user_email,
+              createdAt: row.created_at,
+              tokenUsage
+            });
+          }
+        }
+      } catch (parseErr) {
+        console.warn('⚠️ [ADMIN] Error parsing story data:', parseErr.message);
+      }
+    }
+
+    // Calculate costs (approximate)
+    // Claude Sonnet 4.5: $3/MTok input, $15/MTok output
+    // Gemini Flash: $0.075/MTok input, $0.30/MTok output (approximate)
+    const costs = {
+      anthropic: {
+        input: (totals.anthropic.input_tokens / 1000000) * 3,
+        output: (totals.anthropic.output_tokens / 1000000) * 15,
+        total: 0
+      },
+      gemini_text: {
+        input: (totals.gemini_text.input_tokens / 1000000) * 0.075,
+        output: (totals.gemini_text.output_tokens / 1000000) * 0.30,
+        total: 0
+      },
+      gemini_image: {
+        input: (totals.gemini_image.input_tokens / 1000000) * 0.075,
+        output: (totals.gemini_image.output_tokens / 1000000) * 0.30,
+        total: 0
+      },
+      gemini_quality: {
+        input: (totals.gemini_quality.input_tokens / 1000000) * 0.075,
+        output: (totals.gemini_quality.output_tokens / 1000000) * 0.30,
+        total: 0
+      }
+    };
+    costs.anthropic.total = costs.anthropic.input + costs.anthropic.output;
+    costs.gemini_text.total = costs.gemini_text.input + costs.gemini_text.output;
+    costs.gemini_image.total = costs.gemini_image.input + costs.gemini_image.output;
+    costs.gemini_quality.total = costs.gemini_quality.input + costs.gemini_quality.output;
+    costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total;
+
+    const response = {
+      summary: {
+        totalStories: storiesResult.rows.length,
+        storiesWithTokenData,
+        storiesWithoutTokenData: storiesResult.rows.length - storiesWithTokenData
+      },
+      totals,
+      costs,
+      byUser: Object.values(byUser).sort((a, b) =>
+        (b.anthropic.input_tokens + b.anthropic.output_tokens) -
+        (a.anthropic.input_tokens + a.anthropic.output_tokens)
+      ),
+      byStoryType,
+      byMonth,
+      recentStories: storiesWithUsage
+    };
+
+    console.log(`✅ [ADMIN] Token usage: ${storiesWithTokenData}/${storiesResult.rows.length} stories have token data`);
+    console.log(`   Anthropic: ${totals.anthropic.input_tokens.toLocaleString()} in / ${totals.anthropic.output_tokens.toLocaleString()} out`);
+    console.log(`   Estimated cost: $${costs.grandTotal.toFixed(2)}`);
+
+    res.json(response);
+  } catch (err) {
+    console.error('❌ [ADMIN] Error fetching token usage:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin Dashboard - Clean orphaned files (matches client adminService)
 app.post('/api/admin/cleanup-orphaned', authenticateToken, async (req, res) => {
   try {
@@ -8836,6 +9363,23 @@ function extractShortSceneDescriptions(outline) {
 async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId) {
   console.log(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
+  // Token usage tracker - accumulates usage from all API calls
+  const tokenUsage = {
+    anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+  };
+
+  // Helper to add usage
+  const addUsage = (provider, usage) => {
+    if (usage && tokenUsage[provider]) {
+      tokenUsage[provider].input_tokens += usage.input_tokens || 0;
+      tokenUsage[provider].output_tokens += usage.output_tokens || 0;
+      tokenUsage[provider].calls += 1;
+    }
+  };
+
   // For Picture Book: pages = scenes (each page has image + text)
   // inputData.pages is the actual print page count, which equals scene count in picture book mode
   const sceneCount = inputData.pages;
@@ -9223,11 +9767,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     let response;
     try {
       // Use streaming API call
-      response = await callTextModelStreaming(storybookPrompt, 16000, (chunk, fullText) => {
+      const streamResult = await callTextModelStreaming(storybookPrompt, 16000, (chunk, fullText) => {
         // Process each chunk to detect complete scenes AND cover scenes
         coverParser.processChunk(chunk, fullText);
         sceneParser.processChunk(chunk, fullText);
       });
+      response = streamResult.text;
+      addUsage('anthropic', streamResult.usage);
       console.log(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
       console.log(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
       console.log(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
@@ -9752,9 +10298,20 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
+      tokenUsage: tokenUsage, // Token usage statistics for cost tracking
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+
+    // Log token usage summary
+    const totalInputTokens = Object.values(tokenUsage).reduce((sum, p) => sum + p.input_tokens, 0);
+    const totalOutputTokens = Object.values(tokenUsage).reduce((sum, p) => sum + p.output_tokens, 0);
+    console.log(`📊 [STORYBOOK] Token usage summary:`);
+    console.log(`   Anthropic: ${tokenUsage.anthropic.input_tokens.toLocaleString()} in / ${tokenUsage.anthropic.output_tokens.toLocaleString()} out (${tokenUsage.anthropic.calls} calls)`);
+    console.log(`   Gemini Text: ${tokenUsage.gemini_text.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_text.output_tokens.toLocaleString()} out (${tokenUsage.gemini_text.calls} calls)`);
+    console.log(`   Gemini Image: ${tokenUsage.gemini_image.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString()} out (${tokenUsage.gemini_image.calls} calls)`);
+    console.log(`   Gemini Quality: ${tokenUsage.gemini_quality.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString()} out (${tokenUsage.gemini_quality.calls} calls)`);
+    console.log(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output tokens`);
 
     // Insert into stories table
     await dbPool.query(
@@ -9871,6 +10428,23 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 async function processStoryJob(jobId) {
   console.log(`🎬 Starting processing for job ${jobId}`);
 
+  // Token usage tracker - accumulates usage from all API calls
+  const tokenUsage = {
+    anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+  };
+
+  // Helper to add usage
+  const addUsage = (provider, usage) => {
+    if (usage && tokenUsage[provider]) {
+      tokenUsage[provider].input_tokens += usage.input_tokens || 0;
+      tokenUsage[provider].output_tokens += usage.output_tokens || 0;
+      tokenUsage[provider].calls += 1;
+    }
+  };
+
   try {
     // Get job data
     const jobResult = await dbPool.query(
@@ -9941,7 +10515,9 @@ async function processStoryJob(jobId) {
     // Claude can handle up to 64,000 output tokens - use generous limit for outlines
     const outlineTokens = 16000;
     console.log(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
-    const outline = await callTextModelStreaming(outlinePrompt, outlineTokens);
+    const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens);
+    const outline = outlineResult.text;
+    addUsage('anthropic', outlineResult.usage);
 
     // Save checkpoint: outline (include prompt for debugging)
     await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt });
@@ -10239,7 +10815,9 @@ Output Format:
             console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
 
             // Generate detailed scene description
-            const sceneDescription = await callTextModelStreaming(scenePrompt, 4000);
+            const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
+            const sceneDescription = sceneDescResult.text;
+            addUsage('anthropic', sceneDescResult.usage);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -10352,16 +10930,20 @@ Output Format:
         });
 
         // Stream with progressive parsing
-        batchText = await callTextModelStreaming(batchPrompt, batchTokensNeeded, (chunk, fullText) => {
+        const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded, (chunk, fullText) => {
           progressiveParser.processChunk(chunk, fullText);
         });
+        batchText = batchResult.text;
+        addUsage('anthropic', batchResult.usage);
 
         // Finalize to emit the last page
         progressiveParser.finalize(batchText);
         console.log(`🌊 [PROGRESSIVE] Batch streaming complete, ${pagesStarted.size} pages started during stream`);
       } else {
         // No progressive parsing - just stream text
-        batchText = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
+        const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
+        batchText = batchResult.text;
+        addUsage('anthropic', batchResult.usage);
       }
 
       fullStoryText += batchText + '\n\n';
@@ -10412,7 +10994,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 [Write the story text for page ${missingPageNum} here, following the outline and maintaining continuity with other pages]`;
 
           console.log(`🔄 [RETRY] Generating missing page ${missingPageNum}...`);
-          const retryText = await callTextModelStreaming(retryPrompt, 1500);
+          const retryResult = await callTextModelStreaming(retryPrompt, 1500);
+          const retryText = retryResult.text;
+          addUsage('anthropic', retryResult.usage);
 
           // Parse the retry response
           const retryPages = parseStoryPages(retryText);
@@ -10563,7 +11147,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
 
             console.log(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
-            const sceneDescription = await callTextModelStreaming(scenePrompt, 4000);
+            const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
+            const sceneDescription = sceneDescResult.text;
+            addUsage('anthropic', sceneDescResult.usage);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -10824,9 +11410,20 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       sceneImages: allImages,
       coverImages: coverImages,
       visualBible: visualBible, // Visual Bible for recurring element consistency (dev mode)
+      tokenUsage: tokenUsage, // Token usage statistics for cost tracking
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+
+    // Log token usage summary
+    const totalInputTokens = Object.values(tokenUsage).reduce((sum, p) => sum + p.input_tokens, 0);
+    const totalOutputTokens = Object.values(tokenUsage).reduce((sum, p) => sum + p.output_tokens, 0);
+    console.log(`📊 [PIPELINE] Token usage summary:`);
+    console.log(`   Anthropic: ${tokenUsage.anthropic.input_tokens.toLocaleString()} in / ${tokenUsage.anthropic.output_tokens.toLocaleString()} out (${tokenUsage.anthropic.calls} calls)`);
+    console.log(`   Gemini Text: ${tokenUsage.gemini_text.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_text.output_tokens.toLocaleString()} out (${tokenUsage.gemini_text.calls} calls)`);
+    console.log(`   Gemini Image: ${tokenUsage.gemini_image.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString()} out (${tokenUsage.gemini_image.calls} calls)`);
+    console.log(`   Gemini Quality: ${tokenUsage.gemini_quality.input_tokens.toLocaleString()} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString()} out (${tokenUsage.gemini_quality.calls} calls)`);
+    console.log(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output tokens`);
 
     // Insert into stories table
     await dbPool.query(
@@ -11552,7 +12149,22 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
   }
 
   const data = await response.json();
-  return data.content[0].text;
+
+  // Extract token usage
+  const inputTokens = data.usage?.input_tokens || 0;
+  const outputTokens = data.usage?.output_tokens || 0;
+
+  if (inputTokens > 0 || outputTokens > 0) {
+    console.log(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  }
+
+  return {
+    text: data.content[0].text,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens
+    }
+  };
 }
 
 /**
@@ -11602,6 +12214,8 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
   let fullText = '';
   let buffer = '';
   let stopReason = null;
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   // Helper function to process SSE lines
   const processLine = (line) => {
@@ -11630,14 +12244,25 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
           throw new Error(`Claude API stream error: ${event.error?.message || JSON.stringify(event.error)}`);
         }
 
-        // Capture stop_reason from message_delta
-        if (event.type === 'message_delta' && event.delta?.stop_reason) {
-          stopReason = event.delta.stop_reason;
+        // Capture input tokens from message_start
+        if (event.type === 'message_start' && event.message?.usage?.input_tokens) {
+          inputTokens = event.message.usage.input_tokens;
+        }
+
+        // Capture stop_reason and output tokens from message_delta
+        if (event.type === 'message_delta') {
+          if (event.delta?.stop_reason) {
+            stopReason = event.delta.stop_reason;
+          }
+          if (event.usage?.output_tokens) {
+            outputTokens = event.usage.output_tokens;
+          }
         }
 
         // Log when streaming completes
         if (event.type === 'message_stop') {
           console.log(`🌊 [STREAM] Streaming complete, received ${fullText.length} chars, stop_reason: ${stopReason}`);
+          console.log(`📊 [STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
         }
       } catch (parseError) {
         // Log parse errors for debugging (but don't fail on empty lines)
@@ -11695,7 +12320,13 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     console.error(`❌ [STREAM] Response is EMPTY! stopReason: ${stopReason}, maxTokens: ${maxTokens}`);
   }
 
-  return fullText;
+  return {
+    text: fullText,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens
+    }
+  };
 }
 
 /**
@@ -11703,7 +12334,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
  * @param {string} prompt - The prompt to send
  * @param {number} maxTokens - Maximum tokens to generate
  * @param {function} onChunk - Callback for each text chunk: (chunk: string, fullText: string) => void
- * @returns {Promise<string>} The complete generated text
+ * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number}}>} The complete generated text and usage
  */
 async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null) {
   const model = activeTextModel;
@@ -11719,7 +12350,9 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null) 
     case 'google':
       // Fallback to non-streaming for Gemini (streaming implementation can be added later)
       console.log(`⚠️ [TEXT-STREAM] Gemini streaming not implemented, falling back to non-streaming`);
-      return await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
+      const result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
+      // callGeminiTextAPI returns { text, usage } - pass through
+      return result;
     default:
       throw new Error(`Unknown provider: ${model.provider}`);
   }
@@ -12081,7 +12714,21 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
     throw new Error('Gemini returned empty content');
   }
 
-  return data.candidates[0].content.parts[0].text;
+  // Extract token usage from usageMetadata
+  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+
+  if (inputTokens > 0 || outputTokens > 0) {
+    console.log(`📊 [GEMINI-TEXT] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  }
+
+  return {
+    text: data.candidates[0].content.parts[0].text,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens
+    }
+  };
 }
 
 // Backward compatibility alias
@@ -12295,6 +12942,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     const data = await response.json();
 
+    // Extract and log token usage for quality evaluation
+    const qualityInputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const qualityOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    if (qualityInputTokens > 0 || qualityOutputTokens > 0) {
+      log.verbose(`📊 [QUALITY] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}`);
+    }
+
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
       log.warn('⚠️  [QUALITY] No text response from Gemini');
       return null;
@@ -12399,7 +13053,8 @@ async function rewriteBlockedScene(sceneDescription) {
       SCENE_DESCRIPTION: sceneDescription
     });
 
-    const rewrittenScene = await callTextModel(rewritePrompt, 1000);
+    const rewriteResult = await callTextModel(rewritePrompt, 1000);
+    const rewrittenScene = rewriteResult.text;
     console.log(`✅ [REWRITE] Scene rewritten: ${rewrittenScene.substring(0, 100)}...`);
     return rewrittenScene.trim();
   } catch (error) {
@@ -12563,6 +13218,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   const data = await response.json();
 
+  // Extract token usage from response
+  const imageUsage = {
+    input_tokens: data.usageMetadata?.promptTokenCount || 0,
+    output_tokens: data.usageMetadata?.candidatesTokenCount || 0
+  };
+  if (imageUsage.input_tokens > 0 || imageUsage.output_tokens > 0) {
+    console.log(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}`);
+  }
+
   // Log response structure (without base64 data to avoid massive logs)
   console.log('🖼️  [IMAGE GEN] Response structure:', {
     hasCandidates: !!data.candidates,
@@ -12631,7 +13295,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           textErrorOnly,
           expectedText,
           actualText,
-          modelId  // Include which model was used for dev mode
+          modelId,  // Include which model was used for dev mode
+          usage: imageUsage  // Token usage for cost tracking
         };
         imageCache.set(cacheKey, result);
         log.verbose('💾 [IMAGE CACHE] Stored in cache. Total cached:', imageCache.size, 'images');
