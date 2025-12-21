@@ -6687,6 +6687,269 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
   }
 });
 
+// Generate multi-story book PDF - combines multiple stories into one printable book
+// Page order:
+// - Story 1: Back cover + Front cover (combined spread), Introduction, Story pages
+// - Story 2+: Front cover (title), Introduction, Story pages, Back cover, Blank page
+// Page count starts from Story 1's first story page (covers/intro don't count)
+app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
+  try {
+    const { storyIds } = req.body;
+    const userId = req.user.id;
+
+    if (!storyIds || !Array.isArray(storyIds) || storyIds.length === 0) {
+      return res.status(400).json({ error: 'Missing or invalid storyIds array' });
+    }
+
+    console.log(`📚 [BOOK PDF] Generating multi-story book with ${storyIds.length} stories`);
+
+    // Fetch all stories from database
+    const stories = [];
+    for (const storyId of storyIds) {
+      const storyResult = await dbPool.query(
+        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+        [storyId, userId]
+      );
+
+      if (storyResult.rows.length === 0) {
+        console.log(`📚 [BOOK PDF] Story not found: ${storyId}`);
+        return res.status(404).json({ error: `Story not found: ${storyId}` });
+      }
+
+      const storyData = typeof storyResult.rows[0].data === 'string'
+        ? JSON.parse(storyResult.rows[0].data)
+        : storyResult.rows[0].data;
+
+      stories.push({ id: storyId, data: storyData });
+    }
+
+    console.log(`📚 [BOOK PDF] Loaded ${stories.length} stories: ${stories.map(s => s.data.title).join(', ')}`);
+
+    // Helper functions
+    const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
+    const PDFDocument = require('pdfkit');
+    const mmToPoints = (mm) => mm * 2.83465;
+    const coverWidth = mmToPoints(290.27);  // Cover spread width with bleed
+    const coverHeight = mmToPoints(146.0);   // Cover height with bleed
+    const pageSize = mmToPoints(140);        // Interior pages: 140x140mm
+
+    // Create PDF document
+    const doc = new PDFDocument({
+      size: [coverWidth, coverHeight],
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      autoFirstPage: false
+    });
+
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    const pdfPromise = new Promise((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+    });
+
+    let totalStoryPages = 0;
+
+    // Helper: Parse story pages from story text
+    const parseStoryPages = (storyData) => {
+      const storyText = storyData.storyText || storyData.generatedStory || storyData.story || storyData.text || '';
+      const pageMatches = storyText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
+      return pageMatches.slice(1).filter(p => p.trim().length > 0);
+    };
+
+    // Helper: Add story content pages (text + images)
+    const addStoryContentPages = (storyData, storyPages) => {
+      const isPictureBook = storyData.languageLevel === '1st-grade';
+      const margin = mmToPoints(5);
+      const textMargin = 28;
+
+      if (isPictureBook) {
+        // Picture Book: combined image + text on same page
+        const imageHeight = pageSize * 0.85;
+        const textAreaHeight = pageSize * 0.15;
+        const textWidth = pageSize - (margin * 2);
+        const availableTextHeight = textAreaHeight - margin;
+        const lineGap = -2;
+
+        storyPages.forEach((pageText, index) => {
+          const pageNumber = index + 1;
+          const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+          const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+
+          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          totalStoryPages++;
+
+          if (image && image.imageData) {
+            try {
+              const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+              doc.image(imageBuffer, margin, margin, {
+                fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+                align: 'center',
+                valign: 'center'
+              });
+            } catch (err) {
+              console.error(`Error adding image for page ${pageNumber}:`, err.message);
+            }
+          }
+
+          // Add text with vertical centering
+          let fontSize = 10;
+          doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+          let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+
+          while (textHeight > availableTextHeight && fontSize > 4) {
+            fontSize -= 0.5;
+            doc.fontSize(fontSize);
+            textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+          }
+
+          const textY = imageHeight + (availableTextHeight - textHeight) / 2;
+          doc.text(cleanText, margin, textY, { width: textWidth, align: 'center', lineGap });
+        });
+      } else {
+        // Standard: separate text and image pages
+        const availableWidth = pageSize - (textMargin * 2);
+        const availableHeight = pageSize - (textMargin * 2);
+        const lineGap = -2;
+
+        storyPages.forEach((pageText, index) => {
+          const pageNumber = index + 1;
+          const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+          const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+
+          // Text page
+          doc.addPage({ size: [pageSize, pageSize], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
+          totalStoryPages++;
+
+          let fontSize = 9;
+          doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+          let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+
+          while (textHeight > availableHeight * 0.9 && fontSize > 4) {
+            fontSize -= 0.5;
+            doc.fontSize(fontSize);
+            textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+          }
+
+          const yPosition = textMargin + (availableHeight - textHeight) / 2;
+          doc.text(cleanText, textMargin, yPosition, { width: availableWidth, align: 'left', lineGap });
+
+          // Image page
+          if (image && image.imageData) {
+            doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+            totalStoryPages++;
+            try {
+              const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+              const imgMargin = mmToPoints(5);
+              doc.image(imageBuffer, imgMargin, imgMargin, {
+                fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
+                align: 'center',
+                valign: 'center'
+              });
+            } catch (err) {
+              console.error(`Error adding image for page ${pageNumber}:`, err.message);
+            }
+          }
+        });
+      }
+    };
+
+    // Process each story
+    for (let storyIndex = 0; storyIndex < stories.length; storyIndex++) {
+      const { data: storyData } = stories[storyIndex];
+      const isFirstStory = storyIndex === 0;
+      const storyPages = parseStoryPages(storyData);
+
+      console.log(`📚 [BOOK PDF] Processing story ${storyIndex + 1}: "${storyData.title}" with ${storyPages.length} pages`);
+
+      if (isFirstStory) {
+        // STORY 1: Back cover + Front cover (combined spread for book binding)
+        doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+        const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+        const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+
+        if (backCoverImageData && frontCoverImageData) {
+          const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
+          doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
+        }
+
+        // Introduction page (doesn't count towards page total)
+        const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+        if (initialPageImageData) {
+          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
+        }
+
+        // Story 1 content pages (page count starts here)
+        addStoryContentPages(storyData, storyPages);
+        // Story 1 does NOT get a back cover (that's the book's back cover)
+
+      } else {
+        // STORY 2+: Front cover (title page)
+        const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+        if (frontCoverImageData) {
+          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          totalStoryPages++;
+          const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          doc.image(frontCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
+        }
+
+        // Introduction page
+        const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+        if (initialPageImageData) {
+          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          totalStoryPages++;
+          const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
+        }
+
+        // Story content pages
+        addStoryContentPages(storyData, storyPages);
+
+        // Back cover for this story
+        const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+        if (backCoverImageData) {
+          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          totalStoryPages++;
+          const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+          doc.image(backCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
+        }
+
+        // Blank page between stories
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        totalStoryPages++;
+      }
+    }
+
+    // Add blank pages if needed to reach even page count for printing
+    if (totalStoryPages % 2 !== 0) {
+      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      totalStoryPages++;
+      console.log(`📚 [BOOK PDF] Added final blank page for even page count`);
+    }
+
+    doc.end();
+    const pdfBuffer = await pdfPromise;
+
+    console.log(`✅ [BOOK PDF] Generated book PDF (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${totalStoryPages} story pages`);
+
+    // Send PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    const bookTitle = stories.length > 1
+      ? `Book_${stories.length}_Stories`
+      : (stories[0].data.title || 'Book').replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_');
+    res.setHeader('Content-Disposition', `attachment; filename="${bookTitle}.pdf"`);
+    res.send(pdfBuffer);
+
+  } catch (err) {
+    console.error('📚 [BOOK PDF] Error:', err);
+    res.status(500).json({ error: 'Failed to generate book PDF', details: err.message });
+  }
+});
+
 // ADMIN: Force add shipping columns (emergency fix)
 app.post('/api/admin/fix-shipping-columns', async (req, res) => {
   try {
