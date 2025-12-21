@@ -10,6 +10,7 @@ interface AuthContextType extends AuthState {
   resetPassword: (email: string) => Promise<void>;
   logout: () => void;
   updateCredits: (credits: number) => void;
+  refreshUser: () => Promise<void>;
   impersonate: (userId: string) => Promise<void>;
   stopImpersonating: () => Promise<void>;
   isLoading: boolean;

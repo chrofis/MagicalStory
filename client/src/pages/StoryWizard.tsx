@@ -29,7 +29,7 @@ export default function StoryWizard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const { isAuthenticated, user, updateCredits } = useAuth();
+  const { isAuthenticated, user, updateCredits, isLoading: isAuthLoading } = useAuth();
   const { showSuccess, showInfo } = useToast();
 
   // Wizard state - start at step 5 with loading if we have a storyId in URL
@@ -144,13 +144,14 @@ export default function StoryWizard() {
   const [editPromptText, setEditPromptText] = useState('');
 
   // Redirect if not authenticated, preserving the current URL for after login
+  // Wait for auth loading to complete before checking authentication
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthLoading && !isAuthenticated) {
       const currentUrl = window.location.pathname + window.location.search;
       const redirectParam = encodeURIComponent(currentUrl);
       navigate(`/?login=true&redirect=${redirectParam}`);
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isAuthLoading, navigate]);
 
   // Load saved story from URL parameter
   useEffect(() => {
@@ -293,6 +294,19 @@ export default function StoryWizard() {
 
     checkPaymentStatus();
   }, [searchParams, setSearchParams, language, showSuccess, showInfo]);
+
+  // Handle auto-generate after email verification - store as ref to be checked when generateStory is ready
+  const pendingAutoGenerate = useRef(false);
+  useEffect(() => {
+    const autoGenerate = searchParams.get('autoGenerate');
+    if (autoGenerate === 'true' && !pendingAutoGenerate.current) {
+      pendingAutoGenerate.current = true;
+      // Clear the URL param
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('autoGenerate');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Auto-select main characters based on age
   const autoSelectMainCharacters = (charactersList: Character[]) => {
@@ -860,6 +874,8 @@ export default function StoryWizard() {
   const generateStory = async (overrides?: { skipImages?: boolean }) => {
     // Check email verification before generating
     if (user && user.emailVerified === false) {
+      // Store flag so we can auto-generate after email verification
+      localStorage.setItem('pendingStoryGeneration', 'true');
       setShowEmailVerificationModal(true);
       return;
     }
@@ -1077,6 +1093,17 @@ export default function StoryWizard() {
       setTimeout(() => setIsGenerating(false), 500);
     }
   };
+
+  // Trigger auto-generate if pending (from email verification redirect)
+  useEffect(() => {
+    if (pendingAutoGenerate.current && isAuthenticated && characters.length > 0 && step === 4 && !isGenerating) {
+      pendingAutoGenerate.current = false;
+      // Small delay to ensure UI is ready
+      setTimeout(() => {
+        generateStory();
+      }, 500);
+    }
+  }, [isAuthenticated, characters, step, isGenerating]);
 
   // Render current step content
   const renderStep = () => {

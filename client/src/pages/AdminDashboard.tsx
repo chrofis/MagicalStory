@@ -70,11 +70,14 @@ export default function AdminDashboard() {
     credits: false
   });
 
-  // Print Products state (for future product management feature)
+  // Print Products state
   const [printProducts, setPrintProducts] = useState<PrintProduct[]>([]);
   const [gelatoProducts, setGelatoProducts] = useState<GelatoProduct[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isFetchingGelato, setIsFetchingGelato] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<PrintProduct | null>(null);
+  const [editMinPages, setEditMinPages] = useState('');
+  const [editMaxPages, setEditMaxPages] = useState('');
 
   const t = {
     en: {
@@ -166,6 +169,8 @@ export default function AdminDashboard() {
       hardcover: 'Hardcover',
       fetching: 'Fetching products...',
       confirmDeleteProduct: 'Are you sure you want to delete this product?',
+      editProduct: 'Edit Product',
+      editPages: 'Edit Page Range',
     },
     de: {
       title: 'Admin-Dashboard',
@@ -256,6 +261,8 @@ export default function AdminDashboard() {
       hardcover: 'Hardcover',
       fetching: 'Lade Produkte...',
       confirmDeleteProduct: 'Sind Sie sicher, dass Sie dieses Produkt loeschen moechten?',
+      editProduct: 'Produkt bearbeiten',
+      editPages: 'Seitenbereich bearbeiten',
     },
     fr: {
       title: 'Tableau de bord Admin',
@@ -346,6 +353,8 @@ export default function AdminDashboard() {
       hardcover: 'Couverture rigide',
       fetching: 'Chargement des produits...',
       confirmDeleteProduct: 'Etes-vous sur de vouloir supprimer ce produit?',
+      editProduct: 'Modifier le produit',
+      editPages: 'Modifier la plage de pages',
     },
   };
 
@@ -614,6 +623,35 @@ export default function AdminDashboard() {
       setPrintProducts(products => products.filter(p => p.id !== product.id));
     } catch (err) {
       setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to delete product' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const startEditingProduct = (product: PrintProduct) => {
+    setEditingProduct(product);
+    setEditMinPages(String(product.min_pages));
+    setEditMaxPages(String(product.max_pages));
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return;
+    setIsActionLoading(true);
+    try {
+      const minPages = parseInt(editMinPages, 10);
+      const maxPages = parseInt(editMaxPages, 10);
+      if (isNaN(minPages) || isNaN(maxPages) || minPages < 1 || maxPages < minPages) {
+        setActionMessage({ type: 'error', text: 'Invalid page range' });
+        return;
+      }
+      await adminService.updatePrintProduct(editingProduct.id, { min_pages: minPages, max_pages: maxPages });
+      setPrintProducts(products =>
+        products.map(p => p.id === editingProduct.id ? { ...p, min_pages: minPages, max_pages: maxPages } : p)
+      );
+      setEditingProduct(null);
+      setActionMessage({ type: 'success', text: 'Product updated successfully' });
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update product' });
     } finally {
       setIsActionLoading(false);
     }
@@ -991,6 +1029,14 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-2">
+                              <button
+                                onClick={() => startEditingProduct(product)}
+                                className="p-1.5 rounded hover:bg-gray-100 text-indigo-600"
+                                title={texts.editPages}
+                                disabled={isActionLoading}
+                              >
+                                <Edit2 size={16} />
+                              </button>
                               <button
                                 onClick={() => handleToggleProduct(product)}
                                 className={`p-1.5 rounded hover:bg-gray-100 ${product.is_active ? 'text-green-600' : 'text-gray-400'}`}
@@ -1478,6 +1524,43 @@ export default function AdminDashboard() {
           <div className="flex justify-end pt-2">
             <Button variant="secondary" onClick={() => setSelectedUser(null)}>
               {texts.close}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Product Modal */}
+      <Modal
+        isOpen={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+        title={texts.editPages}
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 text-sm">
+            {editingProduct?.product_name}
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label={texts.minPages}
+              type="number"
+              value={editMinPages}
+              onChange={(e) => setEditMinPages(e.target.value)}
+              min={1}
+            />
+            <Input
+              label={texts.maxPages}
+              type="number"
+              value={editMaxPages}
+              onChange={(e) => setEditMaxPages(e.target.value)}
+              min={1}
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={() => setEditingProduct(null)}>
+              {texts.cancel}
+            </Button>
+            <Button onClick={handleUpdateProduct} disabled={isActionLoading}>
+              {texts.save}
             </Button>
           </div>
         </div>
