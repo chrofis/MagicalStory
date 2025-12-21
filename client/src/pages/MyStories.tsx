@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Book, Trash2, Eye, AlertTriangle, CheckSquare, Square, X, BookOpen, Tag } from 'lucide-react';
+import { Book, Trash2, Eye, AlertTriangle, Plus, Minus, BookOpen, Tag } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { storyService } from '@/services';
@@ -9,6 +9,10 @@ import { MAX_BOOK_PAGES } from './Pricing';
 import { createLogger } from '@/services/logger';
 
 const log = createLogger('MyStories');
+
+// Simple cache for stories to prevent reload on navigation
+let storiesCache: { data: StoryListItem[] | null; timestamp: number } = { data: null, timestamp: 0 };
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 interface StoryListItem {
   id: string;
@@ -25,50 +29,62 @@ interface StoryListItem {
   totalPages?: number;
 }
 
-// Story card component with individual image loading state
+// Story card component with lazy loading and individual image loading state
 function StoryCard({
   story,
   language,
   onView,
   onDelete,
   formatDate,
-  selectionMode,
   isSelected,
   onToggleSelect,
+  t,
 }: {
   story: StoryListItem;
   language: string;
   onView: () => void;
   onDelete: () => void;
   formatDate: (date: string | undefined) => string;
-  selectionMode: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
+  t: { add: string; remove: string };
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  // In selection mode, clicking the card toggles selection
-  const handleCardClick = () => {
-    if (selectionMode && !story.isPartial) {
-      onToggleSelect();
+  // Lazy load images using IntersectionObserver
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
     }
-  };
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col ${
+      ref={cardRef}
+      className={`bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ${
         story.isPartial ? 'ring-2 ring-amber-400' : ''
       } ${
-        selectionMode && !story.isPartial ? 'cursor-pointer hover:ring-2 hover:ring-indigo-400' : 'hover:shadow-lg'
-      } ${
-        isSelected ? 'ring-2 ring-indigo-600 bg-indigo-50' : ''
+        isSelected ? 'ring-3 ring-green-500 bg-green-50' : ''
       }`}
-      onClick={handleCardClick}
     >
-      {/* Thumbnail with selection checkbox overlay */}
+      {/* Thumbnail */}
       <div className="relative">
-        {story.thumbnail && !imageError ? (
+        {isVisible && story.thumbnail && !imageError ? (
           <div className="relative w-full h-48 bg-gray-100">
             {!imageLoaded && (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -83,24 +99,13 @@ function StoryCard({
               onError={() => setImageError(true)}
             />
           </div>
+        ) : !isVisible ? (
+          <div className="relative w-full h-48 bg-gray-100 flex items-center justify-center">
+            <div className="w-8 h-8 spinner" />
+          </div>
         ) : (
           <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
             <Book className="w-12 h-12 text-indigo-300" />
-          </div>
-        )}
-
-        {/* Selection checkbox (top-left) */}
-        {selectionMode && !story.isPartial && (
-          <div className="absolute top-2 left-2">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-              isSelected ? 'bg-indigo-600' : 'bg-white/90 border-2 border-gray-300'
-            }`}>
-              {isSelected ? (
-                <CheckSquare size={18} className="text-white" />
-              ) : (
-                <Square size={18} className="text-gray-400" />
-              )}
-            </div>
           </div>
         )}
 
@@ -112,12 +117,10 @@ function StoryCard({
           </div>
         )}
 
-        {/* Selection mode: can't select partial stories */}
-        {selectionMode && story.isPartial && (
-          <div className="absolute inset-0 bg-gray-900/50 flex items-center justify-center">
-            <span className="text-white text-sm font-medium px-3 py-1 bg-gray-800/80 rounded-lg">
-              {language === 'de' ? 'Nicht verfügbar' : language === 'fr' ? 'Non disponible' : 'Not available'}
-            </span>
+        {/* Selected indicator (top-left) */}
+        {isSelected && (
+          <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded-md text-xs font-bold">
+            ✓
           </div>
         )}
       </div>
@@ -136,24 +139,38 @@ function StoryCard({
           )}
         </div>
 
-        {/* Action buttons - hidden in selection mode */}
-        {!selectionMode && (
-          <div className="flex gap-2 mt-auto">
+        {/* Action buttons */}
+        <div className="flex gap-2 mt-auto">
+          <button
+            onClick={(e) => { e.stopPropagation(); onView(); }}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            <Eye size={18} />
+            {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : 'View'}
+          </button>
+
+          {/* Add/Remove button for book selection */}
+          {!story.isPartial && (
             <button
-              onClick={(e) => { e.stopPropagation(); onView(); }}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+              className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg font-medium transition-colors ${
+                isSelected
+                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                  : 'bg-green-100 text-green-600 hover:bg-green-200'
+              }`}
             >
-              <Eye size={18} />
-              {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : 'View'}
+              {isSelected ? <Minus size={18} /> : <Plus size={18} />}
+              {isSelected ? t.remove : t.add}
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-            >
-              <Trash2 size={18} />
-            </button>
-          </div>
-        )}
+          )}
+
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -165,7 +182,6 @@ export default function MyStories() {
   const { isAuthenticated } = useAuth();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const translations = {
@@ -173,40 +189,40 @@ export default function MyStories() {
       myStories: 'My Stories',
       createStory: 'Create Story',
       noStories: 'No stories created yet',
-      selectForBook: 'Select for Book',
-      cancel: 'Cancel',
       seePricing: 'See Pricing',
-      selectHint: 'Select stories to combine into one book',
+      selectHint: 'Select stories to create a book',
       selected: 'selected',
       pages: 'pages',
       createBook: 'Create Book',
       tooManyPages: 'Too many pages (max 100)',
+      add: 'Add',
+      remove: 'Remove',
     },
     de: {
       myStories: 'Meine Geschichten',
       createStory: 'Geschichte erstellen',
       noStories: 'Noch keine Geschichten erstellt',
-      selectForBook: 'Für Buch auswählen',
-      cancel: 'Abbrechen',
       seePricing: 'Preise ansehen',
-      selectHint: 'Wähle Geschichten, um sie zu einem Buch zu kombinieren',
+      selectHint: 'Wähle Geschichten, um ein Buch zu erstellen',
       selected: 'ausgewählt',
       pages: 'Seiten',
       createBook: 'Buch erstellen',
       tooManyPages: 'Zu viele Seiten (max. 100)',
+      add: 'Hinzufügen',
+      remove: 'Entfernen',
     },
     fr: {
       myStories: 'Mes histoires',
       createStory: 'Créer une histoire',
       noStories: 'Aucune histoire créée',
-      selectForBook: 'Sélectionner pour livre',
-      cancel: 'Annuler',
       seePricing: 'Voir les tarifs',
-      selectHint: 'Sélectionnez des histoires à combiner en un livre',
+      selectHint: 'Sélectionnez des histoires pour créer un livre',
       selected: 'sélectionné(s)',
       pages: 'pages',
       createBook: 'Créer le livre',
       tooManyPages: 'Trop de pages (max 100)',
+      add: 'Ajouter',
+      remove: 'Retirer',
     },
   };
 
@@ -223,10 +239,23 @@ export default function MyStories() {
   const loadStories = async () => {
     log.debug('Loading stories...');
     try {
+      // Check cache first
+      const now = Date.now();
+      if (storiesCache.data && (now - storiesCache.timestamp) < CACHE_DURATION) {
+        log.debug('Using cached stories');
+        setStories(storiesCache.data);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       const data = await storyService.getStories();
       log.info('Loaded stories:', data.length);
-      setStories(data as unknown as StoryListItem[]);
+      const storyList = data as unknown as StoryListItem[];
+      setStories(storyList);
+
+      // Update cache
+      storiesCache = { data: storyList, timestamp: now };
     } catch (error) {
       log.error('Failed to load stories:', error);
     } finally {
