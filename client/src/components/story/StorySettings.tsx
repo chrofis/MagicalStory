@@ -81,8 +81,8 @@ export function StorySettings({
     if (languageLevel === '1st-grade') {
       return `${pageCount} ${language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} = ${creditsCost} ${creditsLabel}${testSuffix}`;
     }
-    const textPages = pageCount / 2;
-    const imagePages = pageCount / 2;
+    const textPages = Math.floor(pageCount / 2);
+    const imagePages = Math.floor(pageCount / 2);
     if (language === 'de') {
       return `${pageCount} Seiten (${textPages} Text + ${imagePages} Bilder) = ${creditsCost} ${creditsLabel}${testSuffix}`;
     } else if (language === 'fr') {
@@ -181,7 +181,7 @@ export function StorySettings({
             >
               {availablePageOptions.map((pageOption) => (
                 <option key={pageOption} value={pageOption}>
-                  {getPageLabel(pageOption, pageOption === 4 || pageOption === 10)}
+                  {getPageLabel(pageOption, pageOption === 4)}
                 </option>
               ))}
             </select>
