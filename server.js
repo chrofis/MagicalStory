@@ -220,6 +220,26 @@ function calculateOptimalBatchSize(totalPages, tokensPerPage = 400, safetyMargin
 }
 
 /**
+ * Calculate the actual page count for a story
+ * Picture book (1st-grade): 1 scene = 1 page (text + image combined)
+ * Standard book: 1 scene = 2 pages (text page + image page)
+ * @param {Object} storyData - The story data object
+ * @param {boolean} includeCoverPages - Whether to add 3 pages for covers (default: true)
+ * @returns {number} Total page count
+ */
+function calculateStoryPageCount(storyData, includeCoverPages = true) {
+  const sceneCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
+  if (sceneCount === 0) return 0;
+
+  // Picture book (1st-grade): 1 scene = 1 page. Standard book: 1 scene = 2 pages
+  const isPictureBook = storyData?.languageLevel === '1st-grade';
+  const scenePageCount = isPictureBook ? sceneCount : sceneCount * 2;
+
+  // Add 3 pages for front cover, back cover, and initial page (title page)
+  return includeCoverPages ? scenePageCount + 3 : scenePageCount;
+}
+
+/**
  * Detect which characters are mentioned in a scene description
  * @param {string} sceneDescription - The scene text
  * @param {Array} characters - Array of character objects
@@ -2824,12 +2844,7 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
     const stories = storiesResult.map(s => {
       try {
         const storyData = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
-        const sceneCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
-        // Picture book (1st-grade): 1 scene = 1 page. Standard book: 1 scene = 2 pages (text + image)
-        const isPictureBook = storyData?.languageLevel === '1st-grade';
-        const scenePageCount = isPictureBook ? sceneCount : sceneCount * 2;
-        // Add 3 pages for front cover, back cover, and initial page (title page)
-        const pageCount = scenePageCount > 0 ? scenePageCount + 3 : 0;
+        const pageCount = calculateStoryPageCount(storyData, true);
         // Count scene images + cover images (front, back, spine)
         const sceneImageCount = storyData?.sceneImages?.length || 0;
         const coverImageCount = storyData?.coverImages ?

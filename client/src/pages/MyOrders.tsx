@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Eye, Truck, CheckCircle, Clock, ExternalLink } from 'lucide-react';
+import { Package, Eye, Truck, CheckCircle, Clock, ExternalLink, Coins } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { LoadingSpinner, Navigation } from '@/components/common';
@@ -10,26 +10,33 @@ import { createLogger } from '@/services/logger';
 const log = createLogger('MyOrders');
 
 interface Order {
-  id: number;
-  storyId: string;
-  storyTitle: string;
-  customerName: string;
-  shippingName: string;
-  shippingAddress: {
+  id: number | string;
+  type: 'book' | 'credits';
+  // Book order fields
+  storyId?: string;
+  storyTitle?: string;
+  customerName?: string;
+  shippingName?: string;
+  shippingAddress?: {
     line1: string;
     city: string;
     postalCode: string;
     country: string;
   };
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+  // Credit purchase fields
+  creditsAmount?: number;
+  balanceAfter?: number;
+  description?: string;
+  // Shared fields
   amount: number;
   currency: string;
   paymentStatus: string;
   orderStatus: string;
-  trackingNumber: string | null;
-  trackingUrl: string | null;
   createdAt: string;
-  shippedAt: string | null;
-  deliveredAt: string | null;
 }
 
 function OrderStatusBadge({ status, language }: { status: string; language: string }) {
@@ -74,7 +81,62 @@ function OrderStatusBadge({ status, language }: { status: string; language: stri
   );
 }
 
-function OrderCard({
+function CreditOrderCard({
+  order,
+  language,
+  formatDate,
+  formatAmount
+}: {
+  order: Order;
+  language: string;
+  formatDate: (date: string | null) => string;
+  formatAmount: (amount: number, currency: string) => string;
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border-l-4 border-amber-400">
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+              <Coins className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">
+                {language === 'de' ? 'Guthaben' : language === 'fr' ? 'Crédits' : 'Credits'}
+              </p>
+              <h3 className="font-bold text-lg text-gray-800">
+                +{order.creditsAmount} {language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits'}
+              </h3>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            <CheckCircle size={14} />
+            {language === 'de' ? 'Abgeschlossen' : language === 'fr' ? 'Terminé' : 'Completed'}
+          </span>
+        </div>
+
+        {/* Details */}
+        <div className="space-y-2 text-sm text-gray-600">
+          <p>
+            <span className="font-medium">
+              {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date:' : 'Date:'}
+            </span>{' '}
+            {formatDate(order.createdAt)}
+          </p>
+          <p>
+            <span className="font-medium">
+              {language === 'de' ? 'Betrag:' : language === 'fr' ? 'Montant:' : 'Amount:'}
+            </span>{' '}
+            {formatAmount(order.amount, order.currency)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BookOrderCard({
   order,
   language,
   onViewStory,
@@ -115,12 +177,14 @@ function OrderCard({
             </span>{' '}
             {formatAmount(order.amount, order.currency)}
           </p>
-          <p>
-            <span className="font-medium">
-              {language === 'de' ? 'Lieferadresse:' : language === 'fr' ? 'Adresse:' : 'Ship to:'}
-            </span>{' '}
-            {order.shippingAddress.city}, {order.shippingAddress.country}
-          </p>
+          {order.shippingAddress && (
+            <p>
+              <span className="font-medium">
+                {language === 'de' ? 'Lieferadresse:' : language === 'fr' ? 'Adresse:' : 'Ship to:'}
+              </span>{' '}
+              {order.shippingAddress.city}, {order.shippingAddress.country}
+            </p>
+          )}
         </div>
 
         {/* Tracking info */}
@@ -146,15 +210,17 @@ function OrderCard({
         )}
 
         {/* Actions */}
-        <div className="flex gap-2">
-          <button
-            onClick={onViewStory}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
-          >
-            <Eye size={16} />
-            {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}
-          </button>
-        </div>
+        {order.storyId && (
+          <div className="flex gap-2">
+            <button
+              onClick={onViewStory}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+            >
+              <Eye size={16} />
+              {language === 'de' ? 'Geschichte ansehen' : language === 'fr' ? 'Voir l\'histoire' : 'View Story'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -252,14 +318,24 @@ export default function MyOrders() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {orders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                language={language}
-                onViewStory={() => navigate(`/create?storyId=${order.storyId}`)}
-                formatDate={formatDate}
-                formatAmount={formatAmount}
-              />
+              order.type === 'credits' ? (
+                <CreditOrderCard
+                  key={order.id}
+                  order={order}
+                  language={language}
+                  formatDate={formatDate}
+                  formatAmount={formatAmount}
+                />
+              ) : (
+                <BookOrderCard
+                  key={order.id}
+                  order={order}
+                  language={language}
+                  onViewStory={() => navigate(`/create?storyId=${order.storyId}`)}
+                  formatDate={formatDate}
+                  formatAmount={formatAmount}
+                />
+              )
             ))}
           </div>
         )}
