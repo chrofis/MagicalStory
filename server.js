@@ -3123,12 +3123,15 @@ app.post('/api/admin/print-products', authenticateToken, async (req, res) => {
          RETURNING *`;
 
     const pageCountsJson = JSON.stringify(pageCounts);
+    // Derive cover_type from product_uid if not provided
+    const derivedCoverType = cover_type ||
+      (product_uid.toLowerCase().includes('hardcover') ? 'hardcover' : 'softcover');
     const params = [
       product_uid,
       product_name,
       description || null,
       size || null,
-      cover_type || null,
+      derivedCoverType.toLowerCase(),
       min_pages,
       max_pages,
       pageCountsJson,
