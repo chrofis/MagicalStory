@@ -693,64 +693,58 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         // Store order in database (book purchase)
         if (STORAGE_MODE === 'database') {
           const userId = parseInt(fullSession.metadata?.userId);
-          // Get storyId from metadata - could be numeric ID or job ID
-          const storyIdRaw = fullSession.metadata?.storyId || fullSession.metadata?.story_id;
           const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
+          const orderCoverType = fullSession.metadata?.coverType || 'softcover';
 
           // Validate required metadata
           if (!userId || isNaN(userId)) {
             console.error('❌ [STRIPE WEBHOOK] Invalid or missing userId in metadata:', fullSession.metadata);
             throw new Error('Invalid userId in session metadata');
           }
-          if (!storyIdRaw) {
-            console.error('❌ [STRIPE WEBHOOK] Missing storyId in metadata:', fullSession.metadata);
-            console.error('❌ [STRIPE WEBHOOK] Session ID:', fullSession.id);
-            throw new Error('Missing storyId in session metadata - cannot process book order');
+
+          // Parse story IDs - support both new storyIds array and legacy storyId
+          let allStoryIds = [];
+          if (fullSession.metadata?.storyIds) {
+            try {
+              allStoryIds = JSON.parse(fullSession.metadata.storyIds);
+            } catch (e) {
+              console.error('❌ [STRIPE WEBHOOK] Failed to parse storyIds:', e);
+            }
           }
-
-          // Handle both numeric story IDs and job IDs
-          let storyId = null;
-          let storyData = null;
-
-          // Try as numeric ID first
-          const numericId = parseInt(storyIdRaw);
-          if (!isNaN(numericId)) {
-            // It's a numeric story ID
-            const result = await dbPool.query('SELECT id, data FROM stories WHERE id = $1 AND user_id = $2', [numericId, userId]);
-            if (result.rows.length > 0) {
-              storyId = numericId;
-              storyData = result.rows[0].data;
-              console.log('✅ [STRIPE WEBHOOK] Found story by numeric ID:', storyId);
+          // Fallback to legacy single storyId
+          if (allStoryIds.length === 0) {
+            const storyIdRaw = fullSession.metadata?.storyId || fullSession.metadata?.story_id;
+            if (storyIdRaw) {
+              allStoryIds = [storyIdRaw];
             }
           }
 
-          // If not found by numeric ID, try as job ID (which IS the database ID for job-based stories)
-          if (!storyId && storyIdRaw.startsWith('job_')) {
-            console.log('🔍 [STRIPE WEBHOOK] Searching for story with ID:', storyIdRaw);
-            console.log('🔍 [STRIPE WEBHOOK] User ID:', userId);
+          if (allStoryIds.length === 0) {
+            console.error('❌ [STRIPE WEBHOOK] No story IDs in metadata:', fullSession.metadata);
+            throw new Error('Missing story IDs in session metadata - cannot process book order');
+          }
 
-            // The job_id IS the primary key in the stories table
-            const result = await dbPool.query(
-              'SELECT id, data FROM stories WHERE id = $1 AND user_id = $2',
-              [storyIdRaw, userId]
-            );
+          console.log(`📚 [STRIPE WEBHOOK] Processing order with ${allStoryIds.length} stories:`, allStoryIds);
 
+          // Validate all stories exist
+          const validatedStoryIds = [];
+          for (const sid of allStoryIds) {
+            const result = await dbPool.query('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [sid, userId]);
             if (result.rows.length > 0) {
-              storyId = result.rows[0].id;
-              storyData = result.rows[0].data;
-              console.log('✅ [STRIPE WEBHOOK] Found story by ID:', storyIdRaw);
+              validatedStoryIds.push(sid);
             } else {
-              console.log('❌ [STRIPE WEBHOOK] Story not found in database with ID:', storyIdRaw);
+              console.warn(`⚠️ [STRIPE WEBHOOK] Story not found: ${sid}, skipping`);
             }
           }
 
-          // If still not found, error out
-          if (!storyId) {
-            console.error('❌ [STRIPE WEBHOOK] Story not found for storyId:', storyIdRaw);
+          if (validatedStoryIds.length === 0) {
+            console.error('❌ [STRIPE WEBHOOK] No valid stories found for IDs:', allStoryIds);
             console.error('❌ [STRIPE WEBHOOK] User ID:', userId);
-            console.error('❌ [STRIPE WEBHOOK] This might be a job that hasn\'t completed or been saved yet');
-            throw new Error(`Story not found: ${storyIdRaw}`);
+            throw new Error('No valid stories found');
           }
+
+          // Use first story ID as the primary for orders table (for backwards compatibility)
+          const primaryStoryId = validatedStoryIds[0];
 
           await dbPool.query(`
             INSERT INTO orders (
@@ -761,7 +755,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               amount_total, currency, payment_status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
           `, [
-            userId, storyId, fullSession.id, fullSession.payment_intent,
+            userId, primaryStoryId, fullSession.id, fullSession.payment_intent,
             customerInfo.name, customerInfo.email,
             fullSession.shipping?.name || customerInfo.name,
             address.line1, address.line2,
@@ -771,17 +765,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
           console.log('💾 [STRIPE WEBHOOK] Order saved to database');
           console.log('   User ID:', userId);
-          console.log('   Story ID:', storyId);
+          console.log('   Story IDs:', validatedStoryIds.join(', '));
 
           // Trigger background PDF generation and print provider order (don't await - fire and forget)
           // Pass isTestPayment so Gelato knows whether to create draft or real order
-          const orderCoverType = fullSession.metadata?.coverType || 'softcover';
-          processBookOrder(fullSession.id, userId, storyId, customerInfo, address, isTestPayment, orderCoverType).catch(async (err) => {
+          // Now passing array of storyIds for combined book generation
+          processBookOrder(fullSession.id, userId, validatedStoryIds, customerInfo, address, isTestPayment, orderCoverType).catch(async (err) => {
             console.error('❌ [BACKGROUND] Error processing book order:', err);
             console.error('   Error stack:', err.stack);
             console.error('   Session ID:', fullSession.id);
             console.error('   User ID:', userId);
-            console.error('   Story ID:', storyId);
+            console.error('   Story IDs:', validatedStoryIds.join(', '));
             console.error('   CRITICAL: Customer paid but book order failed! Check database for stripe_session_id:', fullSession.id);
 
             // Send critical admin alert
@@ -805,9 +799,14 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             if (userLangResult.rows.length > 0 && userLangResult.rows[0].preferred_language) {
               orderEmailLanguage = userLangResult.rows[0].preferred_language;
             } else {
-              // Fall back to story language
-              const parsedStoryData = typeof storyData === 'string' ? JSON.parse(storyData) : storyData;
-              orderEmailLanguage = parsedStoryData?.inputData?.language || parsedStoryData?.language || 'English';
+              // Fall back to first story's language
+              const storyLangResult = await dbPool.query('SELECT data FROM stories WHERE id = $1', [primaryStoryId]);
+              if (storyLangResult.rows.length > 0) {
+                const storyData = typeof storyLangResult.rows[0].data === 'string'
+                  ? JSON.parse(storyLangResult.rows[0].data)
+                  : storyLangResult.rows[0].data;
+                orderEmailLanguage = storyData?.inputData?.language || storyData?.language || 'English';
+              }
             }
           } catch (e) {
             console.warn('⚠️ Could not get language for order email:', e.message);
@@ -6442,6 +6441,224 @@ async function generatePrintPdf(storyData) {
   return { pdfBuffer, pageCount: targetPageCount };
 }
 
+// Generate combined book PDF from multiple stories
+// Used by processBookOrder when ordering a book with multiple stories
+async function generateCombinedBookPdf(stories) {
+  console.log(`📚 [COMBINED PDF] Generating book with ${stories.length} stories`);
+
+  const PDFDocument = require('pdfkit');
+  const mmToPoints = (mm) => mm * 2.83465;
+  const coverWidth = mmToPoints(290.27);   // Cover spread width with bleed
+  const coverHeight = mmToPoints(146.0);    // Cover height with bleed
+  const pageSize = mmToPoints(140);         // Interior pages: 140x140mm
+
+  const doc = new PDFDocument({
+    size: [coverWidth, coverHeight],
+    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    autoFirstPage: false
+  });
+
+  const buffers = [];
+  doc.on('data', buffers.push.bind(buffers));
+  const pdfPromise = new Promise((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+  });
+
+  let totalStoryPages = 0;
+  const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
+
+  // Helper: Parse story pages from story text
+  const parseStoryPages = (storyData) => {
+    const storyText = storyData.storyText || storyData.generatedStory || storyData.story || storyData.text || '';
+    const pageMatches = storyText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
+    return pageMatches.slice(1).filter(p => p.trim().length > 0);
+  };
+
+  // Helper: Add story content pages (text + images)
+  const addStoryContentPages = (storyData, storyPages) => {
+    const isPictureBook = storyData.languageLevel === '1st-grade';
+    const margin = mmToPoints(5);
+    const textMargin = 28;
+
+    if (isPictureBook) {
+      // Picture Book: combined image + text on same page
+      const imageHeight = pageSize * 0.85;
+      const textAreaHeight = pageSize * 0.15;
+      const textWidth = pageSize - (margin * 2);
+      const availableTextHeight = textAreaHeight - margin;
+      const lineGap = -2;
+
+      storyPages.forEach((pageText, index) => {
+        const pageNumber = index + 1;
+        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        totalStoryPages++;
+
+        if (image && image.imageData) {
+          try {
+            const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+            doc.image(imageBuffer, margin, margin, {
+              fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+              align: 'center',
+              valign: 'center'
+            });
+          } catch (err) {
+            console.error(`Error adding image for page ${pageNumber}:`, err.message);
+          }
+        }
+
+        // Add text with vertical centering
+        let fontSize = 10;
+        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+
+        while (textHeight > availableTextHeight && fontSize > 4) {
+          fontSize -= 0.5;
+          doc.fontSize(fontSize);
+          textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+        }
+
+        const textY = imageHeight + (availableTextHeight - textHeight) / 2;
+        doc.text(cleanText, margin, textY, { width: textWidth, align: 'center', lineGap });
+      });
+    } else {
+      // Standard: separate text and image pages
+      const availableWidth = pageSize - (textMargin * 2);
+      const availableHeight = pageSize - (textMargin * 2);
+      const lineGap = -2;
+
+      storyPages.forEach((pageText, index) => {
+        const pageNumber = index + 1;
+        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
+        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+
+        // Text page
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
+        totalStoryPages++;
+
+        let fontSize = 9;
+        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
+        let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+
+        while (textHeight > availableHeight * 0.9 && fontSize > 4) {
+          fontSize -= 0.5;
+          doc.fontSize(fontSize);
+          textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+        }
+
+        const yPosition = textMargin + (availableHeight - textHeight) / 2;
+        doc.text(cleanText, textMargin, yPosition, { width: availableWidth, align: 'left', lineGap });
+
+        // Image page
+        if (image && image.imageData) {
+          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          totalStoryPages++;
+          try {
+            const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+            const imgMargin = mmToPoints(5);
+            doc.image(imageBuffer, imgMargin, imgMargin, {
+              fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
+              align: 'center',
+              valign: 'center'
+            });
+          } catch (err) {
+            console.error(`Error adding image for page ${pageNumber}:`, err.message);
+          }
+        }
+      });
+    }
+  };
+
+  // Process each story
+  for (let storyIndex = 0; storyIndex < stories.length; storyIndex++) {
+    const { data: storyData } = stories[storyIndex];
+    const isFirstStory = storyIndex === 0;
+    const storyPages = parseStoryPages(storyData);
+
+    console.log(`📚 [COMBINED PDF] Processing story ${storyIndex + 1}: "${storyData.title}" with ${storyPages.length} pages`);
+
+    if (isFirstStory) {
+      // STORY 1: Back cover + Front cover (combined spread for book binding)
+      doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+      const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+      const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+
+      if (backCoverImageData && frontCoverImageData) {
+        const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
+        doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
+      }
+
+      // Introduction page
+      const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+      if (initialPageImageData) {
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
+      }
+
+      // Story 1 content pages
+      addStoryContentPages(storyData, storyPages);
+
+    } else {
+      // STORY 2+: Front cover (title page)
+      const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+      if (frontCoverImageData) {
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        totalStoryPages++;
+        const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(frontCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
+      }
+
+      // Introduction page
+      const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+      if (initialPageImageData) {
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        totalStoryPages++;
+        const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
+      }
+
+      // Story content pages
+      addStoryContentPages(storyData, storyPages);
+
+      // Back cover for this story
+      const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+      if (backCoverImageData) {
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        totalStoryPages++;
+        const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        doc.image(backCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
+      }
+
+      // Blank page between stories (if not last story)
+      if (storyIndex < stories.length - 1) {
+        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        totalStoryPages++;
+      }
+    }
+  }
+
+  // Add blank pages if needed to reach even page count for printing
+  if (totalStoryPages % 2 !== 0) {
+    doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    totalStoryPages++;
+    console.log(`📚 [COMBINED PDF] Added final blank page for even page count`);
+  }
+
+  doc.end();
+  const pdfBuffer = await pdfPromise;
+
+  console.log(`✅ [COMBINED PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${totalStoryPages} story pages`);
+
+  return { pdfBuffer, pageCount: totalStoryPages };
+}
+
 // GET PDF for a story - for DOWNLOAD/VIEWING (different sequence than print)
 // Sequence: Front cover, Initial page, Story pages, Back cover (all separate pages)
 // This is for viewing/download, NOT for printing - no database storage
@@ -8863,8 +9080,12 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
 // Background function to process book orders after payment
 // isTestPayment: true = admin/developer (Gelato draft), false = real user (Gelato real order)
 // coverType: 'softcover' or 'hardcover' - determines which product to use
-async function processBookOrder(sessionId, userId, storyId, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover') {
+async function processBookOrder(sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover') {
+  // Normalize storyIds to array (backwards compatible with single storyId)
+  const allStoryIds = Array.isArray(storyIds) ? storyIds : [storyIds];
+
   console.log(`📚 [BACKGROUND] Starting book order processing for session ${sessionId}`);
+  console.log(`   Stories: ${allStoryIds.length} (${allStoryIds.join(', ')})`);
   console.log(`   Payment mode: ${isTestPayment ? 'TEST (Gelato draft)' : 'LIVE (real Gelato order)'}`);
   console.log(`   Cover type: ${coverType}`);
 
@@ -8880,45 +9101,65 @@ async function processBookOrder(sessionId, userId, storyId, customerInfo, shippi
     `, [sessionId]);
     console.log('✅ [BACKGROUND] Order status updated to processing');
 
-    // Step 2: Fetch story data from database
-    const storyResult = await dbPool.query('SELECT data FROM stories WHERE id = $1', [storyId]);
-    if (storyResult.rows.length === 0) {
-      throw new Error(`Story ${storyId} not found`);
+    // Step 2: Fetch all stories from database
+    const stories = [];
+    for (const sid of allStoryIds) {
+      const storyResult = await dbPool.query('SELECT data FROM stories WHERE id = $1', [sid]);
+      if (storyResult.rows.length === 0) {
+        throw new Error(`Story ${sid} not found`);
+      }
+      let storyData = storyResult.rows[0].data;
+      if (typeof storyData === 'string') {
+        storyData = JSON.parse(storyData);
+      }
+      stories.push({ id: sid, data: storyData });
     }
 
-    let storyData = storyResult.rows[0].data;
+    console.log(`✅ [BACKGROUND] Fetched ${stories.length} stories`);
+    console.log('📊 [BACKGROUND] Titles:', stories.map(s => s.data.title).join(', '));
 
-    // Parse JSON if needed
-    if (typeof storyData === 'string') {
-      storyData = JSON.parse(storyData);
+    // Step 3: Generate PDF (single story uses generatePrintPdf, multiple uses combined book)
+    let pdfBuffer, targetPageCount;
+
+    if (stories.length === 1) {
+      // Single story - use existing generatePrintPdf
+      console.log('📄 [BACKGROUND] Generating single-story PDF...');
+      const result = await generatePrintPdf(stories[0].data);
+      pdfBuffer = result.pdfBuffer;
+      targetPageCount = result.pageCount;
+    } else {
+      // Multiple stories - generate combined book PDF
+      console.log('📄 [BACKGROUND] Generating combined multi-story PDF...');
+      const result = await generateCombinedBookPdf(stories);
+      pdfBuffer = result.pdfBuffer;
+      targetPageCount = result.pageCount;
     }
 
-    console.log('✅ [BACKGROUND] Story data fetched');
-    console.log('📊 [BACKGROUND] Story data keys:', Object.keys(storyData));
-
-    // Step 3: Generate PDF using shared print function (same code as Print Book)
-    console.log('📄 [BACKGROUND] Generating PDF using shared print function...');
-    const { pdfBuffer, pageCount: targetPageCount } = await generatePrintPdf(storyData);
     const pdfBase64 = pdfBuffer.toString('base64');
+    console.log(`✅ [BACKGROUND] PDF generated: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB, ${targetPageCount} pages`);
 
     // Step 3.5: Save PDF to database and get public URL
     console.log('💾 [BACKGROUND] Saving PDF to database...');
-    const pdfFileId = `pdf-${storyId}-${Date.now()}`;
+    const primaryStoryId = allStoryIds[0];
+    const pdfFileId = `pdf-${primaryStoryId}-${Date.now()}`;
     const pdfInsertQuery = `
       INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       ON CONFLICT (id) DO UPDATE SET file_data = EXCLUDED.file_data
       RETURNING id
     `;
+    const filename = allStoryIds.length > 1
+      ? `book-${allStoryIds.length}-stories.pdf`
+      : `story-${primaryStoryId}.pdf`;
     await dbPool.query(pdfInsertQuery, [
       pdfFileId,
       userId,
       'order_pdf',
-      storyId,
+      primaryStoryId,
       'application/pdf',
       pdfBase64,
       pdfBuffer.length,
-      `story-${storyId}.pdf`
+      filename
     ]);
 
     // Get the base URL from environment or construct it
