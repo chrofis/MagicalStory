@@ -3581,8 +3581,12 @@ app.put('/api/user/update-email', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to update email' });
   }
 });
+END OF USER ROUTES */
 
-// Character management endpoints
+// =============================================================================
+// CHARACTER ROUTES - MIGRATED TO server/routes/characters.js
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 app.get('/api/characters', authenticateToken, async (req, res) => {
   try {
     let characterData = {
@@ -3676,7 +3680,12 @@ app.post('/api/characters', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to save characters' });
   }
 });
+END OF CHARACTER ROUTES */
 
+// =============================================================================
+// STORY DRAFT ROUTES - MIGRATED TO server/routes/storyDraft.js
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 // Story draft endpoints - persist story settings before generation
 // This saves step 1 (storyType, artStyle) and step 4 (storyDetails, dedication, pages, languageLevel, mainCharacters) data
 app.get('/api/story-draft', authenticateToken, async (req, res) => {
@@ -3772,7 +3781,13 @@ app.delete('/api/story-draft', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to clear story draft' });
   }
 });
+END OF STORY DRAFT ROUTES */
 
+// =============================================================================
+// STORIES CRUD ROUTES - MIGRATED TO server/routes/stories.js
+// Note: Regenerate/Edit routes are NOT migrated and remain active below
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 // Story management endpoints
 app.get('/api/stories', authenticateToken, async (req, res) => {
   try {
@@ -4063,9 +4078,11 @@ app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete story' });
   }
 });
+END OF STORIES CRUD ROUTES */
 
 // =============================================================================
 // STORY REGENERATION ENDPOINTS - Regenerate individual components
+// NOT MIGRATED - These remain active in server.js (AI generation dependencies)
 // =============================================================================
 
 // Regenerate scene description for a specific page
@@ -5508,6 +5525,10 @@ app.post('/api/admin/print-provider/seed-products', authenticateToken, async (re
   }
 });
 
+// =============================================================================
+// CONFIG ROUTES - MIGRATED TO server/routes/config.js
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 // Get general app configuration (public, no auth required)
 app.get('/api/config', (req, res) => {
   res.json({
@@ -5529,6 +5550,7 @@ app.get('/api/config/print-product-uid', authenticateToken, (req, res) => {
 
   res.json({ productUid });
 });
+END OF CONFIG ROUTES */
 
 app.get('/api/print-provider/products', async (req, res) => {
   try {
@@ -6122,6 +6144,10 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
   }
 });
 
+// =============================================================================
+// FILE MANAGEMENT ROUTES - MIGRATED TO server/routes/files.js
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 // File Management Endpoints
 
 // Upload file (image or PDF)
@@ -6338,6 +6364,7 @@ app.delete('/api/files/:fileId', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete file', details: err.message });
   }
 });
+END OF FILE MANAGEMENT ROUTES */
 
 // ========================================
 // SHARED PDF GENERATION FUNCTION FOR PRINTING
@@ -8908,6 +8935,10 @@ app.post('/api/admin/stop-impersonate', authenticateToken, async (req, res) => {
   }
 });
 
+// =============================================================================
+// HEALTH ROUTES - MIGRATED TO server/routes/health.js
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -8952,6 +8983,7 @@ app.post('/api/log-error', (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to log error' });
   }
 });
+END OF HEALTH ROUTES */
 
 // Create Stripe checkout session for book purchase
 app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, res) => {
@@ -9291,10 +9323,21 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
     // Fetch product UID from database based on page count and cover type
     let printProductUid = null;
     try {
+      // Debug: log all active products
+      const allProductsResult = await dbPool.query(
+        'SELECT product_uid, product_name, cover_type, min_pages, max_pages FROM gelato_products WHERE is_active = true'
+      );
+      log.debug(`📦 [BACKGROUND] Active products: ${allProductsResult.rows.length}, looking for "${coverType}" with ${printPageCount} pages`);
+      allProductsResult.rows.forEach((p, i) => {
+        log.debug(`   ${i+1}. "${p.product_name}" cover_type="${p.cover_type}" pages=${p.min_pages}-${p.max_pages}`);
+      });
+
       const productsResult = await dbPool.query(
         'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND LOWER(cover_type) = LOWER($1)',
         [coverType]
       );
+
+      log.debug(`📦 [BACKGROUND] Products matching "${coverType}": ${productsResult.rows.length}`);
 
       if (productsResult.rows.length > 0) {
         // Find product matching the page count
@@ -9314,7 +9357,9 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
           log.warn(`[BACKGROUND] No ${coverType} product matches page count ${printPageCount}`);
         }
       } else {
-        log.warn(`[BACKGROUND] No active ${coverType} products found in database`);
+        // Log all products to help debug
+        const availableTypes = allProductsResult.rows.map(p => `"${p.cover_type}"`).join(', ');
+        log.warn(`[BACKGROUND] No active ${coverType} products found. Available cover_types: ${availableTypes || 'none'}`);
       }
     } catch (err) {
       console.error('❌ [BACKGROUND] Error fetching products:', err.message);
