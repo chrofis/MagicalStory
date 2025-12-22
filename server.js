@@ -5362,12 +5362,12 @@ app.post('/api/admin/print-provider/seed-products', authenticateToken, async (re
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    // Default 14x14cm photobook product from your URL
+    // Default 20x20cm (8x8 inch) photobook product
     const defaultProduct = {
-      product_uid: 'photobooks-softcover_pf_140x140-mm-5_5x5_5-inch_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver',
-      product_name: '14x14cm Softcover Photobook',
+      product_uid: 'photobooks-softcover_pf_8x8-inch-200x200-mm_pt_170-gsm-65lb-coated-silk_cl_4-4_ccl_4-4_bt_glued-left_ct_matt-lamination_prt_1-0_cpt_250-gsm-100-lb-cover-coated-silk_ver',
+      product_name: '20x20cm Softcover Photobook',
       description: 'Square softcover photobook with matt lamination, 170gsm coated silk paper',
-      size: '14x14cm (5.5x5.5 inch)',
+      size: '20x20cm (8x8 inch)',
       cover_type: 'Softcover',
       min_pages: 24,
       max_pages: 200,
@@ -6257,9 +6257,9 @@ async function generatePrintPdf(storyData) {
   const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
 
   const mmToPoints = (mm) => mm * 2.83465;
-  const coverWidth = mmToPoints(290.27);
-  const coverHeight = mmToPoints(146.0);
-  const pageSize = mmToPoints(140);
+  const coverWidth = mmToPoints(416);    // 20x20cm cover spread
+  const coverHeight = mmToPoints(206);   // 20x20cm cover height with bleed
+  const pageSize = mmToPoints(200);      // 20x20cm interior pages
 
   const doc = new PDFDocument({
     size: [coverWidth, coverHeight],
@@ -6463,9 +6463,9 @@ async function generateCombinedBookPdf(stories) {
 
   const PDFDocument = require('pdfkit');
   const mmToPoints = (mm) => mm * 2.83465;
-  const coverWidth = mmToPoints(290.27);   // Cover spread width with bleed
-  const coverHeight = mmToPoints(146.0);    // Cover height with bleed
-  const pageSize = mmToPoints(140);         // Interior pages: 140x140mm
+  const coverWidth = mmToPoints(416);       // 20x20cm cover spread
+  const coverHeight = mmToPoints(206);      // 20x20cm cover height with bleed
+  const pageSize = mmToPoints(200);         // Interior pages: 200x200mm
 
   const doc = new PDFDocument({
     size: [coverWidth, coverHeight],
@@ -6718,7 +6718,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
 
     const PDFDocument = require('pdfkit');
     const mmToPoints = (mm) => mm * 2.83465;
-    const pageSize = mmToPoints(140);
+    const pageSize = mmToPoints(200);
 
     // Create PDF document - start with square pages for viewing
     const doc = new PDFDocument({
@@ -6973,10 +6973,10 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
     // Convert mm to points (1mm = 2.83465 points)
     const mmToPoints = (mm) => mm * 2.83465;
 
-    // Page dimensions for 14x14cm photobook
-    const coverWidth = mmToPoints(290.27);  // Cover spread width with bleed
-    const coverHeight = mmToPoints(146.0);   // Cover height with bleed
-    const pageSize = mmToPoints(140);        // Interior pages: 140x140mm
+    // Page dimensions for 20x20cm (8x8 inch) photobook
+    const coverWidth = mmToPoints(416);      // Cover spread: 200mm back + ~16mm spine + 200mm front
+    const coverHeight = mmToPoints(206);     // Cover height: 200mm + 6mm bleed
+    const pageSize = mmToPoints(200);        // Interior pages: 200x200mm
 
     // Create PDF document - start with cover page
     const doc = new PDFDocument({
@@ -6998,7 +6998,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       doc.on('error', reject);
     });
 
-    // PDF Page 1: Back Cover + Front Cover (spread, 290.27 x 146.0 mm)
+    // PDF Page 1: Back Cover + Front Cover (spread, 416 x 206 mm for 20x20cm book)
     doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
     const backCoverImageData = getCoverImageData(coverImages?.backCover);
@@ -7322,9 +7322,9 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
     const PDFDocument = require('pdfkit');
     const mmToPoints = (mm) => mm * 2.83465;
-    const coverWidth = mmToPoints(290.27);  // Cover spread width with bleed
-    const coverHeight = mmToPoints(146.0);   // Cover height with bleed
-    const pageSize = mmToPoints(140);        // Interior pages: 140x140mm
+    const coverWidth = mmToPoints(416);     // 20x20cm cover spread
+    const coverHeight = mmToPoints(206);    // 20x20cm cover height with bleed
+    const pageSize = mmToPoints(200);       // Interior pages: 200x200mm
 
     // Create PDF document
     const doc = new PDFDocument({
