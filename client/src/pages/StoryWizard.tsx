@@ -29,7 +29,7 @@ export default function StoryWizard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const { isAuthenticated, user, updateCredits, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading } = useAuth();
   const { showSuccess, showInfo } = useToast();
 
   // Wizard state - start at step 5 with loading if we have a storyId in URL
@@ -298,10 +298,54 @@ export default function StoryWizard() {
         newParams.delete('payment');
         setSearchParams(newParams, { replace: true });
       }
+
+      // Handle credits payment callback
+      const creditsPaymentStatus = searchParams.get('credits_payment');
+      if (creditsPaymentStatus === 'success') {
+        log.info('Credits payment successful!');
+        // Refresh user to get updated credits balance
+        await refreshUser();
+        const titles = {
+          en: 'Credits Added!',
+          de: 'Credits hinzugefuegt!',
+          fr: 'Credits ajoutes!',
+        };
+        const messages = {
+          en: '100 credits have been added to your account.',
+          de: '100 Credits wurden Ihrem Konto gutgeschrieben.',
+          fr: '100 credits ont ete ajoutes a votre compte.',
+        };
+        showSuccess(
+          messages[language as keyof typeof messages] || messages.en,
+          titles[language as keyof typeof titles] || titles.en
+        );
+
+        // Clean up URL parameters
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('credits_payment');
+        newParams.delete('session_id');
+        setSearchParams(newParams, { replace: true });
+      } else if (creditsPaymentStatus === 'cancelled') {
+        log.info('Credits payment cancelled by user');
+        const messages = {
+          en: 'Credits purchase was cancelled.',
+          de: 'Kreditkauf wurde abgebrochen.',
+          fr: 'L\'achat de credits a ete annule.',
+        };
+        showInfo(
+          messages[language as keyof typeof messages] || messages.en,
+          language === 'de' ? 'Abgebrochen' : language === 'fr' ? 'Annule' : 'Cancelled'
+        );
+
+        // Clean up URL parameters
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('credits_payment');
+        setSearchParams(newParams, { replace: true });
+      }
     };
 
     checkPaymentStatus();
-  }, [searchParams, setSearchParams, language, showSuccess, showInfo]);
+  }, [searchParams, setSearchParams, language, showSuccess, showInfo, refreshUser]);
 
   // Handle auto-generate after email verification - store as ref to be checked when generateStory is ready
   const pendingAutoGenerate = useRef(false);

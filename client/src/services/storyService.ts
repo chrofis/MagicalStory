@@ -611,11 +611,21 @@ export const storyService = {
     return response.blob();
   },
 
-  // Stripe checkout for book purchase
-  async createCheckoutSession(storyId: string, coverType?: 'softcover' | 'hardcover'): Promise<{ url: string }> {
+  // Stripe checkout for book purchase (supports single story or multiple stories)
+  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover'): Promise<{ url: string }> {
+    const ids = Array.isArray(storyIds) ? storyIds : [storyIds];
     const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', {
-      storyId,
+      storyIds: ids,
       coverType: coverType || 'softcover',
+    });
+    return response;
+  },
+
+  // Stripe checkout for credits purchase
+  async createCreditsCheckout(credits: number = 100, amount: number = 500): Promise<{ url: string }> {
+    const response = await api.post<{ url: string }>('/api/stripe/create-credits-checkout', {
+      credits,
+      amount,
     });
     return response;
   },

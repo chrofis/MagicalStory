@@ -167,11 +167,10 @@ export default function BookBuilder() {
 
     setIsCheckingOut(true);
     try {
-      log.info('Creating combined book checkout:', { storyIds: stories.map(s => s.id), coverType, totalPages });
+      const storyIds = stories.map(s => s.id);
+      log.info('Creating combined book checkout:', { storyIds, coverType, totalPages });
 
-      // TODO: Implement combined book checkout API
-      // For now, we'll use the first story's checkout as a placeholder
-      const { url } = await storyService.createCheckoutSession(stories[0].id, coverType);
+      const { url } = await storyService.createCheckoutSession(storyIds, coverType);
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);

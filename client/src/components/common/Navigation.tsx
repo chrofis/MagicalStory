@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, LogOut, BookOpen, Settings, Users, Code, Package, CreditCard, KeyRound } from 'lucide-react';
+import { Menu, LogOut, BookOpen, Settings, Users, Code, Package, CreditCard, KeyRound, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
+import { storyService } from '@/services';
 import type { Language } from '@/types/story';
 
 interface NavigationProps {
@@ -21,6 +22,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   const [showMenu, setShowMenu] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [isBuyingCredits, setIsBuyingCredits] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
@@ -266,35 +268,82 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
 
       {/* Buy Credits Modal */}
       {showCreditsModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreditsModal(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => !isBuyingCredits && setShowCreditsModal(false)}>
           <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-gray-900 mb-4">
-              {language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : 'Buy Credits'}
+              {language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des credits' : 'Buy Credits'}
             </h2>
-            <p className="text-gray-600 mb-4">
-              {language === 'de'
-                ? 'Diese Funktion kommt bald. Bitte kontaktieren Sie uns für weitere Credits.'
-                : language === 'fr'
-                ? 'Cette fonctionnalité arrive bientôt. Veuillez nous contacter pour obtenir plus de crédits.'
-                : 'This feature is coming soon. Please contact us to get more credits.'}
-            </p>
-            <div className="bg-indigo-50 rounded-lg p-4 mb-4">
-              <p className="text-indigo-900 font-medium">
-                {language === 'de' ? 'Kontakt:' : language === 'fr' ? 'Contact:' : 'Contact:'}
+
+            {/* Credit Package */}
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 mb-6 border-2 border-indigo-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="text-indigo-600" size={24} />
+                  <span className="text-2xl font-bold text-gray-900">100</span>
+                  <span className="text-gray-600">{language === 'de' ? 'Credits' : language === 'fr' ? 'credits' : 'credits'}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-3xl font-bold text-indigo-600">CHF 5.-</span>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500">
+                {language === 'de'
+                  ? '100 Credits reichen fuer etwa 3-4 Geschichten'
+                  : language === 'fr'
+                  ? '100 credits suffisent pour environ 3-4 histoires'
+                  : '100 credits are enough for about 3-4 stories'}
               </p>
-              <a
-                href="mailto:info@magicalstory.ch"
-                className="text-indigo-600 hover:underline font-semibold"
-              >
-                info@magicalstory.ch
-              </a>
             </div>
-            <button
-              onClick={() => setShowCreditsModal(false)}
-              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 font-semibold"
-            >
-              {language === 'de' ? 'Schließen' : language === 'fr' ? 'Fermer' : 'Close'}
-            </button>
+
+            <p className="text-sm text-gray-500 mb-4 text-center">
+              {language === 'de'
+                ? 'Sichere Zahlung mit Stripe'
+                : language === 'fr'
+                ? 'Paiement securise avec Stripe'
+                : 'Secure payment with Stripe'}
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCreditsModal(false)}
+                disabled={isBuyingCredits}
+                className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-300 font-semibold disabled:opacity-50"
+              >
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                onClick={async () => {
+                  setIsBuyingCredits(true);
+                  try {
+                    const { url } = await storyService.createCreditsCheckout(100, 500);
+                    if (url) {
+                      window.location.href = url;
+                    }
+                  } catch (error) {
+                    console.error('Failed to create checkout:', error);
+                    alert(language === 'de'
+                      ? 'Fehler beim Erstellen der Zahlung. Bitte versuchen Sie es erneut.'
+                      : language === 'fr'
+                      ? 'Erreur lors de la creation du paiement. Veuillez reessayer.'
+                      : 'Failed to create payment. Please try again.');
+                    setIsBuyingCredits(false);
+                  }
+                }}
+                disabled={isBuyingCredits}
+                className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isBuyingCredits ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    {language === 'de' ? 'Wird geladen...' : language === 'fr' ? 'Chargement...' : 'Loading...'}
+                  </>
+                ) : (
+                  <>
+                    {language === 'de' ? 'Jetzt kaufen' : language === 'fr' ? 'Acheter maintenant' : 'Buy Now'}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

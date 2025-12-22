@@ -161,7 +161,7 @@ export function GenerationProgress({
     return available[Math.floor(Math.random() * available.length)] || '';
   };
 
-  // Build rotation items: interleave messages and characters (one per character, not per avatar)
+  // Build rotation items: always alternate tip, char, tip, char...
   const rotationItems = useMemo(() => {
     const messages = [
       { type: 'message' as const, key: 'timeInfo' },
@@ -173,37 +173,34 @@ export function GenerationProgress({
       { type: 'message' as const, key: 'tipArtStyle' },
     ];
 
-    const items: Array<
-      { type: 'message'; key: string } |
-      { type: 'character'; char: Character }
-    > = [];
-
-    // Interleave messages and characters (always alternate between different characters)
-    const maxLen = Math.max(messages.length, charactersWithAvatars.length);
-    for (let i = 0; i < maxLen; i++) {
-      if (i < messages.length) {
-        items.push(messages[i]);
-      }
-      if (i < charactersWithAvatars.length) {
-        items.push({ type: 'character', char: charactersWithAvatars[i] });
-      }
-    }
-
     // If no characters with avatars, just use messages
     if (charactersWithAvatars.length === 0) {
       return messages;
     }
 
+    const items: Array<
+      { type: 'message'; key: string } |
+      { type: 'character'; char: Character }
+    > = [];
+
+    // Always alternate: tip, char, tip, char...
+    // Use the longer list to determine total pairs, cycling through the shorter one
+    const numPairs = Math.max(messages.length, charactersWithAvatars.length);
+    for (let i = 0; i < numPairs; i++) {
+      items.push(messages[i % messages.length]);
+      items.push({ type: 'character', char: charactersWithAvatars[i % charactersWithAvatars.length] });
+    }
+
     return items;
   }, [charactersWithAvatars]);
 
-  // Rotate every 5 seconds
+  // Rotate every 8 seconds
   useEffect(() => {
     if (rotationItems.length <= 1) return;
 
     const interval = setInterval(() => {
       setRotationIndex(prev => (prev + 1) % rotationItems.length);
-    }, 5000);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, [rotationItems.length]);
