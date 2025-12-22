@@ -49,6 +49,17 @@ const sharp = require('sharp');
 const email = require('./email');
 const admin = require('firebase-admin');
 
+// Import modular routes
+const configRoutes = require('./server/routes/config');
+const healthRoutes = require('./server/routes/health');
+const authRoutes = require('./server/routes/auth');
+const userRoutes = require('./server/routes/user');
+const characterRoutes = require('./server/routes/characters');
+const storyDraftRoutes = require('./server/routes/storyDraft');
+const storiesRoutes = require('./server/routes/stories');
+const filesRoutes = require('./server/routes/files');
+const adminRoutes = require('./server/routes/admin');
+
 // Initialize Firebase Admin SDK
 // Supports: FIREBASE_SERVICE_ACCOUNT_BASE64 (base64), FIREBASE_SERVICE_ACCOUNT (JSON string), or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
 let firebaseInitialized = false;
@@ -1007,6 +1018,21 @@ if (hasDistFolder) {
 
 // Always serve images folder
 app.use('/images', express.static(path.join(__dirname, 'images')));
+
+// =============================================================================
+// MODULAR ROUTES (migrated from this file)
+// =============================================================================
+app.use('/api/config', configRoutes);
+app.use('/api', healthRoutes);  // /api/health, /api/check-ip, /api/log-error
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/characters', characterRoutes);
+app.use('/api/story-draft', storyDraftRoutes);
+app.use('/api/stories', storiesRoutes);
+app.use('/api/files', filesRoutes);
+app.use('/api/admin', adminRoutes);
+
+console.log('📦 Modular routes loaded: config, health, auth, user, characters, story-draft, stories, files, admin');
 
 // SPA fallback - serve index.html for client-side routing (only if dist exists)
 // Must be placed AFTER API routes are defined
