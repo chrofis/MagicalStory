@@ -25,6 +25,7 @@ const authRoutes = require('./routes/auth');
 const storyDraftRoutes = require('./routes/storyDraft');
 const storiesRoutes = require('./routes/stories');
 const filesRoutes = require('./routes/files');
+const adminRoutes = require('./routes/admin');
 
 // Create Express app
 const app = express();
@@ -95,12 +96,14 @@ app.use('/api/stories', storiesRoutes);
 // Files routes: /api/files/*
 app.use('/api/files', filesRoutes);
 
+// Admin routes: /api/admin/*
+app.use('/api/admin', adminRoutes);
+
 // =============================================================================
 // ROUTES STILL IN server.js (to be migrated):
 // - /api/stories/:id/regenerate/* - Story regeneration (AI generation)
 // - /api/stories/:id/edit/* - Story editing (AI generation)
 // - /api/stories/:id/pdf - PDF generation
-// - /api/admin/* - Admin panel
 // - /api/stripe/* - Payments
 // - /api/print-provider/* - Gelato integration
 // - /api/jobs/* - Background job management

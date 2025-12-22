@@ -229,4 +229,126 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Helper function to update page text
+function updatePageText(storyText, pageNumber, newText) {
+  const pageRegex = new RegExp(`(Page ${pageNumber}[:\\s]*\\n?)([\\s\\S]*?)(?=Page \\d+|$)`, 'i');
+  const match = storyText.match(pageRegex);
+
+  if (match) {
+    return storyText.replace(pageRegex, `$1${newText}\n\n`);
+  }
+  return storyText;
+}
+
+// PATCH /api/stories/:id/page/:pageNum - Update page text or scene description
+router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { text, sceneDescription } = req.body;
+    const pageNumber = parseInt(pageNum);
+
+    if (!text && !sceneDescription) {
+      return res.status(400).json({ error: 'Provide text or sceneDescription to update' });
+    }
+
+    console.log(`📝 Editing page ${pageNumber} for story ${id}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+    const storyResult = await pool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    // Update page text if provided
+    if (text !== undefined) {
+      storyData.storyText = updatePageText(storyData.storyText, pageNumber, text);
+    }
+
+    // Update scene description if provided
+    if (sceneDescription !== undefined) {
+      let sceneDescriptions = storyData.sceneDescriptions || [];
+      const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
+
+      if (existingIndex >= 0) {
+        sceneDescriptions[existingIndex].description = sceneDescription;
+      } else {
+        sceneDescriptions.push({ pageNumber, description: sceneDescription });
+        sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
+      }
+      storyData.sceneDescriptions = sceneDescriptions;
+    }
+
+    // Save updated story
+    await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+
+    console.log(`✅ Page ${pageNumber} updated for story ${id}`);
+
+    res.json({
+      success: true,
+      pageNumber,
+      updated: { text: text !== undefined, sceneDescription: sceneDescription !== undefined }
+    });
+
+  } catch (err) {
+    console.error('Error editing page:', err);
+    res.status(500).json({ error: 'Failed to edit page: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/visual-bible - Update Visual Bible
+router.put('/:id/visual-bible', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { visualBible } = req.body;
+
+    if (!visualBible) {
+      return res.status(400).json({ error: 'visualBible is required' });
+    }
+
+    console.log(`📖 PUT /api/stories/${id}/visual-bible - User: ${req.user.username}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = JSON.parse(result.rows[0].data);
+    storyData.visualBible = visualBible;
+    storyData.updatedAt = new Date().toISOString();
+
+    await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+
+    console.log(`✅ Visual Bible updated for story ${id}`);
+
+    res.json({
+      success: true,
+      message: 'Visual Bible updated successfully'
+    });
+
+  } catch (err) {
+    console.error('Error updating Visual Bible:', err);
+    res.status(500).json({ error: 'Failed to update Visual Bible: ' + err.message });
+  }
+});
+
 module.exports = router;

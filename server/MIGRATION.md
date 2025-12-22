@@ -2,28 +2,64 @@
 
 ## Current State
 
-The server has been restructured from a single 15,000-line `server.js` file into a modular architecture. Currently, `server.js` still contains all the route handlers, but the foundation for modular code is in place.
+The server has been restructured from a single 15,000-line `server.js` file into a modular architecture. Many routes have been migrated to the new structure.
+
+### Migrated Routes ✅
+
+| Route | File | Lines | Status |
+|-------|------|-------|--------|
+| `/api/config/*` | `routes/config.js` | ~35 | ✅ Migrated |
+| `/api/health`, `/api/check-ip`, `/api/log-error` | `routes/health.js` | ~55 | ✅ Migrated |
+| `/api/auth/*` | `routes/auth.js` | ~600 | ✅ Migrated |
+| `/api/user/*` | `routes/user.js` | ~260 | ✅ Migrated |
+| `/api/characters/*` | `routes/characters.js` | ~110 | ✅ Migrated |
+| `/api/story-draft` | `routes/storyDraft.js` | ~100 | ✅ Migrated |
+| `/api/stories/*` (CRUD) | `routes/stories.js` | ~350 | ✅ Migrated |
+| `/api/files/*` | `routes/files.js` | ~160 | ✅ Migrated |
+| `/api/admin/*` | `routes/admin.js` | ~1600 | ✅ Migrated |
+
+### Routes Remaining in server.js (Complex Dependencies)
+
+| Route | Reason |
+|-------|--------|
+| `/api/stories/:id/regenerate/*` | AI generation dependencies |
+| `/api/stories/:id/edit/*` | AI generation dependencies |
+| `/api/stories/:id/pdf` | PDF generation with puppeteer |
+| `/api/stripe/*` | Stripe SDK, processBookOrder, email |
+| `/api/jobs/*` | Story generation, background processing |
+| `/api/print-provider/*` | Gelato API integration |
+| `/api/analyze-photo` | AI vision analysis |
+| `/api/generate-clothing-avatars` | AI avatar generation |
+| `/api/claude`, `/api/gemini` | AI API proxies |
+
+These routes have tight coupling with:
+- AI generation functions (callClaudeAPI, callGeminiAPIForImage)
+- Background job processing (processStoryJob)
+- Stripe SDK initialization (stripeTest, stripeLive)
+- Email service functions
+- PDF generation with puppeteer
+
+A future phase should extract these into services.
 
 ## New Structure
 
 ```
 server/
-├── index.js              # New modular entry point
+├── index.js              # New modular entry point ✅
 ├── MIGRATION.md          # This file
 ├── routes/
-│   ├── index.js          # Route exports
-│   ├── auth.js           # /api/auth/* (template)
-│   ├── stories.js        # /api/stories/* (to create)
-│   ├── characters.js     # /api/characters/* (to create)
-│   ├── admin.js          # /api/admin/* (to create)
-│   ├── payments.js       # /api/stripe/* (to create)
-│   ├── print.js          # /api/print-provider/* (to create)
-│   ├── files.js          # /api/files/* (to create)
-│   ├── jobs.js           # /api/jobs/* (to create)
-│   ├── user.js           # /api/user/* (to create)
-│   └── config.js         # /api/config/* (to create)
+│   ├── index.js          # Route exports ✅
+│   ├── auth.js           # /api/auth/* ✅
+│   ├── config.js         # /api/config/* ✅
+│   ├── health.js         # /api/health, check-ip, log-error ✅
+│   ├── user.js           # /api/user/* ✅
+│   ├── characters.js     # /api/characters/* ✅
+│   ├── stories.js        # /api/stories/* (CRUD) ✅
+│   ├── storyDraft.js     # /api/story-draft ✅
+│   ├── files.js          # /api/files/* ✅
+│   └── admin.js          # /api/admin/* ✅
 ├── services/
-│   ├── index.js          # Service exports
+│   ├── index.js          # Service exports ✅
 │   ├── database.js       # Database connection & queries ✅
 │   ├── storyGenerator.js # Story generation logic (to create)
 │   ├── imageGenerator.js # Image generation with Gemini (to create)
@@ -90,18 +126,21 @@ Run the app and verify the routes work correctly.
 
 ## Migration Priority
 
-Recommended order for migration:
+Migration order (completed items marked):
 
-1. **Config routes** (`/api/config/*`) - Simple, few dependencies
-2. **Health/Utility routes** (`/api/health`, `/api/check-ip`) - Simple
-3. **User routes** (`/api/user/*`) - Moderate complexity
-4. **Character routes** (`/api/characters/*`) - Moderate complexity
-5. **Auth routes** (`/api/auth/*`) - Complex but self-contained
-6. **Story routes** (`/api/stories/*`) - Complex, many dependencies
-7. **Admin routes** (`/api/admin/*`) - Complex, admin-only
-8. **Payment routes** (`/api/stripe/*`) - Critical, test carefully
-9. **Print routes** (`/api/print-provider/*`) - External API dependencies
-10. **Job routes** (`/api/jobs/*`) - Most complex, story generation
+1. ✅ **Config routes** (`/api/config/*`) - Simple, few dependencies
+2. ✅ **Health/Utility routes** (`/api/health`, `/api/check-ip`) - Simple
+3. ✅ **User routes** (`/api/user/*`) - Moderate complexity
+4. ✅ **Character routes** (`/api/characters/*`) - Moderate complexity
+5. ✅ **Auth routes** (`/api/auth/*`) - Complex but self-contained
+6. ✅ **Story routes** (`/api/stories/*`) - CRUD operations migrated
+7. ✅ **Story draft routes** (`/api/story-draft`) - Step 1 & 4 data persistence
+8. ✅ **Files routes** (`/api/files/*`) - File upload/download
+9. ✅ **Admin routes** (`/api/admin/*`) - Complex, admin-only
+10. ⏸️ **Payment routes** (`/api/stripe/*`) - Deferred (Stripe SDK dependencies)
+11. ⏸️ **Job routes** (`/api/jobs/*`) - Deferred (AI generation dependencies)
+12. ⏸️ **Story AI routes** (`regenerate/*`, `edit/*`) - Deferred (AI dependencies)
+13. ⏸️ **Print routes** (`/api/print-provider/*`) - Deferred (Gelato integration)
 
 ## Services to Extract
 

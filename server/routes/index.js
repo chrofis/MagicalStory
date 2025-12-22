@@ -12,6 +12,7 @@ const authRoutes = require('./auth');
 const storyDraftRoutes = require('./storyDraft');
 const storiesRoutes = require('./stories');
 const filesRoutes = require('./files');
+const adminRoutes = require('./admin');
 
 module.exports = {
   configRoutes,
@@ -22,4 +23,5 @@ module.exports = {
   storyDraftRoutes,
   storiesRoutes,
   filesRoutes,
+  adminRoutes,
 };
