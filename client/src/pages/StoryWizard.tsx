@@ -871,6 +871,8 @@ export default function StoryWizard() {
         await saveAllCharacterData();
       }
       setStep(newStep);
+      // Scroll to top when changing steps
+      window.scrollTo(0, 0);
     }
   };
 
