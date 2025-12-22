@@ -9243,13 +9243,16 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
     // Use CHF currency for print orders
     const currency = 'CHF';
 
+    // Create order reference using first story ID or combined if multiple
+    const orderRefId = storyIds.length === 1 ? storyIds[0] : `multi-${storyIds.length}-${storyIds[0]}`;
+
     const printOrderPayload = {
       orderType: gelatoOrderType,
-      orderReferenceId: `story-${storyId}-${Date.now()}`,
+      orderReferenceId: `story-${orderRefId}-${Date.now()}`,
       customerReferenceId: userId,
       currency: currency,
       items: [{
-        itemReferenceId: `item-${storyId}-${Date.now()}`,
+        itemReferenceId: `item-${orderRefId}-${Date.now()}`,
         productUid: printProductUid,
         pageCount: printPageCount,
         files: [{
