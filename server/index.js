@@ -23,6 +23,8 @@ const userRoutes = require('./routes/user');
 const characterRoutes = require('./routes/characters');
 const authRoutes = require('./routes/auth');
 const storyDraftRoutes = require('./routes/storyDraft');
+const storiesRoutes = require('./routes/stories');
+const filesRoutes = require('./routes/files');
 
 // Create Express app
 const app = express();
@@ -87,14 +89,21 @@ app.use('/api/characters', characterRoutes);
 // Story draft routes: /api/story-draft
 app.use('/api/story-draft', storyDraftRoutes);
 
+// Stories routes: /api/stories/* (CRUD only, regenerate/edit still in server.js)
+app.use('/api/stories', storiesRoutes);
+
+// Files routes: /api/files/*
+app.use('/api/files', filesRoutes);
+
 // =============================================================================
 // ROUTES STILL IN server.js (to be migrated):
-// - /api/stories/* - Story CRUD and generation
+// - /api/stories/:id/regenerate/* - Story regeneration (AI generation)
+// - /api/stories/:id/edit/* - Story editing (AI generation)
+// - /api/stories/:id/pdf - PDF generation
 // - /api/admin/* - Admin panel
 // - /api/stripe/* - Payments
 // - /api/print-provider/* - Gelato integration
 // - /api/jobs/* - Background job management
-// - /api/files/* - File uploads
 // - /api/analyze-photo - Photo analysis
 // - /api/generate-clothing-avatars - Avatar generation
 // =============================================================================

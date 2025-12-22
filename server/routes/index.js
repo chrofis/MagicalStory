@@ -10,6 +10,8 @@ const userRoutes = require('./user');
 const characterRoutes = require('./characters');
 const authRoutes = require('./auth');
 const storyDraftRoutes = require('./storyDraft');
+const storiesRoutes = require('./stories');
+const filesRoutes = require('./files');
 
 module.exports = {
   configRoutes,
@@ -18,4 +20,6 @@ module.exports = {
   characterRoutes,
   authRoutes,
   storyDraftRoutes,
+  storiesRoutes,
+  filesRoutes,
 };
