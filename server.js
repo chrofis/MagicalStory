@@ -49,7 +49,8 @@ const sharp = require('sharp');
 const email = require('./email');
 const admin = require('firebase-admin');
 
-// Import modular routes
+// Import modular routes and database service
+const { initializePool: initModularPool } = require('./server/services/database');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -511,6 +512,10 @@ if (STORAGE_MODE === 'database') {
     }
   });
   console.log(`✓ PostgreSQL pool created (Railway)`);
+
+  // Initialize the modular database service pool as well
+  initModularPool();
+  console.log(`✓ Modular database pool initialized`);
 }
 
 // Middleware
