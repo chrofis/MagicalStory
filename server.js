@@ -2990,7 +2990,7 @@ app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) 
           pages: story.pages,
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: story.sceneImages?.length || 0,
+          pageCount: calculateStoryPageCount(story, true),
           thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
         };
       });
@@ -3010,7 +3010,7 @@ app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) 
         pages: story.pages,
         language: story.language,
         characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: story.sceneImages?.length || 0,
+        pageCount: calculateStoryPageCount(story, true),
         thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
       }));
 
@@ -3871,7 +3871,7 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           pages: story.pages,
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: story.sceneImages?.length || 0,
+          pageCount: calculateStoryPageCount(story, true),
           hasThumbnail, // Boolean flag - fetch actual thumbnail via /api/stories/:id/thumbnail
           // Partial story fields
           isPartial: story.isPartial || false,
@@ -3907,7 +3907,7 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
           pages: story.pages,
           language: story.language,
           characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: story.sceneImages?.length || 0,
+          pageCount: calculateStoryPageCount(story, true),
           hasThumbnail, // Boolean flag - fetch actual cover via /api/stories/:id/cover
           // Partial story fields
           isPartial: story.isPartial || false,
