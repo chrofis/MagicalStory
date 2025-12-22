@@ -2,16 +2,7 @@
  * MagicalStory Server - Modular Entry Point
  *
  * This is the new modular architecture entry point.
- * Routes can be migrated from server.js incrementally.
- *
- * Migration Guide:
- * 1. Create a new route file in /server/routes/ (e.g., auth.js)
- * 2. Move the route handlers from server.js to the new file
- * 3. Import and use the router here
- * 4. Remove the routes from server.js
- *
- * Currently this file re-exports the legacy server.js
- * As routes are migrated, they will be imported here instead.
+ * Routes are being migrated from server.js incrementally.
  */
 
 const express = require('express');
@@ -24,6 +15,12 @@ const { dbQuery, initializePool, initializeDatabase, getPool } = require('./serv
 const { authenticateToken, requireAdmin } = require('./middleware/auth');
 const { apiLimiter, authLimiter, registerLimiter } = require('./middleware/rateLimit');
 const { log, CORS_ORIGINS, PORT, IS_PRODUCTION } = require('./utils');
+
+// Import routes
+const configRoutes = require('./routes/config');
+const healthRoutes = require('./routes/health');
+const userRoutes = require('./routes/user');
+const characterRoutes = require('./routes/characters');
 
 // Create Express app
 const app = express();
@@ -66,19 +63,33 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
 app.use('/images', express.static(path.join(__dirname, '..', 'images')));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// =============================================================================
+// MIGRATED ROUTES
+// =============================================================================
+
+// Config routes: /api/config/*
+app.use('/api/config', configRoutes);
+
+// Health & utility routes: /api/health, /api/check-ip, /api/log-error
+app.use('/api', healthRoutes);
+
+// User routes: /api/user/*
+app.use('/api/user', userRoutes);
+
+// Character routes: /api/characters/*
+app.use('/api/characters', characterRoutes);
 
 // =============================================================================
-// MIGRATED ROUTES GO HERE
-// As routes are extracted from server.js, import and use them here:
-//
-// const authRoutes = require('./routes/auth');
-// const storyRoutes = require('./routes/stories');
-// app.use('/api/auth', authRoutes);
-// app.use('/api/stories', storyRoutes);
+// ROUTES STILL IN server.js (to be migrated):
+// - /api/auth/* - Authentication
+// - /api/stories/* - Story CRUD and generation
+// - /api/admin/* - Admin panel
+// - /api/stripe/* - Payments
+// - /api/print-provider/* - Gelato integration
+// - /api/jobs/* - Background job management
+// - /api/files/* - File uploads
+// - /api/analyze-photo - Photo analysis
+// - /api/generate-clothing-avatars - Avatar generation
 // =============================================================================
 
 // Export for use by legacy server.js during migration
@@ -97,9 +108,7 @@ module.exports = {
 };
 
 // =============================================================================
-// LEGACY COMPATIBILITY
-// During migration, the legacy server.js can import this module
-// and use its exports, or this can import from server.js
+// STANDALONE SERVER MODE
 // =============================================================================
 
 // If run directly (not imported), start the server
@@ -114,6 +123,7 @@ if (require.main === module) {
       app.listen(PORT, () => {
         log.info(`🚀 Server running on port ${PORT}`);
         log.info(`📊 Environment: ${IS_PRODUCTION ? 'production' : 'development'}`);
+        log.info(`📁 Migrated routes: /api/config, /api/health, /api/user, /api/characters`);
       });
     } catch (error) {
       log.error('Failed to start server:', error);

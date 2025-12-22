@@ -1,0 +1,266 @@
+/**
+ * User Routes - /api/user/*
+ *
+ * User profile, quota, shipping address, and orders
+ */
+
+const express = require('express');
+const router = express.Router();
+
+const { dbQuery, getPool } = require('../services/database');
+const { authenticateToken } = require('../middleware/auth');
+const { log } = require('../utils/logger');
+
+// Helper to check if using database mode
+const isDatabaseMode = () => {
+  return process.env.STORAGE_MODE === 'database' && getPool();
+};
+
+// Helper to log activity
+async function logActivity(userId, username, action, details) {
+  try {
+    if (isDatabaseMode()) {
+      await dbQuery(
+        'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)',
+        [userId, username, action, JSON.stringify(details)]
+      );
+    }
+  } catch (err) {
+    console.error('Failed to log activity:', err);
+  }
+}
+
+// GET /api/user/quota - Get user's credits and quota
+router.get('/quota', authenticateToken, async (req, res) => {
+  try {
+    let credits;
+    let preferredLanguage = 'English';
+
+    if (isDatabaseMode()) {
+      const selectQuery = 'SELECT credits, preferred_language FROM users WHERE id = $1';
+      const rows = await dbQuery(selectQuery, [req.user.id]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      credits = rows[0].credits !== undefined ? rows[0].credits : 500;
+      preferredLanguage = rows[0].preferred_language || 'English';
+    } else {
+      // File mode not supported in modular routes
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    res.json({
+      credits: credits,
+      unlimited: credits === -1,
+      preferredLanguage: preferredLanguage
+    });
+  } catch (err) {
+    console.error('Error fetching user credits:', err);
+    res.status(500).json({ error: 'Failed to fetch user credits' });
+  }
+});
+
+// GET /api/user/shipping-address - Get user's saved shipping address
+router.get('/shipping-address', authenticateToken, async (req, res) => {
+  try {
+    if (isDatabaseMode()) {
+      const selectQuery = 'SELECT shipping_first_name, shipping_last_name, shipping_address_line1, shipping_city, shipping_post_code, shipping_country, shipping_email FROM users WHERE id = $1';
+      const rows = await dbQuery(selectQuery, [req.user.id]);
+
+      if (rows.length === 0) {
+        return res.json(null);
+      }
+
+      const user = rows[0];
+      if (!user.shipping_first_name) {
+        return res.json(null);
+      }
+
+      res.json({
+        firstName: user.shipping_first_name,
+        lastName: user.shipping_last_name,
+        addressLine1: user.shipping_address_line1,
+        city: user.shipping_city,
+        postCode: user.shipping_post_code,
+        country: user.shipping_country,
+        email: user.shipping_email
+      });
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+  } catch (err) {
+    console.error('Error fetching shipping address:', err);
+    res.status(500).json({ error: 'Failed to fetch shipping address' });
+  }
+});
+
+// PUT /api/user/shipping-address - Save user's shipping address
+router.put('/shipping-address', authenticateToken, async (req, res) => {
+  try {
+    let { firstName, lastName, addressLine1, city, postCode, country, email } = req.body;
+
+    // Validate and normalize country code (must be 2-letter ISO code)
+    if (!country || typeof country !== 'string') {
+      return res.status(400).json({ error: 'Country code is required' });
+    }
+
+    country = country.trim().toUpperCase();
+
+    if (country.length !== 2 || !/^[A-Z]{2}$/.test(country)) {
+      return res.status(400).json({
+        error: 'Country must be a valid 2-letter ISO code (e.g., US, DE, CH, FR)',
+        hint: 'Please use the standard 2-letter country code'
+      });
+    }
+
+    // Validate email format
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    email = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        error: 'Please provide a valid email address',
+        hint: 'Email format should be like: user@example.com'
+      });
+    }
+
+    // Validate required fields
+    if (!firstName || !lastName || !addressLine1 || !city || !postCode) {
+      return res.status(400).json({ error: 'All address fields are required' });
+    }
+
+    if (isDatabaseMode()) {
+      const updateQuery = 'UPDATE users SET shipping_first_name = $1, shipping_last_name = $2, shipping_address_line1 = $3, shipping_city = $4, shipping_post_code = $5, shipping_country = $6, shipping_email = $7 WHERE id = $8';
+      await dbQuery(updateQuery, [firstName, lastName, addressLine1, city, postCode, country, email, req.user.id]);
+
+      await logActivity(req.user.id, req.user.username, 'SHIPPING_ADDRESS_SAVED', { country });
+      res.json({ success: true });
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+  } catch (err) {
+    console.error('Error saving shipping address:', err);
+    res.status(500).json({ error: 'Failed to save shipping address' });
+  }
+});
+
+// GET /api/user/orders - Get user's orders
+router.get('/orders', authenticateToken, async (req, res) => {
+  try {
+    log.debug(`📦 [USER] GET /api/user/orders - User: ${req.user.username}`);
+
+    if (isDatabaseMode()) {
+      const query = `
+        SELECT
+          o.id,
+          o.story_id,
+          o.customer_name,
+          o.shipping_name,
+          o.shipping_address_line1,
+          o.shipping_city,
+          o.shipping_postal_code,
+          o.shipping_country,
+          o.amount_total,
+          o.currency,
+          o.payment_status,
+          o.gelato_status,
+          o.tracking_number,
+          o.tracking_url,
+          o.created_at,
+          o.shipped_at,
+          o.delivered_at,
+          s.data as story_data
+        FROM orders o
+        LEFT JOIN stories s ON o.story_id = s.id
+        WHERE o.user_id = $1
+        ORDER BY o.created_at DESC
+      `;
+      const rows = await dbQuery(query, [req.user.id]);
+
+      // Parse story data to get title
+      const orders = rows.map(order => {
+        let storyTitle = 'Untitled Story';
+        if (order.story_data) {
+          try {
+            const storyData = JSON.parse(order.story_data);
+            storyTitle = storyData.title || storyData.storyTitle || 'Untitled Story';
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+
+        return {
+          id: order.id,
+          storyId: order.story_id,
+          storyTitle,
+          customerName: order.customer_name,
+          shippingName: order.shipping_name,
+          shippingAddress: {
+            line1: order.shipping_address_line1,
+            city: order.shipping_city,
+            postalCode: order.shipping_postal_code,
+            country: order.shipping_country
+          },
+          amount: order.amount_total,
+          currency: order.currency,
+          paymentStatus: order.payment_status,
+          orderStatus: order.gelato_status || 'processing',
+          trackingNumber: order.tracking_number,
+          trackingUrl: order.tracking_url,
+          createdAt: order.created_at,
+          shippedAt: order.shipped_at,
+          deliveredAt: order.delivered_at
+        };
+      });
+
+      log.debug(`📦 [USER] Found ${orders.length} orders for user ${req.user.username}`);
+      res.json({ orders });
+    } else {
+      // File mode - not implemented for orders
+      res.json({ orders: [] });
+    }
+  } catch (err) {
+    console.error('Error fetching user orders:', err);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// PUT /api/user/update-email - Update user's email address
+router.put('/update-email', authenticateToken, async (req, res) => {
+  try {
+    const { newEmail } = req.body;
+
+    if (!newEmail || !newEmail.includes('@')) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    if (isDatabaseMode()) {
+      // Check if email already exists
+      const checkQuery = 'SELECT id FROM users WHERE username = $1 AND id != $2';
+      const existing = await dbQuery(checkQuery, [newEmail, req.user.id]);
+
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Email already in use' });
+      }
+
+      const updateQuery = 'UPDATE users SET username = $1 WHERE id = $2';
+      await dbQuery(updateQuery, [newEmail, req.user.id]);
+
+      await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
+      res.json({ success: true, username: newEmail });
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+  } catch (err) {
+    console.error('Error updating email:', err);
+    res.status(500).json({ error: 'Failed to update email' });
+  }
+});
+
+module.exports = router;

@@ -1,22 +1,17 @@
 /**
  * Routes Index
  *
- * Export all route modules here as they are migrated from server.js
+ * Export all migrated route modules
  */
 
-// Example (uncomment as routes are migrated):
-// const authRoutes = require('./auth');
-// const storyRoutes = require('./stories');
-// const characterRoutes = require('./characters');
-// const adminRoutes = require('./admin');
-// const paymentRoutes = require('./payments');
-// const printRoutes = require('./print');
+const configRoutes = require('./config');
+const healthRoutes = require('./health');
+const userRoutes = require('./user');
+const characterRoutes = require('./characters');
 
 module.exports = {
-  // authRoutes,
-  // storyRoutes,
-  // characterRoutes,
-  // adminRoutes,
-  // paymentRoutes,
-  // printRoutes,
+  configRoutes,
+  healthRoutes,
+  userRoutes,
+  characterRoutes,
 };
