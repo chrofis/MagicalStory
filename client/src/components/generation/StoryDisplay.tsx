@@ -385,13 +385,6 @@ export function StoryDisplay({
     return img.imageData || null;
   };
 
-  // Helper to get full cover image object (kept for potential future use)
-  const _getCoverImageObject = (img: string | CoverImageData | null | undefined): CoverImageData | null => {
-    if (!img) return null;
-    if (typeof img === 'string') return { imageData: img };
-    return img;
-  };
-
   // Helper to get scene description for a page
   const getSceneDescription = (pageNumber: number): string | undefined => {
     // First check sceneDescriptions array

@@ -189,8 +189,10 @@ function StoryCard({
 
 export default function MyStories() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
   const { isAuthenticated } = useAuth();
+  const { showSuccess, showInfo } = useToast();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -213,6 +215,81 @@ export default function MyStories() {
   useEffect(() => {
     sessionStorage.setItem('mystories_selected', JSON.stringify([...selectedIds]));
   }, [selectedIds]);
+
+  // Check for Stripe payment callback on page load
+  useEffect(() => {
+    const checkPaymentStatus = async () => {
+      const paymentStatus = searchParams.get('payment');
+      const sessionId = searchParams.get('session_id');
+
+      if (paymentStatus === 'success' && sessionId) {
+        log.info('Payment successful! Checking order status...');
+
+        try {
+          const data = await storyService.getOrderStatus(sessionId);
+          log.info('Order Status:', data);
+
+          if (data.order) {
+            // Clear selection after successful purchase
+            setSelectedIds(new Set());
+            sessionStorage.removeItem('mystories_selected');
+
+            const amount = `CHF ${(data.order.amount_total / 100).toFixed(2)}`;
+            const titles = {
+              en: 'Payment Successful!',
+              de: 'Zahlung erfolgreich!',
+              fr: 'Paiement réussi!',
+            };
+            const messages = {
+              en: 'Your book order has been received and will be printed soon.',
+              de: 'Ihre Buchbestellung wurde entgegengenommen und wird bald gedruckt.',
+              fr: 'Votre commande de livre a été reçue et sera bientôt imprimée.',
+            };
+            const details = [
+              `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : 'Customer'}: ${data.order.customer_name}`,
+              `Email: ${data.order.customer_email}`,
+              `${language === 'de' ? 'Betrag' : language === 'fr' ? 'Montant' : 'Amount'}: ${amount}`,
+              `${language === 'de' ? 'Versand an' : language === 'fr' ? 'Expédié à' : 'Shipping to'}: ${data.order.shipping_name}`,
+              `${data.order.shipping_address_line1}`,
+              `${data.order.shipping_postal_code} ${data.order.shipping_city}`,
+              `${data.order.shipping_country}`,
+            ];
+            showSuccess(
+              messages[language as keyof typeof messages] || messages.en,
+              titles[language as keyof typeof titles] || titles.en,
+              details
+            );
+          }
+        } catch (error) {
+          log.error('Error checking order status:', error);
+        }
+
+        // Clean up URL parameters
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('payment');
+        newParams.delete('session_id');
+        setSearchParams(newParams, { replace: true });
+      } else if (paymentStatus === 'cancelled') {
+        log.info('Payment cancelled by user');
+        const messages = {
+          en: 'Payment was cancelled. You can try again when ready.',
+          de: 'Zahlung wurde abgebrochen. Sie können es erneut versuchen.',
+          fr: 'Paiement annulé. Vous pouvez réessayer quand vous êtes prêt.',
+        };
+        showInfo(
+          messages[language as keyof typeof messages] || messages.en,
+          language === 'de' ? 'Abgebrochen' : language === 'fr' ? 'Annulé' : 'Cancelled'
+        );
+
+        // Clean up URL parameters
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('payment');
+        setSearchParams(newParams, { replace: true });
+      }
+    };
+
+    checkPaymentStatus();
+  }, [searchParams, setSearchParams, language, showSuccess, showInfo]);
 
   const translations = {
     en: {
