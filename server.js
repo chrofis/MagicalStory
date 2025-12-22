@@ -5418,7 +5418,7 @@ app.post('/api/admin/print-provider/seed-products', authenticateToken, async (re
       product_name: '20x20cm Softcover Photobook',
       description: 'Square softcover photobook with matt lamination, 170gsm coated silk paper',
       size: '20x20cm (8x8 inch)',
-      cover_type: 'Softcover',
+      cover_type: 'softcover',
       min_pages: 24,
       max_pages: 200,
       available_page_counts: JSON.stringify([24, 30, 40, 50, 60, 80, 100, 120, 150, 200]),
@@ -9248,7 +9248,7 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
     let printProductUid = null;
     try {
       const productsResult = await dbPool.query(
-        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND cover_type = $1',
+        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND LOWER(cover_type) = LOWER($1)',
         [coverType]
       );
 
