@@ -6491,7 +6491,6 @@ async function generatePrintPdf(storyData) {
       const pageNumber = index + 1;
       const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
       const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-      const margin = mmToPoints(5);
 
       doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
@@ -6502,10 +6501,10 @@ async function generatePrintPdf(storyData) {
       if (image && image.imageData) {
         try {
           const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          doc.image(imageBuffer, margin, margin, {
-            fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
-            align: 'center',
-            valign: 'center'
+          // Full-bleed image (no margin) - same as cover pages
+          doc.image(imageBuffer, 0, 0, {
+            width: pageSize,
+            height: imageHeight
           });
         } catch (imgErr) {
           console.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
@@ -6587,11 +6586,10 @@ async function generatePrintPdf(storyData) {
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         try {
           const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          const imgMargin = mmToPoints(5);
-          doc.image(imageBuffer, imgMargin, imgMargin, {
-            fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
-            align: 'center',
-            valign: 'center'
+          // Full-bleed image (no margin) - same as cover pages
+          doc.image(imageBuffer, 0, 0, {
+            width: pageSize,
+            height: pageSize
           });
         } catch (imgErr) {
           console.error('Error adding image to PDF:', imgErr);

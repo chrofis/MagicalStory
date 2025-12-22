@@ -1458,20 +1458,28 @@ export default function StoryWizard() {
                     : 'PDF download failed');
                 }
               } : undefined}
-              onBuyBook={storyId ? async () => {
+              onAddToBook={storyId ? () => {
+                // Add story to selection in sessionStorage
                 try {
-                  log.info('Creating checkout session for story:', storyId);
-                  const { url } = await storyService.createCheckoutSession(storyId);
-                  if (url) {
-                    window.location.href = url;
+                  const saved = sessionStorage.getItem('mystories_selected');
+                  const selectedIds: string[] = saved ? JSON.parse(saved) : [];
+                  if (!selectedIds.includes(storyId)) {
+                    selectedIds.push(storyId);
+                    sessionStorage.setItem('mystories_selected', JSON.stringify(selectedIds));
                   }
+                  log.info('Added story to book selection:', storyId);
+                  showSuccess(
+                    language === 'de'
+                      ? 'Geschichte zum Buch hinzugefügt. Du kannst weitere hinzufügen oder das Buch bestellen.'
+                      : language === 'fr'
+                      ? 'Histoire ajoutée au livre. Vous pouvez en ajouter d\'autres ou commander le livre.'
+                      : 'Story added to book. You can add more or order the book.',
+                    language === 'de' ? 'Zum Buch hinzugefügt' : language === 'fr' ? 'Ajouté au livre' : 'Added to Book'
+                  );
+                  // Navigate to My Stories
+                  navigate('/stories');
                 } catch (error) {
-                  log.error('Checkout failed:', error);
-                  alert(language === 'de'
-                    ? 'Checkout fehlgeschlagen. Bitte versuche es erneut.'
-                    : language === 'fr'
-                    ? 'Échec du paiement. Veuillez réessayer.'
-                    : 'Checkout failed. Please try again.');
+                  log.error('Failed to add story to selection:', error);
                 }
               } : undefined}
               onPrintBook={storyId ? async () => {

@@ -217,7 +217,7 @@ interface StoryDisplayProps {
   languageLevel?: LanguageLevel;
   isGenerating?: boolean;
   onDownloadPdf?: () => void;
-  onBuyBook?: () => void;
+  onAddToBook?: () => void;
   onPrintBook?: () => void;
   onCreateAnother?: () => void;
   onDownloadTxt?: () => void;
@@ -258,14 +258,14 @@ export function StoryDisplay({
   languageLevel = 'standard',
   isGenerating = false,
   onDownloadPdf,
-  onBuyBook,
+  onAddToBook,
   onPrintBook,
   onCreateAnother,
   onDownloadTxt,
   onRegenerateImage,
-  onRegenerateCover,
+  onRegenerateCover: _onRegenerateCover,
   onEditImage,
-  onEditCover,
+  onEditCover: _onEditCover,
   onVisualBibleChange,
   storyId,
   developerMode = false,
@@ -385,8 +385,8 @@ export function StoryDisplay({
     return img.imageData || null;
   };
 
-  // Helper to get full cover image object
-  const getCoverImageObject = (img: string | CoverImageData | null | undefined): CoverImageData | null => {
+  // Helper to get full cover image object (kept for potential future use)
+  const _getCoverImageObject = (img: string | CoverImageData | null | undefined): CoverImageData | null => {
     if (!img) return null;
     if (typeof img === 'string') return { imageData: img };
     return img;
@@ -475,16 +475,16 @@ export function StoryDisplay({
           </button>
         )}
 
-        {/* Buy Book - All users when images exist and story is saved */}
-        {hasImages && storyId && onBuyBook && (
+        {/* Add to Book - All users when images exist and story is saved */}
+        {hasImages && storyId && onAddToBook && (
           <button
-            onClick={onBuyBook}
+            onClick={onAddToBook}
             disabled={isGenerating}
             className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <ShoppingCart size={20} /> {language === 'de' ? 'Buch kaufen (CHF 36)' : language === 'fr' ? 'Acheter le livre (CHF 36)' : 'Buy Book (CHF 36)'}
+            <ShoppingCart size={20} /> {language === 'de' ? 'Zum Buch hinzufügen' : language === 'fr' ? 'Ajouter au livre' : 'Add to Book'}
           </button>
         )}
 
@@ -958,256 +958,14 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Cover Images Display */}
-      {coverImages && (getCoverImageData(coverImages.frontCover) || getCoverImageData(coverImages.initialPage) || getCoverImageData(coverImages.backCover)) && (
-        <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 mt-6 max-w-2xl mx-auto">
-          <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <BookOpen size={24} /> {language === 'de' ? 'Buchcover' : language === 'fr' ? 'Couvertures' : 'Book Covers'}
-          </h3>
-          <div className="flex flex-col gap-6">
-            {/* Front Cover */}
-            {getCoverImageData(coverImages.frontCover) && (() => {
-              const coverObj = getCoverImageObject(coverImages.frontCover);
-              return (
-                <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
-                  <h4 className="text-lg font-bold text-gray-800 mb-3">
-                    {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
-                  </h4>
-                  <img
-                    src={getCoverImageData(coverImages.frontCover)!}
-                    alt="Front Cover"
-                    className="w-full rounded-lg shadow-md"
-                  />
-                  {developerMode && (
-                    <div className="mt-3 space-y-2">
-                      <div className="flex gap-2">
-                        {onRegenerateCover && (
-                          <button onClick={() => onRegenerateCover('front')} disabled={isGenerating}
-                            className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}>
-                            <RefreshCw size={14} /> {language === 'de' ? 'Neu' : 'Regen'}
-                          </button>
-                        )}
-                        {onEditCover && (
-                          <button onClick={() => onEditCover('front')} disabled={isGenerating}
-                            className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'}`}>
-                            <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                          </button>
-                        )}
-                      </div>
-                      {/* 1. Outline Extract (from cover scenes in outline) */}
-                      {coverObj?.description && (
-                        <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
-                            {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
-                          </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
-                        </details>
-                      )}
-                      {/* 2. API Prompt (final prompt to image generation) */}
-                      {coverObj?.prompt && (
-                        <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
-                            {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                            {coverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({coverObj.modelId})</span>}
-                          </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
-                        </details>
-                      )}
-                      {/* Reference Photos */}
-                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
-                        <ReferencePhotosDisplay
-                          referencePhotos={coverObj.referencePhotos}
-                          language={language}
-                        />
-                      )}
-                      {/* Quality Score */}
-                      {coverObj?.qualityScore !== undefined && (
-                        <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
-                            <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
-                            <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                              {Math.round(coverObj.qualityScore)}%
-                            </span>
-                          </summary>
-                          {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
-                        </details>
-                      )}
-                      {/* Retry History */}
-                      {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
-                        <RetryHistoryDisplay
-                          retryHistory={coverObj.retryHistory}
-                          totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
-                          language={language}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Initial Page */}
-            {getCoverImageData(coverImages.initialPage) && (() => {
-              const coverObj = getCoverImageObject(coverImages.initialPage);
-              return (
-                <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
-                  <h4 className="text-lg font-bold text-gray-800 mb-3">
-                    {language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page d\'introduction' : 'Initial Page'}
-                  </h4>
-                  <img
-                    src={getCoverImageData(coverImages.initialPage)!}
-                    alt="Initial Page"
-                    className="w-full rounded-lg shadow-md"
-                  />
-                  {developerMode && (
-                    <div className="mt-3 space-y-2">
-                      <div className="flex gap-2">
-                        {onRegenerateCover && (
-                          <button onClick={() => onRegenerateCover('initial')} disabled={isGenerating}
-                            className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}>
-                            <RefreshCw size={14} /> {language === 'de' ? 'Neu' : 'Regen'}
-                          </button>
-                        )}
-                        {onEditCover && (
-                          <button onClick={() => onEditCover('initial')} disabled={isGenerating}
-                            className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'}`}>
-                            <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                          </button>
-                        )}
-                      </div>
-                      {/* 1. Outline Extract (from cover scenes in outline) */}
-                      {coverObj?.description && (
-                        <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
-                            {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
-                          </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
-                        </details>
-                      )}
-                      {/* 2. API Prompt (final prompt to image generation) */}
-                      {coverObj?.prompt && (
-                        <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
-                            {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                            {coverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({coverObj.modelId})</span>}
-                          </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
-                        </details>
-                      )}
-                      {/* Reference Photos */}
-                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
-                        <ReferencePhotosDisplay
-                          referencePhotos={coverObj.referencePhotos}
-                          language={language}
-                        />
-                      )}
-                      {/* Quality Score */}
-                      {coverObj?.qualityScore !== undefined && (
-                        <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
-                            <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
-                            <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                              {Math.round(coverObj.qualityScore)}%
-                            </span>
-                          </summary>
-                          {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
-                        </details>
-                      )}
-                      {/* Retry History */}
-                      {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
-                        <RetryHistoryDisplay
-                          retryHistory={coverObj.retryHistory}
-                          totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
-                          language={language}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Back Cover */}
-            {getCoverImageData(coverImages.backCover) && (() => {
-              const coverObj = getCoverImageObject(coverImages.backCover);
-              return (
-                <div className="bg-white border-2 border-indigo-300 rounded-lg p-4 shadow-lg">
-                  <h4 className="text-lg font-bold text-gray-800 mb-3">
-                    {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
-                  </h4>
-                  <img
-                    src={getCoverImageData(coverImages.backCover)!}
-                    alt="Back Cover"
-                    className="w-full rounded-lg shadow-md"
-                  />
-                  {developerMode && (
-                    <div className="mt-3 space-y-2">
-                      <div className="flex gap-2">
-                        {onRegenerateCover && (
-                          <button onClick={() => onRegenerateCover('back')} disabled={isGenerating}
-                            className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'}`}>
-                            <RefreshCw size={14} /> {language === 'de' ? 'Neu' : 'Regen'}
-                          </button>
-                        )}
-                        {onEditCover && (
-                          <button onClick={() => onEditCover('back')} disabled={isGenerating}
-                            className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'}`}>
-                            <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                          </button>
-                        )}
-                      </div>
-                      {/* 1. Outline Extract (from cover scenes in outline) */}
-                      {coverObj?.description && (
-                        <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
-                            {language === 'de' ? 'Auszug aus Gliederung' : language === 'fr' ? 'Extrait du plan' : 'Outline Extract'}
-                          </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto">{coverObj.description}</pre>
-                        </details>
-                      )}
-                      {/* 2. API Prompt (final prompt to image generation) */}
-                      {coverObj?.prompt && (
-                        <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
-                            {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
-                            {coverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({coverObj.modelId})</span>}
-                          </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border overflow-x-auto max-h-48 overflow-y-auto">{coverObj.prompt}</pre>
-                        </details>
-                      )}
-                      {/* Reference Photos */}
-                      {coverObj?.referencePhotos && coverObj.referencePhotos.length > 0 && (
-                        <ReferencePhotosDisplay
-                          referencePhotos={coverObj.referencePhotos}
-                          language={language}
-                        />
-                      )}
-                      {/* Quality Score */}
-                      {coverObj?.qualityScore !== undefined && (
-                        <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
-                            <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
-                            <span className={`text-lg font-bold ${coverObj.qualityScore >= 70 ? 'text-green-600' : coverObj.qualityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
-                              {Math.round(coverObj.qualityScore)}%
-                            </span>
-                          </summary>
-                          {coverObj.qualityReasoning && <div className="mt-2 text-xs bg-white p-3 rounded border"><p className="whitespace-pre-wrap">{coverObj.qualityReasoning}</p></div>}
-                        </details>
-                      )}
-                      {/* Retry History */}
-                      {coverObj?.retryHistory && coverObj.retryHistory.length > 0 && (
-                        <RetryHistoryDisplay
-                          retryHistory={coverObj.retryHistory}
-                          totalAttempts={coverObj.totalAttempts || coverObj.retryHistory.length}
-                          language={language}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
+      {/* Front Cover Display - simple, no border wrapper */}
+      {coverImages && getCoverImageData(coverImages.frontCover) && (
+        <div className="mt-6 max-w-2xl mx-auto">
+          <img
+            src={getCoverImageData(coverImages.frontCover)!}
+            alt="Front Cover"
+            className="w-full rounded-lg shadow-lg"
+          />
         </div>
       )}
 
@@ -1681,16 +1439,16 @@ export function StoryDisplay({
               </button>
             )}
 
-            {/* Buy Book */}
-            {storyId && onBuyBook && (
+            {/* Add to Book */}
+            {storyId && onAddToBook && (
               <button
-                onClick={onBuyBook}
+                onClick={onAddToBook}
                 disabled={isGenerating}
                 className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <ShoppingCart size={20} /> {language === 'de' ? 'Buch kaufen (CHF 36)' : language === 'fr' ? 'Acheter le livre (CHF 36)' : 'Buy Book (CHF 36)'}
+                <ShoppingCart size={20} /> {language === 'de' ? 'Zum Buch hinzufügen' : language === 'fr' ? 'Ajouter au livre' : 'Add to Book'}
               </button>
             )}
 

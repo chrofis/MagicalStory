@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Book, Trash2, Eye, AlertTriangle, BookOpen, Tag } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { storyService } from '@/services';
 import { LoadingSpinner, Navigation } from '@/components/common';
 import { MAX_BOOK_PAGES } from './Pricing';
