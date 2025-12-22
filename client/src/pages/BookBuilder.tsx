@@ -67,8 +67,8 @@ export default function BookBuilder() {
       noStoriesDesc: 'Bitte geh zurück und wähle Geschichten zum Kombinieren aus.',
       backToStories: 'Zurück zu meinen Geschichten',
       storyOrder: 'Reihenfolge der Geschichten',
-      storyOrderHint: 'Verschiebe Geschichten, um die Reihenfolge zu ändern. Das Cover der ersten Geschichte wird als Buchcover verwendet.',
-      coverNote: 'Das Cover der ersten Geschichte wird als Buchcover verwendet.',
+      storyOrderHint: 'Verschiebe Geschichten, um die Reihenfolge zu ändern. Das Titelbild der ersten Geschichte wird als Titelbild vom Buch verwendet.',
+      coverNote: 'Das Titelbild der ersten Geschichte wird als Titelbild vom Buch verwendet.',
       moveUp: 'Nach oben',
       moveDown: 'Nach unten',
       pages: 'Seiten',
@@ -312,9 +312,7 @@ export default function BookBuilder() {
               {stories.map((story, index) => (
                 <div
                   key={story.id}
-                  className={`bg-white rounded-xl shadow-md p-4 flex items-center gap-4 ${
-                    index === 0 ? 'ring-2 ring-indigo-400' : ''
-                  }`}
+                  className="bg-white rounded-xl shadow-md p-4 flex items-center gap-4"
                 >
                   {/* Thumbnail */}
                   {story.thumbnail ? (
@@ -335,7 +333,7 @@ export default function BookBuilder() {
                     <p className="text-sm text-gray-500">{story.pages} {t.pages}</p>
                     {index === 0 && (
                       <span className="inline-block mt-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full font-medium">
-                        Cover
+                        {language === 'de' ? 'Titelbild' : language === 'fr' ? 'Couverture' : 'Cover'}
                       </span>
                     )}
                   </div>

@@ -1548,7 +1548,10 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Auth endpoints
+// =============================================================================
+// AUTH ROUTES - MIGRATED TO server/routes/auth.js
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 app.post('/api/auth/register', registerLimiter, async (req, res) => {
   try {
     const { username, password, email } = req.body;
@@ -2329,8 +2332,9 @@ app.post('/api/auth/dev-login', async (req, res) => {
     res.status(500).json({ error: 'Dev login failed' });
   }
 });
+END OF AUTH ROUTES */
 
-// API Key management (admin only)
+// API Key management (admin only) - KEEP: Uses writeJSON which is local to server.js
 app.post('/api/admin/config', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -2502,7 +2506,12 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
   }
 });
 
-// Admin endpoints
+// =============================================================================
+// ADMIN ROUTES - MIGRATED TO server/routes/admin.js
+// NOTE: /api/admin/logs kept here (uses local readJSON)
+// NOTE: /api/admin/orders/:orderId/retry-print-order kept here (uses Gelato)
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 app.get('/api/admin/logs', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -3287,8 +3296,12 @@ app.delete('/api/admin/print-products/:id', authenticateToken, async (req, res) 
     res.status(500).json({ error: 'Failed to delete print provider product' });
   }
 });
+END OF ADMIN ROUTES BLOCK 1 */
 
-// Get current user's credits status
+// =============================================================================
+// USER ROUTES - MIGRATED TO server/routes/user.js
+// =============================================================================
+/* COMMENTED OUT - Now served from modular routes
 app.get('/api/user/quota', authenticateToken, async (req, res) => {
   try {
     let credits;

@@ -194,7 +194,23 @@ export default function MyStories() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalStories, setTotalStories] = useState(0);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    // Restore selection from sessionStorage
+    try {
+      const saved = sessionStorage.getItem('mystories_selected');
+      if (saved) {
+        return new Set(JSON.parse(saved));
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return new Set();
+  });
+
+  // Persist selection to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('mystories_selected', JSON.stringify([...selectedIds]));
+  }, [selectedIds]);
 
   const translations = {
     en: {
