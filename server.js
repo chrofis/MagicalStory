@@ -649,48 +649,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         console.log('   Address:', JSON.stringify(customerInfo.address, null, 2));
         console.log('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
 
-        // Check if this is a credits purchase
-        if (fullSession.metadata?.type === 'credits') {
-          console.log('💰 [STRIPE WEBHOOK] Processing credits purchase');
-          const userId = parseInt(fullSession.metadata?.userId);
-          const creditsToAdd = parseInt(fullSession.metadata?.credits) || 100;
-
-          if (!userId || isNaN(userId)) {
-            console.error('❌ [STRIPE WEBHOOK] Invalid userId for credits purchase:', fullSession.metadata);
-            throw new Error('Invalid userId in credits purchase metadata');
-          }
-
-          if (STORAGE_MODE === 'database') {
-            // Get current credits
-            const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [userId]);
-            if (userResult.rows.length === 0) {
-              throw new Error('User not found for credits purchase');
-            }
-
-            const currentCredits = userResult.rows[0].credits || 0;
-            // Don't add to unlimited credits (-1)
-            const newCredits = currentCredits === -1 ? -1 : currentCredits + creditsToAdd;
-
-            // Update credits
-            await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, userId]);
-
-            console.log(`✅ [STRIPE WEBHOOK] Added ${creditsToAdd} credits to user ${userId}`);
-            console.log(`   Previous balance: ${currentCredits}, New balance: ${newCredits}`);
-
-            // Create transaction record
-            await dbPool.query(`
-              INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-              VALUES ($1, $2, $3, 'purchase', $4, $5)
-            `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe`]);
-
-            console.log('💾 [STRIPE WEBHOOK] Credits transaction recorded');
-          }
-
-          res.json({ received: true, type: 'credits' });
-          return;
-        }
-
-        // Store order in database (book purchase)
+        // Store order in database
         if (STORAGE_MODE === 'database') {
           const userId = parseInt(fullSession.metadata?.userId);
           // Get storyId from metadata - could be numeric ID or job ID
@@ -6415,10 +6374,7 @@ async function generatePrintPdf(storyData) {
     });
   }
 
-  // Calculate page count and add blank pages if needed
-  // Must be even for print AND meet minimum page count (24 is standard for photobooks)
-  const MINIMUM_PAGE_COUNT = 24;
-
+  // Calculate page count and add blank pages if needed (must be even for print)
   let actualPdfPages;
   if (isPictureBook) {
     actualPdfPages = storyPages.length;
@@ -6426,17 +6382,11 @@ async function generatePrintPdf(storyData) {
     actualPdfPages = storyPages.length * 2;
   }
 
-  // Ensure even number and at least minimum pages
-  let targetPageCount = actualPdfPages % 2 === 0 ? actualPdfPages : actualPdfPages + 1;
-  if (targetPageCount < MINIMUM_PAGE_COUNT) {
-    targetPageCount = MINIMUM_PAGE_COUNT;
-    log.debug(`📄 [PRINT PDF] Padding to minimum ${MINIMUM_PAGE_COUNT} pages (had ${actualPdfPages})`);
-  }
-
+  const targetPageCount = actualPdfPages % 2 === 0 ? actualPdfPages : actualPdfPages + 1;
   const blankPagesToAdd = targetPageCount - actualPdfPages;
 
   if (blankPagesToAdd > 0) {
-    log.debug(`📄 [PRINT PDF] Adding ${blankPagesToAdd} blank page(s) to reach ${targetPageCount} pages`);
+    log.debug(`📄 [PRINT PDF] Adding ${blankPagesToAdd} blank page(s) to reach even count ${targetPageCount}`);
   }
 
   for (let i = 0; i < blankPagesToAdd; i++) {
@@ -8697,59 +8647,6 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
     res.json({ sessionId: session.id, url: session.url });
   } catch (err) {
     console.error('❌ Error creating checkout session:', err);
-    res.status(500).json({ error: 'Failed to create checkout session' });
-  }
-});
-
-// Create Stripe checkout session for credits purchase
-app.post('/api/stripe/create-credits-checkout', authenticateToken, async (req, res) => {
-  try {
-    const { credits = 100, amount = 500 } = req.body; // Default: 100 credits for CHF 5.00 (500 cents)
-    const userId = req.user.id;
-
-    // Get the appropriate Stripe client for this user
-    const userStripe = getStripeForUser(req.user);
-    const isTestMode = isUserTestMode(req.user);
-
-    if (!userStripe) {
-      const keyNeeded = isTestMode ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_LIVE_SECRET_KEY';
-      return res.status(500).json({ error: `Stripe not configured. Please set ${keyNeeded}` });
-    }
-
-    console.log(`💳 Creating credits checkout session for user ${userId}`);
-    console.log(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}`);
-    console.log(`   Credits: ${credits}, Amount: CHF ${(amount / 100).toFixed(2)}`);
-
-    // Create checkout session
-    const session = await userStripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'chf',
-          product_data: {
-            name: `${credits} Story Credits`,
-            description: `${credits} credits for creating personalized stories on MagicalStory`,
-          },
-          unit_amount: amount,
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/create?credits_payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/create?credits_payment=cancelled`,
-      metadata: {
-        type: 'credits',
-        userId: userId.toString(),
-        credits: credits.toString(),
-      },
-    });
-
-    console.log(`✅ Credits checkout session created: ${session.id}`);
-    console.log(`   URL: ${session.url}`);
-
-    res.json({ sessionId: session.id, url: session.url });
-  } catch (err) {
-    console.error('❌ Error creating credits checkout session:', err);
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
