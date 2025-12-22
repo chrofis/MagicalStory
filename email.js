@@ -341,17 +341,22 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
  * @param {string} language - Language for email content (English, German, French)
  */
 async function sendEmailVerificationEmail(userEmail, userName, verifyUrl, language = 'English') {
+  console.log(`📧 [EMAIL] sendEmailVerificationEmail called for ${userEmail}`);
+
   if (!resend) {
-    console.log('📧 Email not configured - skipping email verification');
+    console.error('❌ [EMAIL] Resend API key not configured - RESEND_API_KEY environment variable is missing');
     return null;
   }
 
   // Get template for the specified language
   const template = getTemplateSection('email-verification', language);
   if (!template) {
-    console.error('❌ Failed to get email-verification template');
+    console.error('❌ [EMAIL] Failed to get email-verification template - template may not be loaded');
+    console.error('   Available templates:', Object.keys(EMAIL_TEMPLATES));
     return null;
   }
+
+  console.log(`📧 [EMAIL] Template loaded for ${language}, sending to ${userEmail}...`);
 
   // Fill in placeholders
   const values = {

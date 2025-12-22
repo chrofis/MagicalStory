@@ -1879,7 +1879,15 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
       // Send reset email
       const resetUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
-      await email.sendPasswordResetEmail(user.email, user.username, resetUrl);
+      console.log(`📧 Sending password reset email to ${user.email}...`);
+      const emailResult = await email.sendPasswordResetEmail(user.email, user.username, resetUrl);
+
+      if (!emailResult) {
+        console.error('❌ Failed to send password reset email - email service returned null');
+        // Still return success to prevent email enumeration
+      } else {
+        console.log(`✅ Password reset email sent to ${user.email}`);
+      }
 
       res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
     } else {
@@ -2027,8 +2035,15 @@ app.post('/api/auth/send-verification', authenticateToken, async (req, res) => {
 
       // Send verification email
       const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-      await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
+      console.log(`📧 Sending verification email to ${user.email}...`);
+      const emailResult = await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
 
+      if (!emailResult) {
+        console.error('❌ Failed to send verification email - email service returned null');
+        return res.status(500).json({ error: 'Failed to send verification email. Please try again later.' });
+      }
+
+      console.log(`✅ Verification email sent to ${user.email}`);
       res.json({ success: true, message: 'Verification email sent' });
     } else {
       res.status(400).json({ error: 'Email verification requires database mode' });
