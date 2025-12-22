@@ -23,6 +23,7 @@ interface StoryListItem {
   art_style: string;
   language: string;
   pages: number;
+  pageCount?: number; // Calculated page count (accounts for picture book vs standard layout)
   created_at: string;
   createdAt?: string;
   thumbnail?: string; // Loaded lazily via getStoryCover
@@ -151,7 +152,7 @@ function StoryCard({
             </p>
           ) : (
             <p className="text-sm text-gray-500 mb-3">
-              {story.pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} • {formatDate(story.created_at || story.createdAt)}
+              {story.pageCount || story.pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} • {formatDate(story.created_at || story.createdAt)}
             </p>
           )}
         </div>
@@ -415,7 +416,7 @@ export default function MyStories() {
   }, [stories, selectedIds]);
 
   const totalSelectedPages = useMemo(() => {
-    return selectedStories.reduce((sum, s) => sum + s.pages, 0);
+    return selectedStories.reduce((sum, s) => sum + (s.pageCount || s.pages), 0);
   }, [selectedStories]);
 
   const isOverLimit = totalSelectedPages > MAX_BOOK_PAGES;
@@ -425,7 +426,7 @@ export default function MyStories() {
     const selectedData = selectedStories.map(s => ({
       id: s.id,
       title: s.title,
-      pages: s.pages,
+      pages: s.pageCount || s.pages, // Use calculated page count
       thumbnail: s.thumbnail,
     }));
     navigate('/book-builder', { state: { selectedStories: selectedData } });
