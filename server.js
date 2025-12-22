@@ -2824,7 +2824,10 @@ app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) 
     const stories = storiesResult.map(s => {
       try {
         const storyData = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
-        const scenePageCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
+        const sceneCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
+        // Picture book (1st-grade): 1 scene = 1 page. Standard book: 1 scene = 2 pages (text + image)
+        const isPictureBook = storyData?.languageLevel === '1st-grade';
+        const scenePageCount = isPictureBook ? sceneCount : sceneCount * 2;
         // Add 3 pages for front cover, back cover, and initial page (title page)
         const pageCount = scenePageCount > 0 ? scenePageCount + 3 : 0;
         // Count scene images + cover images (front, back, spine)
@@ -3521,8 +3524,37 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
         };
       });
 
-      log.debug(`📦 [USER] Found ${orders.length} orders for user ${req.user.username}`);
-      res.json({ orders });
+      // Fetch credit purchases
+      const creditPurchasesQuery = `
+        SELECT id, amount, balance_after, reference_id, description, created_at
+        FROM credit_transactions
+        WHERE user_id = $1 AND transaction_type = 'purchase'
+        ORDER BY created_at DESC
+      `;
+      const creditRows = await dbQuery(creditPurchasesQuery, [req.user.id]);
+
+      // Map credit purchases to order-like format
+      const creditOrders = creditRows.map(tx => ({
+        id: `credit-${tx.id}`,
+        type: 'credits',
+        creditsAmount: tx.amount,
+        balanceAfter: tx.balance_after,
+        description: tx.description,
+        amount: Math.round((tx.amount / 100) * 500), // CHF 5 per 100 credits
+        currency: 'chf',
+        paymentStatus: 'paid',
+        orderStatus: 'completed',
+        createdAt: tx.created_at
+      }));
+
+      // Add type to book orders and combine
+      const typedOrders = orders.map(o => ({ ...o, type: 'book' }));
+      const allOrders = [...typedOrders, ...creditOrders].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      log.debug(`📦 [USER] Found ${orders.length} book orders and ${creditOrders.length} credit purchases`);
+      res.json({ orders: allOrders });
     } else {
       // File mode - not implemented for orders
       res.json({ orders: [] });
