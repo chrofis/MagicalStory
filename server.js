@@ -6576,11 +6576,11 @@ async function generateCombinedBookPdf(stories) {
         }
 
         // Add text with vertical centering
-        let fontSize = 10;
+        let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
         let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
 
-        while (textHeight > availableTextHeight && fontSize > 4) {
+        while (textHeight > availableTextHeight && fontSize > 6) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
@@ -6604,11 +6604,11 @@ async function generateCombinedBookPdf(stories) {
         doc.addPage({ size: [pageSize, pageSize], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
         totalStoryPages++;
 
-        let fontSize = 9;
+        let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
         let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
 
-        while (textHeight > availableHeight * 0.9 && fontSize > 4) {
+        while (textHeight > availableHeight * 0.9 && fontSize > 6) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
@@ -6839,11 +6839,11 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         }
 
         // Add text with vertical centering in text area
-        let fontSize = 10;
+        let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
         let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
 
-        while (textHeight > availableTextHeight && fontSize > 4) {
+        while (textHeight > availableTextHeight && fontSize > 6) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
@@ -6867,11 +6867,11 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         // Text page with vertical centering
         doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
 
-        let fontSize = 9;
+        let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
         let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
 
-        while (textHeight > availableHeight * 0.9 && fontSize > 4) {
+        while (textHeight > availableHeight * 0.9 && fontSize > 6) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
@@ -7114,7 +7114,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         const availableTextWidth = pageSize - (textMargin * 2);
         const availableTextHeight = textAreaHeight - (textMargin);
 
-        const startFontSize = 10;  // Start with 10pt, auto-reduce if needed
+        const startFontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
         let fontSize = startFontSize;
         let textHeight;
 
@@ -7122,7 +7122,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         textHeight = doc.heightOfString(page.text, { width: availableTextWidth, align: 'center' });
         const initialHeight = textHeight;
 
-        while (textHeight > availableTextHeight && fontSize > 4) {
+        while (textHeight > availableTextHeight && fontSize > 6) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(page.text, { width: availableTextWidth, align: 'center' });
@@ -7171,11 +7171,11 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       const truncatedPages = [];
       storyPages.forEach((page, index) => {
         const pageNumber = index + 1;
-        let fontSize = 9;
+        let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
         doc.fontSize(fontSize).font('Helvetica');
         let textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
 
-        while (textHeight > safeAvailableHeight && fontSize > 4) {
+        while (textHeight > safeAvailableHeight && fontSize > 6) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
@@ -7204,7 +7204,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         // Add text page (square format)
         doc.addPage({ size: [pageSize, pageSize], margins: { top: marginTopBottom, bottom: marginTopBottom, left: marginLeftRight, right: marginLeftRight } });
 
-        const startFontSize = 9;
+        const startFontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
         let fontSize = startFontSize;
         let textHeight;
 
@@ -7212,7 +7212,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
         const initialHeight = textHeight;
 
-        while (textHeight > safeAvailableHeight && fontSize > 4) {
+        while (textHeight > safeAvailableHeight && fontSize > 6) {
           fontSize -= 0.5;
           doc.fontSize(fontSize);
           textHeight = doc.heightOfString(page.text, { width: availableWidth, align: 'left' });
@@ -7435,11 +7435,11 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
           }
 
           // Add text with vertical centering
-          let fontSize = 10;
+          let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
           doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
           let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
 
-          while (textHeight > availableTextHeight && fontSize > 4) {
+          while (textHeight > availableTextHeight && fontSize > 6) {
             fontSize -= 0.5;
             doc.fontSize(fontSize);
             textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
@@ -7463,11 +7463,11 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
           doc.addPage({ size: [pageSize, pageSize], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
           totalStoryPages++;
 
-          let fontSize = 9;
+          let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
           doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
           let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
 
-          while (textHeight > availableHeight * 0.9 && fontSize > 4) {
+          while (textHeight > availableHeight * 0.9 && fontSize > 6) {
             fontSize -= 0.5;
             doc.fontSize(fontSize);
             textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
