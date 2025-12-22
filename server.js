@@ -9382,9 +9382,10 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
         log.debug(`   ${i+1}. "${p.product_name}" cover_type="${p.cover_type}" pages=${p.min_pages}-${p.max_pages}`);
       });
 
+      // Match by product_uid pattern since cover_type column may be null
       const productsResult = await dbPool.query(
-        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND LOWER(cover_type) = LOWER($1)',
-        [coverType]
+        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1',
+        [`%${coverType.toLowerCase()}%`]
       );
 
       log.debug(`📦 [BACKGROUND] Products matching "${coverType}": ${productsResult.rows.length}`);
