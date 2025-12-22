@@ -284,10 +284,13 @@ export default function MyStories() {
       const storyList = newStories as unknown as StoryListItem[];
 
       if (loadMore || loadAll) {
-        const updatedStories = [...stories, ...storyList];
-        setStories(updatedStories);
-        // Update cache
-        storiesCache = { data: updatedStories, total: pagination.total, timestamp: now };
+        // Use functional update to avoid losing concurrent thumbnail updates
+        setStories(prev => {
+          const updatedStories = [...prev, ...storyList];
+          // Update cache with merged data
+          storiesCache = { data: updatedStories, total: pagination.total, timestamp: now };
+          return updatedStories;
+        });
       } else {
         setStories(storyList);
         // Update cache
