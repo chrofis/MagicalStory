@@ -21,6 +21,8 @@ const configRoutes = require('./routes/config');
 const healthRoutes = require('./routes/health');
 const userRoutes = require('./routes/user');
 const characterRoutes = require('./routes/characters');
+const authRoutes = require('./routes/auth');
+const storyDraftRoutes = require('./routes/storyDraft');
 
 // Create Express app
 const app = express();
@@ -73,15 +75,20 @@ app.use('/api/config', configRoutes);
 // Health & utility routes: /api/health, /api/check-ip, /api/log-error
 app.use('/api', healthRoutes);
 
+// Auth routes: /api/auth/*
+app.use('/api/auth', authRoutes);
+
 // User routes: /api/user/*
 app.use('/api/user', userRoutes);
 
 // Character routes: /api/characters/*
 app.use('/api/characters', characterRoutes);
 
+// Story draft routes: /api/story-draft
+app.use('/api/story-draft', storyDraftRoutes);
+
 // =============================================================================
 // ROUTES STILL IN server.js (to be migrated):
-// - /api/auth/* - Authentication
 // - /api/stories/* - Story CRUD and generation
 // - /api/admin/* - Admin panel
 // - /api/stripe/* - Payments

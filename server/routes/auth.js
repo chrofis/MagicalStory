@@ -1,0 +1,644 @@
+/**
+ * Auth Routes - /api/auth/*
+ *
+ * Authentication endpoints: register, login, password reset, email verification
+ */
+
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
+const { dbQuery, getPool } = require('../services/database');
+const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const { authLimiter, registerLimiter } = require('../middleware/rateLimit');
+const { log } = require('../utils/logger');
+
+// Firebase Admin SDK - import if available
+let firebaseAdmin = null;
+try {
+  firebaseAdmin = require('firebase-admin');
+} catch (e) {
+  console.warn('Firebase Admin SDK not available');
+}
+
+// Email service
+let emailService = null;
+try {
+  emailService = require('../../email');
+} catch (e) {
+  console.warn('Email service not available');
+}
+
+// Helper to check if using database mode
+const isDatabaseMode = () => {
+  return process.env.STORAGE_MODE === 'database' && getPool();
+};
+
+// Helper to log activity
+async function logActivity(userId, username, action, details) {
+  try {
+    if (isDatabaseMode()) {
+      await dbQuery(
+        'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)',
+        [userId, username, action, JSON.stringify(details)]
+      );
+    }
+  } catch (err) {
+    console.error('Failed to log activity:', err);
+  }
+}
+
+// POST /api/auth/register
+router.post('/register', registerLimiter, async (req, res) => {
+  try {
+    const { username, password, email } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    let newUser;
+
+    if (isDatabaseMode()) {
+      // Check if user already exists
+      const existing = await dbQuery('SELECT id FROM users WHERE username = $1', [username]);
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'This email is already registered' });
+      }
+
+      // Check if first user (will be admin)
+      const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
+      const isFirstUser = parseInt(userCount[0].count) === 0;
+
+      const userId = Date.now().toString();
+      const role = isFirstUser ? 'admin' : 'user';
+      const storyQuota = isFirstUser ? -1 : 2;
+      const initialCredits = isFirstUser ? -1 : 500;
+
+      await dbQuery(
+        'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+        [userId, username, username, hashedPassword, role, storyQuota, 0, initialCredits]
+      );
+
+      // Create initial credit transaction
+      if (initialCredits > 0) {
+        await dbQuery(
+          'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
+          [userId, initialCredits, initialCredits, 'initial', 'Welcome credits for new account']
+        );
+      }
+
+      newUser = { id: userId, username, email: username, role, storyQuota, storiesGenerated: 0, credits: initialCredits };
+
+      // Send verification email for non-admin users
+      if (role !== 'admin' && emailService) {
+        try {
+          const verificationToken = crypto.randomBytes(32).toString('hex');
+          const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+          await dbQuery(
+            'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
+            [verificationToken, verificationExpires, userId]
+          );
+
+          const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+          await emailService.sendEmailVerificationEmail(username, username, verifyUrl);
+          console.log(`📧 Verification email sent to: ${username}`);
+        } catch (emailErr) {
+          console.error('Failed to send verification email:', emailErr.message);
+        }
+      } else if (role === 'admin') {
+        await dbQuery('UPDATE users SET email_verified = TRUE WHERE id = $1', [userId]);
+      }
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    await logActivity(newUser.id, username, 'USER_REGISTERED', { email });
+
+    const token = jwt.sign(
+      { id: newUser.id, username: newUser.username, role: newUser.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log(`✅ User registered: ${newUser.username} (role: ${newUser.role})`);
+
+    res.json({
+      token,
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+        storyQuota: newUser.storyQuota,
+        storiesGenerated: newUser.storiesGenerated,
+        credits: newUser.credits
+      }
+    });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// POST /api/auth/login
+router.post('/login', authLimiter, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    let user;
+
+    if (isDatabaseMode()) {
+      const rows = await dbQuery('SELECT * FROM users WHERE username = $1', [username]);
+      if (rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      const dbUser = rows[0];
+      user = {
+        id: dbUser.id,
+        username: dbUser.username,
+        email: dbUser.email,
+        password: dbUser.password,
+        role: dbUser.role,
+        storyQuota: dbUser.story_quota,
+        storiesGenerated: dbUser.stories_generated,
+        credits: dbUser.credits !== undefined ? dbUser.credits : 500,
+        preferredLanguage: dbUser.preferred_language || 'English',
+        emailVerified: dbUser.email_verified !== false
+      };
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    await logActivity(user.id, username, 'USER_LOGIN', {});
+    await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log(`✅ User logged in: ${user.username} (role: ${user.role})`);
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
+        storiesGenerated: user.storiesGenerated || 0,
+        credits: user.credits != null ? user.credits : 500,
+        preferredLanguage: user.preferredLanguage || 'English',
+        emailVerified: user.emailVerified !== false
+      }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// GET /api/auth/me - Get current user info
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (isDatabaseMode()) {
+      const rows = await dbQuery('SELECT * FROM users WHERE id = $1', [userId]);
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const dbUser = rows[0];
+      res.json({
+        user: {
+          id: dbUser.id,
+          username: dbUser.username,
+          email: dbUser.email,
+          role: dbUser.role,
+          storyQuota: dbUser.story_quota !== undefined ? dbUser.story_quota : 2,
+          storiesGenerated: dbUser.stories_generated || 0,
+          credits: dbUser.credits != null ? dbUser.credits : 500,
+          preferredLanguage: dbUser.preferred_language || 'English',
+          emailVerified: dbUser.email_verified !== false
+        }
+      });
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+  } catch (err) {
+    console.error('Get user error:', err);
+    res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
+// POST /api/auth/firebase - Firebase authentication (Google, Apple)
+router.post('/firebase', authLimiter, async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ error: 'ID token required' });
+    }
+
+    if (!firebaseAdmin || !firebaseAdmin.apps.length) {
+      return res.status(500).json({ error: 'Firebase authentication not configured on server' });
+    }
+
+    const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
+    const { uid, email: firebaseEmail, name } = decodedToken;
+    const username = firebaseEmail || `firebase_${uid}`;
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Firebase auth requires database mode' });
+    }
+
+    const existingUser = await dbQuery('SELECT * FROM users WHERE username = $1', [username]);
+    let user;
+
+    if (existingUser.length > 0) {
+      user = existingUser[0];
+      await logActivity(user.id, username, 'USER_LOGIN_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
+    } else {
+      // Create new user
+      const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
+      const isFirstUser = parseInt(userCount[0].count) === 0;
+      const role = isFirstUser ? 'admin' : 'user';
+      const storyQuota = isFirstUser ? 999 : 2;
+      const initialCredits = isFirstUser ? -1 : 500;
+
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      const result = await dbQuery(
+        'INSERT INTO users (username, email, password, role, story_quota, stories_generated, credits) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [username, firebaseEmail, hashedPassword, role, storyQuota, 0, initialCredits]
+      );
+      user = result[0];
+
+      if (initialCredits > 0) {
+        await dbQuery(
+          'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
+          [user.id, initialCredits, initialCredits, 'initial', 'Welcome credits for new account']
+        );
+      }
+
+      await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
+      console.log(`✅ New Firebase user registered: ${username} (role: ${role})`);
+    }
+
+    await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log(`✅ Firebase user authenticated: ${username}`);
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email || firebaseEmail,
+        role: user.role,
+        storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
+        storiesGenerated: user.stories_generated || 0,
+        credits: user.credits != null ? user.credits : 500,
+        preferredLanguage: user.preferred_language || 'English',
+        emailVerified: true
+      }
+    });
+  } catch (err) {
+    console.error('Firebase auth error:', err);
+    if (err.code === 'auth/id-token-expired') {
+      return res.status(401).json({ error: 'Token expired. Please sign in again.' });
+    }
+    res.status(500).json({ error: 'Firebase authentication failed' });
+  }
+});
+
+// POST /api/auth/reset-password - Request password reset
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Password reset requires database mode' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT id, username, email FROM users WHERE email = $1 OR username = $1',
+      [email.toLowerCase()]
+    );
+
+    // Always return success to prevent email enumeration
+    if (result.rows.length === 0) {
+      return res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
+    }
+
+    const user = result.rows[0];
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await pool.query(
+      'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $3',
+      [resetToken, resetExpires, user.id]
+    );
+
+    if (emailService) {
+      const resetUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
+      await emailService.sendPasswordResetEmail(user.email, user.username, resetUrl);
+      console.log(`✅ Password reset email sent to ${user.email}`);
+    }
+
+    res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
+  } catch (err) {
+    console.error('Password reset error:', err);
+    res.status(500).json({ error: 'Failed to process password reset' });
+  }
+});
+
+// POST /api/auth/reset-password/confirm - Confirm password reset
+router.post('/reset-password/confirm', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Password reset requires database mode' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT id, email FROM users WHERE password_reset_token = $1 AND password_reset_expires > NOW()',
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    const user = result.rows[0];
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      'UPDATE users SET password = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2',
+      [hashedPassword, user.id]
+    );
+
+    res.json({ success: true, message: 'Password has been reset successfully' });
+  } catch (err) {
+    console.error('Password reset confirm error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// POST /api/auth/change-password - Change password (authenticated)
+router.post('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Password change requires database mode' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query('SELECT id, password, firebase_uid FROM users WHERE id = $1', [userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+
+    if (user.firebase_uid && !user.password) {
+      return res.status(400).json({ error: 'Cannot change password for Google accounts.' });
+    }
+
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!validPassword) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (err) {
+    console.error('Password change error:', err);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+// POST /api/auth/send-verification - Send email verification
+router.post('/send-verification', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Email verification requires database mode' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query('SELECT id, username, email, email_verified FROM users WHERE id = $1', [userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+
+    if (user.email_verified) {
+      return res.json({ success: true, message: 'Email already verified' });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
+      [verificationToken, verificationExpires, user.id]
+    );
+
+    if (emailService) {
+      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+      const emailResult = await emailService.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
+
+      if (!emailResult) {
+        return res.status(500).json({ error: 'Failed to send verification email. Please try again later.' });
+      }
+
+      console.log(`✅ Verification email sent to ${user.email}`);
+    }
+
+    res.json({ success: true, message: 'Verification email sent' });
+  } catch (err) {
+    console.error('Send verification error:', err);
+    res.status(500).json({ error: 'Failed to send verification email' });
+  }
+});
+
+// GET /api/auth/verify-email/:token - Verify email
+router.get('/verify-email/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Email verification requires database mode' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT id, email FROM users WHERE email_verification_token = $1 AND email_verification_expires > NOW()',
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired verification token' });
+    }
+
+    const user = result.rows[0];
+
+    await pool.query(
+      'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
+      [user.id]
+    );
+
+    res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
+  } catch (err) {
+    console.error('Verify email error:', err);
+    res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
+// POST /api/auth/change-email - Change email (requires password)
+router.post('/change-email', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { newEmail, password } = req.body;
+
+    if (!newEmail || !password) {
+      return res.status(400).json({ error: 'New email and current password are required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Email change requires database mode' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query('SELECT id, username, email, password FROM users WHERE id = $1', [userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const existingEmail = await pool.query(
+      'SELECT id FROM users WHERE (email = $1 OR username = $1) AND id != $2',
+      [newEmail.toLowerCase(), userId]
+    );
+
+    if (existingEmail.rows.length > 0) {
+      return res.status(400).json({ error: 'This email is already registered' });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      `UPDATE users SET email = $1, username = $1, email_verified = FALSE, email_verification_token = $2, email_verification_expires = $3 WHERE id = $4`,
+      [newEmail.toLowerCase(), verificationToken, verificationExpires, userId]
+    );
+
+    if (emailService) {
+      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+      await emailService.sendEmailVerificationEmail(newEmail, user.username, verifyUrl);
+    }
+
+    res.json({
+      success: true,
+      message: 'Email changed. Please verify your new email address.',
+      newEmail: newEmail.toLowerCase()
+    });
+  } catch (err) {
+    console.error('Change email error:', err);
+    res.status(500).json({ error: 'Failed to change email' });
+  }
+});
+
+// GET /api/auth/verification-status - Check email verification status
+router.get('/verification-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (isDatabaseMode()) {
+      const pool = getPool();
+      const result = await pool.query('SELECT email_verified FROM users WHERE id = $1', [userId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ emailVerified: result.rows[0].email_verified });
+    } else {
+      res.json({ emailVerified: true });
+    }
+  } catch (err) {
+    console.error('Verification status error:', err);
+    res.status(500).json({ error: 'Failed to check verification status' });
+  }
+});
+
+module.exports = router;
