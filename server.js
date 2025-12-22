@@ -1738,6 +1738,56 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   }
 });
 
+// Get current user info (for refreshing credits, etc.)
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let user;
+
+    if (STORAGE_MODE === 'database' && dbPool) {
+      const rows = await dbQuery('SELECT * FROM users WHERE id = $1', [userId]);
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      const dbUser = rows[0];
+      user = {
+        id: dbUser.id,
+        username: dbUser.username,
+        email: dbUser.email,
+        role: dbUser.role,
+        storyQuota: dbUser.story_quota,
+        storiesGenerated: dbUser.stories_generated,
+        credits: dbUser.credits !== undefined ? dbUser.credits : 500,
+        preferredLanguage: dbUser.preferred_language || 'English',
+        emailVerified: dbUser.email_verified !== false
+      };
+    } else {
+      const users = await readJSON(USERS_FILE);
+      user = users.find(u => u.id === userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+    }
+
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
+        storiesGenerated: user.storiesGenerated || 0,
+        credits: user.credits != null ? user.credits : 500,
+        preferredLanguage: user.preferredLanguage || 'English',
+        emailVerified: user.emailVerified !== false
+      }
+    });
+  } catch (err) {
+    console.error('Get user error:', err);
+    res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
 // Firebase Authentication (Google, Apple, etc.)
 app.post('/api/auth/firebase', authLimiter, async (req, res) => {
   try {
