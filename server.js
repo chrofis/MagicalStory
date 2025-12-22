@@ -6397,12 +6397,12 @@ async function generatePrintPdf(storyData) {
       const availableTextHeight = textAreaHeight - textMargin;
 
       const lineGap = -2;
-      let fontSize = 10;
+      let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
       doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
       let textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center', lineGap });
 
       // Auto-reduce font size if text doesn't fit
-      while (textHeight > availableTextHeight && fontSize > 4) {
+      while (textHeight > availableTextHeight && fontSize > 6) {
         fontSize -= 0.5;
         doc.fontSize(fontSize);
         textHeight = doc.heightOfString(cleanText, { width: availableTextWidth, align: 'center', lineGap });
@@ -6434,20 +6434,20 @@ async function generatePrintPdf(storyData) {
       const availableHeight = pageSize - (margin * 2);
 
       const lineGap = -2;
-      let fontSize = 9;
+      let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
       doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
       const safeAvailableHeight = availableHeight * 0.9;
       let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
 
       // Auto-reduce font size if text doesn't fit
-      while (textHeight > safeAvailableHeight && fontSize > 4) {
+      while (textHeight > safeAvailableHeight && fontSize > 6) {
         fontSize -= 0.5;
         doc.fontSize(fontSize);
         textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
       }
 
-      if (fontSize < 9) {
-        log.debug(`📄 [PRINT PDF] Page ${pageNumber}: Font reduced 9pt → ${fontSize}pt`);
+      if (fontSize < 13) {
+        log.debug(`📄 [PRINT PDF] Page ${pageNumber}: Font reduced 13pt → ${fontSize}pt`);
       }
 
       // Check if text still doesn't fit
