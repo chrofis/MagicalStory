@@ -49,8 +49,9 @@ const sharp = require('sharp');
 const email = require('./email');
 const admin = require('firebase-admin');
 
-// Import modular routes and database service
+// Import modular routes and services
 const { initializePool: initModularPool } = require('./server/services/database');
+const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -60,6 +61,7 @@ const storyDraftRoutes = require('./server/routes/storyDraft');
 const storiesRoutes = require('./server/routes/stories');
 const filesRoutes = require('./server/routes/files');
 const adminRoutes = require('./server/routes/admin');
+const photosRoutes = require('./server/routes/photos');
 
 // Initialize Firebase Admin SDK
 // Supports: FIREBASE_SERVICE_ACCOUNT_BASE64 (base64), FIREBASE_SERVICE_ACCOUNT (JSON string), or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
@@ -443,55 +445,7 @@ function buildCharacterPhysicalDescription(char) {
   return description;
 }
 
-// Load prompt templates from files
-const PROMPT_TEMPLATES = {};
-async function loadPromptTemplates() {
-  try {
-    const promptsDir = path.join(__dirname, 'prompts');
-    PROMPT_TEMPLATES.outline = await fs.readFile(path.join(promptsDir, 'outline.txt'), 'utf-8');
-    PROMPT_TEMPLATES.storyTextBatch = await fs.readFile(path.join(promptsDir, 'story-text-batch.txt'), 'utf-8');
-    PROMPT_TEMPLATES.storyTextSingle = await fs.readFile(path.join(promptsDir, 'story-text-single.txt'), 'utf-8');
-    PROMPT_TEMPLATES.sceneDescriptions = await fs.readFile(path.join(promptsDir, 'scene-descriptions.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationDe = await fs.readFile(path.join(promptsDir, 'image-generation-de.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationFr = await fs.readFile(path.join(promptsDir, 'image-generation-fr.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationSequential = await fs.readFile(path.join(promptsDir, 'image-generation-sequential.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationSequentialDe = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-de.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationSequentialFr = await fs.readFile(path.join(promptsDir, 'image-generation-sequential-fr.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageGenerationStorybook = await fs.readFile(path.join(promptsDir, 'image-generation-storybook.txt'), 'utf-8');
-    PROMPT_TEMPLATES.imageEvaluation = await fs.readFile(path.join(promptsDir, 'image-evaluation.txt'), 'utf-8');
-    PROMPT_TEMPLATES.coverImageEvaluation = await fs.readFile(path.join(promptsDir, 'cover-image-evaluation.txt'), 'utf-8');
-    PROMPT_TEMPLATES.frontCover = await fs.readFile(path.join(promptsDir, 'front-cover.txt'), 'utf-8');
-    PROMPT_TEMPLATES.initialPageWithDedication = await fs.readFile(path.join(promptsDir, 'initial-page-with-dedication.txt'), 'utf-8');
-    PROMPT_TEMPLATES.initialPageNoDedication = await fs.readFile(path.join(promptsDir, 'initial-page-no-dedication.txt'), 'utf-8');
-    PROMPT_TEMPLATES.backCover = await fs.readFile(path.join(promptsDir, 'back-cover.txt'), 'utf-8');
-    PROMPT_TEMPLATES.storybookCombined = await fs.readFile(path.join(promptsDir, 'storybook-combined.txt'), 'utf-8');
-    PROMPT_TEMPLATES.rewriteBlockedScene = await fs.readFile(path.join(promptsDir, 'rewrite-blocked-scene.txt'), 'utf-8');
-    // Character analysis prompt
-    PROMPT_TEMPLATES.characterAnalysis = await fs.readFile(path.join(promptsDir, 'character-analysis.txt'), 'utf-8');
-    // Avatar generation prompts
-    PROMPT_TEMPLATES.avatarSystemInstruction = await fs.readFile(path.join(promptsDir, 'avatar-system-instruction.txt'), 'utf-8');
-    PROMPT_TEMPLATES.avatarMainPrompt = await fs.readFile(path.join(promptsDir, 'avatar-main-prompt.txt'), 'utf-8');
-    PROMPT_TEMPLATES.avatarRetryPrompt = await fs.readFile(path.join(promptsDir, 'avatar-retry-prompt.txt'), 'utf-8');
-    // Visual Bible and editing prompts
-    PROMPT_TEMPLATES.visualBibleAnalysis = await fs.readFile(path.join(promptsDir, 'visual-bible-analysis.txt'), 'utf-8');
-    PROMPT_TEMPLATES.illustrationEdit = await fs.readFile(path.join(promptsDir, 'illustration-edit.txt'), 'utf-8');
-    log.info('📝 Prompt templates loaded from prompts/ folder');
-  } catch (err) {
-    log.error('❌ Failed to load prompt templates:', err.message);
-    log.error('   Falling back to hardcoded prompts');
-  }
-}
-
-// Helper function to replace placeholders in prompt templates
-function fillTemplate(template, replacements) {
-  if (!template) return '';
-  let result = template;
-  for (const [key, value] of Object.entries(replacements)) {
-    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
-  }
-  return result;
-}
+// NOTE: PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate imported from server/services/prompts.js
 
 const app = express();
 
@@ -1056,8 +1010,9 @@ app.use('/api/story-draft', storyDraftRoutes);
 app.use('/api/stories', storiesRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/photos', photosRoutes);
 
-console.log('📦 Modular routes loaded: config, health, auth, user, characters, story-draft, stories, files, admin');
+console.log('📦 Modular routes loaded: config, health, auth, user, characters, story-draft, stories, files, admin, photos');
 
 // SPA fallback - serve index.html for client-side routing (only if dist exists)
 // Must be placed AFTER API routes are defined
@@ -3173,32 +3128,7 @@ app.get('/api/print-provider/products', async (req, res) => {
   }
 });
 
-// Photo Analyzer Health Check
-app.get('/api/photo-analyzer-status', async (req, res) => {
-  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-
-  try {
-    const response = await fetch(`${photoAnalyzerUrl}/health`, {
-      signal: AbortSignal.timeout(5000)
-    });
-    const data = await response.json();
-
-    log.debug('📸 [HEALTH] Python service status:', data);
-
-    res.json({
-      status: 'ok',
-      pythonService: data,
-      url: photoAnalyzerUrl
-    });
-  } catch (err) {
-    log.error('📸 [HEALTH] Python service unavailable:', err.message);
-    res.status(503).json({
-      status: 'error',
-      error: err.message,
-      url: photoAnalyzerUrl
-    });
-  }
-});
+// NOTE: Photo analyzer status moved to server/routes/photos.js -> GET /api/photos/status
 
 // Photo Analysis Endpoint (calls Python DeepFace service)
 app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
