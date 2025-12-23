@@ -6501,10 +6501,11 @@ async function generatePrintPdf(storyData) {
       if (image && image.imageData) {
         try {
           const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          // Full-bleed image (no margin) - same as cover pages
+          // Full-bleed image (no margin) - fit to image area while maintaining aspect ratio
           doc.image(imageBuffer, 0, 0, {
-            width: pageSize,
-            height: imageHeight
+            fit: [pageSize, imageHeight],
+            align: 'center',
+            valign: 'center'
           });
         } catch (imgErr) {
           console.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
@@ -6581,15 +6582,16 @@ async function generatePrintPdf(storyData) {
       const yPosition = margin + (availableHeight - textHeight) / 2;
       doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
 
-      // Add image page if available
+      // Add image page if available (full-bleed, no margin)
       if (image && image.imageData) {
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         try {
           const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          // Full-bleed image (no margin) - same as cover pages
+          // Full-bleed image (no margin) - fit to page while maintaining aspect ratio
           doc.image(imageBuffer, 0, 0, {
-            width: pageSize,
-            height: pageSize
+            fit: [pageSize, pageSize],
+            align: 'center',
+            valign: 'center'
           });
         } catch (imgErr) {
           console.error('Error adding image to PDF:', imgErr);
