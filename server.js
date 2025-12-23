@@ -1206,11 +1206,10 @@ async function initializeDatabase() {
       UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;
     `);
 
-    // Mark Firebase/Google users as email verified (Google verifies emails)
+    // Mark ALL existing users as email verified (migration fix)
+    // Users who registered before email verification was required should be grandfathered in
     await dbPool.query(`
-      UPDATE users SET email_verified = TRUE
-      WHERE email_verified = FALSE
-      AND (email LIKE '%@gmail.com' OR email LIKE '%@googlemail.com' OR username LIKE 'firebase_%');
+      UPDATE users SET email_verified = TRUE WHERE email_verified = FALSE;
     `);
 
     await dbPool.query(`
