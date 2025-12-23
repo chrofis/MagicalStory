@@ -3549,15 +3549,16 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
         WHERE user_id = $1 AND transaction_type = 'purchase'
         ORDER BY created_at DESC
       `;
-      log.debug(`📦 [USER] Querying credit purchases for user_id: ${req.user.id} (type: ${typeof req.user.id})`);
+      console.log(`📦 [ORDERS DEBUG] Querying credit purchases for user_id: ${req.user.id}`);
       const creditRows = await dbQuery(creditPurchasesQuery, [req.user.id]);
-      log.debug(`📦 [USER] Credit query returned ${creditRows.length} rows`);
+      console.log(`📦 [ORDERS DEBUG] Credit query returned ${creditRows.length} rows`);
 
       // Debug: check all transactions for this user
-      if (creditRows.length === 0) {
-        const allTxQuery = `SELECT id, transaction_type, amount, created_at FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5`;
-        const allTx = await dbQuery(allTxQuery, [req.user.id]);
-        log.debug(`📦 [USER] All transactions for user: ${JSON.stringify(allTx.map(t => ({ id: t.id, type: t.transaction_type, amount: t.amount })))}`);
+      const allTxQuery = `SELECT id, transaction_type, amount FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5`;
+      const allTx = await dbQuery(allTxQuery, [req.user.id]);
+      console.log(`📦 [ORDERS DEBUG] All transactions: ${JSON.stringify(allTx.map(t => ({ id: t.id, type: t.transaction_type, amount: t.amount })))}`);
+      if (creditRows.length === 0 && allTx.length > 0) {
+        console.log(`📦 [ORDERS DEBUG] WARNING: Found ${allTx.length} transactions but none with type='purchase'`);
       }
 
       // Map credit purchases to order-like format
@@ -6673,15 +6674,15 @@ async function generateCombinedBookPdf(stories) {
   // Helper: Add story content pages (text + images)
   const addStoryContentPages = (storyData, storyPages) => {
     const isPictureBook = storyData.languageLevel === '1st-grade';
-    const margin = mmToPoints(5);
     const textMargin = 28;
+    const textMarginMm = mmToPoints(3); // For picture book text area
 
     if (isPictureBook) {
       // Picture Book: combined image + text on same page
       const imageHeight = pageSize * 0.85;
       const textAreaHeight = pageSize * 0.15;
-      const textWidth = pageSize - (margin * 2);
-      const availableTextHeight = textAreaHeight - margin;
+      const textWidth = pageSize - (textMarginMm * 2);
+      const availableTextHeight = textAreaHeight - textMarginMm;
       const lineGap = -2;
 
       storyPages.forEach((pageText, index) => {
@@ -6695,8 +6696,9 @@ async function generateCombinedBookPdf(stories) {
         if (image && image.imageData) {
           try {
             const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            doc.image(imageBuffer, margin, margin, {
-              fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+            // Full-bleed image (no margin) - fit to image area
+            doc.image(imageBuffer, 0, 0, {
+              fit: [pageSize, imageHeight],
               align: 'center',
               valign: 'center'
             });
@@ -6705,7 +6707,7 @@ async function generateCombinedBookPdf(stories) {
           }
         }
 
-        // Add text with vertical centering
+        // Add text with vertical centering (text still has margin)
         let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
         let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
@@ -6717,7 +6719,7 @@ async function generateCombinedBookPdf(stories) {
         }
 
         const textY = imageHeight + (availableTextHeight - textHeight) / 2;
-        doc.text(cleanText, margin, textY, { width: textWidth, align: 'center', lineGap });
+        doc.text(cleanText, textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
       });
     } else {
       // Standard: separate text and image pages
@@ -6730,7 +6732,7 @@ async function generateCombinedBookPdf(stories) {
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-        // Text page
+        // Text page (has margin for readability)
         doc.addPage({ size: [pageSize, pageSize], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
         totalStoryPages++;
 
@@ -6747,15 +6749,15 @@ async function generateCombinedBookPdf(stories) {
         const yPosition = textMargin + (availableHeight - textHeight) / 2;
         doc.text(cleanText, textMargin, yPosition, { width: availableWidth, align: 'left', lineGap });
 
-        // Image page
+        // Image page (full-bleed, no margin)
         if (image && image.imageData) {
           doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           totalStoryPages++;
           try {
             const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            const imgMargin = mmToPoints(5);
-            doc.image(imageBuffer, imgMargin, imgMargin, {
-              fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
+            // Full-bleed image (no margin)
+            doc.image(imageBuffer, 0, 0, {
+              fit: [pageSize, pageSize],
               align: 'center',
               valign: 'center'
             });
