@@ -9390,13 +9390,8 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
       log.debug(`📦 [BACKGROUND] Products matching "${coverType}": ${productsResult.rows.length}`);
 
       if (productsResult.rows.length > 0) {
-        // Find product matching the page count
+        // Find product matching the page count using min/max range
         const matchingProduct = productsResult.rows.find(p => {
-          if (p.available_page_counts) {
-            const availableCounts = JSON.parse(p.available_page_counts || '[]');
-            return availableCounts.includes(printPageCount);
-          }
-          // Fallback: check min/max range
           return printPageCount >= (p.min_pages || 0) && printPageCount <= (p.max_pages || 999);
         });
 
