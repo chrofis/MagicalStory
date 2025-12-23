@@ -11,6 +11,22 @@ const path = require('path');
 const { Pool } = require('pg');
 const pLimit = require('p-limit');
 const crypto = require('crypto');
+
+// LOG_LEVEL controls verbosity: error < warn < info < debug < trace
+// Defined early so it can be used throughout initialization
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3, trace: 4 };
+const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
+const CURRENT_LOG_LEVEL = LOG_LEVELS[LOG_LEVEL] !== undefined ? LOG_LEVELS[LOG_LEVEL] : LOG_LEVELS.info;
+
+const log = {
+  error: (msg, ...args) => console.error(`[ERROR] ${msg}`, ...args),
+  warn: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.warn && console.warn(`[WARN] ${msg}`, ...args),
+  info: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.info && console.log(msg, ...args),
+  debug: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args),
+  trace: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.trace && console.log(`[TRACE] ${msg}`, ...args),
+  verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args)
+};
+
 // Initialize BOTH Stripe clients - test for admins/developers, live for regular users
 const stripeTest = process.env.STRIPE_TEST_SECRET_KEY
   ? require('stripe')(process.env.STRIPE_TEST_SECRET_KEY)
@@ -128,26 +144,6 @@ const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
 
 // Image quality threshold - regenerate if score below this value (0-100 scale)
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
-
-// LOG_LEVEL controls verbosity: error < warn < info < debug < trace
-const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3, trace: 4 };
-const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
-const CURRENT_LOG_LEVEL = LOG_LEVELS[LOG_LEVEL] !== undefined ? LOG_LEVELS[LOG_LEVEL] : LOG_LEVELS.info;
-
-const log = {
-  // ERROR: Something failed, needs immediate attention
-  error: (msg, ...args) => log.error(`[ERROR] ${msg}`, ...args),
-  // WARN: Something unexpected but not broken
-  warn: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.warn && log.warn(`[WARN] ${msg}`, ...args),
-  // INFO: Key business events (startup, user actions, completions)
-  info: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.info && log.debug(msg, ...args),
-  // DEBUG: Developer troubleshooting (API calls, DB queries, flow tracing)
-  debug: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && log.debug(`[DEBUG] ${msg}`, ...args),
-  // TRACE: Super detailed (request/response bodies, token counts, internal state)
-  trace: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.trace && log.debug(`[TRACE] ${msg}`, ...args),
-  // Backwards compatibility alias
-  verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && log.debug(`[DEBUG] ${msg}`, ...args)
-};
 
 log.info(`📚 Story batch size: ${STORY_BATCH_SIZE === 0 ? 'DISABLED (generate all at once)' : STORY_BATCH_SIZE + ' pages per batch'}`);
 log.info(`📊 Log level: ${LOG_LEVEL.toUpperCase()}`);
