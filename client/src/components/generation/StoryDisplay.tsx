@@ -1429,8 +1429,8 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Back Cover Display */}
-      {coverImages && getCoverImageData(coverImages.backCover) && (
+      {/* Back Cover Display - only show when not generating (back cover is generated early but should appear last) */}
+      {coverImages && getCoverImageData(coverImages.backCover) && !isGenerating && (
         <div className="mt-8 max-w-2xl mx-auto">
           <p className="text-sm text-gray-500 text-center mb-2">
             {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
