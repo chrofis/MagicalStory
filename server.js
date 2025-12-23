@@ -1208,9 +1208,10 @@ async function initializeDatabase() {
 
     // Mark ALL existing users as email verified (migration fix)
     // Users who registered before email verification was required should be grandfathered in
-    await dbPool.query(`
-      UPDATE users SET email_verified = TRUE WHERE email_verified = FALSE;
+    const verifyResult = await dbPool.query(`
+      UPDATE users SET email_verified = TRUE WHERE email_verified = FALSE RETURNING id, username;
     `);
+    console.log(`[MIGRATION] Set email_verified=TRUE for ${verifyResult.rowCount} users:`, verifyResult.rows.map(r => r.username).join(', '));
 
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS config (

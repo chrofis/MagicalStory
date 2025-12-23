@@ -227,6 +227,9 @@ router.get('/me', authenticateToken, async (req, res) => {
       }
 
       const dbUser = rows[0];
+      console.log(`[AUTH /me] User ${dbUser.username}: email_verified in DB = ${dbUser.email_verified} (type: ${typeof dbUser.email_verified})`);
+      const emailVerifiedResult = dbUser.email_verified !== false;
+      console.log(`[AUTH /me] Returning emailVerified = ${emailVerifiedResult}`);
       res.json({
         user: {
           id: dbUser.id,
@@ -237,7 +240,7 @@ router.get('/me', authenticateToken, async (req, res) => {
           storiesGenerated: dbUser.stories_generated || 0,
           credits: dbUser.credits != null ? dbUser.credits : 500,
           preferredLanguage: dbUser.preferred_language || 'English',
-          emailVerified: dbUser.email_verified !== false
+          emailVerified: emailVerifiedResult
         }
       });
     } else {
