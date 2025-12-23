@@ -6943,11 +6943,11 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     // 3. STORY PAGES
     if (isPictureBook) {
       // Picture Book: combined image + text on same page
-      const margin = mmToPoints(5);
+      const textMarginMm = mmToPoints(3);
       const imageHeight = pageSize * 0.85;
       const textAreaHeight = pageSize * 0.15;
-      const textWidth = pageSize - (margin * 2);
-      const availableTextHeight = textAreaHeight - margin;
+      const textWidth = pageSize - (textMarginMm * 2);
+      const availableTextHeight = textAreaHeight - textMarginMm;
       const lineGap = -2;
 
       storyPages.forEach((pageText, index) => {
@@ -6960,8 +6960,9 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         if (image && image.imageData) {
           try {
             const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            doc.image(imageBuffer, margin, margin, {
-              fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+            // Full-bleed image (no margin)
+            doc.image(imageBuffer, 0, 0, {
+              fit: [pageSize, imageHeight],
               align: 'center',
               valign: 'center'
             });
@@ -6970,7 +6971,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
           }
         }
 
-        // Add text with vertical centering in text area
+        // Add text with vertical centering in text area (text has margin)
         let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
         doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
         let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
@@ -6982,7 +6983,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         }
 
         const textY = imageHeight + (availableTextHeight - textHeight) / 2;
-        doc.text(cleanText, margin, textY, { width: textWidth, align: 'center', lineGap });
+        doc.text(cleanText, textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
       });
     } else {
       // Standard: separate text and image pages
@@ -6996,7 +6997,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-        // Text page with vertical centering
+        // Text page with vertical centering (has margin)
         doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
 
         let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
@@ -7013,14 +7014,13 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         const yPosition = margin + (availableHeight - textHeight) / 2;
         doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
 
-        // Image page
+        // Image page (full-bleed, no margin)
         if (image && image.imageData) {
           doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           try {
             const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            const imgMargin = mmToPoints(5);
-            doc.image(imageBuffer, imgMargin, imgMargin, {
-              fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
+            doc.image(imageBuffer, 0, 0, {
+              fit: [pageSize, pageSize],
               align: 'center',
               valign: 'center'
             });
@@ -7215,7 +7215,6 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
       // PICTURE BOOK LAYOUT: Combined image on top (~90%), text below (~10%)
       storyPages.forEach((page, index) => {
         const pageNumber = index + 1;
-        const margin = mmToPoints(5);  // 5mm margin around page
 
         doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
@@ -7224,15 +7223,15 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         const textAreaHeight = pageSize * 0.15;
         const textAreaY = imageHeight;
 
-        // Add image at top if available
+        // Add image at top if available (full-bleed, no margin)
         const sceneImage = sceneImages.find(img => img.pageNumber === pageNumber);
         if (sceneImage && sceneImage.imageData) {
           try {
             const base64Data = sceneImage.imageData.replace(/^data:image\/\w+;base64,/, '');
             const imageBuffer = Buffer.from(base64Data, 'base64');
 
-            doc.image(imageBuffer, margin, margin, {
-              fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+            doc.image(imageBuffer, 0, 0, {
+              fit: [pageSize, imageHeight],
               align: 'center',
               valign: 'center'
             });
@@ -7242,7 +7241,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
         }
 
         // Add text in bottom portion (small area for Picture Book)
-        const textMargin = mmToPoints(3);  // Smaller margin for compact text area
+        const textMargin = mmToPoints(3);  // Margin for text area only
         const availableTextWidth = pageSize - (textMargin * 2);
         const availableTextHeight = textAreaHeight - (textMargin);
 
@@ -7359,7 +7358,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 
         doc.fillColor('#333333').text(page.text, marginLeftRight, yPosition, { width: availableWidth, align: 'left' });
 
-        // Add image page if available (square format)
+        // Add image page if available (full-bleed, no margin)
         const sceneImage = sceneImages.find(img => img.pageNumber === pageNumber);
         if (sceneImage && sceneImage.imageData) {
           doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -7367,10 +7366,9 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
           try {
             const base64Data = sceneImage.imageData.replace(/^data:image\/\w+;base64,/, '');
             const imageBuffer = Buffer.from(base64Data, 'base64');
-            const imgMargin = mmToPoints(5);
 
-            doc.image(imageBuffer, imgMargin, imgMargin, {
-              fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
+            doc.image(imageBuffer, 0, 0, {
+              fit: [pageSize, pageSize],
               align: 'center',
               valign: 'center'
             });
@@ -7534,15 +7532,15 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     // Helper: Add story content pages (text + images)
     const addStoryContentPages = (storyData, storyPages) => {
       const isPictureBook = storyData.languageLevel === '1st-grade';
-      const margin = mmToPoints(5);
       const textMargin = 28;
+      const textMarginMm = mmToPoints(3);
 
       if (isPictureBook) {
         // Picture Book: combined image + text on same page
         const imageHeight = pageSize * 0.85;
         const textAreaHeight = pageSize * 0.15;
-        const textWidth = pageSize - (margin * 2);
-        const availableTextHeight = textAreaHeight - margin;
+        const textWidth = pageSize - (textMarginMm * 2);
+        const availableTextHeight = textAreaHeight - textMarginMm;
         const lineGap = -2;
 
         storyPages.forEach((pageText, index) => {
@@ -7556,8 +7554,9 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
           if (image && image.imageData) {
             try {
               const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-              doc.image(imageBuffer, margin, margin, {
-                fit: [pageSize - (margin * 2), imageHeight - (margin * 2)],
+              // Full-bleed image (no margin)
+              doc.image(imageBuffer, 0, 0, {
+                fit: [pageSize, imageHeight],
                 align: 'center',
                 valign: 'center'
               });
@@ -7566,7 +7565,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
             }
           }
 
-          // Add text with vertical centering
+          // Add text with vertical centering (text has margin)
           let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
           doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
           let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
@@ -7578,7 +7577,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
           }
 
           const textY = imageHeight + (availableTextHeight - textHeight) / 2;
-          doc.text(cleanText, margin, textY, { width: textWidth, align: 'center', lineGap });
+          doc.text(cleanText, textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
         });
       } else {
         // Standard: separate text and image pages
@@ -7591,7 +7590,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
           const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
           const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-          // Text page
+          // Text page (has margin)
           doc.addPage({ size: [pageSize, pageSize], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
           totalStoryPages++;
 
@@ -7608,15 +7607,14 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
           const yPosition = textMargin + (availableHeight - textHeight) / 2;
           doc.text(cleanText, textMargin, yPosition, { width: availableWidth, align: 'left', lineGap });
 
-          // Image page
+          // Image page (full-bleed, no margin)
           if (image && image.imageData) {
             doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
             totalStoryPages++;
             try {
               const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-              const imgMargin = mmToPoints(5);
-              doc.image(imageBuffer, imgMargin, imgMargin, {
-                fit: [pageSize - (imgMargin * 2), pageSize - (imgMargin * 2)],
+              doc.image(imageBuffer, 0, 0, {
+                fit: [pageSize, pageSize],
                 align: 'center',
                 valign: 'center'
               });
