@@ -43,7 +43,7 @@ console.log(`💳 Stripe Configuration:`);
 console.log(`   - Test mode (for admins): ${stripeTest || stripeLegacy ? '✅ Configured' : '❌ Not configured'}`);
 console.log(`   - Live mode (for users): ${stripeLive ? '✅ Configured' : '❌ Not configured'}`);
 if (!stripeLive) {
-  console.log(`   ⚠️  Warning: STRIPE_LIVE_SECRET_KEY not set - all users will use test mode`);
+  log.warn(`   ⚠️  Warning: STRIPE_LIVE_SECRET_KEY not set - all users will use test mode`);
 }
 const sharp = require('sharp');
 const email = require('./email');
@@ -74,9 +74,9 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
       credential: admin.credential.cert(serviceAccount)
     });
     firebaseInitialized = true;
-    console.log('🔥 Firebase Admin SDK initialized from base64 env var');
+    log.debug('🔥 Firebase Admin SDK initialized from base64 env var');
   } catch (err) {
-    console.warn('⚠️  Firebase Admin SDK initialization from base64 failed:', err.message);
+    log.warn('⚠️  Firebase Admin SDK initialization from base64 failed:', err.message);
   }
 } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
@@ -89,9 +89,9 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
       credential: admin.credential.cert(serviceAccount)
     });
     firebaseInitialized = true;
-    console.log('🔥 Firebase Admin SDK initialized from JSON env var');
+    log.debug('🔥 Firebase Admin SDK initialized from JSON env var');
   } catch (err) {
-    console.warn('⚠️  Firebase Admin SDK initialization failed:', err.message);
+    log.warn('⚠️  Firebase Admin SDK initialization failed:', err.message);
   }
 } else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
   try {
@@ -100,18 +100,18 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
       credential: admin.credential.cert(serviceAccount)
     });
     firebaseInitialized = true;
-    console.log('🔥 Firebase Admin SDK initialized from file:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+    log.debug('🔥 Firebase Admin SDK initialized from file:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
   } catch (err) {
-    console.warn('⚠️  Firebase Admin SDK initialization from file failed:', err.message);
+    log.warn('⚠️  Firebase Admin SDK initialization from file failed:', err.message);
   }
 } else {
-  console.warn('⚠️  FIREBASE_SERVICE_ACCOUNT not configured - Firebase auth disabled');
-  console.warn('⚠️  Available env vars with FIREBASE:', Object.keys(process.env).filter(k => k.includes('FIREBASE')));
+  log.warn('⚠️  FIREBASE_SERVICE_ACCOUNT not configured - Firebase auth disabled');
+  log.warn('⚠️  Available env vars with FIREBASE:', Object.keys(process.env).filter(k => k.includes('FIREBASE')));
 }
 
 // Image cache for storing generated images (hash of prompt + photos → image data)
 const imageCache = new Map();
-console.log('💾 Image cache initialized');
+log.debug('💾 Image cache initialized');
 
 // Story Generation Batch Size Configuration
 // Set to 0 or a number >= total pages to generate entire story in one API call
@@ -134,17 +134,17 @@ const CURRENT_LOG_LEVEL = LOG_LEVELS[LOG_LEVEL] !== undefined ? LOG_LEVELS[LOG_L
 
 const log = {
   // ERROR: Something failed, needs immediate attention
-  error: (msg, ...args) => console.error(`[ERROR] ${msg}`, ...args),
+  error: (msg, ...args) => log.error(`[ERROR] ${msg}`, ...args),
   // WARN: Something unexpected but not broken
-  warn: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.warn && console.warn(`[WARN] ${msg}`, ...args),
+  warn: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.warn && log.warn(`[WARN] ${msg}`, ...args),
   // INFO: Key business events (startup, user actions, completions)
-  info: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.info && console.log(msg, ...args),
+  info: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.info && log.debug(msg, ...args),
   // DEBUG: Developer troubleshooting (API calls, DB queries, flow tracing)
-  debug: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args),
+  debug: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && log.debug(`[DEBUG] ${msg}`, ...args),
   // TRACE: Super detailed (request/response bodies, token counts, internal state)
-  trace: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.trace && console.log(`[TRACE] ${msg}`, ...args),
+  trace: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.trace && log.debug(`[TRACE] ${msg}`, ...args),
   // Backwards compatibility alias
-  verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args)
+  verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && log.debug(`[DEBUG] ${msg}`, ...args)
 };
 
 log.info(`📚 Story batch size: ${STORY_BATCH_SIZE === 0 ? 'DISABLED (generate all at once)' : STORY_BATCH_SIZE + ' pages per batch'}`);
@@ -507,10 +507,10 @@ const DATABASE_URL = process.env.DATABASE_URL;
 
 // Debug logging
 console.log('🔍 Environment Check:');
-console.log(`  DATABASE_URL: ${DATABASE_URL ? 'SET (length: ' + DATABASE_URL.length + ')' : 'NOT SET'}`);
-console.log(`  STORAGE_MODE: ${process.env.STORAGE_MODE}`);
-console.log(`  GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'SET (length: ' + process.env.GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
-console.log(`  ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'SET (length: ' + process.env.ANTHROPIC_API_KEY.length + ')' : 'NOT SET'}`);
+log.debug(`  DATABASE_URL: ${DATABASE_URL ? 'SET (length: ' + DATABASE_URL.length + ')' : 'NOT SET'}`);
+log.debug(`  STORAGE_MODE: ${process.env.STORAGE_MODE}`);
+log.debug(`  GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'SET (length: ' + process.env.GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
+log.debug(`  ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'SET (length: ' + process.env.ANTHROPIC_API_KEY.length + ')' : 'NOT SET'}`);
 
 // Default to file mode for safety - only use database if explicitly configured
 const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' && DATABASE_URL)
@@ -531,11 +531,11 @@ if (STORAGE_MODE === 'database') {
       rejectUnauthorized: false
     }
   });
-  console.log(`✓ PostgreSQL pool created (Railway)`);
+  log.debug(`✓ PostgreSQL pool created (Railway)`);
 
   // Initialize the modular database service pool as well
   initModularPool();
-  console.log(`✓ Modular database pool initialized`);
+  log.debug(`✓ Modular database pool initialized`);
 }
 
 // Middleware
@@ -557,7 +557,7 @@ const corsOptions = {
     if (origin.includes('railway.app') || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.warn('⚠️  CORS blocked origin:', origin);
+      log.warn('⚠️  CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -613,8 +613,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   const liveWebhookSecret = process.env.STRIPE_LIVE_WEBHOOK_SECRET;
 
   if (!testWebhookSecret && !liveWebhookSecret) {
-    console.error('❌ [STRIPE WEBHOOK] No webhook secrets configured!');
-    console.error('   Please add STRIPE_TEST_WEBHOOK_SECRET and/or STRIPE_LIVE_WEBHOOK_SECRET');
+    log.error('❌ [STRIPE WEBHOOK] No webhook secrets configured!');
+    log.error('   Please add STRIPE_TEST_WEBHOOK_SECRET and/or STRIPE_LIVE_WEBHOOK_SECRET');
     return res.status(500).json({ error: 'Webhook secret not configured' });
   }
 
@@ -642,20 +642,20 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       isTestPayment = true;
       console.log('✅ [STRIPE WEBHOOK] Verified with TEST webhook secret');
     } catch (err) {
-      console.error('❌ [STRIPE WEBHOOK] Signature verification failed with both secrets:', err.message);
+      log.error('❌ [STRIPE WEBHOOK] Signature verification failed with both secrets:', err.message);
       return res.status(400).json({ error: 'Invalid signature' });
     }
   }
 
   if (!event) {
-    console.error('❌ [STRIPE WEBHOOK] Could not verify webhook signature');
+    log.error('❌ [STRIPE WEBHOOK] Could not verify webhook signature');
     return res.status(400).json({ error: 'Invalid signature' });
   }
 
   // Now handle the verified event
   try {
-    console.log('💳 [STRIPE WEBHOOK] Received verified event:', event.type);
-    console.log(`   Payment type: ${isTestPayment ? 'TEST (admin/developer)' : 'LIVE (real payment)'}`);
+    log.debug('💳 [STRIPE WEBHOOK] Received verified event:', event.type);
+    log.debug(`   Payment type: ${isTestPayment ? 'TEST (admin/developer)' : 'LIVE (real payment)'}`);
 
     // Handle the checkout.session.completed event
     if (event.type === 'checkout.session.completed') {
@@ -679,20 +679,20 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           address: fullSession.shipping?.address || fullSession.customer_details?.address || {}
         };
 
-        console.log('📦 [STRIPE WEBHOOK] Customer Information:');
-        console.log('   Name:', customerInfo.name);
+        log.debug('📦 [STRIPE WEBHOOK] Customer Information:');
+        log.debug('   Name:', customerInfo.name);
         console.log('   Email:', customerInfo.email);
-        console.log('   Address:', JSON.stringify(customerInfo.address, null, 2));
-        console.log('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
+        log.debug('   Address:', JSON.stringify(customerInfo.address, null, 2));
+        log.debug('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
 
         // Check if this is a credits purchase
         if (fullSession.metadata?.type === 'credits') {
-          console.log('💰 [STRIPE WEBHOOK] Processing credits purchase');
+          log.debug('💰 [STRIPE WEBHOOK] Processing credits purchase');
           const userId = parseInt(fullSession.metadata?.userId);
           const creditsToAdd = parseInt(fullSession.metadata?.credits) || 100;
 
           if (!userId || isNaN(userId)) {
-            console.error('❌ [STRIPE WEBHOOK] Invalid userId for credits purchase:', fullSession.metadata);
+            log.error('❌ [STRIPE WEBHOOK] Invalid userId for credits purchase:', fullSession.metadata);
             throw new Error('Invalid userId in credits purchase metadata');
           }
 
@@ -711,7 +711,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, userId]);
 
             console.log(`✅ [STRIPE WEBHOOK] Added ${creditsToAdd} credits to user ${userId}`);
-            console.log(`   Previous balance: ${currentCredits}, New balance: ${newCredits}`);
+            log.debug(`   Previous balance: ${currentCredits}, New balance: ${newCredits}`);
 
             // Create transaction record
             await dbPool.query(`
@@ -719,7 +719,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               VALUES ($1, $2, $3, 'purchase', $4, $5)
             `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe`]);
 
-            console.log('💾 [STRIPE WEBHOOK] Credits transaction recorded');
+            log.debug('💾 [STRIPE WEBHOOK] Credits transaction recorded');
           }
 
           res.json({ received: true, type: 'credits' });
@@ -734,7 +734,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
           // Validate required metadata
           if (!userId || isNaN(userId)) {
-            console.error('❌ [STRIPE WEBHOOK] Invalid or missing userId in metadata:', fullSession.metadata);
+            log.error('❌ [STRIPE WEBHOOK] Invalid or missing userId in metadata:', fullSession.metadata);
             throw new Error('Invalid userId in session metadata');
           }
 
@@ -744,7 +744,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             try {
               allStoryIds = JSON.parse(fullSession.metadata.storyIds);
             } catch (e) {
-              console.error('❌ [STRIPE WEBHOOK] Failed to parse storyIds:', e);
+              log.error('❌ [STRIPE WEBHOOK] Failed to parse storyIds:', e);
             }
           }
           // Fallback to legacy single storyId
@@ -756,11 +756,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           }
 
           if (allStoryIds.length === 0) {
-            console.error('❌ [STRIPE WEBHOOK] No story IDs in metadata:', fullSession.metadata);
+            log.error('❌ [STRIPE WEBHOOK] No story IDs in metadata:', fullSession.metadata);
             throw new Error('Missing story IDs in session metadata - cannot process book order');
           }
 
-          console.log(`📚 [STRIPE WEBHOOK] Processing order with ${allStoryIds.length} stories:`, allStoryIds);
+          log.debug(`📚 [STRIPE WEBHOOK] Processing order with ${allStoryIds.length} stories:`, allStoryIds);
 
           // Validate all stories exist
           const validatedStoryIds = [];
@@ -769,13 +769,13 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             if (result.rows.length > 0) {
               validatedStoryIds.push(sid);
             } else {
-              console.warn(`⚠️ [STRIPE WEBHOOK] Story not found: ${sid}, skipping`);
+              log.warn(`⚠️ [STRIPE WEBHOOK] Story not found: ${sid}, skipping`);
             }
           }
 
           if (validatedStoryIds.length === 0) {
-            console.error('❌ [STRIPE WEBHOOK] No valid stories found for IDs:', allStoryIds);
-            console.error('❌ [STRIPE WEBHOOK] User ID:', userId);
+            log.error('❌ [STRIPE WEBHOOK] No valid stories found for IDs:', allStoryIds);
+            log.error('❌ [STRIPE WEBHOOK] User ID:', userId);
             throw new Error('No valid stories found');
           }
 
@@ -799,20 +799,20 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             fullSession.amount_total, fullSession.currency, fullSession.payment_status
           ]);
 
-          console.log('💾 [STRIPE WEBHOOK] Order saved to database');
-          console.log('   User ID:', userId);
-          console.log('   Story IDs:', validatedStoryIds.join(', '));
+          log.debug('💾 [STRIPE WEBHOOK] Order saved to database');
+          log.debug('   User ID:', userId);
+          log.debug('   Story IDs:', validatedStoryIds.join(', '));
 
           // Trigger background PDF generation and print provider order (don't await - fire and forget)
           // Pass isTestPayment so Gelato knows whether to create draft or real order
           // Now passing array of storyIds for combined book generation
           processBookOrder(fullSession.id, userId, validatedStoryIds, customerInfo, address, isTestPayment, orderCoverType).catch(async (err) => {
-            console.error('❌ [BACKGROUND] Error processing book order:', err);
-            console.error('   Error stack:', err.stack);
-            console.error('   Session ID:', fullSession.id);
-            console.error('   User ID:', userId);
-            console.error('   Story IDs:', validatedStoryIds.join(', '));
-            console.error('   CRITICAL: Customer paid but book order failed! Check database for stripe_session_id:', fullSession.id);
+            log.error('❌ [BACKGROUND] Error processing book order:', err);
+            log.error('   Error stack:', err.stack);
+            log.error('   Session ID:', fullSession.id);
+            log.error('   User ID:', userId);
+            log.error('   Story IDs:', validatedStoryIds.join(', '));
+            log.error('   CRITICAL: Customer paid but book order failed! Check database for stripe_session_id:', fullSession.id);
 
             // Send critical admin alert
             await email.sendAdminOrderFailureAlert(
@@ -845,7 +845,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               }
             }
           } catch (e) {
-            console.warn('⚠️ Could not get language for order email:', e.message);
+            log.warn('⚠️ Could not get language for order email:', e.message);
           }
           email.sendOrderConfirmationEmail(
             customerInfo.email,
@@ -857,28 +857,28 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               shippingAddress: address
             },
             orderEmailLanguage
-          ).catch(err => console.error('❌ Failed to send order confirmation email:', err));
+          ).catch(err => log.error('❌ Failed to send order confirmation email:', err));
 
           console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
         } else {
-          console.warn('⚠️  [STRIPE WEBHOOK] Payment received but STORAGE_MODE is not "database" - order not processed!');
-          console.warn('   Current STORAGE_MODE:', STORAGE_MODE);
-          console.warn('   Session ID:', fullSession.id);
-          console.warn('   Amount:', fullSession.amount_total, fullSession.currency);
-          console.warn('   This payment succeeded but the customer will NOT receive their book!');
+          log.warn('⚠️  [STRIPE WEBHOOK] Payment received but STORAGE_MODE is not "database" - order not processed!');
+          log.warn('   Current STORAGE_MODE:', STORAGE_MODE);
+          log.warn('   Session ID:', fullSession.id);
+          log.warn('   Amount:', fullSession.amount_total, fullSession.currency);
+          log.warn('   This payment succeeded but the customer will NOT receive their book!');
         }
 
       } catch (retrieveError) {
-        console.error('❌ [STRIPE WEBHOOK] Error retrieving/storing session details:', retrieveError);
-        console.error('   Error stack:', retrieveError.stack);
-        console.error('   Session ID:', session.id);
-        console.error('   This payment succeeded but order processing failed!');
+        log.error('❌ [STRIPE WEBHOOK] Error retrieving/storing session details:', retrieveError);
+        log.error('   Error stack:', retrieveError.stack);
+        log.error('   Session ID:', session.id);
+        log.error('   This payment succeeded but order processing failed!');
       }
     }
 
     res.json({ received: true });
   } catch (err) {
-    console.error('❌ [STRIPE WEBHOOK] Error processing webhook:', err);
+    log.error('❌ [STRIPE WEBHOOK] Error processing webhook:', err);
     res.status(400).json({ error: 'Webhook error' });
   }
 });
@@ -892,16 +892,16 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
     const receivedSecret = req.headers['x-gelato-webhook-secret'];
 
     if (webhookSecret && receivedSecret !== webhookSecret) {
-      console.warn('⚠️ [GELATO WEBHOOK] Invalid or missing authorization header');
+      log.warn('⚠️ [GELATO WEBHOOK] Invalid or missing authorization header');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const event = req.body;
 
-    console.log('📦 [GELATO WEBHOOK] Received event:', event.event);
-    console.log('   Order ID:', event.orderId);
-    console.log('   Order Reference:', event.orderReferenceId);
-    console.log('   Status:', event.fulfillmentStatus);
+    log.debug('📦 [GELATO WEBHOOK] Received event:', event.event);
+    log.debug('   Order ID:', event.orderId);
+    log.debug('   Order Reference:', event.orderReferenceId);
+    log.debug('   Status:', event.fulfillmentStatus);
 
     // Handle different event types
     if (event.event === 'order_status_updated') {
@@ -914,14 +914,14 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
       );
 
       if (orderResult.rows.length === 0) {
-        console.warn('⚠️ [GELATO WEBHOOK] Order not found for Gelato ID:', orderId);
+        log.warn('⚠️ [GELATO WEBHOOK] Order not found for Gelato ID:', orderId);
         // Still return 200 to prevent retries
         return res.status(200).json({ received: true, warning: 'Order not found' });
       }
 
       const order = orderResult.rows[0];
-      console.log('   Found order ID:', order.id);
-      console.log('   Customer:', order.customer_email);
+      log.debug('   Found order ID:', order.id);
+      log.debug('   Customer:', order.customer_email);
 
       // Map Gelato status to our status
       const statusMap = {
@@ -945,8 +945,8 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
         const fulfillment = items[0].fulfillments[0];
         trackingNumber = fulfillment.trackingCode || null;
         trackingUrl = fulfillment.trackingUrl || null;
-        console.log('   Tracking:', trackingNumber);
-        console.log('   Tracking URL:', trackingUrl);
+        log.debug('   Tracking:', trackingNumber);
+        log.debug('   Tracking URL:', trackingUrl);
       }
 
       // Update order status in database
@@ -1000,7 +1000,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
           );
           console.log('📧 [GELATO WEBHOOK] Shipped notification sent to:', order.customer_email);
         } catch (emailErr) {
-          console.error('❌ [GELATO WEBHOOK] Failed to send shipped email:', emailErr.message);
+          log.error('❌ [GELATO WEBHOOK] Failed to send shipped email:', emailErr.message);
         }
       }
 
@@ -1017,7 +1017,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
     res.status(200).json({ received: true });
 
   } catch (err) {
-    console.error('❌ [GELATO WEBHOOK] Error processing webhook:', err);
+    log.error('❌ [GELATO WEBHOOK] Error processing webhook:', err);
     // Still return 200 to prevent infinite retries
     res.status(200).json({ received: true, error: err.message });
   }
@@ -1034,11 +1034,11 @@ const hasDistFolder = require('fs').existsSync(distPath);
 if (hasDistFolder) {
   // Serve the built React app from dist/
   app.use(express.static(distPath));
-  console.log('📦 Serving built React app from dist/');
+  log.debug('📦 Serving built React app from dist/');
 } else {
   // Fallback to legacy: serve files from project root (index.html with Babel)
   app.use(express.static(__dirname));
-  console.log('📦 Serving legacy HTML files (no dist/ folder found)');
+  log.debug('📦 Serving legacy HTML files (no dist/ folder found)');
 }
 
 // Always serve images folder
@@ -1078,7 +1078,7 @@ async function initializeDataFiles() {
   try {
     await fs.mkdir(dataDir, { recursive: true });
   } catch (err) {
-    console.log('Data directory already exists');
+    log.debug('Data directory already exists');
   }
 
   // Initialize users.json
@@ -1140,7 +1140,7 @@ async function dbQuery(sql, params = []) {
 // Initialize database tables
 async function initializeDatabase() {
   if (!dbPool) {
-    console.log('⚠️  No database pool - skipping database initialization');
+    log.warn('⚠️  No database pool - skipping database initialization');
     return;
   }
 
@@ -1442,14 +1442,14 @@ async function initializeDatabase() {
       const { runMigrations } = require('./run-migrations');
       await runMigrations(dbPool, 'postgresql');
     } catch (err) {
-      console.error('⚠️  Migration warning:', err.message);
+      log.error('⚠️  Migration warning:', err.message);
       // Don't fail initialization if migrations fail
     }
 
   } catch (err) {
-    console.error('❌ Database initialization error:', err.message);
-    console.error('Error code:', err.code);
-    if (err.sql) console.error('SQL:', err.sql);
+    log.error('❌ Database initialization error:', err.message);
+    log.error('Error code:', err.code);
+    if (err.sql) log.error('SQL:', err.sql);
     throw err; // Re-throw to be caught by initialization
   }
 }
@@ -1460,7 +1460,7 @@ async function readJSON(filePath) {
     const data = await fs.readFile(filePath, 'utf8');
     return JSON.parse(data);
   } catch (err) {
-    console.error(`Error reading ${filePath}:`, err);
+    log.error(`Error reading ${filePath}:`, err);
     return [];
   }
 }
@@ -1476,7 +1476,7 @@ async function logActivity(userId, username, action, details) {
       const insertQuery = 'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)';
       await dbQuery(insertQuery, [userId, username, action, JSON.stringify(details)]);
     } catch (err) {
-      console.error('Log error:', err);
+      log.error('Log error:', err);
     }
   } else {
     const logs = await readJSON(LOGS_FILE);
@@ -1568,791 +1568,6 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// =============================================================================
-// AUTH ROUTES - MIGRATED TO server/routes/auth.js
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-app.post('/api/auth/register', registerLimiter, async (req, res) => {
-  try {
-    const { username, password, email } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    let newUser;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      // Check if user already exists
-      const existingQuery = 'SELECT id FROM users WHERE username = $1';
-      const existing = await dbQuery(existingQuery, [username]);
-
-      if (existing.length > 0) {
-        return res.status(400).json({ error: 'This email is already registered' });
-      }
-
-      // Check if this is the first user (will be admin)
-      const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
-      const isFirstUser = userCount[0].count === 0;
-
-      const userId = Date.now().toString();
-      const role = isFirstUser ? 'admin' : 'user';
-      const storyQuota = isFirstUser ? -1 : 2;
-      const initialCredits = isFirstUser ? -1 : 500;
-
-      const insertQuery = 'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
-      await dbQuery(insertQuery, [userId, username, username, hashedPassword, role, storyQuota, 0, initialCredits]);
-
-      // Create initial credit transaction record
-      if (initialCredits > 0) {
-        await dbQuery(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [userId, initialCredits, initialCredits, 'initial', 'Welcome credits for new account']
-        );
-      }
-
-      newUser = {
-        id: userId,
-        username,
-        email: username,
-        role,
-        storyQuota,
-        storiesGenerated: 0,
-        credits: initialCredits
-      };
-    } else {
-      // File mode
-      const users = await readJSON(USERS_FILE);
-
-      // Check if user already exists
-      if (users.find(u => u.username === username)) {
-        return res.status(400).json({ error: 'This email is already registered' });
-      }
-
-      const isFirstUser = users.length === 0;
-      newUser = {
-        id: Date.now().toString(),
-        username,
-        email: username,
-        password: hashedPassword,
-        createdAt: new Date().toISOString(),
-        role: isFirstUser ? 'admin' : 'user',
-        storyQuota: isFirstUser ? -1 : 2,
-        storiesGenerated: 0,
-        credits: isFirstUser ? -1 : 500
-      };
-
-      users.push(newUser);
-      await writeJSON(USERS_FILE, users);
-    }
-
-    await logActivity(newUser.id, username, 'USER_REGISTERED', { email });
-
-    // Send verification email for new users (non-admin)
-    let emailVerified = false;
-    if (STORAGE_MODE === 'database' && newUser.role !== 'admin') {
-      try {
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-        await dbQuery(
-          'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
-          [verificationToken, verificationExpires, newUser.id]
-        );
-
-        const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-        await email.sendEmailVerificationEmail(username, username, verifyUrl);
-        console.log(`📧 Verification email sent to: ${username}`);
-      } catch (emailErr) {
-        console.error('Failed to send verification email:', emailErr.message);
-        // Don't fail registration if email fails - user can request resend
-      }
-    } else if (newUser.role === 'admin') {
-      // First user (admin) is auto-verified
-      emailVerified = true;
-      if (STORAGE_MODE === 'database') {
-        await dbQuery('UPDATE users SET email_verified = TRUE WHERE id = $1', [newUser.id]);
-      }
-    }
-
-    // Generate token
-    const token = jwt.sign(
-      { id: newUser.id, username: newUser.username, role: newUser.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    console.log(`✅ User registered: ${newUser.username} (role: ${newUser.role})`);
-
-    res.json({
-      token,
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email,
-        role: newUser.role,
-        storyQuota: newUser.storyQuota,
-        storiesGenerated: newUser.storiesGenerated,
-        credits: newUser.credits
-      }
-    });
-  } catch (err) {
-    console.error('Registration error:', err);
-    res.status(500).json({ error: 'Registration failed' });
-  }
-});
-
-app.post('/api/auth/login', authLimiter, async (req, res) => {
-  try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
-    }
-
-    let user;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const selectQuery = 'SELECT * FROM users WHERE username = $1';
-      const rows = await dbQuery(selectQuery, [username]);
-
-      if (rows.length === 0) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      const dbUser = rows[0];
-      user = {
-        id: dbUser.id,
-        username: dbUser.username,
-        email: dbUser.email,
-        password: dbUser.password,
-        role: dbUser.role,
-        storyQuota: dbUser.story_quota,
-        storiesGenerated: dbUser.stories_generated,
-        credits: dbUser.credits !== undefined ? dbUser.credits : 500,
-        preferredLanguage: dbUser.preferred_language || 'English',
-        emailVerified: dbUser.email_verified !== false
-      };
-    } else {
-      // File mode
-      const users = await readJSON(USERS_FILE);
-      user = users.find(u => u.username === username);
-
-      if (!user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-    }
-
-    // Verify password
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    await logActivity(user.id, username, 'USER_LOGIN', {});
-
-    // Update last_login timestamp
-    if (STORAGE_MODE === 'database' && dbPool) {
-      await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
-    }
-
-    // Generate token
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    console.log(`✅ User logged in: ${user.username} (role: ${user.role})`);
-    log.warn(`TEST LOG - If you see this, logs are working!`);
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
-        storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits != null ? user.credits : 500,
-        preferredLanguage: user.preferredLanguage || 'English',
-        emailVerified: user.emailVerified !== false
-      }
-    });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
-
-// Get current user info (for refreshing credits, etc.)
-app.get('/api/auth/me', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    let user;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      const rows = await dbQuery('SELECT * FROM users WHERE id = $1', [userId]);
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      const dbUser = rows[0];
-      user = {
-        id: dbUser.id,
-        username: dbUser.username,
-        email: dbUser.email,
-        role: dbUser.role,
-        storyQuota: dbUser.story_quota,
-        storiesGenerated: dbUser.stories_generated,
-        credits: dbUser.credits !== undefined ? dbUser.credits : 500,
-        preferredLanguage: dbUser.preferred_language || 'English',
-        emailVerified: dbUser.email_verified !== false
-      };
-    } else {
-      const users = await readJSON(USERS_FILE);
-      user = users.find(u => u.id === userId);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-    }
-
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
-        storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits != null ? user.credits : 500,
-        preferredLanguage: user.preferredLanguage || 'English',
-        emailVerified: user.emailVerified !== false
-      }
-    });
-  } catch (err) {
-    console.error('Get user error:', err);
-    res.status(500).json({ error: 'Failed to get user info' });
-  }
-});
-
-// Firebase Authentication (Google, Apple, etc.)
-app.post('/api/auth/firebase', authLimiter, async (req, res) => {
-  try {
-    const { idToken } = req.body;
-
-    if (!idToken) {
-      return res.status(400).json({ error: 'ID token required' });
-    }
-
-    // Check if Firebase Admin is initialized
-    if (!admin.apps.length) {
-      return res.status(500).json({ error: 'Firebase authentication not configured on server' });
-    }
-
-    // Verify the Firebase ID token
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    const { uid, email: firebaseEmail, name, picture } = decodedToken;
-
-    // Use email as username, fall back to uid if no email
-    const username = firebaseEmail || `firebase_${uid}`;
-    const displayName = name || username.split('@')[0];
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Check if user exists
-      const existingUser = await dbQuery('SELECT * FROM users WHERE username = $1', [username]);
-
-      let user;
-      if (existingUser.length > 0) {
-        // User exists - log them in
-        user = existingUser[0];
-        await logActivity(user.id, username, 'USER_LOGIN_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
-      } else {
-        // Create new user
-        const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
-        const isFirstUser = parseInt(userCount[0].count) === 0;
-        const role = isFirstUser ? 'admin' : 'user';
-        const storyQuota = isFirstUser ? 999 : 2;
-        const initialCredits = isFirstUser ? -1 : 500;
-
-        // Generate a random password (user won't need it - they use Firebase)
-        const randomPassword = crypto.randomBytes(32).toString('hex');
-        const hashedPassword = await bcrypt.hash(randomPassword, 10);
-
-        const insertQuery = `
-          INSERT INTO users (username, email, password, role, story_quota, stories_generated, credits)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          RETURNING id, username, email, role, story_quota, stories_generated, credits
-        `;
-        const result = await dbQuery(insertQuery, [username, firebaseEmail, hashedPassword, role, storyQuota, 0, initialCredits]);
-        user = result[0];
-
-        // Create initial credit transaction record
-        if (initialCredits > 0) {
-          await dbQuery(
-            `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [user.id, initialCredits, initialCredits, 'initial', 'Welcome credits for new account']
-          );
-        }
-
-        await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
-        console.log(`✅ New Firebase user registered: ${username} (role: ${role})`);
-      }
-
-      // Update last_login timestamp
-      await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
-
-      // Generate JWT token (same as regular login)
-      const token = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      console.log(`✅ Firebase user authenticated: ${username}`);
-
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email || firebaseEmail,
-          role: user.role,
-          storyQuota: user.story_quota !== undefined ? user.story_quota : 2,
-          storiesGenerated: user.stories_generated || 0,
-          credits: user.credits != null ? user.credits : 500,
-          preferredLanguage: user.preferred_language || 'English',
-          emailVerified: user.email_verified !== false // Firebase users are considered verified
-        }
-      });
-    } else {
-      // File mode - not supported for Firebase auth
-      return res.status(400).json({ error: 'Firebase auth requires database mode' });
-    }
-  } catch (err) {
-    console.error('Firebase auth error:', err);
-    if (err.code === 'auth/id-token-expired') {
-      return res.status(401).json({ error: 'Token expired. Please sign in again.' });
-    }
-    if (err.code === 'auth/argument-error') {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    res.status(500).json({ error: 'Firebase authentication failed' });
-  }
-});
-
-// Password reset - request reset link
-app.post('/api/auth/reset-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    if (STORAGE_MODE === 'database') {
-      // Find user by email
-      const result = await dbPool.query(
-        'SELECT id, username, email FROM users WHERE email = $1 OR username = $1',
-        [email.toLowerCase()]
-      );
-
-      // Always return success to prevent email enumeration
-      if (result.rows.length === 0) {
-        return res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
-      }
-
-      const user = result.rows[0];
-
-      // Generate reset token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-      // Store token in database
-      await dbPool.query(
-        'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $3',
-        [resetToken, resetExpires, user.id]
-      );
-
-      // Send reset email
-      const resetUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
-      console.log(`📧 Sending password reset email to ${user.email}...`);
-      const emailResult = await email.sendPasswordResetEmail(user.email, user.username, resetUrl);
-
-      if (!emailResult) {
-        console.error('❌ Failed to send password reset email - email service returned null');
-        // Still return success to prevent email enumeration
-      } else {
-        console.log(`✅ Password reset email sent to ${user.email}`);
-      }
-
-      res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
-    } else {
-      res.status(400).json({ error: 'Password reset requires database mode' });
-    }
-  } catch (err) {
-    console.error('Password reset error:', err);
-    res.status(500).json({ error: 'Failed to process password reset' });
-  }
-});
-
-// Password reset - confirm new password
-app.post('/api/auth/reset-password/confirm', async (req, res) => {
-  try {
-    const { token, password } = req.body;
-
-    if (!token || !password) {
-      return res.status(400).json({ error: 'Token and password are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    }
-
-    if (STORAGE_MODE === 'database') {
-      // Find user by reset token
-      const result = await dbPool.query(
-        'SELECT id, email FROM users WHERE password_reset_token = $1 AND password_reset_expires > NOW()',
-        [token]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid or expired reset token' });
-      }
-
-      const user = result.rows[0];
-
-      // Hash new password
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      // Update password and clear reset token
-      await dbPool.query(
-        'UPDATE users SET password = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2',
-        [hashedPassword, user.id]
-      );
-
-      res.json({ success: true, message: 'Password has been reset successfully' });
-    } else {
-      res.status(400).json({ error: 'Password reset requires database mode' });
-    }
-  } catch (err) {
-    console.error('Password reset confirm error:', err);
-    res.status(500).json({ error: 'Failed to reset password' });
-  }
-});
-
-// Change password (authenticated user)
-app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    const userId = req.user.id;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Current password and new password are required' });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters' });
-    }
-
-    if (STORAGE_MODE === 'database') {
-      // Get current user with password
-      const result = await dbPool.query(
-        'SELECT id, password, firebase_uid FROM users WHERE id = $1',
-        [userId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const user = result.rows[0];
-
-      // Check if user signed up with Google (no password set)
-      if (user.firebase_uid && !user.password) {
-        return res.status(400).json({ error: 'Cannot change password for Google accounts. Please use Google to sign in.' });
-      }
-
-      // Verify current password
-      const validPassword = await bcrypt.compare(currentPassword, user.password);
-      if (!validPassword) {
-        return res.status(400).json({ error: 'Current password is incorrect' });
-      }
-
-      // Hash new password
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-      // Update password
-      await dbPool.query(
-        'UPDATE users SET password = $1 WHERE id = $2',
-        [hashedPassword, userId]
-      );
-
-      res.json({ success: true, message: 'Password changed successfully' });
-    } else {
-      res.status(400).json({ error: 'Password change requires database mode' });
-    }
-  } catch (err) {
-    console.error('Password change error:', err);
-    res.status(500).json({ error: 'Failed to change password' });
-  }
-});
-
-// Send email verification
-app.post('/api/auth/send-verification', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    if (STORAGE_MODE === 'database') {
-      // Get user
-      const result = await dbPool.query(
-        'SELECT id, username, email, email_verified FROM users WHERE id = $1',
-        [userId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const user = result.rows[0];
-
-      if (user.email_verified) {
-        return res.json({ success: true, message: 'Email already verified' });
-      }
-
-      // Generate verification token
-      const verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-      // Store token in database
-      await dbPool.query(
-        'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
-        [verificationToken, verificationExpires, user.id]
-      );
-
-      // Send verification email
-      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-      console.log(`📧 Sending verification email to ${user.email}...`);
-      const emailResult = await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
-
-      if (!emailResult) {
-        console.error('❌ Failed to send verification email - email service returned null');
-        return res.status(500).json({ error: 'Failed to send verification email. Please try again later.' });
-      }
-
-      console.log(`✅ Verification email sent to ${user.email}`);
-      res.json({ success: true, message: 'Verification email sent' });
-    } else {
-      res.status(400).json({ error: 'Email verification requires database mode' });
-    }
-  } catch (err) {
-    console.error('Send verification error:', err);
-    res.status(500).json({ error: 'Failed to send verification email' });
-  }
-});
-
-// Verify email with token
-app.get('/api/auth/verify-email/:token', async (req, res) => {
-  try {
-    const { token } = req.params;
-
-    if (STORAGE_MODE === 'database') {
-      // Find user by verification token
-      const result = await dbPool.query(
-        'SELECT id, email FROM users WHERE email_verification_token = $1 AND email_verification_expires > NOW()',
-        [token]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(400).json({ error: 'Invalid or expired verification token' });
-      }
-
-      const user = result.rows[0];
-
-      // Mark email as verified and clear token
-      await dbPool.query(
-        'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
-        [user.id]
-      );
-
-      // Redirect to success page
-      res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
-    } else {
-      res.status(400).json({ error: 'Email verification requires database mode' });
-    }
-  } catch (err) {
-    console.error('Verify email error:', err);
-    res.status(500).json({ error: 'Failed to verify email' });
-  }
-});
-
-// Change email (requires re-verification)
-app.post('/api/auth/change-email', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { newEmail, password } = req.body;
-
-    if (!newEmail || !password) {
-      return res.status(400).json({ error: 'New email and current password are required' });
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newEmail)) {
-      return res.status(400).json({ error: 'Invalid email format' });
-    }
-
-    if (STORAGE_MODE === 'database') {
-      // Get current user with password
-      const result = await dbPool.query(
-        'SELECT id, username, email, password FROM users WHERE id = $1',
-        [userId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const user = result.rows[0];
-
-      // Verify current password
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ error: 'Current password is incorrect' });
-      }
-
-      // Check if new email is already taken
-      const existingEmail = await dbPool.query(
-        'SELECT id FROM users WHERE (email = $1 OR username = $1) AND id != $2',
-        [newEmail.toLowerCase(), userId]
-      );
-
-      if (existingEmail.rows.length > 0) {
-        return res.status(400).json({ error: 'This email is already registered' });
-      }
-
-      // Generate new verification token
-      const verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-      // Update email and set to unverified
-      await dbPool.query(
-        `UPDATE users SET
-          email = $1,
-          username = $1,
-          email_verified = FALSE,
-          email_verification_token = $2,
-          email_verification_expires = $3
-        WHERE id = $4`,
-        [newEmail.toLowerCase(), verificationToken, verificationExpires, userId]
-      );
-
-      // Send verification email to new address
-      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-      await email.sendEmailVerificationEmail(newEmail, user.username, verifyUrl);
-
-      res.json({
-        success: true,
-        message: 'Email changed. Please verify your new email address.',
-        newEmail: newEmail.toLowerCase()
-      });
-    } else {
-      res.status(400).json({ error: 'Email change requires database mode' });
-    }
-  } catch (err) {
-    console.error('Change email error:', err);
-    res.status(500).json({ error: 'Failed to change email' });
-  }
-});
-
-// Get email verification status
-app.get('/api/auth/verification-status', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    if (STORAGE_MODE === 'database') {
-      const result = await dbPool.query(
-        'SELECT email_verified FROM users WHERE id = $1',
-        [userId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      res.json({ emailVerified: result.rows[0].email_verified });
-    } else {
-      // In file mode, assume verified
-      res.json({ emailVerified: true });
-    }
-  } catch (err) {
-    console.error('Verification status error:', err);
-    res.status(500).json({ error: 'Failed to check verification status' });
-  }
-});
-
-// Dev auto-login (file mode only - for local development)
-app.post('/api/auth/dev-login', async (req, res) => {
-  try {
-    // Only allow in file mode
-    if (STORAGE_MODE === 'database') {
-      return res.status(403).json({ error: 'Dev login only available in file mode' });
-    }
-
-    // Get first admin user or create one
-    const users = await readJSON(USERS_FILE);
-    let user = users.find(u => u.role === 'admin');
-
-    if (!user) {
-      // Create a dev admin user
-      const hashedPassword = await bcrypt.hash('admin', 10);
-      user = {
-        id: Date.now(),
-        username: 'admin@local.dev',
-        email: 'admin@local.dev',
-        password: hashedPassword,
-        role: 'admin',
-        storyQuota: 999,
-        storiesGenerated: 0,
-        createdAt: new Date().toISOString()
-      };
-      users.push(user);
-      await writeJSON(USERS_FILE, users);
-    }
-
-    // Generate token
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '30d' }  // Longer expiration for dev
-    );
-
-    log.debug(`🔧 Dev auto-login: ${user.username} (role: ${user.role})`);
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 999,
-        storiesGenerated: user.storiesGenerated || 0
-      }
-    });
-  } catch (err) {
-    console.error('Dev login error:', err);
-    res.status(500).json({ error: 'Dev login failed' });
-  }
-});
-END OF AUTH ROUTES */
 
 // API Key management (admin only) - KEEP: Uses writeJSON which is local to server.js
 app.post('/api/admin/config', authenticateToken, async (req, res) => {
@@ -2372,32 +1587,32 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
 
     res.json({ message: 'API keys updated successfully' });
   } catch (err) {
-    console.error('Config update error:', err);
+    log.error('Config update error:', err);
     res.status(500).json({ error: 'Failed to update configuration' });
   }
 });
 
 // Proxy endpoint for Claude API
 app.post('/api/claude', authenticateToken, async (req, res) => {
-  console.log('📖 === CLAUDE/ANTHROPIC ENDPOINT CALLED ===');
-  console.log(`  User: ${req.user?.username || 'unknown'}`);
-  console.log(`  Time: ${new Date().toISOString()}`);
+  log.debug('📖 === CLAUDE/ANTHROPIC ENDPOINT CALLED ===');
+  log.debug(`  User: ${req.user?.username || 'unknown'}`);
+  log.debug(`  Time: ${new Date().toISOString()}`);
 
   try {
     // Prioritize environment variable, fallback to config file
     let anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 
-    console.log('🔑 Anthropic API key check:');
-    console.log(`  From env: ${anthropicApiKey ? 'SET (length: ' + anthropicApiKey.length + ', starts with: ' + anthropicApiKey.substring(0, 6) + ')' : 'NOT SET'}`);
+    log.debug('🔑 Anthropic API key check:');
+    log.debug(`  From env: ${anthropicApiKey ? 'SET (length: ' + anthropicApiKey.length + ', starts with: ' + anthropicApiKey.substring(0, 6) + ')' : 'NOT SET'}`);
 
     if (!anthropicApiKey) {
       const config = await readJSON(CONFIG_FILE);
       anthropicApiKey = config.anthropicApiKey;
-      console.log(`  From config file: ${anthropicApiKey ? 'SET' : 'NOT SET'}`);
+      log.debug(`  From config file: ${anthropicApiKey ? 'SET' : 'NOT SET'}`);
     }
 
     if (!anthropicApiKey) {
-      console.log('  ❌ No API key found!');
+      log.debug('  ❌ No API key found!');
       return res.status(500).json({ error: 'Anthropic API key not configured' });
     }
 
@@ -2425,44 +1640,44 @@ app.post('/api/claude', authenticateToken, async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Claude API error response:', JSON.stringify(data, null, 2));
+      log.error('Claude API error response:', JSON.stringify(data, null, 2));
       const errorMsg = data.error?.message || data.error?.type || JSON.stringify(data.error) || 'Claude API request failed';
       throw new Error(errorMsg);
     }
 
     // Log token usage
     if (data.usage) {
-      console.log('📊 Token Usage:');
-      console.log(`  Input tokens:  ${data.usage.input_tokens.toLocaleString()}`);
-      console.log(`  Output tokens: ${data.usage.output_tokens.toLocaleString()}`);
-      console.log(`  Total tokens:  ${(data.usage.input_tokens + data.usage.output_tokens).toLocaleString()}`);
-      console.log(`  Max requested: ${max_tokens?.toLocaleString() || 'default'}`);
+      log.debug('📊 Token Usage:');
+      log.debug(`  Input tokens:  ${data.usage.input_tokens.toLocaleString()}`);
+      log.debug(`  Output tokens: ${data.usage.output_tokens.toLocaleString()}`);
+      log.debug(`  Total tokens:  ${(data.usage.input_tokens + data.usage.output_tokens).toLocaleString()}`);
+      log.debug(`  Max requested: ${max_tokens?.toLocaleString() || 'default'}`);
 
       // Warn if output limit was reached
       if (data.stop_reason === 'max_tokens') {
-        console.warn('⚠️  WARNING: Output was truncated - max_tokens limit reached!');
+        log.warn('⚠️  WARNING: Output was truncated - max_tokens limit reached!');
       }
     }
 
     res.json(data);
   } catch (err) {
-    console.error('Claude API error:', err.message);
-    console.error('Full error:', err);
+    log.error('Claude API error:', err.message);
+    log.error('Full error:', err);
     res.status(500).json({ error: err.message || 'Failed to call Claude API' });
   }
 });
 
 // Proxy endpoint for Gemini API
 app.post('/api/gemini', authenticateToken, async (req, res) => {
-  console.log('🎨 === GEMINI ENDPOINT CALLED ===');
-  console.log(`  User: ${req.user?.username || 'unknown'}`);
-  console.log(`  Time: ${new Date().toISOString()}`);
+  log.debug('🎨 === GEMINI ENDPOINT CALLED ===');
+  log.debug(`  User: ${req.user?.username || 'unknown'}`);
+  log.debug(`  Time: ${new Date().toISOString()}`);
 
   try {
     // Prioritize environment variable, fallback to config file
     let geminiApiKey = process.env.GEMINI_API_KEY;
 
-    console.log('🔑 Gemini API key check:');
+    log.debug('🔑 Gemini API key check:');
     console.log(`  From env: ${geminiApiKey ? 'SET (length: ' + geminiApiKey.length + ', starts with: ' + geminiApiKey.substring(0, 6) + ')' : 'NOT SET'}`);
 
     if (!geminiApiKey) {
@@ -2472,7 +1687,7 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
     }
 
     if (!geminiApiKey) {
-      console.log('  ❌ No API key found!');
+      log.debug('  ❌ No API key found!');
       return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
@@ -2511,1516 +1726,25 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('❌ Gemini API error response:');
-      console.error('  Status:', response.status);
-      console.error('  Response:', JSON.stringify(data, null, 2));
-      console.error('  Request URL:', url.substring(0, 100) + '...');
-      console.error('  Model:', model || 'gemini-2.5-flash-image');
+      log.error('❌ Gemini API error response:');
+      log.error('  Status:', response.status);
+      log.error('  Response:', JSON.stringify(data, null, 2));
+      log.error('  Request URL:', url.substring(0, 100) + '...');
+      log.error('  Model:', model || 'gemini-2.5-flash-image');
       throw new Error(data.error?.message || `Gemini API request failed: ${response.status}`);
     }
 
     res.json(data);
   } catch (err) {
-    console.error('Gemini API error:', err);
+    log.error('Gemini API error:', err);
     res.status(500).json({ error: err.message || 'Failed to call Gemini API' });
   }
 });
 
-// =============================================================================
-// ADMIN ROUTES - MIGRATED TO server/routes/admin.js
-// NOTE: /api/admin/logs kept here (uses local readJSON)
-// NOTE: /api/admin/orders/:orderId/retry-print-order kept here (uses Gelato)
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-app.get('/api/admin/logs', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
-    const logs = await readJSON(LOGS_FILE);
-    const limit = parseInt(req.query.limit) || 100;
 
-    res.json(logs.slice(-limit).reverse()); // Return most recent logs first
-  } catch (err) {
-    console.error('Error fetching logs:', err);
-    res.status(500).json({ error: 'Failed to fetch logs' });
-  }
-});
 
-app.get('/api/admin/users', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
 
-    let safeUsers;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode - include order counts with JOIN
-      const selectQuery = `
-        SELECT
-          u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at, u.last_login, u.email_verified,
-          COALESCE(order_stats.total_orders, 0) as total_orders,
-          COALESCE(order_stats.failed_orders, 0) as failed_orders
-        FROM users u
-        LEFT JOIN (
-          SELECT
-            user_id,
-            COUNT(*) as total_orders,
-            COUNT(*) FILTER (WHERE payment_status = 'paid' AND gelato_order_id IS NULL) as failed_orders
-          FROM orders
-          GROUP BY user_id
-        ) order_stats ON u.id::text = order_stats.user_id
-        ORDER BY u.created_at ASC
-      `;
-      const rows = await dbQuery(selectQuery, []);
-      safeUsers = rows.map(user => ({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        storyQuota: user.story_quota,
-        storiesGenerated: user.stories_generated,
-        credits: user.credits != null ? user.credits : 500,
-        createdAt: user.created_at,
-        lastLogin: user.last_login,
-        emailVerified: user.email_verified !== false,
-        totalOrders: parseInt(user.total_orders) || 0,
-        failedOrders: parseInt(user.failed_orders) || 0
-      }));
-    } else {
-      // File mode
-      const users = await readJSON(USERS_FILE);
-      safeUsers = users.map(({ password, ...user }) => ({
-        ...user,
-        storyQuota: user.storyQuota !== undefined ? user.storyQuota : 2,
-        storiesGenerated: user.storiesGenerated || 0,
-        credits: user.credits != null ? user.credits : 500,
-        totalOrders: 0,
-        failedOrders: 0
-      }));
-    }
-
-    res.json(safeUsers);
-  } catch (err) {
-    console.error('Error fetching users:', err);
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
-});
-
-// Update user credits (admin only)
-app.post('/api/admin/users/:userId/quota', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const { userId } = req.params;
-    const { credits } = req.body;
-
-    if (credits === undefined || (credits !== -1 && credits < 0)) {
-      return res.status(400).json({ error: 'Invalid credits value. Use -1 for unlimited or a positive number.' });
-    }
-
-    let user;
-    let previousCredits;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const selectQuery = 'SELECT * FROM users WHERE id = $1';
-      const rows = await dbQuery(selectQuery, [userId]);
-
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      previousCredits = rows[0].credits || 0;
-      const creditDiff = credits - previousCredits;
-
-      const updateQuery = 'UPDATE users SET credits = $1 WHERE id = $2';
-      await dbQuery(updateQuery, [credits, userId]);
-
-      // Create transaction record
-      if (creditDiff !== 0) {
-        const transactionType = creditDiff > 0 ? 'admin_add' : 'admin_deduct';
-        const description = creditDiff > 0
-          ? `Admin added ${creditDiff} credits`
-          : `Admin deducted ${Math.abs(creditDiff)} credits`;
-
-        await dbQuery(
-          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [userId, creditDiff, credits, transactionType, req.user.id, description]
-        );
-      }
-
-      user = {
-        id: rows[0].id,
-        username: rows[0].username,
-        credits: credits
-      };
-    } else {
-      // File mode
-      const users = await readJSON(USERS_FILE);
-      user = users.find(u => u.id === userId);
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      user.credits = credits;
-      await writeJSON(USERS_FILE, users);
-    }
-
-    await logActivity(req.user.id, req.user.username, 'USER_CREDITS_UPDATED', {
-      targetUserId: userId,
-      targetUsername: user.username,
-      newCredits: credits
-    });
-
-    res.json({
-      message: 'User credits updated successfully',
-      user: {
-        id: user.id,
-        username: user.username,
-        credits: user.credits
-      }
-    });
-  } catch (err) {
-    console.error('Error updating user credits:', err);
-    res.status(500).json({ error: 'Failed to update user credits' });
-  }
-});
-
-// ADMIN: Toggle user email verification status (for testing)
-app.post('/api/admin/users/:userId/email-verified', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const { userId } = req.params;
-    const { emailVerified } = req.body;
-
-    if (typeof emailVerified !== 'boolean') {
-      return res.status(400).json({ error: 'emailVerified must be a boolean' });
-    }
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      const selectQuery = 'SELECT id, username, email_verified FROM users WHERE id = $1';
-      const rows = await dbQuery(selectQuery, [userId]);
-
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      const user = rows[0];
-      const previousStatus = user.email_verified;
-
-      await dbQuery('UPDATE users SET email_verified = $1 WHERE id = $2', [emailVerified, userId]);
-
-      log.debug(`🔧 [ADMIN] Email verification for user ${user.username} changed: ${previousStatus} -> ${emailVerified}`);
-
-      res.json({
-        message: `Email verification status updated`,
-        user: {
-          id: user.id,
-          username: user.username,
-          emailVerified: emailVerified,
-          previousStatus: previousStatus
-        }
-      });
-    } else {
-      return res.status(503).json({ error: 'This feature requires database mode' });
-    }
-  } catch (err) {
-    console.error('Error updating email verification status:', err);
-    res.status(500).json({ error: 'Failed to update email verification status' });
-  }
-});
-
-// Get credit transaction history for a user (admin only)
-app.get('/api/admin/users/:userId/credits', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const targetUserId = req.params.userId;
-    const limit = parseInt(req.query.limit) || 50;
-
-    log.info(`💳 [ADMIN] GET /api/admin/users/${targetUserId}/credits - Admin: ${req.user.username}`);
-
-    if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database mode required for credit history' });
-    }
-
-    // Get user info
-    const userResult = await dbPool.query(
-      'SELECT username, email, credits FROM users WHERE id = $1',
-      [targetUserId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const user = userResult.rows[0];
-
-    // Get credit transactions
-    const transactionsResult = await dbPool.query(
-      `SELECT id, amount, balance_after, transaction_type, reference_id, description, created_at
-       FROM credit_transactions
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT $2`,
-      [targetUserId, limit]
-    );
-
-    res.json({
-      user: {
-        id: targetUserId,
-        username: user.username,
-        email: user.email,
-        currentCredits: user.credits
-      },
-      transactions: transactionsResult.rows.map(t => ({
-        id: t.id,
-        amount: t.amount,
-        balanceAfter: t.balance_after,
-        type: t.transaction_type,
-        referenceId: t.reference_id,
-        description: t.description,
-        createdAt: t.created_at
-      }))
-    });
-  } catch (err) {
-    console.error('Error fetching credit history:', err);
-    res.status(500).json({ error: 'Failed to fetch credit history' });
-  }
-});
-
-// Get detailed user info (admin only) - for user management
-app.get('/api/admin/users/:userId/details', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const targetUserId = req.params.userId;
-    log.info(`👤 [ADMIN] GET /api/admin/users/${targetUserId}/details - Admin: ${req.user.username}`);
-
-    if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(400).json({ error: 'User details requires database mode' });
-    }
-
-    // Get user info
-    const userResult = await dbQuery(
-      'SELECT id, username, email, role, credits, story_quota, stories_generated, created_at, last_login FROM users WHERE id = $1',
-      [targetUserId]
-    );
-    if (userResult.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const user = userResult[0];
-
-    // Get story count and list - data is stored as TEXT containing JSON
-    const storiesResult = await dbQuery(
-      `SELECT id, data, created_at FROM stories WHERE user_id = $1 ORDER BY created_at DESC`,
-      [targetUserId]
-    );
-
-    // Calculate totals by parsing JSON data
-    let totalCharacters = 0;
-    let totalImages = 0;
-    // Token usage aggregation
-    const totalTokens = {
-      anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
-      gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
-      gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-      gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
-    };
-    const stories = storiesResult.map(s => {
-      try {
-        const storyData = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
-        const pageCount = calculateStoryPageCount(storyData, true);
-        // Count scene images + cover images (front, back, spine)
-        const sceneImageCount = storyData?.sceneImages?.length || 0;
-        const coverImageCount = storyData?.coverImages ?
-          (storyData.coverImages.frontCover ? 1 : 0) +
-          (storyData.coverImages.backCover ? 1 : 0) +
-          (storyData.coverImages.spine ? 1 : 0) : 0;
-        const imageCount = sceneImageCount + coverImageCount;
-        const charCount = storyData?.characters?.length || 0;
-        totalImages += imageCount;
-        totalCharacters += charCount;
-
-        // Aggregate token usage
-        if (storyData?.tokenUsage) {
-          const tu = storyData.tokenUsage;
-          for (const provider of ['anthropic', 'gemini_text', 'gemini_image', 'gemini_quality']) {
-            if (tu[provider]) {
-              totalTokens[provider].input_tokens += tu[provider].input_tokens || 0;
-              totalTokens[provider].output_tokens += tu[provider].output_tokens || 0;
-              totalTokens[provider].calls += tu[provider].calls || 0;
-            }
-          }
-        }
-
-        return {
-          id: s.id,
-          title: storyData?.title || storyData?.storyTitle || 'Untitled',
-          createdAt: s.created_at,
-          pageCount,
-          imageCount
-        };
-      } catch {
-        return {
-          id: s.id,
-          title: 'Untitled',
-          createdAt: s.created_at,
-          pageCount: 0,
-          imageCount: 0
-        };
-      }
-    });
-
-    // Get purchase history (orders)
-    const ordersResult = await dbQuery(
-      `SELECT id, story_id, amount_total, currency, payment_status, gelato_order_id, created_at
-       FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
-      [targetUserId]
-    );
-    const purchases = ordersResult.map(o => ({
-      id: o.id,
-      storyId: o.story_id,
-      amount: o.amount_total,
-      currency: o.currency,
-      status: o.payment_status,
-      gelatoOrderId: o.gelato_order_id,
-      createdAt: o.created_at
-    }));
-
-    // Get recent credit transactions
-    const creditsResult = await dbQuery(
-      `SELECT id, amount, balance_after, transaction_type, description, created_at
-       FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [targetUserId]
-    );
-    const creditHistory = creditsResult.map(t => ({
-      id: t.id,
-      amount: t.amount,
-      balanceAfter: t.balance_after,
-      type: t.transaction_type,
-      description: t.description,
-      createdAt: t.created_at
-    }));
-
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        credits: user.credits,
-        storyQuota: user.story_quota,
-        storiesGenerated: user.stories_generated,
-        createdAt: user.created_at,
-        lastLogin: user.last_login
-      },
-      stats: {
-        totalStories: stories.length,
-        totalCharacters,
-        totalImages,
-        totalPurchases: purchases.filter(p => p.status === 'paid').length,
-        totalSpent: purchases.filter(p => p.status === 'paid').reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
-        tokenUsage: {
-          ...totalTokens,
-          totalInputTokens: Object.values(totalTokens).reduce((sum, p) => sum + p.input_tokens, 0),
-          totalOutputTokens: Object.values(totalTokens).reduce((sum, p) => sum + p.output_tokens, 0),
-          totalCalls: Object.values(totalTokens).reduce((sum, p) => sum + p.calls, 0)
-        }
-      },
-      stories,
-      purchases,
-      creditHistory
-    });
-  } catch (err) {
-    console.error('Error fetching user details:', err);
-    res.status(500).json({ error: 'Failed to fetch user details' });
-  }
-});
-
-// Get stories for any user (admin only) - for debugging/fixing crashed stories
-app.get('/api/admin/users/:userId/stories', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const targetUserId = parseInt(req.params.userId);
-    if (isNaN(targetUserId)) {
-      return res.status(400).json({ error: 'Invalid user ID' });
-    }
-
-    log.info(`📚 [ADMIN] GET /api/admin/users/${targetUserId}/stories - Admin: ${req.user.username}`);
-    let userStories = [];
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Get user info first
-      const userResult = await dbQuery('SELECT username FROM users WHERE id = $1', [targetUserId]);
-      if (userResult.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      const targetUsername = userResult[0].username;
-
-      // Get stories for target user
-      const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC';
-      const rows = await dbQuery(selectQuery, [targetUserId]);
-
-      // Return full-quality thumbnails
-      userStories = rows.map(row => {
-        const story = JSON.parse(row.data);
-        return {
-          id: story.id,
-          title: story.title,
-          createdAt: story.createdAt,
-          updatedAt: story.updatedAt,
-          pages: story.pages,
-          language: story.language,
-          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: calculateStoryPageCount(story, true),
-          thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
-        };
-      });
-
-      log.info(`📚 [ADMIN] Found ${userStories.length} stories for user ${targetUsername} (ID: ${targetUserId})`);
-      res.json({ userId: targetUserId, username: targetUsername, stories: userStories });
-    } else {
-      // File mode - return full-quality thumbnails
-      const allStories = await readJSON(STORIES_FILE);
-      const fullStories = allStories[targetUserId] || [];
-
-      userStories = fullStories.map(story => ({
-        id: story.id,
-        title: story.title,
-        createdAt: story.createdAt,
-        updatedAt: story.updatedAt,
-        pages: story.pages,
-        language: story.language,
-        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: calculateStoryPageCount(story, true),
-        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
-      }));
-
-      log.info(`📚 [ADMIN] File mode: Found ${userStories.length} stories for user ${targetUserId}`);
-      res.json({ userId: targetUserId, stories: userStories });
-    }
-  } catch (err) {
-    console.error('❌ [ADMIN] Error fetching user stories:', err);
-    res.status(500).json({ error: 'Failed to fetch user stories', details: err.message });
-  }
-});
-
-// Get single story for any user (admin only) - full data including images
-app.get('/api/admin/users/:userId/stories/:storyId', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    const targetUserId = parseInt(req.params.userId);
-    const storyId = req.params.storyId;
-
-    if (isNaN(targetUserId)) {
-      return res.status(400).json({ error: 'Invalid user ID' });
-    }
-
-    log.info(`📖 [ADMIN] GET /api/admin/users/${targetUserId}/stories/${storyId} - Admin: ${req.user.username}`);
-
-    let story = null;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      const selectQuery = 'SELECT data FROM stories WHERE id = $1 AND user_id = $2';
-      const rows = await dbQuery(selectQuery, [storyId, targetUserId]);
-
-      if (rows.length > 0) {
-        story = JSON.parse(rows[0].data);
-      }
-    } else {
-      const allStories = await readJSON(STORIES_FILE);
-      const userStories = allStories[targetUserId] || [];
-      story = userStories.find(s => s.id === storyId);
-    }
-
-    if (!story) {
-      return res.status(404).json({ error: 'Story not found' });
-    }
-
-    log.info(`📖 [ADMIN] Returning story "${story.title}" for user ${targetUserId}`);
-    res.json(story);
-  } catch (err) {
-    console.error('❌ [ADMIN] Error fetching story:', err);
-    res.status(500).json({ error: 'Failed to fetch story', details: err.message });
-  }
-});
-
-// =======================
-// Print Provider Products Admin Endpoints
-// =======================
-
-// Get all print provider products (admin only)
-app.get('/api/admin/print-products', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for print provider products management' });
-    }
-
-    const selectQuery = 'SELECT * FROM gelato_products ORDER BY created_at DESC';
-    const products = await dbQuery(selectQuery, []);
-
-    res.json({ products });
-  } catch (err) {
-    console.error('Error fetching print provider products:', err);
-    res.status(500).json({ error: 'Failed to fetch print provider products' });
-  }
-});
-
-// Create new print provider product (admin only)
-app.post('/api/admin/print-products', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for print provider products management' });
-    }
-
-    const {
-      product_uid,
-      product_name,
-      description,
-      size,
-      cover_type,
-      min_pages,
-      max_pages,
-      available_page_counts,
-      is_active
-    } = req.body;
-
-    // Validate required fields
-    if (!product_uid || !product_name || min_pages === undefined || max_pages === undefined) {
-      return res.status(400).json({ error: 'Missing required fields: product_uid, product_name, min_pages, max_pages' });
-    }
-
-    // Validate JSON format for available_page_counts
-    let pageCounts;
-    try {
-      pageCounts = typeof available_page_counts === 'string'
-        ? JSON.parse(available_page_counts)
-        : available_page_counts;
-      if (!Array.isArray(pageCounts)) {
-        throw new Error('Must be an array');
-      }
-    } catch (err) {
-      return res.status(400).json({ error: 'available_page_counts must be a valid JSON array' });
-    }
-
-    const insertQuery = `INSERT INTO gelato_products
-         (product_uid, product_name, description, size, cover_type, min_pages, max_pages, available_page_counts, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         RETURNING *`;
-
-    const pageCountsJson = JSON.stringify(pageCounts);
-    // Derive cover_type from product_uid if not provided
-    const derivedCoverType = cover_type ||
-      (product_uid.toLowerCase().includes('hardcover') ? 'hardcover' : 'softcover');
-    const params = [
-      product_uid,
-      product_name,
-      description || null,
-      size || null,
-      derivedCoverType.toLowerCase(),
-      min_pages,
-      max_pages,
-      pageCountsJson,
-      is_active !== false
-    ];
-
-    const result = await dbQuery(insertQuery, params);
-
-    // For MySQL, fetch the inserted record
-    let newProduct;
-    newProduct = result[0];
-
-    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_CREATED', {
-      productId: newProduct.id,
-      productName: product_name
-    });
-
-    res.json({ product: newProduct, message: 'Product created successfully' });
-  } catch (err) {
-    console.error('Error creating print provider product:', err);
-    res.status(500).json({ error: 'Failed to create print provider product' });
-  }
-});
-
-// Update print provider product (admin only)
-app.put('/api/admin/print-products/:id', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for print provider products management' });
-    }
-
-    const { id } = req.params;
-    const updates = req.body;
-
-    // Build dynamic update query based on provided fields
-    const allowedFields = ['product_uid', 'product_name', 'description', 'size', 'cover_type', 'min_pages', 'max_pages', 'available_page_counts', 'is_active'];
-    const setClauses = [];
-    const params = [];
-    let paramIndex = 1;
-
-    for (const field of allowedFields) {
-      if (updates[field] !== undefined) {
-        let value = updates[field];
-
-        // Handle available_page_counts JSON validation
-        if (field === 'available_page_counts') {
-          try {
-            const pageCounts = typeof value === 'string' ? JSON.parse(value) : value;
-            if (!Array.isArray(pageCounts)) {
-              throw new Error('Must be an array');
-            }
-            value = JSON.stringify(pageCounts);
-          } catch (err) {
-            return res.status(400).json({ error: 'available_page_counts must be a valid JSON array' });
-          }
-        }
-
-        setClauses.push(`${field} = $${paramIndex}`);
-        params.push(value);
-        paramIndex++;
-      }
-    }
-
-    if (setClauses.length === 0) {
-      return res.status(400).json({ error: 'No valid fields to update' });
-    }
-
-    setClauses.push('updated_at = CURRENT_TIMESTAMP');
-    params.push(id);
-
-    const updateQuery = `UPDATE gelato_products SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
-
-    const result = await dbQuery(updateQuery, params);
-
-    // PostgreSQL RETURNING clause returns the updated record
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    const updatedProduct = result[0];
-
-    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_UPDATED', {
-      productId: id,
-      productName: updatedProduct.product_name
-    });
-
-    res.json({ product: updatedProduct, message: 'Product updated successfully' });
-  } catch (err) {
-    console.error('Error updating print provider product:', err);
-    res.status(500).json({ error: 'Failed to update print provider product' });
-  }
-});
-
-// Toggle product active status (admin only)
-app.put('/api/admin/print-products/:id/toggle', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for print provider products management' });
-    }
-
-    const { id } = req.params;
-    const { is_active } = req.body;
-
-    const updateQuery = 'UPDATE gelato_products SET is_active = $1 WHERE id = $2 RETURNING *';
-
-    const result = await dbQuery(updateQuery, [!is_active, id]);
-
-    // PostgreSQL RETURNING clause returns the updated record
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    const updatedProduct = result[0];
-
-    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_TOGGLED', {
-      productId: id,
-      isActive: !is_active
-    });
-
-    res.json({ product: updatedProduct, message: 'Product status updated successfully' });
-  } catch (err) {
-    console.error('Error toggling print provider product status:', err);
-    res.status(500).json({ error: 'Failed to toggle product status' });
-  }
-});
-
-// Delete print provider product (admin only)
-app.delete('/api/admin/print-products/:id', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    if (STORAGE_MODE !== 'database' || !dbPool) {
-      return res.status(503).json({ error: 'Database required for print provider products management' });
-    }
-
-    const { id } = req.params;
-
-    // Get product name before deleting for logging
-    const selectQuery = 'SELECT product_name FROM gelato_products WHERE id = $1';
-    const rows = await dbQuery(selectQuery, [id]);
-
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    const productName = rows[0].product_name;
-
-    const deleteQuery = 'DELETE FROM gelato_products WHERE id = $1';
-
-    await dbQuery(deleteQuery, [id]);
-
-    await logActivity(req.user.id, req.user.username, 'GELATO_PRODUCT_DELETED', {
-      productId: id,
-      productName: productName
-    });
-
-    res.json({ message: 'Product deleted successfully' });
-  } catch (err) {
-    console.error('Error deleting print provider product:', err);
-    res.status(500).json({ error: 'Failed to delete print provider product' });
-  }
-});
-END OF ADMIN ROUTES BLOCK 1 */
-
-// =============================================================================
-// USER ROUTES - MIGRATED TO server/routes/user.js
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-app.get('/api/user/quota', authenticateToken, async (req, res) => {
-  try {
-    let credits;
-    let preferredLanguage = 'English';
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const selectQuery = 'SELECT credits, preferred_language FROM users WHERE id = $1';
-      const rows = await dbQuery(selectQuery, [req.user.id]);
-
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      credits = rows[0].credits !== undefined ? rows[0].credits : 500;
-      preferredLanguage = rows[0].preferred_language || 'English';
-    } else {
-      // File mode
-      const users = await readJSON(USERS_FILE);
-      const user = users.find(u => u.id === req.user.id);
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      credits = user.credits != null ? user.credits : 500;
-      preferredLanguage = user.preferredLanguage || 'English';
-    }
-
-    res.json({
-      credits: credits,
-      unlimited: credits === -1,
-      preferredLanguage: preferredLanguage
-    });
-  } catch (err) {
-    console.error('Error fetching user credits:', err);
-    res.status(500).json({ error: 'Failed to fetch user credits' });
-  }
-});
-
-// Get user's saved shipping address
-app.get('/api/user/shipping-address', authenticateToken, async (req, res) => {
-  try {
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const selectQuery = 'SELECT shipping_first_name, shipping_last_name, shipping_address_line1, shipping_city, shipping_post_code, shipping_country, shipping_email FROM users WHERE id = $1';
-      const rows = await dbQuery(selectQuery, [req.user.id]);
-
-      if (rows.length === 0) {
-        return res.json(null);
-      }
-
-      const user = rows[0];
-      if (!user.shipping_first_name) {
-        return res.json(null);
-      }
-
-      res.json({
-        firstName: user.shipping_first_name,
-        lastName: user.shipping_last_name,
-        addressLine1: user.shipping_address_line1,
-        city: user.shipping_city,
-        postCode: user.shipping_post_code,
-        country: user.shipping_country,
-        email: user.shipping_email
-      });
-    } else {
-      // File mode
-      const users = await readJSON(USERS_FILE);
-      const user = users.find(u => u.id === req.user.id);
-
-      if (!user || !user.shippingAddress) {
-        return res.json(null);
-      }
-
-      res.json(user.shippingAddress);
-    }
-  } catch (err) {
-    console.error('Error fetching shipping address:', err);
-    res.status(500).json({ error: 'Failed to fetch shipping address' });
-  }
-});
-
-// Save user's shipping address
-app.put('/api/user/shipping-address', authenticateToken, async (req, res) => {
-  try {
-    let { firstName, lastName, addressLine1, city, postCode, country, email } = req.body;
-
-    // Validate and normalize country code (must be 2-letter ISO code)
-    if (!country || typeof country !== 'string') {
-      return res.status(400).json({ error: 'Country code is required' });
-    }
-
-    country = country.trim().toUpperCase();
-
-    if (country.length !== 2 || !/^[A-Z]{2}$/.test(country)) {
-      return res.status(400).json({
-        error: 'Country must be a valid 2-letter ISO code (e.g., US, DE, CH, FR)',
-        hint: 'Please use the standard 2-letter country code'
-      });
-    }
-
-    // Validate email format
-    if (!email || typeof email !== 'string') {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    email = email.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        error: 'Please provide a valid email address',
-        hint: 'Email format should be like: user@example.com'
-      });
-    }
-
-    // Validate required fields
-    if (!firstName || !lastName || !addressLine1 || !city || !postCode) {
-      return res.status(400).json({ error: 'All address fields are required' });
-    }
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const updateQuery = 'UPDATE users SET shipping_first_name = $1, shipping_last_name = $2, shipping_address_line1 = $3, shipping_city = $4, shipping_post_code = $5, shipping_country = $6, shipping_email = $7 WHERE id = $8';
-      await dbQuery(updateQuery, [firstName, lastName, addressLine1, city, postCode, country, email, req.user.id]);
-
-      await logActivity(req.user.id, req.user.username, 'SHIPPING_ADDRESS_SAVED', { country });
-      res.json({ success: true });
-    } else {
-      // File mode
-      const users = await readJSON(USERS_FILE);
-      const user = users.find(u => u.id === req.user.id);
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      user.shippingAddress = { firstName, lastName, addressLine1, city, postCode, country, email };
-      await writeJSON(USERS_FILE, users);
-
-      await logActivity(req.user.id, req.user.username, 'SHIPPING_ADDRESS_SAVED', { country });
-      res.json({ success: true });
-    }
-  } catch (err) {
-    console.error('Error saving shipping address:', err);
-    res.status(500).json({ error: 'Failed to save shipping address' });
-  }
-});
-
-// NOTE: /api/user/orders is handled by server/routes/user.js
-
-// Update user's email address
-app.put('/api/user/update-email', authenticateToken, async (req, res) => {
-  try {
-    const { newEmail } = req.body;
-
-    if (!newEmail || !newEmail.includes('@')) {
-      return res.status(400).json({ error: 'Invalid email address' });
-    }
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode - check if email already exists
-      const checkQuery = 'SELECT id FROM users WHERE username = $1 AND id != $2';
-      const existing = await dbQuery(checkQuery, [newEmail, req.user.id]);
-
-      if (existing.length > 0) {
-        return res.status(400).json({ error: 'Email already in use' });
-      }
-
-      const updateQuery = 'UPDATE users SET username = $1 WHERE id = $2';
-      await dbQuery(updateQuery, [newEmail, req.user.id]);
-
-      await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
-      res.json({ success: true, username: newEmail });
-    } else {
-      // File mode
-      const users = await readJSON(USERS_FILE);
-      const existing = users.find(u => u.username === newEmail && u.id !== req.user.id);
-
-      if (existing) {
-        return res.status(400).json({ error: 'Email already in use' });
-      }
-
-      const user = users.find(u => u.id === req.user.id);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      user.username = newEmail;
-      await writeJSON(USERS_FILE, users);
-
-      await logActivity(req.user.id, newEmail, 'EMAIL_UPDATED', { oldEmail: req.user.username });
-      res.json({ success: true, username: newEmail });
-    }
-  } catch (err) {
-    console.error('Error updating email:', err);
-    res.status(500).json({ error: 'Failed to update email' });
-  }
-});
-END OF USER ROUTES */
-
-// =============================================================================
-// CHARACTER ROUTES - MIGRATED TO server/routes/characters.js
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-app.get('/api/characters', authenticateToken, async (req, res) => {
-  try {
-    let characterData = {
-      characters: [],
-      relationships: {},
-      relationshipTexts: {},
-      customRelationships: [],
-      customStrengths: [],
-      customWeaknesses: [],
-      customFears: []
-    };
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const selectQuery = 'SELECT data FROM characters WHERE user_id = $1 ORDER BY id DESC LIMIT 1';
-      const rows = await dbQuery(selectQuery, [req.user.id]);
-
-      if (rows.length > 0) {
-        const data = JSON.parse(rows[0].data);
-        // Handle both old format (array) and new format (object)
-        if (Array.isArray(data)) {
-          characterData.characters = data;
-        } else {
-          characterData = {
-            ...characterData,
-            ...data
-          };
-        }
-      }
-    } else {
-      // File mode
-      const allCharacters = await readJSON(CHARACTERS_FILE);
-      const data = allCharacters[req.user.id];
-
-      if (data) {
-        // Handle both old format (array) and new format (object)
-        if (Array.isArray(data)) {
-          characterData.characters = data;
-        } else {
-          characterData = {
-            ...characterData,
-            ...data
-          };
-        }
-      }
-    }
-
-    await logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: characterData.characters.length });
-    res.json(characterData);
-  } catch (err) {
-    console.error('Error fetching characters:', err);
-    res.status(500).json({ error: 'Failed to fetch characters' });
-  }
-});
-
-app.post('/api/characters', authenticateToken, async (req, res) => {
-  try {
-    const { characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears } = req.body;
-
-    // Store character data as an object with all related information
-    const characterData = {
-      characters: characters || [],
-      relationships: relationships || {},
-      relationshipTexts: relationshipTexts || {},
-      customRelationships: customRelationships || [],
-      customStrengths: customStrengths || [],
-      customWeaknesses: customWeaknesses || [],
-      customFears: customFears || []
-    };
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode - delete old characters and insert new ones
-      const deleteQuery = 'DELETE FROM characters WHERE user_id = $1';
-      await dbQuery(deleteQuery, [req.user.id]);
-
-      // Insert character data as a single record with all information
-      const characterId = `characters_${req.user.id}_${Date.now()}`;
-      const insertQuery = 'INSERT INTO characters (id, user_id, data) VALUES ($1, $2, $3)';
-      await dbQuery(insertQuery, [characterId, req.user.id, JSON.stringify(characterData)]);
-    } else {
-      // File mode - save all character data as an object
-      const allCharacters = await readJSON(CHARACTERS_FILE);
-      allCharacters[req.user.id] = characterData;
-      await writeJSON(CHARACTERS_FILE, allCharacters);
-    }
-
-    await logActivity(req.user.id, req.user.username, 'CHARACTERS_SAVED', { count: characters.length });
-    res.json({ message: 'Characters saved successfully', count: characters.length });
-  } catch (err) {
-    console.error('Error saving characters:', err);
-    res.status(500).json({ error: 'Failed to save characters' });
-  }
-});
-END OF CHARACTER ROUTES */
-
-// =============================================================================
-// STORY DRAFT ROUTES - MIGRATED TO server/routes/storyDraft.js
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-// Story draft endpoints - persist story settings before generation
-// This saves step 1 (storyType, artStyle) and step 4 (storyDetails, dedication, pages, languageLevel, mainCharacters) data
-app.get('/api/story-draft', authenticateToken, async (req, res) => {
-  try {
-    let draftData = {
-      storyType: '',
-      artStyle: 'pixar',
-      storyDetails: '',
-      dedication: '',
-      pages: 30,
-      languageLevel: 'standard',
-      mainCharacters: []
-    };
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      const selectQuery = 'SELECT data FROM story_drafts WHERE user_id = $1';
-      const rows = await dbQuery(selectQuery, [req.user.id]);
-
-      if (rows.length > 0) {
-        const data = JSON.parse(rows[0].data);
-        draftData = { ...draftData, ...data };
-      }
-    } else {
-      // File mode
-      const allDrafts = await readJSON(STORY_DRAFTS_FILE);
-      const data = allDrafts[req.user.id];
-
-      if (data) {
-        draftData = { ...draftData, ...data };
-      }
-    }
-
-    res.json(draftData);
-  } catch (err) {
-    console.error('Error fetching story draft:', err);
-    res.status(500).json({ error: 'Failed to fetch story draft' });
-  }
-});
-
-app.post('/api/story-draft', authenticateToken, async (req, res) => {
-  try {
-    const { storyType, artStyle, storyDetails, dedication, pages, languageLevel, mainCharacters } = req.body;
-
-    const draftData = {
-      storyType: storyType || '',
-      artStyle: artStyle || 'pixar',
-      storyDetails: storyDetails || '',
-      dedication: dedication || '',
-      pages: pages || 30,
-      languageLevel: languageLevel || 'standard',
-      mainCharacters: mainCharacters || [],
-      updatedAt: new Date().toISOString()
-    };
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Upsert - insert or update on conflict
-      const upsertQuery = `
-        INSERT INTO story_drafts (user_id, data, updated_at)
-        VALUES ($1, $2, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id) DO UPDATE SET data = $2, updated_at = CURRENT_TIMESTAMP
-      `;
-      await dbQuery(upsertQuery, [req.user.id, JSON.stringify(draftData)]);
-    } else {
-      // File mode
-      const allDrafts = await readJSON(STORY_DRAFTS_FILE);
-      allDrafts[req.user.id] = draftData;
-      await writeJSON(STORY_DRAFTS_FILE, allDrafts);
-    }
-
-    log.debug(`📝 [DRAFT] Saved story draft for user ${req.user.username}`);
-    res.json({ message: 'Story draft saved successfully' });
-  } catch (err) {
-    console.error('Error saving story draft:', err);
-    res.status(500).json({ error: 'Failed to save story draft' });
-  }
-});
-
-// Clear story draft (called after successful story generation)
-app.delete('/api/story-draft', authenticateToken, async (req, res) => {
-  try {
-    if (STORAGE_MODE === 'database' && dbPool) {
-      await dbQuery('DELETE FROM story_drafts WHERE user_id = $1', [req.user.id]);
-    } else {
-      const allDrafts = await readJSON(STORY_DRAFTS_FILE);
-      delete allDrafts[req.user.id];
-      await writeJSON(STORY_DRAFTS_FILE, allDrafts);
-    }
-
-    log.debug(`🗑️ [DRAFT] Cleared story draft for user ${req.user.username}`);
-    res.json({ message: 'Story draft cleared' });
-  } catch (err) {
-    console.error('Error clearing story draft:', err);
-    res.status(500).json({ error: 'Failed to clear story draft' });
-  }
-});
-END OF STORY DRAFT ROUTES */
-
-// =============================================================================
-// STORIES CRUD ROUTES - MIGRATED TO server/routes/stories.js
-// Note: Regenerate/Edit routes are NOT migrated and remain active below
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-// Story management endpoints
-app.get('/api/stories', authenticateToken, async (req, res) => {
-  try {
-    // Pagination: limit (default 6, max 50) and offset
-    const limit = Math.min(Math.max(parseInt(req.query.limit) || 6, 1), 50);
-    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
-
-    log.debug(`📚 GET/api/stories - User: ${req.user.username}, limit: ${limit}, offset: ${offset}`);
-    let userStories = [];
-    let totalCount = 0;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode - get total count first
-      const countResult = await dbQuery('SELECT COUNT(*) as count FROM stories WHERE user_id = $1', [req.user.id]);
-      totalCount = parseInt(countResult[0]?.count || 0);
-
-      // Then get paginated data
-      const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3';
-      const rows = await dbQuery(selectQuery, [req.user.id, limit, offset]);
-      log.trace(`📚 Query returned ${rows.length} rows (total: ${totalCount})`);
-
-      // Parse the JSON data from each row - return metadata only (no images for performance)
-      userStories = rows.map(row => {
-        const story = JSON.parse(row.data);
-        const hasThumbnail = !!(story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail);
-        return {
-          id: story.id,
-          title: story.title,
-          createdAt: story.createdAt,
-          updatedAt: story.updatedAt,
-          pages: story.pages,
-          language: story.language,
-          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: calculateStoryPageCount(story, true),
-          hasThumbnail, // Boolean flag - fetch actual thumbnail via /api/stories/:id/thumbnail
-          // Partial story fields
-          isPartial: story.isPartial || false,
-          generatedPages: story.generatedPages,
-          totalPages: story.totalPages
-        };
-      });
-      log.trace(`📚 Parsed ${userStories.length} stories (metadata only, no images)`);
-
-      if (userStories.length > 0) {
-        log.trace(`📚 First story: ${userStories[0].title} (ID: ${userStories[0].id})`);
-      }
-    } else {
-      // File mode
-      const allStories = await readJSON(STORIES_FILE);
-      const fullStories = allStories[req.user.id] || [];
-      totalCount = fullStories.length;
-
-      // Sort by createdAt descending, then paginate
-      const sortedStories = [...fullStories].sort((a, b) =>
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-      );
-      const paginatedStories = sortedStories.slice(offset, offset + limit);
-
-      // Return metadata only (no images for performance)
-      userStories = paginatedStories.map(story => {
-        const hasThumbnail = !!(story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail);
-        return {
-          id: story.id,
-          title: story.title,
-          createdAt: story.createdAt,
-          updatedAt: story.updatedAt,
-          pages: story.pages,
-          language: story.language,
-          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-          pageCount: calculateStoryPageCount(story, true),
-          hasThumbnail, // Boolean flag - fetch actual cover via /api/stories/:id/cover
-          // Partial story fields
-          isPartial: story.isPartial || false,
-          generatedPages: story.generatedPages,
-          totalPages: story.totalPages
-        };
-      });
-      console.log(`📚 File mode: Returning ${userStories.length} of ${totalCount} stories`);
-    }
-
-    console.log(`📚 Returning ${userStories.length} stories (total size: ${JSON.stringify(userStories).length} bytes)`);
-    await logActivity(req.user.id, req.user.username, 'STORIES_LOADED', { count: userStories.length });
-    res.json({
-      stories: userStories,
-      pagination: {
-        total: totalCount,
-        limit,
-        offset,
-        hasMore: offset + userStories.length < totalCount
-      }
-    });
-  } catch (err) {
-    console.error('❌ Error fetching stories:', err);
-    console.error('Error stack:', err.stack);
-    res.status(500).json({ error: 'Failed to fetch stories', details: err.message });
-  }
-});
-
-// Get single story with ALL data (images included)
-app.get('/api/stories/:id', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log(`📖 GET /api/stories/${id} - User: ${req.user.username}`);
-
-    let story = null;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      const selectQuery = 'SELECT data FROM stories WHERE id = $1 AND user_id = $2';
-      const rows = await dbQuery(selectQuery, [id, req.user.id]);
-
-      if (rows.length > 0) {
-        story = JSON.parse(rows[0].data);
-      }
-    } else {
-      const allStories = await readJSON(STORIES_FILE);
-      const userStories = allStories[req.user.id] || [];
-      story = userStories.find(s => s.id === id);
-    }
-
-    if (!story) {
-      return res.status(404).json({ error: 'Story not found' });
-    }
-
-    console.log(`📖 Returning full story: ${story.title} with ${story.sceneImages?.length || 0} images`);
-    res.json(story);
-  } catch (err) {
-    console.error('❌ Error fetching story:', err);
-    res.status(500).json({ error: 'Failed to fetch story', details: err.message });
-  }
-});
-
-// Get story cover image only (for lazy loading in story list)
-app.get('/api/stories/:id/cover', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    let coverImage = null;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      const result = await dbPool.query(
-        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
-        [id, req.user.id]
-      );
-      if (result.rows.length > 0) {
-        const story = JSON.parse(result.rows[0].data);
-        coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
-      }
-    } else {
-      const allStories = await readJSON(STORIES_FILE);
-      const userStories = allStories[req.user.id] || [];
-      const story = userStories.find(s => s.id === id);
-      if (story) {
-        coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
-      }
-    }
-
-    if (!coverImage) {
-      return res.status(404).json({ error: 'Cover image not found' });
-    }
-
-    res.json({ coverImage });
-  } catch (err) {
-    console.error('❌ Error fetching cover image:', err);
-    res.status(500).json({ error: 'Failed to fetch cover image' });
-  }
-});
-
-app.post('/api/stories', authenticateToken, async (req, res) => {
-  try {
-    const { story } = req.body;
-
-    // Add timestamp and ID if not present
-    if (!story.id) {
-      story.id = Date.now().toString();
-    }
-    story.createdAt = story.createdAt || new Date().toISOString();
-    story.updatedAt = new Date().toISOString();
-
-    let isNewStory;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      // Check if story exists
-      const checkQuery = 'SELECT id FROM stories WHERE id = $1 AND user_id = $2';
-      const existing = await dbQuery(checkQuery, [story.id, req.user.id]);
-      isNewStory = existing.length === 0;
-
-      // Note: Credits are now checked and deducted at job creation time (/api/jobs/create-story)
-      // This endpoint is for saving/updating story data only
-
-      // Save or update story
-      if (isNewStory) {
-        const insertQuery = 'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3)';
-        await dbQuery(insertQuery, [story.id, req.user.id, JSON.stringify(story)]);
-      } else {
-        const updateQuery = 'UPDATE stories SET data = $1 WHERE id = $2 AND user_id = $3';
-        await dbQuery(updateQuery, [JSON.stringify(story), story.id, req.user.id]);
-      }
-    } else {
-      // File mode
-      const allStories = await readJSON(STORIES_FILE);
-      const users = await readJSON(USERS_FILE);
-
-      if (!allStories[req.user.id]) {
-        allStories[req.user.id] = [];
-      }
-
-      const existingIndex = allStories[req.user.id].findIndex(s => s.id === story.id);
-      isNewStory = existingIndex < 0;
-
-      // Note: Credits are now checked and deducted at job creation time (/api/jobs/create-story)
-      // This endpoint is for saving/updating story data only
-
-      if (existingIndex >= 0) {
-        allStories[req.user.id][existingIndex] = story;
-      } else {
-        allStories[req.user.id].push(story);
-      }
-
-      await writeJSON(STORIES_FILE, allStories);
-    }
-
-    await logActivity(req.user.id, req.user.username, 'STORY_SAVED', {
-      storyId: story.id,
-      isNew: isNewStory
-    });
-
-    res.json({ message: 'Story saved successfully', id: story.id });
-  } catch (err) {
-    console.error('Error saving story:', err);
-    res.status(500).json({ error: 'Failed to save story' });
-  }
-});
-
-app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log(`🗑️  DELETE /api/stories/${id} - User: ${req.user.username} (ID: ${req.user.id})`);
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const deleteQuery = 'DELETE FROM stories WHERE id = $1 AND user_id = $2';
-      const result = await dbQuery(deleteQuery, [id, req.user.id]);
-
-      console.log(`🗑️  Delete result:`, { rowCount: result.rowCount, command: result.command });
-
-      // Check if any rows were deleted using rowCount
-      if (!result.rowCount || result.rowCount === 0) {
-        log.warn(`Story ${id} not found for user ${req.user.id}`);
-        return res.status(404).json({ error: 'Story not found or you do not have permission to delete it' });
-      }
-
-      // Also delete the associated story_job (story.id = job.id)
-      try {
-        const deleteJobResult = await dbPool.query(
-          'DELETE FROM story_jobs WHERE id = $1 AND user_id = $2',
-          [id, req.user.id]
-        );
-        if (deleteJobResult.rowCount > 0) {
-          console.log(`🗑️  Also deleted story_job ${id}`);
-        }
-      } catch (jobErr) {
-        log.warn(`Could not delete story_job ${id}:`, jobErr.message);
-      }
-
-      console.log(`✅ Successfully deleted story ${id}`);
-    } else {
-      // File mode
-      const allStories = await readJSON(STORIES_FILE);
-
-      if (!allStories[req.user.id]) {
-        return res.status(404).json({ error: 'Story not found' });
-      }
-
-      const initialLength = allStories[req.user.id].length;
-      allStories[req.user.id] = allStories[req.user.id].filter(s => s.id !== id);
-
-      if (allStories[req.user.id].length === initialLength) {
-        return res.status(404).json({ error: 'Story not found' });
-      }
-
-      await writeJSON(STORIES_FILE, allStories);
-    }
-
-    await logActivity(req.user.id, req.user.username, 'STORY_DELETED', { storyId: id });
-    res.json({ message: 'Story deleted successfully' });
-  } catch (err) {
-    console.error('Error deleting story:', err);
-    res.status(500).json({ error: 'Failed to delete story' });
-  }
-});
-END OF STORIES CRUD ROUTES */
 
 // =============================================================================
 // STORY REGENERATION ENDPOINTS - Regenerate individual components
@@ -4033,7 +1757,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
 
-    console.log(`🔄 Regenerating scene description for story ${id}, page ${pageNumber}`);
+    log.debug(`🔄 Regenerating scene description for story ${id}, page ${pageNumber}`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -4097,7 +1821,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     });
 
   } catch (err) {
-    console.error('Error regenerating scene description:', err);
+    log.error('Error regenerating scene description:', err);
     res.status(500).json({ error: 'Failed to regenerate scene description: ' + err.message });
   }
 });
@@ -4109,7 +1833,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const { customPrompt } = req.body;
     const pageNumber = parseInt(pageNum);
 
-    console.log(`🔄 Regenerating image for story ${id}, page ${pageNumber}`);
+    log.debug(`🔄 Regenerating image for story ${id}, page ${pageNumber}`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -4141,13 +1865,13 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const clothingCategory = parseClothingCategory(sceneText) || 'standard';
     // Use detailed photo info (with names) for labeled reference images
     const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
-    console.log(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}`);
+    log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}`);
 
     // Get visual bible from stored story (for recurring elements)
     const visualBible = storyData.visualBible || null;
     if (visualBible) {
       const relevantEntries = getVisualBibleEntriesForPage(visualBible, pageNumber);
-      console.log(`📖 [REGEN] Visual Bible: ${relevantEntries.length} entries relevant to page ${pageNumber}`);
+      log.debug(`📖 [REGEN] Visual Bible: ${relevantEntries.length} entries relevant to page ${pageNumber}`);
     }
 
     // Build image prompt with scene-specific characters and visual bible
@@ -4251,7 +1975,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     });
 
   } catch (err) {
-    console.error('Error regenerating image:', err);
+    log.error('Error regenerating image:', err);
     res.status(500).json({ error: 'Failed to regenerate image: ' + err.message });
   }
 });
@@ -4268,7 +1992,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       return res.status(400).json({ error: 'Invalid cover type. Must be: front, initial/initialPage, or back' });
     }
 
-    console.log(`🔄 Regenerating ${normalizedCoverType} cover for story ${id}`);
+    log.debug(`🔄 Regenerating ${normalizedCoverType} cover for story ${id}`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -4491,7 +2215,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     });
 
   } catch (err) {
-    console.error('Error regenerating cover:', err);
+    log.error('Error regenerating cover:', err);
     res.status(500).json({ error: 'Failed to regenerate cover: ' + err.message });
   }
 });
@@ -4547,16 +2271,16 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
     }
 
     // Evaluate the edited image quality
-    console.log(`⭐ [EDIT] Evaluating edited image quality...`);
+    log.debug(`⭐ [EDIT] Evaluating edited image quality...`);
     let qualityScore = null;
     let qualityReasoning = null;
     try {
       const evaluation = await evaluateImageQuality(editResult.imageData, 'scene');
       qualityScore = evaluation.score;
       qualityReasoning = evaluation.reasoning;
-      console.log(`⭐ [EDIT] Edited image score: ${qualityScore}%`);
+      log.debug(`⭐ [EDIT] Edited image score: ${qualityScore}%`);
     } catch (evalErr) {
-      console.error(`⚠️ [EDIT] Quality evaluation failed:`, evalErr.message);
+      log.error(`⚠️ [EDIT] Quality evaluation failed:`, evalErr.message);
     }
 
     // Update the image in story data
@@ -4597,7 +2321,7 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
     });
 
   } catch (err) {
-    console.error('Error editing image:', err);
+    log.error('Error editing image:', err);
     res.status(500).json({ error: 'Failed to edit image: ' + err.message });
   }
 });
@@ -4666,16 +2390,16 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
     }
 
     // Evaluate the edited cover quality
-    console.log(`⭐ [COVER EDIT] Evaluating edited cover quality...`);
+    log.debug(`⭐ [COVER EDIT] Evaluating edited cover quality...`);
     let qualityScore = null;
     let qualityReasoning = null;
     try {
       const evaluation = await evaluateImageQuality(editResult.imageData, 'cover');
       qualityScore = evaluation.score;
       qualityReasoning = evaluation.reasoning;
-      console.log(`⭐ [COVER EDIT] Edited cover score: ${qualityScore}%`);
+      log.debug(`⭐ [COVER EDIT] Edited cover score: ${qualityScore}%`);
     } catch (evalErr) {
-      console.error(`⚠️ [COVER EDIT] Quality evaluation failed:`, evalErr.message);
+      log.error(`⚠️ [COVER EDIT] Quality evaluation failed:`, evalErr.message);
     }
 
     // Update the cover image in story data
@@ -4718,7 +2442,7 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
     });
 
   } catch (err) {
-    console.error('Error editing cover:', err);
+    log.error('Error editing cover:', err);
     res.status(500).json({ error: 'Failed to edit cover: ' + err.message });
   }
 });
@@ -4734,7 +2458,7 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
       return res.status(400).json({ error: 'Provide text or sceneDescription to update' });
     }
 
-    console.log(`📝 Editing page ${pageNumber} for story ${id}`);
+    log.debug(`📝 Editing page ${pageNumber} for story ${id}`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -4785,7 +2509,7 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
     });
 
   } catch (err) {
-    console.error('Error editing page:', err);
+    log.error('Error editing page:', err);
     res.status(500).json({ error: 'Failed to edit page: ' + err.message });
   }
 });
@@ -4822,7 +2546,7 @@ app.get('/api/jobs/:jobId/checkpoints', authenticateToken, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error getting checkpoints:', err);
+    log.error('Error getting checkpoints:', err);
     res.status(500).json({ error: 'Failed to get checkpoints: ' + err.message });
   }
 });
@@ -4861,7 +2585,7 @@ app.get('/api/jobs/:jobId/checkpoints/:stepName', authenticateToken, async (req,
     });
 
   } catch (err) {
-    console.error('Error getting checkpoint:', err);
+    log.error('Error getting checkpoint:', err);
     res.status(500).json({ error: 'Failed to get checkpoint: ' + err.message });
   }
 });
@@ -4917,7 +2641,7 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
       }
 
       // Generate fresh PDF using the shared print function (same as Buy Book)
-      console.log(`🖨️ [PRINT] Generating fresh print PDF for story: ${storyId}`);
+      log.debug(`🖨️ [PRINT] Generating fresh print PDF for story: ${storyId}`);
       try {
         const { pdfBuffer, pageCount: generatedPageCount } = await generatePrintPdf(storyData);
         pageCount = generatedPageCount;
@@ -4936,9 +2660,9 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
 
         const baseUrl = process.env.BASE_URL || 'https://www.magicalstory.ch';
         pdfUrl = `${baseUrl}/api/files/${pdfFileId}`;
-        console.log(`🖨️ [PRINT] PDF generated and saved with URL: ${pdfUrl}, pageCount: ${pageCount}`);
+        log.debug(`🖨️ [PRINT] PDF generated and saved with URL: ${pdfUrl}, pageCount: ${pageCount}`);
       } catch (pdfErr) {
-        console.error(`🖨️ [PRINT] Error generating PDF:`, pdfErr.message);
+        log.error(`🖨️ [PRINT] Error generating PDF:`, pdfErr.message);
         return res.status(500).json({ error: 'Failed to generate print PDF', details: pdfErr.message });
       }
     }
@@ -5066,7 +2790,7 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
     const printData = await printResponse.json();
 
     if (!printResponse.ok) {
-      console.error('Print provider API error:', printData);
+      log.error('Print provider API error:', printData);
       return res.status(printResponse.status).json({
         error: 'Print provider order failed',
         details: printData
@@ -5108,7 +2832,7 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error creating print provider order:', err);
+    log.error('Error creating print provider order:', err);
     res.status(500).json({ error: 'Failed to create print order', details: err.message });
   }
 });
@@ -5157,7 +2881,7 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
     let allPhotobooks = [];
     const photobookCatalogs = ['hard-cover-photobooks', 'soft-cover-photobooks'];
 
-    console.log(`📚 Targeting photobook catalogs: ${photobookCatalogs.join(', ')}`);
+    log.debug(`📚 Targeting photobook catalogs: ${photobookCatalogs.join(', ')}`);
 
     for (const catalogUid of photobookCatalogs) {
       try {
@@ -5175,11 +2899,11 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
           })
         });
 
-        console.log(`📡 Search response status: ${searchResponse.status}`);
+        log.debug(`📡 Search response status: ${searchResponse.status}`);
 
         if (!searchResponse.ok) {
           const errorText = await searchResponse.text();
-          console.error(`❌ Failed to search ${catalogUid}:`, errorText.substring(0, 200));
+          log.error(`❌ Failed to search ${catalogUid}:`, errorText.substring(0, 200));
           continue;
         }
 
@@ -5192,12 +2916,12 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
 
         // Accept ALL products from photobook catalogs
         const photobooks = searchData.products || [];
-        console.log(`📚 ${catalogUid}: Found ${photobooks.length} products`);
+        log.debug(`📚 ${catalogUid}: Found ${photobooks.length} products`);
 
         if (photobooks.length > 0) {
-          console.log(`📚 First 3 products from ${catalogUid}:`);
+          log.debug(`📚 First 3 products from ${catalogUid}:`);
           photobooks.slice(0, 3).forEach((p, i) => {
-            console.log(`  ${i+1}. ${p.name || p.productName || 'Unnamed'} (UID: ${p.productUid || p.uid})`);
+            log.debug(`  ${i+1}. ${p.name || p.productName || 'Unnamed'} (UID: ${p.productUid || p.uid})`);
           });
         } else {
           log.warn(`No products found in ${catalogUid}!`);
@@ -5205,8 +2929,8 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
 
         allPhotobooks = allPhotobooks.concat(photobooks);
       } catch (err) {
-        console.error(`❌ Error searching catalog ${catalogUid}:`, err.message);
-        console.error('Error stack:', err.stack);
+        log.error(`❌ Error searching catalog ${catalogUid}:`, err.message);
+        log.error('Error stack:', err.stack);
       }
     }
 
@@ -5215,7 +2939,7 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
       new Map(allPhotobooks.map(p => [p.productUid || p.uid, p])).values()
     );
 
-    console.log('📚 Total unique photobooks found:', uniquePhotobooks.length);
+    log.debug('📚 Total unique photobooks found:', uniquePhotobooks.length);
 
     res.json({
       success: true,
@@ -5226,7 +2950,7 @@ app.get('/api/admin/print-provider/fetch-products', authenticateToken, async (re
     });
 
   } catch (err) {
-    console.error('Error fetching print provider products:', err);
+    log.error('Error fetching print provider products:', err);
     res.status(500).json({ error: 'Failed to fetch products', details: err.message });
   }
 });
@@ -5259,7 +2983,7 @@ app.get('/api/admin/print-provider/products', authenticateToken, async (req, res
     }
 
   } catch (err) {
-    console.error('Error getting products:', err);
+    log.error('Error getting products:', err);
     res.status(500).json({ error: 'Failed to get products', details: err.message });
   }
 });
@@ -5355,7 +3079,7 @@ app.post('/api/admin/print-provider/products', authenticateToken, async (req, re
     res.json({ success: true, message: 'Product saved successfully' });
 
   } catch (err) {
-    console.error('Error saving product:', err);
+    log.error('Error saving product:', err);
     res.status(500).json({ error: 'Failed to save product', details: err.message });
   }
 });
@@ -5414,37 +3138,11 @@ app.post('/api/admin/print-provider/seed-products', authenticateToken, async (re
     }
 
   } catch (err) {
-    console.error('Error seeding products:', err);
+    log.error('Error seeding products:', err);
     res.status(500).json({ error: 'Failed to seed products', details: err.message });
   }
 });
 
-// =============================================================================
-// CONFIG ROUTES - MIGRATED TO server/routes/config.js
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-// Get general app configuration (public, no auth required)
-app.get('/api/config', (req, res) => {
-  res.json({
-    imageGenMode: IMAGE_GEN_MODE  // 'parallel' or 'sequential'
-  });
-});
-
-// Get active products for users
-// Get default print provider product UID from environment
-app.get('/api/config/print-product-uid', authenticateToken, (req, res) => {
-  const productUid = process.env.GELATO_PHOTOBOOK_UID;
-
-  if (!productUid) {
-    return res.status(500).json({
-      error: 'Print product UID not configured',
-      message: 'Please set GELATO_PHOTOBOOK_UID in environment variables'
-    });
-  }
-
-  res.json({ productUid });
-});
-END OF CONFIG ROUTES */
 
 app.get('/api/print-provider/products', async (req, res) => {
   try {
@@ -5470,7 +3168,7 @@ app.get('/api/print-provider/products', async (req, res) => {
     }
 
   } catch (err) {
-    console.error('Error getting active products:', err);
+    log.error('Error getting active products:', err);
     res.status(500).json({ error: 'Failed to get products', details: err.message });
   }
 });
@@ -5485,7 +3183,7 @@ app.get('/api/photo-analyzer-status', async (req, res) => {
     });
     const data = await response.json();
 
-    console.log('📸 [HEALTH] Python service status:', data);
+    log.debug('📸 [HEALTH] Python service status:', data);
 
     res.json({
       status: 'ok',
@@ -5493,7 +3191,7 @@ app.get('/api/photo-analyzer-status', async (req, res) => {
       url: photoAnalyzerUrl
     });
   } catch (err) {
-    console.error('📸 [HEALTH] Python service unavailable:', err.message);
+    log.error('📸 [HEALTH] Python service unavailable:', err.message);
     res.status(503).json({
       status: 'error',
       error: err.message,
@@ -5508,7 +3206,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
     const { imageData } = req.body;
 
     if (!imageData) {
-      console.log('📸 [PHOTO] Missing imageData in request');
+      log.debug('📸 [PHOTO] Missing imageData in request');
       return res.status(400).json({ error: 'Missing imageData' });
     }
 
@@ -5529,7 +3227,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
       try {
         const geminiApiKey = process.env.GEMINI_API_KEY;
         if (!geminiApiKey) {
-          console.log('📸 [GEMINI] No API key, skipping trait extraction');
+          log.debug('📸 [GEMINI] No API key, skipping trait extraction');
           return null;
         }
 
@@ -5566,7 +3264,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         );
 
         if (!response.ok) {
-          console.error('📸 [GEMINI] API error:', response.status);
+          log.error('📸 [GEMINI] API error:', response.status);
           return null;
         }
 
@@ -5582,29 +3280,29 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
 
         if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
           const text = data.candidates[0].content.parts[0].text;
-          console.log('📸 [GEMINI] Raw response length:', text.length);
+          log.debug('📸 [GEMINI] Raw response length:', text.length);
           // Extract JSON from response (may have markdown wrapping)
           const jsonMatch = text.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const result = JSON.parse(jsonMatch[0]);
             // Handle nested traits format or flat format
             if (result.traits) {
-              console.log('📸 [GEMINI] Extracted traits:', result.traits);
+              log.debug('📸 [GEMINI] Extracted traits:', result.traits);
               return result;
             } else {
               // Flat traits object - wrap in traits
-              console.log('📸 [GEMINI] Extracted traits (flat format):', result);
+              log.debug('📸 [GEMINI] Extracted traits (flat format):', result);
               return { traits: result };
             }
           } else {
-            console.error('📸 [GEMINI] No JSON found in response:', text.substring(0, 200));
+            log.error('📸 [GEMINI] No JSON found in response:', text.substring(0, 200));
           }
         } else {
-          console.error('📸 [GEMINI] Unexpected response structure:', JSON.stringify(data).substring(0, 200));
+          log.error('📸 [GEMINI] Unexpected response structure:', JSON.stringify(data).substring(0, 200));
         }
         return null;
       } catch (err) {
-        console.error('📸 [GEMINI] Trait extraction error:', err.message);
+        log.error('📸 [GEMINI] Trait extraction error:', err.message);
         return null;
       }
     };
@@ -5645,7 +3343,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
       });
 
       if (!analyzerData.success) {
-        console.error('📸 [PHOTO] Python analysis failed:', analyzerData.error, analyzerData.traceback);
+        log.error('📸 [PHOTO] Python analysis failed:', analyzerData.error, analyzerData.traceback);
         return res.status(500).json({
           error: 'Photo analysis failed',
           details: analyzerData.error || 'Unknown error',
@@ -5710,14 +3408,14 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         attributes: analyzerData.attributes
       };
 
-      console.log('📸 [PHOTO] Sending response:', {
+      log.debug('📸 [PHOTO] Sending response:', {
         hasAttributes: !!analyzerData.attributes,
         clothing: analyzerData.attributes?.clothing
       });
       res.json(response);
 
     } catch (fetchErr) {
-      console.error('Photo analyzer service error:', fetchErr.message);
+      log.error('Photo analyzer service error:', fetchErr.message);
 
       // Return a helpful error when Python service is down
       if (fetchErr.cause?.code === 'ECONNREFUSED') {
@@ -5732,7 +3430,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
     }
 
   } catch (err) {
-    console.error('Error analyzing photo:', err);
+    log.error('Error analyzing photo:', err);
     res.status(500).json({
       error: 'Failed to analyze photo',
       details: err.message,
@@ -5786,7 +3484,7 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
 
     res.json({ success: true, prompt: avatarPrompt });
   } catch (error) {
-    console.error('Error getting avatar prompt:', error);
+    log.error('Error getting avatar prompt:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -5860,16 +3558,16 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
     // Generate avatars sequentially to avoid rate limits
     for (const [category, config] of Object.entries(clothingCategories)) {
       try {
-        console.log(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'})...`);
+        log.debug(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'})...`);
 
         // Build the prompt from template (use only the prompt part, not the CLOTHING_STYLES section)
         const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
         const clothingStyle = getClothingStylePrompt(category);
-        console.log(`   [CLOTHING] Style for ${category}: "${clothingStyle}"`);
+        log.debug(`   [CLOTHING] Style for ${category}: "${clothingStyle}"`);
         const avatarPrompt = fillTemplate(promptPart, {
           'CLOTHING_STYLE': clothingStyle
         });
-        console.log(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStyle.substring(0, 50)}..."`);
+        log.debug(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStyle.substring(0, 50)}..."`);
 
         // Prepare the request with reference photo
         const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
@@ -5922,7 +3620,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`❌ [CLOTHING AVATARS] ${category} generation failed:`, errorText);
+          log.error(`❌ [CLOTHING AVATARS] ${category} generation failed:`, errorText);
           continue; // Skip this category, try next
         }
 
@@ -5939,7 +3637,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
         // Check if blocked by safety filters - retry once with simplified prompt
         if (data.promptFeedback?.blockReason) {
           log.warn(`[CLOTHING AVATARS] ${category} blocked by safety filters:`, data.promptFeedback.blockReason);
-          console.log(`🔄 [CLOTHING AVATARS] Retrying ${category} with simplified prompt...`);
+          log.debug(`🔄 [CLOTHING AVATARS] Retrying ${category} with simplified prompt...`);
 
           // Simplified retry prompt from template
           const outfitDescription = category === 'winter' ? 'a winter coat' : category === 'summer' ? 'a casual T-shirt and shorts' : category === 'formal' ? 'formal attire' : 'casual clothes';
@@ -5979,7 +3677,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
               continue;
             }
           } else {
-            console.error(`❌ [CLOTHING AVATARS] ${category} retry failed`);
+            log.error(`❌ [CLOTHING AVATARS] ${category} retry failed`);
             continue;
           }
         }
@@ -6016,7 +3714,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (err) {
-        console.error(`❌ [CLOTHING AVATARS] Error generating ${category}:`, err.message);
+        log.error(`❌ [CLOTHING AVATARS] Error generating ${category}:`, err.message);
       }
     }
 
@@ -6033,232 +3731,11 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
     res.json({ success: true, clothingAvatars: results });
 
   } catch (err) {
-    console.error('Error generating clothing avatars:', err);
+    log.error('Error generating clothing avatars:', err);
     res.status(500).json({ error: 'Failed to generate clothing avatars', details: err.message });
   }
 });
 
-// =============================================================================
-// FILE MANAGEMENT ROUTES - MIGRATED TO server/routes/files.js
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-// File Management Endpoints
-
-// Upload file (image or PDF)
-app.post('/api/files', authenticateToken, async (req, res) => {
-  try {
-    const { fileData, fileType, storyId, mimeType, filename } = req.body;
-
-    if (!fileData || !fileType || !mimeType) {
-      return res.status(400).json({ error: 'Missing required fields: fileData, fileType, mimeType' });
-    }
-
-    // Extract base64 data (remove data URL prefix if present)
-    const base64Data = fileData.replace(/^data:[^;]+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    const fileSize = buffer.length;
-
-    const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const insertQuery = 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
-
-      await dbQuery(insertQuery, [
-        fileId,
-        req.user.id,
-        fileType,
-        storyId || null,
-        mimeType,
-        buffer,
-        fileSize,
-        filename || null
-      ]);
-    } else {
-      // File mode - save to disk
-      const fs = require('fs').promises;
-      const path = require('path');
-      const uploadsDir = path.join(__dirname, 'data', 'uploads');
-
-      // Create uploads directory if it doesn't exist
-      await fs.mkdir(uploadsDir, { recursive: true });
-
-      const filePath = path.join(uploadsDir, fileId);
-      await fs.writeFile(filePath, buffer);
-
-      // Save metadata to JSON
-      const metadataFile = path.join(__dirname, 'data', 'files.json');
-      let metadata = {};
-      try {
-        const data = await fs.readFile(metadataFile, 'utf-8');
-        metadata = JSON.parse(data);
-      } catch (err) {
-        // File doesn't exist yet
-      }
-
-      metadata[fileId] = {
-        id: fileId,
-        userId: req.user.id,
-        fileType,
-        storyId: storyId || null,
-        mimeType,
-        fileSize,
-        filename: filename || null,
-        createdAt: new Date().toISOString()
-      };
-
-      await fs.writeFile(metadataFile, JSON.stringify(metadata, null, 2));
-    }
-
-    await logActivity(req.user.id, req.user.username, 'FILE_UPLOADED', {
-      fileId,
-      fileType,
-      fileSize
-    });
-
-    res.json({
-      success: true,
-      fileId,
-      fileUrl: `${req.protocol}://${req.get('host')}/api/files/${fileId}`,
-      fileSize
-    });
-
-  } catch (err) {
-    console.error('Error uploading file:', err);
-    res.status(500).json({ error: 'Failed to upload file', details: err.message });
-  }
-});
-
-// Get/serve file by ID
-app.get('/api/files/:fileId', async (req, res) => {
-  try {
-    const { fileId } = req.params;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode
-      const selectQuery = 'SELECT mime_type, file_data, filename FROM files WHERE id = $1';
-
-      const rows = await dbQuery(selectQuery, [fileId]);
-
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-
-      const file = rows[0];
-
-      res.set('Content-Type', file.mime_type);
-      if (file.filename) {
-        // Sanitize filename for Content-Disposition header (remove/replace non-ASCII chars)
-        const safeFilename = file.filename.replace(/[^\x20-\x7E]/g, '_');
-        // Use RFC 5987 encoding for proper Unicode support
-        const encodedFilename = encodeURIComponent(file.filename).replace(/'/g, '%27');
-        res.set('Content-Disposition', `inline; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`);
-      }
-
-      // file_data could be: Buffer (bytea), string (base64), or string (data URL)
-      let fileBuffer;
-      if (Buffer.isBuffer(file.file_data)) {
-        // Already a buffer - check if it's base64 encoded text
-        const str = file.file_data.toString('utf8');
-        if (str.startsWith('data:')) {
-          fileBuffer = Buffer.from(str.split(',')[1], 'base64');
-        } else if (/^[A-Za-z0-9+/=]+$/.test(str.substring(0, 100))) {
-          // Looks like base64 string stored as buffer
-          fileBuffer = Buffer.from(str, 'base64');
-        } else {
-          fileBuffer = file.file_data;
-        }
-      } else if (typeof file.file_data === 'string') {
-        if (file.file_data.startsWith('data:')) {
-          fileBuffer = Buffer.from(file.file_data.split(',')[1], 'base64');
-        } else {
-          fileBuffer = Buffer.from(file.file_data, 'base64');
-        }
-      } else {
-        fileBuffer = file.file_data;
-      }
-
-      res.send(fileBuffer);
-
-    } else {
-      // File mode - read from disk
-      const fs = require('fs').promises;
-      const path = require('path');
-
-      const metadataFile = path.join(__dirname, 'data', 'files.json');
-      const data = await fs.readFile(metadataFile, 'utf-8');
-      const metadata = JSON.parse(data);
-
-      if (!metadata[fileId]) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-
-      const fileMetadata = metadata[fileId];
-      const filePath = path.join(__dirname, 'data', 'uploads', fileId);
-      const fileBuffer = await fs.readFile(filePath);
-
-      res.set('Content-Type', fileMetadata.mimeType);
-      if (fileMetadata.filename) {
-        // Sanitize filename for Content-Disposition header (remove/replace non-ASCII chars)
-        const safeFilename = fileMetadata.filename.replace(/[^\x20-\x7E]/g, '_');
-        // Use RFC 5987 encoding for proper Unicode support
-        const encodedFilename = encodeURIComponent(fileMetadata.filename).replace(/'/g, '%27');
-        res.set('Content-Disposition', `inline; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`);
-      }
-      res.send(fileBuffer);
-    }
-
-  } catch (err) {
-    console.error('Error serving file:', err);
-    res.status(500).json({ error: 'Failed to serve file', details: err.message });
-  }
-});
-
-// Delete file by ID
-app.delete('/api/files/:fileId', authenticateToken, async (req, res) => {
-  try {
-    const { fileId } = req.params;
-
-    if (STORAGE_MODE === 'database' && dbPool) {
-      // Database mode - verify ownership before deleting
-      const deleteQuery = 'DELETE FROM files WHERE id = $1 AND user_id = $2';
-
-      const result = await dbQuery(deleteQuery, [fileId, req.user.id]);
-
-      if (result.length === 0) {
-        return res.status(404).json({ error: 'File not found or unauthorized' });
-      }
-    } else {
-      // File mode
-      const fs = require('fs').promises;
-      const path = require('path');
-
-      const metadataFile = path.join(__dirname, 'data', 'files.json');
-      const data = await fs.readFile(metadataFile, 'utf-8');
-      const metadata = JSON.parse(data);
-
-      if (!metadata[fileId] || metadata[fileId].userId !== req.user.id) {
-        return res.status(404).json({ error: 'File not found or unauthorized' });
-      }
-
-      // Delete file from disk
-      const filePath = path.join(__dirname, 'data', 'uploads', fileId);
-      await fs.unlink(filePath);
-
-      // Remove from metadata
-      delete metadata[fileId];
-      await fs.writeFile(metadataFile, JSON.stringify(metadata, null, 2));
-    }
-
-    await logActivity(req.user.id, req.user.username, 'FILE_DELETED', { fileId });
-    res.json({ success: true, message: 'File deleted successfully' });
-
-  } catch (err) {
-    console.error('Error deleting file:', err);
-    res.status(500).json({ error: 'Failed to delete file', details: err.message });
-  }
-});
-END OF FILE MANAGEMENT ROUTES */
 
 // ========================================
 // SHARED PDF GENERATION FUNCTION FOR PRINTING
@@ -6352,7 +3829,7 @@ async function generatePrintPdf(storyData) {
             valign: 'center'
           });
         } catch (imgErr) {
-          console.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+          log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
         }
       }
 
@@ -6376,7 +3853,7 @@ async function generatePrintPdf(storyData) {
       // Check if text still doesn't fit
       if (textHeight > availableTextHeight) {
         const errorMsg = `Text too long on page ${pageNumber}. Please shorten the story text for this page.`;
-        console.error(`❌ [PRINT PDF] ${errorMsg}`);
+        log.error(`❌ [PRINT PDF] ${errorMsg}`);
         throw new Error(errorMsg);
       }
 
@@ -6418,7 +3895,7 @@ async function generatePrintPdf(storyData) {
       // Check if text still doesn't fit
       if (textHeight > safeAvailableHeight) {
         const errorMsg = `Text too long on page ${pageNumber}. Please shorten the story text for this page.`;
-        console.error(`❌ [PRINT PDF] ${errorMsg}`);
+        log.error(`❌ [PRINT PDF] ${errorMsg}`);
         throw new Error(errorMsg);
       }
 
@@ -6438,7 +3915,7 @@ async function generatePrintPdf(storyData) {
             valign: 'center'
           });
         } catch (imgErr) {
-          console.error('Error adding image to PDF:', imgErr);
+          log.error('Error adding image to PDF:', imgErr);
         }
       }
     });
@@ -6474,7 +3951,7 @@ async function generatePrintPdf(storyData) {
 // Generate combined book PDF from multiple stories
 // Used by processBookOrder when ordering a book with multiple stories
 async function generateCombinedBookPdf(stories) {
-  console.log(`📚 [COMBINED PDF] Generating book with ${stories.length} stories`);
+  log.debug(`📚 [COMBINED PDF] Generating book with ${stories.length} stories`);
 
   const PDFDocument = require('pdfkit');
   const mmToPoints = (mm) => mm * 2.83465;
@@ -6537,7 +4014,7 @@ async function generateCombinedBookPdf(stories) {
               valign: 'center'
             });
           } catch (err) {
-            console.error(`Error adding image for page ${pageNumber}:`, err.message);
+            log.error(`Error adding image for page ${pageNumber}:`, err.message);
           }
         }
 
@@ -6596,7 +4073,7 @@ async function generateCombinedBookPdf(stories) {
               valign: 'center'
             });
           } catch (err) {
-            console.error(`Error adding image for page ${pageNumber}:`, err.message);
+            log.error(`Error adding image for page ${pageNumber}:`, err.message);
           }
         }
       });
@@ -6609,7 +4086,7 @@ async function generateCombinedBookPdf(stories) {
     const isFirstStory = storyIndex === 0;
     const storyPages = parseStoryPages(storyData);
 
-    console.log(`📚 [COMBINED PDF] Processing story ${storyIndex + 1}: "${storyData.title}" with ${storyPages.length} pages`);
+    log.debug(`📚 [COMBINED PDF] Processing story ${storyIndex + 1}: "${storyData.title}" with ${storyPages.length} pages`);
 
     if (isFirstStory) {
       // STORY 1: Back cover + Front cover (combined spread for book binding)
@@ -6679,7 +4156,7 @@ async function generateCombinedBookPdf(stories) {
   if (totalStoryPages % 2 !== 0) {
     doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     totalStoryPages++;
-    console.log(`📚 [COMBINED PDF] Added final blank page for even page count`);
+    log.debug(`📚 [COMBINED PDF] Added final blank page for even page count`);
   }
 
   doc.end();
@@ -6758,7 +4235,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         doc.image(frontCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
       } catch (err) {
-        console.error('Error adding front cover:', err.message);
+        log.error('Error adding front cover:', err.message);
       }
     }
 
@@ -6770,7 +4247,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
       } catch (err) {
-        console.error('Error adding initial page:', err.message);
+        log.error('Error adding initial page:', err.message);
       }
     }
 
@@ -6801,7 +4278,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
               valign: 'center'
             });
           } catch (err) {
-            console.error(`Error adding image for page ${pageNumber}:`, err.message);
+            log.error(`Error adding image for page ${pageNumber}:`, err.message);
           }
         }
 
@@ -6859,7 +4336,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
               valign: 'center'
             });
           } catch (err) {
-            console.error(`Error adding image for page ${pageNumber}:`, err.message);
+            log.error(`Error adding image for page ${pageNumber}:`, err.message);
           }
         }
       });
@@ -6873,7 +4350,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         doc.image(backCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
       } catch (err) {
-        console.error('Error adding back cover:', err.message);
+        log.error('Error adding back cover:', err.message);
       }
     }
 
@@ -6894,7 +4371,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     res.send(pdfBuffer);
 
   } catch (err) {
-    console.error('Error generating PDF:', err);
+    log.error('Error generating PDF:', err);
     res.status(500).json({ error: 'Failed to generate PDF', details: err.message });
   }
 });
@@ -6905,12 +4382,12 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
   try {
     // Admin only
     if (req.user.role !== 'admin') {
-      console.log(`🖨️ [ADMIN PRINT PDF] Access denied - user ${req.user.username} is not admin (role: ${req.user.role})`);
+      log.debug(`🖨️ [ADMIN PRINT PDF] Access denied - user ${req.user.username} is not admin (role: ${req.user.role})`);
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     const storyId = req.params.id;
-    console.log(`🖨️ [ADMIN PRINT PDF] Admin ${req.user.username} requesting print PDF for story: ${storyId}`);
+    log.debug(`🖨️ [ADMIN PRINT PDF] Admin ${req.user.username} requesting print PDF for story: ${storyId}`);
     console.log(`🖨️ [ADMIN PRINT PDF] Storage mode: ${STORAGE_MODE}, dbPool exists: ${!!dbPool}`);
 
     // Fetch story from database (admin can access any story)
@@ -6935,12 +4412,12 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
     }
 
     if (!storyData) {
-      console.log(`🖨️ [ADMIN PRINT PDF] Story not found: ${storyId}`);
+      log.debug(`🖨️ [ADMIN PRINT PDF] Story not found: ${storyId}`);
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    console.log(`🖨️ [ADMIN PRINT PDF] Story found: ${storyData.title}`);
-    console.log(`🖨️ [ADMIN PRINT PDF] Story has: coverImages=${!!storyData.coverImages}, sceneImages=${storyData.sceneImages?.length || 0}, storyText=${!!storyData.storyText || !!storyData.generatedStory}`);
+    log.debug(`🖨️ [ADMIN PRINT PDF] Story found: ${storyData.title}`);
+    log.debug(`🖨️ [ADMIN PRINT PDF] Story has: coverImages=${!!storyData.coverImages}, sceneImages=${storyData.sceneImages?.length || 0}, storyText=${!!storyData.storyText || !!storyData.generatedStory}`);
 
     // Generate print PDF using the shared function (same as Buy Book / Print Book)
     const { pdfBuffer, pageCount } = await generatePrintPdf(storyData);
@@ -6959,7 +4436,7 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
     res.send(pdfBuffer);
 
   } catch (err) {
-    console.error('Error generating print PDF:', err);
+    log.error('Error generating print PDF:', err);
     res.status(500).json({ error: 'Failed to generate print PDF', details: err.message });
   }
 });
@@ -7070,7 +4547,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
               valign: 'center'
             });
           } catch (imgErr) {
-            console.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
+            log.error(`Error adding image to PDF page ${pageNumber}:`, imgErr);
           }
         }
 
@@ -7148,13 +4625,13 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 
         if (textHeight > safeAvailableHeight) {
           truncatedPages.push(pageNumber);
-          console.error(`❌ Page ${pageNumber}: Text too long even at minimum font size (${fontSize}pt) - would be truncated`);
+          log.error(`❌ Page ${pageNumber}: Text too long even at minimum font size (${fontSize}pt) - would be truncated`);
         }
       });
 
       // Abort if any pages would be truncated
       if (truncatedPages.length > 0) {
-        console.error(`❌ [PDF] Aborting: ${truncatedPages.length} pages have text too long for print`);
+        log.error(`❌ [PDF] Aborting: ${truncatedPages.length} pages have text too long for print`);
         return res.status(400).json({
           error: 'Text too long for print',
           message: `Pages ${truncatedPages.join(', ')} have too much text and would be truncated. Please shorten the text before printing.`,
@@ -7207,7 +4684,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
               valign: 'center'
             });
           } catch (imgErr) {
-            console.error('Error adding image to PDF:', imgErr);
+            log.error('Error adding image to PDF:', imgErr);
           }
         }
       });
@@ -7289,7 +4766,7 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error generating PDF:', err);
+    log.error('Error generating PDF:', err);
     res.status(500).json({ error: 'Failed to generate PDF', details: err.message });
   }
 });
@@ -7308,7 +4785,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Missing or invalid storyIds array' });
     }
 
-    console.log(`📚 [BOOK PDF] Generating multi-story book with ${storyIds.length} stories`);
+    log.debug(`📚 [BOOK PDF] Generating multi-story book with ${storyIds.length} stories`);
 
     // Fetch all stories from database
     const stories = [];
@@ -7319,7 +4796,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
       );
 
       if (storyResult.rows.length === 0) {
-        console.log(`📚 [BOOK PDF] Story not found: ${storyId}`);
+        log.debug(`📚 [BOOK PDF] Story not found: ${storyId}`);
         return res.status(404).json({ error: `Story not found: ${storyId}` });
       }
 
@@ -7330,7 +4807,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
       stories.push({ id: storyId, data: storyData });
     }
 
-    console.log(`📚 [BOOK PDF] Loaded ${stories.length} stories: ${stories.map(s => s.data.title).join(', ')}`);
+    log.debug(`📚 [BOOK PDF] Loaded ${stories.length} stories: ${stories.map(s => s.data.title).join(', ')}`);
 
     // Helper functions
     const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
@@ -7395,7 +4872,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
                 valign: 'center'
               });
             } catch (err) {
-              console.error(`Error adding image for page ${pageNumber}:`, err.message);
+              log.error(`Error adding image for page ${pageNumber}:`, err.message);
             }
           }
 
@@ -7453,7 +4930,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
                 valign: 'center'
               });
             } catch (err) {
-              console.error(`Error adding image for page ${pageNumber}:`, err.message);
+              log.error(`Error adding image for page ${pageNumber}:`, err.message);
             }
           }
         });
@@ -7466,7 +4943,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
       const isFirstStory = storyIndex === 0;
       const storyPages = parseStoryPages(storyData);
 
-      console.log(`📚 [BOOK PDF] Processing story ${storyIndex + 1}: "${storyData.title}" with ${storyPages.length} pages`);
+      log.debug(`📚 [BOOK PDF] Processing story ${storyIndex + 1}: "${storyData.title}" with ${storyPages.length} pages`);
 
       if (isFirstStory) {
         // STORY 1: Back cover + Front cover (combined spread for book binding)
@@ -7535,7 +5012,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     if (totalStoryPages % 2 !== 0) {
       doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       totalStoryPages++;
-      console.log(`📚 [BOOK PDF] Added final blank page for even page count`);
+      log.debug(`📚 [BOOK PDF] Added final blank page for even page count`);
     }
 
     doc.end();
@@ -7552,7 +5029,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     res.send(pdfBuffer);
 
   } catch (err) {
-    console.error('📚 [BOOK PDF] Error:', err);
+    log.error('📚 [BOOK PDF] Error:', err);
     res.status(500).json({ error: 'Failed to generate book PDF', details: err.message });
   }
 });
@@ -7564,7 +5041,7 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
     }
 
     const { orderId } = req.params;
-    console.log(`🔄 [ADMIN] Retrying print order for order ID: ${orderId}`);
+    log.debug(`🔄 [ADMIN] Retrying print order for order ID: ${orderId}`);
 
     // Get order details
     const orderResult = await dbPool.query(`
@@ -7693,7 +5170,7 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
 
     if (!printResponse.ok) {
       const errorText = await printResponse.text();
-      console.error(`❌ [ADMIN] Print provider API error: ${printResponse.status} - ${errorText}`);
+      log.error(`❌ [ADMIN] Print provider API error: ${printResponse.status} - ${errorText}`);
       return res.status(printResponse.status).json({
         error: 'Print provider order failed',
         details: errorText
@@ -7720,59 +5197,10 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
     });
 
   } catch (err) {
-    console.error('❌ [ADMIN] Error retrying print order:', err);
+    log.error('❌ [ADMIN] Error retrying print order:', err);
     res.status(500).json({ error: err.message });
   }
 });
-// =============================================================================
-// HEALTH ROUTES - MIGRATED TO server/routes/health.js
-// =============================================================================
-/* COMMENTED OUT - Now served from modular routes
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// IP check endpoint - shows Railway's outgoing IP
-app.get('/api/check-ip', async (req, res) => {
-  try {
-    const response = await fetch('https://api.ipify.org?format=json');
-    const data = await response.json();
-    res.json({
-      railwayOutgoingIp: data.ip,
-      requestIp: req.ip,
-      forwardedFor: req.headers['x-forwarded-for'],
-      message: 'Railway outgoing IP address for debugging'
-    });
-  } catch (err) {
-    res.json({ error: err.message });
-  }
-});
-
-// Browser error logging endpoint - receives errors from frontend
-app.post('/api/log-error', (req, res) => {
-  try {
-    const { message, stack, url, line, column, userAgent, userId, timestamp, errorType } = req.body;
-
-    // Log to console with emoji for visibility in Railway logs
-    console.error('🔴 BROWSER ERROR:', {
-      type: errorType || 'JavaScript Error',
-      message,
-      url,
-      location: line && column ? `Line ${line}, Column ${column}` : 'Unknown',
-      user: userId || 'Anonymous',
-      userAgent: userAgent || 'Unknown',
-      timestamp: timestamp || new Date().toISOString(),
-      stack: stack ? stack.substring(0, 500) : 'No stack trace' // Limit stack trace length
-    });
-
-    res.json({ success: true, message: 'Error logged' });
-  } catch (err) {
-    console.error('Error logging browser error:', err);
-    res.status(500).json({ success: false, error: 'Failed to log error' });
-  }
-});
-END OF HEALTH ROUTES */
 
 // Create Stripe checkout session for book purchase
 app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, res) => {
@@ -7797,7 +5225,7 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
     }
 
     console.log(`💳 Creating Stripe checkout session for user ${userId}, stories: ${allStoryIds.join(', ')}`);
-    console.log(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}, Cover: ${coverType}`);
+    log.debug(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}, Cover: ${coverType}`);
 
     // Fetch all stories and calculate total pages
     const stories = [];
@@ -7867,11 +5295,11 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
     });
 
     console.log(`✅ Checkout session created: ${session.id}`);
-    console.log(`   Stories: ${stories.length}, Pages: ${totalPages}, Price: CHF ${price / 100}`);
+    log.debug(`   Stories: ${stories.length}, Pages: ${totalPages}, Price: CHF ${price / 100}`);
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (err) {
-    console.error('❌ Error creating checkout session:', err);
+    log.error('❌ Error creating checkout session:', err);
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
@@ -7892,8 +5320,8 @@ app.post('/api/stripe/create-credits-checkout', authenticateToken, async (req, r
     }
 
     console.log(`💳 Creating credits checkout session for user ${userId}`);
-    console.log(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}`);
-    console.log(`   Credits: ${credits}, Amount: CHF ${(amount / 100).toFixed(2)}`);
+    log.debug(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}`);
+    log.debug(`   Credits: ${credits}, Amount: CHF ${(amount / 100).toFixed(2)}`);
 
     // Create checkout session
     const session = await userStripe.checkout.sessions.create({
@@ -7924,7 +5352,7 @@ app.post('/api/stripe/create-credits-checkout', authenticateToken, async (req, r
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (err) {
-    console.error('❌ Error creating credits checkout session:', err);
+    log.error('❌ Error creating credits checkout session:', err);
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
 });
@@ -7956,7 +5384,7 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
         }
 
         if (attempt < maxRetries) {
-          console.log(`⏳ Order not found yet, waiting... (attempt ${attempt}/${maxRetries})`);
+          log.debug(`⏳ Order not found yet, waiting... (attempt ${attempt}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
@@ -8002,7 +5430,7 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('❌ Error checking order status:', err);
+    log.error('❌ Error checking order status:', err);
     res.status(500).json({ error: 'Failed to check order status' });
   }
 });
@@ -8015,9 +5443,9 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
   const allStoryIds = Array.isArray(storyIds) ? storyIds : [storyIds];
 
   console.log(`📚 [BACKGROUND] Starting book order processing for session ${sessionId}`);
-  console.log(`   Stories: ${allStoryIds.length} (${allStoryIds.join(', ')})`);
-  console.log(`   Payment mode: ${isTestPayment ? 'TEST (Gelato draft)' : 'LIVE (real Gelato order)'}`);
-  console.log(`   Cover type: ${coverType}`);
+  log.debug(`   Stories: ${allStoryIds.length} (${allStoryIds.join(', ')})`);
+  log.debug(`   Payment mode: ${isTestPayment ? 'TEST (Gelato draft)' : 'LIVE (real Gelato order)'}`);
+  log.debug(`   Cover type: ${coverType}`);
 
   // Determine Gelato order type based on payment mode
   const gelatoOrderType = isTestPayment ? 'draft' : 'order';
@@ -8046,20 +5474,20 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
     }
 
     console.log(`✅ [BACKGROUND] Fetched ${stories.length} stories`);
-    console.log('📊 [BACKGROUND] Titles:', stories.map(s => s.data.title).join(', '));
+    log.debug('📊 [BACKGROUND] Titles:', stories.map(s => s.data.title).join(', '));
 
     // Step 3: Generate PDF (single story uses generatePrintPdf, multiple uses combined book)
     let pdfBuffer, targetPageCount;
 
     if (stories.length === 1) {
       // Single story - use existing generatePrintPdf
-      console.log('📄 [BACKGROUND] Generating single-story PDF...');
+      log.debug('📄 [BACKGROUND] Generating single-story PDF...');
       const result = await generatePrintPdf(stories[0].data);
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     } else {
       // Multiple stories - generate combined book PDF
-      console.log('📄 [BACKGROUND] Generating combined multi-story PDF...');
+      log.debug('📄 [BACKGROUND] Generating combined multi-story PDF...');
       const result = await generateCombinedBookPdf(stories);
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
@@ -8069,7 +5497,7 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
     console.log(`✅ [BACKGROUND] PDF generated: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB, ${targetPageCount} pages`);
 
     // Step 3.5: Save PDF to database and get public URL
-    console.log('💾 [BACKGROUND] Saving PDF to database...');
+    log.debug('💾 [BACKGROUND] Saving PDF to database...');
     const primaryStoryId = allStoryIds[0];
     const pdfFileId = `pdf-${primaryStoryId}-${Date.now()}`;
     const pdfInsertQuery = `
@@ -8098,7 +5526,7 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
     console.log(`✅ [BACKGROUND] PDF saved with URL: ${pdfUrl}`);
 
     // Step 4: Create print order
-    console.log('📦 [BACKGROUND] Creating print order...');
+    log.debug('📦 [BACKGROUND] Creating print order...');
 
     const printApiKey = process.env.GELATO_API_KEY;
     if (!printApiKey) {
@@ -8147,7 +5575,7 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
         log.warn(`[BACKGROUND] No active ${coverType} products found. Available cover_types: ${availableTypes || 'none'}`);
       }
     } catch (err) {
-      console.error('❌ [BACKGROUND] Error fetching products:', err.message);
+      log.error('❌ [BACKGROUND] Error fetching products:', err.message);
     }
 
     // Fallback to environment variable or first active product of any type
@@ -8162,7 +5590,7 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
           log.warn(`[BACKGROUND] Using fallback product: ${fallbackResult.rows[0].product_name}`);
         }
       } catch (err) {
-        console.error('❌ [BACKGROUND] Error fetching fallback product:', err.message);
+        log.error('❌ [BACKGROUND] Error fetching fallback product:', err.message);
       }
     }
 
@@ -8244,10 +5672,10 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
       WHERE stripe_session_id = $2
     `, [printOrder.orderId, sessionId]);
 
-    console.log('🎉 [BACKGROUND] Book order processing completed successfully!');
+    log.debug('🎉 [BACKGROUND] Book order processing completed successfully!');
 
   } catch (error) {
-    console.error('❌ [BACKGROUND] Error processing book order:', error);
+    log.error('❌ [BACKGROUND] Error processing book order:', error);
 
     // Update order status to failed
     try {
@@ -8258,7 +5686,7 @@ async function processBookOrder(sessionId, userId, storyIds, customerInfo, shipp
         WHERE stripe_session_id = $1
       `, [sessionId]);
     } catch (updateError) {
-      console.error('❌ [BACKGROUND] Failed to update order status:', updateError);
+      log.error('❌ [BACKGROUND] Failed to update order status:', updateError);
     }
 
     // Send failure notification email to customer
@@ -8295,7 +5723,7 @@ The MagicalStory Team`,
       });
       console.log(`📧 [BACKGROUND] Failure notification sent to ${customerInfo.email}`);
     } catch (emailError) {
-      console.error('❌ [BACKGROUND] Failed to send failure email:', emailError);
+      log.error('❌ [BACKGROUND] Failed to send failure email:', emailError);
     }
 
     throw error;
@@ -8373,7 +5801,7 @@ function parseVisualBible(outline) {
 
   // Check if outline contains Visual Bible mention at all (case-insensitive)
   if (!outline.toLowerCase().includes('visual bible')) {
-    console.log('📖 [VISUAL BIBLE] Outline does not contain "Visual Bible" text');
+    log.debug('📖 [VISUAL BIBLE] Outline does not contain "Visual Bible" text');
     return visualBible;
   }
 
@@ -8381,7 +5809,7 @@ function parseVisualBible(outline) {
   // Matches: "# VISUAL BIBLE", "## Visual Bible", "# Part 5: Visual Bible", etc.
   const visualBibleMatch = outline.match(/#+\s*(?:Part\s*\d+[:\s]*)?Visual\s*Bible\b([\s\S]*?)(?=\n#[^#]|\n---|$)/i);
   if (!visualBibleMatch) {
-    console.log('📖 [VISUAL BIBLE] Regex did not match Visual Bible section');
+    log.debug('📖 [VISUAL BIBLE] Regex did not match Visual Bible section');
     // Try alternate regex patterns
     const altMatch = outline.match(/Visual\s*Bible[\s\S]{0,50}/i);
     if (altMatch) {
@@ -8495,13 +5923,13 @@ function filterMainCharactersFromVisualBible(visualBible, mainCharacters) {
       const scName = sc.name?.toLowerCase();
       const isMainChar = mainNames.has(scName);
       if (isMainChar) {
-        console.log(`🚫 [VISUAL BIBLE] Filtering out "${sc.name}" - matches main character`);
+        log.debug(`🚫 [VISUAL BIBLE] Filtering out "${sc.name}" - matches main character`);
       }
       return !isMainChar;
     });
     const filteredCount = originalCount - visualBible.secondaryCharacters.length;
     if (filteredCount > 0) {
-      console.log(`🚫 [VISUAL BIBLE] Filtered ${filteredCount} main characters from secondary characters`);
+      log.debug(`🚫 [VISUAL BIBLE] Filtered ${filteredCount} main characters from secondary characters`);
     }
   }
 
@@ -8629,7 +6057,7 @@ function addVisualBibleChangeLog(visualBible, pageNumber, element, type, change,
   };
 
   visualBible.changeLog.push(entry);
-  console.log(`📖 [VISUAL BIBLE CHANGE] Page ${pageNumber}: ${element} (${type}) - ${change}`);
+  log.debug(`📖 [VISUAL BIBLE CHANGE] Page ${pageNumber}: ${element} (${type}) - ${change}`);
 }
 
 // Update main character's generated outfit in Visual Bible
@@ -8812,7 +6240,7 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.log('⚠️  [VISUAL BIBLE] Gemini API key not configured, skipping analysis');
+    log.warn('⚠️  [VISUAL BIBLE] Gemini API key not configured, skipping analysis');
     return [];
   }
 
@@ -8866,7 +6294,7 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
     // Parse JSON response
     const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.log('⚠️  [VISUAL BIBLE] Could not parse JSON response');
+      log.warn('⚠️  [VISUAL BIBLE] Could not parse JSON response');
       return [];
     }
 
@@ -8877,7 +6305,7 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
 
     return results;
   } catch (error) {
-    console.error('⚠️  [VISUAL BIBLE] Error analyzing image:', error.message);
+    log.error('⚠️  [VISUAL BIBLE] Error analyzing image:', error.message);
     return [];
   }
 }
@@ -9522,7 +6950,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker);
           } catch (error) {
             retries++;
-            console.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
+            log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
             if (retries > MAX_RETRIES) throw error;
             await new Promise(resolve => setTimeout(resolve, 1000 * retries));
           }
@@ -9553,7 +6981,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         return pageData;
       } catch (error) {
-        console.error(`❌ [STREAM-IMG] Failed to generate image for page ${pageNum}:`, error.message);
+        log.error(`❌ [STREAM-IMG] Failed to generate image for page ${pageNum}:`, error.message);
         return {
           pageNumber: pageNum,
           imageData: null,
@@ -9716,7 +7144,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         return { type: coverKey, data: coverData };
       } catch (error) {
-        console.error(`❌ [STREAM-COVER] Failed to generate ${coverType} cover:`, error.message);
+        log.error(`❌ [STREAM-COVER] Failed to generate ${coverType} cover:`, error.message);
         return null;
       }
     };
@@ -9728,7 +7156,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       (parsedVB, rawSection) => {
         // Filter out main characters from secondary characters (safety net)
         streamingVisualBible = filterMainCharactersFromVisualBible(parsedVB, inputData.characters);
-        console.log(`📖 [STREAM-COVER] Visual Bible ready for cover generation`);
+        log.debug(`📖 [STREAM-COVER] Visual Bible ready for cover generation`);
       },
       // onCoverSceneComplete
       (coverType, sceneDescription, rawBlock, extractedTitle) => {
@@ -9750,7 +7178,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       // Store the page text for later use
       pageTexts[pageNumber] = text;
 
-      console.log(`🌊 [STREAM] Scene ${pageNumber} complete during streaming (${scenesEmittedCount}/${sceneCount})`);
+      log.debug(`🌊 [STREAM] Scene ${pageNumber} complete during streaming (${scenesEmittedCount}/${sceneCount})`);
 
       // Start image generation immediately for this scene (only in parallel mode)
       // Pass the page text so it can be saved with the partial result
@@ -9771,10 +7199,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       response = streamResult.text;
       addUsage('anthropic', streamResult.usage, 'storybook_combined', activeTextModel.modelId);
       log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
-      console.log(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
-      console.log(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
+      log.debug(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
+      log.debug(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
     } catch (apiError) {
-      console.error(`❌ [STORYBOOK] Claude API streaming call failed:`, apiError.message);
+      log.error(`❌ [STORYBOOK] Claude API streaming call failed:`, apiError.message);
       throw apiError;
     }
 
@@ -10004,7 +7432,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker);
             } catch (error) {
               retries++;
-              console.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
+              log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
               if (retries > MAX_RETRIES) throw error;
               await new Promise(resolve => setTimeout(resolve, 1000 * retries));
             }
@@ -10035,7 +7463,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             referencePhotos
           };
         } catch (error) {
-          console.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
+          log.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
           return {
             pageNumber: pageNum,
             imageData: null,
@@ -10057,7 +7485,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         for (let i = 0; i < allSceneDescriptions.length; i++) {
           const scene = allSceneDescriptions[i];
-          console.log(`🔗 [STORYBOOK SEQUENTIAL ${i + 1}/${allSceneDescriptions.length}] Processing page ${scene.pageNumber}...`);
+          log.debug(`🔗 [STORYBOOK SEQUENTIAL ${i + 1}/${allSceneDescriptions.length}] Processing page ${scene.pageNumber}...`);
 
           const result = await generateImage(scene, i, previousImage, true, visualBible); // isSequential = true, with visual bible
           allImages.push(result);
@@ -10146,7 +7574,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
           // Use detailed photo info (with names) for labeled reference images
           const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
-          console.log(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}), clothing: ${frontCoverClothing}`);
+          log.debug(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}), clothing: ${frontCoverClothing}`);
 
           const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
             TITLE_PAGE_SCENE: titlePageScene,
@@ -10182,7 +7610,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           // Use extracted clothing or parse from scene description
           const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
           const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
-          console.log(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
+          log.debug(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
 
           const initialPrompt = inputData.dedication && inputData.dedication.trim()
             ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
@@ -10226,7 +7654,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           // Use extracted clothing or parse from scene description
           const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
           const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
-          console.log(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
+          log.debug(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
 
           const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
             BACK_COVER_SCENE: backCoverScene,
@@ -10258,7 +7686,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         log.debug(`✅ [STORYBOOK] Cover images complete (${coversFromStreaming} from streaming, ${3 - coversFromStreaming} generated after)`);
       } catch (error) {
-        console.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
+        log.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
       }
     }
 
@@ -10330,7 +7758,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
     if (byFunc.storybook_combined.calls > 0) {
       const cost = calculateCost(byFunc.storybook_combined.provider, byFunc.storybook_combined.input_tokens, byFunc.storybook_combined.output_tokens);
-      console.log(`   Story+Scenes:  ${byFunc.storybook_combined.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.storybook_combined.output_tokens.toLocaleString().padStart(8)} out (${byFunc.storybook_combined.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.storybook_combined)}]`);
+      log.debug(`   Story+Scenes:  ${byFunc.storybook_combined.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.storybook_combined.output_tokens.toLocaleString().padStart(8)} out (${byFunc.storybook_combined.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.storybook_combined)}]`);
     }
     if (byFunc.cover_images.calls > 0) {
       const cost = calculateCost(byFunc.cover_images.provider, byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
@@ -10379,7 +7807,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         log.info(`💳 [STORYBOOK] Story completed, ${creditsUsed} credits used for job ${jobId}`);
       }
     } catch (creditErr) {
-      console.error('❌ [STORYBOOK] Failed to log credit completion:', creditErr.message);
+      log.error('❌ [STORYBOOK] Failed to log credit completion:', creditErr.message);
     }
 
     // Add storyId to resultData so client can navigate to it
@@ -10402,7 +7830,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     return resultData;
 
   } catch (error) {
-    console.error(`❌ [STORYBOOK] Job ${jobId} failed:`, error);
+    log.error(`❌ [STORYBOOK] Job ${jobId} failed:`, error);
 
     // Refund reserved credits on failure
     try {
@@ -10447,7 +7875,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         }
       }
     } catch (refundErr) {
-      console.error('❌ [STORYBOOK] Failed to refund credits:', refundErr.message);
+      log.error('❌ [STORYBOOK] Failed to refund credits:', refundErr.message);
     }
 
     await dbPool.query(
@@ -10549,7 +7977,7 @@ async function processStoryJob(jobId) {
     // - Standard: 1 scene per 2 print pages (text page + facing image page)
     const printPages = inputData.pages;  // Total pages when printed
     const sceneCount = isPictureBook ? printPages : Math.floor(printPages / 2);
-    console.log(`📚 [PIPELINE] Print pages: ${printPages}, Mode: ${isPictureBook ? 'Picture Book' : 'Standard'}, Scenes to generate: ${sceneCount}`);
+    log.debug(`📚 [PIPELINE] Print pages: ${printPages}, Mode: ${isPictureBook ? 'Picture Book' : 'Standard'}, Scenes to generate: ${sceneCount}`);
 
     if (skipImages) {
       log.debug(`📝 [PIPELINE] Text-only mode enabled - skipping image generation`);
@@ -10575,7 +8003,7 @@ async function processStoryJob(jobId) {
     );
 
     if (isPictureBook) {
-      console.log(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
+      log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
       return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id);
     }
 
@@ -10615,7 +8043,7 @@ async function processStoryJob(jobId) {
                                    visualBible.artifacts.length +
                                    visualBible.locations.length;
 
-    console.log(`📖 [PIPELINE] Visual Bible after parsing: ${JSON.stringify({
+    log.debug(`📖 [PIPELINE] Visual Bible after parsing: ${JSON.stringify({
       mainCharacters: visualBible.mainCharacters.length,
       secondaryCharacters: visualBible.secondaryCharacters.length,
       animals: visualBible.animals.length,
@@ -10626,10 +8054,10 @@ async function processStoryJob(jobId) {
 
     // Validate visual bible was parsed - if outline contains "visual bible" but we got 0 entries, fail
     if (outline.toLowerCase().includes('visual bible') && visualBibleEntryCount === 0) {
-      console.error('❌ [PIPELINE] Visual Bible section exists in outline but parsing returned 0 entries!');
-      console.error('📖 [PIPELINE] This indicates a parsing bug. Outline preview around "visual bible":');
+      log.error('❌ [PIPELINE] Visual Bible section exists in outline but parsing returned 0 entries!');
+      log.error('📖 [PIPELINE] This indicates a parsing bug. Outline preview around "visual bible":');
       const vbIndex = outline.toLowerCase().indexOf('visual bible');
-      console.error(outline.substring(Math.max(0, vbIndex - 50), Math.min(outline.length, vbIndex + 500)));
+      log.error(outline.substring(Math.max(0, vbIndex - 50), Math.min(outline.length, vbIndex + 500)));
       throw new Error('Visual Bible parsing failed: section exists but no entries extracted. Check outline format.');
     }
 
@@ -10654,7 +8082,7 @@ async function processStoryJob(jobId) {
     const titleMatch = boldTitleMatch || prefixTitleMatch || plainTitleMatch || inlineTitleMatch;
     if (titleMatch) {
       storyTitle = titleMatch[1].trim();
-      console.log(`📖 [PIPELINE] Extracted title from outline: "${storyTitle}"`);
+      log.debug(`📖 [PIPELINE] Extracted title from outline: "${storyTitle}"`);
     }
 
     // START COVER GENERATION IN PARALLEL (optimization: don't wait for page images)
@@ -10781,7 +8209,7 @@ async function processStoryJob(jobId) {
         })()
       ]);
 
-      console.log(`📕 [PIPELINE] Cover generation started in background (3 covers in parallel)`);
+      log.debug(`📕 [PIPELINE] Cover generation started in background (3 covers in parallel)`);
     }
 
     await dbPool.query(
@@ -10952,7 +8380,7 @@ Output Format:
                 imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker);
               } catch (error) {
                 retries++;
-                console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
+                log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
                 if (retries > MAX_RETRIES) throw error;
                 await new Promise(resolve => setTimeout(resolve, 1000 * retries));
               }
@@ -11000,7 +8428,7 @@ Output Format:
 
             return imageData;
           } catch (error) {
-            console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
+            log.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
             throw error;
           }
         });
@@ -11013,7 +8441,7 @@ Output Format:
       if (!skipImages && imageGenMode === 'parallel') {
         // Create progressive parser that starts image generation as pages stream in
         const progressiveParser = new ProgressiveStoryPageParser((page) => {
-          console.log(`🌊 [PROGRESSIVE] Page ${page.pageNumber} detected during streaming, starting image generation`);
+          log.debug(`🌊 [PROGRESSIVE] Page ${page.pageNumber} detected during streaming, starting image generation`);
           startPageImageGeneration(page.pageNumber, page.content);
         });
 
@@ -11026,7 +8454,7 @@ Output Format:
 
         // Finalize to emit the last page
         progressiveParser.finalize(batchText);
-        console.log(`🌊 [PROGRESSIVE] Batch streaming complete, ${pagesStarted.size} pages started during stream`);
+        log.debug(`🌊 [PROGRESSIVE] Batch streaming complete, ${pagesStarted.size} pages started during stream`);
       } else {
         // No progressive parsing - just stream text
         const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
@@ -11227,7 +8655,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           const pageContent = page.content;
           const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
 
-          console.log(`🔗 [SEQUENTIAL ${i + 1}/${allPages.length}] Processing page ${pageNum}...`);
+          log.debug(`🔗 [SEQUENTIAL ${i + 1}/${allPages.length}] Processing page ${pageNum}...`);
 
           try {
             // Generate scene description using Art Director prompt (in story language)
@@ -11294,7 +8722,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker);
               } catch (error) {
                 retries++;
-                console.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
+                log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
                 if (retries > MAX_RETRIES) {
                   throw error;
                 }
@@ -11352,7 +8780,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               [imageProgress, `Image ${i + 1}/${allPages.length}...`, jobId]
             );
           } catch (error) {
-            console.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
+            log.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
             throw error;
           }
         }
@@ -11364,7 +8792,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         log.debug(`🚀 [STREAMING] All ${allImages.length} images generated (SEQUENTIAL MODE)!`);
       }
     } else {
-      console.log(`📝 [STREAMING] Text-only mode - skipping image wait`);
+      log.debug(`📝 [STREAMING] Text-only mode - skipping image wait`);
     }
 
     // Update title from story text if we found a better one (optional refinement)
@@ -11373,7 +8801,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       if (storyTitleMatch) {
         const storyTextTitle = storyTitleMatch[1].trim();
         if (storyTextTitle !== storyTitle) {
-          console.log(`📖 [PIPELINE] Story text has different title: "${storyTextTitle}" (outline had: "${storyTitle}")`);
+          log.debug(`📖 [PIPELINE] Story text has different title: "${storyTextTitle}" (outline had: "${storyTitle}")`);
           // Keep the outline title since covers already used it
         }
       }
@@ -11383,7 +8811,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     let coverImages = null;
 
     if (coverGenerationPromise) {
-      console.log(`📕 [PIPELINE] Waiting for parallel cover generation to complete...`);
+      log.debug(`📕 [PIPELINE] Waiting for parallel cover generation to complete...`);
       await dbPool.query(
         'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
         [95, 'Finishing covers...', jobId]
@@ -11451,7 +8879,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const backRegen = backCover.result.wasRegenerated ? ' (regenerated)' : '';
         log.debug(`📊 [PIPELINE] Cover quality scores - Front: ${frontCover.result.score}${frontRegen}, Initial: ${initialPage.result.score}${initialRegen}, Back: ${backCover.result.score}${backRegen}`);
       } catch (error) {
-        console.error(`❌ [PIPELINE] Cover generation failed:`, error);
+        log.error(`❌ [PIPELINE] Cover generation failed:`, error);
         throw new Error(`Cover generation failed: ${error.message}`);
       }
     } else if (!skipImages && !skipCovers) {
@@ -11528,15 +8956,15 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
     if (byFunc.outline.calls > 0) {
       const cost = calculateCost(byFunc.outline.provider, byFunc.outline.input_tokens, byFunc.outline.output_tokens);
-      console.log(`   Outline:       ${byFunc.outline.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.outline.output_tokens.toLocaleString().padStart(8)} out (${byFunc.outline.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.outline)}]`);
+      log.debug(`   Outline:       ${byFunc.outline.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.outline.output_tokens.toLocaleString().padStart(8)} out (${byFunc.outline.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.outline)}]`);
     }
     if (byFunc.scene_descriptions.calls > 0) {
       const cost = calculateCost(byFunc.scene_descriptions.provider, byFunc.scene_descriptions.input_tokens, byFunc.scene_descriptions.output_tokens);
-      console.log(`   Scene Desc:    ${byFunc.scene_descriptions.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_descriptions.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_descriptions.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_descriptions)}]`);
+      log.debug(`   Scene Desc:    ${byFunc.scene_descriptions.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_descriptions.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_descriptions.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_descriptions)}]`);
     }
     if (byFunc.story_text.calls > 0) {
       const cost = calculateCost(byFunc.story_text.provider, byFunc.story_text.input_tokens, byFunc.story_text.output_tokens);
-      console.log(`   Story Text:    ${byFunc.story_text.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.story_text.output_tokens.toLocaleString().padStart(8)} out (${byFunc.story_text.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.story_text)}]`);
+      log.debug(`   Story Text:    ${byFunc.story_text.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.story_text.output_tokens.toLocaleString().padStart(8)} out (${byFunc.story_text.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.story_text)}]`);
     }
     if (byFunc.cover_images.calls > 0) {
       const cost = calculateCost(byFunc.cover_images.provider, byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
@@ -11564,7 +8992,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
       [storyId, job.user_id, JSON.stringify(storyData)]
     );
-    console.log(`📚 Story ${storyId} saved to stories table`);
+    log.debug(`📚 Story ${storyId} saved to stories table`);
 
     // Log credit completion (credits were already reserved at job creation)
     try {
@@ -11582,10 +9010,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [job.user_id, 0, currentBalance, 'story_complete', jobId, `Story completed - ${creditsUsed} credits used`]
         );
-        console.log(`💳 Story completed, ${creditsUsed} credits used for job ${jobId}`);
+        log.debug(`💳 Story completed, ${creditsUsed} credits used for job ${jobId}`);
       }
     } catch (creditErr) {
-      console.error('❌ Failed to log credit completion:', creditErr.message);
+      log.error('❌ Failed to log credit completion:', creditErr.message);
     }
 
     // Add storyId to resultData so client can navigate to it
@@ -11617,74 +9045,74 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         await email.sendStoryCompleteEmail(user.email, firstName, storyTitle, storyId, emailLanguage);
       }
     } catch (emailErr) {
-      console.error('❌ Failed to send story complete email:', emailErr);
+      log.error('❌ Failed to send story complete email:', emailErr);
     }
 
   } catch (error) {
-    console.error(`❌ Job ${jobId} failed:`, error);
+    log.error(`❌ Job ${jobId} failed:`, error);
 
     // Log all partial data for debugging
     try {
-      console.log('\n' + '='.repeat(80));
-      console.log('📋 [DEBUG] PARTIAL DATA DUMP FOR FAILED JOB:', jobId);
-      console.log('='.repeat(80));
+      log.debug('\n' + '='.repeat(80));
+      log.error('📋 [DEBUG] PARTIAL DATA DUMP FOR FAILED JOB:', jobId);
+      log.debug('='.repeat(80));
 
       // Get job input data
       const jobDataResult = await dbPool.query('SELECT input_data FROM story_jobs WHERE id = $1', [jobId]);
       if (jobDataResult.rows.length > 0) {
         const inputData = jobDataResult.rows[0].input_data;
-        console.log('\n📥 [INPUT DATA]:');
-        console.log('  Story Type:', inputData?.storyType);
-        console.log('  Story Type Name:', inputData?.storyTypeName);
-        console.log('  Art Style:', inputData?.artStyle);
-        console.log('  Language:', inputData?.language);
-        console.log('  Language Level:', inputData?.languageLevel);
-        console.log('  Pages:', inputData?.pages);
-        console.log('  Story Details:', inputData?.storyDetails?.substring(0, 200) + (inputData?.storyDetails?.length > 200 ? '...' : ''));
-        console.log('  Characters:', inputData?.characters?.map(c => `${c.name} (${c.gender}, ${c.age})`).join(', '));
-        console.log('  Main Characters:', inputData?.mainCharacters);
+        log.debug('\n📥 [INPUT DATA]:');
+        log.debug('  Story Type:', inputData?.storyType);
+        log.debug('  Story Type Name:', inputData?.storyTypeName);
+        log.debug('  Art Style:', inputData?.artStyle);
+        log.debug('  Language:', inputData?.language);
+        log.debug('  Language Level:', inputData?.languageLevel);
+        log.debug('  Pages:', inputData?.pages);
+        log.debug('  Story Details:', inputData?.storyDetails?.substring(0, 200) + (inputData?.storyDetails?.length > 200 ? '...' : ''));
+        log.debug('  Characters:', inputData?.characters?.map(c => `${c.name} (${c.gender}, ${c.age})`).join(', '));
+        log.debug('  Main Characters:', inputData?.mainCharacters);
       }
 
       // Get all checkpoints
       const checkpoints = await getAllCheckpoints(jobId);
-      console.log(`\n💾 [CHECKPOINTS]: Found ${checkpoints.length} checkpoints`);
+      log.debug(`\n💾 [CHECKPOINTS]: Found ${checkpoints.length} checkpoints`);
 
       for (const cp of checkpoints) {
-        console.log(`\n--- ${cp.step_name} (index: ${cp.step_index}) at ${cp.created_at} ---`);
+        log.debug(`\n--- ${cp.step_name} (index: ${cp.step_index}) at ${cp.created_at} ---`);
         const data = typeof cp.step_data === 'string' ? JSON.parse(cp.step_data) : cp.step_data;
 
         if (cp.step_name === 'outline') {
-          console.log('📜 [OUTLINE]:', data.outline?.substring(0, 500) + '...');
+          log.debug('📜 [OUTLINE]:', data.outline?.substring(0, 500) + '...');
           if (data.outlinePrompt) {
-            console.log('📜 [OUTLINE PROMPT]:', data.outlinePrompt?.substring(0, 1000) + '...');
+            log.debug('📜 [OUTLINE PROMPT]:', data.outlinePrompt?.substring(0, 1000) + '...');
           }
         } else if (cp.step_name === 'scene_hints') {
-          console.log('🎬 [SCENE HINTS]:', JSON.stringify(data.shortSceneDescriptions, null, 2).substring(0, 500) + '...');
+          log.debug('🎬 [SCENE HINTS]:', JSON.stringify(data.shortSceneDescriptions, null, 2).substring(0, 500) + '...');
         } else if (cp.step_name === 'story_batch') {
-          console.log(`📖 [STORY BATCH ${data.batchNum}] Pages ${data.startScene}-${data.endScene}:`);
-          console.log('  Text preview:', data.batchText?.substring(0, 300) + '...');
+          log.debug(`📖 [STORY BATCH ${data.batchNum}] Pages ${data.startScene}-${data.endScene}:`);
+          log.debug('  Text preview:', data.batchText?.substring(0, 300) + '...');
           if (data.batchPrompt) {
-            console.log('  Batch prompt:', data.batchPrompt?.substring(0, 500) + '...');
+            log.debug('  Batch prompt:', data.batchPrompt?.substring(0, 500) + '...');
           }
         } else if (cp.step_name === 'partial_page') {
           log.debug(`🖼️  [PAGE ${cp.step_index}]:`);
-          console.log('  Scene description:', (data.description || data.sceneDescription?.description)?.substring(0, 200) + '...');
-          console.log('  Image prompt:', (data.prompt || data.imagePrompt)?.substring(0, 200) + '...');
-          console.log('  Has image:', !!data.imageData);
-          console.log('  Quality score:', data.qualityScore || data.score);
+          log.debug('  Scene description:', (data.description || data.sceneDescription?.description)?.substring(0, 200) + '...');
+          log.debug('  Image prompt:', (data.prompt || data.imagePrompt)?.substring(0, 200) + '...');
+          log.debug('  Has image:', !!data.imageData);
+          log.debug('  Quality score:', data.qualityScore || data.score);
         } else if (cp.step_name === 'cover') {
           log.debug(`🎨 [COVER ${data.type}]:`);
-          console.log('  Prompt:', data.prompt?.substring(0, 200) + '...');
+          log.debug('  Prompt:', data.prompt?.substring(0, 200) + '...');
         } else if (cp.step_name === 'storybook_combined') {
-          console.log('📚 [STORYBOOK COMBINED]:', data.response?.substring(0, 500) + '...');
+          log.debug('📚 [STORYBOOK COMBINED]:', data.response?.substring(0, 500) + '...');
         } else {
-          console.log('  Data keys:', Object.keys(data).join(', '));
+          log.debug('  Data keys:', Object.keys(data).join(', '));
         }
       }
 
-      console.log('\n' + '='.repeat(80));
-      console.log('📋 [DEBUG] END OF PARTIAL DATA DUMP');
-      console.log('='.repeat(80) + '\n');
+      log.debug('\n' + '='.repeat(80));
+      log.debug('📋 [DEBUG] END OF PARTIAL DATA DUMP');
+      log.debug('='.repeat(80) + '\n');
 
       // SAVE PARTIAL RESULTS - reconstruct story from checkpoints and save to stories table
       try {
@@ -11800,16 +9228,16 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
               [jobId, userId, JSON.stringify(storyData)]
             );
-            console.log(`📚 [PARTIAL SAVE] Saved partial story ${jobId} with ${sceneImages.length} images to stories table`);
+            log.debug(`📚 [PARTIAL SAVE] Saved partial story ${jobId} with ${sceneImages.length} images to stories table`);
           } else {
-            console.log('📚 [PARTIAL SAVE] No content to save');
+            log.debug('📚 [PARTIAL SAVE] No content to save');
           }
         }
       } catch (partialSaveErr) {
-        console.error('❌ [PARTIAL SAVE] Failed to save partial results:', partialSaveErr.message);
+        log.error('❌ [PARTIAL SAVE] Failed to save partial results:', partialSaveErr.message);
       }
     } catch (dumpErr) {
-      console.error('❌ Failed to dump partial data:', dumpErr.message);
+      log.error('❌ Failed to dump partial data:', dumpErr.message);
     }
 
     // Refund reserved credits on failure
@@ -11851,11 +9279,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             [jobId]
           );
 
-          console.log(`💳 Refunded ${creditsToRefund} credits for failed job ${jobId} (user balance: ${currentBalance} -> ${newBalance})`);
+          log.error(`💳 Refunded ${creditsToRefund} credits for failed job ${jobId} (user balance: ${currentBalance} -> ${newBalance})`);
         }
       }
     } catch (refundErr) {
-      console.error('❌ Failed to refund credits:', refundErr.message);
+      log.error('❌ Failed to refund credits:', refundErr.message);
     }
 
     await dbPool.query(
@@ -11888,7 +9316,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         }
       }
     } catch (emailErr) {
-      console.error('❌ Failed to send failure notification emails:', emailErr);
+      log.error('❌ Failed to send failure notification emails:', emailErr);
     }
   }
 }
@@ -11993,10 +9421,10 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   });
 
   // Log the prompt parameters for debugging
-  console.log(`📝 [PROMPT] Building outline prompt:`);
-  console.log(`   - Language Level: ${inputData.languageLevel || 'standard'}`);
-  console.log(`   - Reading Level: ${readingLevel}`);
-  console.log(`   - Pages: ${pageCount}`);
+  log.debug(`📝 [PROMPT] Building outline prompt:`);
+  log.debug(`   - Language Level: ${inputData.languageLevel || 'standard'}`);
+  log.debug(`   - Reading Level: ${readingLevel}`);
+  log.debug(`   - Pages: ${pageCount}`);
 
   // Use template if available, otherwise fall back to hardcoded prompt
   if (PROMPT_TEMPLATES.outline) {
@@ -12012,7 +9440,7 @@ function buildStoryPrompt(inputData, sceneCount = null) {
       STORY_DETAILS: inputData.storyDetails || 'None',
       DEDICATION: inputData.dedication || 'None'
     });
-    console.log(`📝 [PROMPT] Outline prompt length: ${prompt.length} chars`);
+    log.debug(`📝 [PROMPT] Outline prompt length: ${prompt.length} chars`);
     return prompt;
   }
 
@@ -12132,7 +9560,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Build character reference list (Option B: explicit labeling in prompt)
   let characterReferenceList = '';
   if (sceneCharacters && sceneCharacters.length > 0) {
-    console.log(`📖 [IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
+    log.debug(`📖 [IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
 
     // Build a numbered list of characters with brief descriptions
     const charDescriptions = sceneCharacters.map((char, index) => {
@@ -12149,7 +9577,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
     if (heightDescription) {
       characterReferenceList += `\n${heightDescription}\n`;
-      console.log(`📏 [IMAGE PROMPT] Added relative heights: ${heightDescription}`);
+      log.debug(`📏 [IMAGE PROMPT] Added relative heights: ${heightDescription}`);
     }
   }
 
@@ -12159,7 +9587,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     const sceneCharacterNames = sceneCharacters ? sceneCharacters.map(c => c.name) : null;
     visualBibleSection = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames, language);
     if (visualBibleSection) {
-      console.log(`📖 [IMAGE PROMPT] Added Visual Bible section for page ${pageNumber}`);
+      log.debug(`📖 [IMAGE PROMPT] Added Visual Bible section for page ${pageNumber}`);
     }
   }
 
@@ -12374,7 +9802,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
 
         // Handle error events from Claude API
         if (event.type === 'error') {
-          console.error(`❌ [STREAM] API error event:`, event.error);
+          log.error(`❌ [STREAM] API error event:`, event.error);
           throw new Error(`Claude API stream error: ${event.error?.message || JSON.stringify(event.error)}`);
         }
 
@@ -12395,7 +9823,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
 
         // Log when streaming completes
         if (event.type === 'message_stop') {
-          console.log(`🌊 [STREAM] Streaming complete, received ${fullText.length} chars, stop_reason: ${stopReason}`);
+          log.debug(`🌊 [STREAM] Streaming complete, received ${fullText.length} chars, stop_reason: ${stopReason}`);
           log.debug(`📊 [STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
         }
       } catch (parseError) {
@@ -12451,7 +9879,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
 
   // Warn if response is empty (possible API issue)
   if (fullText.length === 0) {
-    console.error(`❌ [STREAM] Response is EMPTY! stopReason: ${stopReason}, maxTokens: ${maxTokens}`);
+    log.error(`❌ [STREAM] Response is EMPTY! stopReason: ${stopReason}, maxTokens: ${maxTokens}`);
   }
 
   return {
@@ -12521,7 +9949,7 @@ class ProgressiveCoverParser {
       if (visualBibleMatch) {
         this.visualBibleEmitted = true;
         const visualBibleSection = visualBibleMatch[1].trim();
-        console.log(`🌊 [STREAM-COVER] Visual Bible section complete (${visualBibleSection.length} chars)`);
+        log.debug(`🌊 [STREAM-COVER] Visual Bible section complete (${visualBibleSection.length} chars)`);
         if (this.onVisualBibleComplete) {
           const parsedVB = parseVisualBible('## Visual Bible\n' + visualBibleSection);
           this.onVisualBibleComplete(parsedVB, visualBibleSection);
@@ -12545,7 +9973,7 @@ class ProgressiveCoverParser {
           if (titleMatch) {
             extractedTitle = titleMatch[1].trim();
           }
-          console.log(`🌊 [STREAM-COVER] Title Page scene complete: ${scene.substring(0, 80)}...${extractedTitle ? ` (title: ${extractedTitle})` : ''}`);
+          log.debug(`🌊 [STREAM-COVER] Title Page scene complete: ${scene.substring(0, 80)}...${extractedTitle ? ` (title: ${extractedTitle})` : ''}`);
           if (this.onCoverSceneComplete) {
             this.onCoverSceneComplete('titlePage', scene, titlePageBlock, extractedTitle);
           }
@@ -12563,7 +9991,7 @@ class ProgressiveCoverParser {
         if (sceneMatch) {
           this.emittedCovers.add('initialPage');
           const scene = sceneMatch[1].trim();
-          console.log(`🌊 [STREAM-COVER] Initial Page scene complete: ${scene.substring(0, 80)}...`);
+          log.debug(`🌊 [STREAM-COVER] Initial Page scene complete: ${scene.substring(0, 80)}...`);
           if (this.onCoverSceneComplete) {
             this.onCoverSceneComplete('initialPage', scene, initialPageBlock);
           }
@@ -12581,7 +10009,7 @@ class ProgressiveCoverParser {
         if (sceneMatch) {
           this.emittedCovers.add('backCover');
           const scene = sceneMatch[1].trim();
-          console.log(`🌊 [STREAM-COVER] Back Cover scene complete: ${scene.substring(0, 80)}...`);
+          log.debug(`🌊 [STREAM-COVER] Back Cover scene complete: ${scene.substring(0, 80)}...`);
           if (this.onCoverSceneComplete) {
             this.onCoverSceneComplete('backCover', scene, backCoverBlock);
           }
@@ -12641,7 +10069,7 @@ class ProgressiveSceneParser {
         const pageText = textMatch ? textMatch[1].trim() : '';
         const sceneDesc = sceneMatch ? sceneMatch[1].trim() : '';
 
-        console.log(`🌊 [STREAM-PARSE] Scene ${pageNum} complete, emitting...`);
+        log.debug(`🌊 [STREAM-PARSE] Scene ${pageNum} complete, emitting...`);
 
         if (this.onSceneComplete) {
           this.onSceneComplete({
@@ -12726,7 +10154,7 @@ class ProgressiveStoryPageParser {
 
         if (content.length > 0) {
           this.emittedPages.add(pageNum);
-          console.log(`🌊 [STREAM-PAGE] Page ${pageNum} complete (${content.length} chars), emitting...`);
+          log.debug(`🌊 [STREAM-PAGE] Page ${pageNum} complete (${content.length} chars), emitting...`);
 
           if (this.onPageComplete) {
             this.onPageComplete({
@@ -12768,7 +10196,7 @@ class ProgressiveStoryPageParser {
 
         if (content.length > 0) {
           this.emittedPages.add(pageNum);
-          console.log(`🌊 [STREAM-PAGE] Final page ${pageNum} complete (${content.length} chars), emitting...`);
+          log.debug(`🌊 [STREAM-PAGE] Final page ${pageNum} complete (${content.length} chars), emitting...`);
 
           if (this.onPageComplete) {
             this.onPageComplete({
@@ -12830,21 +10258,21 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
 
   // Log full response for debugging
   if (!data.candidates || data.candidates.length === 0) {
-    console.error('❌ [GEMINI] Empty response. Full data:', JSON.stringify(data, null, 2));
+    log.error('❌ [GEMINI] Empty response. Full data:', JSON.stringify(data, null, 2));
     if (data.promptFeedback) {
-      console.error('❌ [GEMINI] Prompt feedback:', JSON.stringify(data.promptFeedback));
+      log.error('❌ [GEMINI] Prompt feedback:', JSON.stringify(data.promptFeedback));
     }
     throw new Error(`No response from Gemini API: ${data.promptFeedback?.blockReason || 'unknown reason'}`);
   }
 
   // Check if content was blocked
   if (data.candidates[0].finishReason === 'SAFETY') {
-    console.error('❌ [GEMINI] Content blocked by safety filter');
+    log.error('❌ [GEMINI] Content blocked by safety filter');
     throw new Error('Gemini blocked content due to safety filter');
   }
 
   if (!data.candidates[0].content || !data.candidates[0].content.parts) {
-    console.error('❌ [GEMINI] Missing content in response:', JSON.stringify(data.candidates[0], null, 2));
+    log.error('❌ [GEMINI] Missing content in response:', JSON.stringify(data.candidates[0], null, 2));
     throw new Error('Gemini returned empty content');
   }
 
@@ -12912,7 +10340,7 @@ async function cropImageForSequential(imageBase64) {
     const { width, height } = metadata;
 
     if (!width || !height) {
-      console.log('⚠️ [CROP] Could not get image dimensions, returning original');
+      log.warn('⚠️ [CROP] Could not get image dimensions, returning original');
       return imageBase64;
     }
 
@@ -12921,7 +10349,7 @@ async function cropImageForSequential(imageBase64) {
     const cropBottom = Math.floor(height * 0.15);
     const newHeight = height - cropTop - cropBottom;
 
-    console.log(`✂️ [CROP] Cropping reference image: ${width}x${height} → ${width}x${newHeight} (removed ${cropTop}px from top, ${cropBottom}px from bottom)`);
+    log.debug(`✂️ [CROP] Cropping reference image: ${width}x${height} → ${width}x${newHeight} (removed ${cropTop}px from top, ${cropBottom}px from bottom)`);
 
     // Crop the image - extract from cropTop offset
     const croppedBuffer = await sharp(imageBuffer)
@@ -12934,7 +10362,7 @@ async function cropImageForSequential(imageBase64) {
 
     return croppedBase64;
   } catch (err) {
-    console.error('❌ [CROP] Error cropping image:', err.message);
+    log.error('❌ [CROP] Error cropping image:', err.message);
     // Return original image if cropping fails
     return imageBase64;
   }
@@ -12966,11 +10394,11 @@ async function compressImageToJPEG(pngBase64) {
     const compressedBase64 = compressedBuffer.toString('base64');
     const compressedSizeKB = (compressedBuffer.length / 1024).toFixed(2);
 
-    console.log(`🗜️  [COMPRESSION] PNG ${originalSizeKB} KB → JPEG ${compressedSizeKB} KB (${((1 - compressedBuffer.length / imageBuffer.length) * 100).toFixed(1)}% reduction)`);
+    log.debug(`🗜️  [COMPRESSION] PNG ${originalSizeKB} KB → JPEG ${compressedSizeKB} KB (${((1 - compressedBuffer.length / imageBuffer.length) * 100).toFixed(1)}% reduction)`);
 
     return `data:image/jpeg;base64,${compressedBase64}`;
   } catch (error) {
-    console.error('❌ [COMPRESSION] Error compressing image:', error);
+    log.error('❌ [COMPRESSION] Error compressing image:', error);
     throw error;
   }
 }
@@ -13181,8 +10609,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
  * @returns {Promise<string>} - The rewritten, safer scene description
  */
 async function rewriteBlockedScene(sceneDescription) {
-  console.log(`🔄 [REWRITE] Rewriting blocked scene to be safer...`);
-  console.log(`🔄 [REWRITE] Original: ${sceneDescription.substring(0, 100)}...`);
+  log.debug(`🔄 [REWRITE] Rewriting blocked scene to be safer...`);
+  log.debug(`🔄 [REWRITE] Original: ${sceneDescription.substring(0, 100)}...`);
 
   try {
     const rewritePrompt = fillTemplate(PROMPT_TEMPLATES.rewriteBlockedScene, {
@@ -13194,7 +10622,7 @@ async function rewriteBlockedScene(sceneDescription) {
     console.log(`✅ [REWRITE] Scene rewritten: ${rewrittenScene.substring(0, 100)}...`);
     return rewrittenScene.trim();
   } catch (error) {
-    console.error(`❌ [REWRITE] Failed to rewrite scene:`, error.message);
+    log.error(`❌ [REWRITE] Failed to rewrite scene:`, error.message);
     throw error;
   }
 }
@@ -13212,9 +10640,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     if (onImageReady && cachedResult.imageData) {
       try {
         await onImageReady(cachedResult.imageData, cachedResult.modelId);
-        console.log('📤 [IMAGE CACHE] Cached image sent for immediate display');
+        log.debug('📤 [IMAGE CACHE] Cached image sent for immediate display');
       } catch (callbackError) {
-        console.error('⚠️ [IMAGE CACHE] onImageReady callback error:', callbackError.message);
+        log.error('⚠️ [IMAGE CACHE] onImageReady callback error:', callbackError.message);
       }
     }
     return cachedResult;
@@ -13303,7 +10731,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
     // Log hashes of images being sent to API
     if (apiImageHashes.length > 0) {
-      console.log(`🔐 [IMAGE GEN] API image hashes:`, apiImageHashes.map(h => `${h.name}:${h.hash}`).join(', '));
+      log.debug(`🔐 [IMAGE GEN] API image hashes:`, apiImageHashes.map(h => `${h.name}:${h.hash}`).join(', '));
     }
 
     if (characterNames.length > 0) {
@@ -13332,7 +10760,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   };
 
-  console.log('🖼️  [IMAGE GEN] Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
+  log.debug('🖼️  [IMAGE GEN] Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
   log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8`);
 
   const response = await fetch(
@@ -13344,11 +10772,11 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   );
 
-  console.log('🖼️  [IMAGE GEN] Response status:', response.status, response.statusText);
+  log.debug('🖼️  [IMAGE GEN] Response status:', response.status, response.statusText);
 
   if (!response.ok) {
     const error = await response.text();
-    console.error('❌ [IMAGE GEN] Gemini API error response:', error);
+    log.error('❌ [IMAGE GEN] Gemini API error response:', error);
     throw new Error(`Gemini API error (${response.status}): ${error}`);
   }
 
@@ -13364,20 +10792,20 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   }
 
   // Log response structure (without base64 data to avoid massive logs)
-  console.log('🖼️  [IMAGE GEN] Response structure:', {
+  log.debug('🖼️  [IMAGE GEN] Response structure:', {
     hasCandidates: !!data.candidates,
     candidatesCount: data.candidates?.length || 0,
     responseKeys: Object.keys(data)
   });
 
   if (!data.candidates || data.candidates.length === 0) {
-    console.error('❌ [IMAGE GEN] No candidates in response. Response keys:', Object.keys(data));
+    log.error('❌ [IMAGE GEN] No candidates in response. Response keys:', Object.keys(data));
     throw new Error('No image generated - no candidates in response');
   }
 
   // Extract image data
   const candidate = data.candidates[0];
-  console.log('🖼️  [IMAGE GEN] Candidate structure:', {
+  log.debug('🖼️  [IMAGE GEN] Candidate structure:', {
     hasContent: !!candidate.content,
     hasParts: !!candidate.content?.parts,
     partsCount: candidate.content?.parts?.length || 0,
@@ -13385,9 +10813,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   });
 
   if (candidate.content && candidate.content.parts) {
-    console.log('🖼️  [IMAGE GEN] Found', candidate.content.parts.length, 'parts in candidate');
+    log.debug('🖼️  [IMAGE GEN] Found', candidate.content.parts.length, 'parts in candidate');
     for (const part of candidate.content.parts) {
-      console.log('🖼️  [IMAGE GEN] Part keys:', Object.keys(part));
+      log.debug('🖼️  [IMAGE GEN] Part keys:', Object.keys(part));
       // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API may vary
       const inlineData = part.inlineData || part.inline_data;
       if (inlineData && inlineData.data) {
@@ -13397,21 +10825,21 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const pngImageData = `data:image/png;base64,${inlineData.data}`;
 
         // Compress PNG to JPEG
-        console.log('🗜️  [COMPRESSION] Compressing image to JPEG...');
+        log.debug('🗜️  [COMPRESSION] Compressing image to JPEG...');
         const compressedImageData = await compressImageToJPEG(pngImageData);
 
         // Call onImageReady callback immediately (before quality eval) for progressive display
         if (onImageReady) {
           try {
             await onImageReady(compressedImageData, modelId);
-            console.log('📤 [IMAGE GEN] Image sent for immediate display (quality eval pending)');
+            log.debug('📤 [IMAGE GEN] Image sent for immediate display (quality eval pending)');
           } catch (callbackError) {
-            console.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
+            log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
           }
         }
 
         // Evaluate image quality with prompt and reference images
-        console.log(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...`);
+        log.debug(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...`);
         const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType);
 
         // Extract score, reasoning, and text error info from quality result
@@ -13445,16 +10873,16 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       }
     }
   } else {
-    console.error('❌ [IMAGE GEN] Unexpected candidate structure. Keys:', Object.keys(candidate));
+    log.error('❌ [IMAGE GEN] Unexpected candidate structure. Keys:', Object.keys(candidate));
     // Log the finishReason and finishMessage to understand why image was blocked
     if (candidate.finishReason) {
-      console.error('🚫 [IMAGE GEN] FINISH REASON:', candidate.finishReason);
+      log.error('🚫 [IMAGE GEN] FINISH REASON:', candidate.finishReason);
     }
     if (candidate.finishMessage) {
-      console.error('🚫 [IMAGE GEN] FINISH MESSAGE:', candidate.finishMessage);
+      log.error('🚫 [IMAGE GEN] FINISH MESSAGE:', candidate.finishMessage);
     }
     // Log the full candidate for debugging
-    console.error('🚫 [IMAGE GEN] FULL CANDIDATE DUMP:', JSON.stringify(candidate, null, 2));
+    log.error('🚫 [IMAGE GEN] FULL CANDIDATE DUMP:', JSON.stringify(candidate, null, 2));
 
     // Throw with more context about why it failed
     const reason = candidate.finishReason || 'unknown';
@@ -13462,7 +10890,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
   }
 
-  console.error('❌ [IMAGE GEN] No image data found in any part');
+  log.error('❌ [IMAGE GEN] No image data found in any part');
   throw new Error('No image data in response - check logs for API response structure');
 }
 
@@ -13480,7 +10908,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
       throw new Error('Gemini API key not configured');
     }
 
-    console.log(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}"`);
+    log.debug(`✏️  [IMAGE EDIT] Editing image with instruction: "${editInstruction}"`);
 
     // Extract base64 and mime type from the image
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -13521,14 +10949,14 @@ async function editImageWithPrompt(imageData, editInstruction) {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('❌ [IMAGE EDIT] Gemini API error:', error);
+      log.error('❌ [IMAGE EDIT] Gemini API error:', error);
       throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
 
     // Log response structure for debugging
-    console.log('✏️  [IMAGE EDIT] Response structure:', {
+    log.debug('✏️  [IMAGE EDIT] Response structure:', {
       hasCandidates: !!data.candidates,
       candidatesCount: data.candidates?.length || 0,
       responseKeys: Object.keys(data)
@@ -13537,10 +10965,10 @@ async function editImageWithPrompt(imageData, editInstruction) {
     // Extract the edited image from the response
     if (data.candidates && data.candidates[0]?.content?.parts) {
       const parts = data.candidates[0].content.parts;
-      console.log(`✏️  [IMAGE EDIT] Found ${parts.length} parts in response`);
+      log.debug(`✏️  [IMAGE EDIT] Found ${parts.length} parts in response`);
 
       for (const part of parts) {
-        console.log('✏️  [IMAGE EDIT] Part keys:', Object.keys(part));
+        log.debug('✏️  [IMAGE EDIT] Part keys:', Object.keys(part));
         // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API varies
         const inlineData = part.inlineData || part.inline_data;
         if (inlineData && inlineData.data) {
@@ -13550,22 +10978,22 @@ async function editImageWithPrompt(imageData, editInstruction) {
           return { imageData: editedImageData };
         }
         if (part.text) {
-          console.log('✏️  [IMAGE EDIT] Text response:', part.text.substring(0, 200));
+          log.debug('✏️  [IMAGE EDIT] Text response:', part.text.substring(0, 200));
         }
       }
     } else if (data.candidates && data.candidates[0]) {
       const candidate = data.candidates[0];
-      console.log('✏️  [IMAGE EDIT] Candidate structure:', {
+      log.debug('✏️  [IMAGE EDIT] Candidate structure:', {
         hasContent: !!candidate.content,
         finishReason: candidate.finishReason,
         finishMessage: candidate.finishMessage
       });
     }
 
-    console.warn('⚠️  [IMAGE EDIT] No edited image in response');
+    log.warn('⚠️  [IMAGE EDIT] No edited image in response');
     return null;
   } catch (error) {
-    console.error('❌ [IMAGE EDIT] Error editing image:', error);
+    log.error('❌ [IMAGE EDIT] Error editing image:', error);
     throw error;
   }
 }
@@ -13617,7 +11045,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
                            errorMsg.includes('prohibited') || errorMsg.includes('filtered');
 
       if (isSafetyBlock && !wasSceneRewritten && attempts < MAX_ATTEMPTS) {
-        console.log(`🚫 [QUALITY RETRY] Image blocked by safety filter, attempting to rewrite scene...`);
+        log.debug(`🚫 [QUALITY RETRY] Image blocked by safety filter, attempting to rewrite scene...`);
 
         // Extract scene description from prompt - supports English, German, and French
         const sceneMatch = currentPrompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i) ||
@@ -13648,7 +11076,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             attempts--;
             continue;
           } catch (rewriteError) {
-            console.error(`❌ [QUALITY RETRY] Scene rewrite failed:`, rewriteError.message);
+            log.error(`❌ [QUALITY RETRY] Scene rewrite failed:`, rewriteError.message);
           }
         } else {
           log.warn(`[QUALITY RETRY] Could not extract scene from prompt for rewriting. First 500 chars: ${currentPrompt.substring(0, 500)}`);
@@ -13670,7 +11098,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       continue;
     }
     const score = result.score || 0;
-    console.log(`⭐ [QUALITY RETRY] Attempt ${attempts} score: ${score}%`);
+    log.debug(`⭐ [QUALITY RETRY] Attempt ${attempts} score: ${score}%`);
 
     // Check for text errors on covers (but not when "NO TEXT" was expected and is missing)
     const noTextExpected = result.expectedText && result.expectedText.toUpperCase() === 'NO TEXT';
@@ -13745,7 +11173,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const inputData = req.body;
 
-    console.log(`📝 Creating story job ${jobId} for user ${req.user.username}`);
+    log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}`);
 
     // Check email verification (skip for admins)
     if (req.user.role !== 'admin' && STORAGE_MODE === 'database') {
@@ -13778,7 +11206,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
             console.log(`📧 Verification email resent to: ${user.email}`);
           }
         } catch (emailErr) {
-          console.error('Failed to send verification email:', emailErr.message);
+          log.error('Failed to send verification email:', emailErr.message);
         }
 
         return res.status(403).json({
@@ -13805,7 +11233,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
         // If job is older than 30 minutes, consider it stale and mark as failed
         const STALE_JOB_TIMEOUT_MINUTES = 30;
         if (jobAgeMinutes > STALE_JOB_TIMEOUT_MINUTES) {
-          console.log(`⏰ Job ${activeJob.id} is stale (${Math.round(jobAgeMinutes)} minutes old), marking as failed`);
+          log.error(`⏰ Job ${activeJob.id} is stale (${Math.round(jobAgeMinutes)} minutes old), marking as failed`);
           await dbPool.query(
             `UPDATE story_jobs
              SET status = 'failed',
@@ -13876,7 +11304,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
           [userId, -creditsNeeded, newBalance, 'story_reserve', jobId, `Reserved ${creditsNeeded} credits for ${pages}-page story`]
         );
 
-        console.log(`💳 Reserved ${creditsNeeded} credits for job ${jobId} (user balance: ${userCredits} -> ${newBalance})`);
+        log.debug(`💳 Reserved ${creditsNeeded} credits for job ${jobId} (user balance: ${userCredits} -> ${newBalance})`);
       }
 
       await dbPool.query(
@@ -13891,7 +11319,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
           'UPDATE users SET preferred_language = $1 WHERE id = $2',
           [inputData.language, userId]
         );
-        console.log(`🌐 Updated preferred language for user ${userId}: ${inputData.language}`);
+        log.debug(`🌐 Updated preferred language for user ${userId}: ${inputData.language}`);
       }
     } else {
       // File mode fallback - not supported for background jobs
@@ -13902,7 +11330,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
 
     // Start processing the job asynchronously (don't await)
     processStoryJob(jobId).catch(err => {
-      console.error(`❌ Job ${jobId} failed:`, err);
+      log.error(`❌ Job ${jobId} failed:`, err);
     });
 
     res.json({
@@ -13911,7 +11339,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
       message: 'Story generation started. This will take approximately 10 minutes.'
     });
   } catch (err) {
-    console.error('Error creating story job:', err);
+    log.error('Error creating story job:', err);
     res.status(500).json({ error: 'Failed to create story job' });
   }
 });
@@ -14010,7 +11438,7 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
       return res.status(503).json({ error: 'Background jobs require database mode' });
     }
   } catch (err) {
-    console.error('Error fetching job status:', err);
+    log.error('Error fetching job status:', err);
     res.status(500).json({ error: 'Failed to fetch job status' });
   }
 });
@@ -14056,7 +11484,7 @@ app.post('/api/jobs/:jobId/cancel', authenticateToken, async (req, res) => {
       [jobId]
     );
 
-    console.log(`🛑 Job ${jobId} cancelled by user ${req.user.username}`);
+    log.debug(`🛑 Job ${jobId} cancelled by user ${req.user.username}`);
 
     res.json({
       success: true,
@@ -14064,7 +11492,7 @@ app.post('/api/jobs/:jobId/cancel', authenticateToken, async (req, res) => {
       jobId: jobId
     });
   } catch (err) {
-    console.error('Error cancelling job:', err);
+    log.error('Error cancelling job:', err);
     res.status(500).json({ error: 'Failed to cancel job' });
   }
 });
@@ -14090,7 +11518,7 @@ app.get('/api/jobs/my-jobs', authenticateToken, async (req, res) => {
       return res.status(503).json({ error: 'Background jobs require database mode' });
     }
   } catch (err) {
-    console.error('Error fetching user jobs:', err);
+    log.error('Error fetching user jobs:', err);
     res.status(500).json({ error: 'Failed to fetch jobs' });
   }
 });
@@ -14105,7 +11533,7 @@ async function initialize() {
     try {
       await initializeDatabase();
     } catch (err) {
-      console.error('⚠️  Database initialization failed, falling back to file storage');
+      log.error('⚠️  Database initialization failed, falling back to file storage');
       await initializeDataFiles();
     }
   } else {
@@ -14132,7 +11560,7 @@ app.get('*', (req, res, next) => {
 
 initialize().then(() => {
   app.listen(PORT, () => {
-    console.log(`\n=================================`);
+    log.debug(`\n=================================`);
     console.log(`🚀 MagicalStory Server Running`);
     log.debug(`=================================`);
     console.log(`📍 URL: http://localhost:${PORT}`);
@@ -14147,12 +11575,12 @@ initialize().then(() => {
         console.log(`🗄️  Database: PostgreSQL (Railway)`);
       }
     } else {
-      console.log(`📝 Logs: data/logs.json`);
-      console.log(`👥 Users: data/users.json`);
+      log.debug(`📝 Logs: data/logs.json`);
+      log.debug(`👥 Users: data/users.json`);
     }
     log.debug(`=================================\n`);
   });
 }).catch(err => {
-  console.error('Failed to initialize server:', err);
+  log.error('Failed to initialize server:', err);
   process.exit(1);
 });
