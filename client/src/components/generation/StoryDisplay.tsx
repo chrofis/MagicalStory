@@ -1429,8 +1429,26 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Back Cover Display - only show when not generating (back cover is generated early but should appear last) */}
-      {coverImages && getCoverImageData(coverImages.backCover) && !isGenerating && (
+      {/* Placeholder for remaining pages during generation */}
+      {isGenerating && story && (
+        <div className="mt-8 max-w-2xl mx-auto">
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 border-dashed rounded-xl p-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
+              <p className="text-indigo-700 font-semibold">
+                {language === 'de'
+                  ? 'Weitere Seiten werden erstellt...'
+                  : language === 'fr'
+                  ? 'Création des pages suivantes...'
+                  : 'Creating more pages...'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Back Cover Display - show as soon as available */}
+      {coverImages && getCoverImageData(coverImages.backCover) && (
         <div className="mt-8 max-w-2xl mx-auto">
           <p className="text-sm text-gray-500 text-center mb-2">
             {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
