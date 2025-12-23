@@ -3475,6 +3475,7 @@ app.put('/api/user/shipping-address', authenticateToken, async (req, res) => {
 
 // Get user's orders
 app.get('/api/user/orders', authenticateToken, async (req, res) => {
+  console.log(`📦 [ORDERS] GET /api/user/orders called by user: ${req.user?.username || 'unknown'}`);
   try {
     log.debug(`📦 [USER] GET /api/user/orders - User: ${req.user.username}`);
 
