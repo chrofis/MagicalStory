@@ -3549,17 +3549,7 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
         WHERE user_id = $1 AND transaction_type = 'purchase'
         ORDER BY created_at DESC
       `;
-      console.log(`📦 [ORDERS DEBUG] Querying credit purchases for user_id: ${req.user.id}`);
       const creditRows = await dbQuery(creditPurchasesQuery, [req.user.id]);
-      console.log(`📦 [ORDERS DEBUG] Credit query returned ${creditRows.length} rows`);
-
-      // Debug: check all transactions for this user
-      const allTxQuery = `SELECT id, transaction_type, amount FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5`;
-      const allTx = await dbQuery(allTxQuery, [req.user.id]);
-      console.log(`📦 [ORDERS DEBUG] All transactions: ${JSON.stringify(allTx.map(t => ({ id: t.id, type: t.transaction_type, amount: t.amount })))}`);
-      if (creditRows.length === 0 && allTx.length > 0) {
-        console.log(`📦 [ORDERS DEBUG] WARNING: Found ${allTx.length} transactions but none with type='purchase'`);
-      }
 
       // Map credit purchases to order-like format
       const creditOrders = creditRows.map(tx => ({
