@@ -192,8 +192,8 @@ export const adminService = {
     return api.put<{ product: PrintProduct }>(`/api/admin/print-products/${id}`, product);
   },
 
-  async togglePrintProduct(id: number): Promise<{ product: PrintProduct }> {
-    return api.put<{ product: PrintProduct }>(`/api/admin/print-products/${id}/toggle`);
+  async togglePrintProduct(id: number, currentIsActive: boolean): Promise<{ product: PrintProduct }> {
+    return api.put<{ product: PrintProduct }>(`/api/admin/print-products/${id}/toggle`, { is_active: currentIsActive });
   },
 
   async deletePrintProduct(id: number): Promise<void> {

@@ -604,7 +604,7 @@ export default function AdminDashboard() {
   const handleToggleProduct = async (product: PrintProduct) => {
     setIsActionLoading(true);
     try {
-      await adminService.togglePrintProduct(product.id);
+      await adminService.togglePrintProduct(product.id, product.is_active);
       setPrintProducts(products =>
         products.map(p => p.id === product.id ? { ...p, is_active: !p.is_active } : p)
       );
