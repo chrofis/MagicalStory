@@ -954,9 +954,26 @@ export function StoryDisplay({
       {/* Front Cover Display - simple, no border wrapper */}
       {coverImages && getCoverImageData(coverImages.frontCover) && (
         <div className="mt-6 max-w-2xl mx-auto">
+          <p className="text-sm text-gray-500 text-center mb-2">
+            {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
+          </p>
           <img
             src={getCoverImageData(coverImages.frontCover)!}
             alt="Front Cover"
+            className="w-full rounded-lg shadow-lg"
+          />
+        </div>
+      )}
+
+      {/* Initial Page (Dedication Page) Display */}
+      {coverImages && getCoverImageData(coverImages.initialPage) && (
+        <div className="mt-6 max-w-2xl mx-auto">
+          <p className="text-sm text-gray-500 text-center mb-2">
+            {language === 'de' ? 'Widmungsseite' : language === 'fr' ? 'Page de dédicace' : 'Dedication Page'}
+          </p>
+          <img
+            src={getCoverImageData(coverImages.initialPage)!}
+            alt="Dedication Page"
             className="w-full rounded-lg shadow-lg"
           />
         </div>
@@ -1409,6 +1426,20 @@ export function StoryDisplay({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Back Cover Display */}
+      {coverImages && getCoverImageData(coverImages.backCover) && (
+        <div className="mt-8 max-w-2xl mx-auto">
+          <p className="text-sm text-gray-500 text-center mb-2">
+            {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
+          </p>
+          <img
+            src={getCoverImageData(coverImages.backCover)!}
+            alt="Back Cover"
+            className="w-full rounded-lg shadow-lg"
+          />
         </div>
       )}
 
