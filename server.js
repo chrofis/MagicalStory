@@ -1206,6 +1206,13 @@ async function initializeDatabase() {
       UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;
     `);
 
+    // Mark Firebase/Google users as email verified (Google verifies emails)
+    await dbPool.query(`
+      UPDATE users SET email_verified = TRUE
+      WHERE email_verified = FALSE
+      AND (email LIKE '%@gmail.com' OR email LIKE '%@googlemail.com' OR username LIKE 'firebase_%');
+    `);
+
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS config (
         id SERIAL PRIMARY KEY,
