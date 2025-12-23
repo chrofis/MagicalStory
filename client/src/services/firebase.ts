@@ -6,7 +6,6 @@ import {
   signInWithRedirect,
   getRedirectResult,
   signOut,
-  onAuthStateChanged,
   browserPopupRedirectResolver,
   type User as FirebaseUser
 } from 'firebase/auth';
@@ -74,10 +73,6 @@ export async function getIdToken(user: FirebaseUser): Promise<string> {
 
 export async function firebaseSignOut(): Promise<void> {
   await signOut(auth);
-}
-
-export function onFirebaseAuthStateChanged(callback: (user: FirebaseUser | null) => void) {
-  return onAuthStateChanged(auth, callback);
 }
 
 export { auth };

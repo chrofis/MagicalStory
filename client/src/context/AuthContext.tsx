@@ -1,25 +1,31 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { User, AuthState } from '@/types/user';
 import logger from '@/services/logger';
-import { signInWithGoogle, getIdToken, firebaseSignOut, onFirebaseAuthStateChanged, handleRedirectResult, type FirebaseUser } from '@/services/firebase';
+import storage, { STORAGE_KEYS } from '@/services/storage';
+import { signInWithGoogle, getIdToken, firebaseSignOut, handleRedirectResult, type FirebaseUser } from '@/services/firebase';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string, email?: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (redirectUrl?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateCredits: (credits: number) => void;
   refreshUser: () => Promise<void>;
+  refreshToken: () => Promise<boolean>;
   impersonate: (userId: string) => Promise<void>;
   stopImpersonating: () => Promise<void>;
   isLoading: boolean;
+  storageWarning: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const API_URL = import.meta.env.VITE_API_URL || '';
+
+// Token refresh interval (refresh when 1 day left of 7 day token)
+const TOKEN_REFRESH_THRESHOLD_MS = 6 * 24 * 60 * 60 * 1000; // 6 days
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -30,26 +36,123 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     originalAdmin: null,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const redirectCheckedRef = useRef(false);
   const authInProgressRef = useRef(false);
+  const tokenRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Restore session from localStorage on mount
+  // Check storage availability and warn user if limited
   useEffect(() => {
-    // Migration: copy old 'token' key to 'auth_token' if needed
-    const oldToken = localStorage.getItem('token');
-    if (oldToken && !localStorage.getItem('auth_token')) {
-      localStorage.setItem('auth_token', oldToken);
-      localStorage.removeItem('token');
+    const storageType = storage.getStorageType();
+    if (storageType === 'sessionStorage') {
+      setStorageWarning('Your session will not persist after closing the browser (private mode detected)');
+    } else if (storageType === 'memory') {
+      setStorageWarning('Your session will be lost on page refresh (storage unavailable)');
+    }
+  }, []);
+
+  // Parse JWT to get expiration time
+  const getTokenExpiry = useCallback((token: string): number | null => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.exp ? payload.exp * 1000 : null; // Convert to ms
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Refresh token before it expires
+  const refreshToken = useCallback(async (): Promise<boolean> => {
+    const token = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) return false;
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        logger.warn('Token refresh failed, user may need to re-login');
+        return false;
+      }
+
+      const data = await response.json();
+      storage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.token);
+
+      setState(prev => ({
+        ...prev,
+        token: data.token,
+      }));
+
+      logger.info('Token refreshed successfully');
+      return true;
+    } catch (error) {
+      logger.error('Token refresh error:', error);
+      return false;
+    }
+  }, []);
+
+  // Schedule token refresh
+  const scheduleTokenRefresh = useCallback((token: string) => {
+    // Clear any existing interval
+    if (tokenRefreshIntervalRef.current) {
+      clearInterval(tokenRefreshIntervalRef.current);
     }
 
-    const token = localStorage.getItem('auth_token');
-    const userJson = localStorage.getItem('current_user');
+    const expiry = getTokenExpiry(token);
+    if (!expiry) return;
+
+    const now = Date.now();
+    const timeUntilRefresh = expiry - now - TOKEN_REFRESH_THRESHOLD_MS;
+
+    if (timeUntilRefresh > 0) {
+      // Schedule refresh
+      tokenRefreshIntervalRef.current = setTimeout(async () => {
+        const success = await refreshToken();
+        if (success) {
+          const newToken = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+          if (newToken) {
+            scheduleTokenRefresh(newToken);
+          }
+        }
+      }, timeUntilRefresh);
+      logger.info(`Token refresh scheduled in ${Math.round(timeUntilRefresh / 1000 / 60)} minutes`);
+    } else if (now < expiry) {
+      // Token expires soon, refresh now
+      refreshToken();
+    }
+  }, [getTokenExpiry, refreshToken]);
+
+  // Restore session from storage on mount
+  useEffect(() => {
+    // Migration: copy old 'token' key to 'auth_token' if needed
+    const oldToken = storage.getItem('token');
+    if (oldToken && !storage.getItem(STORAGE_KEYS.AUTH_TOKEN)) {
+      storage.setItem(STORAGE_KEYS.AUTH_TOKEN, oldToken);
+      storage.removeItem('token');
+    }
+
+    const token = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    const userJson = storage.getItem(STORAGE_KEYS.CURRENT_USER);
 
     if (token && userJson) {
       try {
+        // Check if token is expired
+        const expiry = getTokenExpiry(token);
+        if (expiry && Date.now() >= expiry) {
+          logger.warn('Stored token has expired, clearing session');
+          storage.clearAuthStorage();
+          setIsLoading(false);
+          return;
+        }
+
         const user = JSON.parse(userJson) as User;
         // Restore impersonation state if present
-        const impersonationJson = localStorage.getItem('impersonation_state');
+        const impersonationJson = storage.getItem(STORAGE_KEYS.IMPERSONATION_STATE);
         let isImpersonating = false;
         let originalAdmin = null;
         if (impersonationJson) {
@@ -58,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isImpersonating = impersonationState.isImpersonating || false;
             originalAdmin = impersonationState.originalAdmin || null;
           } catch {
-            localStorage.removeItem('impersonation_state');
+            storage.removeItem(STORAGE_KEYS.IMPERSONATION_STATE);
           }
         }
         setState({
@@ -71,15 +174,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Configure logger based on original admin role or current user role
         logger.configure({ isAdmin: originalAdmin ? true : user.role === 'admin' });
         logger.info(`Session restored for ${user.username}${isImpersonating ? ' (impersonating)' : ''}`);
+
+        // Schedule token refresh
+        scheduleTokenRefresh(token);
       } catch {
         // Invalid stored data, clear it
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('current_user');
-        localStorage.removeItem('impersonation_state');
+        storage.clearAuthStorage();
       }
     }
     setIsLoading(false);
-  }, []);
+  }, [getTokenExpiry, scheduleTokenRefresh]);
+
+  // Save auth data to storage
+  const saveAuthData = useCallback((token: string, user: User) => {
+    storage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+    storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    storage.removeItem(STORAGE_KEYS.IMPERSONATION_STATE);
+
+    // Set UI language based on user's preferred language
+    if (user.preferredLanguage) {
+      const langMap: Record<string, string> = { 'English': 'en', 'German': 'de', 'French': 'fr' };
+      const langCode = langMap[user.preferredLanguage] || 'en';
+      storage.setItem(STORAGE_KEYS.LANGUAGE, langCode);
+      window.dispatchEvent(new Event('languageUpdated'));
+    }
+
+    // Schedule token refresh
+    scheduleTokenRefresh(token);
+  }, [scheduleTokenRefresh]);
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await fetch(`${API_URL}/api/auth/login`, {
@@ -104,18 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       emailVerified: data.user.emailVerified,
     };
 
-    localStorage.setItem('auth_token', data.token);
-    localStorage.setItem('current_user', JSON.stringify(user));
-    localStorage.removeItem('impersonation_state'); // Clear any impersonation state on fresh login
-
-    // Set UI language based on user's preferred language
-    if (data.user.preferredLanguage) {
-      const langMap: Record<string, string> = { 'English': 'en', 'German': 'de', 'French': 'fr' };
-      const langCode = langMap[data.user.preferredLanguage] || 'en';
-      localStorage.setItem('magicalstory_language', langCode);
-      // Dispatch event to notify LanguageContext
-      window.dispatchEvent(new Event('languageUpdated'));
-    }
+    saveAuthData(data.token, user);
 
     setState({
       isAuthenticated: true,
@@ -125,10 +236,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       originalAdmin: null,
     });
 
-    // Configure logger based on user role
     logger.configure({ isAdmin: user.role === 'admin' });
     logger.success(`Logged in as ${user.username} (${user.role})`);
-  }, []);
+  }, [saveAuthData]);
 
   const register = useCallback(async (username: string, password: string, email?: string) => {
     const response = await fetch(`${API_URL}/api/auth/register`, {
@@ -172,18 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       emailVerified: data.user.emailVerified,
     };
 
-    localStorage.setItem('auth_token', data.token);
-    localStorage.setItem('current_user', JSON.stringify(user));
-    localStorage.removeItem('impersonation_state');
-
-    // Set UI language based on user's preferred language
-    if (data.user.preferredLanguage) {
-      const langMap: Record<string, string> = { 'English': 'en', 'German': 'de', 'French': 'fr' };
-      const langCode = langMap[data.user.preferredLanguage] || 'en';
-      localStorage.setItem('magicalstory_language', langCode);
-      // Dispatch event to notify LanguageContext
-      window.dispatchEvent(new Event('languageUpdated'));
-    }
+    saveAuthData(data.token, user);
 
     setState({
       isAuthenticated: true,
@@ -195,15 +294,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     logger.configure({ isAdmin: user.role === 'admin' });
     logger.success(`Logged in with Google as ${user.username}`);
-  }, []);
 
-  const loginWithGoogle = useCallback(async () => {
-    // Store intended redirect URL in case we need to do a redirect flow (mobile)
-    sessionStorage.setItem('auth_redirect_after_login', '/create');
-    const firebaseUser = await signInWithGoogle();
-    await handleFirebaseAuth(firebaseUser);
-    // Clear redirect URL since we completed login without redirect
-    sessionStorage.removeItem('auth_redirect_after_login');
+    return user;
+  }, [saveAuthData]);
+
+  const loginWithGoogle = useCallback(async (redirectUrl?: string) => {
+    // Store intended redirect URL (use localStorage for persistence across redirects)
+    const targetUrl = redirectUrl || window.location.pathname || '/create';
+    storage.setItem(STORAGE_KEYS.AUTH_REDIRECT_URL, targetUrl);
+
+    try {
+      const firebaseUser = await signInWithGoogle();
+      await handleFirebaseAuth(firebaseUser);
+      // Clear redirect URL since we completed login without full page redirect
+      storage.removeItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
+    } catch (error) {
+      // If this was a redirect (not popup), the error is expected
+      // The redirect will complete and handleRedirectResult will be called
+      if (error instanceof Error && error.message.includes('Redirecting')) {
+        logger.info('Google sign-in redirecting...');
+        return;
+      }
+      throw error;
+    }
   }, [handleFirebaseAuth]);
 
   const resetPassword = useCallback(async (email: string) => {
@@ -220,7 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
-    const token = localStorage.getItem('auth_token');
+    const token = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
     if (!token) {
       throw new Error('Not authenticated');
     }
@@ -242,15 +355,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.success('Password changed successfully');
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     logger.info('Logging out...');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('current_user');
-    localStorage.removeItem('impersonation_state');
+
+    // Clear refresh timer
+    if (tokenRefreshIntervalRef.current) {
+      clearTimeout(tokenRefreshIntervalRef.current);
+      tokenRefreshIntervalRef.current = null;
+    }
+
+    // Try to invalidate token on server (best effort)
+    const token = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (token) {
+      try {
+        await fetch(`${API_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+      } catch {
+        // Ignore errors - logout should succeed even if server call fails
+      }
+    }
+
+    // Clear all auth storage
+    storage.clearAuthStorage();
+
     // Also sign out from Firebase
     firebaseSignOut().catch(err => {
       console.warn('Firebase sign out error:', err);
     });
+
     setState({
       isAuthenticated: false,
       user: null,
@@ -258,6 +394,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isImpersonating: false,
       originalAdmin: null,
     });
+
     // Reset logger to non-admin mode
     logger.configure({ isAdmin: false });
   }, []);
@@ -293,9 +430,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       originalAdmin: data.originalAdmin,
     };
 
-    localStorage.setItem('auth_token', data.token);
-    localStorage.setItem('current_user', JSON.stringify(user));
-    localStorage.setItem('impersonation_state', JSON.stringify(impersonationState));
+    storage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.token);
+    storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    storage.setItem(STORAGE_KEYS.IMPERSONATION_STATE, JSON.stringify(impersonationState));
 
     setState({
       isAuthenticated: true,
@@ -334,9 +471,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       emailVerified: data.user.emailVerified,
     };
 
-    localStorage.setItem('auth_token', data.token);
-    localStorage.setItem('current_user', JSON.stringify(user));
-    localStorage.removeItem('impersonation_state');
+    storage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.token);
+    storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    storage.removeItem(STORAGE_KEYS.IMPERSONATION_STATE);
 
     setState({
       isAuthenticated: true,
@@ -351,7 +488,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [state.token]);
 
   // Handle redirect result on page load (for mobile Google sign-in)
-  // This must only run ONCE because getRedirectResult() consumes the result
+  // This is the ONLY mechanism for handling OAuth redirects - no auth state listener
   useEffect(() => {
     const checkRedirectResult = async () => {
       // Only check once - getRedirectResult returns null on subsequent calls
@@ -360,29 +497,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       redirectCheckedRef.current = true;
 
+      // Skip if already authenticated
+      if (state.isAuthenticated || state.token) {
+        logger.info('Already authenticated, skipping redirect check');
+        return;
+      }
+
       try {
         logger.info('Checking for Google redirect result...');
         const firebaseUser = await handleRedirectResult();
         if (firebaseUser) {
-          // Prevent duplicate auth if auth state listener also fires
           if (authInProgressRef.current) {
-            logger.info('Redirect result: Auth already in progress, skipping');
+            logger.info('Auth already in progress, skipping');
             return;
           }
           authInProgressRef.current = true;
-          logger.info('Redirect result: Firebase user detected, completing login...');
-          await handleFirebaseAuth(firebaseUser);
-          authInProgressRef.current = false;
+          logger.info('Firebase user from redirect detected, completing login...');
 
-          // Check if we have a stored redirect URL and navigate there
-          const redirectUrl = sessionStorage.getItem('auth_redirect_after_login');
-          if (redirectUrl) {
-            sessionStorage.removeItem('auth_redirect_after_login');
-            logger.info('Redirect result: Navigating to stored redirect URL:', redirectUrl);
-            window.location.href = redirectUrl;
+          try {
+            await handleFirebaseAuth(firebaseUser);
+
+            // Check if we have a stored redirect URL and navigate there
+            const redirectUrl = storage.getItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
+            if (redirectUrl && redirectUrl !== window.location.pathname) {
+              storage.removeItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
+              logger.info('Navigating to stored redirect URL:', redirectUrl);
+              // Use replace to avoid back button issues
+              window.location.replace(redirectUrl);
+            }
+          } finally {
+            authInProgressRef.current = false;
           }
         } else {
-          logger.info('Redirect result: No pending redirect');
+          logger.info('No pending Google redirect');
         }
       } catch (err) {
         authInProgressRef.current = false;
@@ -390,27 +537,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
     checkRedirectResult();
-  }, [handleFirebaseAuth]);
-
-  // Firebase Auth State Listener - catches sign-in even if redirect handling fails
-  useEffect(() => {
-    const unsubscribe = onFirebaseAuthStateChanged(async (firebaseUser) => {
-      // Only process if we have a Firebase user but NOT already authenticated in our app
-      // Also check authInProgressRef to avoid duplicate auth attempts
-      if (firebaseUser && !state.isAuthenticated && !state.token && !authInProgressRef.current) {
-        authInProgressRef.current = true;
-        logger.info('Firebase auth state changed: User detected, completing login...');
-        try {
-          await handleFirebaseAuth(firebaseUser);
-        } catch (err) {
-          console.error('Firebase auth state change error:', err);
-        }
-        authInProgressRef.current = false;
-      }
-    });
-
-    return () => unsubscribe();
   }, [state.isAuthenticated, state.token, handleFirebaseAuth]);
+
+  // NOTE: Removed Firebase onAuthStateChanged listener to prevent race conditions
+  // All Firebase auth is now handled through explicit loginWithGoogle() or handleRedirectResult()
 
   const updateCredits = useCallback((credits: number) => {
     setState(prev => {
@@ -419,7 +549,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...prev.user,
         credits,
       };
-      localStorage.setItem('current_user', JSON.stringify(updatedUser));
+      storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
       return {
         ...prev,
         user: updatedUser,
@@ -428,7 +558,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem('auth_token');
+    const token = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
     if (!token) return;
 
     try {
@@ -449,7 +579,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailVerified: data.user.emailVerified,
       };
 
-      localStorage.setItem('current_user', JSON.stringify(user));
+      storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
       setState(prev => ({
         ...prev,
         user,
@@ -457,6 +587,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       logger.error('Failed to refresh user:', error);
     }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (tokenRefreshIntervalRef.current) {
+        clearTimeout(tokenRefreshIntervalRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -471,9 +610,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         updateCredits,
         refreshUser,
+        refreshToken,
         impersonate,
         stopImpersonating,
         isLoading,
+        storageWarning,
       }}
     >
       {children}

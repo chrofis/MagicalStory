@@ -641,4 +641,78 @@ router.get('/verification-status', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/auth/refresh - Refresh JWT token
+router.post('/refresh', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Token refresh requires database mode' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT id, username, email, role, credits, preferred_language, email_verified FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = result.rows[0];
+
+    // Generate new token with same 7-day expiry
+    const newToken = jwt.sign(
+      {
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+      },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Log the refresh
+    await logActivity(userId, user.username, 'TOKEN_REFRESHED', {});
+
+    res.json({
+      token: newToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        credits: user.credits,
+        preferredLanguage: user.preferred_language,
+        emailVerified: user.email_verified,
+      },
+    });
+  } catch (err) {
+    console.error('Token refresh error:', err);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+// POST /api/auth/logout - Logout and invalidate token (best effort)
+// Note: Full token blacklisting would require Redis or similar
+// This endpoint logs the logout for audit purposes
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const username = req.user.username;
+
+    // Log the logout
+    await logActivity(userId, username, 'LOGOUT', {});
+
+    log.info(`User ${username} logged out`);
+
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    // Even if logging fails, consider logout successful
+    console.error('Logout logging error:', err);
+    res.json({ success: true, message: 'Logged out' });
+  }
+});
+
 module.exports = router;
