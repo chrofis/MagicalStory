@@ -281,8 +281,21 @@ router.get('/users/:userId/details', authenticateToken, requireAdmin, async (req
       [targetUserId]
     );
 
-    // Calculate totals
+    // Count characters from the characters table for this user (matches main dashboard)
+    const characterDataResult = await dbQuery('SELECT data FROM characters WHERE user_id = $1', [targetUserId]);
     let totalCharacters = 0;
+    for (const row of characterDataResult) {
+      try {
+        const charData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+        if (charData.characters && Array.isArray(charData.characters)) {
+          totalCharacters += charData.characters.length;
+        }
+      } catch (err) {
+        // Skip malformed character data
+      }
+    }
+
+    // Calculate totals
     let totalImages = 0;
     const totalTokens = {
       anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
@@ -302,9 +315,7 @@ router.get('/users/:userId/details', authenticateToken, requireAdmin, async (req
           (storyData.coverImages.backCover ? 1 : 0) +
           (storyData.coverImages.spine ? 1 : 0) : 0;
         const imageCount = sceneImageCount + coverImageCount;
-        const charCount = storyData?.characters?.length || 0;
         totalImages += imageCount;
-        totalCharacters += charCount;
 
         // Aggregate token usage
         if (storyData?.tokenUsage) {
