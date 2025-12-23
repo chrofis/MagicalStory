@@ -3544,12 +3544,21 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
 
       // Fetch credit purchases
       const creditPurchasesQuery = `
-        SELECT id, amount, balance_after, reference_id, description, created_at
+        SELECT id, amount, balance_after, reference_id, description, created_at, transaction_type
         FROM credit_transactions
         WHERE user_id = $1 AND transaction_type = 'purchase'
         ORDER BY created_at DESC
       `;
+      log.debug(`📦 [USER] Querying credit purchases for user_id: ${req.user.id} (type: ${typeof req.user.id})`);
       const creditRows = await dbQuery(creditPurchasesQuery, [req.user.id]);
+      log.debug(`📦 [USER] Credit query returned ${creditRows.length} rows`);
+
+      // Debug: check all transactions for this user
+      if (creditRows.length === 0) {
+        const allTxQuery = `SELECT id, transaction_type, amount, created_at FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5`;
+        const allTx = await dbQuery(allTxQuery, [req.user.id]);
+        log.debug(`📦 [USER] All transactions for user: ${JSON.stringify(allTx.map(t => ({ id: t.id, type: t.transaction_type, amount: t.amount })))}`);
+      }
 
       // Map credit purchases to order-like format
       const creditOrders = creditRows.map(tx => ({
