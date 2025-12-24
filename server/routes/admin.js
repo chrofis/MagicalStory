@@ -438,6 +438,14 @@ router.get('/users/:userId/stories', authenticateToken, requireAdmin, async (req
 
     const userStories = rows.map(row => {
       const story = JSON.parse(row.data);
+      // Calculate page count:
+      // - Picture book (1st-grade): 1 scene = 1 page (image with text below)
+      // - Standard/Advanced: 1 scene = 2 pages (text page + image page)
+      // - Plus 3 cover pages (front, back, initial/dedication)
+      const sceneCount = story.sceneImages?.length || 0;
+      const isPictureBook = story.languageLevel === '1st-grade';
+      const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
+      const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
       return {
         id: story.id,
         title: story.title,
@@ -445,8 +453,9 @@ router.get('/users/:userId/stories', authenticateToken, requireAdmin, async (req
         updatedAt: story.updatedAt,
         pages: story.pages,
         language: story.language,
+        languageLevel: story.languageLevel,
         characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
-        pageCount: story.sceneImages?.length || 0,
+        pageCount,
         thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
       };
     });
