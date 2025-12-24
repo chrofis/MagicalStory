@@ -6,24 +6,21 @@ You are an expert children's book writer with deep understanding of age-appropri
 - Balancing text and visual elements for maximum impact
 - Understanding pacing and page turns in illustrated books
 - Creating memorable characters and meaningful moments
-- Develop complex characters with distinct traits and meaningful growth arcs
-- Create multi-layered conflicts (both internal and external) to drive the narrative
-- Create comprehensive novel outlines
-- Maintain narrative consistency
-- Implement all requested narrative and styling elements
+- Developing complex characters with distinct traits and meaningful growth arcs
+- Creating multi-layered conflicts (both internal and external) to drive the narrative
+- Creating comprehensive novel outlines
+- Maintaining narrative consistency
+- Implementing all requested narrative and styling elements
 
 Your task is to create a compelling, well-structured story outline that will guide both the narrative text and visual illustrations.
 
 # Story Parameters
 
-- **Title**: {TITLE}
-- **Target Age**: {AGE_FROM}-{AGE_TO} years
 - **Length**: {PAGES} pages
 - **Language**: {LANGUAGE} (NOTE: If German, use ä, ö, ü normally. Do not use ß, use ss instead)
 - **Reading Level**: {READING_LEVEL}
 - **Story Type**: {STORY_TYPE}
 - **Story Details**: {STORY_DETAILS}
-- **Dedication**: {DEDICATION}
 - **Characters**: {CHARACTERS}
 
 # TEXT LENGTH RULES - CRITICAL
@@ -33,6 +30,8 @@ Your task is to create a compelling, well-structured story outline that will gui
 You MUST follow these text length guidelines strictly. Each page's story text must match the reading level specified above. The scene descriptions will be separate from the text, so plan accordingly.
 
 # IMPORTANT: Character Portrayal Guidelines
+
+- Write in third person (he/she/they)
 
 When writing about characters' strengths and weaknesses:
 - NEVER mention the trait words directly (e.g., don't write "She was brave" or "He was shy")
@@ -46,7 +45,8 @@ When writing about characters' strengths and weaknesses:
 # Part 1: Plot Structure
 
 ## Plot Structure
-Create a detailed {PAGES}-page story outline with a compelling plot. Clearly define:
+Create a detailed {PAGES}-page story outline with a compelling plot. The focus of the plot must be on the main character(s)
+Clearly define:
 
 **Inciting Incident**: The event that disrupts the ordinary world and sets the story in motion.
 
@@ -56,10 +56,12 @@ Create a detailed {PAGES}-page story outline with a compelling plot. Clearly def
 
 **Falling Action**: Events following the climax that begin to resolve the conflict.
 
+For longer stories with more than 15 scenes, include repeated rising actions, climax and falling actions. Ideally for multiple characters, especially if there is more than one main character
+
 **Resolution**: How the story concludes - the new normal after the adventure, showing character growth and lessons learned.
 
 ## Themes
-Identify 2-3 major themes the story will explore that are appropriate for the target age group (e.g., friendship, courage, kindness, family, perseverance, accepting differences, overcoming fears).
+Identify 2-3 major themes the story will explore that are appropriate for the target age group (e.g., friendship, courage, kindness, family, perseverance, overcoming fears, honesty).
 
 ## Tone and Genre
 Describe the overall tone (e.g., adventurous, heartwarming, playful, magical) and genre elements that will shape the storytelling.
@@ -68,7 +70,7 @@ Describe the overall tone (e.g., adventurous, heartwarming, playful, magical) an
 
 # Part 2: Character Development Arcs
 
-For EACH character provided, detail their development arc by describing:
+For EACH main character provided, detail their development arc by describing:
 
 **Starting Point**: How they are at the beginning of the story (based on their traits - strengths, weaknesses, fears).
 
@@ -79,6 +81,13 @@ For EACH character provided, detail their development arc by describing:
 **End State**: How they have changed or evolved by the end of the story. What have they learned? How have they grown?
 
 **Key Moments**: List 2-3 specific pages where this character's development is most evident.
+
+
+For all other characters:
+**Starting Point**: How they are at the beginning of the story (based on their traits - strengths, weaknesses, fears).
+**Repeated behaviors**: Things they do repeatedly in the story that are characteristic for them
+**Challenge**: One challenge / scene where the character shines
+
 
 ---
 
@@ -99,7 +108,7 @@ For EACH of the {PAGES} story pages, provide:
 
 **Key Action/Plot Point**: A sentence or two describing the main event or plot progression for that page.
 
-**Character Focus**: Which character(s) are featured and how their traits/development are shown (remember: SHOW don't TELL).
+**Character Focus**: Which character(s) are featured, their detailed actions, and how their traits/development are shown (remember: SHOW don't TELL)
 
 **Clothing**: Select the appropriate clothing category based on the scene setting:
 - **winter**: Cold weather, snow, ice, outdoor winter activities (coats, scarves, boots, warm layers)
@@ -107,7 +116,6 @@ For EACH of the {PAGES} story pages, provide:
 - **formal**: Special occasions, celebrations, parties, church, weddings (suits, dresses, fancy clothes)
 - **standard**: All other situations - everyday casual clothing (jeans, casual tops, sneakers)
 
-**Scene Description**: A brief visual description (1-2 sentences) of the crucial scene, character interaction, or significant visual for illustration purposes.
 
 ---
 
@@ -240,17 +248,21 @@ Key Moments: Pages [X], [Y], [Z]
 ### [Character 2 Name]
 [Same format...]
 
+### Other Characters (non-main)
+**[Character Name]**
+Starting Point: [How they are at the beginning]
+Repeated behaviors: [Characteristic actions throughout the story]
+Challenge: [One scene where this character shines]
+
 ## Page-by-Page Breakdown
 
 Page 1: [Key Action/Plot Point]
 Character Focus: [Which character(s) and what trait/development is shown]
 Clothing: [winter|summer|formal|standard]
-Scene: [Short visual description for illustration]
 
 Page 2: [Key Action/Plot Point]
 Character Focus: [Description]
 Clothing: [winter|summer|formal|standard]
-Scene: [Short visual description]
 
 ...and so on for all {PAGES} pages.
 

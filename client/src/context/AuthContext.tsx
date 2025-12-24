@@ -301,21 +301,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = useCallback(async (redirectUrl?: string) => {
     // Store intended redirect URL (use localStorage for persistence across redirects)
     const targetUrl = redirectUrl || window.location.pathname || '/create';
-    console.log('[AUTH] loginWithGoogle called, targetUrl:', targetUrl);
     storage.setItem(STORAGE_KEYS.AUTH_REDIRECT_URL, targetUrl);
 
     try {
-      console.log('[AUTH] Calling signInWithGoogle...');
       const firebaseUser = await signInWithGoogle();
-      console.log('[AUTH] signInWithGoogle completed, user:', firebaseUser?.email);
-      console.log('[AUTH] Calling handleFirebaseAuth...');
       await handleFirebaseAuth(firebaseUser);
-      console.log('[AUTH] handleFirebaseAuth completed');
       // Clear redirect URL since we completed login without full page redirect
       storage.removeItem(STORAGE_KEYS.AUTH_REDIRECT_URL);
-      console.log('[AUTH] loginWithGoogle success, returning');
     } catch (error) {
-      console.log('[AUTH] loginWithGoogle error:', error);
       // If this was a redirect (not popup), the error is expected
       // The redirect will complete and handleRedirectResult will be called
       if (error instanceof Error && error.message.includes('Redirecting')) {

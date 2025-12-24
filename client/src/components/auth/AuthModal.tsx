@@ -49,15 +49,10 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
 
   const handleLoginSuccess = () => {
     // Navigate first, then close modal to avoid race conditions
-    console.log('[AUTH] handleLoginSuccess called, onSuccess:', !!onSuccess);
     if (onSuccess) {
-      console.log('[AUTH] Calling onSuccess...');
       onSuccess();
-      console.log('[AUTH] onSuccess completed');
     }
-    console.log('[AUTH] Calling onClose...');
     onClose();
-    console.log('[AUTH] onClose completed');
   };
 
   const handleLogin = async (email: string, password: string) => {
@@ -88,16 +83,12 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
   };
 
   const handleGoogleSignIn = async () => {
-    console.log('[AUTH] handleGoogleSignIn started, redirectUrl:', redirectUrl);
     setError('');
     setIsLoading(true);
     try {
-      console.log('[AUTH] Calling loginWithGoogle...');
       await loginWithGoogle(redirectUrl);
-      console.log('[AUTH] loginWithGoogle completed, calling handleLoginSuccess...');
       handleLoginSuccess();
     } catch (err) {
-      console.error('[AUTH] handleGoogleSignIn error:', err);
       setError(err instanceof Error ? err.message : errors.googleSignInFailed);
     } finally {
       setIsLoading(false);
