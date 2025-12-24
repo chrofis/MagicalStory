@@ -137,7 +137,7 @@ export function StorySettings({
               return (
                 <div
                   key={char.id}
-                  className={`p-4 rounded-lg transition-all flex items-center justify-between gap-4 ${
+                  className={`p-4 rounded-lg transition-all flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${
                     isOut
                       ? 'border-2 border-dashed border-gray-300 bg-gray-50 opacity-60'
                       : isMain
@@ -145,7 +145,7 @@ export function StorySettings({
                       : 'border-2 border-indigo-400 bg-white'
                   }`}
                 >
-                  {/* Character info - left side */}
+                  {/* Character info - top on mobile, left on desktop */}
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     {(char.photos?.face || char.photos?.original) && (
                       <img
@@ -165,13 +165,13 @@ export function StorySettings({
                     </div>
                   </div>
 
-                  {/* Role selector - right side */}
-                  <div className="flex rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
+                  {/* Role selector - full width on mobile, right side on desktop */}
+                  <div className="flex rounded-lg overflow-hidden border border-gray-300 w-full md:w-auto">
                     <button
                       onClick={() => onCharacterRoleChange(char.id, 'out')}
                       disabled={isLastInStory}
                       title={isLastInStory ? (language === 'de' ? 'Mindestens ein Charakter muss in der Geschichte sein' : language === 'fr' ? 'Au moins un personnage doit être dans l\'histoire' : 'At least one character must be in the story') : undefined}
-                      className={`px-3 py-2 text-sm font-medium transition-colors ${
+                      className={`flex-1 md:flex-initial px-3 py-2 text-sm font-medium transition-colors ${
                         isOut
                           ? 'bg-gray-500 text-white'
                           : isLastInStory
@@ -183,7 +183,7 @@ export function StorySettings({
                     </button>
                     <button
                       onClick={() => onCharacterRoleChange(char.id, 'in')}
-                      className={`px-3 py-2 text-sm font-medium transition-colors border-l border-r border-gray-300 ${
+                      className={`flex-1 md:flex-initial px-3 py-2 text-sm font-medium transition-colors border-l border-r border-gray-300 ${
                         isIn
                           ? 'bg-indigo-500 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
@@ -193,7 +193,7 @@ export function StorySettings({
                     </button>
                     <button
                       onClick={() => onCharacterRoleChange(char.id, 'main')}
-                      className={`px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${
+                      className={`flex-1 md:flex-initial px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
                         isMain
                           ? 'bg-indigo-600 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
