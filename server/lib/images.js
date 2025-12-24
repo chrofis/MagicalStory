@@ -904,7 +904,20 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
  */
 function clearImageCache() {
   imageCache.clear();
-  log.debug('🗑️  [IMAGE CACHE] Cache cleared');
+  log.debug('[IMAGE CACHE] Cache cleared');
+}
+
+/**
+ * Delete a specific entry from the image cache
+ * @param {string} cacheKey - The cache key to delete
+ * @returns {boolean} True if the key was deleted, false if it didn't exist
+ */
+function deleteFromImageCache(cacheKey) {
+  if (imageCache.has(cacheKey)) {
+    imageCache.delete(cacheKey);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -930,6 +943,7 @@ module.exports = {
 
   // Cache management
   clearImageCache,
+  deleteFromImageCache,
   getImageCacheSize,
 
   // Constants (for external access if needed)
