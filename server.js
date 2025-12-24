@@ -1788,11 +1788,20 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const buildCharRefList = (photos, characters) => {
       if (!photos || photos.length === 0) return '';
       const charDescriptions = photos.map((photo, index) => {
-        // Look up character info by name to get age/gender
+        // Look up character info by name to get full physical description
         const char = characters?.find(c => c.name === photo.name);
         const age = char?.age ? `${char.age} years old` : '';
         const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-        const brief = [photo.name, age, gender].filter(Boolean).join(', ');
+        // Include physical traits (excluding height - AI doesn't understand it for images)
+        const physical = char?.physical;
+        const physicalParts = [
+          physical?.build,
+          physical?.face,
+          physical?.hair,
+          physical?.other
+        ].filter(Boolean);
+        const physicalDesc = physicalParts.length > 0 ? physicalParts.join(', ') : '';
+        const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
       return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
@@ -5012,11 +5021,20 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const buildCharacterReferenceList = (photos, characters = null) => {
       if (!photos || photos.length === 0) return '';
       const charDescriptions = photos.map((photo, index) => {
-        // Find the original character to get age/gender
+        // Find the original character to get full physical description
         const char = characters?.find(c => c.name === photo.name);
         const age = char?.age ? `${char.age} years old` : '';
         const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-        const brief = [photo.name, age, gender].filter(Boolean).join(', ');
+        // Include physical traits (excluding height - AI doesn't understand it for images)
+        const physical = char?.physical;
+        const physicalParts = [
+          physical?.build,
+          physical?.face,
+          physical?.hair,
+          physical?.other
+        ].filter(Boolean);
+        const physicalDesc = physicalParts.length > 0 ? physicalParts.join(', ') : '';
+        const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
       let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
@@ -6114,11 +6132,20 @@ async function processStoryJob(jobId) {
       const buildCharacterReferenceList = (photos, characters = null) => {
         if (!photos || photos.length === 0) return '';
         const charDescriptions = photos.map((photo, index) => {
-          // Find the original character to get age/gender
+          // Find the original character to get full physical description
           const char = characters?.find(c => c.name === photo.name);
           const age = char?.age ? `${char.age} years old` : '';
           const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-          const brief = [photo.name, age, gender].filter(Boolean).join(', ');
+          // Include physical traits (excluding height - AI doesn't understand it for images)
+          const physical = char?.physical;
+          const physicalParts = [
+            physical?.build,
+            physical?.face,
+            physical?.hair,
+            physical?.other
+          ].filter(Boolean);
+          const physicalDesc = physicalParts.length > 0 ? physicalParts.join(', ') : '';
+          const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
           return `${index + 1}. ${brief}`;
         });
         let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;

@@ -929,11 +929,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   if (sceneCharacters && sceneCharacters.length > 0) {
     log.debug(`[IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
 
-    // Build a numbered list of characters with brief descriptions
+    // Build a numbered list of characters with full physical descriptions
     const charDescriptions = sceneCharacters.map((char, index) => {
       const age = char.age ? `${char.age} years old` : '';
       const gender = char.gender === 'male' ? 'boy/man' : char.gender === 'female' ? 'girl/woman' : '';
-      const brief = [char.name, age, gender].filter(Boolean).join(', ');
+      // Include physical traits (excluding height - AI doesn't understand it for images)
+      const physical = char.physical;
+      const physicalParts = [
+        physical?.build,
+        physical?.face,
+        physical?.hair,
+        physical?.other
+      ].filter(Boolean);
+      const physicalDesc = physicalParts.length > 0 ? physicalParts.join(', ') : '';
+      const brief = [char.name, age, gender, physicalDesc].filter(Boolean).join(', ');
       return `${index + 1}. ${brief}`;
     });
 
