@@ -531,15 +531,41 @@ export function StoryDisplay({
             </details>
           )}
 
-          {/* Full Story Text */}
+          {/* Full API Output */}
           {story && (
             <details className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-amber-800 hover:text-amber-900 flex items-center gap-2">
                 <BookOpen size={20} />
-                {language === 'de' ? 'Vollständiger Story-Text' : language === 'fr' ? 'Texte complet de l\'histoire' : 'Full Story Text'}
+                {language === 'de' ? 'Vollständige API-Ausgabe' : language === 'fr' ? 'Sortie API complète' : 'Full API Output'}
               </summary>
-              <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-96 overflow-y-auto">
-                {story}
+              <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[600px] overflow-y-auto">
+                {JSON.stringify({
+                  title,
+                  story,
+                  outline,
+                  sceneDescriptions,
+                  sceneImages: sceneImages.map(img => ({
+                    pageNumber: img.pageNumber,
+                    description: img.description,
+                    prompt: img.prompt,
+                    qualityScore: img.qualityScore,
+                    qualityReasoning: img.qualityReasoning,
+                    wasRegenerated: img.wasRegenerated,
+                    totalAttempts: img.totalAttempts,
+                    hasImage: !!img.imageData
+                  })),
+                  coverImages: coverImages ? {
+                    frontCover: coverImages.frontCover ? { hasImage: true, ...(typeof coverImages.frontCover === 'object' ? { description: coverImages.frontCover.description, storyTitle: coverImages.frontCover.storyTitle } : {}) } : null,
+                    initialPage: coverImages.initialPage ? { hasImage: true, ...(typeof coverImages.initialPage === 'object' ? { description: coverImages.initialPage.description } : {}) } : null,
+                    backCover: coverImages.backCover ? { hasImage: true, ...(typeof coverImages.backCover === 'object' ? { description: coverImages.backCover.description } : {}) } : null
+                  } : null,
+                  visualBible,
+                  languageLevel,
+                  isPartial,
+                  failureReason,
+                  generatedPages,
+                  totalPages
+                }, null, 2)}
               </pre>
             </details>
           )}

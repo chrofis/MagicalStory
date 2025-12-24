@@ -994,6 +994,8 @@ export default function StoryWizard() {
 
     try {
       // Create the story generation job with developer skip options
+      // Filter out excluded characters - only send characters that are in the story
+      const charactersForStory = characters.filter(c => !excludedCharacters.includes(c.id));
       const { jobId: newJobId } = await storyService.createStoryJob({
         storyType,
         storyTypeName: getStoryTypeName(),
@@ -1003,7 +1005,7 @@ export default function StoryWizard() {
         pages,
         dedication,
         storyDetails,
-        characters,
+        characters: charactersForStory,
         mainCharacters,
         relationships,
         relationshipTexts,

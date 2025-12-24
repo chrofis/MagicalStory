@@ -129,6 +129,10 @@ export function StorySettings({
               const isOut = role === 'out';
               const isIn = role === 'in';
               const isMain = role === 'main';
+              // Count characters currently in story (not excluded)
+              const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
+              // Prevent removing the last character from the story
+              const isLastInStory = !isOut && charactersInStory.length === 1;
 
               return (
                 <div
@@ -165,9 +169,13 @@ export function StorySettings({
                   <div className="flex rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
                     <button
                       onClick={() => onCharacterRoleChange(char.id, 'out')}
+                      disabled={isLastInStory}
+                      title={isLastInStory ? (language === 'de' ? 'Mindestens ein Charakter muss in der Geschichte sein' : language === 'fr' ? 'Au moins un personnage doit être dans l\'histoire' : 'At least one character must be in the story') : undefined}
                       className={`px-3 py-2 text-sm font-medium transition-colors ${
                         isOut
                           ? 'bg-gray-500 text-white'
+                          : isLastInStory
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
                       }`}
                     >
