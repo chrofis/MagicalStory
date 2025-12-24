@@ -9,7 +9,8 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles, Users } from 'lucide-react';
 import { Button, LoadingSpinner, Navigation } from '@/components/common';
 import { StoryTypeSelector, ArtStyleSelector, RelationshipEditor, StorySettings } from '@/components/story';
 import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
-import { GenerationProgress, StoryDisplay } from '@/components/generation';
+import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
+import type { ModelSelections } from '@/components/generation';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 
 // Types
@@ -51,6 +52,16 @@ export default function StoryWizard() {
   const [devSkipSceneDescriptions, setDevSkipSceneDescriptions] = useState(false);
   const [devSkipImages, setDevSkipImages] = useState(false);
   const [devSkipCovers, setDevSkipCovers] = useState(false);
+
+  // Developer model selection (admin only)
+  const [modelSelections, setModelSelections] = useState<ModelSelections>({
+    outlineModel: null,
+    textModel: null,
+    sceneDescriptionModel: null,
+    imageModel: null,
+    coverImageModel: null,
+    qualityModel: null,
+  });
 
   // Step 1: Story Type & Art Style
   const [storyType, setStoryType] = useState('');
@@ -1016,6 +1027,15 @@ export default function StoryWizard() {
         skipText: devSkipText,
         skipSceneDescriptions: devSkipSceneDescriptions,
         skipCovers: devSkipCovers,
+        // Developer model overrides (admin only)
+        modelOverrides: user?.role === 'admin' ? {
+          outlineModel: modelSelections.outlineModel,
+          textModel: modelSelections.textModel,
+          sceneDescriptionModel: modelSelections.sceneDescriptionModel,
+          imageModel: modelSelections.imageModel,
+          coverImageModel: modelSelections.coverImageModel,
+          qualityModel: modelSelections.qualityModel,
+        } : undefined,
       });
 
       setJobId(newJobId);
@@ -1863,6 +1883,14 @@ export default function StoryWizard() {
                         {language === 'de' ? 'Hinweis: Übersprungene Schritte verwenden Platzhalter/leere Daten' : language === 'fr' ? 'Note: Les étapes sautées utiliseront des données vides/provisoires' : 'Note: Skipped steps will use placeholder/empty data'}
                       </p>
                     </div>
+                  )}
+
+                  {/* Developer Model Selection - Admin only */}
+                  {developerMode && user?.role === 'admin' && (
+                    <ModelSelector
+                      selections={modelSelections}
+                      onChange={setModelSelections}
+                    />
                   )}
 
                   <button

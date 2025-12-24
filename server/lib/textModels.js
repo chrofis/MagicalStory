@@ -312,13 +312,21 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
  * @param {number} maxTokens - Maximum tokens to generate (capped to model limit)
  * @returns {Promise<{text: string, usage: object}>}
  */
-async function callTextModel(prompt, maxTokens = 4096) {
-  const model = activeTextModel;
+async function callTextModel(prompt, maxTokens = 4096, modelOverride = null) {
+  // Use override if provided, otherwise use global active model
+  let model = activeTextModel;
+  let modelName = TEXT_MODEL;
+
+  if (modelOverride && TEXT_MODELS[modelOverride]) {
+    model = TEXT_MODELS[modelOverride];
+    modelName = modelOverride;
+    log.debug(`🔧 [TEXT] Using model override: ${modelOverride}`);
+  }
 
   // Cap maxTokens to model limit
   const effectiveMaxTokens = Math.min(maxTokens, model.maxOutputTokens);
 
-  log.verbose(`🤖 [TEXT] Calling ${TEXT_MODEL} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
+  log.verbose(`🤖 [TEXT] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
   switch (model.provider) {
     case 'anthropic':
@@ -337,13 +345,21 @@ async function callTextModel(prompt, maxTokens = 4096) {
  * @param {function} onChunk - Callback for each text chunk
  * @returns {Promise<{text: string, usage: object}>}
  */
-async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null) {
-  const model = activeTextModel;
+async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, modelOverride = null) {
+  // Use override if provided, otherwise use global active model
+  let model = activeTextModel;
+  let modelName = TEXT_MODEL;
+
+  if (modelOverride && TEXT_MODELS[modelOverride]) {
+    model = TEXT_MODELS[modelOverride];
+    modelName = modelOverride;
+    log.debug(`🔧 [TEXT STREAM] Using model override: ${modelOverride}`);
+  }
 
   // Cap maxTokens to model limit
   const effectiveMaxTokens = Math.min(maxTokens, model.maxOutputTokens);
 
-  log.verbose(`🌊 [TEXT STREAM] Calling ${TEXT_MODEL} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
+  log.verbose(`🌊 [TEXT STREAM] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
   // Only Anthropic supports streaming currently
   if (model.provider === 'anthropic') {
@@ -351,7 +367,7 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null) 
   } else {
     // Fall back to non-streaming for other providers
     log.debug(`🌊 [TEXT STREAM] Provider ${model.provider} doesn't support streaming, falling back to regular call`);
-    const result = await callTextModel(prompt, maxTokens);
+    const result = await callTextModel(prompt, maxTokens, modelOverride);
     if (onChunk) {
       onChunk(result.text, result.text);
     }

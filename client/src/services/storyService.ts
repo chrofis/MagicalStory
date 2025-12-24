@@ -483,6 +483,15 @@ export const storyService = {
     skipText?: boolean;
     skipSceneDescriptions?: boolean;
     skipCovers?: boolean;
+    // Developer model overrides (admin only)
+    modelOverrides?: {
+      outlineModel?: string | null;
+      textModel?: string | null;
+      sceneDescriptionModel?: string | null;
+      imageModel?: string | null;
+      coverImageModel?: string | null;
+      qualityModel?: string | null;
+    };
   }): Promise<{ jobId: string }> {
     const response = await api.post<{ jobId: string; message: string }>('/api/jobs/create-story', {
       storyType: data.storyType,
@@ -504,6 +513,8 @@ export const storyService = {
       skipText: data.skipText,
       skipSceneDescriptions: data.skipSceneDescriptions,
       skipCovers: data.skipCovers,
+      // Developer model overrides
+      modelOverrides: data.modelOverrides,
     });
     return { jobId: response.jobId };
   },
