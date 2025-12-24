@@ -1792,15 +1792,15 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
         const char = characters?.find(c => c.name === photo.name);
         const age = char?.age ? `${char.age} years old` : '';
         const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-        // Include physical traits (excluding height - AI doesn't understand it for images)
+        // Include physical traits with labels (excluding height - AI doesn't understand it for images)
         const physical = char?.physical;
         const physicalParts = [
-          physical?.build,
-          physical?.face,
-          physical?.hair,
-          physical?.other
+          physical?.build ? `Build: ${physical.build}` : '',
+          physical?.face ? `Face: ${physical.face}` : '',
+          physical?.hair ? `Hair: ${physical.hair}` : '',
+          physical?.other ? `Other: ${physical.other}` : ''
         ].filter(Boolean);
-        const physicalDesc = physicalParts.length > 0 ? physicalParts.join(', ') : '';
+        const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
         const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
@@ -5019,15 +5019,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const char = characters?.find(c => c.name === photo.name);
         const age = char?.age ? `${char.age} years old` : '';
         const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-        // Include physical traits (excluding height - AI doesn't understand it for images)
+        // Include physical traits with labels (excluding height - AI doesn't understand it for images)
         const physical = char?.physical;
         const physicalParts = [
-          physical?.build,
-          physical?.face,
-          physical?.hair,
-          physical?.other
+          physical?.build ? `Build: ${physical.build}` : '',
+          physical?.face ? `Face: ${physical.face}` : '',
+          physical?.hair ? `Hair: ${physical.hair}` : '',
+          physical?.other ? `Other: ${physical.other}` : ''
         ].filter(Boolean);
-        const physicalDesc = physicalParts.length > 0 ? physicalParts.join(', ') : '';
+        const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
         const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
@@ -5952,15 +5952,15 @@ async function processStoryJob(jobId) {
           const char = characters?.find(c => c.name === photo.name);
           const age = char?.age ? `${char.age} years old` : '';
           const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-          // Include physical traits (excluding height - AI doesn't understand it for images)
+          // Include physical traits with labels (excluding height - AI doesn't understand it for images)
           const physical = char?.physical;
           const physicalParts = [
-            physical?.build,
-            physical?.face,
-            physical?.hair,
-            physical?.other
+            physical?.build ? `Build: ${physical.build}` : '',
+            physical?.face ? `Face: ${physical.face}` : '',
+            physical?.hair ? `Hair: ${physical.hair}` : '',
+            physical?.other ? `Other: ${physical.other}` : ''
           ].filter(Boolean);
-          const physicalDesc = physicalParts.length > 0 ? physicalParts.join(', ') : '';
+          const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
           const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
           return `${index + 1}. ${brief}`;
         });
