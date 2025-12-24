@@ -31,12 +31,16 @@ export default function LandingPage() {
   const handleAuthSuccess = () => {
     console.log('[AUTH] handleAuthSuccess called');
     // Check for redirect parameter (e.g., from email link when not logged in)
-    const redirectUrl = searchParams.get('redirect');
-    console.log('[AUTH] redirectUrl from searchParams:', redirectUrl);
+    // Ignore '/' as a redirect - we want to go to /create after login, not stay on home
+    const redirectParam = searchParams.get('redirect');
+    const redirectUrl = redirectParam && redirectParam !== '/' && redirectParam !== '%2F'
+      ? decodeURIComponent(redirectParam)
+      : null;
+    console.log('[AUTH] redirectUrl from searchParams:', redirectParam, '-> using:', redirectUrl);
     if (redirectUrl) {
       // Decode and navigate to the original URL
-      console.log('[AUTH] Navigating to:', decodeURIComponent(redirectUrl));
-      navigate(decodeURIComponent(redirectUrl));
+      console.log('[AUTH] Navigating to:', redirectUrl);
+      navigate(redirectUrl);
     } else {
       console.log('[AUTH] Navigating to /create');
       navigate('/create');
@@ -148,7 +152,13 @@ export default function LandingPage() {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onSuccess={handleAuthSuccess}
-        redirectUrl={searchParams.get('redirect') ? decodeURIComponent(searchParams.get('redirect')!) : '/create'}
+        redirectUrl={(() => {
+          const redirect = searchParams.get('redirect');
+          // Ignore '/' as redirect - always go to /create after login
+          return (redirect && redirect !== '/' && redirect !== '%2F')
+            ? decodeURIComponent(redirect)
+            : '/create';
+        })()}
       />
     </div>
   );

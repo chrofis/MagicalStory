@@ -40,17 +40,19 @@ Create a simple story arc:
 
 
 # Character Guidelines
-- Show character traits through actions, not descriptions. (Trait: brave = Good example: Leo approached the dangerous looking animal. Bad example: Not Leo was brave.)
+- Show character traits through actions, not descriptions. (Trait: brave = Good example: Leo approached the dangerous looking animal. Bad example: Leo was brave.)
 - Keep interactions simple and positive
 
 
 # Scene Guidelines
 - Focus on 1-2 characters per page for clear illustrations
-- ALWAYS refer to characters BY THEIR EXACT NAME in scene descriptions
+- ALWAYS refer to characters BY THEIR EXACT NAME in scene descriptions. Every character in a scene description MUST be named explicitly
 - NEVER use generic terms like "the family", "everyone", "the group", "the children", "the parents"
-- If the story mentions a group doing something, pick 1-2 key characters to focus on in the scene
-- Every character in a scene description MUST be named explicitly
+- If a group is doing something, pick 1-2 key characters to focus on in the scene
 - Fewer characters = better illustration quality
+- Describe the background where scene takes place
+- Describe spatial relationships between characters clearly for the illustrator. (Good: "The dog runs toward the back right. The girl stands in the front left, watching the dog." Bad: "A dog is running, the girl is looking at the dog.")
+- Optionally suggest composition: close-up, medium shot, wide shot, bird's eye view
 
 # Clothing Categories
 
