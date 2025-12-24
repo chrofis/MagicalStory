@@ -123,7 +123,7 @@ export function StorySettings({
           <label className="block text-xl font-semibold mb-3">
             {language === 'de' ? 'Charaktere in der Geschichte' : language === 'fr' ? 'Personnages dans l\'histoire' : 'Characters in the Story'}
           </label>
-          <div className="space-y-3">
+          <div className="grid md:grid-cols-2 gap-3">
             {characters.map((char) => {
               const role = getCharacterRole(char.id);
               const isOut = role === 'out';
