@@ -155,16 +155,20 @@ export default function StoryWizard() {
   // Wait for auth loading to complete before checking authentication
   // Also check localStorage as backup - state might not have propagated yet after login
   useEffect(() => {
+    console.log('[WIZARD] Auth check effect - isAuthLoading:', isAuthLoading, 'isAuthenticated:', isAuthenticated);
     if (!isAuthLoading && !isAuthenticated) {
       // Check if there's a token in localStorage - auth state might just be slow to update
       const hasToken = !!localStorage.getItem('auth_token');
+      console.log('[WIZARD] Not authenticated, hasToken:', hasToken);
       if (hasToken) {
         // Token exists but isAuthenticated is false - wait for state to sync
         log.debug('Token found but not authenticated yet, waiting for state sync...');
+        console.log('[WIZARD] Waiting for state sync (token exists)...');
         return;
       }
       const currentUrl = window.location.pathname + window.location.search;
       const redirectParam = encodeURIComponent(currentUrl);
+      console.log('[WIZARD] Redirecting to login, currentUrl:', currentUrl, 'redirectParam:', redirectParam);
       navigate(`/?login=true&redirect=${redirectParam}`);
     }
   }, [isAuthenticated, isAuthLoading, navigate]);
