@@ -82,6 +82,14 @@ export default function StoryWizard() {
       return [];
     }
   });
+  const [excludedCharacters, setExcludedCharacters] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('story_excluded_characters');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [languageLevel, setLanguageLevel] = useState<LanguageLevel>(() => {
     try {
       const saved = localStorage.getItem('story_language_level');
@@ -457,6 +465,10 @@ export default function StoryWizard() {
   useEffect(() => {
     localStorage.setItem('story_main_characters', JSON.stringify(mainCharacters));
   }, [mainCharacters]);
+
+  useEffect(() => {
+    localStorage.setItem('story_excluded_characters', JSON.stringify(excludedCharacters));
+  }, [excludedCharacters]);
 
   useEffect(() => {
     localStorage.setItem('story_language_level', languageLevel);
@@ -849,14 +861,21 @@ export default function StoryWizard() {
     }
   };
 
-  // Main character toggle
-  const toggleMainCharacter = (charId: number) => {
-    setMainCharacters(prev => {
-      if (prev.includes(charId)) {
-        return prev.filter(id => id !== charId);
-      }
-      return [...prev, charId];
-    });
+  // Character role change handler (out/in/main)
+  const handleCharacterRoleChange = (charId: number, role: 'out' | 'in' | 'main') => {
+    if (role === 'out') {
+      // Add to excluded, remove from main
+      setExcludedCharacters(prev => prev.includes(charId) ? prev : [...prev, charId]);
+      setMainCharacters(prev => prev.filter(id => id !== charId));
+    } else if (role === 'in') {
+      // Remove from excluded and main
+      setExcludedCharacters(prev => prev.filter(id => id !== charId));
+      setMainCharacters(prev => prev.filter(id => id !== charId));
+    } else if (role === 'main') {
+      // Remove from excluded, add to main
+      setExcludedCharacters(prev => prev.filter(id => id !== charId));
+      setMainCharacters(prev => prev.includes(charId) ? prev : [...prev, charId]);
+    }
   };
 
   // Navigation
@@ -889,7 +908,11 @@ export default function StoryWizard() {
     if (step === 1) return storyType !== '';
     if (step === 2) return characters.length > 0;
     if (step === 3) return areAllRelationshipsDefined();
-    if (step === 4) return mainCharacters.length > 0;
+    // Step 4: At least one character must be in the story (not excluded) and at least one main character
+    if (step === 4) {
+      const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
+      return charactersInStory.length > 0 && mainCharacters.length > 0;
+    }
     return false;
   };
 
@@ -1326,7 +1349,8 @@ export default function StoryWizard() {
           <StorySettings
             characters={characters}
             mainCharacters={mainCharacters}
-            onToggleMainCharacter={toggleMainCharacter}
+            excludedCharacters={excludedCharacters}
+            onCharacterRoleChange={handleCharacterRoleChange}
             languageLevel={languageLevel}
             onLanguageLevelChange={setLanguageLevel}
             pages={pages}
@@ -1597,6 +1621,7 @@ export default function StoryWizard() {
                 setPages(30);
                 setDedication('');
                 setStoryDetails('');
+                setExcludedCharacters([]);
 
                 // Clear localStorage for story settings
                 localStorage.removeItem('story_language_level');
@@ -1604,6 +1629,7 @@ export default function StoryWizard() {
                 localStorage.removeItem('story_dedication');
                 localStorage.removeItem('story_details');
                 localStorage.removeItem('story_main_characters');
+                localStorage.removeItem('story_excluded_characters');
 
                 // Go back to step 1
                 setStep(1);

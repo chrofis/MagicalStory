@@ -4,10 +4,14 @@ import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
 import type { LanguageLevel } from '@/types/story';
 
+// Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
+export type CharacterRole = 'out' | 'in' | 'main';
+
 interface StorySettingsProps {
   characters: Character[];
   mainCharacters: number[];
-  onToggleMainCharacter: (charId: number) => void;
+  excludedCharacters: number[];
+  onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   languageLevel: LanguageLevel;
   onLanguageLevelChange: (level: LanguageLevel) => void;
   pages: number;
@@ -24,7 +28,8 @@ interface StorySettingsProps {
 export function StorySettings({
   characters,
   mainCharacters,
-  onToggleMainCharacter,
+  excludedCharacters,
+  onCharacterRoleChange,
   languageLevel,
   onLanguageLevelChange,
   pages,
@@ -38,6 +43,13 @@ export function StorySettings({
   onImageGenModeChange,
 }: StorySettingsProps) {
   const { t, language } = useLanguage();
+
+  // Helper to determine character's current role
+  const getCharacterRole = (charId: number): CharacterRole => {
+    if (excludedCharacters.includes(charId)) return 'out';
+    if (mainCharacters.includes(charId)) return 'main';
+    return 'in';
+  };
 
   // Available page options based on developer mode
   // Only even numbers so text/image split works (pageCount / 2 must be whole number)
@@ -91,6 +103,13 @@ export function StorySettings({
     return `${pageCount} pages (${textPages} text + ${imagePages} images) = ${creditsCost} ${creditsLabel}${testSuffix}`;
   };
 
+  // Role labels for 3-state buttons
+  const roleLabels = {
+    out: language === 'de' ? 'Nicht dabei' : language === 'fr' ? 'Absent' : 'Out',
+    in: language === 'de' ? 'Dabei' : language === 'fr' ? 'Présent' : 'In',
+    main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : 'Main',
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -99,42 +118,86 @@ export function StorySettings({
       </h2>
 
       <div className="space-y-6">
-        {/* Main Character Selection */}
+        {/* Character Role Selection */}
         <div>
-          <label className="block text-xl font-semibold mb-3">{t.selectMainCharacters}</label>
-          <div className="grid md:grid-cols-2 gap-3">
-            {characters.map((char) => (
-              <button
-                key={char.id}
-                onClick={() => onToggleMainCharacter(char.id)}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${
-                  mainCharacters.includes(char.id)
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {(char.photos?.face || char.photos?.original) && (
-                    <img
-                      src={char.photos?.face || char.photos?.original}
-                      alt={char.name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <div className="font-bold text-base flex items-center gap-2">
-                      {char.name}
-                      <span className={mainCharacters.includes(char.id) ? 'inline-block' : 'hidden'}>
-                        <Star size={16} className="text-indigo-600" />
-                      </span>
-                    </div>
-                    <div className="text-sm md:text-base text-gray-500">
-                      {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
+          <label className="block text-xl font-semibold mb-3">
+            {language === 'de' ? 'Charaktere in der Geschichte' : language === 'fr' ? 'Personnages dans l\'histoire' : 'Characters in the Story'}
+          </label>
+          <div className="space-y-3">
+            {characters.map((char) => {
+              const role = getCharacterRole(char.id);
+              const isOut = role === 'out';
+              const isIn = role === 'in';
+              const isMain = role === 'main';
+
+              return (
+                <div
+                  key={char.id}
+                  className={`p-4 rounded-lg transition-all flex items-center justify-between gap-4 ${
+                    isOut
+                      ? 'border-2 border-dashed border-gray-300 bg-gray-50 opacity-60'
+                      : isMain
+                      ? 'border-3 border-indigo-600 bg-indigo-50'
+                      : 'border-2 border-indigo-400 bg-white'
+                  }`}
+                >
+                  {/* Character info - left side */}
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {(char.photos?.face || char.photos?.original) && (
+                      <img
+                        src={char.photos?.face || char.photos?.original}
+                        alt={char.name}
+                        className={`w-12 h-12 rounded-full object-cover flex-shrink-0 ${isOut ? 'grayscale' : ''}`}
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-bold text-base flex items-center gap-2">
+                        <span className="truncate">{char.name}</span>
+                        {isMain && <Star size={18} className="text-indigo-600 fill-indigo-600 flex-shrink-0" />}
+                      </div>
+                      <div className="text-sm text-gray-500 truncate">
+                        {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Role selector - right side */}
+                  <div className="flex rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
+                    <button
+                      onClick={() => onCharacterRoleChange(char.id, 'out')}
+                      className={`px-3 py-2 text-sm font-medium transition-colors ${
+                        isOut
+                          ? 'bg-gray-500 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {roleLabels.out}
+                    </button>
+                    <button
+                      onClick={() => onCharacterRoleChange(char.id, 'in')}
+                      className={`px-3 py-2 text-sm font-medium transition-colors border-l border-r border-gray-300 ${
+                        isIn
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {roleLabels.in}
+                    </button>
+                    <button
+                      onClick={() => onCharacterRoleChange(char.id, 'main')}
+                      className={`px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${
+                        isMain
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Star size={14} className={isMain ? 'fill-white' : ''} />
+                      {roleLabels.main}
+                    </button>
+                  </div>
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
