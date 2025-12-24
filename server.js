@@ -1785,11 +1785,13 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
     // Helper to build character reference list for cover prompts
-    const buildCharRefList = (photos) => {
+    const buildCharRefList = (photos, characters) => {
       if (!photos || photos.length === 0) return '';
       const charDescriptions = photos.map((photo, index) => {
-        const age = photo.age ? `${photo.age} years old` : '';
-        const gender = photo.gender === 'male' ? 'boy/man' : photo.gender === 'female' ? 'girl/woman' : '';
+        // Look up character info by name to get age/gender
+        const char = characters?.find(c => c.name === photo.name);
+        const age = char?.age ? `${char.age} years old` : '';
+        const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
         const brief = [photo.name, age, gender].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
@@ -1837,7 +1839,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
           TITLE_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
           STORY_TITLE: storyTitle,
-          CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos),
+          CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos, storyData.characters),
           VISUAL_BIBLE: visualBiblePrompt
         });
       } else if (normalizedCoverType === 'initialPage') {
@@ -1846,21 +1848,21 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
               INITIAL_PAGE_SCENE: sceneDescription,
               STYLE_DESCRIPTION: styleDescription,
               DEDICATION: storyData.dedication,
-              CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos),
+              CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos, storyData.characters),
               VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: sceneDescription,
               STYLE_DESCRIPTION: styleDescription,
               STORY_TITLE: storyTitle,
-              CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos),
+              CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos, storyData.characters),
               VISUAL_BIBLE: visualBiblePrompt
             });
       } else {
         coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos),
+          CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos, storyData.characters),
           VISUAL_BIBLE: visualBiblePrompt
         });
       }
