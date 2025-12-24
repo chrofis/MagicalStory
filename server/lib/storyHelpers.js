@@ -514,6 +514,7 @@ function extractShortSceneDescriptions(outline) {
 
 /**
  * Extract cover scene descriptions and clothing from outline
+ * Supports both story mode format ("Back Cover Scene: ...") and storybook format ("---BACK COVER---")
  * Returns: { titlePage: { scene, clothing }, initialPage: { scene, clothing }, backCover: { scene, clothing } }
  */
 function extractCoverScenes(outline) {
@@ -526,23 +527,85 @@ function extractCoverScenes(outline) {
   const lines = outline.split('\n');
   let currentCoverType = null;
   let sceneBuffer = '';
+  let collectingMultilineScene = false;
 
-  // Helper to save current buffer and extract clothing
+  // Track multiline scene parts for storybook format (Setting, Characters, Action, Mood)
+  let sceneParts = { setting: '', characters: '', action: '', mood: '' };
+
+  // Helper to save current buffer
   const saveCurrentScene = () => {
     if (currentCoverType && sceneBuffer) {
       coverScenes[currentCoverType].scene = sceneBuffer.trim();
     }
   };
 
+  // Helper to build scene from storybook multiline format
+  const buildSceneFromParts = (parts) => {
+    const sceneParts = [];
+    if (parts.setting) sceneParts.push(parts.setting);
+    if (parts.characters) sceneParts.push(`Characters: ${parts.characters}`);
+    if (parts.action) sceneParts.push(parts.action);
+    if (parts.mood) sceneParts.push(`Mood: ${parts.mood}`);
+    return sceneParts.join('. ').replace(/\.\./g, '.');
+  };
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
 
-    // Look for cover page patterns
+    // ===== STORYBOOK FORMAT: Section headers like ---TITLE PAGE---, ---BACK COVER--- =====
+    const storybookTitleMatch = line.match(/^---\s*TITLE\s+PAGE\s*---$/i);
+    if (storybookTitleMatch) {
+      saveCurrentScene();
+      currentCoverType = 'titlePage';
+      sceneBuffer = '';
+      sceneParts = { setting: '', characters: '', action: '', mood: '' };
+      collectingMultilineScene = true;
+      continue;
+    }
+
+    const storybookInitialMatch = line.match(/^---\s*INITIAL\s+PAGE\s*---$/i);
+    if (storybookInitialMatch) {
+      saveCurrentScene();
+      currentCoverType = 'initialPage';
+      sceneBuffer = '';
+      sceneParts = { setting: '', characters: '', action: '', mood: '' };
+      collectingMultilineScene = true;
+      continue;
+    }
+
+    const storybookBackCoverMatch = line.match(/^---\s*BACK\s+COVER\s*---$/i);
+    if (storybookBackCoverMatch) {
+      saveCurrentScene();
+      currentCoverType = 'backCover';
+      sceneBuffer = '';
+      sceneParts = { setting: '', characters: '', action: '', mood: '' };
+      collectingMultilineScene = true;
+      continue;
+    }
+
+    // Detect end of storybook cover section (next page or section)
+    if (line.match(/^---\s*PAGE\s+\d+\s*---$/i) || line.match(/^---\s*VISUAL\s+BIBLE\s*---$/i) || line.match(/^---\s*TITLE\s*---$/i)) {
+      if (collectingMultilineScene && currentCoverType) {
+        const builtScene = buildSceneFromParts(sceneParts);
+        if (builtScene) {
+          sceneBuffer = builtScene;
+        }
+        saveCurrentScene();
+      }
+      currentCoverType = null;
+      sceneBuffer = '';
+      collectingMultilineScene = false;
+      sceneParts = { setting: '', characters: '', action: '', mood: '' };
+      continue;
+    }
+
+    // ===== STORY MODE FORMAT: "Title Page Scene:", "Back Cover Scene:" etc =====
     const titlePageMatch = line.match(/(?:\*\*)?Title\s+Page(?:\s+Scene)?(?:\*\*)?:\s*(.+)/i);
     if (titlePageMatch) {
       saveCurrentScene();
       currentCoverType = 'titlePage';
       sceneBuffer = titlePageMatch[1].trim();
+      collectingMultilineScene = false;
       continue;
     }
 
@@ -552,6 +615,7 @@ function extractCoverScenes(outline) {
       saveCurrentScene();
       currentCoverType = 'initialPage';
       sceneBuffer = initialPageMatch[1].trim();
+      collectingMultilineScene = false;
       continue;
     }
 
@@ -560,43 +624,80 @@ function extractCoverScenes(outline) {
       saveCurrentScene();
       currentCoverType = 'backCover';
       sceneBuffer = backCoverMatch[1].trim();
+      collectingMultilineScene = false;
       continue;
     }
 
-    // Stop collecting if we hit section separators or new sections
+    // Stop collecting if we hit section separators or new sections (story mode)
     if (line === '---' || line.match(/^#{1,3}\s*(Visual Bible|Page-by-Page|Characters|Animals|Locations|Plot)/i)) {
       saveCurrentScene();
       currentCoverType = null;
       sceneBuffer = '';
+      collectingMultilineScene = false;
       continue;
     }
 
-    // Extract Clothing for current cover type (handles various markdown formats)
+    // ===== COLLECT SCENE PARTS (works for both formats) =====
+
+    // Extract Clothing for current cover type
     const clothingMatch = line.match(/^[\*_\-#\s\d\.]*(?:Clothing|Kleidung|Vetements|Tenue)[\*_\-#\s]*:?\s*[\*_\-#\s]*(winter|summer|formal|standard)?/i);
     if (clothingMatch && currentCoverType) {
       if (clothingMatch[1]) {
-        // Clothing value on same line
         coverScenes[currentCoverType].clothing = clothingMatch[1].toLowerCase();
-      } else {
-        // Clothing value might be on next line
-        if (i + 1 < lines.length) {
-          const nextLine = lines[i + 1].trim();
-          const valueMatch = nextLine.match(/^[\*_\-#\s]*(winter|summer|formal|standard)[\*_\-#\s]*$/i);
-          if (valueMatch) {
-            coverScenes[currentCoverType].clothing = valueMatch[1].toLowerCase();
-            i++; // Skip the value line
-          }
+      } else if (i + 1 < lines.length) {
+        const nextLine = lines[i + 1].trim();
+        const valueMatch = nextLine.match(/^[\*_\-#\s]*(winter|summer|formal|standard)[\*_\-#\s]*$/i);
+        if (valueMatch) {
+          coverScenes[currentCoverType].clothing = valueMatch[1].toLowerCase();
+          i++;
         }
       }
       continue;
     }
 
-    // Look for "Scene:" pattern
+    // Storybook multiline format: collect Setting, Characters, Action, Mood
+    if (collectingMultilineScene && currentCoverType) {
+      const settingMatch = line.match(/^Setting:\s*(.+)/i);
+      if (settingMatch) {
+        sceneParts.setting = settingMatch[1].trim();
+        continue;
+      }
+
+      const charactersMatch = line.match(/^Characters:\s*(.+)/i);
+      if (charactersMatch) {
+        sceneParts.characters = charactersMatch[1].trim();
+        continue;
+      }
+
+      const actionMatch = line.match(/^Action:\s*(.+)/i);
+      if (actionMatch) {
+        sceneParts.action = actionMatch[1].trim();
+        continue;
+      }
+
+      const moodMatch = line.match(/^Mood:\s*(.+)/i);
+      if (moodMatch) {
+        sceneParts.mood = moodMatch[1].trim();
+        continue;
+      }
+
+      // Also capture SCENE: line in storybook format (skip parenthetical instructions)
+      const sceneLineMatch = line.match(/^SCENE:\s*(.+)/i);
+      if (sceneLineMatch) {
+        const sceneText = sceneLineMatch[1].trim();
+        if (!sceneText.startsWith('(')) {
+          sceneBuffer = sceneText;
+        }
+        continue;
+      }
+    }
+
+    // Look for "Scene:" pattern (story mode format)
     const sceneMatch = line.match(/^(?:\*\*)?Scene(?:\*\*)?:\s*(.+)/i);
-    if (sceneMatch) {
+    if (sceneMatch && !collectingMultilineScene) {
       sceneBuffer = sceneMatch[1].trim();
-    } else if (currentCoverType && line.length > 0 && !line.match(/^(Page|Title|Back\s+Cover)/i)) {
-      // Continue collecting multi-line scene descriptions
+    } else if (currentCoverType && !collectingMultilineScene && line.length > 0 && !line.match(/^(Page|Title|Back\s+Cover)/i)) {
+      // Continue collecting multi-line scene descriptions (story mode)
       sceneBuffer += ' ' + line;
     }
 
@@ -605,10 +706,17 @@ function extractCoverScenes(outline) {
       saveCurrentScene();
       currentCoverType = null;
       sceneBuffer = '';
+      collectingMultilineScene = false;
     }
   }
 
-  // Save last buffer
+  // Save last buffer (handle end of file for storybook format)
+  if (collectingMultilineScene && currentCoverType) {
+    const builtScene = buildSceneFromParts(sceneParts);
+    if (builtScene) {
+      sceneBuffer = builtScene;
+    }
+  }
   saveCurrentScene();
 
   log.debug(`[COVER-EXTRACT] Title Page: clothing=${coverScenes.titlePage.clothing || 'not found'}, scene=${coverScenes.titlePage.scene.substring(0, 50)}...`);
