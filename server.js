@@ -4748,6 +4748,310 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
 // Exports: ART_STYLES, LANGUAGE_LEVELS, getReadingLevel, getTokensPerPage,
 // extractCoverScenes, buildSceneDescriptionPrompt, parseStoryPages, extractShortSceneDescriptions
 
+// =============================================================================
+// PROGRESSIVE STREAMING PARSERS
+// These classes detect complete sections during Claude API streaming and trigger
+// callbacks to start image generation early (before the full response is received)
+// =============================================================================
+
+/**
+ * Progressive cover parser for streaming storybook generation
+ * Detects Visual Bible and cover scenes as text streams in
+ * and triggers callbacks to start cover image generation early
+ */
+class ProgressiveCoverParser {
+  constructor(onVisualBibleComplete, onCoverSceneComplete) {
+    this.onVisualBibleComplete = onVisualBibleComplete;
+    this.onCoverSceneComplete = onCoverSceneComplete;
+    this.fullText = '';
+    this.visualBibleEmitted = false;
+    this.emittedCovers = new Set();  // 'titlePage', 'initialPage', 'backCover'
+  }
+
+  /**
+   * Process new text chunk and emit Visual Bible and cover scenes as they complete
+   * @param {string} chunk - New text chunk
+   * @param {string} fullText - Complete text so far
+   */
+  processChunk(chunk, fullText) {
+    this.fullText = fullText;
+
+    // Check for Visual Bible completion
+    // Visual Bible is complete when we see ---TITLE PAGE--- after ---VISUAL BIBLE---
+    if (!this.visualBibleEmitted && fullText.includes('---VISUAL BIBLE---') && fullText.includes('---TITLE PAGE---')) {
+      const visualBibleMatch = fullText.match(/---VISUAL BIBLE---\s*([\s\S]*?)(?=---TITLE PAGE---|$)/i);
+      if (visualBibleMatch) {
+        this.visualBibleEmitted = true;
+        const visualBibleSection = visualBibleMatch[1].trim();
+        log.debug(`🌊 [STREAM-COVER] Visual Bible section complete (${visualBibleSection.length} chars)`);
+        if (this.onVisualBibleComplete) {
+          const parsedVB = parseVisualBible('## Visual Bible\n' + visualBibleSection);
+          this.onVisualBibleComplete(parsedVB, visualBibleSection);
+        }
+      }
+    }
+
+    // Check for Title Page scene completion
+    // Title Page is complete when we see ---INITIAL PAGE--- after ---TITLE PAGE---
+    if (!this.emittedCovers.has('titlePage') && fullText.includes('---TITLE PAGE---') && fullText.includes('---INITIAL PAGE---')) {
+      const titlePageMatch = fullText.match(/---TITLE PAGE---\s*([\s\S]*?)(?=---INITIAL PAGE---|$)/i);
+      if (titlePageMatch) {
+        const titlePageBlock = titlePageMatch[1];
+        const sceneMatch = titlePageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+        if (sceneMatch) {
+          this.emittedCovers.add('titlePage');
+          const scene = sceneMatch[1].trim();
+          // Extract title from the streaming text for progressive display
+          let extractedTitle = null;
+          const titleMatch = fullText.match(/TITLE:\s*(.+)/i);
+          if (titleMatch) {
+            extractedTitle = titleMatch[1].trim();
+          }
+          log.debug(`🌊 [STREAM-COVER] Title Page scene complete: ${scene.substring(0, 80)}...${extractedTitle ? ` (title: ${extractedTitle})` : ''}`);
+          if (this.onCoverSceneComplete) {
+            this.onCoverSceneComplete('titlePage', scene, titlePageBlock, extractedTitle);
+          }
+        }
+      }
+    }
+
+    // Check for Initial Page scene completion
+    // Initial Page is complete when we see ---BACK COVER--- after ---INITIAL PAGE---
+    if (!this.emittedCovers.has('initialPage') && fullText.includes('---INITIAL PAGE---') && fullText.includes('---BACK COVER---')) {
+      const initialPageMatch = fullText.match(/---INITIAL PAGE---\s*([\s\S]*?)(?=---BACK COVER---|$)/i);
+      if (initialPageMatch) {
+        const initialPageBlock = initialPageMatch[1];
+        const sceneMatch = initialPageBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+        if (sceneMatch) {
+          this.emittedCovers.add('initialPage');
+          const scene = sceneMatch[1].trim();
+          log.debug(`🌊 [STREAM-COVER] Initial Page scene complete: ${scene.substring(0, 80)}...`);
+          if (this.onCoverSceneComplete) {
+            this.onCoverSceneComplete('initialPage', scene, initialPageBlock);
+          }
+        }
+      }
+    }
+
+    // Check for Back Cover scene completion
+    // Back Cover is complete when we see ---PAGE 1--- after ---BACK COVER---
+    if (!this.emittedCovers.has('backCover') && fullText.includes('---BACK COVER---') && fullText.includes('---PAGE 1---')) {
+      const backCoverMatch = fullText.match(/---BACK COVER---\s*([\s\S]*?)(?=---PAGE 1---|$)/i);
+      if (backCoverMatch) {
+        const backCoverBlock = backCoverMatch[1];
+        const sceneMatch = backCoverBlock.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+        if (sceneMatch) {
+          this.emittedCovers.add('backCover');
+          const scene = sceneMatch[1].trim();
+          log.debug(`🌊 [STREAM-COVER] Back Cover scene complete: ${scene.substring(0, 80)}...`);
+          if (this.onCoverSceneComplete) {
+            this.onCoverSceneComplete('backCover', scene, backCoverBlock);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if all cover scenes have been emitted
+   */
+  allCoversEmitted() {
+    return this.emittedCovers.size === 3;
+  }
+}
+
+/**
+ * Progressive scene parser for streaming story generation
+ * Detects complete scenes as text streams in and triggers callbacks
+ */
+class ProgressiveSceneParser {
+  constructor(onSceneComplete) {
+    this.onSceneComplete = onSceneComplete;
+    this.fullText = '';
+    this.completedScenes = new Set();
+    this.scenePattern = /---PAGE\s+(\d+)---\s*([\s\S]*?)(?=---PAGE\s+\d+---|---BACK COVER---|$)/gi;
+  }
+
+  /**
+   * Process new text chunk and emit any newly completed scenes
+   * @param {string} chunk - New text chunk
+   * @param {string} fullText - Complete text so far
+   */
+  processChunk(chunk, fullText) {
+    this.fullText = fullText;
+
+    // Find all complete scenes in the current text
+    const matches = [...fullText.matchAll(this.scenePattern)];
+
+    for (const match of matches) {
+      const pageNum = parseInt(match[1], 10);
+      const content = match[2];
+
+      // Only emit if this scene hasn't been emitted yet and appears complete
+      // A scene is complete if there's another scene after it or we've seen ---BACK COVER---
+      const hasNextScene = fullText.includes(`---PAGE ${pageNum + 1}---`);
+      const hasBackCover = fullText.includes('---BACK COVER---');
+      const isComplete = hasNextScene || hasBackCover;
+
+      if (isComplete && !this.completedScenes.has(pageNum)) {
+        this.completedScenes.add(pageNum);
+
+        // Extract TEXT and SCENE from the page content
+        const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|$)/i);
+        const sceneMatch = content.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+
+        const pageText = textMatch ? textMatch[1].trim() : '';
+        const sceneDesc = sceneMatch ? sceneMatch[1].trim() : '';
+
+        log.debug(`🌊 [STREAM-PARSE] Scene ${pageNum} complete, emitting...`);
+
+        if (this.onSceneComplete) {
+          this.onSceneComplete({
+            pageNumber: pageNum,
+            text: pageText,
+            sceneDescription: sceneDesc
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Get all parsed scenes (for final processing)
+   */
+  getAllScenes() {
+    const scenes = [];
+    const matches = [...this.fullText.matchAll(this.scenePattern)];
+
+    for (const match of matches) {
+      const pageNum = parseInt(match[1], 10);
+      const content = match[2];
+
+      const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE:|$)/i);
+      const sceneMatch = content.match(/SCENE:\s*([\s\S]*?)(?=---|$)/i);
+
+      scenes.push({
+        pageNumber: pageNum,
+        text: textMatch ? textMatch[1].trim() : '',
+        sceneDescription: sceneMatch ? sceneMatch[1].trim() : ''
+      });
+    }
+
+    return scenes.sort((a, b) => a.pageNumber - b.pageNumber);
+  }
+}
+
+/**
+ * Progressive page parser for streaming normal story text generation
+ * Detects complete pages as text streams in (format: "--- Page X ---")
+ * and triggers callbacks to start image generation early
+ */
+class ProgressiveStoryPageParser {
+  constructor(onPageComplete) {
+    this.onPageComplete = onPageComplete;
+    this.fullText = '';
+    this.emittedPages = new Set();
+    // Pattern matches "--- Page X ---" with flexible spacing
+    this.pagePattern = /---\s*Page\s+(\d+)\s*---/gi;
+  }
+
+  /**
+   * Process new text chunk and emit any newly completed pages
+   * A page is complete when we see the start of the next page
+   * @param {string} chunk - New text chunk
+   * @param {string} fullText - Complete text so far
+   */
+  processChunk(chunk, fullText) {
+    this.fullText = fullText;
+
+    // Find all page markers in the text
+    const markers = [];
+    let match;
+    const patternCopy = new RegExp(this.pagePattern.source, 'gi');
+    while ((match = patternCopy.exec(fullText)) !== null) {
+      markers.push({
+        pageNumber: parseInt(match[1], 10),
+        startIndex: match.index,
+        markerEnd: match.index + match[0].length
+      });
+    }
+
+    // For each page marker (except the last), extract and emit if not already done
+    for (let i = 0; i < markers.length - 1; i++) {
+      const current = markers[i];
+      const next = markers[i + 1];
+      const pageNum = current.pageNumber;
+
+      if (!this.emittedPages.has(pageNum)) {
+        // Extract content between this marker and the next
+        const content = fullText.substring(current.markerEnd, next.startIndex).trim();
+
+        if (content.length > 0) {
+          this.emittedPages.add(pageNum);
+          log.debug(`🌊 [STREAM-PAGE] Page ${pageNum} complete (${content.length} chars), emitting...`);
+
+          if (this.onPageComplete) {
+            this.onPageComplete({
+              pageNumber: pageNum,
+              content: content
+            });
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Finalize parsing - emit the last page when stream ends
+   * @param {string} fullText - Final complete text
+   */
+  finalize(fullText) {
+    this.fullText = fullText;
+
+    // Find the last page marker
+    const markers = [];
+    let match;
+    const patternCopy = new RegExp(this.pagePattern.source, 'gi');
+    while ((match = patternCopy.exec(fullText)) !== null) {
+      markers.push({
+        pageNumber: parseInt(match[1], 10),
+        startIndex: match.index,
+        markerEnd: match.index + match[0].length
+      });
+    }
+
+    if (markers.length > 0) {
+      const lastMarker = markers[markers.length - 1];
+      const pageNum = lastMarker.pageNumber;
+
+      if (!this.emittedPages.has(pageNum)) {
+        // Extract content from last marker to end of text
+        const content = fullText.substring(lastMarker.markerEnd).trim();
+
+        if (content.length > 0) {
+          this.emittedPages.add(pageNum);
+          log.debug(`🌊 [STREAM-PAGE] Final page ${pageNum} complete (${content.length} chars), emitting...`);
+
+          if (this.onPageComplete) {
+            this.onPageComplete({
+              pageNumber: pageNum,
+              content: content
+            });
+          }
+        }
+      }
+    }
+
+    return this.emittedPages.size;
+  }
+
+  /**
+   * Get set of emitted page numbers
+   */
+  getEmittedPages() {
+    return new Set(this.emittedPages);
+  }
+}
 
 
 // Process picture book (storybook) job - simplified flow with combined text+scene generation
@@ -5008,6 +5312,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Set up progressive scene parser to start image generation during streaming
     // DISABLED: Don't stream images in storybook mode - wait for Visual Bible to be parsed first
     // This ensures all images get Visual Bible entries for recurring elements
+    const shouldStreamImages = false; // Was: !skipImages && imageGenMode === 'parallel'
+    let scenesEmittedCount = 0;
+
+    // Track cover image generation promises
+    const streamingCoverPromises = [];
+    let streamingVisualBible = null;
     let coverImages = { frontCover: null, initialPage: null, backCover: null };
     const coverPrompts = { front: null, initialPage: null, backCover: null };
 
@@ -5047,18 +5357,191 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       return result;
     };
 
-    // NOTE: Streaming parsers were removed - cover/scene parsing happens after full response
+    // Helper function to generate cover image during streaming
+    const generateCoverImageDuringStream = async (coverType, sceneDescription, rawBlock = null, extractedTitle = null) => {
+      if (skipImages) return null;
+
+      try {
+        // Extract clothing from block first (more reliable), fallback to parsing scene
+        let clothing = null;
+        if (rawBlock) {
+          const clothingMatch = rawBlock.match(/CLOTHING:\s*(winter|summer|formal|standard)/i);
+          if (clothingMatch) {
+            clothing = clothingMatch[1].toLowerCase();
+          }
+        }
+        if (!clothing) {
+          clothing = parseClothingCategory(sceneDescription) || 'standard';
+        }
+
+        // Determine character selection based on cover type
+        let referencePhotos;
+        if (coverType === 'titlePage') {
+          // Front cover: Main character prominently, maybe 1-2 supporting
+          const frontCoverCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
+          referencePhotos = getCharacterPhotoDetails(frontCoverCharacters.length > 0 ? frontCoverCharacters : inputData.characters || [], clothing);
+          log.debug(`📕 [STREAM-COVER] Generating front cover: ${referencePhotos.length} characters, clothing: ${clothing}`);
+        } else {
+          // Initial page and back cover: ALL characters
+          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing);
+          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}`);
+        }
+
+        // Build the prompt
+        let coverPrompt;
+        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible) : '';
+        const artStyleId = inputData.artStyle || 'pixar';
+        const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+
+        if (coverType === 'titlePage') {
+          // Use extracted title from Claude response, fallback to input title
+          const storyTitleForCover = extractedTitle || inputData.title || 'My Story';
+          log.debug(`📕 [STREAM-COVER] Using title for front cover: "${storyTitleForCover}"`);
+          coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+            TITLE_PAGE_SCENE: sceneDescription,
+            STYLE_DESCRIPTION: styleDescription,
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
+            VISUAL_BIBLE: visualBibleText,
+            STORY_TITLE: storyTitleForCover
+          });
+          coverPrompts.front = coverPrompt;
+        } else if (coverType === 'initialPage') {
+          coverPrompt = inputData.dedication && inputData.dedication.trim()
+            ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+                INITIAL_PAGE_SCENE: sceneDescription,
+                STYLE_DESCRIPTION: styleDescription,
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
+                VISUAL_BIBLE: visualBibleText,
+                DEDICATION: inputData.dedication
+              })
+            : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+                INITIAL_PAGE_SCENE: sceneDescription,
+                STYLE_DESCRIPTION: styleDescription,
+                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
+                VISUAL_BIBLE: visualBibleText
+              });
+          coverPrompts.initialPage = coverPrompt;
+        } else if (coverType === 'backCover') {
+          coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+            BACK_COVER_SCENE: sceneDescription,
+            STYLE_DESCRIPTION: styleDescription,
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
+            VISUAL_BIBLE: visualBibleText
+          });
+          coverPrompts.backCover = coverPrompt;
+        }
+
+        // Usage tracker for streaming cover images
+        const streamCoverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+          if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
+        };
+
+        // Generate the image
+        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker);
+
+        const coverData = {
+          imageData: result.imageData,
+          description: sceneDescription,
+          prompt: coverPrompt,
+          qualityScore: result.score,
+          qualityReasoning: result.reasoning || null,
+          wasRegenerated: result.wasRegenerated || false,
+          totalAttempts: result.totalAttempts || 1,
+          retryHistory: result.retryHistory || [],
+          originalImage: result.originalImage || null,
+          originalScore: result.originalScore || null,
+          originalReasoning: result.originalReasoning || null,
+          referencePhotos: referencePhotos,
+          modelId: result.modelId || null
+        };
+
+        // Save partial cover checkpoint for progressive display
+        const coverKey = coverType === 'titlePage' ? 'frontCover' : coverType;
+        // Include title for frontCover so client can transition to story display immediately
+        const checkpointData = { type: coverKey, ...coverData };
+        if (coverType === 'titlePage' && extractedTitle) {
+          checkpointData.storyTitle = extractedTitle;
+        }
+        await saveCheckpoint(jobId, 'partial_cover', checkpointData,
+          coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? 1 : 2);
+
+        console.log(`✅ [STREAM-COVER] ${coverType} cover generated during streaming (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+
+        return { type: coverKey, data: coverData };
+      } catch (error) {
+        log.error(`❌ [STREAM-COVER] Failed to generate ${coverType} cover:`, error.message);
+        return null;
+      }
+    };
+
+    // Set up cover parser to start cover image generation during streaming
+    const shouldStreamCovers = !skipImages;
+    const coverParser = new ProgressiveCoverParser(
+      // onVisualBibleComplete
+      (parsedVB, rawSection) => {
+        // Filter out main characters from secondary characters (safety net)
+        streamingVisualBible = filterMainCharactersFromVisualBible(parsedVB, inputData.characters);
+        log.debug(`📖 [STREAM-COVER] Visual Bible ready for cover generation`);
+      },
+      // onCoverSceneComplete
+      (coverType, sceneDescription, rawBlock, extractedTitle) => {
+        if (shouldStreamCovers) {
+          const coverPromise = streamLimit(() => generateCoverImageDuringStream(coverType, sceneDescription, rawBlock, extractedTitle));
+          streamingCoverPromises.push(coverPromise);
+        }
+      }
+    );
+
+    const sceneParser = new ProgressiveSceneParser((completedScene) => {
+      // Called when a scene is detected as complete during streaming
+      const { pageNumber, text, sceneDescription } = completedScene;
+
+      if (completedSceneNumbers.has(pageNumber)) return;  // Already processed
+      completedSceneNumbers.add(pageNumber);
+      scenesEmittedCount++;
+
+      // Store the page text for later use
+      pageTexts[pageNumber] = text;
+
+      log.debug(`🌊 [STREAM] Scene ${pageNumber} complete during streaming (${scenesEmittedCount}/${sceneCount})`);
+
+      // Start image generation immediately for this scene (only in parallel mode)
+      // Pass the page text so it can be saved with the partial result
+      if (shouldStreamImages && sceneDescription) {
+        const imagePromise = streamLimit(() => generateImageForScene(pageNumber, sceneDescription, text));
+        streamingImagePromises.push(imagePromise);
+      }
+    });
 
     let response;
     try {
-      // Use streaming API call (streaming provides progress but parsing is done after completion)
-      const streamResult = await callTextModelStreaming(storybookPrompt, 16000);
+      // Use streaming API call with progressive parsers
+      const streamResult = await callTextModelStreaming(storybookPrompt, 16000, (chunk, fullText) => {
+        // Process each chunk to detect complete scenes AND cover scenes
+        coverParser.processChunk(chunk, fullText);
+        sceneParser.processChunk(chunk, fullText);
+      });
       response = streamResult.text;
       addUsage('anthropic', streamResult.usage, 'storybook_combined', getActiveTextModel().modelId);
-      log.debug(`[STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
+      log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
+      log.debug(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
+      log.debug(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
     } catch (apiError) {
       log.error(`[STORYBOOK] Claude API streaming call failed:`, apiError.message);
       throw apiError;
+    }
+
+    // Wait for any cover images started during streaming
+    if (streamingCoverPromises.length > 0) {
+      log.debug(`⚡ [STORYBOOK] Waiting for ${streamingCoverPromises.length} cover images started during streaming...`);
+      const coverResults = await Promise.all(streamingCoverPromises);
+      coverResults.forEach(result => {
+        if (result && result.type && result.data) {
+          coverImages[result.type] = result.data;
+        }
+      });
+      log.debug(`✅ [STORYBOOK] ${coverResults.filter(r => r).length} cover images complete from streaming`);
     }
 
     // Save checkpoint
@@ -5381,9 +5864,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       allImages.sort((a, b) => a.pageNumber - b.pageNumber);
     }
 
+    // Count how many covers were already generated during streaming
+    const coversFromStreaming = Object.values(coverImages).filter(c => c !== null).length;
+
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [85, 'Generating cover images...', jobId]
+      [85, coversFromStreaming > 0 ? `${coversFromStreaming} cover images ready. Generating remaining covers...` : 'Generating cover images...', jobId]
     );
 
     // Generate any cover images not generated during streaming
@@ -5522,7 +6008,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           };
         }
 
-        log.debug(`✅ [STORYBOOK] Cover images complete (3 covers generated)`);
+        log.debug(`✅ [STORYBOOK] Cover images complete (${coversFromStreaming} from streaming, ${3 - coversFromStreaming} generated after)`);
       } catch (error) {
         log.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
       }
