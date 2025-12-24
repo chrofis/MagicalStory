@@ -141,8 +141,8 @@ export function StorySettings({
                     isOut
                       ? 'border-2 border-dashed border-gray-300 bg-gray-50 opacity-60'
                       : isMain
-                      ? 'border-3 border-indigo-600 bg-indigo-50'
-                      : 'border-2 border-indigo-400 bg-white'
+                      ? 'border-3 border-indigo-600 bg-white'
+                      : 'border-2 border-indigo-400 bg-indigo-50'
                   }`}
                 >
                   {/* Character info - top on mobile, left on desktop */}
