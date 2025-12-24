@@ -4,10 +4,14 @@ import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
 import type { LanguageLevel } from '@/types/story';
 
+// Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
+export type CharacterRole = 'out' | 'in' | 'main';
+
 interface StorySettingsProps {
   characters: Character[];
   mainCharacters: number[];
-  onToggleMainCharacter: (charId: number) => void;
+  excludedCharacters: number[];
+  onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   languageLevel: LanguageLevel;
   onLanguageLevelChange: (level: LanguageLevel) => void;
   pages: number;
@@ -24,7 +28,8 @@ interface StorySettingsProps {
 export function StorySettings({
   characters,
   mainCharacters,
-  onToggleMainCharacter,
+  excludedCharacters,
+  onCharacterRoleChange,
   languageLevel,
   onLanguageLevelChange,
   pages,

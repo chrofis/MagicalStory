@@ -385,6 +385,13 @@ export function StoryDisplay({
     return img.imageData || null;
   };
 
+  // Helper to get full cover object (for accessing prompt, quality, etc.)
+  const getCoverObject = (img: string | CoverImageData | null | undefined): CoverImageData | null => {
+    if (!img) return null;
+    if (typeof img === 'string') return { imageData: img };
+    return img;
+  };
+
   // Helper to get scene description for a page
   const getSceneDescription = (pageNumber: number): string | undefined => {
     // First check sceneDescriptions array
@@ -951,33 +958,231 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Front Cover Display - simple, no border wrapper */}
-      {coverImages && getCoverImageData(coverImages.frontCover) && (
-        <div className="mt-6 max-w-2xl mx-auto">
-          <p className="text-sm text-gray-500 text-center mb-2">
-            {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
-          </p>
-          <img
-            src={getCoverImageData(coverImages.frontCover)!}
-            alt="Front Cover"
-            className="w-full rounded-lg shadow-lg"
-          />
-        </div>
-      )}
+      {/* Front Cover Display */}
+      {coverImages && getCoverImageData(coverImages.frontCover) && (() => {
+        const frontCoverObj = getCoverObject(coverImages.frontCover);
+        return (
+          <div className="mt-6 max-w-2xl mx-auto">
+            <p className="text-sm text-gray-500 text-center mb-2">
+              {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
+            </p>
+            <img
+              src={getCoverImageData(coverImages.frontCover)!}
+              alt="Front Cover"
+              className="w-full rounded-lg shadow-lg"
+            />
+            {/* Developer Mode Features for Front Cover */}
+            {developerMode && frontCoverObj && (
+              <div className="mt-3 space-y-2">
+                {/* Regenerate/Edit Buttons */}
+                {(_onRegenerateCover || _onEditCover) && (
+                  <div className="flex gap-2">
+                    {_onRegenerateCover && (
+                      <button
+                        onClick={() => _onRegenerateCover('front')}
+                        disabled={isGenerating}
+                        className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                        }`}
+                      >
+                        <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
+                      </button>
+                    )}
+                    {_onEditCover && (
+                      <button
+                        onClick={() => _onEditCover('front')}
+                        disabled={isGenerating}
+                        className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                        }`}
+                      >
+                        <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Scene Description */}
+                {frontCoverObj.description && (
+                  <details className="bg-green-50 border border-green-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
+                      {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                    </summary>
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                      {frontCoverObj.description}
+                    </pre>
+                  </details>
+                )}
+
+                {/* API Prompt */}
+                {frontCoverObj.prompt && (
+                  <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
+                      {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                      {frontCoverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({frontCoverObj.modelId})</span>}
+                    </summary>
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                      {frontCoverObj.prompt}
+                    </pre>
+                  </details>
+                )}
+
+                {/* Reference Photos */}
+                {frontCoverObj.referencePhotos && frontCoverObj.referencePhotos.length > 0 && (
+                  <ReferencePhotosDisplay
+                    referencePhotos={frontCoverObj.referencePhotos}
+                    language={language}
+                  />
+                )}
+
+                {/* Quality Score */}
+                {frontCoverObj.qualityScore !== undefined && (
+                  <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                      <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                      <span className={`text-lg font-bold ${
+                        frontCoverObj.qualityScore >= 70 ? 'text-green-600' :
+                        frontCoverObj.qualityScore >= 50 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {Math.round(frontCoverObj.qualityScore)}%
+                      </span>
+                    </summary>
+                    {frontCoverObj.qualityReasoning && (
+                      <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
+                        <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                        <p className="whitespace-pre-wrap">{frontCoverObj.qualityReasoning}</p>
+                      </div>
+                    )}
+                  </details>
+                )}
+
+                {/* Retry History */}
+                {frontCoverObj.retryHistory && frontCoverObj.retryHistory.length > 0 && (
+                  <RetryHistoryDisplay
+                    retryHistory={frontCoverObj.retryHistory}
+                    totalAttempts={frontCoverObj.totalAttempts || frontCoverObj.retryHistory.length}
+                    language={language}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Initial Page (Dedication Page) Display */}
-      {coverImages && getCoverImageData(coverImages.initialPage) && (
-        <div className="mt-6 max-w-2xl mx-auto">
-          <p className="text-sm text-gray-500 text-center mb-2">
-            {language === 'de' ? 'Widmungsseite' : language === 'fr' ? 'Page de dédicace' : 'Dedication Page'}
-          </p>
-          <img
-            src={getCoverImageData(coverImages.initialPage)!}
-            alt="Dedication Page"
-            className="w-full rounded-lg shadow-lg"
-          />
-        </div>
-      )}
+      {coverImages && getCoverImageData(coverImages.initialPage) && (() => {
+        const initialPageObj = getCoverObject(coverImages.initialPage);
+        return (
+          <div className="mt-6 max-w-2xl mx-auto">
+            <p className="text-sm text-gray-500 text-center mb-2">
+              {language === 'de' ? 'Widmungsseite' : language === 'fr' ? 'Page de dédicace' : 'Dedication Page'}
+            </p>
+            <img
+              src={getCoverImageData(coverImages.initialPage)!}
+              alt="Dedication Page"
+              className="w-full rounded-lg shadow-lg"
+            />
+            {/* Developer Mode Features for Initial Page */}
+            {developerMode && initialPageObj && (
+              <div className="mt-3 space-y-2">
+                {/* Regenerate/Edit Buttons */}
+                {(_onRegenerateCover || _onEditCover) && (
+                  <div className="flex gap-2">
+                    {_onRegenerateCover && (
+                      <button
+                        onClick={() => _onRegenerateCover('initial')}
+                        disabled={isGenerating}
+                        className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                        }`}
+                      >
+                        <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
+                      </button>
+                    )}
+                    {_onEditCover && (
+                      <button
+                        onClick={() => _onEditCover('initial')}
+                        disabled={isGenerating}
+                        className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                        }`}
+                      >
+                        <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Scene Description */}
+                {initialPageObj.description && (
+                  <details className="bg-green-50 border border-green-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
+                      {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                    </summary>
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                      {initialPageObj.description}
+                    </pre>
+                  </details>
+                )}
+
+                {/* API Prompt */}
+                {initialPageObj.prompt && (
+                  <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
+                      {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                      {initialPageObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({initialPageObj.modelId})</span>}
+                    </summary>
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                      {initialPageObj.prompt}
+                    </pre>
+                  </details>
+                )}
+
+                {/* Reference Photos */}
+                {initialPageObj.referencePhotos && initialPageObj.referencePhotos.length > 0 && (
+                  <ReferencePhotosDisplay
+                    referencePhotos={initialPageObj.referencePhotos}
+                    language={language}
+                  />
+                )}
+
+                {/* Quality Score */}
+                {initialPageObj.qualityScore !== undefined && (
+                  <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                      <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                      <span className={`text-lg font-bold ${
+                        initialPageObj.qualityScore >= 70 ? 'text-green-600' :
+                        initialPageObj.qualityScore >= 50 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {Math.round(initialPageObj.qualityScore)}%
+                      </span>
+                    </summary>
+                    {initialPageObj.qualityReasoning && (
+                      <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
+                        <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                        <p className="whitespace-pre-wrap">{initialPageObj.qualityReasoning}</p>
+                      </div>
+                    )}
+                  </details>
+                )}
+
+                {/* Retry History */}
+                {initialPageObj.retryHistory && initialPageObj.retryHistory.length > 0 && (
+                  <RetryHistoryDisplay
+                    retryHistory={initialPageObj.retryHistory}
+                    totalAttempts={initialPageObj.totalAttempts || initialPageObj.retryHistory.length}
+                    language={language}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Progressive Mode: Waiting for story text after cover */}
       {progressiveMode && !story && coverImages?.frontCover && (
@@ -1448,18 +1653,117 @@ export function StoryDisplay({
       )}
 
       {/* Back Cover Display - show as soon as available */}
-      {coverImages && getCoverImageData(coverImages.backCover) && (
-        <div className="mt-8 max-w-2xl mx-auto">
-          <p className="text-sm text-gray-500 text-center mb-2">
-            {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
-          </p>
-          <img
-            src={getCoverImageData(coverImages.backCover)!}
-            alt="Back Cover"
-            className="w-full rounded-lg shadow-lg"
-          />
-        </div>
-      )}
+      {coverImages && getCoverImageData(coverImages.backCover) && (() => {
+        const backCoverObj = getCoverObject(coverImages.backCover);
+        return (
+          <div className="mt-8 max-w-2xl mx-auto">
+            <p className="text-sm text-gray-500 text-center mb-2">
+              {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
+            </p>
+            <img
+              src={getCoverImageData(coverImages.backCover)!}
+              alt="Back Cover"
+              className="w-full rounded-lg shadow-lg"
+            />
+            {/* Developer Mode Features for Back Cover */}
+            {developerMode && backCoverObj && (
+              <div className="mt-3 space-y-2">
+                {/* Regenerate/Edit Buttons */}
+                {(_onRegenerateCover || _onEditCover) && (
+                  <div className="flex gap-2">
+                    {_onRegenerateCover && (
+                      <button
+                        onClick={() => _onRegenerateCover('back')}
+                        disabled={isGenerating}
+                        className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                        }`}
+                      >
+                        <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
+                      </button>
+                    )}
+                    {_onEditCover && (
+                      <button
+                        onClick={() => _onEditCover('back')}
+                        disabled={isGenerating}
+                        className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                        }`}
+                      >
+                        <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Scene Description */}
+                {backCoverObj.description && (
+                  <details className="bg-green-50 border border-green-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
+                      {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                    </summary>
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                      {backCoverObj.description}
+                    </pre>
+                  </details>
+                )}
+
+                {/* API Prompt */}
+                {backCoverObj.prompt && (
+                  <details className="bg-blue-50 border border-blue-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-blue-800 hover:text-blue-900">
+                      {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
+                      {backCoverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({backCoverObj.modelId})</span>}
+                    </summary>
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                      {backCoverObj.prompt}
+                    </pre>
+                  </details>
+                )}
+
+                {/* Reference Photos */}
+                {backCoverObj.referencePhotos && backCoverObj.referencePhotos.length > 0 && (
+                  <ReferencePhotosDisplay
+                    referencePhotos={backCoverObj.referencePhotos}
+                    language={language}
+                  />
+                )}
+
+                {/* Quality Score */}
+                {backCoverObj.qualityScore !== undefined && (
+                  <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
+                      <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                      <span className={`text-lg font-bold ${
+                        backCoverObj.qualityScore >= 70 ? 'text-green-600' :
+                        backCoverObj.qualityScore >= 50 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {Math.round(backCoverObj.qualityScore)}%
+                      </span>
+                    </summary>
+                    {backCoverObj.qualityReasoning && (
+                      <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
+                        <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
+                        <p className="whitespace-pre-wrap">{backCoverObj.qualityReasoning}</p>
+                      </div>
+                    )}
+                  </details>
+                )}
+
+                {/* Retry History */}
+                {backCoverObj.retryHistory && backCoverObj.retryHistory.length > 0 && (
+                  <RetryHistoryDisplay
+                    retryHistory={backCoverObj.retryHistory}
+                    totalAttempts={backCoverObj.totalAttempts || backCoverObj.retryHistory.length}
+                    language={language}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Bottom Action Buttons - for users who scrolled to the end */}
       {hasImages && story && (
