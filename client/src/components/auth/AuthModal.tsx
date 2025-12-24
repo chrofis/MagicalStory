@@ -48,10 +48,11 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
   if (!isOpen) return null;
 
   const handleLoginSuccess = () => {
-    onClose();
+    // Navigate first, then close modal to avoid race conditions
     if (onSuccess) {
       onSuccess();
     }
+    onClose();
   };
 
   const handleLogin = async (email: string, password: string) => {
