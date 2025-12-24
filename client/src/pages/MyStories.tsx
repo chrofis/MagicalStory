@@ -23,8 +23,9 @@ interface StoryListItem {
   story_type: string;
   art_style: string;
   language: string;
+  languageLevel?: string; // '1st-grade', 'standard', 'advanced'
   pages: number;
-  pageCount?: number; // Calculated page count (accounts for picture book vs standard layout)
+  pageCount?: number; // Calculated page count (accounts for picture book vs standard layout + cover pages)
   created_at: string;
   createdAt?: string;
   thumbnail?: string; // Loaded lazily via getStoryCover

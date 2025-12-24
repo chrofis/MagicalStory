@@ -307,8 +307,14 @@ router.get('/users/:userId/details', authenticateToken, requireAdmin, async (req
     const stories = storiesResult.map(s => {
       try {
         const storyData = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
-        const scenePageCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
-        const pageCount = scenePageCount > 0 ? scenePageCount + 3 : 0;
+        // Calculate page count:
+        // - Picture book (1st-grade): 1 scene = 1 page (image with text below)
+        // - Standard/Advanced: 1 scene = 2 pages (text page + image page)
+        // - Plus 3 cover pages (front, back, initial/dedication)
+        const sceneCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
+        const isPictureBook = storyData?.languageLevel === '1st-grade';
+        const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
+        const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
         const sceneImageCount = storyData?.sceneImages?.length || 0;
         const coverImageCount = storyData?.coverImages ?
           (storyData.coverImages.frontCover ? 1 : 0) +
