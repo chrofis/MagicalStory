@@ -7787,6 +7787,7 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
       );
 
       if (userResult.rows.length === 0) {
+        console.log(`❌ User not found in database: userId=${userId}, username=${req.user.username}, email=${req.user.email}`);
         return res.status(404).json({ error: 'User not found' });
       }
 
