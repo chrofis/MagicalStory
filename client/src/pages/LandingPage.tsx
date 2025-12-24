@@ -29,14 +29,19 @@ export default function LandingPage() {
   };
 
   const handleAuthSuccess = () => {
+    console.log('[AUTH] handleAuthSuccess called');
     // Check for redirect parameter (e.g., from email link when not logged in)
     const redirectUrl = searchParams.get('redirect');
+    console.log('[AUTH] redirectUrl from searchParams:', redirectUrl);
     if (redirectUrl) {
       // Decode and navigate to the original URL
+      console.log('[AUTH] Navigating to:', decodeURIComponent(redirectUrl));
       navigate(decodeURIComponent(redirectUrl));
     } else {
+      console.log('[AUTH] Navigating to /create');
       navigate('/create');
     }
+    console.log('[AUTH] navigate() called');
   };
 
   return (
