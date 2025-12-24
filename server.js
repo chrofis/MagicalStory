@@ -5008,12 +5008,6 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Set up progressive scene parser to start image generation during streaming
     // DISABLED: Don't stream images in storybook mode - wait for Visual Bible to be parsed first
     // This ensures all images get Visual Bible entries for recurring elements
-    const shouldStreamImages = false; // Was: !skipImages && imageGenMode === 'parallel'
-    let scenesEmittedCount = 0;
-
-    // Track cover image generation promises
-    const streamingCoverPromises = [];
-    let streamingVisualBible = null;
     let coverImages = { frontCover: null, initialPage: null, backCover: null };
     const coverPrompts = { front: null, initialPage: null, backCover: null };
 
@@ -5053,191 +5047,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       return result;
     };
 
-    // Helper function to generate cover image during streaming
-    const generateCoverImageDuringStream = async (coverType, sceneDescription, rawBlock = null, extractedTitle = null) => {
-      if (skipImages) return null;
-
-      try {
-        // Extract clothing from block first (more reliable), fallback to parsing scene
-        let clothing = null;
-        if (rawBlock) {
-          const clothingMatch = rawBlock.match(/CLOTHING:\s*(winter|summer|formal|standard)/i);
-          if (clothingMatch) {
-            clothing = clothingMatch[1].toLowerCase();
-          }
-        }
-        if (!clothing) {
-          clothing = parseClothingCategory(sceneDescription) || 'standard';
-        }
-
-        // Determine character selection based on cover type
-        let referencePhotos;
-        if (coverType === 'titlePage') {
-          // Front cover: Main character prominently, maybe 1-2 supporting
-          const frontCoverCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
-          referencePhotos = getCharacterPhotoDetails(frontCoverCharacters.length > 0 ? frontCoverCharacters : inputData.characters || [], clothing);
-          log.debug(`📕 [STREAM-COVER] Generating front cover: ${referencePhotos.length} characters, clothing: ${clothing}`);
-        } else {
-          // Initial page and back cover: ALL characters
-          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing);
-          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}`);
-        }
-
-        // Build the prompt
-        let coverPrompt;
-        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible) : '';
-        const artStyleId = inputData.artStyle || 'pixar';
-        const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
-
-        if (coverType === 'titlePage') {
-          // Use extracted title from Claude response, fallback to input title
-          const storyTitleForCover = extractedTitle || inputData.title || 'My Story';
-          log.debug(`📕 [STREAM-COVER] Using title for front cover: "${storyTitleForCover}"`);
-          coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-            TITLE_PAGE_SCENE: sceneDescription,
-            STYLE_DESCRIPTION: styleDescription,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
-            VISUAL_BIBLE: visualBibleText,
-            STORY_TITLE: storyTitleForCover
-          });
-          coverPrompts.front = coverPrompt;
-        } else if (coverType === 'initialPage') {
-          coverPrompt = inputData.dedication && inputData.dedication.trim()
-            ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
-                INITIAL_PAGE_SCENE: sceneDescription,
-                STYLE_DESCRIPTION: styleDescription,
-                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
-                VISUAL_BIBLE: visualBibleText,
-                DEDICATION: inputData.dedication
-              })
-            : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
-                INITIAL_PAGE_SCENE: sceneDescription,
-                STYLE_DESCRIPTION: styleDescription,
-                CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
-                VISUAL_BIBLE: visualBibleText
-              });
-          coverPrompts.initialPage = coverPrompt;
-        } else if (coverType === 'backCover') {
-          coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
-            BACK_COVER_SCENE: sceneDescription,
-            STYLE_DESCRIPTION: styleDescription,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(referencePhotos, inputData.characters),
-            VISUAL_BIBLE: visualBibleText
-          });
-          coverPrompts.backCover = coverPrompt;
-        }
-
-        // Usage tracker for streaming cover images
-        const streamCoverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
-          if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
-        };
-
-        // Generate the image
-        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker);
-
-        const coverData = {
-          imageData: result.imageData,
-          description: sceneDescription,
-          prompt: coverPrompt,
-          qualityScore: result.score,
-          qualityReasoning: result.reasoning || null,
-          wasRegenerated: result.wasRegenerated || false,
-          totalAttempts: result.totalAttempts || 1,
-          retryHistory: result.retryHistory || [],
-          originalImage: result.originalImage || null,
-          originalScore: result.originalScore || null,
-          originalReasoning: result.originalReasoning || null,
-          referencePhotos: referencePhotos,
-          modelId: result.modelId || null
-        };
-
-        // Save partial cover checkpoint for progressive display
-        const coverKey = coverType === 'titlePage' ? 'frontCover' : coverType;
-        // Include title for frontCover so client can transition to story display immediately
-        const checkpointData = { type: coverKey, ...coverData };
-        if (coverType === 'titlePage' && extractedTitle) {
-          checkpointData.storyTitle = extractedTitle;
-        }
-        await saveCheckpoint(jobId, 'partial_cover', checkpointData,
-          coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? 1 : 2);
-
-        console.log(`✅ [STREAM-COVER] ${coverType} cover generated during streaming (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
-
-        return { type: coverKey, data: coverData };
-      } catch (error) {
-        log.error(`❌ [STREAM-COVER] Failed to generate ${coverType} cover:`, error.message);
-        return null;
-      }
-    };
-
-    // Set up cover parser to start cover image generation during streaming
-    const shouldStreamCovers = !skipImages;
-    const coverParser = new ProgressiveCoverParser(
-      // onVisualBibleComplete
-      (parsedVB, rawSection) => {
-        // Filter out main characters from secondary characters (safety net)
-        streamingVisualBible = filterMainCharactersFromVisualBible(parsedVB, inputData.characters);
-        log.debug(`📖 [STREAM-COVER] Visual Bible ready for cover generation`);
-      },
-      // onCoverSceneComplete
-      (coverType, sceneDescription, rawBlock, extractedTitle) => {
-        if (shouldStreamCovers) {
-          const coverPromise = streamLimit(() => generateCoverImageDuringStream(coverType, sceneDescription, rawBlock, extractedTitle));
-          streamingCoverPromises.push(coverPromise);
-        }
-      }
-    );
-
-    const sceneParser = new ProgressiveSceneParser((completedScene) => {
-      // Called when a scene is detected as complete during streaming
-      const { pageNumber, text, sceneDescription } = completedScene;
-
-      if (completedSceneNumbers.has(pageNumber)) return;  // Already processed
-      completedSceneNumbers.add(pageNumber);
-      scenesEmittedCount++;
-
-      // Store the page text for later use
-      pageTexts[pageNumber] = text;
-
-      log.debug(`🌊 [STREAM] Scene ${pageNumber} complete during streaming (${scenesEmittedCount}/${sceneCount})`);
-
-      // Start image generation immediately for this scene (only in parallel mode)
-      // Pass the page text so it can be saved with the partial result
-      if (shouldStreamImages && sceneDescription) {
-        const imagePromise = streamLimit(() => generateImageForScene(pageNumber, sceneDescription, text));
-        streamingImagePromises.push(imagePromise);
-      }
-    });
+    // NOTE: Streaming parsers were removed - cover/scene parsing happens after full response
 
     let response;
     try {
-      // Use streaming API call
-      const streamResult = await callTextModelStreaming(storybookPrompt, 16000, (chunk, fullText) => {
-        // Process each chunk to detect complete scenes AND cover scenes
-        coverParser.processChunk(chunk, fullText);
-        sceneParser.processChunk(chunk, fullText);
-      });
+      // Use streaming API call (streaming provides progress but parsing is done after completion)
+      const streamResult = await callTextModelStreaming(storybookPrompt, 16000);
       response = streamResult.text;
       addUsage('anthropic', streamResult.usage, 'storybook_combined', activeTextModel.modelId);
-      log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
-      log.debug(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
-      log.debug(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
+      log.debug(`[STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
     } catch (apiError) {
-      log.error(`❌ [STORYBOOK] Claude API streaming call failed:`, apiError.message);
+      log.error(`[STORYBOOK] Claude API streaming call failed:`, apiError.message);
       throw apiError;
-    }
-
-    // Wait for any cover images started during streaming
-    if (streamingCoverPromises.length > 0) {
-      log.debug(`⚡ [STORYBOOK] Waiting for ${streamingCoverPromises.length} cover images started during streaming...`);
-      const coverResults = await Promise.all(streamingCoverPromises);
-      coverResults.forEach(result => {
-        if (result && result.type && result.data) {
-          coverImages[result.type] = result.data;
-        }
-      });
-      log.debug(`✅ [STORYBOOK] ${coverResults.filter(r => r).length} cover images complete from streaming`);
     }
 
     // Save checkpoint
@@ -5560,12 +5381,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       allImages.sort((a, b) => a.pageNumber - b.pageNumber);
     }
 
-    // Count how many covers were already generated during streaming
-    const coversFromStreaming = Object.values(coverImages).filter(c => c !== null).length;
-
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [85, coversFromStreaming > 0 ? `${coversFromStreaming} cover images ready. Generating remaining covers...` : 'Generating cover images...', jobId]
+      [85, 'Generating cover images...', jobId]
     );
 
     // Generate any cover images not generated during streaming
@@ -5702,11 +5520,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             referencePhotos: backCoverPhotos,
             modelId: backCoverResult.modelId || null
           };
-        } else {
-          log.debug(`⚡ [STORYBOOK] Back cover already generated during streaming (skipping)`);
         }
 
-        log.debug(`✅ [STORYBOOK] Cover images complete (${coversFromStreaming} from streaming, ${3 - coversFromStreaming} generated after)`);
+        log.debug(`✅ [STORYBOOK] Cover images complete (3 covers generated)`);
       } catch (error) {
         log.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
       }
