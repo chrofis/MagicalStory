@@ -7,7 +7,7 @@
  * Used by both processStoryJob and processStorybookJob.
  */
 
-const log = require('../utils/logger');
+const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // ============================================================================
