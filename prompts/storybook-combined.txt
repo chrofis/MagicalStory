@@ -40,6 +40,7 @@ Create a simple story arc:
 
 
 # Character Guidelines
+- Write in third person (he/she/they)
 - Show character traits through actions, not descriptions. (Trait: brave = Good example: Leo approached the dangerous looking animal. Bad example: Leo was brave.)
 - Keep interactions simple and positive
 
@@ -170,13 +171,13 @@ Mood: [Emotional tone]
 
 ---PAGE 2---
 TEXT:
-[Story text]
+[Story text - 4-6 sentences, 50-70 words]
 
 SCENE:
 Setting: [Indoor or Outdoor, Location, time of day, atmosphere]
-Characters: [Who is in this scene, 1-2 characters. In exceptions 3 characters not more] 
+Characters: [Who is in this scene, 1-2 characters. In exceptions 3 characters not more]
 Action: [Key visual moment]
-Clothing: [winter/summer/formal/standard]
+Clothing: [winter/summer/formal/standard - pick ONE based on scene context]
 Mood: [Emotional tone]
 
 ... continue for all {PAGES} pages ...
