@@ -5054,7 +5054,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       // Use streaming API call (streaming provides progress but parsing is done after completion)
       const streamResult = await callTextModelStreaming(storybookPrompt, 16000);
       response = streamResult.text;
-      addUsage('anthropic', streamResult.usage, 'storybook_combined', activeTextModel.modelId);
+      addUsage('anthropic', streamResult.usage, 'storybook_combined', getActiveTextModel().modelId);
       log.debug(`[STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
     } catch (apiError) {
       log.error(`[STORYBOOK] Claude API streaming call failed:`, apiError.message);
@@ -5859,7 +5859,7 @@ async function processStoryJob(jobId) {
     log.debug(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
     const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens);
     const outline = outlineResult.text;
-    addUsage('anthropic', outlineResult.usage, 'outline', activeTextModel.modelId);
+    addUsage('anthropic', outlineResult.usage, 'outline', getActiveTextModel().modelId);
 
     // Save checkpoint: outline (include prompt for debugging)
     await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt });
@@ -6076,7 +6076,7 @@ async function processStoryJob(jobId) {
       // Token estimate: max words/page × 1.3 tokens/word × 2 (safety margin)
       const tokensPerPage = getTokensPerPage(inputData.languageLevel);
       BATCH_SIZE = calculateOptimalBatchSize(sceneCount, tokensPerPage, 1.0); // Full capacity
-      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} pages per batch (${tokensPerPage} tokens/page estimate, model max: ${activeTextModel.maxOutputTokens})`);
+      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} pages per batch (${tokensPerPage} tokens/page estimate, model max: ${getActiveTextModel().maxOutputTokens})`);
     }
     const numBatches = Math.ceil(sceneCount / BATCH_SIZE);
 
@@ -6149,7 +6149,7 @@ Output Format:
       // Use the full model capacity - no artificial limits
       // Claude stops naturally when done (end_turn), we only pay for tokens actually used
       const batchSceneCount = endScene - startScene + 1;
-      const batchTokensNeeded = activeTextModel.maxOutputTokens; // Use full capacity (64000)
+      const batchTokensNeeded = getActiveTextModel().maxOutputTokens; // Use full capacity (64000)
       log.debug(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} max tokens for ${batchSceneCount} pages - STREAMING`);
 
       // Track which pages have started image generation (for progressive mode)
@@ -6174,7 +6174,7 @@ Output Format:
             // Generate detailed scene description
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
             const sceneDescription = sceneDescResult.text;
-            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', activeTextModel.modelId);
+            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', getActiveTextModel().modelId);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -6297,7 +6297,7 @@ Output Format:
           progressiveParser.processChunk(chunk, fullText);
         });
         batchText = batchResult.text;
-        addUsage('anthropic', batchResult.usage, 'story_text', activeTextModel.modelId);
+        addUsage('anthropic', batchResult.usage, 'story_text', getActiveTextModel().modelId);
 
         // Finalize to emit the last page
         progressiveParser.finalize(batchText);
@@ -6306,7 +6306,7 @@ Output Format:
         // No progressive parsing - just stream text
         const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
         batchText = batchResult.text;
-        addUsage('anthropic', batchResult.usage, 'story_text', activeTextModel.modelId);
+        addUsage('anthropic', batchResult.usage, 'story_text', getActiveTextModel().modelId);
       }
 
       fullStoryText += batchText + '\n\n';
@@ -6359,7 +6359,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           log.debug(` Generating missing page ${missingPageNum}...`);
           const retryResult = await callTextModelStreaming(retryPrompt, 1500);
           const retryText = retryResult.text;
-          addUsage('anthropic', retryResult.usage, 'story_text', activeTextModel.modelId);
+          addUsage('anthropic', retryResult.usage, 'story_text', getActiveTextModel().modelId);
 
           // Parse the retry response
           const retryPages = parseStoryPages(retryText);
@@ -6512,7 +6512,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
             const sceneDescription = sceneDescResult.text;
-            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', activeTextModel.modelId);
+            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', getActiveTextModel().modelId);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
