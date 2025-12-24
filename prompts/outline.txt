@@ -110,6 +110,8 @@ For EACH of the {PAGES} story pages, provide:
 
 **Character Focus**: Which character(s) are featured, their detailed actions, and how their traits/development are shown (remember: SHOW don't TELL)
 
+**Scene**: One sentence describing the key visual moment for the illustrator
+
 **Clothing**: Select the appropriate clothing category based on the scene setting:
 - **winter**: Cold weather, snow, ice, outdoor winter activities (coats, scarves, boots, warm layers)
 - **summer**: Warm weather, beach, swimming, outdoor summer activities (t-shirts, shorts, light dresses, sandals)
@@ -258,10 +260,12 @@ Challenge: [One scene where this character shines]
 
 Page 1: [Key Action/Plot Point]
 Character Focus: [Which character(s) and what trait/development is shown]
+Scene: [One sentence - the key visual moment]
 Clothing: [winter|summer|formal|standard]
 
 Page 2: [Key Action/Plot Point]
 Character Focus: [Description]
+Scene: [One sentence - the key visual moment]
 Clothing: [winter|summer|formal|standard]
 
 ...and so on for all {PAGES} pages.

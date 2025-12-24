@@ -1,8 +1,8 @@
 **ROLE:**
 You are an expert Art Director creating an illustration brief for a children's book.
 
-**SCENE CONTEXT:**
-{SCENE_SUMMARY}Story Text (Page {PAGE_NUMBER}):
+{PREVIOUS_SCENES}**CURRENT SCENE (Page {PAGE_NUMBER}) - YOUR FOCUS:**
+{SCENE_SUMMARY}Story Text:
 {PAGE_CONTENT}
 
 **CHARACTERS IN THIS STORY:**

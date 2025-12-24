@@ -869,8 +869,15 @@ function buildStoryPrompt(inputData, sceneCount = null) {
 
 /**
  * Build Art Director scene description prompt
+ * @param {number} pageNumber - Current page number
+ * @param {string} pageContent - Text content for current page
+ * @param {Array} characters - Character data array
+ * @param {string} shortSceneDesc - Scene hint from outline (current page)
+ * @param {string} language - Output language
+ * @param {Object} visualBible - Visual Bible data
+ * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint} for previous pages (max 2)
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null) {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null, previousScenes = []) {
   // Debug: Log Visual Bible mainCharacters status
   log.debug(`[SCENE PROMPT P${pageNumber}] Building prompt for ${characters.length} characters`);
   log.debug(`[SCENE PROMPT P${pageNumber}] Visual Bible mainCharacters: ${visualBible?.mainCharacters?.length || 0}`);
@@ -978,9 +985,23 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     recurringElements = '(None available)';
   }
 
+  // Build previous scenes context (for narrative continuity)
+  let previousScenesText = '';
+  if (previousScenes && previousScenes.length > 0) {
+    previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
+    for (const prev of previousScenes) {
+      previousScenesText += `Page ${prev.pageNumber}: ${prev.text.substring(0, 200)}${prev.text.length > 200 ? '...' : ''}\n`;
+      if (prev.sceneHint) {
+        previousScenesText += `  Scene: ${prev.sceneHint}\n`;
+      }
+    }
+    previousScenesText += '\n';
+  }
+
   // Use template from file if available
   if (PROMPT_TEMPLATES.sceneDescriptions) {
     return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
+      PREVIOUS_SCENES: previousScenesText,
       SCENE_SUMMARY: shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : '',
       PAGE_NUMBER: pageNumber.toString(),
       PAGE_CONTENT: pageContent,
@@ -994,8 +1015,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   return `**ROLE:**
 You are an expert Art Director creating an illustration brief for a children's book.
 
-**SCENE CONTEXT:**
-${shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : ''}Story Text (Page ${pageNumber}):
+${previousScenesText}**CURRENT SCENE (Page ${pageNumber}) - YOUR FOCUS:**
+${shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : ''}Story Text:
 ${pageContent}
 
 **AVAILABLE CHARACTERS & VISUAL REFERENCES:**

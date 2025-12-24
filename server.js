@@ -1532,8 +1532,23 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Get Visual Bible for recurring elements
     const visualBible = storyData.visualBible || null;
 
+    // Build previous scenes context (last 2 pages)
+    const previousScenes = [];
+    for (let prevPage = pageNumber - 2; prevPage < pageNumber; prevPage++) {
+      if (prevPage >= 1) {
+        const prevText = getPageText(storyData.storyText, prevPage);
+        if (prevText) {
+          previousScenes.push({
+            pageNumber: prevPage,
+            text: prevText,
+            sceneHint: ''
+          });
+        }
+      }
+    }
+
     // Generate new scene description (includes Visual Bible recurring elements)
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible);
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes);
     const sceneResult = await callClaudeAPI(scenePrompt, 2048);
     const newSceneDescription = sceneResult.text;
 
@@ -6640,6 +6655,8 @@ Output Format:
 
       // Track which pages have started image generation (for progressive mode)
       const pagesStarted = new Set();
+      // Track page texts for passing previous scenes context
+      const pageTextsForContext = {};
 
       // Helper function to start image generation for a page
       const startPageImageGeneration = (pageNum, pageContent) => {
@@ -6647,10 +6664,25 @@ Output Format:
         if (pageNum < startScene || pageNum > endScene) return; // Outside batch range
         pagesStarted.add(pageNum);
 
+        // Store this page's text for future pages' context
+        pageTextsForContext[pageNum] = pageContent;
+
         const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
 
+        // Build previous scenes context (last 2 pages)
+        const previousScenes = [];
+        for (let prevPage = pageNum - 2; prevPage < pageNum; prevPage++) {
+          if (prevPage >= 1 && pageTextsForContext[prevPage]) {
+            previousScenes.push({
+              pageNumber: prevPage,
+              text: pageTextsForContext[prevPage],
+              sceneHint: shortSceneDescriptions[prevPage] || ''
+            });
+          }
+        }
+
         // Generate scene description using Art Director prompt (in story language)
-        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
+        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes);
 
         // Start scene description + image generation (don't await)
         const imagePromise = limit(async () => {
@@ -6981,6 +7013,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         );
 
         let previousImage = null;
+        const pageTextsForContext = {}; // Track page texts for previous scenes context
 
         for (let i = 0; i < allPages.length; i++) {
           const page = allPages[i];
@@ -6988,12 +7021,27 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           const pageContent = page.content;
           const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
 
+          // Store this page's text for future context
+          pageTextsForContext[pageNum] = pageContent;
+
+          // Build previous scenes context (last 2 pages)
+          const previousScenes = [];
+          for (let prevPage = pageNum - 2; prevPage < pageNum; prevPage++) {
+            if (prevPage >= 1 && pageTextsForContext[prevPage]) {
+              previousScenes.push({
+                pageNumber: prevPage,
+                text: pageTextsForContext[prevPage],
+                sceneHint: shortSceneDescriptions[prevPage] || ''
+              });
+            }
+          }
+
           log.debug(`🔗 [SEQUENTIAL ${i + 1}/${allPages.length}] Processing page ${pageNum}...`);
 
           try {
             // Generate scene description using Art Director prompt (in story language)
             // Pass visualBible so recurring elements are included in scene description
-            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible);
+            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes);
 
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
             const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
