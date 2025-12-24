@@ -10,6 +10,7 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  redirectUrl?: string;
 }
 
 type AuthMode = 'login' | 'register' | 'reset' | 'resetSent';
@@ -35,7 +36,7 @@ const errorMessages = {
   },
 };
 
-export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
+export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModalProps) {
   const { t, language } = useLanguage();
   const { login, register, loginWithGoogle, resetPassword } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
@@ -84,7 +85,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     setError('');
     setIsLoading(true);
     try {
-      await loginWithGoogle();
+      await loginWithGoogle(redirectUrl);
       handleLoginSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : errors.googleSignInFailed);

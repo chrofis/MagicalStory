@@ -143,6 +143,7 @@ export default function LandingPage() {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onSuccess={handleAuthSuccess}
+        redirectUrl={searchParams.get('redirect') ? decodeURIComponent(searchParams.get('redirect')!) : '/create'}
       />
     </div>
   );
