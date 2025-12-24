@@ -223,11 +223,11 @@ export function StorySettings({
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
-                <div className="w-full bg-gray-100 overflow-hidden">
+                <div className="w-full bg-gray-100 p-2 aspect-square md:aspect-auto">
                   <img
                     src={level.image}
                     alt={level.label}
-                    className="w-full h-24 md:h-32 object-cover object-center scale-110"
+                    className="w-full h-full md:h-auto object-contain"
                   />
                 </div>
                 <div className="p-3">
