@@ -84,7 +84,7 @@ For EACH main character provided, detail their development arc by describing:
 
 
 For all other characters:
-**Starting Point**: How they are at the beginning of the story (based on their traits - strengths, weaknesses, fears).
+**Starting Point**: In which scene do they enter the story. Do not have all characters start on scene 1.
 **Repeated behaviors**: Things they do repeatedly in the story that are characteristic for them
 **Challenge**: One challenge / scene where the character shines
 
