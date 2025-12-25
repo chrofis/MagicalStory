@@ -1524,7 +1524,7 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
     };
 
     // Load prompt from file and replace placeholders
-    const promptTemplate = fs.readFileSync(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
+    const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
       .replace('{STORY_TYPE_NAME}', storyTypeName)
       .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
