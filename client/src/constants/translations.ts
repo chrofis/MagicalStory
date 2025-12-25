@@ -48,6 +48,7 @@ export interface TranslationStrings {
   uploadPhotoFirst: string;
   photoGoodExamples: string;
   photoBadExamples: string;
+  noFaceDetected: string;
   orDescribe: string;
   characterAge: string;
   hairColor: string;
@@ -209,6 +210,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     uploadPhotoFirst: 'Please upload a photo to continue',
     photoGoodExamples: 'Good: Full body or upper body',
     photoBadExamples: 'Avoid: Close-up face only, sunglasses, hats, helmets, blurry',
+    noFaceDetected: 'No face detected in the photo. Please upload a clear photo showing a face.',
     orDescribe: 'OR describe the character',
     characterAge: 'Age',
     hairColor: 'Hair Color',
@@ -368,6 +370,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     uploadPhotoFirst: 'Bitte laden Sie ein Foto hoch, um fortzufahren',
     photoGoodExamples: 'Gut: Ganzkörper oder Oberkörper',
     photoBadExamples: 'Vermeiden: Nur Gesicht, Sonnenbrille, Hüte, Helme, unscharf',
+    noFaceDetected: 'Kein Gesicht im Foto erkannt. Bitte laden Sie ein klares Foto mit einem sichtbaren Gesicht hoch.',
     orDescribe: 'ODER Figur beschreiben',
     characterAge: 'Alter',
     hairColor: 'Haarfarbe',
@@ -527,6 +530,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     uploadPhotoFirst: 'Veuillez télécharger une photo pour continuer',
     photoGoodExamples: 'Bien : Corps entier ou buste',
     photoBadExamples: 'Éviter : Gros plan visage, lunettes de soleil, chapeaux, casques, flou',
+    noFaceDetected: 'Aucun visage détecté dans la photo. Veuillez télécharger une photo claire montrant un visage.',
     orDescribe: 'OU décrivez le personnage',
     characterAge: 'Âge',
     hairColor: 'Couleur des Cheveux',

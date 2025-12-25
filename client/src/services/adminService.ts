@@ -20,6 +20,7 @@ export interface AdminUser {
   createdAt: string;
   lastLogin?: string;
   emailVerified?: boolean;
+  photoConsentAt?: string | null;
 }
 
 export interface CreditTransaction {
@@ -152,6 +153,10 @@ export const adminService = {
 
   async toggleEmailVerified(userId: string, emailVerified: boolean): Promise<{ user: { emailVerified: boolean } }> {
     return api.post(`/api/admin/users/${userId}/email-verified`, { emailVerified });
+  },
+
+  async togglePhotoConsent(userId: string, hasConsent: boolean): Promise<{ user: { photoConsentAt: string | null } }> {
+    return api.post(`/api/admin/users/${userId}/photo-consent`, { hasConsent });
   },
 
   async cleanOrphanedFiles(): Promise<{ cleaned: number }> {

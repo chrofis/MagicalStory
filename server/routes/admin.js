@@ -56,7 +56,7 @@ router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
     const pool = getPool();
     const selectQuery = `
       SELECT
-        u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at, u.last_login, u.email_verified,
+        u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at, u.last_login, u.email_verified, u.photo_consent_at,
         COALESCE(order_stats.total_orders, 0) as total_orders,
         COALESCE(order_stats.failed_orders, 0) as failed_orders
       FROM users u
@@ -83,6 +83,7 @@ router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
       createdAt: user.created_at,
       lastLogin: user.last_login,
       emailVerified: user.email_verified !== false,
+      photoConsentAt: user.photo_consent_at || null,
       totalOrders: parseInt(user.total_orders) || 0,
       failedOrders: parseInt(user.failed_orders) || 0
     }));
@@ -196,6 +197,59 @@ router.post('/users/:userId/email-verified', authenticateToken, requireAdmin, as
   } catch (err) {
     console.error('Error updating email verification status:', err);
     res.status(500).json({ error: 'Failed to update email verification status' });
+  }
+});
+
+// POST /api/admin/users/:userId/photo-consent - Toggle photo consent status
+router.post('/users/:userId/photo-consent', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { hasConsent } = req.body;
+
+    if (typeof hasConsent !== 'boolean') {
+      return res.status(400).json({ error: 'hasConsent must be a boolean' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(503).json({ error: 'This feature requires database mode' });
+    }
+
+    const selectQuery = 'SELECT id, username, photo_consent_at FROM users WHERE id = $1';
+    const rows = await dbQuery(selectQuery, [userId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = rows[0];
+    const previousStatus = !!user.photo_consent_at;
+
+    if (hasConsent) {
+      // Set consent to current timestamp
+      await dbQuery('UPDATE users SET photo_consent_at = CURRENT_TIMESTAMP WHERE id = $1', [userId]);
+    } else {
+      // Remove consent (set to NULL)
+      await dbQuery('UPDATE users SET photo_consent_at = NULL WHERE id = $1', [userId]);
+    }
+
+    // Fetch the updated value
+    const updatedRows = await dbQuery('SELECT photo_consent_at FROM users WHERE id = $1', [userId]);
+    const photoConsentAt = updatedRows[0]?.photo_consent_at || null;
+
+    log.debug(`🔧 [ADMIN] Photo consent for user ${user.username} changed: ${previousStatus} -> ${hasConsent}`);
+
+    res.json({
+      message: 'Photo consent status updated',
+      user: {
+        id: user.id,
+        username: user.username,
+        photoConsentAt: photoConsentAt,
+        previousStatus: previousStatus
+      }
+    });
+  } catch (err) {
+    console.error('Error updating photo consent status:', err);
+    res.status(500).json({ error: 'Failed to update photo consent status' });
   }
 });
 

@@ -43,12 +43,14 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <Navigation currentStep={0} />
+    <div className="h-screen overflow-y-auto snap-y snap-mandatory bg-gray-50">
+      {/* Navigation - Fixed at top */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gray-50">
+        <Navigation currentStep={0} />
+      </div>
 
       {/* Hero Section - Full viewport height */}
-      <section className="min-h-[calc(100vh-80px)] flex flex-col px-4 lg:px-8 py-6 lg:py-8 relative">
+      <section className="min-h-screen flex flex-col px-4 lg:px-8 pt-24 lg:pt-28 pb-6 lg:pb-8 relative snap-start">
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 w-full relative z-10 flex-1 items-center">
           {/* Left Side - Text and Button */}
           <div className="w-full lg:w-[35%] flex flex-col justify-center">
@@ -147,7 +149,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 1: Create Your Characters */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
+      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content */}
@@ -193,7 +195,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 2: Tell Your Story */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
+      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Image Placeholder */}
@@ -239,7 +241,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 3: Choose Your Style */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
+      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content */}
@@ -285,7 +287,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 4: Print & Share */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
+      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Image Placeholder */}

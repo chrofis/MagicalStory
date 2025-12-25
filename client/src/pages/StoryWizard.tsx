@@ -668,13 +668,20 @@ export default function StoryWizard() {
             };
           });
         } else {
-          log.warn('Photo analysis returned no data, using original photo');
-          // Fallback to original photo - mark avatars as stale
-          setCurrentCharacter(prev => prev ? {
-            ...prev,
-            photos: { original: originalPhotoUrl },
-            avatars: prev.avatars ? { ...prev.avatars, stale: true } : undefined,
-          } : null);
+          // Check for specific errors
+          if (analysis.error === 'no_face_detected') {
+            log.warn('No face detected in photo');
+            alert(t.noFaceDetected);
+            // Don't set the photo - user needs to upload a different one
+          } else {
+            log.warn('Photo analysis returned no data, using original photo');
+            // Fallback to original photo - mark avatars as stale
+            setCurrentCharacter(prev => prev ? {
+              ...prev,
+              photos: { original: originalPhotoUrl },
+              avatars: prev.avatars ? { ...prev.avatars, stale: true } : undefined,
+            } : null);
+          }
         }
       } catch (error) {
         log.error('Photo analysis error:', error);

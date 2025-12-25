@@ -27,6 +27,8 @@ import {
   ChevronUp,
   Mail,
   MailX,
+  Camera,
+  CameraOff,
   Printer,
   Plus,
   Search,
@@ -493,6 +495,26 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleTogglePhotoConsent = async (targetUser: AdminUser) => {
+    const hasConsent = !!targetUser.photoConsentAt;
+    const newStatus = !hasConsent;
+    setIsActionLoading(true);
+    try {
+      const result = await adminService.togglePhotoConsent(targetUser.id, newStatus);
+      setUsers(users.map(u =>
+        u.id === targetUser.id ? { ...u, photoConsentAt: result.user.photoConsentAt } : u
+      ));
+      setActionMessage({
+        type: 'success',
+        text: `Photo consent ${newStatus ? 'granted' : 'revoked'} for ${targetUser.username}`
+      });
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed' });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const handleImpersonate = async (targetUser: AdminUser) => {
     setIsActionLoading(true);
     try {
@@ -922,6 +944,15 @@ export default function AdminDashboard() {
                             title={u.emailVerified ? 'Email verified - click to unverify' : 'Email NOT verified - click to verify'}
                           >
                             {u.emailVerified ? <Mail size={16} /> : <MailX size={16} />}
+                          </button>
+                          <button
+                            onClick={() => handleTogglePhotoConsent(u)}
+                            className={`p-1 rounded hover:bg-gray-100 ${
+                              u.photoConsentAt ? 'text-emerald-600' : 'text-orange-500'
+                            }`}
+                            title={u.photoConsentAt ? 'Photo consent given - click to revoke' : 'Photo consent NOT given - click to grant'}
+                          >
+                            {u.photoConsentAt ? <Camera size={16} /> : <CameraOff size={16} />}
                           </button>
                           <button
                             onClick={() => handleImpersonate(u)}

@@ -255,6 +255,7 @@ export const characterService = {
 
   async analyzePhoto(imageData: string): Promise<{
     success: boolean;
+    error?: string;  // Error code (e.g., 'no_face_detected')
     photos?: {
       face?: string;
       body?: string;
@@ -307,6 +308,14 @@ export const characterService = {
         other: response.attributes?.other_features,  // Distinctive markings
       };
 
+      // If analysis failed (e.g., no face detected), return error
+      if (!response.success) {
+        return {
+          success: false,
+          error: response.error,
+        };
+      }
+
       return {
         success: response.success,
         photos: {
@@ -324,7 +333,7 @@ export const characterService = {
       };
     } catch (error) {
       log.error('Photo analysis failed:', error);
-      return { success: false };
+      return { success: false, error: 'unknown_error' };
     }
   },
 

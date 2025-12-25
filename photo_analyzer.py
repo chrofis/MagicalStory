@@ -200,6 +200,18 @@ def process_photo(image_data, is_base64=True):
         face_box = detect_face_mediapipe(img)
         print(f"   Face detected: {face_box is not None}")
 
+        # If no face detected, return error immediately
+        if face_box is None:
+            print("❌ No face detected in photo")
+            # Clean up temp files
+            if os.path.exists(temp_input) and is_base64:
+                os.remove(temp_input)
+            return {
+                "success": False,
+                "error": "no_face_detected",
+                "error_message": "No face was detected in the photo. Please upload a clear photo showing your face."
+            }
+
         # 3. REMOVE BACKGROUND (fast - ~100ms)
         print("🎭 Removing background...")
         full_img_rgba = None
