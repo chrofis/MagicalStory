@@ -140,7 +140,7 @@ async function compressImageToJPEG(pngBase64) {
  * @param {string} evaluationType - Type of evaluation: 'scene' (default) or 'cover' (text-focused)
  * @returns {Promise<number>} Quality score from 0-100
  */
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene') {
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -208,8 +208,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Add evaluation prompt text
     parts.push({ text: evaluationPrompt });
 
-    // Use Gemini Flash for fast quality evaluation
-    const modelId = 'gemini-2.0-flash';
+    // Use Gemini Flash for fast quality evaluation (or override if provided)
+    const modelId = qualityModelOverride || 'gemini-2.0-flash';
+    if (qualityModelOverride) {
+      log.debug(`🔧 [QUALITY] Using model override: ${modelId}`);
+    }
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
@@ -359,9 +362,11 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {string|null} previousImage - Previous image for sequential mode
  * @param {string} evaluationType - 'scene' or 'cover'
  * @param {Function|null} onImageReady - Callback when image is ready
+ * @param {string|null} imageModelOverride - Override image model (e.g., 'gemini-2.5-flash-image' or 'gemini-3-pro-image-preview')
+ * @param {string|null} qualityModelOverride - Override quality evaluation model
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null) {
   // Check cache first (include previousImage presence in cache key for sequential mode)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
@@ -478,8 +483,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   }
 
-  // Use Gemini 3 Pro Image for covers (higher quality), 2.5 Flash for scenes (faster)
-  const modelId = evaluationType === 'cover' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+  // Use model override if provided, otherwise default based on type:
+  // - Covers: Gemini 3 Pro Image (higher quality)
+  // - Scenes: Gemini 2.5 Flash Image (faster)
+  const defaultModel = evaluationType === 'cover' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+  const modelId = imageModelOverride || defaultModel;
+  if (imageModelOverride) {
+    log.debug(`🔧 [IMAGE GEN] Using model override: ${modelId}`);
+  }
 
   const requestBody = {
     contents: [{
@@ -573,8 +584,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         }
 
         // Evaluate image quality with prompt and reference images
-        log.debug(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...`);
-        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType);
+        log.debug(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
+        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride);
 
         // Extract score, reasoning, and text error info from quality result
         const score = qualityResult ? qualityResult.score : null;
@@ -742,9 +753,10 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @param {Function|null} onImageReady - Optional callback called immediately when image is generated (before quality eval)
  * @param {Function|null} usageTracker - Optional callback to track token usage: (imageUsage, qualityUsage) => void
  * @param {Function|null} callTextModel - Function to call text model for scene rewriting
+ * @param {Object|null} modelOverrides - Model overrides: { imageModel, qualityModel }
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
-async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null) {
+async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null) {
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   let bestResult = null;
@@ -768,7 +780,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
     let result;
     try {
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady);
+      const imageModelOverride = modelOverrides?.imageModel || null;
+      const qualityModelOverride = modelOverrides?.qualityModel || null;
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);

@@ -5135,7 +5135,7 @@ class ProgressiveStoryPageParser {
 
 
 // Process picture book (storybook) job - simplified flow with combined text+scene generation
-async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId) {
+async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}) {
   log.debug(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
   // Token usage tracker - accumulates usage from all API calls by provider and function
@@ -5344,7 +5344,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         while (retries <= MAX_RETRIES && !imageResult) {
           try {
             // Use quality retry with labeled character photos (name + photoUrl)
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker);
+            const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides);
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -5517,8 +5518,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
-        // Generate the image
-        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker);
+        // Generate the image (use coverImageModel for covers)
+        const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
+        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker, null, coverModelOverrides);
 
         const coverData = {
           imageData: result.imageData,
@@ -5835,7 +5837,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               // Pass labeled character photos (name + photoUrl)
               // In sequential mode, also pass previous image for consistency
               // Use quality retry to regenerate if score is below threshold
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker);
+              const seqSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides);
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -5990,7 +5993,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             VISUAL_BIBLE: visualBiblePrompt
           });
           coverPrompts.frontCover = frontCoverPrompt;
-          const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker);
+          const frontCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
+          const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, frontCoverModelOverrides);
           log.debug(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.frontCover = {
             imageData: frontCoverResult.imageData,
@@ -6034,7 +6038,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                 VISUAL_BIBLE: visualBiblePrompt
               });
           coverPrompts.initialPage = initialPrompt;
-          const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker);
+          const initialPageModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
+          const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, initialPageModelOverrides);
           log.debug(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.initialPage = {
             imageData: initialResult.imageData,
@@ -6069,7 +6074,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             VISUAL_BIBLE: visualBiblePrompt
           });
           coverPrompts.backCover = backCoverPrompt;
-          const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker);
+          const backCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
+          const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, backCoverModelOverrides);
           log.debug(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.backCover = {
             imageData: backCoverResult.imageData,
@@ -6414,7 +6420,7 @@ async function processStoryJob(jobId) {
 
     if (isPictureBook) {
       log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id);
+      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides);
     }
 
     // Standard flow for normal stories
@@ -6428,10 +6434,13 @@ async function processStoryJob(jobId) {
     const outlinePrompt = buildStoryPrompt(inputData, sceneCount);
     // Claude can handle up to 64,000 output tokens - use generous limit for outlines
     const outlineTokens = 16000;
-    log.debug(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING`);
-    const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens);
+    const outlineModelOverride = modelOverrides.outlineModel || null;
+    log.debug(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING${outlineModelOverride ? ` [model: ${outlineModelOverride}]` : ''}`);
+    const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens, null, outlineModelOverride);
     const outline = outlineResult.text;
-    addUsage('anthropic', outlineResult.usage, 'outline', getActiveTextModel().modelId);
+    // Get the actual model used (override or default)
+    const outlineModelUsed = outlineModelOverride ? TEXT_MODELS[outlineModelOverride]?.modelId : getActiveTextModel().modelId;
+    addUsage('anthropic', outlineResult.usage, 'outline', outlineModelUsed || getActiveTextModel().modelId);
 
     // Save checkpoint: outline (include prompt for debugging)
     await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt });
@@ -6603,25 +6612,28 @@ async function processStoryJob(jobId) {
         if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
       };
 
+      // Model overrides for cover images (use coverImageModel for covers)
+      const pipelineCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
+
       // Start all 3 covers in parallel (don't await yet)
       coverGenerationPromise = Promise.all([
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting front cover (${frontCoverCharacters.length} chars, clothing: ${frontCoverClothing})`);
-          const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker);
+          const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
           console.log(`✅ [COVER-PARALLEL] Front cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'frontCover', imageData: result.imageData, storyTitle }, 0);
           return { type: 'frontCover', result, photos: frontCoverPhotos, scene: titlePageScene, prompt: frontCoverPrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting initial page (${initialPagePhotos.length} chars, clothing: ${initialPageClothing})`);
-          const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker);
+          const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
           console.log(`✅ [COVER-PARALLEL] Initial page complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'initialPage', imageData: result.imageData }, 1);
           return { type: 'initialPage', result, photos: initialPagePhotos, scene: initialPageScene, prompt: initialPagePrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting back cover (${backCoverPhotos.length} chars, clothing: ${backCoverClothing})`);
-          const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker);
+          const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
           console.log(`✅ [COVER-PARALLEL] Back cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'backCover', imageData: result.imageData }, 2);
           return { type: 'backCover', result, photos: backCoverPhotos, scene: backCoverScene, prompt: backCoverPrompt };
@@ -6721,13 +6733,19 @@ Output Format:
       // Use the full model capacity - no artificial limits
       // Claude stops naturally when done (end_turn), we only pay for tokens actually used
       const batchSceneCount = endScene - startScene + 1;
-      const batchTokensNeeded = getActiveTextModel().maxOutputTokens; // Use full capacity (64000)
-      log.debug(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} max tokens for ${batchSceneCount} pages - STREAMING`);
+      const textModelOverride = modelOverrides.textModel || null;
+      const textModelConfig = textModelOverride ? TEXT_MODELS[textModelOverride] : getActiveTextModel();
+      const batchTokensNeeded = textModelConfig?.maxOutputTokens || getActiveTextModel().maxOutputTokens;
+      log.debug(`📝 [BATCH ${batchNum + 1}] Requesting ${batchTokensNeeded} max tokens for ${batchSceneCount} pages - STREAMING${textModelOverride ? ` [model: ${textModelOverride}]` : ''}`);
 
       // Track which pages have started image generation (for progressive mode)
       const pagesStarted = new Set();
       // Track page texts for passing previous scenes context
       const pageTextsForContext = {};
+
+      // Scene description model override
+      const sceneModelOverride = modelOverrides.sceneDescriptionModel || null;
+      const sceneModelConfig = sceneModelOverride ? TEXT_MODELS[sceneModelOverride] : getActiveTextModel();
 
       // Helper function to start image generation for a page
       const startPageImageGeneration = (pageNum, pageContent) => {
@@ -6758,12 +6776,12 @@ Output Format:
         // Start scene description + image generation (don't await)
         const imagePromise = limit(async () => {
           try {
-            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
+            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)${sceneModelOverride ? ` [model: ${sceneModelOverride}]` : ''}`);
 
             // Generate detailed scene description
-            const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
+            const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000, null, sceneModelOverride);
             const sceneDescription = sceneDescResult.text;
-            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', getActiveTextModel().modelId);
+            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', sceneModelConfig?.modelId || getActiveTextModel().modelId);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -6813,7 +6831,8 @@ Output Format:
 
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker);
+                const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides);
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -6884,18 +6903,18 @@ Output Format:
         // Stream with progressive parsing
         const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded, (chunk, fullText) => {
           progressiveParser.processChunk(chunk, fullText);
-        });
+        }, textModelOverride);
         batchText = batchResult.text;
-        addUsage('anthropic', batchResult.usage, 'story_text', getActiveTextModel().modelId);
+        addUsage('anthropic', batchResult.usage, 'story_text', textModelConfig?.modelId || getActiveTextModel().modelId);
 
         // Finalize to emit the last page
         progressiveParser.finalize(batchText);
         log.debug(`🌊 [PROGRESSIVE] Batch streaming complete, ${pagesStarted.size} pages started during stream`);
       } else {
         // No progressive parsing - just stream text
-        const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded);
+        const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded, null, textModelOverride);
         batchText = batchResult.text;
-        addUsage('anthropic', batchResult.usage, 'story_text', getActiveTextModel().modelId);
+        addUsage('anthropic', batchResult.usage, 'story_text', textModelConfig?.modelId || getActiveTextModel().modelId);
       }
 
       fullStoryText += batchText + '\n\n';
@@ -6946,9 +6965,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 [Write the story text for page ${missingPageNum} here, following the outline and maintaining continuity with other pages]`;
 
           log.debug(` Generating missing page ${missingPageNum}...`);
-          const retryResult = await callTextModelStreaming(retryPrompt, 1500);
+          const retryResult = await callTextModelStreaming(retryPrompt, 1500, null, textModelOverride);
           const retryText = retryResult.text;
-          addUsage('anthropic', retryResult.usage, 'story_text', getActiveTextModel().modelId);
+          addUsage('anthropic', retryResult.usage, 'story_text', textModelConfig?.modelId || getActiveTextModel().modelId);
 
           // Parse the retry response
           const retryPages = parseStoryPages(retryText);
@@ -7086,6 +7105,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         let previousImage = null;
         const pageTextsForContext = {}; // Track page texts for previous scenes context
 
+        // Scene description model override for sequential mode
+        const seqSceneModelOverride = modelOverrides.sceneDescriptionModel || null;
+        const seqSceneModelConfig = seqSceneModelOverride ? TEXT_MODELS[seqSceneModelOverride] : getActiveTextModel();
+
         for (let i = 0; i < allPages.length; i++) {
           const page = allPages[i];
           const pageNum = page.pageNumber;
@@ -7114,10 +7137,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Pass visualBible so recurring elements are included in scene description
             const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes);
 
-            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)`);
-            const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000);
+            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)${seqSceneModelOverride ? ` [model: ${seqSceneModelOverride}]` : ''}`);
+            const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000, null, seqSceneModelOverride);
             const sceneDescription = sceneDescResult.text;
-            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', getActiveTextModel().modelId);
+            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', seqSceneModelConfig?.modelId || getActiveTextModel().modelId);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -7171,7 +7194,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               try {
                 // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
                 // Use quality retry to regenerate if score is below threshold
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker);
+                const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides);
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
