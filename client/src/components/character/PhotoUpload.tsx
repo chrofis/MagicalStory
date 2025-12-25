@@ -90,28 +90,31 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
       {!hasExistingConsent && (
         <div className="bg-white rounded-lg p-4 mb-4 space-y-3">
           {/* Consent 1: Rights to use photo */}
-          <label className="flex items-start gap-3 cursor-pointer group">
-            <button
-              type="button"
-              onClick={() => setConsent1Checked(!consent1Checked)}
-              className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800"
-            >
+          <div
+            onClick={() => setConsent1Checked(!consent1Checked)}
+            className="flex items-start gap-3 cursor-pointer group"
+          >
+            <span className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800">
               {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
-            </button>
+            </span>
             <span className="text-sm text-gray-700 group-hover:text-gray-900">
               {texts.consent1}
             </span>
-          </label>
+          </div>
 
           {/* Consent 2: Terms and Privacy */}
-          <label className="flex items-start gap-3 cursor-pointer group">
-            <button
-              type="button"
-              onClick={() => setConsent2Checked(!consent2Checked)}
-              className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800"
-            >
+          <div
+            onClick={(e) => {
+              // Don't toggle if clicking on a link
+              if ((e.target as HTMLElement).tagName !== 'A') {
+                setConsent2Checked(!consent2Checked);
+              }
+            }}
+            className="flex items-start gap-3 cursor-pointer group"
+          >
+            <span className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800">
               {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
-            </button>
+            </span>
             <span className="text-sm text-gray-700 group-hover:text-gray-900">
               {texts.consent2}{' '}
               <Link to="/terms" className="text-indigo-600 hover:underline" target="_blank">
@@ -123,7 +126,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
               </Link>
               {texts.period}
             </span>
-          </label>
+          </div>
         </div>
       )}
 

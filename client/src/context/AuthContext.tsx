@@ -425,6 +425,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: data.user.role,
       credits: data.user.credits || 0,
       emailVerified: data.user.emailVerified,
+      photoConsentAt: data.user.photoConsentAt,
     };
 
     // Store impersonation state
@@ -472,6 +473,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: data.user.role,
       credits: data.user.credits || 0,
       emailVerified: data.user.emailVerified,
+      photoConsentAt: data.user.photoConsentAt,
     };
 
     storage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.token);

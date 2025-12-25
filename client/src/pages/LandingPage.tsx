@@ -284,14 +284,13 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
-            {/* Image Placeholder */}
+            {/* Image */}
             <div className="w-full lg:w-1/2 order-1 lg:order-2">
-              <div className="bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl p-8 aspect-[4/3] flex items-center justify-center">
-                <div className="text-center">
-                  <Camera className="w-16 h-16 text-indigo-300 mx-auto mb-4" />
-                  <p className="text-indigo-400 font-medium">[Character Creation Screenshot]</p>
-                </div>
-              </div>
+              <img
+                src={`/images/landing-characters-${language}.jpg`}
+                alt={st.createCharacters}
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
             </div>
           </div>
         </div>
@@ -301,14 +300,13 @@ export default function LandingPage() {
       <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
-            {/* Image Placeholder */}
+            {/* Image */}
             <div className="w-full lg:w-1/2">
-              <div className="bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl p-8 aspect-[4/3] flex items-center justify-center">
-                <div className="text-center">
-                  <BookOpen className="w-16 h-16 text-amber-300 mx-auto mb-4" />
-                  <p className="text-amber-400 font-medium">[Story Settings Screenshot]</p>
-                </div>
-              </div>
+              <img
+                src="/images/landing-story.jpg"
+                alt={st.tellStory}
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
             </div>
             {/* Text Content */}
             <div className="w-full lg:w-1/2">
@@ -376,14 +374,13 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
-            {/* Image Placeholder */}
+            {/* Image */}
             <div className="w-full lg:w-1/2 order-1 lg:order-2">
-              <div className="bg-gradient-to-br from-pink-100 to-rose-100 rounded-2xl p-8 aspect-[4/3] flex items-center justify-center">
-                <div className="text-center">
-                  <Palette className="w-16 h-16 text-pink-300 mx-auto mb-4" />
-                  <p className="text-pink-400 font-medium">[Art Style Gallery]</p>
-                </div>
-              </div>
+              <img
+                src="/images/landing-styles.jpg"
+                alt={st.chooseStyle}
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
             </div>
           </div>
         </div>
@@ -393,14 +390,13 @@ export default function LandingPage() {
       <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
-            {/* Image Placeholder */}
+            {/* Image */}
             <div className="w-full lg:w-1/2">
-              <div className="bg-gradient-to-br from-emerald-100 to-teal-100 rounded-2xl p-8 aspect-[4/3] flex items-center justify-center">
-                <div className="text-center">
-                  <Printer className="w-16 h-16 text-emerald-300 mx-auto mb-4" />
-                  <p className="text-emerald-400 font-medium">[Printed Book Photo]</p>
-                </div>
-              </div>
+              <img
+                src="/images/landing-print.jpg"
+                alt={st.printShare}
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
             </div>
             {/* Text Content */}
             <div className="w-full lg:w-1/2">

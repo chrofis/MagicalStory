@@ -431,13 +431,23 @@ export default function TermsOfService() {
   const navigate = useNavigate();
   const content = termsContent[language] || termsContent.en;
 
+  const handleBack = () => {
+    // Check if there's history to go back to
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // If opened in new tab with no history, go to home
+      navigate('/');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navigation currentStep={0} />
 
       <div className="flex-1 max-w-4xl mx-auto px-4 py-8">
         <button
-          onClick={() => navigate(-1)}
+          onClick={handleBack}
           className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-6"
         >
           <ArrowLeft size={20} />
