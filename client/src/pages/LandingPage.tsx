@@ -6,12 +6,115 @@ import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Downlo
 import { AuthModal } from '@/components/auth';
 import { Navigation, Footer } from '@/components/common';
 
+const sectionTranslations = {
+  en: {
+    // Section 1: Characters
+    step1: 'Step 1',
+    createCharacters: 'Create Your Characters',
+    createCharactersDesc: 'Upload photos of your loved ones and watch them transform into beautiful illustrated characters. Our AI analyzes each photo to capture unique features, expressions, and personality.',
+    addFamily: 'Add your whole family - children, parents, grandparents, or friends',
+    defineNames: 'Define names, ages, and relationships between characters',
+    consistentCharacters: 'Characters appear consistently throughout your entire story',
+    // Section 2: Story
+    step2: 'Step 2',
+    tellStory: 'Tell Your Story',
+    tellStoryDesc: "Choose from magical themes or describe your own adventure. Whether it's a birthday surprise, a bedtime tale, or an educational journey - you're in control of the narrative.",
+    selectThemes: 'Select from popular themes: Adventure, Fantasy, Educational, Birthday, and more',
+    customElements: 'Add custom story elements and personal details',
+    readingLevel: "Adjust reading level to match your child's age",
+    // Section 3: Style
+    step3: 'Step 3',
+    chooseStyle: 'Choose Your Style',
+    chooseStyleDesc: 'Select from a variety of beautiful illustration styles. From delicate watercolors to bold 3D animation - find the perfect look for your story.',
+    artStyles: '8+ unique art styles: Pixar-style 3D, Watercolor, Comic, Anime, and more',
+    consistentStyle: 'Consistent style across all pages and characters',
+    bookLength: 'Choose your preferred book length - from short stories to longer adventures',
+    // Section 4: Print
+    step4: 'Step 4',
+    printShare: 'Print & Share',
+    printShareDesc: 'Your story is ready! Download it instantly as a PDF or order a beautifully printed book delivered to your door.',
+    pdfDownload: 'Instant PDF download - perfect for reading on tablets or printing at home',
+    printOptions: 'Hardcover or softcover printing - 20x20cm, professional quality',
+    shipping: 'Ships within Switzerland - the perfect gift for any occasion',
+    // CTA
+    readyToCreate: 'Ready to Create Magic?',
+    ctaDesc: 'Transform your photos into a personalized storybook in minutes. Your child will be the hero of their very own adventure!',
+  },
+  de: {
+    // Section 1: Characters
+    step1: 'Schritt 1',
+    createCharacters: 'Erstelle deine Charaktere',
+    createCharactersDesc: 'Lade Fotos deiner Liebsten hoch und sieh zu, wie sie sich in wunderschön illustrierte Charaktere verwandeln. Unsere KI analysiert jedes Foto, um einzigartige Merkmale, Ausdrücke und Persönlichkeit einzufangen.',
+    addFamily: 'Füge deine ganze Familie hinzu - Kinder, Eltern, Grosseltern oder Freunde',
+    defineNames: 'Definiere Namen, Alter und Beziehungen zwischen den Charakteren',
+    consistentCharacters: 'Charaktere erscheinen einheitlich in der gesamten Geschichte',
+    // Section 2: Story
+    step2: 'Schritt 2',
+    tellStory: 'Erzähle deine Geschichte',
+    tellStoryDesc: 'Wähle aus magischen Themen oder beschreibe dein eigenes Abenteuer. Ob Geburtstagsüberraschung, Gute-Nacht-Geschichte oder Lernreise - du bestimmst die Handlung.',
+    selectThemes: 'Wähle aus beliebten Themen: Abenteuer, Fantasy, Lerngeschichten, Geburtstag und mehr',
+    customElements: 'Füge eigene Story-Elemente und persönliche Details hinzu',
+    readingLevel: 'Passe das Leseniveau an das Alter deines Kindes an',
+    // Section 3: Style
+    step3: 'Schritt 3',
+    chooseStyle: 'Wähle deinen Stil',
+    chooseStyleDesc: 'Wähle aus einer Vielzahl schöner Illustrationsstile. Von zarten Aquarellen bis zu kräftiger 3D-Animation - finde den perfekten Look für deine Geschichte.',
+    artStyles: '8+ einzigartige Kunststile: Pixar-ähnliches 3D, Aquarell, Comic, Anime und mehr',
+    consistentStyle: 'Einheitlicher Stil auf allen Seiten und bei allen Charakteren',
+    bookLength: 'Wähle deine bevorzugte Buchlänge - von kurzen Geschichten bis zu längeren Abenteuern',
+    // Section 4: Print
+    step4: 'Schritt 4',
+    printShare: 'Drucken & Teilen',
+    printShareDesc: 'Deine Geschichte ist fertig! Lade sie sofort als PDF herunter oder bestelle ein wunderschön gedrucktes Buch direkt zu dir nach Hause.',
+    pdfDownload: 'Sofortiger PDF-Download - perfekt zum Lesen auf Tablets oder zum Ausdrucken zu Hause',
+    printOptions: 'Hardcover oder Softcover Druck - 20x20cm, professionelle Qualität',
+    shipping: 'Versand innerhalb der Schweiz - das perfekte Geschenk für jeden Anlass',
+    // CTA
+    readyToCreate: 'Bereit, Magie zu erschaffen?',
+    ctaDesc: 'Verwandle deine Fotos in Minuten in ein personalisiertes Geschichtenbuch. Dein Kind wird der Held seines eigenen Abenteuers!',
+  },
+  fr: {
+    // Section 1: Characters
+    step1: 'Étape 1',
+    createCharacters: 'Créez vos personnages',
+    createCharactersDesc: "Téléchargez des photos de vos proches et regardez-les se transformer en magnifiques personnages illustrés. Notre IA analyse chaque photo pour capturer les traits uniques, les expressions et la personnalité.",
+    addFamily: 'Ajoutez toute votre famille - enfants, parents, grands-parents ou amis',
+    defineNames: 'Définissez les noms, âges et relations entre les personnages',
+    consistentCharacters: 'Les personnages apparaissent de manière cohérente tout au long de votre histoire',
+    // Section 2: Story
+    step2: 'Étape 2',
+    tellStory: 'Racontez votre histoire',
+    tellStoryDesc: "Choisissez parmi des thèmes magiques ou décrivez votre propre aventure. Que ce soit une surprise d'anniversaire, un conte du soir ou un voyage éducatif - vous contrôlez le récit.",
+    selectThemes: "Sélectionnez parmi les thèmes populaires : Aventure, Fantasy, Éducatif, Anniversaire, et plus",
+    customElements: 'Ajoutez des éléments personnalisés et des détails personnels',
+    readingLevel: "Ajustez le niveau de lecture à l'âge de votre enfant",
+    // Section 3: Style
+    step3: 'Étape 3',
+    chooseStyle: 'Choisissez votre style',
+    chooseStyleDesc: "Sélectionnez parmi une variété de beaux styles d'illustration. Des aquarelles délicates à l'animation 3D audacieuse - trouvez le look parfait pour votre histoire.",
+    artStyles: "8+ styles artistiques uniques : 3D style Pixar, Aquarelle, Bande dessinée, Anime, et plus",
+    consistentStyle: 'Style cohérent sur toutes les pages et personnages',
+    bookLength: 'Choisissez la longueur de livre souhaitée - des histoires courtes aux aventures plus longues',
+    // Section 4: Print
+    step4: 'Étape 4',
+    printShare: 'Imprimez & Partagez',
+    printShareDesc: "Votre histoire est prête ! Téléchargez-la instantanément en PDF ou commandez un beau livre imprimé livré à votre porte.",
+    pdfDownload: "Téléchargement PDF instantané - parfait pour lire sur tablettes ou imprimer à la maison",
+    printOptions: 'Impression couverture rigide ou souple - 20x20cm, qualité professionnelle',
+    shipping: 'Livraison en Suisse - le cadeau parfait pour toute occasion',
+    // CTA
+    readyToCreate: 'Prêt à créer de la magie ?',
+    ctaDesc: "Transformez vos photos en livre d'histoires personnalisé en quelques minutes. Votre enfant sera le héros de sa propre aventure !",
+  },
+};
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
   const { isAuthenticated } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const st = sectionTranslations[language] || sectionTranslations.en;
 
   // Check for login query param
   useEffect(() => {
@@ -158,26 +261,26 @@ export default function LandingPage() {
                 <div className="bg-indigo-100 p-3 rounded-full">
                   <Camera className="w-6 h-6 text-indigo-600" />
                 </div>
-                <span className="text-indigo-600 font-semibold text-lg">Step 1</span>
+                <span className="text-indigo-600 font-semibold text-lg">{st.step1}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-gray-900 mb-6">
-                Create Your Characters
+                {st.createCharacters}
               </h2>
               <p className="text-lg text-gray-600 mb-4">
-                Upload photos of your loved ones and watch them transform into beautiful illustrated characters. Our AI analyzes each photo to capture unique features, expressions, and personality.
+                {st.createCharactersDesc}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
                   <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Add up to 5 characters - children, parents, grandparents, or friends</span>
+                  <span className="text-gray-600">{st.addFamily}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Define names, ages, and relationships between characters</span>
+                  <span className="text-gray-600">{st.defineNames}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Characters appear consistently throughout your entire story</span>
+                  <span className="text-gray-600">{st.consistentCharacters}</span>
                 </li>
               </ul>
             </div>
@@ -213,26 +316,26 @@ export default function LandingPage() {
                 <div className="bg-amber-100 p-3 rounded-full">
                   <BookOpen className="w-6 h-6 text-amber-600" />
                 </div>
-                <span className="text-amber-600 font-semibold text-lg">Step 2</span>
+                <span className="text-amber-600 font-semibold text-lg">{st.step2}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-gray-900 mb-6">
-                Tell Your Story
+                {st.tellStory}
               </h2>
               <p className="text-lg text-gray-600 mb-4">
-                Choose from magical themes or describe your own adventure. Whether it's a birthday surprise, a bedtime tale, or an educational journey - you're in control of the narrative.
+                {st.tellStoryDesc}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
                   <BookOpen className="w-5 h-5 text-amber-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Select from popular themes: Adventure, Fantasy, Educational, Birthday, and more</span>
+                  <span className="text-gray-600">{st.selectThemes}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <BookOpen className="w-5 h-5 text-amber-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Add custom story elements and personal details</span>
+                  <span className="text-gray-600">{st.customElements}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <BookOpen className="w-5 h-5 text-amber-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Choose reading level from toddler-friendly to chapter books</span>
+                  <span className="text-gray-600">{st.readingLevel}</span>
                 </li>
               </ul>
             </div>
@@ -250,26 +353,26 @@ export default function LandingPage() {
                 <div className="bg-pink-100 p-3 rounded-full">
                   <Palette className="w-6 h-6 text-pink-600" />
                 </div>
-                <span className="text-pink-600 font-semibold text-lg">Step 3</span>
+                <span className="text-pink-600 font-semibold text-lg">{st.step3}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-gray-900 mb-6">
-                Choose Your Style
+                {st.chooseStyle}
               </h2>
               <p className="text-lg text-gray-600 mb-4">
-                Select from a variety of beautiful illustration styles. From whimsical watercolors to modern 3D animation - find the perfect look for your story.
+                {st.chooseStyleDesc}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
                   <Palette className="w-5 h-5 text-pink-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">8+ unique art styles: Pixar-style 3D, Watercolor, Comic, Anime, and more</span>
+                  <span className="text-gray-600">{st.artStyles}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Palette className="w-5 h-5 text-pink-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Consistent style across all pages and characters</span>
+                  <span className="text-gray-600">{st.consistentStyle}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Palette className="w-5 h-5 text-pink-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Choose book length: 10, 15, or 20 pages</span>
+                  <span className="text-gray-600">{st.bookLength}</span>
                 </li>
               </ul>
             </div>
@@ -305,26 +408,26 @@ export default function LandingPage() {
                 <div className="bg-emerald-100 p-3 rounded-full">
                   <Printer className="w-6 h-6 text-emerald-600" />
                 </div>
-                <span className="text-emerald-600 font-semibold text-lg">Step 4</span>
+                <span className="text-emerald-600 font-semibold text-lg">{st.step4}</span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-title text-gray-900 mb-6">
-                Print & Share
+                {st.printShare}
               </h2>
               <p className="text-lg text-gray-600 mb-4">
-                Your story is ready! Download it instantly as a PDF or order a beautifully printed hardcover book delivered to your door.
+                {st.printShareDesc}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
                   <Download className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Instant PDF download - perfect for reading on tablets or printing at home</span>
+                  <span className="text-gray-600">{st.pdfDownload}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Printer className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Premium hardcover printing - 20x20cm, professional quality</span>
+                  <span className="text-gray-600">{st.printOptions}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Printer className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">Ships worldwide - the perfect gift for any occasion</span>
+                  <span className="text-gray-600">{st.shipping}</span>
                 </li>
               </ul>
             </div>
@@ -336,10 +439,10 @@ export default function LandingPage() {
       <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600 snap-start flex flex-col justify-center">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl lg:text-5xl font-title text-white mb-6">
-            Ready to Create Magic?
+            {st.readyToCreate}
           </h2>
           <p className="text-xl text-indigo-100 mb-8 max-w-2xl mx-auto">
-            Transform your photos into a personalized storybook in minutes. Your child will be the hero of their very own adventure!
+            {st.ctaDesc}
           </p>
           <button
             onClick={handleStartJourney}
