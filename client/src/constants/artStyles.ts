@@ -11,7 +11,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Lebendige, warme Disney/Pixar 3D-Animation',
       fr: 'Animation 3D Disney/Pixar vibrante et chaleureuse',
     },
-    prompt: 'pixar style 3d character, vibrant Disney/Pixar 3D animation, warm lighting, child-friendly',
+    prompt: '3D render, Pixar cinematic style, natural eye proportion, subtle expression, highly detailed textures, octane render, volumetric lighting, vibrant colors, smooth shading, family-friendly',
   },
   {
     id: 'cartoon',
@@ -23,7 +23,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Klassischer 2D-Cartoon-Stil mit kräftigen Farben',
       fr: 'Style cartoon 2D classique aux couleurs vives',
     },
-    prompt: '2D cartoon style, bold outlines, vibrant flat colors, classic animation look',
+    prompt: '2D cartoon style, bold black outlines, vibrant flat colors (minimal shading/cel-shading), smooth vector quality, classic Saturday morning animation aesthetic',
   },
   {
     id: 'anime',
@@ -35,7 +35,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Japanischer Anime-Stil mit ausdrucksstarken Features',
       fr: 'Style anime japonais aux traits expressifs',
     },
-    prompt: 'anime style, Japanese animation, expressive eyes, dynamic poses, cel-shaded',
+    prompt: 'Modern digital anime art, high detail, expressive large eyes, dynamic composition, detailed cel-shading, vibrant palette, style of Makoto Shinkai',
   },
   {
     id: 'chibi',
@@ -47,7 +47,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Niedlicher Chibi-Stil mit grossen Köpfen und kleinen Körpern',
       fr: 'Style chibi mignon avec grandes têtes et petits corps',
     },
-    prompt: 'chibi style, super deformed, cute, big head, small body, kawaii, adorable',
+    prompt: 'Chibi style, super deformed (SD) proportions, massive head, tiny body, kawaii aesthetic, adorable, smooth illustration, minimalist detail',
   },
   {
     id: 'steampunk',
@@ -59,7 +59,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Von der viktorianischen Ära inspiriert mit Zahnrädern und Messing',
       fr: "Inspiré de l'ère victorienne avec engrenages et laiton",
     },
-    prompt: 'steampunk anime style, Victorian era, gears, brass, copper, goggles, mechanical details, vintage technology, anime influenced',
+    prompt: 'Steampunk graphic novel illustration, Victorian aesthetic, intricate gears, brass and copper mechanisms, leather textures, sepia/muted color palette, detailed linework',
   },
   {
     id: 'comic',
@@ -71,7 +71,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Comic-Stil mit kräftigen Linien und Raster',
       fr: 'Style bande dessinée avec lignes épaisses et trames',
     },
-    prompt: 'comic book style, bold ink lines, halftone dots, dynamic action, speech bubbles aesthetic, superhero comic art',
+    prompt: 'Classic American comic book art, heavy black ink lines, dynamic composition, visible halftone/Ben-Day dots, vibrant CMYK colors, style of Jack Kirby/Jim Lee',
   },
   {
     id: 'manga',
@@ -83,7 +83,7 @@ export const artStyles: ArtStyle[] = [
       de: 'Japanischer Manga-Stil, schwarz-weiss mit Rastern',
       fr: 'Style manga japonais, noir et blanc avec trames',
     },
-    prompt: 'manga style, Japanese comic art, detailed linework, screentones, dramatic shading, expressive characters',
+    prompt: 'Traditional manga style, Japanese comic art, intricate detailed linework, black and white/monochrome, atmospheric screentones, dramatic lighting and composition',
   },
   {
     id: 'watercolor',
@@ -95,6 +95,66 @@ export const artStyles: ArtStyle[] = [
       de: 'Sanfte Aquarellmalerei mit fliessenden Farben',
       fr: 'Peinture aquarelle douce aux couleurs fluides',
     },
-    prompt: 'watercolor painting style, soft edges, flowing colors, delicate washes, artistic brushstrokes, dreamy atmosphere, traditional watercolor illustration',
+    prompt: 'Traditional watercolor painting, textured paper, delicate color washes (wet-on-wet technique), soft edges, visible artistic brushstrokes, transparent and flowing colors',
+  },
+  {
+    id: 'oil',
+    name: { en: 'Oil Painting', de: 'Ölgemälde', fr: 'Peinture à l\'huile' },
+    emoji: '🖼️',
+    image: '/images/oil style.svg',
+    description: {
+      en: 'Classic oil painting with rich textures',
+      de: 'Klassisches Ölgemälde mit reichen Texturen',
+      fr: 'Peinture à l\'huile classique aux textures riches',
+    },
+    prompt: 'Classic oil painting style, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, canvas texture, museum quality art',
+  },
+  {
+    id: 'lowpoly',
+    name: { en: 'Low Poly', de: 'Low Poly', fr: 'Low Poly' },
+    emoji: '🔷',
+    image: '/images/lowpoly style.svg',
+    description: {
+      en: 'Minimalist geometric 3D style',
+      de: 'Minimalistischer geometrischer 3D-Stil',
+      fr: 'Style 3D géométrique minimaliste',
+    },
+    prompt: 'Low poly 3D model, isometric perspective, minimalist geometric shapes, vibrant solid colors, clear edges, retro video game aesthetic, style of Monument Valley',
+  },
+  {
+    id: 'concept',
+    name: { en: 'Concept Art', de: 'Konzeptkunst', fr: 'Art conceptuel' },
+    emoji: '✨',
+    image: '/images/concept style.svg',
+    description: {
+      en: 'Professional digital concept art',
+      de: 'Professionelle digitale Konzeptkunst',
+      fr: 'Art conceptuel numérique professionnel',
+    },
+    prompt: 'Highly detailed digital concept art, dramatic lighting, epic composition, smooth rendering, focus on mood and atmosphere, wide-angle lens, matte painting aesthetic',
+  },
+  {
+    id: 'pixel',
+    name: { en: 'Pixel Art', de: 'Pixelkunst', fr: 'Pixel art' },
+    emoji: '👾',
+    image: '/images/pixel style.svg',
+    description: {
+      en: 'Retro 16-bit pixel art style',
+      de: 'Retro 16-Bit Pixelkunst-Stil',
+      fr: 'Style pixel art rétro 16 bits',
+    },
+    prompt: '16-bit pixel art style, low resolution, limited color palette, detailed sprite work, retro video game aesthetic, style of Final Fantasy VI',
+  },
+  {
+    id: 'cyber',
+    name: { en: 'Cyberpunk', de: 'Cyberpunk', fr: 'Cyberpunk' },
+    emoji: '🌃',
+    image: '/images/cyber style.svg',
+    description: {
+      en: 'Dark futuristic cyberpunk aesthetic',
+      de: 'Dunkle futuristische Cyberpunk-Ästhetik',
+      fr: 'Esthétique cyberpunk futuriste sombre',
+    },
+    prompt: 'Cyberpunk aesthetic, neon reflections, rainy streets, chrome, dense complexity, high contrast, dark atmosphere, volumetric fog, graphic novel illustration',
   },
 ];

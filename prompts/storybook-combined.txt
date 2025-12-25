@@ -3,7 +3,7 @@ You are an expert children's picture book author. Create a simple, heartwarming 
 # Story Input Parameters
 
 - **Length**: {PAGES} pages
-- **Language**: {LANGUAGE} (NOTE: If German, use ä, ö, ü normally. Do not use ß, use ss instead)
+- **Language**: {LANGUAGE} (NOTE: If German, use Swiss Standard German spelling (Schweizer Hochdeutsch): use ä, ö, ü normally, but use "ss" instead of "ß". Use standard German vocabulary, not Swiss dialect words.)
 - **Story Type**: {STORY_TYPE}
 - **Story Details**: {STORY_DETAILS}
 - **Characters**: {CHARACTERS}
