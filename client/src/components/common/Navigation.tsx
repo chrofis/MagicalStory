@@ -234,7 +234,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                     className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
                   >
                     <KeyRound size={16} />
-                    <span>{language === 'de' ? 'Passwort aendern' : language === 'fr' ? 'Changer le mot de passe' : 'Change Password'}</span>
+                    <span>{language === 'de' ? 'Passwort ändern' : language === 'fr' ? 'Changer le mot de passe' : 'Change Password'}</span>
                   </button>
 
                   {/* Logout */}

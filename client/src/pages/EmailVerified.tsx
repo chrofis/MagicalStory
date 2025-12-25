@@ -15,8 +15,8 @@ const translations = {
     goHome: 'Go to Homepage',
   },
   de: {
-    title: 'E-Mail bestaetigt!',
-    description: 'Ihre E-Mail wurde erfolgreich bestaetigt. Sie koennen jetzt Ihre magische Geschichte erstellen.',
+    title: 'E-Mail bestätigt!',
+    description: 'Ihre E-Mail wurde erfolgreich bestätigt. Sie können jetzt Ihre magische Geschichte erstellen.',
     autoGenerating: 'Starte Ihre Geschichte...',
     createStory: 'Geschichte erstellen',
     goHome: 'Zur Startseite',

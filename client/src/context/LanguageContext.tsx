@@ -14,9 +14,12 @@ const STORAGE_KEY = 'magicalstory_language';
 
 function detectBrowserLanguage(): Language {
   const browserLang = navigator.language.toLowerCase();
+  // Check for supported languages first
   if (browserLang.startsWith('de')) return 'de';
   if (browserLang.startsWith('fr')) return 'fr';
-  return 'en';
+  if (browserLang.startsWith('en')) return 'en';
+  // Default to German if browser language is not supported
+  return 'de';
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {

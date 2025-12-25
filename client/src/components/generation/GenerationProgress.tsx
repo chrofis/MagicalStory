@@ -278,7 +278,7 @@ export function GenerationProgress({
       title: 'Geschichte wird erstellt!',
       timeInfo: 'Deine Geschichte wird in etwa 1 Minute angezeigt. Die Erstellung der vollständigen Geschichte kann bis zu 10 Minuten dauern.',
       emailInfo: 'Du erhältst eine E-Mail, wenn deine Geschichte bereit ist.',
-      canClose: 'Du kannst hier warten oder den Browser schliessen - deine Geschichte wird weiter generiert.',
+      canClose: 'Du kannst hier warten oder den Browser schließen - deine Geschichte wird weiter generiert.',
       tipCharacters: 'Je besser du deine Charaktere beschreibst, desto lustiger wird die Geschichte!',
       tipStoryPlot: 'Mit "Handlung / Angaben zur Geschichte" kannst du dein ganz persönliches Abenteuer gestalten.',
       tipLocations: 'Füge deinen Heimatort und Lieblingsorte zu "Handlung / Angaben zur Geschichte" hinzu für eine persönliche Note.',
@@ -412,7 +412,7 @@ export function GenerationProgress({
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {language === 'de'
-                ? 'Dies kann einige Minuten dauern. Du kannst den Browser schliessen.'
+                ? 'Dies kann einige Minuten dauern. Du kannst den Browser schließen.'
                 : language === 'fr'
                 ? 'Cela peut prendre quelques minutes. Vous pouvez fermer le navigateur.'
                 : 'This may take a few minutes. You can close the browser.'}
