@@ -18,14 +18,19 @@ const { buildVisualBiblePrompt } = require('./visualBible');
  * Art styles definitions (matches index.html)
  */
 const ART_STYLES = {
-  pixar: 'pixar style 3d character, vibrant Disney/Pixar 3D animation, warm lighting, child-friendly',
-  cartoon: '2D cartoon style, bold outlines, vibrant flat colors, classic animation look',
-  anime: 'anime style, Japanese animation, expressive eyes, dynamic poses, cel-shaded',
-  chibi: 'chibi style, super deformed, cute, big head, small body, kawaii, adorable',
-  steampunk: 'steampunk anime style, Victorian era, gears, brass, copper, goggles, mechanical details, vintage technology, anime influenced',
-  comic: 'comic book style, bold ink lines, halftone dots, dynamic action, speech bubbles aesthetic, superhero comic art',
-  manga: 'manga style, Japanese comic art, detailed linework, screentones, dramatic shading, expressive characters',
-  watercolor: 'watercolor painting style, soft edges, flowing colors, delicate washes, artistic brushstrokes, dreamy atmosphere, traditional watercolor illustration'
+  pixar: '3D render, Pixar cinematic style, natural eye proportion, subtle expression, highly detailed textures, octane render, volumetric lighting, vibrant colors, smooth shading, family-friendly',
+  cartoon: '2D cartoon style, bold black outlines, vibrant flat colors (minimal shading/cel-shading), smooth vector quality, classic Saturday morning animation aesthetic',
+  anime: 'Modern digital anime art, high detail, expressive large eyes, dynamic composition, detailed cel-shading, vibrant palette, style of Makoto Shinkai',
+  chibi: 'Chibi style, super deformed (SD) proportions, massive head, tiny body, kawaii aesthetic, adorable, smooth illustration, minimalist detail',
+  steampunk: 'Steampunk graphic novel illustration, Victorian aesthetic, intricate gears, brass and copper mechanisms, leather textures, sepia/muted color palette, detailed linework',
+  comic: 'Classic American comic book art, heavy black ink lines, dynamic composition, visible halftone/Ben-Day dots, vibrant CMYK colors, style of Jack Kirby/Jim Lee',
+  manga: 'Traditional manga style, Japanese comic art, intricate detailed linework, black and white/monochrome, atmospheric screentones, dramatic lighting and composition',
+  watercolor: 'Traditional watercolor painting, textured paper, delicate color washes (wet-on-wet technique), soft edges, visible artistic brushstrokes, transparent and flowing colors',
+  oil: 'Classic oil painting style, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, canvas texture, museum quality art',
+  lowpoly: 'Low poly 3D model, isometric perspective, minimalist geometric shapes, vibrant solid colors, clear edges, retro video game aesthetic, style of Monument Valley',
+  concept: 'Highly detailed digital concept art, dramatic lighting, epic composition, smooth rendering, focus on mood and atmosphere, wide-angle lens, matte painting aesthetic',
+  pixel: '16-bit pixel art style, low resolution, limited color palette, detailed sprite work, retro video game aesthetic, style of Final Fantasy VI',
+  cyber: 'Cyberpunk aesthetic, neon reflections, rainy streets, chrome, dense complexity, high contrast, dark atmosphere, volumetric fog, graphic novel illustration'
 };
 
 /**
