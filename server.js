@@ -1484,6 +1484,71 @@ app.post('/api/gemini', authenticateToken, async (req, res) => {
   }
 });
 
+// Generate story ideas endpoint - FREE, no credits
+app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
+  try {
+    const { storyType, storyTypeName, language, languageLevel, characters, relationships } = req.body;
+
+    log.debug(`💡 Generating story ideas for user ${req.user.username}`);
+    log.debug(`  Story type: ${storyTypeName}, Language: ${language}, Characters: ${characters?.length || 0}`);
+
+    // Build character descriptions
+    const characterDescriptions = characters.map(c => {
+      const role = c.isMain ? 'main character' : 'side character';
+      const traits = [];
+      if (c.traits?.strengths?.length) traits.push(`strengths: ${c.traits.strengths.join(', ')}`);
+      if (c.traits?.flaws?.length) traits.push(`flaws: ${c.traits.flaws.join(', ')}`);
+      if (c.traits?.challenges?.length) traits.push(`challenges: ${c.traits.challenges.join(', ')}`);
+      if (c.traits?.specialDetails) traits.push(`special: ${c.traits.specialDetails}`);
+      const traitsStr = traits.length ? ` (${traits.join('; ')})` : '';
+      return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
+    }).join('\n');
+
+    // Build relationship descriptions
+    const relationshipDescriptions = relationships.map(r =>
+      `- ${r.character1} and ${r.character2}: ${r.relationship}`
+    ).join('\n');
+
+    // Determine language for response
+    const langInstructions = {
+      'de': 'Antworte auf Deutsch.',
+      'fr': 'Réponds en français.',
+      'en': 'Respond in English.'
+    };
+
+    // Build the prompt
+    const prompt = `You are a creative children's story writer. Generate ONE engaging story idea based on the following:
+
+STORY TYPE: ${storyTypeName}
+
+CHARACTERS:
+${characterDescriptions}
+
+RELATIONSHIPS:
+${relationshipDescriptions || 'No specific relationships defined.'}
+
+READING LEVEL: ${languageLevel === '1st-grade' ? 'Early reader (simple sentences, 6-7 year olds)' : languageLevel === 'advanced' ? 'Advanced (older children 10+)' : 'Standard (7-9 year olds)'}
+
+${langInstructions[language] || langInstructions['en']}
+
+Generate a creative, age-appropriate story idea in 3-5 sentences. Include:
+1. The main conflict or adventure
+2. How the characters work together
+3. A hint at the resolution or lesson
+
+Write ONLY the story idea description, nothing else. Be creative and engaging!`;
+
+    // Call the text model (using the imported function)
+    const { callTextModel } = require('./server/lib/textModels');
+    const result = await callTextModel(prompt, 500);
+
+    res.json({ storyIdea: result.text.trim() });
+
+  } catch (err) {
+    log.error('Generate story ideas error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate story ideas' });
+  }
+});
 
 
 

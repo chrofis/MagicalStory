@@ -462,6 +462,29 @@ export const storyService = {
     return response.content;
   },
 
+  // Generate story ideas using AI
+  async generateStoryIdeas(data: {
+    storyType: string;
+    storyTypeName: string;
+    language: 'en' | 'de' | 'fr';
+    languageLevel: LanguageLevel;
+    characters: Array<{
+      name: string;
+      age: string;
+      gender: string;
+      traits?: { strengths?: string[]; flaws?: string[]; challenges?: string[]; specialDetails?: string };
+      isMain: boolean;
+    }>;
+    relationships: Array<{
+      character1: string;
+      character2: string;
+      relationship: string;
+    }>;
+  }): Promise<{ storyIdea: string }> {
+    const response = await api.post<{ storyIdea: string }>('/api/generate-story-ideas', data);
+    return response;
+  },
+
   // Job-based story generation
   async createStoryJob(data: {
     storyType: string;

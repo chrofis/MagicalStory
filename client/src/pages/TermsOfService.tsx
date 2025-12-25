@@ -31,29 +31,68 @@ const termsContent = {
         content: `By using the Service, you warrant and represent that:
 
 • You are a resident of Switzerland or the European Union (not the United States)
-• You have the legal right to upload and use any photos you submit
-• For photos of minors, you are the parent or legal guardian, or have obtained explicit permission from the parent/guardian
-• You will not upload photos of individuals without their consent
+• You own the copyright to any photos you upload, OR you have obtained explicit permission from the copyright holder (typically the photographer)
+• You have obtained explicit consent from every individual depicted in uploaded photos for the creation of AI-generated avatars and stories
+• For photos of minors, you are the parent or legal guardian with full authority to grant such consent
+• You will NOT upload photos of celebrities, public figures, or any person without their explicit written consent
+• You will NOT create characters that imitate, reference, or infringe upon copyrighted fictional characters (e.g., from movies, books, games)
 • All information you provide is accurate and not misleading
-• You will not use the Service for any unlawful purpose
-• You will not upload content that is defamatory, obscene, or infringes on third-party rights`
+• You will not use the Service for any unlawful purpose`
       },
       {
-        title: '5. Intellectual Property',
+        title: '5. Prohibited Content and Acceptable Use',
+        content: `The following content is strictly prohibited:
+
+• Photos of individuals without their consent
+• Photos of celebrities or public figures without documented permission
+• Character descriptions mimicking copyrighted fictional characters
+• Content that is defamatory, libelous, or harmful to any person's reputation
+• Hate speech, harassment, or discriminatory content
+• Sexually explicit, obscene, or pornographic content
+• Content depicting violence, gore, or illegal activities
+• Content that exploits or harms minors in any way
+• Any content that violates applicable laws
+
+We reserve the right to refuse service, remove content, and terminate accounts that violate this policy without notice or refund.`
+      },
+      {
+        title: '6. Intellectual Property',
         content: `• You retain all rights to the original photos you upload
-• You grant us a limited license to process your photos solely for the purpose of creating your personalized story
+• You grant us a non-exclusive, worldwide, royalty-free license to use, copy, modify, and display uploaded content solely for providing the Service
 • The generated story content and illustrations become your property upon purchase
+• You may use generated stories for personal, non-commercial purposes
+• Commercial use of generated content requires separate licensing
 • Our platform, technology, and branding remain our intellectual property`
       },
       {
-        title: '6. Content and Output Responsibility',
-        content: `• AI-generated content may occasionally produce unexpected results
-• You are responsible for reviewing the generated content before finalizing or sharing
-• You assume full responsibility for any use of the generated stories
-• We do not guarantee that AI-generated content will be free from errors or suitable for all purposes`
+        title: '7. Content Review and Final Responsibility',
+        content: `IMPORTANT: You are the final publisher of your story.
+
+• The Service provides AI-generated draft content that YOU must review before finalizing
+• By saving, downloading, or sharing your story, you confirm that you have reviewed all content
+• You accept sole and full responsibility for the final content and its compliance with all laws
+• You are responsible for ensuring the story does not defame, harm, or infringe upon anyone's rights
+• The platform is a tool; you are the publisher of the final work`
       },
       {
-        title: '7. Limitation of Liability',
+        title: '8. Copyright Claims and Takedowns',
+        content: `We respect intellectual property rights and respond to valid infringement notices.
+
+• If you believe content infringes your copyright, contact us at legal@magicalstory.com with: (1) identification of the copyrighted work, (2) identification of the infringing material, (3) your contact information, (4) a statement of good faith belief, and (5) a statement under penalty of perjury that you are authorized to act
+• We will investigate and may remove content that infringes intellectual property rights
+• Repeat infringers will have their accounts terminated`
+      },
+      {
+        title: '9. Reporting Violations',
+        content: `If you encounter content that violates these Terms or applicable laws:
+
+• Report it immediately to legal@magicalstory.com
+• Include details of the violation and any relevant evidence
+• We will investigate all reports and take appropriate action
+• We may remove content and terminate accounts without prior notice`
+      },
+      {
+        title: '10. Limitation of Liability',
         content: `TO THE MAXIMUM EXTENT PERMITTED BY LAW:
 
 • The Service is provided "as is" without warranties of any kind
@@ -62,7 +101,7 @@ const termsContent = {
 • We are not responsible for any claims arising from your misuse of the Service or violation of these terms`
       },
       {
-        title: '8. Indemnification',
+        title: '11. Indemnification',
         content: `You agree to indemnify, defend, and hold harmless Magical Story, its officers, directors, employees, and agents from any claims, damages, losses, or expenses (including legal fees) arising from:
 
 • Your use of the Service
@@ -71,35 +110,36 @@ const termsContent = {
 • Content you upload or create using the Service`
       },
       {
-        title: '9. Data Processing',
+        title: '12. Data Processing',
         content: `• Photos are processed using AI technology to create avatar illustrations
+• By uploading photos, you consent to the processing of facial features and biometric data for avatar creation
 • Original photos are stored temporarily for processing and are deleted according to our Privacy Policy
 • We do not sell or share your personal photos with third parties for marketing purposes
 • See our Privacy Policy for complete details on data handling`
       },
       {
-        title: '10. Age Requirements',
+        title: '13. Age Requirements',
         content: `• You must be at least 18 years old to create an account
 • Parents/guardians may create stories featuring their minor children
 • By uploading photos of minors, you confirm you have parental authority or explicit consent`
       },
       {
-        title: '11. Modifications to Terms',
+        title: '14. Modifications to Terms',
         content: `We reserve the right to modify these Terms at any time. Continued use of the Service after changes constitutes acceptance of the new terms. We will notify users of significant changes via email or platform notification.`
       },
       {
-        title: '12. Termination',
+        title: '15. Termination',
         content: `We may terminate or suspend your account at any time for violation of these Terms. Upon termination, your right to use the Service ceases immediately.`
       },
       {
-        title: '13. Governing Law and Jurisdiction',
+        title: '16. Governing Law and Jurisdiction',
         content: `• These Terms are governed exclusively by the laws of Switzerland
 • Any disputes arising from these Terms or your use of the Service shall be resolved exclusively in the courts of Zurich, Switzerland
 • You agree to submit to the exclusive jurisdiction of the courts of Zurich, Switzerland
 • The United Nations Convention on Contracts for the International Sale of Goods does not apply`
       },
       {
-        title: '14. Contact',
+        title: '17. Contact',
         content: `For questions about these Terms, please contact us at: legal@magicalstory.com`
       }
     ]
@@ -131,39 +171,78 @@ const termsContent = {
         content: `Durch die Nutzung des Dienstes garantieren und versichern Sie, dass:
 
 • Sie Einwohner der Schweiz oder der Europäischen Union sind (nicht der Vereinigten Staaten)
-• Sie das gesetzliche Recht haben, alle von Ihnen hochgeladenen Fotos zu verwenden
-• Bei Fotos von Minderjährigen Sie der Elternteil oder gesetzliche Vormund sind oder die ausdrückliche Genehmigung des Elternteils/Vormunds eingeholt haben
-• Sie keine Fotos von Personen ohne deren Zustimmung hochladen werden
+• Sie das Urheberrecht an allen hochgeladenen Fotos besitzen ODER die ausdrückliche Genehmigung des Urheberrechtsinhabers (typischerweise des Fotografen) eingeholt haben
+• Sie die ausdrückliche Zustimmung aller auf den Fotos abgebildeten Personen zur Erstellung von KI-generierten Avataren und Geschichten eingeholt haben
+• Bei Fotos von Minderjährigen Sie der Elternteil oder gesetzliche Vormund mit voller Befugnis zur Erteilung dieser Zustimmung sind
+• Sie KEINE Fotos von Prominenten, öffentlichen Personen oder anderen Personen ohne deren ausdrückliche schriftliche Zustimmung hochladen
+• Sie KEINE Charaktere erstellen, die urheberrechtlich geschützte fiktive Figuren nachahmen oder darauf verweisen (z.B. aus Filmen, Büchern, Spielen)
 • Alle von Ihnen bereitgestellten Informationen korrekt und nicht irreführend sind
-• Sie den Dienst nicht für rechtswidrige Zwecke nutzen werden
-• Sie keine Inhalte hochladen, die diffamierend, obszön sind oder Rechte Dritter verletzen`
+• Sie den Dienst nicht für rechtswidrige Zwecke nutzen werden`
       },
       {
-        title: '5. Geistiges Eigentum',
+        title: '5. Verbotene Inhalte und Nutzungsbedingungen',
+        content: `Folgende Inhalte sind streng verboten:
+
+• Fotos von Personen ohne deren Zustimmung
+• Fotos von Prominenten oder öffentlichen Personen ohne dokumentierte Genehmigung
+• Charakterbeschreibungen, die urheberrechtlich geschützte fiktive Figuren nachahmen
+• Inhalte, die diffamierend, verleumderisch oder dem Ruf einer Person schaden
+• Hassrede, Belästigung oder diskriminierende Inhalte
+• Sexuell explizite, obszöne oder pornografische Inhalte
+• Inhalte, die Gewalt, Gore oder illegale Aktivitäten darstellen
+• Inhalte, die Minderjährige in irgendeiner Weise ausbeuten oder schaden
+• Alle Inhalte, die gegen geltendes Recht verstoßen
+
+Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen und Konten ohne Vorankündigung oder Rückerstattung zu kündigen.`
+      },
+      {
+        title: '6. Geistiges Eigentum',
         content: `• Sie behalten alle Rechte an den von Ihnen hochgeladenen Originalfotos
-• Sie gewähren uns eine eingeschränkte Lizenz zur Verarbeitung Ihrer Fotos ausschließlich zum Zweck der Erstellung Ihrer personalisierten Geschichte
+• Sie gewähren uns eine nicht-exklusive, weltweite, gebührenfreie Lizenz zur Nutzung, Kopie, Änderung und Anzeige hochgeladener Inhalte ausschließlich zur Bereitstellung des Dienstes
 • Die generierten Geschichtsinhalte und Illustrationen werden nach dem Kauf Ihr Eigentum
+• Sie dürfen generierte Geschichten für persönliche, nicht-kommerzielle Zwecke verwenden
+• Kommerzielle Nutzung generierter Inhalte erfordert eine separate Lizenzierung
 • Unsere Plattform, Technologie und Marke bleiben unser geistiges Eigentum`
       },
       {
-        title: '6. Inhalts- und Ergebnisverantwortung',
-        content: `• KI-generierte Inhalte können gelegentlich unerwartete Ergebnisse liefern
-• Sie sind dafür verantwortlich, die generierten Inhalte vor der Fertigstellung oder Weitergabe zu überprüfen
-• Sie übernehmen die volle Verantwortung für jede Nutzung der generierten Geschichten
-• Wir garantieren nicht, dass KI-generierte Inhalte fehlerfrei oder für alle Zwecke geeignet sind`
+        title: '7. Inhaltsprüfung und Endverantwortung',
+        content: `WICHTIG: Sie sind der endgültige Herausgeber Ihrer Geschichte.
+
+• Der Dienst stellt KI-generierte Entwurfsinhalte bereit, die SIE vor der Fertigstellung prüfen müssen
+• Durch das Speichern, Herunterladen oder Teilen Ihrer Geschichte bestätigen Sie, dass Sie alle Inhalte geprüft haben
+• Sie übernehmen die alleinige und vollständige Verantwortung für den endgültigen Inhalt und dessen Einhaltung aller Gesetze
+• Sie sind dafür verantwortlich, dass die Geschichte niemanden diffamiert, schädigt oder dessen Rechte verletzt
+• Die Plattform ist ein Werkzeug; Sie sind der Herausgeber des endgültigen Werks`
       },
       {
-        title: '7. Haftungsbeschränkung',
+        title: '8. Urheberrechtsansprüche und Löschung',
+        content: `Wir respektieren geistige Eigentumsrechte und reagieren auf gültige Verletzungsanzeigen.
+
+• Wenn Sie glauben, dass Inhalte Ihr Urheberrecht verletzen, kontaktieren Sie uns unter legal@magicalstory.com mit: (1) Identifizierung des urheberrechtlich geschützten Werks, (2) Identifizierung des verletzenden Materials, (3) Ihre Kontaktdaten, (4) eine Erklärung in gutem Glauben, und (5) eine eidesstattliche Erklärung, dass Sie zur Handlung berechtigt sind
+• Wir werden alle Ansprüche untersuchen und möglicherweise Inhalte entfernen, die geistige Eigentumsrechte verletzen
+• Wiederholte Rechtsverletzer werden ihre Konten gekündigt`
+      },
+      {
+        title: '9. Meldung von Verstößen',
+        content: `Wenn Sie Inhalte finden, die gegen diese Bedingungen oder geltendes Recht verstoßen:
+
+• Melden Sie diese sofort an legal@magicalstory.com
+• Fügen Sie Details des Verstoßes und relevante Beweise bei
+• Wir werden alle Meldungen untersuchen und entsprechende Maßnahmen ergreifen
+• Wir können Inhalte entfernen und Konten ohne Vorankündigung kündigen`
+      },
+      {
+        title: '10. Haftungsbeschränkung',
         content: `IM GESETZLICH ZULÄSSIGEN RAHMEN:
 
-• Der Dienst wird ohne jegliche Garantien bereitgestellt
+• Der Dienst wird "wie besehen" ohne jegliche Garantien bereitgestellt
 • Wir haften nicht für indirekte, zufällige, besondere oder Folgeschäden
-• Unsere Gesamthaftung übersteigt nicht den Betrag, den Sie für den spezifischen Dienst bezahlt haben
+• Unsere Gesamthaftung übersteigt nicht den Betrag, den Sie für den spezifischen Dienst bezahlt haben, der den Anspruch begründet
 • Wir sind nicht verantwortlich für Ansprüche, die aus Ihrem Missbrauch des Dienstes oder Ihrer Verletzung dieser Bedingungen entstehen`
       },
       {
-        title: '8. Freistellung',
-        content: `Sie verpflichten sich, Magical Story, seine leitenden Angestellten, Direktoren, Mitarbeiter und Vertreter von allen Ansprüchen, Schäden, Verlusten oder Kosten (einschließlich Anwaltsgebühren) freizustellen, die entstehen aus:
+        title: '11. Freistellung',
+        content: `Sie verpflichten sich, Magical Story, seine leitenden Angestellten, Direktoren, Mitarbeiter und Vertreter von allen Ansprüchen, Schäden, Verlusten oder Kosten (einschließlich Anwaltsgebühren) freizustellen, zu verteidigen und schadlos zu halten, die entstehen aus:
 
 • Ihrer Nutzung des Dienstes
 • Ihrer Verletzung dieser Bedingungen
@@ -171,35 +250,36 @@ const termsContent = {
 • Inhalten, die Sie hochladen oder mit dem Dienst erstellen`
       },
       {
-        title: '9. Datenverarbeitung',
+        title: '12. Datenverarbeitung',
         content: `• Fotos werden mit KI-Technologie verarbeitet, um Avatar-Illustrationen zu erstellen
+• Durch das Hochladen von Fotos stimmen Sie der Verarbeitung von Gesichtsmerkmalen und biometrischen Daten zur Avatar-Erstellung zu
 • Originalfotos werden vorübergehend zur Verarbeitung gespeichert und gemäß unserer Datenschutzrichtlinie gelöscht
 • Wir verkaufen oder teilen Ihre persönlichen Fotos nicht zu Marketingzwecken mit Dritten
 • Siehe unsere Datenschutzrichtlinie für vollständige Details zur Datenverarbeitung`
       },
       {
-        title: '10. Altersanforderungen',
+        title: '13. Altersanforderungen',
         content: `• Sie müssen mindestens 18 Jahre alt sein, um ein Konto zu erstellen
 • Eltern/Erziehungsberechtigte können Geschichten mit ihren minderjährigen Kindern erstellen
 • Durch das Hochladen von Fotos von Minderjährigen bestätigen Sie, dass Sie elterliche Autorität oder ausdrückliche Zustimmung haben`
       },
       {
-        title: '11. Änderungen der Bedingungen',
+        title: '14. Änderungen der Bedingungen',
         content: `Wir behalten uns das Recht vor, diese Bedingungen jederzeit zu ändern. Die fortgesetzte Nutzung des Dienstes nach Änderungen gilt als Annahme der neuen Bedingungen. Wir werden Benutzer über wesentliche Änderungen per E-Mail oder Plattformbenachrichtigung informieren.`
       },
       {
-        title: '12. Kündigung',
+        title: '15. Kündigung',
         content: `Wir können Ihr Konto jederzeit bei Verstoß gegen diese Bedingungen kündigen oder sperren. Bei Kündigung erlischt Ihr Recht zur Nutzung des Dienstes sofort.`
       },
       {
-        title: '13. Anwendbares Recht und Gerichtsstand',
+        title: '16. Anwendbares Recht und Gerichtsstand',
         content: `• Diese Bedingungen unterliegen ausschließlich dem Recht der Schweiz
 • Alle Streitigkeiten aus diesen Bedingungen oder Ihrer Nutzung des Dienstes werden ausschließlich vor den Gerichten in Zürich, Schweiz, beigelegt
 • Sie stimmen der ausschließlichen Zuständigkeit der Gerichte in Zürich, Schweiz, zu
 • Das Übereinkommen der Vereinten Nationen über Verträge über den internationalen Warenkauf findet keine Anwendung`
       },
       {
-        title: '14. Kontakt',
+        title: '17. Kontakt',
         content: `Bei Fragen zu diesen Bedingungen kontaktieren Sie uns bitte unter: legal@magicalstory.com`
       }
     ]
@@ -231,38 +311,77 @@ const termsContent = {
         content: `En utilisant le Service, vous garantissez et déclarez que :
 
 • Vous êtes résident de la Suisse ou de l'Union Européenne (pas des États-Unis)
-• Vous avez le droit légal de télécharger et d'utiliser toutes les photos que vous soumettez
-• Pour les photos de mineurs, vous êtes le parent ou le tuteur légal, ou avez obtenu l'autorisation explicite du parent/tuteur
-• Vous ne téléchargerez pas de photos de personnes sans leur consentement
+• Vous possédez les droits d'auteur sur toutes les photos que vous téléchargez, OU vous avez obtenu l'autorisation explicite du détenteur des droits d'auteur (généralement le photographe)
+• Vous avez obtenu le consentement explicite de chaque personne représentée sur les photos pour la création d'avatars et d'histoires générés par l'IA
+• Pour les photos de mineurs, vous êtes le parent ou tuteur légal avec pleine autorité pour accorder ce consentement
+• Vous ne téléchargerez PAS de photos de célébrités, personnalités publiques ou toute personne sans leur consentement écrit explicite
+• Vous ne créerez PAS de personnages qui imitent, font référence à ou violent les droits d'auteur de personnages fictifs (ex : films, livres, jeux vidéo)
 • Toutes les informations que vous fournissez sont exactes et non trompeuses
-• Vous n'utiliserez pas le Service à des fins illégales
-• Vous ne téléchargerez pas de contenu diffamatoire, obscène ou portant atteinte aux droits de tiers`
+• Vous n'utiliserez pas le Service à des fins illégales`
       },
       {
-        title: '5. Propriété Intellectuelle',
+        title: '5. Contenu Interdit et Utilisation Acceptable',
+        content: `Les contenus suivants sont strictement interdits :
+
+• Photos de personnes sans leur consentement
+• Photos de célébrités ou personnalités publiques sans autorisation documentée
+• Descriptions de personnages imitant des personnages fictifs protégés par le droit d'auteur
+• Contenu diffamatoire, calomnieux ou nuisible à la réputation de toute personne
+• Discours de haine, harcèlement ou contenu discriminatoire
+• Contenu sexuellement explicite, obscène ou pornographique
+• Contenu représentant la violence, le gore ou des activités illégales
+• Contenu exploitant ou nuisant aux mineurs de quelque manière que ce soit
+• Tout contenu violant les lois applicables
+
+Nous nous réservons le droit de refuser le service, de supprimer le contenu et de résilier les comptes qui violent cette politique sans préavis ni remboursement.`
+      },
+      {
+        title: '6. Propriété Intellectuelle',
         content: `• Vous conservez tous les droits sur les photos originales que vous téléchargez
-• Vous nous accordez une licence limitée pour traiter vos photos uniquement dans le but de créer votre histoire personnalisée
+• Vous nous accordez une licence non exclusive, mondiale et libre de redevances pour utiliser, copier, modifier et afficher le contenu téléchargé uniquement pour fournir le Service
 • Le contenu de l'histoire générée et les illustrations deviennent votre propriété après l'achat
+• Vous pouvez utiliser les histoires générées à des fins personnelles et non commerciales
+• L'utilisation commerciale du contenu généré nécessite une licence séparée
 • Notre plateforme, technologie et marque restent notre propriété intellectuelle`
       },
       {
-        title: '6. Responsabilité du Contenu et des Résultats',
-        content: `• Le contenu généré par l'IA peut occasionnellement produire des résultats inattendus
-• Vous êtes responsable de la révision du contenu généré avant de le finaliser ou de le partager
-• Vous assumez l'entière responsabilité de toute utilisation des histoires générées
-• Nous ne garantissons pas que le contenu généré par l'IA sera exempt d'erreurs ou adapté à tous les usages`
+        title: '7. Révision du Contenu et Responsabilité Finale',
+        content: `IMPORTANT : Vous êtes l'éditeur final de votre histoire.
+
+• Le Service fournit un contenu brouillon généré par l'IA que VOUS devez réviser avant de le finaliser
+• En enregistrant, téléchargeant ou partageant votre histoire, vous confirmez avoir révisé tout le contenu
+• Vous acceptez la responsabilité entière et exclusive du contenu final et de sa conformité à toutes les lois
+• Vous êtes responsable de vous assurer que l'histoire ne diffame, ne nuit ou ne viole les droits de personne
+• La plateforme est un outil ; vous êtes l'éditeur de l'œuvre finale`
       },
       {
-        title: '7. Limitation de Responsabilité',
+        title: '8. Réclamations de Droits d\'Auteur et Suppression',
+        content: `Nous respectons les droits de propriété intellectuelle et répondons aux avis de violation valides.
+
+• Si vous pensez qu'un contenu viole vos droits d'auteur, contactez-nous à legal@magicalstory.com avec : (1) l'identification de l'œuvre protégée, (2) l'identification du matériel contrefaisant, (3) vos coordonnées, (4) une déclaration de bonne foi, et (5) une déclaration sous serment attestant que vous êtes autorisé à agir
+• Nous examinerons et pourrons supprimer le contenu qui viole les droits de propriété intellectuelle
+• Les contrevenants récidivistes verront leurs comptes résiliés`
+      },
+      {
+        title: '9. Signalement des Violations',
+        content: `Si vous rencontrez un contenu qui viole ces Conditions ou les lois applicables :
+
+• Signalez-le immédiatement à legal@magicalstory.com
+• Incluez les détails de la violation et toute preuve pertinente
+• Nous examinerons tous les signalements et prendrons les mesures appropriées
+• Nous pouvons supprimer le contenu et résilier les comptes sans préavis`
+      },
+      {
+        title: '10. Limitation de Responsabilité',
         content: `DANS LA MESURE MAXIMALE PERMISE PAR LA LOI :
 
 • Le Service est fourni "tel quel" sans garantie d'aucune sorte
 • Nous ne sommes pas responsables des dommages indirects, accessoires, spéciaux ou consécutifs
-• Notre responsabilité totale ne dépassera pas le montant que vous avez payé pour le service spécifique
+• Notre responsabilité totale ne dépassera pas le montant que vous avez payé pour le service spécifique donnant lieu à la réclamation
 • Nous ne sommes pas responsables des réclamations découlant de votre mauvaise utilisation du Service ou de la violation de ces conditions`
       },
       {
-        title: '8. Indemnisation',
+        title: '11. Indemnisation',
         content: `Vous acceptez d'indemniser, de défendre et de dégager de toute responsabilité Magical Story, ses dirigeants, directeurs, employés et agents contre toute réclamation, dommage, perte ou dépense (y compris les frais juridiques) découlant de :
 
 • Votre utilisation du Service
@@ -271,35 +390,36 @@ const termsContent = {
 • Le contenu que vous téléchargez ou créez en utilisant le Service`
       },
       {
-        title: '9. Traitement des Données',
+        title: '12. Traitement des Données',
         content: `• Les photos sont traitées à l'aide de la technologie IA pour créer des illustrations d'avatar
+• En téléchargeant des photos, vous consentez au traitement des caractéristiques faciales et des données biométriques pour la création d'avatars
 • Les photos originales sont stockées temporairement pour le traitement et sont supprimées conformément à notre Politique de Confidentialité
 • Nous ne vendons ni ne partageons vos photos personnelles avec des tiers à des fins marketing
 • Consultez notre Politique de Confidentialité pour les détails complets sur le traitement des données`
       },
       {
-        title: '10. Conditions d\'Âge',
+        title: '13. Conditions d\'Âge',
         content: `• Vous devez avoir au moins 18 ans pour créer un compte
 • Les parents/tuteurs peuvent créer des histoires mettant en scène leurs enfants mineurs
 • En téléchargeant des photos de mineurs, vous confirmez avoir l'autorité parentale ou le consentement explicite`
       },
       {
-        title: '11. Modifications des Conditions',
+        title: '14. Modifications des Conditions',
         content: `Nous nous réservons le droit de modifier ces Conditions à tout moment. L'utilisation continue du Service après les modifications constitue l'acceptation des nouvelles conditions. Nous informerons les utilisateurs des changements importants par e-mail ou notification sur la plateforme.`
       },
       {
-        title: '12. Résiliation',
+        title: '15. Résiliation',
         content: `Nous pouvons résilier ou suspendre votre compte à tout moment en cas de violation de ces Conditions. À la résiliation, votre droit d'utiliser le Service cesse immédiatement.`
       },
       {
-        title: '13. Droit Applicable et Juridiction',
+        title: '16. Droit Applicable et Juridiction',
         content: `• Ces Conditions sont régies exclusivement par les lois de la Suisse
 • Tout litige découlant de ces Conditions ou de votre utilisation du Service sera résolu exclusivement devant les tribunaux de Zurich, Suisse
 • Vous acceptez de vous soumettre à la compétence exclusive des tribunaux de Zurich, Suisse
 • La Convention des Nations Unies sur les contrats de vente internationale de marchandises ne s'applique pas`
       },
       {
-        title: '14. Contact',
+        title: '17. Contact',
         content: `Pour toute question concernant ces Conditions, veuillez nous contacter à : legal@magicalstory.com`
       }
     ]

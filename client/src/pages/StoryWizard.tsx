@@ -123,6 +123,7 @@ export default function StoryWizard() {
   const [storyDetails, setStoryDetails] = useState(() => {
     return localStorage.getItem('story_details') || '';
   });
+  const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
 
   // Step 5: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
@@ -919,10 +920,10 @@ export default function StoryWizard() {
     if (step === 1) return storyType !== '';
     if (step === 2) return characters.length > 0;
     if (step === 3) return areAllRelationshipsDefined();
-    // Step 4: At least one character must be in the story (not excluded) and at least one main character
+    // Step 4: At least one character, at least one main character, and story details required
     if (step === 4) {
       const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
-      return charactersInStory.length > 0 && mainCharacters.length > 0;
+      return charactersInStory.length > 0 && mainCharacters.length > 0 && storyDetails.trim().length > 0;
     }
     return false;
   };
@@ -963,7 +964,54 @@ export default function StoryWizard() {
     }
   };
 
-  // Generate story
+  // Generate story ideas using AI
+  const generateIdeas = async () => {
+    setIsGeneratingIdeas(true);
+    try {
+      // Get characters in story (not excluded)
+      const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
+
+      const result = await storyService.generateStoryIdeas({
+        storyType,
+        storyTypeName: getStoryTypeName(),
+        language: language as 'en' | 'de' | 'fr',
+        languageLevel,
+        characters: charactersInStory.map(c => ({
+          name: c.name,
+          age: c.age,
+          gender: c.gender,
+          traits: c.traits,
+          isMain: mainCharacters.includes(c.id),
+        })),
+        relationships: Object.entries(relationships).map(([key, rel]) => {
+          const [id1, id2] = key.split('-').map(Number);
+          const char1 = characters.find(c => c.id === id1);
+          const char2 = characters.find(c => c.id === id2);
+          return {
+            character1: char1?.name || '',
+            character2: char2?.name || '',
+            relationship: rel,
+          };
+        }).filter(r => r.character1 && r.character2),
+      });
+
+      if (result.storyIdea) {
+        setStoryDetails(result.storyIdea);
+        // Save to localStorage
+        localStorage.setItem('story_details', result.storyIdea);
+      }
+    } catch (error) {
+      log.error('Failed to generate story ideas:', error);
+      alert(language === 'de'
+        ? 'Fehler beim Generieren von Ideen. Bitte versuchen Sie es erneut.'
+        : language === 'fr'
+        ? 'Erreur lors de la génération d\'idées. Veuillez réessayer.'
+        : 'Failed to generate ideas. Please try again.');
+    } finally {
+      setIsGeneratingIdeas(false);
+    }
+  };
+
   // Get story type name for display
   const getStoryTypeName = () => {
     // Check custom types first
@@ -1384,6 +1432,8 @@ export default function StoryWizard() {
             developerMode={developerMode}
             imageGenMode={imageGenMode}
             onImageGenModeChange={setImageGenMode}
+            onGenerateIdeas={generateIdeas}
+            isGeneratingIdeas={isGeneratingIdeas}
           />
         );
 

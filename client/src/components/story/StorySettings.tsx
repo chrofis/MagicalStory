@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Wand2, Star } from 'lucide-react';
+import { Wand2, Star, Sparkles, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
 import type { LanguageLevel } from '@/types/story';
@@ -23,6 +23,9 @@ interface StorySettingsProps {
   developerMode?: boolean;
   imageGenMode?: 'parallel' | 'sequential' | null;
   onImageGenModeChange?: (mode: 'parallel' | 'sequential' | null) => void;
+  // Generate Ideas
+  onGenerateIdeas?: () => Promise<void>;
+  isGeneratingIdeas?: boolean;
 }
 
 export function StorySettings({
@@ -41,6 +44,8 @@ export function StorySettings({
   developerMode = false,
   imageGenMode,
   onImageGenModeChange,
+  onGenerateIdeas,
+  isGeneratingIdeas = false,
 }: StorySettingsProps) {
   const { t, language } = useLanguage();
 
@@ -265,18 +270,49 @@ export function StorySettings({
           </div>
         )}
 
-        {/* Story Plot / Story Details */}
+        {/* Story Plot / Story Details - Required */}
         <div>
           <label className="block text-xl font-semibold mb-3">
-            {t.storyDetails} <span className="text-sm font-normal text-gray-500">{t.storyDetailsOptional}</span>
+            {t.storyDetails} <span className="text-red-500">*</span>
           </label>
           <textarea
             value={storyDetails}
             onChange={(e) => onStoryDetailsChange(e.target.value)}
             placeholder={t.storyDetailsPlaceholder}
-            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-base"
+            className={`w-full px-3 py-2 border-2 rounded-lg focus:border-indigo-600 focus:outline-none text-base ${
+              storyDetails.trim() ? 'border-gray-300' : 'border-orange-300 bg-orange-50'
+            }`}
             rows={6}
+            disabled={isGeneratingIdeas}
           />
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-sm text-gray-500">
+              {language === 'de'
+                ? 'Beschreiben Sie die Handlung oder klicken Sie auf "Ideen generieren"'
+                : language === 'fr'
+                ? 'Décrivez l\'intrigue ou cliquez sur "Générer des idées"'
+                : 'Describe the plot or click "Generate Ideas"'}
+            </p>
+            {onGenerateIdeas && (
+              <button
+                onClick={onGenerateIdeas}
+                disabled={isGeneratingIdeas}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg font-semibold hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {isGeneratingIdeas ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Generating...'}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={18} />
+                    {language === 'de' ? 'Ideen generieren' : language === 'fr' ? 'Générer des idées' : 'Generate Ideas'}
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Dedication (Widmung) - Optional */}
