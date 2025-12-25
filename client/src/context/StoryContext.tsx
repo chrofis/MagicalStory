@@ -112,12 +112,31 @@ function storyReducer(state: StoryState, action: StoryAction): StoryState {
           c.id === action.payload.id ? action.payload : c
         ),
       };
-    case 'DELETE_CHARACTER':
+    case 'DELETE_CHARACTER': {
+      const deletedId = action.payload;
+      // Filter out relationships involving the deleted character
+      const cleanedRelationships: RelationshipMap = {};
+      const cleanedRelationshipTexts: RelationshipTextMap = {};
+      Object.entries(state.relationships).forEach(([key, value]) => {
+        const [id1, id2] = key.split('-').map(Number);
+        if (id1 !== deletedId && id2 !== deletedId) {
+          cleanedRelationships[key] = value;
+        }
+      });
+      Object.entries(state.relationshipTexts).forEach(([key, value]) => {
+        const [id1, id2] = key.split('-').map(Number);
+        if (id1 !== deletedId && id2 !== deletedId) {
+          cleanedRelationshipTexts[key] = value;
+        }
+      });
       return {
         ...state,
-        characters: state.characters.filter(c => c.id !== action.payload),
-        mainCharacters: state.mainCharacters.filter(id => id !== action.payload),
+        characters: state.characters.filter(c => c.id !== deletedId),
+        mainCharacters: state.mainCharacters.filter(id => id !== deletedId),
+        relationships: cleanedRelationships,
+        relationshipTexts: cleanedRelationshipTexts,
       };
+    }
     case 'SET_CURRENT_CHARACTER':
       return { ...state, currentCharacterId: action.payload };
     case 'SET_CHARACTERS':
