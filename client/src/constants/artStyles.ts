@@ -5,7 +5,7 @@ export const artStyles: ArtStyle[] = [
     id: 'pixar',
     name: { en: 'Pixar 3D', de: 'Pixar 3D', fr: 'Pixar 3D' },
     emoji: '🎬',
-    image: '/images/Pixar style.jpg',
+    image: '/images/pixar art style 2.jpg',
     description: {
       en: 'Vibrant, warm Disney/Pixar style 3D animation',
       de: 'Lebendige, warme Disney/Pixar 3D-Animation',
