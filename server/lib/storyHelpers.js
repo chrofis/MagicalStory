@@ -990,7 +990,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   if (previousScenes && previousScenes.length > 0) {
     previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
     for (const prev of previousScenes) {
-      previousScenesText += `Page ${prev.pageNumber}: ${prev.text.substring(0, 200)}${prev.text.length > 200 ? '...' : ''}\n`;
+      // Include full text - context is valuable and tokens are cheap
+      previousScenesText += `Page ${prev.pageNumber}: ${prev.text}\n`;
       if (prev.sceneHint) {
         previousScenesText += `  Scene: ${prev.sceneHint}\n`;
       }
