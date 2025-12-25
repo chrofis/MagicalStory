@@ -333,7 +333,7 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA Section */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600">
+      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600 snap-start flex flex-col justify-center">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl lg:text-5xl font-title text-white mb-6">
             Ready to Create Magic?
@@ -353,7 +353,9 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <Footer />
+      <div className="snap-start">
+        <Footer />
+      </div>
 
       {/* Auth Modal */}
       <AuthModal
