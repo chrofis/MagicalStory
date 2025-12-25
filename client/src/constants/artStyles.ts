@@ -101,7 +101,7 @@ export const artStyles: ArtStyle[] = [
     id: 'oil',
     name: { en: 'Oil Painting', de: 'Ölgemälde', fr: 'Peinture à l\'huile' },
     emoji: '🖼️',
-    image: '/images/oil style.svg',
+    image: '/images/oil painting style.jpeg',
     description: {
       en: 'Classic oil painting with rich textures',
       de: 'Klassisches Ölgemälde mit reichen Texturen',
@@ -113,7 +113,7 @@ export const artStyles: ArtStyle[] = [
     id: 'lowpoly',
     name: { en: 'Low Poly', de: 'Low Poly', fr: 'Low Poly' },
     emoji: '🔷',
-    image: '/images/lowpoly style.svg',
+    image: '/images/low poly 3-D style.jpeg',
     description: {
       en: 'Minimalist geometric 3D style',
       de: 'Minimalistischer geometrischer 3D-Stil',
@@ -125,7 +125,7 @@ export const artStyles: ArtStyle[] = [
     id: 'concept',
     name: { en: 'Concept Art', de: 'Konzeptkunst', fr: 'Art conceptuel' },
     emoji: '✨',
-    image: '/images/concept style.svg',
+    image: '/images/concept art style.jpeg',
     description: {
       en: 'Professional digital concept art',
       de: 'Professionelle digitale Konzeptkunst',
@@ -137,7 +137,7 @@ export const artStyles: ArtStyle[] = [
     id: 'pixel',
     name: { en: 'Pixel Art', de: 'Pixelkunst', fr: 'Pixel art' },
     emoji: '👾',
-    image: '/images/pixel style.svg',
+    image: '/images/pixel style.jpeg',
     description: {
       en: 'Retro 16-bit pixel art style',
       de: 'Retro 16-Bit Pixelkunst-Stil',
@@ -149,7 +149,7 @@ export const artStyles: ArtStyle[] = [
     id: 'cyber',
     name: { en: 'Cyberpunk', de: 'Cyberpunk', fr: 'Cyberpunk' },
     emoji: '🌃',
-    image: '/images/cyber style.svg',
+    image: '/images/cyber punk style.jpeg',
     description: {
       en: 'Dark futuristic cyberpunk aesthetic',
       de: 'Dunkle futuristische Cyberpunk-Ästhetik',
