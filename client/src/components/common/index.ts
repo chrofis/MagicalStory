@@ -10,3 +10,4 @@ export { Card, CardHeader, CardTitle, CardContent } from './Card';
 export { Badge } from './Badge';
 export { Alert } from './Alert';
 export { ProgressBar } from './ProgressBar';
+export { Footer } from './Footer';

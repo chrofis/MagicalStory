@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
-import { Navigation } from '@/components/common';
+import { Navigation, Footer } from '@/components/common';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -140,6 +140,9 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <Footer />
 
       {/* Auth Modal */}
       <AuthModal

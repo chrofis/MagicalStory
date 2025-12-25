@@ -13,6 +13,8 @@ const Pricing = lazy(() => import('./pages/Pricing'));
 const BookBuilder = lazy(() => import('./pages/BookBuilder'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const EmailVerified = lazy(() => import('./pages/EmailVerified'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 
 function App() {
   return (
@@ -29,6 +31,8 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/email-verified" element={<EmailVerified />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
         </Routes>
       </Suspense>
     </>

@@ -1,18 +1,54 @@
-import { Upload } from 'lucide-react';
+import { useState, ChangeEvent } from 'react';
+import { Upload, CheckSquare, Square } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
-import { ChangeEvent } from 'react';
 
 interface PhotoUploadProps {
   onPhotoSelect: (file: File) => void;
   showExamples?: boolean;
 }
 
+const consentTexts = {
+  en: {
+    consent1: 'I confirm I have the right to use this photo and, for photos of minors, I am the parent/guardian or have obtained their consent.',
+    consent2: 'I agree to the',
+    termsLink: 'Terms of Service',
+    and: 'and',
+    privacyLink: 'Privacy Policy',
+    period: ', including the processing of this photo by AI to create an illustrated avatar.',
+    pleaseAccept: 'Please accept the terms above to upload a photo',
+  },
+  de: {
+    consent1: 'Ich bestätige, dass ich das Recht habe, dieses Foto zu verwenden, und bei Fotos von Minderjährigen bin ich der Elternteil/Vormund oder habe deren Zustimmung eingeholt.',
+    consent2: 'Ich stimme den',
+    termsLink: 'Nutzungsbedingungen',
+    and: 'und der',
+    privacyLink: 'Datenschutzrichtlinie',
+    period: ' zu, einschließlich der Verarbeitung dieses Fotos durch KI zur Erstellung eines illustrierten Avatars.',
+    pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
+  },
+  fr: {
+    consent1: 'Je confirme que j\'ai le droit d\'utiliser cette photo et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
+    consent2: 'J\'accepte les',
+    termsLink: 'Conditions d\'Utilisation',
+    and: 'et la',
+    privacyLink: 'Politique de Confidentialité',
+    period: ', y compris le traitement de cette photo par l\'IA pour créer un avatar illustré.',
+    pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour télécharger une photo',
+  },
+};
+
 export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadProps) {
   const { t, language } = useLanguage();
+  const [consent1Checked, setConsent1Checked] = useState(false);
+  const [consent2Checked, setConsent2Checked] = useState(false);
+  const texts = consentTexts[language] || consentTexts.en;
+
+  const canUpload = consent1Checked && consent2Checked;
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && canUpload) {
       onPhotoSelect(file);
     }
   };
@@ -31,17 +67,64 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
         {descriptionText}
       </p>
 
+      {/* Consent checkboxes */}
+      <div className="bg-white rounded-lg p-4 mb-4 space-y-3">
+        {/* Consent 1: Rights to use photo */}
+        <label className="flex items-start gap-3 cursor-pointer group">
+          <button
+            type="button"
+            onClick={() => setConsent1Checked(!consent1Checked)}
+            className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800"
+          >
+            {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
+          </button>
+          <span className="text-sm text-gray-700 group-hover:text-gray-900">
+            {texts.consent1}
+          </span>
+        </label>
+
+        {/* Consent 2: Terms and Privacy */}
+        <label className="flex items-start gap-3 cursor-pointer group">
+          <button
+            type="button"
+            onClick={() => setConsent2Checked(!consent2Checked)}
+            className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800"
+          >
+            {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
+          </button>
+          <span className="text-sm text-gray-700 group-hover:text-gray-900">
+            {texts.consent2}{' '}
+            <Link to="/terms" className="text-indigo-600 hover:underline" target="_blank">
+              {texts.termsLink}
+            </Link>{' '}
+            {texts.and}{' '}
+            <Link to="/privacy" className="text-indigo-600 hover:underline" target="_blank">
+              {texts.privacyLink}
+            </Link>
+            {texts.period}
+          </span>
+        </label>
+      </div>
+
       {/* Upload button - prominent */}
       <div className="text-center mb-5">
-        <label className="cursor-pointer inline-flex items-center justify-center gap-3 bg-indigo-600 text-white px-10 py-4 rounded-xl text-xl hover:bg-indigo-700 font-bold shadow-lg transition-colors">
+        <label className={`inline-flex items-center justify-center gap-3 px-10 py-4 rounded-xl text-xl font-bold shadow-lg transition-colors ${
+          canUpload
+            ? 'cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700'
+            : 'cursor-not-allowed bg-gray-300 text-gray-500'
+        }`}>
           <Upload size={28} /> {t.uploadPhoto}
           <input
             type="file"
             accept="image/*"
             onChange={handleFileChange}
             className="hidden"
+            disabled={!canUpload}
           />
         </label>
+        {!canUpload && (
+          <p className="text-sm text-amber-600 mt-2">{texts.pleaseAccept}</p>
+        )}
       </div>
 
       {/* Photo examples - smaller on desktop */}
