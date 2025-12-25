@@ -120,6 +120,21 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
      - POSITION: Peeking partially out of the open side pocket of Sophie's backpack, one ear and head visible
 ```
 
+**ANATOMICAL CONSISTENCY:**
+- Humans have exactly 2 arms. If you describe a character's pose and include an arm, account for BOTH arms explicitly and ensure no arm is mentioned twice.
+- WRONG: "both arms gesticulating wildly, left arm holds X, right arm points up"
+- RIGHT: "left arm holds X tucked under armpit, right arm points upward"
+
+**VISUAL HIERARCHY - FOCUS ON MAIN CHARACTERS:**
+- The characters listed as "Key focus" in the Image Summary should have the most prominent, active roles
+- Background characters should have SUBDUED, STATIC poses - NOT dramatic actions that steal attention
+- WRONG: Background character "jumping wildly, arms waving excitedly, shouting" (steals visual focus)
+- RIGHT: Background character "visible in doorway, watching quietly" or "seated at table in background"
+- Background characters should be:
+  - Physically smaller in the composition (further away)
+  - Doing calm, passive actions (standing, sitting, watching)
+  - NOT the ones with the most dynamic/exciting pose in the scene
+
 **CONSTRAINTS:**
 - Include COMPLETE physical descriptions for every character - this ensures visual consistency
 - Do not include dialogue, speech bubbles, or any text/words in the scene
