@@ -248,7 +248,8 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     usage: {
       input_tokens: inputTokens,
       output_tokens: outputTokens
-    }
+    },
+    modelId
   };
 }
 
@@ -328,14 +329,18 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null) {
 
   log.verbose(`🤖 [TEXT] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
+  let result;
   switch (model.provider) {
     case 'anthropic':
-      return await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId);
+      result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId);
+      break;
     case 'google':
-      return await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
+      result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
+      break;
     default:
       throw new Error(`Unknown provider: ${model.provider}`);
   }
+  return { ...result, modelId: model.modelId };
 }
 
 /**
@@ -363,7 +368,8 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
 
   // Only Anthropic supports streaming currently
   if (model.provider === 'anthropic') {
-    return await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
+    const result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
+    return { ...result, modelId: model.modelId };
   } else {
     // Fall back to non-streaming for other providers
     log.debug(`🌊 [TEXT STREAM] Provider ${model.provider} doesn't support streaming, falling back to regular call`);
@@ -371,7 +377,7 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
     if (onChunk) {
       onChunk(result.text, result.text);
     }
-    return result;
+    return { ...result, modelId: model.modelId };
   }
 }
 

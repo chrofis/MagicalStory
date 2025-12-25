@@ -23,6 +23,7 @@ export interface SceneDescription {
   description: string;
   outlineExtract?: string;  // Short scene description from outline
   scenePrompt?: string;     // Art Director prompt used to generate description
+  textModelId?: string;     // Text model used to generate the scene description
 }
 
 export interface RetryAttempt {

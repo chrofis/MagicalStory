@@ -192,8 +192,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
     storage.removeItem(STORAGE_KEYS.IMPERSONATION_STATE);
 
-    // Set UI language based on user's preferred language
-    if (user.preferredLanguage) {
+    // Set UI language based on user's preferred language, but only if no language is already set
+    // This preserves the language the user selected on the landing page before logging in
+    const existingLanguage = storage.getItem(STORAGE_KEYS.LANGUAGE);
+    if (!existingLanguage && user.preferredLanguage) {
       const langMap: Record<string, string> = { 'English': 'en', 'German': 'de', 'French': 'fr' };
       const langCode = langMap[user.preferredLanguage] || 'en';
       storage.setItem(STORAGE_KEYS.LANGUAGE, langCode);

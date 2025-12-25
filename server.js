@@ -6781,7 +6781,8 @@ Output Format:
               pageNumber: pageNum,
               description: sceneDescription,
               outlineExtract: shortSceneDesc,
-              scenePrompt: scenePrompt
+              scenePrompt: scenePrompt,
+              textModelId: sceneDescResult.modelId
             });
 
             // Detect which characters appear in this scene
@@ -7026,7 +7027,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       sceneDescriptions: allSceneDescriptions.map(sd => ({
         pageNumber: sd.pageNumber,
         description: sd.description || '',
-        outlineExtract: shortSceneDescriptions[sd.pageNumber] || ''
+        outlineExtract: shortSceneDescriptions[sd.pageNumber] || '',
+        scenePrompt: sd.scenePrompt || '',
+        textModelId: sd.textModelId || ''
       })),
       totalPages: sceneCount
     });
@@ -7140,7 +7143,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               pageNumber: pageNum,
               description: sceneDescription,
               outlineExtract: shortSceneDesc,  // Store the outline extract for debugging
-              scenePrompt: scenePrompt         // Store the Art Director prompt for debugging
+              scenePrompt: scenePrompt,        // Store the Art Director prompt for debugging
+              textModelId: sceneDescResult.modelId
             });
 
             // Detect which characters appear in this scene

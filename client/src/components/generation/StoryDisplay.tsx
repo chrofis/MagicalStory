@@ -412,6 +412,11 @@ export function StoryDisplay({
     return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.scenePrompt;
   };
 
+  // Helper to get text model ID used for scene description
+  const getSceneTextModelId = (pageNumber: number): string | undefined => {
+    return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.textModelId;
+  };
+
   return (
     <div className="space-y-6">
       {/* Story Title */}
@@ -973,6 +978,7 @@ export function StoryDisplay({
                       {/* Scene Description */}
                       <div className="bg-green-50 p-2 rounded text-xs">
                         <span className="font-semibold text-green-700">Scene Description:</span>
+                        {scene.textModelId && <span className="ml-2 text-green-600">({scene.textModelId})</span>}
                         <p className="text-gray-700 mt-1 whitespace-pre-wrap">{scene.description}</p>
                       </div>
                     </div>
@@ -1333,6 +1339,7 @@ export function StoryDisplay({
                               <details className="bg-green-50 border border-green-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
                                   {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                                  {getSceneTextModelId(pageNumber) && <span className="ml-2 text-xs font-normal text-green-600">({getSceneTextModelId(pageNumber)})</span>}
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                                   {getSceneDescription(pageNumber)}
@@ -1515,6 +1522,7 @@ export function StoryDisplay({
                               <details className="bg-green-50 border border-green-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-green-800 hover:text-green-900">
                                   {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
+                                  {getSceneTextModelId(pageNumber) && <span className="ml-2 text-xs font-normal text-green-600">({getSceneTextModelId(pageNumber)})</span>}
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                                   {getSceneDescription(pageNumber)}
