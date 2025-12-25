@@ -44,7 +44,7 @@ export const artStyles: ArtStyle[] = [
     image: '/images/chibi style.jpg',
     description: {
       en: 'Cute chibi style with big heads and small bodies',
-      de: 'Niedlicher Chibi-Stil mit großen Köpfen und kleinen Körpern',
+      de: 'Niedlicher Chibi-Stil mit grossen Köpfen und kleinen Körpern',
       fr: 'Style chibi mignon avec grandes têtes et petits corps',
     },
     prompt: 'chibi style, super deformed, cute, big head, small body, kawaii, adorable',
@@ -80,7 +80,7 @@ export const artStyles: ArtStyle[] = [
     image: '/images/manga style.jpg',
     description: {
       en: 'Japanese manga style, black and white with screentones',
-      de: 'Japanischer Manga-Stil, schwarz-weiß mit Rastern',
+      de: 'Japanischer Manga-Stil, schwarz-weiss mit Rastern',
       fr: 'Style manga japonais, noir et blanc avec trames',
     },
     prompt: 'manga style, Japanese comic art, detailed linework, screentones, dramatic shading, expressive characters',
@@ -92,7 +92,7 @@ export const artStyles: ArtStyle[] = [
     image: '/images/water color style.jpg',
     description: {
       en: 'Soft watercolor painting with flowing colors',
-      de: 'Sanfte Aquarellmalerei mit fließenden Farben',
+      de: 'Sanfte Aquarellmalerei mit fliessenden Farben',
       fr: 'Peinture aquarelle douce aux couleurs fluides',
     },
     prompt: 'watercolor painting style, soft edges, flowing colors, delicate washes, artistic brushstrokes, dreamy atmosphere, traditional watercolor illustration',

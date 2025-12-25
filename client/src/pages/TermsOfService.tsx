@@ -154,7 +154,7 @@ We reserve the right to refuse service, remove content, and terminate accounts t
       },
       {
         title: '2. Dienstverfügbarkeit und Berechtigung',
-        content: `WICHTIG: Dieser Dienst ist ausschließlich für Einwohner der Schweiz und der Europäischen Union bestimmt.
+        content: `WICHTIG: Dieser Dienst ist ausschliesslich für Einwohner der Schweiz und der Europäischen Union bestimmt.
 
 • Dieser Dienst ist NICHT für Einwohner oder Staatsbürger der Vereinigten Staaten von Amerika verfügbar
 • Durch die Nutzung dieses Dienstes garantieren und versichern Sie, dass Sie Einwohner der Schweiz oder eines Mitgliedstaates der Europäischen Union sind
@@ -191,14 +191,14 @@ We reserve the right to refuse service, remove content, and terminate accounts t
 • Sexuell explizite, obszöne oder pornografische Inhalte
 • Inhalte, die Gewalt, Gore oder illegale Aktivitäten darstellen
 • Inhalte, die Minderjährige in irgendeiner Weise ausbeuten oder schaden
-• Alle Inhalte, die gegen geltendes Recht verstoßen
+• Alle Inhalte, die gegen geltendes Recht verstossen
 
 Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen und Konten ohne Vorankündigung oder Rückerstattung zu kündigen.`
       },
       {
         title: '6. Geistiges Eigentum',
         content: `• Sie behalten alle Rechte an den von Ihnen hochgeladenen Originalfotos
-• Sie gewähren uns eine nicht-exklusive, weltweite, gebührenfreie Lizenz zur Nutzung, Kopie, Änderung und Anzeige hochgeladener Inhalte ausschließlich zur Bereitstellung des Dienstes
+• Sie gewähren uns eine nicht-exklusive, weltweite, gebührenfreie Lizenz zur Nutzung, Kopie, Änderung und Anzeige hochgeladener Inhalte ausschliesslich zur Bereitstellung des Dienstes
 • Die generierten Geschichtsinhalte und Illustrationen werden nach dem Kauf Ihr Eigentum
 • Sie dürfen generierte Geschichten für persönliche, nicht-kommerzielle Zwecke verwenden
 • Kommerzielle Nutzung generierter Inhalte erfordert eine separate Lizenzierung
@@ -223,12 +223,12 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
 • Wiederholte Rechtsverletzer werden ihre Konten gekündigt`
       },
       {
-        title: '9. Meldung von Verstößen',
-        content: `Wenn Sie Inhalte finden, die gegen diese Bedingungen oder geltendes Recht verstoßen:
+        title: '9. Meldung von Verstössen',
+        content: `Wenn Sie Inhalte finden, die gegen diese Bedingungen oder geltendes Recht verstossen:
 
 • Melden Sie diese sofort an legal@magicalstory.com
-• Fügen Sie Details des Verstoßes und relevante Beweise bei
-• Wir werden alle Meldungen untersuchen und entsprechende Maßnahmen ergreifen
+• Fügen Sie Details des Verstosses und relevante Beweise bei
+• Wir werden alle Meldungen untersuchen und entsprechende Massnahmen ergreifen
 • Wir können Inhalte entfernen und Konten ohne Vorankündigung kündigen`
       },
       {
@@ -242,7 +242,7 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
       },
       {
         title: '11. Freistellung',
-        content: `Sie verpflichten sich, Magical Story, seine leitenden Angestellten, Direktoren, Mitarbeiter und Vertreter von allen Ansprüchen, Schäden, Verlusten oder Kosten (einschließlich Anwaltsgebühren) freizustellen, zu verteidigen und schadlos zu halten, die entstehen aus:
+        content: `Sie verpflichten sich, Magical Story, seine leitenden Angestellten, Direktoren, Mitarbeiter und Vertreter von allen Ansprüchen, Schäden, Verlusten oder Kosten (einschliesslich Anwaltsgebühren) freizustellen, zu verteidigen und schadlos zu halten, die entstehen aus:
 
 • Ihrer Nutzung des Dienstes
 • Ihrer Verletzung dieser Bedingungen
@@ -253,7 +253,7 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
         title: '12. Datenverarbeitung',
         content: `• Fotos werden mit KI-Technologie verarbeitet, um Avatar-Illustrationen zu erstellen
 • Durch das Hochladen von Fotos stimmen Sie der Verarbeitung von Gesichtsmerkmalen und biometrischen Daten zur Avatar-Erstellung zu
-• Originalfotos werden vorübergehend zur Verarbeitung gespeichert und gemäß unserer Datenschutzrichtlinie gelöscht
+• Originalfotos werden vorübergehend zur Verarbeitung gespeichert und gemäss unserer Datenschutzrichtlinie gelöscht
 • Wir verkaufen oder teilen Ihre persönlichen Fotos nicht zu Marketingzwecken mit Dritten
 • Siehe unsere Datenschutzrichtlinie für vollständige Details zur Datenverarbeitung`
       },
@@ -269,13 +269,13 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
       },
       {
         title: '15. Kündigung',
-        content: `Wir können Ihr Konto jederzeit bei Verstoß gegen diese Bedingungen kündigen oder sperren. Bei Kündigung erlischt Ihr Recht zur Nutzung des Dienstes sofort.`
+        content: `Wir können Ihr Konto jederzeit bei Verstoss gegen diese Bedingungen kündigen oder sperren. Bei Kündigung erlischt Ihr Recht zur Nutzung des Dienstes sofort.`
       },
       {
         title: '16. Anwendbares Recht und Gerichtsstand',
-        content: `• Diese Bedingungen unterliegen ausschließlich dem Recht der Schweiz
-• Alle Streitigkeiten aus diesen Bedingungen oder Ihrer Nutzung des Dienstes werden ausschließlich vor den Gerichten in Zürich, Schweiz, beigelegt
-• Sie stimmen der ausschließlichen Zuständigkeit der Gerichte in Zürich, Schweiz, zu
+        content: `• Diese Bedingungen unterliegen ausschliesslich dem Recht der Schweiz
+• Alle Streitigkeiten aus diesen Bedingungen oder Ihrer Nutzung des Dienstes werden ausschliesslich vor den Gerichten in Zürich, Schweiz, beigelegt
+• Sie stimmen der ausschliesslichen Zuständigkeit der Gerichte in Zürich, Schweiz, zu
 • Das Übereinkommen der Vereinten Nationen über Verträge über den internationalen Warenkauf findet keine Anwendung`
       },
       {

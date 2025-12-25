@@ -1,4 +1,4 @@
-import{u as a,j as e}from"./index-dOVkmjqR.js";import{u}from"./vendor-react-CHhk3aw2.js";import{N as l}from"./Textarea-DmnZfv6Z.js";import"./api-xNZ1WobR.js";import{A as c}from"./arrow-left-C8XLxvIf.js";import"./vendor-firebase-DTVMaYMy.js";const s={en:{title:"Privacy Policy",lastUpdated:"Last updated: January 2025",sections:[{title:"1. Introduction",content:`Magical Story ("we", "us", or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, process, and protect your personal data when you use our AI-powered personalized storybook service.
+import{u as a,j as e}from"./index-BkdvBRNB.js";import{u}from"./vendor-react-CHhk3aw2.js";import{N as l}from"./Textarea-BZC8GECT.js";import"./api-BimLcVET.js";import{A as c}from"./arrow-left-I4DueSgy.js";import"./vendor-firebase-DTVMaYMy.js";const s={en:{title:"Privacy Policy",lastUpdated:"Last updated: January 2025",sections:[{title:"1. Introduction",content:`Magical Story ("we", "us", or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, process, and protect your personal data when you use our AI-powered personalized storybook service.
 
 We comply with the EU General Data Protection Regulation (GDPR), the Swiss Data Protection Act, and other applicable privacy laws.`},{title:"2. Data Controller",content:`Magical Story
 Zurich, Switzerland
@@ -170,14 +170,14 @@ Zahlungsinformationen:
 
 • Nur Eltern oder gesetzliche Vormünder dürfen Fotos von Kindern hochladen
 • Wir verlangen eine ausdrückliche Einwilligungsbestätigung vor der Verarbeitung von Fotos von Minderjährigen
-• Fotos von Kindern unterliegen denselben Sicherheitsmaßnahmen und Aufbewahrungsrichtlinien
+• Fotos von Kindern unterliegen denselben Sicherheitsmassnahmen und Aufbewahrungsrichtlinien
 • Wir halten COPPA (USA), DSGVO-K (EU) und andere Kinderdatenschutzvorschriften ein
-• Wir erheben wissentlich keine Daten direkt von Kindern unter 16 Jahren`},{title:"7. Datensicherheit",content:`Wir implementieren robuste Sicherheitsmaßnahmen:
+• Wir erheben wissentlich keine Daten direkt von Kindern unter 16 Jahren`},{title:"7. Datensicherheit",content:`Wir implementieren robuste Sicherheitsmassnahmen:
 
 • Verschlüsselung: Alle Daten sind bei der Übertragung (TLS 1.3) und im Ruhezustand (AES-256) verschlüsselt
 • Zugriffskontrolle: Strenge Zugriffskontrollen begrenzen den Zugang zu personenbezogenen Daten
 • Infrastruktur: Wir nutzen Enterprise-Cloud-Infrastruktur mit Sicherheitszertifizierungen
-• Überwachung: Kontinuierliche Sicherheitsüberwachung und regelmäßige Audits
+• Überwachung: Kontinuierliche Sicherheitsüberwachung und regelmässige Audits
 • Incident Response: Dokumentierte Verfahren für den Umgang mit Datenschutzverletzungen`},{title:"8. Datenweitergabe",content:`Wir teilen Daten nur mit:
 
 Dienstleistern (unter Datenverarbeitungsvereinbarungen):
@@ -194,10 +194,10 @@ Wir können Daten offenlegen, wenn dies gesetzlich vorgeschrieben ist, durch Ger
 • Europäische Union
 • Vereinigte Staaten (für bestimmte KI-Verarbeitung)
 
-Für Übertragungen außerhalb der EU/des EWR stützen wir uns auf:
+Für Übertragungen ausserhalb der EU/des EWR stützen wir uns auf:
 • EU-Standardvertragsklauseln
 • Angemessenheitsbeschlüsse, sofern anwendbar
-• Geeignete Garantien gemäß DSGVO`},{title:"10. Ihre Rechte",content:`Nach DSGVO und anwendbaren Gesetzen haben Sie das Recht auf:
+• Geeignete Garantien gemäss DSGVO`},{title:"10. Ihre Rechte",content:`Nach DSGVO und anwendbaren Gesetzen haben Sie das Recht auf:
 
 • Auskunft: Eine Kopie Ihrer personenbezogenen Daten anfordern
 • Berichtigung: Unrichtige Daten korrigieren
@@ -225,7 +225,7 @@ Analysen (Optional):
 • Anonyme Nutzungsstatistiken zur Verbesserung unseres Dienstes
 • Sie können dies in Ihren Browsereinstellungen deaktivieren
 
-Wir verwenden keine Werbe-Cookies oder Tracking-Pixel.`},{title:"13. Änderungen dieser Richtlinie",content:`Wir können diese Datenschutzrichtlinie regelmäßig aktualisieren. Wir informieren Sie über wesentliche Änderungen per:
+Wir verwenden keine Werbe-Cookies oder Tracking-Pixel.`},{title:"13. Änderungen dieser Richtlinie",content:`Wir können diese Datenschutzrichtlinie regelmässig aktualisieren. Wir informieren Sie über wesentliche Änderungen per:
 • E-Mail-Benachrichtigung
 • Auffällige Mitteilung auf unserer Website
 • In-App-Benachrichtigung

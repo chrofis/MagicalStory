@@ -1,4 +1,4 @@
-import{u as a,j as e}from"./index-dOVkmjqR.js";import{u as l}from"./vendor-react-CHhk3aw2.js";import{N as u}from"./Textarea-DmnZfv6Z.js";import"./api-xNZ1WobR.js";import{A as c}from"./arrow-left-C8XLxvIf.js";import"./vendor-firebase-DTVMaYMy.js";const r={en:{title:"Terms of Service",lastUpdated:"Last updated: January 2025",sections:[{title:"1. Acceptance of Terms",content:'By accessing and using Magical Story ("the Service"), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the Service.'},{title:"2. Service Availability and Eligibility",content:`IMPORTANT: This Service is intended exclusively for residents of Switzerland and the European Union.
+import{u as a,j as e}from"./index-BkdvBRNB.js";import{u as l}from"./vendor-react-CHhk3aw2.js";import{N as u}from"./Textarea-BZC8GECT.js";import"./api-BimLcVET.js";import{A as c}from"./arrow-left-I4DueSgy.js";import"./vendor-firebase-DTVMaYMy.js";const r={en:{title:"Terms of Service",lastUpdated:"Last updated: January 2025",sections:[{title:"1. Acceptance of Terms",content:'By accessing and using Magical Story ("the Service"), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the Service.'},{title:"2. Service Availability and Eligibility",content:`IMPORTANT: This Service is intended exclusively for residents of Switzerland and the European Union.
 
 • This Service is NOT available to residents or citizens of the United States of America
 • By using this Service, you warrant and represent that you are a resident of Switzerland or a member state of the European Union
@@ -64,7 +64,7 @@ We reserve the right to refuse service, remove content, and terminate accounts t
 • By uploading photos of minors, you confirm you have parental authority or explicit consent`},{title:"14. Modifications to Terms",content:"We reserve the right to modify these Terms at any time. Continued use of the Service after changes constitutes acceptance of the new terms. We will notify users of significant changes via email or platform notification."},{title:"15. Termination",content:"We may terminate or suspend your account at any time for violation of these Terms. Upon termination, your right to use the Service ceases immediately."},{title:"16. Governing Law and Jurisdiction",content:`• These Terms are governed exclusively by the laws of Switzerland
 • Any disputes arising from these Terms or your use of the Service shall be resolved exclusively in the courts of Zurich, Switzerland
 • You agree to submit to the exclusive jurisdiction of the courts of Zurich, Switzerland
-• The United Nations Convention on Contracts for the International Sale of Goods does not apply`},{title:"17. Contact",content:"For questions about these Terms, please contact us at: legal@magicalstory.com"}]},de:{title:"Nutzungsbedingungen",lastUpdated:"Zuletzt aktualisiert: Januar 2025",sections:[{title:"1. Annahme der Bedingungen",content:'Durch den Zugriff auf und die Nutzung von Magical Story ("der Dienst") erklären Sie sich mit diesen Nutzungsbedingungen einverstanden. Wenn Sie diesen Bedingungen nicht zustimmen, nutzen Sie den Dienst bitte nicht.'},{title:"2. Dienstverfügbarkeit und Berechtigung",content:`WICHTIG: Dieser Dienst ist ausschließlich für Einwohner der Schweiz und der Europäischen Union bestimmt.
+• The United Nations Convention on Contracts for the International Sale of Goods does not apply`},{title:"17. Contact",content:"For questions about these Terms, please contact us at: legal@magicalstory.com"}]},de:{title:"Nutzungsbedingungen",lastUpdated:"Zuletzt aktualisiert: Januar 2025",sections:[{title:"1. Annahme der Bedingungen",content:'Durch den Zugriff auf und die Nutzung von Magical Story ("der Dienst") erklären Sie sich mit diesen Nutzungsbedingungen einverstanden. Wenn Sie diesen Bedingungen nicht zustimmen, nutzen Sie den Dienst bitte nicht.'},{title:"2. Dienstverfügbarkeit und Berechtigung",content:`WICHTIG: Dieser Dienst ist ausschliesslich für Einwohner der Schweiz und der Europäischen Union bestimmt.
 
 • Dieser Dienst ist NICHT für Einwohner oder Staatsbürger der Vereinigten Staaten von Amerika verfügbar
 • Durch die Nutzung dieses Dienstes garantieren und versichern Sie, dass Sie Einwohner der Schweiz oder eines Mitgliedstaates der Europäischen Union sind
@@ -89,10 +89,10 @@ We reserve the right to refuse service, remove content, and terminate accounts t
 • Sexuell explizite, obszöne oder pornografische Inhalte
 • Inhalte, die Gewalt, Gore oder illegale Aktivitäten darstellen
 • Inhalte, die Minderjährige in irgendeiner Weise ausbeuten oder schaden
-• Alle Inhalte, die gegen geltendes Recht verstoßen
+• Alle Inhalte, die gegen geltendes Recht verstossen
 
 Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen und Konten ohne Vorankündigung oder Rückerstattung zu kündigen.`},{title:"6. Geistiges Eigentum",content:`• Sie behalten alle Rechte an den von Ihnen hochgeladenen Originalfotos
-• Sie gewähren uns eine nicht-exklusive, weltweite, gebührenfreie Lizenz zur Nutzung, Kopie, Änderung und Anzeige hochgeladener Inhalte ausschließlich zur Bereitstellung des Dienstes
+• Sie gewähren uns eine nicht-exklusive, weltweite, gebührenfreie Lizenz zur Nutzung, Kopie, Änderung und Anzeige hochgeladener Inhalte ausschliesslich zur Bereitstellung des Dienstes
 • Die generierten Geschichtsinhalte und Illustrationen werden nach dem Kauf Ihr Eigentum
 • Sie dürfen generierte Geschichten für persönliche, nicht-kommerzielle Zwecke verwenden
 • Kommerzielle Nutzung generierter Inhalte erfordert eine separate Lizenzierung
@@ -106,30 +106,30 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
 
 • Wenn Sie glauben, dass Inhalte Ihr Urheberrecht verletzen, kontaktieren Sie uns unter legal@magicalstory.com mit: (1) Identifizierung des urheberrechtlich geschützten Werks, (2) Identifizierung des verletzenden Materials, (3) Ihre Kontaktdaten, (4) eine Erklärung in gutem Glauben, und (5) eine eidesstattliche Erklärung, dass Sie zur Handlung berechtigt sind
 • Wir werden alle Ansprüche untersuchen und möglicherweise Inhalte entfernen, die geistige Eigentumsrechte verletzen
-• Wiederholte Rechtsverletzer werden ihre Konten gekündigt`},{title:"9. Meldung von Verstößen",content:`Wenn Sie Inhalte finden, die gegen diese Bedingungen oder geltendes Recht verstoßen:
+• Wiederholte Rechtsverletzer werden ihre Konten gekündigt`},{title:"9. Meldung von Verstössen",content:`Wenn Sie Inhalte finden, die gegen diese Bedingungen oder geltendes Recht verstossen:
 
 • Melden Sie diese sofort an legal@magicalstory.com
-• Fügen Sie Details des Verstoßes und relevante Beweise bei
-• Wir werden alle Meldungen untersuchen und entsprechende Maßnahmen ergreifen
+• Fügen Sie Details des Verstosses und relevante Beweise bei
+• Wir werden alle Meldungen untersuchen und entsprechende Massnahmen ergreifen
 • Wir können Inhalte entfernen und Konten ohne Vorankündigung kündigen`},{title:"10. Haftungsbeschränkung",content:`IM GESETZLICH ZULÄSSIGEN RAHMEN:
 
 • Der Dienst wird "wie besehen" ohne jegliche Garantien bereitgestellt
 • Wir haften nicht für indirekte, zufällige, besondere oder Folgeschäden
 • Unsere Gesamthaftung übersteigt nicht den Betrag, den Sie für den spezifischen Dienst bezahlt haben, der den Anspruch begründet
-• Wir sind nicht verantwortlich für Ansprüche, die aus Ihrem Missbrauch des Dienstes oder Ihrer Verletzung dieser Bedingungen entstehen`},{title:"11. Freistellung",content:`Sie verpflichten sich, Magical Story, seine leitenden Angestellten, Direktoren, Mitarbeiter und Vertreter von allen Ansprüchen, Schäden, Verlusten oder Kosten (einschließlich Anwaltsgebühren) freizustellen, zu verteidigen und schadlos zu halten, die entstehen aus:
+• Wir sind nicht verantwortlich für Ansprüche, die aus Ihrem Missbrauch des Dienstes oder Ihrer Verletzung dieser Bedingungen entstehen`},{title:"11. Freistellung",content:`Sie verpflichten sich, Magical Story, seine leitenden Angestellten, Direktoren, Mitarbeiter und Vertreter von allen Ansprüchen, Schäden, Verlusten oder Kosten (einschliesslich Anwaltsgebühren) freizustellen, zu verteidigen und schadlos zu halten, die entstehen aus:
 
 • Ihrer Nutzung des Dienstes
 • Ihrer Verletzung dieser Bedingungen
 • Ihrer Verletzung von Rechten Dritter
 • Inhalten, die Sie hochladen oder mit dem Dienst erstellen`},{title:"12. Datenverarbeitung",content:`• Fotos werden mit KI-Technologie verarbeitet, um Avatar-Illustrationen zu erstellen
 • Durch das Hochladen von Fotos stimmen Sie der Verarbeitung von Gesichtsmerkmalen und biometrischen Daten zur Avatar-Erstellung zu
-• Originalfotos werden vorübergehend zur Verarbeitung gespeichert und gemäß unserer Datenschutzrichtlinie gelöscht
+• Originalfotos werden vorübergehend zur Verarbeitung gespeichert und gemäss unserer Datenschutzrichtlinie gelöscht
 • Wir verkaufen oder teilen Ihre persönlichen Fotos nicht zu Marketingzwecken mit Dritten
 • Siehe unsere Datenschutzrichtlinie für vollständige Details zur Datenverarbeitung`},{title:"13. Altersanforderungen",content:`• Sie müssen mindestens 18 Jahre alt sein, um ein Konto zu erstellen
 • Eltern/Erziehungsberechtigte können Geschichten mit ihren minderjährigen Kindern erstellen
-• Durch das Hochladen von Fotos von Minderjährigen bestätigen Sie, dass Sie elterliche Autorität oder ausdrückliche Zustimmung haben`},{title:"14. Änderungen der Bedingungen",content:"Wir behalten uns das Recht vor, diese Bedingungen jederzeit zu ändern. Die fortgesetzte Nutzung des Dienstes nach Änderungen gilt als Annahme der neuen Bedingungen. Wir werden Benutzer über wesentliche Änderungen per E-Mail oder Plattformbenachrichtigung informieren."},{title:"15. Kündigung",content:"Wir können Ihr Konto jederzeit bei Verstoß gegen diese Bedingungen kündigen oder sperren. Bei Kündigung erlischt Ihr Recht zur Nutzung des Dienstes sofort."},{title:"16. Anwendbares Recht und Gerichtsstand",content:`• Diese Bedingungen unterliegen ausschließlich dem Recht der Schweiz
-• Alle Streitigkeiten aus diesen Bedingungen oder Ihrer Nutzung des Dienstes werden ausschließlich vor den Gerichten in Zürich, Schweiz, beigelegt
-• Sie stimmen der ausschließlichen Zuständigkeit der Gerichte in Zürich, Schweiz, zu
+• Durch das Hochladen von Fotos von Minderjährigen bestätigen Sie, dass Sie elterliche Autorität oder ausdrückliche Zustimmung haben`},{title:"14. Änderungen der Bedingungen",content:"Wir behalten uns das Recht vor, diese Bedingungen jederzeit zu ändern. Die fortgesetzte Nutzung des Dienstes nach Änderungen gilt als Annahme der neuen Bedingungen. Wir werden Benutzer über wesentliche Änderungen per E-Mail oder Plattformbenachrichtigung informieren."},{title:"15. Kündigung",content:"Wir können Ihr Konto jederzeit bei Verstoss gegen diese Bedingungen kündigen oder sperren. Bei Kündigung erlischt Ihr Recht zur Nutzung des Dienstes sofort."},{title:"16. Anwendbares Recht und Gerichtsstand",content:`• Diese Bedingungen unterliegen ausschliesslich dem Recht der Schweiz
+• Alle Streitigkeiten aus diesen Bedingungen oder Ihrer Nutzung des Dienstes werden ausschliesslich vor den Gerichten in Zürich, Schweiz, beigelegt
+• Sie stimmen der ausschliesslichen Zuständigkeit der Gerichte in Zürich, Schweiz, zu
 • Das Übereinkommen der Vereinten Nationen über Verträge über den internationalen Warenkauf findet keine Anwendung`},{title:"17. Kontakt",content:"Bei Fragen zu diesen Bedingungen kontaktieren Sie uns bitte unter: legal@magicalstory.com"}]},fr:{title:"Conditions d'Utilisation",lastUpdated:"Dernière mise à jour : Janvier 2025",sections:[{title:"1. Acceptation des Conditions",content:`En accédant et en utilisant Magical Story ("le Service"), vous acceptez d'être lié par ces Conditions d'Utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser le Service.`},{title:"2. Disponibilité du Service et Éligibilité",content:`IMPORTANT : Ce Service est destiné exclusivement aux résidents de la Suisse et de l'Union Européenne.
 
 • Ce Service n'est PAS disponible pour les résidents ou citoyens des États-Unis d'Amérique

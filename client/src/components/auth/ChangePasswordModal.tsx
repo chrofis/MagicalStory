@@ -36,7 +36,7 @@ const translations = {
     passwordTooShort: 'Passwort muss mindestens 6 Zeichen lang sein',
     success: 'Passwort erfolgreich geändert!',
     successDesc: 'Ihr Passwort wurde aktualisiert.',
-    close: 'Schließen',
+    close: 'Schliessen',
   },
   fr: {
     title: 'Changer le mot de passe',

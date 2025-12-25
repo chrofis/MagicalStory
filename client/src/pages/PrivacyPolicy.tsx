@@ -264,18 +264,18 @@ Zahlungsinformationen:
 
 • Nur Eltern oder gesetzliche Vormünder dürfen Fotos von Kindern hochladen
 • Wir verlangen eine ausdrückliche Einwilligungsbestätigung vor der Verarbeitung von Fotos von Minderjährigen
-• Fotos von Kindern unterliegen denselben Sicherheitsmaßnahmen und Aufbewahrungsrichtlinien
+• Fotos von Kindern unterliegen denselben Sicherheitsmassnahmen und Aufbewahrungsrichtlinien
 • Wir halten COPPA (USA), DSGVO-K (EU) und andere Kinderdatenschutzvorschriften ein
 • Wir erheben wissentlich keine Daten direkt von Kindern unter 16 Jahren`
       },
       {
         title: '7. Datensicherheit',
-        content: `Wir implementieren robuste Sicherheitsmaßnahmen:
+        content: `Wir implementieren robuste Sicherheitsmassnahmen:
 
 • Verschlüsselung: Alle Daten sind bei der Übertragung (TLS 1.3) und im Ruhezustand (AES-256) verschlüsselt
 • Zugriffskontrolle: Strenge Zugriffskontrollen begrenzen den Zugang zu personenbezogenen Daten
 • Infrastruktur: Wir nutzen Enterprise-Cloud-Infrastruktur mit Sicherheitszertifizierungen
-• Überwachung: Kontinuierliche Sicherheitsüberwachung und regelmäßige Audits
+• Überwachung: Kontinuierliche Sicherheitsüberwachung und regelmässige Audits
 • Incident Response: Dokumentierte Verfahren für den Umgang mit Datenschutzverletzungen`
       },
       {
@@ -300,10 +300,10 @@ Wir können Daten offenlegen, wenn dies gesetzlich vorgeschrieben ist, durch Ger
 • Europäische Union
 • Vereinigte Staaten (für bestimmte KI-Verarbeitung)
 
-Für Übertragungen außerhalb der EU/des EWR stützen wir uns auf:
+Für Übertragungen ausserhalb der EU/des EWR stützen wir uns auf:
 • EU-Standardvertragsklauseln
 • Angemessenheitsbeschlüsse, sofern anwendbar
-• Geeignete Garantien gemäß DSGVO`
+• Geeignete Garantien gemäss DSGVO`
       },
       {
         title: '10. Ihre Rechte',
@@ -347,7 +347,7 @@ Wir verwenden keine Werbe-Cookies oder Tracking-Pixel.`
       },
       {
         title: '13. Änderungen dieser Richtlinie',
-        content: `Wir können diese Datenschutzrichtlinie regelmäßig aktualisieren. Wir informieren Sie über wesentliche Änderungen per:
+        content: `Wir können diese Datenschutzrichtlinie regelmässig aktualisieren. Wir informieren Sie über wesentliche Änderungen per:
 • E-Mail-Benachrichtigung
 • Auffällige Mitteilung auf unserer Website
 • In-App-Benachrichtigung

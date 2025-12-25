@@ -18,13 +18,13 @@ export const TEXT_MODELS = {
   'gemini-2.5-pro': {
     provider: 'google',
     description: 'Gemini 2.5 Pro - High quality, large output',
-    descriptionDe: 'Gemini 2.5 Pro - Hohe Qualität, große Ausgabe',
+    descriptionDe: 'Gemini 2.5 Pro - Hohe Qualität, grosse Ausgabe',
     descriptionFr: 'Gemini 2.5 Pro - Haute qualité, grande sortie'
   },
   'gemini-2.5-flash': {
     provider: 'google',
     description: 'Gemini 2.5 Flash - Fast with large output',
-    descriptionDe: 'Gemini 2.5 Flash - Schnell mit großer Ausgabe',
+    descriptionDe: 'Gemini 2.5 Flash - Schnell mit grosser Ausgabe',
     descriptionFr: 'Gemini 2.5 Flash - Rapide avec grande sortie'
   },
   'gemini-2.0-flash': {

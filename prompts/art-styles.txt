@@ -1,0 +1,21 @@
+# Art Style Prompts
+# These prompts are appended to image generation requests to define the visual style.
+# Format: STYLE_ID: prompt text
+#
+# NOTE: After editing this file, update client/src/constants/artStyles.ts to match.
+
+pixar: pixar style 3d character, vibrant Disney/Pixar 3D animation, warm lighting, child-friendly
+
+cartoon: 2D cartoon style, bold outlines, vibrant flat colors, classic animation look
+
+anime: anime style, Japanese animation, expressive eyes, dynamic poses, cel-shaded
+
+chibi: chibi style, super deformed, cute, big head, small body, kawaii, adorable
+
+steampunk: steampunk anime style, Victorian era, gears, brass, copper, goggles, mechanical details, vintage technology, anime influenced
+
+comic: comic book style, bold ink lines, halftone dots, dynamic action, speech bubbles aesthetic, superhero comic art
+
+manga: manga style, Japanese comic art, detailed linework, screentones, dramatic shading, expressive characters
+
+watercolor: watercolor painting style, soft edges, flowing colors, delicate washes, artistic brushstrokes, dreamy atmosphere, traditional watercolor illustration

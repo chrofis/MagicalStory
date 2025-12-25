@@ -25,7 +25,7 @@ const consentTexts = {
     termsLink: 'Nutzungsbedingungen',
     and: 'und der',
     privacyLink: 'Datenschutzrichtlinie',
-    period: ' zu, einschließlich der Verarbeitung dieses Fotos durch KI zur Erstellung eines illustrierten Avatars.',
+    period: ' zu, einschliesslich der Verarbeitung dieses Fotos durch KI zur Erstellung eines illustrierten Avatars.',
     pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
   },
   fr: {
