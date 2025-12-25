@@ -146,8 +146,8 @@ export function StorySettings({
                     isOut
                       ? 'border-2 border-dashed border-gray-300 bg-gray-50 opacity-60'
                       : isMain
-                      ? 'border-3 border-indigo-600 bg-indigo-100'
-                      : 'border-2 border-indigo-300 bg-indigo-50'
+                      ? 'border-4 border-indigo-600 bg-indigo-50'
+                      : 'bg-indigo-50'
                   }`}
                 >
                   {/* Character info - top on mobile, left on desktop */}
@@ -190,7 +190,7 @@ export function StorySettings({
                       onClick={() => onCharacterRoleChange(char.id, 'in')}
                       className={`flex-1 md:flex-initial px-3 py-2 text-sm font-medium transition-colors border-l border-r border-gray-300 ${
                         isIn
-                          ? 'bg-indigo-500 text-white'
+                          ? 'bg-indigo-600 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
                       }`}
                     >
