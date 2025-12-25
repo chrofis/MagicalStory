@@ -240,7 +240,8 @@ router.get('/me', authenticateToken, async (req, res) => {
           storiesGenerated: dbUser.stories_generated || 0,
           credits: dbUser.credits != null ? dbUser.credits : 500,
           preferredLanguage: dbUser.preferred_language || 'English',
-          emailVerified: emailVerifiedResult
+          emailVerified: emailVerifiedResult,
+          photoConsentAt: dbUser.photo_consent_at || null
         }
       });
     } else {
@@ -694,6 +695,52 @@ router.post('/refresh', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Token refresh error:', err);
     res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+// POST /api/auth/photo-consent - Record user's photo upload consent
+router.post('/photo-consent', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'Photo consent requires database mode' });
+    }
+
+    const pool = getPool();
+
+    // Check if already consented
+    const existing = await pool.query('SELECT photo_consent_at FROM users WHERE id = $1', [userId]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (existing.rows[0].photo_consent_at) {
+      // Already consented, just return the existing timestamp
+      return res.json({
+        success: true,
+        photoConsentAt: existing.rows[0].photo_consent_at,
+        message: 'Consent already recorded'
+      });
+    }
+
+    // Record consent
+    const result = await pool.query(
+      'UPDATE users SET photo_consent_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING photo_consent_at',
+      [userId]
+    );
+
+    await logActivity(userId, req.user.username, 'PHOTO_CONSENT_GIVEN', {});
+    console.log(`✅ Photo consent recorded for user: ${req.user.username}`);
+
+    res.json({
+      success: true,
+      photoConsentAt: result.rows[0].photo_consent_at,
+      message: 'Consent recorded successfully'
+    });
+  } catch (err) {
+    console.error('Photo consent error:', err);
+    res.status(500).json({ error: 'Failed to record consent' });
   }
 });
 

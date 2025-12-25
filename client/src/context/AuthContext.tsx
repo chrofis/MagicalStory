@@ -16,6 +16,7 @@ interface AuthContextType extends AuthState {
   refreshToken: () => Promise<boolean>;
   impersonate: (userId: string) => Promise<void>;
   stopImpersonating: () => Promise<void>;
+  recordPhotoConsent: () => Promise<void>;
   isLoading: boolean;
   storageWarning: string | null;
 }
@@ -224,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       credits: data.user.credits,
       preferredLanguage: data.user.preferredLanguage,
       emailVerified: data.user.emailVerified,
+      photoConsentAt: data.user.photoConsentAt,
     };
 
     saveAuthData(data.token, user);
@@ -280,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       credits: data.user.credits,
       preferredLanguage: data.user.preferredLanguage,
       emailVerified: data.user.emailVerified,
+      photoConsentAt: data.user.photoConsentAt,
     };
 
     saveAuthData(data.token, user);
@@ -577,6 +580,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credits: data.user.credits,
         preferredLanguage: data.user.preferredLanguage,
         emailVerified: data.user.emailVerified,
+        photoConsentAt: data.user.photoConsentAt,
       };
 
       storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
@@ -587,6 +591,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       logger.error('Failed to refresh user:', error);
     }
+  }, []);
+
+  const recordPhotoConsent = useCallback(async () => {
+    const token = storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_URL}/api/auth/photo-consent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to record consent');
+    }
+
+    const data = await response.json();
+
+    // Update user state with consent timestamp
+    setState(prev => {
+      if (!prev.user) return prev;
+      const updatedUser = {
+        ...prev.user,
+        photoConsentAt: data.photoConsentAt,
+      };
+      storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+      return {
+        ...prev,
+        user: updatedUser,
+      };
+    });
+
+    logger.info('Photo consent recorded');
   }, []);
 
   // Cleanup on unmount
@@ -613,6 +655,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshToken,
         impersonate,
         stopImpersonating,
+        recordPhotoConsent,
         isLoading,
         storageWarning,
       }}

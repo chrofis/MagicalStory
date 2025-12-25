@@ -88,6 +88,7 @@ async function initializeDatabase() {
       { table: 'users', column: 'email_verification_expires', type: 'TIMESTAMP' },
       { table: 'users', column: 'password_reset_token', type: 'VARCHAR(255)' },
       { table: 'users', column: 'password_reset_expires', type: 'TIMESTAMP' },
+      { table: 'users', column: 'photo_consent_at', type: 'TIMESTAMP' },
     ];
 
     for (const { table, column, type } of columnsToAdd) {
@@ -105,6 +106,8 @@ async function initializeDatabase() {
     await dbPool.query(`UPDATE users SET credits = -1 WHERE credits IS NULL AND role = 'admin'`);
     await dbPool.query(`UPDATE users SET credits = 1000 WHERE credits IS NULL AND role = 'user'`);
     await dbPool.query(`UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL`);
+    // Set existing users as having consented to photo uploads (retroactive consent)
+    await dbPool.query(`UPDATE users SET photo_consent_at = CURRENT_TIMESTAMP WHERE photo_consent_at IS NULL`);
 
     // Config table
     await dbPool.query(`

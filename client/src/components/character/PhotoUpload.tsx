@@ -2,6 +2,7 @@ import { useState, ChangeEvent } from 'react';
 import { Upload, CheckSquare, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 
 interface PhotoUploadProps {
   onPhotoSelect: (file: File) => void;
@@ -40,15 +41,33 @@ const consentTexts = {
 
 export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadProps) {
   const { t, language } = useLanguage();
+  const { user, recordPhotoConsent } = useAuth();
   const [consent1Checked, setConsent1Checked] = useState(false);
   const [consent2Checked, setConsent2Checked] = useState(false);
+  const [isRecordingConsent, setIsRecordingConsent] = useState(false);
   const texts = consentTexts[language] || consentTexts.en;
 
-  const canUpload = consent1Checked && consent2Checked;
+  // User has already consented if photoConsentAt is set
+  const hasExistingConsent = !!user?.photoConsentAt;
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  // Can upload if already consented OR both checkboxes are checked
+  const canUpload = hasExistingConsent || (consent1Checked && consent2Checked);
+
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && canUpload) {
+      // If this is the first time consenting, record it
+      if (!hasExistingConsent && consent1Checked && consent2Checked) {
+        setIsRecordingConsent(true);
+        try {
+          await recordPhotoConsent();
+        } catch (error) {
+          console.error('Failed to record consent:', error);
+          // Continue with upload even if consent recording fails
+        } finally {
+          setIsRecordingConsent(false);
+        }
+      }
       onPhotoSelect(file);
     }
   };
@@ -67,62 +86,64 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
         {descriptionText}
       </p>
 
-      {/* Consent checkboxes */}
-      <div className="bg-white rounded-lg p-4 mb-4 space-y-3">
-        {/* Consent 1: Rights to use photo */}
-        <label className="flex items-start gap-3 cursor-pointer group">
-          <button
-            type="button"
-            onClick={() => setConsent1Checked(!consent1Checked)}
-            className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800"
-          >
-            {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
-          </button>
-          <span className="text-sm text-gray-700 group-hover:text-gray-900">
-            {texts.consent1}
-          </span>
-        </label>
+      {/* Consent checkboxes - only shown if user hasn't already consented */}
+      {!hasExistingConsent && (
+        <div className="bg-white rounded-lg p-4 mb-4 space-y-3">
+          {/* Consent 1: Rights to use photo */}
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <button
+              type="button"
+              onClick={() => setConsent1Checked(!consent1Checked)}
+              className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800"
+            >
+              {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
+            </button>
+            <span className="text-sm text-gray-700 group-hover:text-gray-900">
+              {texts.consent1}
+            </span>
+          </label>
 
-        {/* Consent 2: Terms and Privacy */}
-        <label className="flex items-start gap-3 cursor-pointer group">
-          <button
-            type="button"
-            onClick={() => setConsent2Checked(!consent2Checked)}
-            className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800"
-          >
-            {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
-          </button>
-          <span className="text-sm text-gray-700 group-hover:text-gray-900">
-            {texts.consent2}{' '}
-            <Link to="/terms" className="text-indigo-600 hover:underline" target="_blank">
-              {texts.termsLink}
-            </Link>{' '}
-            {texts.and}{' '}
-            <Link to="/privacy" className="text-indigo-600 hover:underline" target="_blank">
-              {texts.privacyLink}
-            </Link>
-            {texts.period}
-          </span>
-        </label>
-      </div>
+          {/* Consent 2: Terms and Privacy */}
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <button
+              type="button"
+              onClick={() => setConsent2Checked(!consent2Checked)}
+              className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800"
+            >
+              {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
+            </button>
+            <span className="text-sm text-gray-700 group-hover:text-gray-900">
+              {texts.consent2}{' '}
+              <Link to="/terms" className="text-indigo-600 hover:underline" target="_blank">
+                {texts.termsLink}
+              </Link>{' '}
+              {texts.and}{' '}
+              <Link to="/privacy" className="text-indigo-600 hover:underline" target="_blank">
+                {texts.privacyLink}
+              </Link>
+              {texts.period}
+            </span>
+          </label>
+        </div>
+      )}
 
       {/* Upload button - prominent */}
       <div className="text-center mb-5">
         <label className={`inline-flex items-center justify-center gap-3 px-10 py-4 rounded-xl text-xl font-bold shadow-lg transition-colors ${
-          canUpload
+          canUpload && !isRecordingConsent
             ? 'cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700'
             : 'cursor-not-allowed bg-gray-300 text-gray-500'
         }`}>
-          <Upload size={28} /> {t.uploadPhoto}
+          <Upload size={28} /> {isRecordingConsent ? '...' : t.uploadPhoto}
           <input
             type="file"
             accept="image/*"
             onChange={handleFileChange}
             className="hidden"
-            disabled={!canUpload}
+            disabled={!canUpload || isRecordingConsent}
           />
         </label>
-        {!canUpload && (
+        {!canUpload && !hasExistingConsent && (
           <p className="text-sm text-amber-600 mt-2">{texts.pleaseAccept}</p>
         )}
       </div>
