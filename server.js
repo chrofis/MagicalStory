@@ -1516,27 +1516,21 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
       'en': 'Respond in English.'
     };
 
-    // Build the prompt
-    const prompt = `You are a creative children's story writer. Generate ONE engaging story idea based on the following:
+    // Determine reading level description
+    const readingLevelDescriptions = {
+      '1st-grade': 'Early reader (simple sentences, 6-7 year olds)',
+      'advanced': 'Advanced (older children 10+)',
+      'standard': 'Standard (7-9 year olds)'
+    };
 
-STORY TYPE: ${storyTypeName}
-
-CHARACTERS:
-${characterDescriptions}
-
-RELATIONSHIPS:
-${relationshipDescriptions || 'No specific relationships defined.'}
-
-READING LEVEL: ${languageLevel === '1st-grade' ? 'Early reader (simple sentences, 6-7 year olds)' : languageLevel === 'advanced' ? 'Advanced (older children 10+)' : 'Standard (7-9 year olds)'}
-
-${langInstructions[language] || langInstructions['en']}
-
-Generate a creative, age-appropriate story idea in 3-5 sentences. Include:
-1. The main conflict or adventure
-2. How the characters work together
-3. A hint at the resolution or lesson
-
-Write ONLY the story idea description, nothing else. Be creative and engaging!`;
+    // Load prompt from file and replace placeholders
+    const promptTemplate = fs.readFileSync(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
+    const prompt = promptTemplate
+      .replace('{STORY_TYPE_NAME}', storyTypeName)
+      .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
+      .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
+      .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
+      .replace('{LANGUAGE_INSTRUCTION}', langInstructions[language] || langInstructions['en']);
 
     // Call the text model (using the imported function)
     const { callTextModel } = require('./server/lib/textModels');

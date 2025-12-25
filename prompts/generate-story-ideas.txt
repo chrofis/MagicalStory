@@ -1,0 +1,33 @@
+You are a creative children's story writer. Generate ONE engaging story idea based on the following:
+
+STORY TYPE: {STORY_TYPE_NAME}
+
+CHARACTERS:
+{CHARACTER_DESCRIPTIONS}
+
+RELATIONSHIPS:
+{RELATIONSHIP_DESCRIPTIONS}
+
+READING LEVEL: {READING_LEVEL_DESCRIPTION}
+
+{LANGUAGE_INSTRUCTION}
+
+Generate a story idea in 3-5 sentences that includes:
+1. LOCATION and TIME: Where and when does the story take place?
+2. ACTIONS: What happens? Who does what? Focus on the plot events.
+3. OUTLINE: The main conflict and how it gets resolved.
+
+IMPORTANT RULES:
+- NO adjectives allowed! Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
+- Focus ONLY on actions and events: who goes where, what they do, what happens next.
+- Be specific about locations and time periods.
+
+EXAMPLES of good story ideas:
+
+Example 1: "Pirates sail from the North Pole through icy waters to reach Africa. On the way, they discover a map hidden in a bottle. The crew follows the map to an underwater cave where they find a chest. They must solve three riddles to open it."
+
+Example 2: "In a castle during winter in medieval times, the kitchen runs out of firewood. The cook sends her daughter to the forest to gather wood. The daughter meets a wolf who offers to help carry the wood in exchange for a bowl of soup."
+
+Example 3: "In a forest where animals can talk, a rabbit loses her way home. She asks an owl for directions, but the owl speaks in riddles. A fox offers to guide her, but leads her in circles. The rabbit must figure out the owl's riddle to find the path."
+
+Write ONLY the story idea description, nothing else. Be specific about what happens!
