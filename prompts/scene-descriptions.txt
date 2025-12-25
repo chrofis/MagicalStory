@@ -135,6 +135,13 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
   - Doing calm, passive actions (standing, sitting, watching)
   - NOT the ones with the most dynamic/exciting pose in the scene
 
+**CHARACTER DIFFERENTIATION:**
+- When multiple characters are in a scene, each must have a UNIQUE pose and action
+- NEVER have multiple characters doing the identical gesture or action (lazy repetition)
+- WRONG: "All three children hold a finger to their lips in the 'shh' gesture"
+- RIGHT: "Sophie holds a finger to her lips signaling silence, Manuel freezes mid-step with wide eyes, Lukas cups his hand to his ear listening intently"
+- Think about realistic group dynamics: one person initiates, others react differently based on their personality
+
 **CONSTRAINTS:**
 - Include COMPLETE physical descriptions for every character - this ensures visual consistency
 - Do not include dialogue, speech bubbles, or any text/words in the scene
