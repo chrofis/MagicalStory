@@ -6369,6 +6369,12 @@ async function processStoryJob(jobId) {
     const skipImages = inputData.skipImages === true; // Developer mode: text only
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
 
+    // Developer mode: model overrides (admin only)
+    const modelOverrides = inputData.modelOverrides || {};
+    if (Object.keys(modelOverrides).some(k => modelOverrides[k])) {
+      log.debug(`🔧 [PIPELINE] Model overrides: ${JSON.stringify(modelOverrides)}`);
+    }
+
     // Check if this is a picture book (1st-grade) - use simplified combined flow
     const isPictureBook = inputData.languageLevel === '1st-grade';
 
