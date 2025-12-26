@@ -221,7 +221,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
-          maxOutputTokens: 800,
+          maxOutputTokens: 1500,  // Increased from 800 to allow full evaluation format
           temperature: 0.3
         }
       })
@@ -256,6 +256,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           finishMessage: data.candidates[0].finishMessage,
           safetyRatings: data.candidates[0].safetyRatings
         }));
+      } else if (data.promptFeedback) {
+        // No candidates at all - likely blocked by safety
+        log.warn('⚠️  [QUALITY] Prompt blocked:', JSON.stringify(data.promptFeedback));
+      } else {
+        log.warn('⚠️  [QUALITY] Unexpected response structure:', JSON.stringify(data).substring(0, 500));
       }
       return null;
     }
