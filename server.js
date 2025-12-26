@@ -1730,18 +1730,17 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     );
 
     // Deduct credits after successful generation
+    const newCredits = userCredits - creditCost;
     await dbPool.query(
       'UPDATE users SET credits = credits - $1 WHERE id = $2',
       [creditCost, req.user.id]
     );
     // Log credit transaction
     await dbPool.query(
-      `INSERT INTO credit_transactions (user_id, amount, type, description)
-       VALUES ($1, $2, 'image_regeneration', $3)`,
-      [req.user.id, -creditCost, `Regenerate image for page ${pageNumber}`]
+      `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+       VALUES ($1, $2, $3, 'image_regeneration', $4)`,
+      [req.user.id, -creditCost, newCredits, `Regenerate image for page ${pageNumber}`]
     );
-
-    const newCredits = userCredits - creditCost;
     console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
 
     // Get version count for response
@@ -2019,9 +2018,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     const newCredits = userCredits - requiredCredits;
     await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, req.user.id]);
     await dbPool.query(
-      `INSERT INTO credit_transactions (user_id, amount, type, description, balance_after)
+      `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
        VALUES ($1, $2, $3, $4, $5)`,
-      [req.user.id, -requiredCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`, newCredits]
+      [req.user.id, -requiredCredits, newCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`]
     );
 
     console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
@@ -4599,6 +4598,55 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
   }
 });
 
+// ============================================================
+// PRICING API - Single source of truth for book pricing
+// ============================================================
+
+// Get all pricing tiers (public endpoint)
+app.get('/api/pricing', async (req, res) => {
+  try {
+    const tiers = await dbPool.query(
+      'SELECT max_pages, label, softcover_price, hardcover_price FROM pricing_tiers ORDER BY max_pages ASC'
+    );
+
+    // Transform to frontend-friendly format
+    const formattedTiers = tiers.rows.map(tier => ({
+      maxPages: tier.max_pages,
+      label: tier.label,
+      softcover: tier.softcover_price,
+      hardcover: tier.hardcover_price
+    }));
+
+    res.json({ tiers: formattedTiers, maxBookPages: 100 });
+  } catch (err) {
+    log.error('❌ Error fetching pricing tiers:', err);
+    res.status(500).json({ error: 'Failed to fetch pricing' });
+  }
+});
+
+// Helper function to get price for a given page count
+async function getPriceForPages(pageCount, isHardcover) {
+  const tiers = await dbPool.query(
+    'SELECT softcover_price, hardcover_price FROM pricing_tiers WHERE max_pages >= $1 ORDER BY max_pages ASC LIMIT 1',
+    [pageCount]
+  );
+
+  if (tiers.rows.length === 0) {
+    // Exceeds maximum - use highest tier
+    const maxTier = await dbPool.query(
+      'SELECT softcover_price, hardcover_price FROM pricing_tiers ORDER BY max_pages DESC LIMIT 1'
+    );
+    if (maxTier.rows.length === 0) {
+      throw new Error('No pricing tiers configured');
+    }
+    const tier = maxTier.rows[0];
+    return isHardcover ? tier.hardcover_price : tier.softcover_price;
+  }
+
+  const tier = tiers.rows[0];
+  return isHardcover ? tier.hardcover_price : tier.softcover_price;
+}
+
 // Create Stripe checkout session for book purchase
 app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
@@ -4646,16 +4694,10 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
     // Add 3 pages per story for covers and title page
     totalPages += stories.length * 3;
 
-    // Calculate price based on pages and cover type
+    // Calculate price based on pages and cover type (using database pricing)
     const isHardcover = coverType === 'hardcover';
-    let price;
-    if (totalPages <= 32) {
-      price = isHardcover ? 4900 : 3600; // CHF 49 or 36
-    } else if (totalPages <= 64) {
-      price = isHardcover ? 5900 : 4600; // CHF 59 or 46
-    } else {
-      price = isHardcover ? 6900 : 5600; // CHF 69 or 56
-    }
+    const priceInChf = await getPriceForPages(totalPages, isHardcover);
+    const price = priceInChf * 100; // Convert CHF to cents for Stripe
 
     const firstStory = stories[0].data;
     const bookTitle = stories.length === 1

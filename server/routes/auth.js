@@ -93,26 +93,12 @@ router.post('/register', registerLimiter, async (req, res) => {
 
       newUser = { id: userId, username, email: username, role, storyQuota, storiesGenerated: 0, credits: initialCredits };
 
-      // Send verification email for non-admin users
-      if (role !== 'admin' && emailService) {
-        try {
-          const verificationToken = crypto.randomBytes(32).toString('hex');
-          const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-          await dbQuery(
-            'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
-            [verificationToken, verificationExpires, userId]
-          );
-
-          const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-          await emailService.sendEmailVerificationEmail(username, username, verifyUrl);
-          console.log(`📧 Verification email sent to: ${username}`);
-        } catch (emailErr) {
-          console.error('Failed to send verification email:', emailErr.message);
-        }
-      } else if (role === 'admin') {
+      // Auto-verify admins, regular users will be prompted to verify when they try to generate a story
+      if (role === 'admin') {
         await dbQuery('UPDATE users SET email_verified = TRUE WHERE id = $1', [userId]);
       }
+      // Note: Verification email is NOT sent on registration - it will be sent when user tries to generate a story
+      // This provides better UX (less spam) and users can browse/upload photos first
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }

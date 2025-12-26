@@ -1,10 +1,20 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Book, BookOpen, Check } from 'lucide-react';
+import { ArrowLeft, Book, BookOpen, Check, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Navigation } from '@/components/common';
+import { storyService } from '@/services';
 
-// Pricing tiers based on page count
-const pricingTiers = [
+// Type for pricing tier
+interface PricingTier {
+  maxPages: number;
+  label: string;
+  softcover: number;
+  hardcover: number;
+}
+
+// Fallback pricing tiers (used while loading or if API fails)
+const fallbackPricingTiers: PricingTier[] = [
   { maxPages: 30, label: '1-30', softcover: 38, hardcover: 53 },
   { maxPages: 40, label: '31-40', softcover: 45, hardcover: 60 },
   { maxPages: 50, label: '41-50', softcover: 51, hardcover: 66 },
@@ -15,7 +25,9 @@ const pricingTiers = [
   { maxPages: 100, label: '91-100', softcover: 81, hardcover: 96 },
 ];
 
-export function getPriceForPages(pageCount: number, isHardcover: boolean): number | null {
+// Helper function to get price for a page count (uses fallback if tiers not loaded)
+export function getPriceForPages(pageCount: number, isHardcover: boolean, tiers?: PricingTier[]): number | null {
+  const pricingTiers = tiers || fallbackPricingTiers;
   const tier = pricingTiers.find(t => pageCount <= t.maxPages);
   if (!tier) return null; // Exceeds maximum
   return isHardcover ? tier.hardcover : tier.softcover;
@@ -26,6 +38,24 @@ export const MAX_BOOK_PAGES = 100;
 export default function Pricing() {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const [pricingTiers, setPricingTiers] = useState<PricingTier[]>(fallbackPricingTiers);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch pricing from API on mount
+  useEffect(() => {
+    async function fetchPricing() {
+      try {
+        const data = await storyService.getPricing();
+        setPricingTiers(data.tiers);
+      } catch (err) {
+        console.error('Failed to fetch pricing, using fallback:', err);
+        // Keep using fallback tiers
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchPricing();
+  }, []);
 
   const translations = {
     en: {
@@ -110,7 +140,13 @@ export default function Pricing() {
         </div>
 
         {/* Pricing Table */}
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8 relative">
+          {/* Loading overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+            </div>
+          )}
           {/* Table Header */}
           <div className="grid grid-cols-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
             <div className="p-4 font-semibold">{t.pages}</div>

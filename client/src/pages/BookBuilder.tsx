@@ -8,6 +8,14 @@ import { storyService } from '@/services';
 import { getPriceForPages, MAX_BOOK_PAGES } from './Pricing';
 import { createLogger } from '@/services/logger';
 
+// Type for pricing tier
+interface PricingTier {
+  maxPages: number;
+  label: string;
+  softcover: number;
+  hardcover: number;
+}
+
 const log = createLogger('BookBuilder');
 
 interface SelectedStory {
@@ -29,6 +37,21 @@ export default function BookBuilder() {
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isPrintingPdf, setIsPrintingPdf] = useState(false);
+  const [pricingTiers, setPricingTiers] = useState<PricingTier[] | undefined>(undefined);
+
+  // Fetch pricing tiers on mount
+  useEffect(() => {
+    async function fetchPricing() {
+      try {
+        const data = await storyService.getPricing();
+        setPricingTiers(data.tiers);
+      } catch (err) {
+        console.error('Failed to fetch pricing:', err);
+        // Will use fallback in getPriceForPages
+      }
+    }
+    fetchPricing();
+  }, []);
 
   const translations = {
     en: {
@@ -144,10 +167,10 @@ export default function BookBuilder() {
     return stories.reduce((sum, story) => sum + story.pages, 0);
   }, [stories]);
 
-  // Calculate price
+  // Calculate price (using fetched pricing tiers)
   const price = useMemo(() => {
-    return getPriceForPages(totalPages, coverType === 'hardcover');
-  }, [totalPages, coverType]);
+    return getPriceForPages(totalPages, coverType === 'hardcover', pricingTiers);
+  }, [totalPages, coverType, pricingTiers]);
 
   const isOverLimit = totalPages > MAX_BOOK_PAGES;
 
@@ -403,7 +426,7 @@ export default function BookBuilder() {
                   </div>
                   {!isOverLimit && (
                     <div className="text-xl font-bold text-gray-800">
-                      CHF {getPriceForPages(totalPages, false)}.-
+                      CHF {getPriceForPages(totalPages, false, pricingTiers)}.-
                     </div>
                   )}
                 </div>
@@ -426,7 +449,7 @@ export default function BookBuilder() {
                   </div>
                   {!isOverLimit && (
                     <div className="text-xl font-bold text-indigo-700">
-                      CHF {getPriceForPages(totalPages, true)}.-
+                      CHF {getPriceForPages(totalPages, true, pricingTiers)}.-
                     </div>
                   )}
                 </div>

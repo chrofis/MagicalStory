@@ -676,6 +676,18 @@ export const storyService = {
     return response;
   },
 
+  // Get pricing tiers from server (single source of truth)
+  async getPricing(): Promise<{
+    tiers: Array<{ maxPages: number; label: string; softcover: number; hardcover: number }>;
+    maxBookPages: number;
+  }> {
+    const response = await api.get<{
+      tiers: Array<{ maxPages: number; label: string; softcover: number; hardcover: number }>;
+      maxBookPages: number;
+    }>('/api/pricing');
+    return response;
+  },
+
   // Direct print order (developer/admin mode - bypasses payment)
   async createPrintOrder(storyId: string, shippingAddress: {
     firstName: string;
