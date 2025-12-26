@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Mail, RefreshCw, Edit3 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Mail, RefreshCw, Edit3, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/common/Button';
@@ -61,9 +61,9 @@ const translations = {
   },
 };
 
-export function EmailVerificationModal({ isOpen, onClose }: EmailVerificationModalProps) {
+export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVerificationModalProps) {
   const { language } = useLanguage();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const t = translations[language as keyof typeof translations] || translations.en;
 
   const [mode, setMode] = useState<'verify' | 'change'>('verify');
@@ -71,10 +71,55 @@ export function EmailVerificationModal({ isOpen, onClose }: EmailVerificationMod
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isPolling, setIsPolling] = useState(false);
 
   // Change email form
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Polling ref to track interval
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Poll for email verification status when modal is open
+  useEffect(() => {
+    if (!isOpen) {
+      // Clear polling when modal closes
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+
+    // Start polling every 3 seconds
+    setIsPolling(true);
+    pollingRef.current = setInterval(async () => {
+      try {
+        const response = await api.get('/api/auth/verification-status');
+        if (response.emailVerified) {
+          // Email verified! Refresh user and trigger callback
+          await refreshUser();
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          setIsPolling(false);
+          onVerified?.();
+          onClose();
+        }
+      } catch (err) {
+        // Silently ignore polling errors
+        console.debug('Verification status poll error:', err);
+      }
+    }, 3000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [isOpen, refreshUser, onVerified, onClose]);
 
   if (!isOpen) return null;
 
@@ -143,6 +188,17 @@ export function EmailVerificationModal({ isOpen, onClose }: EmailVerificationMod
             {success}
             <p className="text-sm mt-1 opacity-80">{t.checkSpam}</p>
           </Alert>
+        )}
+
+        {isPolling && emailSent && (
+          <div className="flex items-center justify-center gap-2 text-indigo-600 mb-4">
+            <Loader2 size={16} className="animate-spin" />
+            <span className="text-sm">
+              {language === 'de' ? 'Warte auf Bestätigung...' :
+               language === 'fr' ? 'En attente de verification...' :
+               'Waiting for verification...'}
+            </span>
+          </div>
         )}
 
         {mode === 'verify' ? (

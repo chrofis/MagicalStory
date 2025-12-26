@@ -1294,12 +1294,17 @@ export default function StoryWizard() {
   useEffect(() => {
     if (pendingAutoGenerate.current && isAuthenticated && characters.length > 0 && step === 4 && !isGenerating) {
       pendingAutoGenerate.current = false;
-      // Small delay to ensure UI is ready
-      setTimeout(() => {
-        generateStory();
-      }, 500);
+      // Refresh user to get updated emailVerified status, then generate
+      const autoGen = async () => {
+        await refreshUser(); // Ensure we have fresh email verification status
+        // Small delay to ensure UI is ready
+        setTimeout(() => {
+          generateStory();
+        }, 500);
+      };
+      autoGen();
     }
-  }, [isAuthenticated, characters, step, isGenerating]);
+  }, [isAuthenticated, characters, step, isGenerating, refreshUser]);
 
   // Render current step content
   const renderStep = () => {
@@ -2231,6 +2236,11 @@ export default function StoryWizard() {
       <EmailVerificationModal
         isOpen={showEmailVerificationModal}
         onClose={() => setShowEmailVerificationModal(false)}
+        onVerified={() => {
+          // Email verified! Now trigger story generation
+          setShowEmailVerificationModal(false);
+          generateStory();
+        }}
       />
     </div>
   );
