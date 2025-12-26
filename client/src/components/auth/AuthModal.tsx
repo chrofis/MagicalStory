@@ -41,6 +41,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
   const { login, register, loginWithGoogle, resetPassword } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [sharedEmail, setSharedEmail] = useState('');
 
@@ -58,12 +59,15 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
 
   const handleLogin = async (email: string, password: string) => {
     setError('');
+    setErrorCode(null);
     setIsLoading(true);
     try {
       await login(email, password);
       handleLoginSuccess();
     } catch (err) {
+      const errorWithCode = err as Error & { code?: string };
       setError(err instanceof Error ? err.message : errors.loginFailed);
+      setErrorCode(errorWithCode.code || null);
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +116,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
   const switchMode = (newMode: AuthMode) => {
     setMode(newMode);
     setError('');
+    setErrorCode(null);
   };
 
   return (
@@ -162,6 +167,8 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
             onSwitchToRegister={() => switchMode('register')}
             onForgotPassword={() => switchMode('reset')}
             error={error}
+            errorCode={errorCode}
+            onClearError={() => { setError(''); setErrorCode(null); }}
             isLoading={isLoading}
             initialEmail={sharedEmail}
             onEmailChange={setSharedEmail}

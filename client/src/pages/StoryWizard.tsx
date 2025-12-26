@@ -63,9 +63,13 @@ export default function StoryWizard() {
     qualityModel: null,
   });
 
-  // Step 1: Story Type & Art Style
-  const [storyType, setStoryType] = useState('');
-  const [artStyle, setArtStyle] = useState('pixar');
+  // Step 1: Story Type & Art Style - load from localStorage
+  const [storyType, setStoryType] = useState(() => {
+    return localStorage.getItem('story_type') || '';
+  });
+  const [artStyle, setArtStyle] = useState(() => {
+    return localStorage.getItem('story_art_style') || 'pixar';
+  });
   const [customStoryTypes, setCustomStoryTypes] = useState<Array<{ id: string; name: { en: string; de: string; fr: string }; emoji: string }>>([]);
 
   // Step 2: Characters
@@ -497,6 +501,15 @@ export default function StoryWizard() {
   useEffect(() => {
     localStorage.setItem('story_details', storyDetails);
   }, [storyDetails]);
+
+  // Persist Step 1 settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('story_type', storyType);
+  }, [storyType]);
+
+  useEffect(() => {
+    localStorage.setItem('story_art_style', artStyle);
+  }, [artStyle]);
 
   // Initialize relationships when moving to step 3 (only once per character set)
   // Wait until not loading to ensure API data is loaded first
@@ -1703,6 +1716,8 @@ export default function StoryWizard() {
                 setExcludedCharacters([]);
 
                 // Clear localStorage for story settings
+                localStorage.removeItem('story_type');
+                localStorage.removeItem('story_art_style');
                 localStorage.removeItem('story_language_level');
                 localStorage.removeItem('story_pages');
                 localStorage.removeItem('story_dedication');
@@ -1818,7 +1833,10 @@ export default function StoryWizard() {
             <div className="py-12 flex flex-col items-center justify-center">
               <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
               <p className="text-gray-600 font-medium mb-2">
-                {language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire...' : 'Loading story...'}
+                {loadingProgress
+                  ? (language === 'de' ? 'Geschichte wird geladen...' : language === 'fr' ? 'Chargement de l\'histoire...' : 'Loading story...')
+                  : (language === 'de' ? 'Wird geladen...' : language === 'fr' ? 'Chargement...' : 'Loading...')
+                }
               </p>
               {loadingProgress && (
                 <div className="w-64 mt-2">

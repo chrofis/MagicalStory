@@ -214,8 +214,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Login failed');
+      const errorData = await response.json();
+      const error = new Error(errorData.error || 'Login failed') as Error & { code?: string };
+      error.code = errorData.code;
+      throw error;
     }
 
     const data = await response.json();

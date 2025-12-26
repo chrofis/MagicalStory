@@ -5,12 +5,35 @@ import { Input } from '@/components/common/Input';
 import { Alert } from '@/components/common/Alert';
 import GoogleIcon from './GoogleIcon';
 
+const emailNotRegisteredTexts = {
+  en: {
+    title: 'Email not registered',
+    message: 'The email address is not registered:',
+    changeEmail: 'Change email',
+    createAccount: 'Create account',
+  },
+  de: {
+    title: 'E-Mail nicht registriert',
+    message: 'Diese E-Mail-Adresse ist nicht registriert:',
+    changeEmail: 'E-Mail ändern',
+    createAccount: 'Konto erstellen',
+  },
+  fr: {
+    title: 'Email non enregistré',
+    message: 'Cette adresse email n\'est pas enregistrée:',
+    changeEmail: 'Modifier l\'email',
+    createAccount: 'Créer un compte',
+  },
+};
+
 interface LoginFormProps {
   onSubmit: (email: string, password: string) => Promise<void>;
   onGoogleSignIn: () => Promise<void>;
   onSwitchToRegister: () => void;
   onForgotPassword: () => void;
   error?: string;
+  errorCode?: string | null;
+  onClearError?: () => void;
   isLoading?: boolean;
   initialEmail?: string;
   onEmailChange?: (email: string) => void;
@@ -22,17 +45,27 @@ export function LoginForm({
   onSwitchToRegister,
   onForgotPassword,
   error,
+  errorCode,
+  onClearError,
   isLoading,
   initialEmail = '',
   onEmailChange,
 }: LoginFormProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
+
+  const notRegisteredTexts = emailNotRegisteredTexts[language as keyof typeof emailNotRegisteredTexts] || emailNotRegisteredTexts.en;
+  const isEmailNotRegistered = errorCode === 'EMAIL_NOT_REGISTERED';
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
     onEmailChange?.(value);
+  };
+
+  const handleChangeEmail = () => {
+    onClearError?.();
+    setPassword('');
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -47,7 +80,29 @@ export function LoginForm({
         <p className="text-gray-500">{t.loginRequired}</p>
       </div>
 
-      {error && (
+      {isEmailNotRegistered ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+          <h3 className="font-semibold text-amber-800 mb-2">{notRegisteredTexts.title}</h3>
+          <p className="text-sm text-amber-700 mb-2">{notRegisteredTexts.message}</p>
+          <p className="font-medium text-gray-800 mb-4 break-all">{email}</p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleChangeEmail}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+            >
+              {notRegisteredTexts.changeEmail}
+            </button>
+            <button
+              type="button"
+              onClick={onSwitchToRegister}
+              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+            >
+              {notRegisteredTexts.createAccount}
+            </button>
+          </div>
+        </div>
+      ) : error && (
         <Alert variant="error" className="mb-4">
           {error}
         </Alert>

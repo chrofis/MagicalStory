@@ -159,7 +159,7 @@ router.post('/login', authLimiter, async (req, res) => {
     if (isDatabaseMode()) {
       const rows = await dbQuery('SELECT * FROM users WHERE username = $1', [username]);
       if (rows.length === 0) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+        return res.status(401).json({ error: 'Email not registered', code: 'EMAIL_NOT_REGISTERED' });
       }
 
       const dbUser = rows[0];

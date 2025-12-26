@@ -984,6 +984,21 @@ async function initializeDatabase() {
       END $$;
     `);
 
+    // Add photo consent column
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='photo_consent_at') THEN
+          ALTER TABLE users ADD COLUMN photo_consent_at TIMESTAMP;
+        END IF;
+      END $$;
+    `);
+
+    // Set existing users as having consented (retroactive consent for users before this feature)
+    await dbPool.query(`
+      UPDATE users SET photo_consent_at = CURRENT_TIMESTAMP WHERE photo_consent_at IS NULL;
+    `);
+
     // Mark existing users as email verified (they registered before this feature)
     await dbPool.query(`
       UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;
