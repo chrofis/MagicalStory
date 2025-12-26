@@ -1782,8 +1782,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     );
 
     // Deduct credits after successful generation (skip for infinite credits)
+    let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
-      const newCredits = userCredits - creditCost;
       await dbPool.query(
         'UPDATE users SET credits = credits - $1 WHERE id = $2',
         [creditCost, req.user.id]
@@ -2075,8 +2075,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     );
 
     // Deduct credits and log transaction (skip for infinite credits)
+    let newCredits = hasInfiniteCredits ? -1 : userCredits - requiredCredits;
     if (!hasInfiniteCredits) {
-      const newCredits = userCredits - requiredCredits;
       await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, req.user.id]);
       await dbPool.query(
         `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
