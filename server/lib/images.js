@@ -223,23 +223,36 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     parts.push({ text: evaluationPrompt });
 
     // Use Gemini Flash for fast quality evaluation (or override if provided)
-    const modelId = qualityModelOverride || 'gemini-2.0-flash';
+    let modelId = qualityModelOverride || 'gemini-2.0-flash';
     if (qualityModelOverride) {
       log.debug(`🔧 [QUALITY] Using model override: ${modelId}`);
     }
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          maxOutputTokens: 2500,  // Increased to allow full evaluation format with reasoning
-          temperature: 0.3
-        }
-      })
-    });
+    // Helper function to call the API
+    const callQualityAPI = async (model) => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            maxOutputTokens: 2500,  // Increased to allow full evaluation format with reasoning
+            temperature: 0.3
+          }
+        })
+      });
+    };
+
+    let response = await callQualityAPI(modelId);
+
+    // Fallback: If 2.5 model fails, try 2.0
+    if (!response.ok && modelId.includes('2.5')) {
+      const error = await response.text();
+      log.warn(`⚠️  [QUALITY] Model ${modelId} failed, falling back to gemini-2.0-flash. Error: ${error.substring(0, 200)}`);
+      modelId = 'gemini-2.0-flash';
+      response = await callQualityAPI(modelId);
+    }
 
     if (!response.ok) {
       const error = await response.text();
