@@ -141,7 +141,9 @@ export default function StoryWizard() {
   const [generatedStory, setGeneratedStory] = useState('');
   const [storyOutline, setStoryOutline] = useState(''); // Outline for dev mode display
   const [outlinePrompt, setOutlinePrompt] = useState(''); // API prompt for outline (dev mode)
-  const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string }>>([]); // API prompts for story text (dev mode)
+  const [outlineModelId, setOutlineModelId] = useState<string | undefined>(); // Model used for outline (dev mode)
+  const [outlineUsage, setOutlineUsage] = useState<{ input_tokens: number; output_tokens: number } | undefined>(); // Token usage for outline (dev mode)
+  const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>>([]); // API prompts for story text (dev mode)
   const [visualBible, setVisualBible] = useState<VisualBible | null>(null); // Visual Bible for dev mode
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
@@ -211,6 +213,8 @@ export default function StoryWizard() {
           setArtStyle(story.artStyle || 'pixar');
           setStoryOutline(story.outline || '');
           setOutlinePrompt(story.outlinePrompt || '');
+          setOutlineModelId(story.outlineModelId);
+          setOutlineUsage(story.outlineUsage);
           setStoryTextPrompts(story.storyTextPrompts || []);
           // Ensure visualBible has required fields (backward compatibility)
           if (story.visualBible) {
@@ -1205,6 +1209,8 @@ export default function StoryWizard() {
           setStoryTitle(status.result.title);
           setStoryOutline(status.result.outline);
           setOutlinePrompt(status.result.outlinePrompt || '');
+          setOutlineModelId(status.result.outlineModelId);
+          setOutlineUsage(status.result.outlineUsage);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
           // Ensure visualBible has required fields (backward compatibility)
           if (status.result.visualBible) {
@@ -1511,6 +1517,8 @@ export default function StoryWizard() {
               story={displayStory}
               outline={storyOutline}
               outlinePrompt={outlinePrompt}
+              outlineModelId={outlineModelId}
+              outlineUsage={outlineUsage}
               storyTextPrompts={storyTextPrompts}
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}

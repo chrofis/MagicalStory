@@ -573,8 +573,10 @@ export const storyService = {
       title: string;
       outline: string;
       outlinePrompt?: string;
+      outlineModelId?: string;
+      outlineUsage?: { input_tokens: number; output_tokens: number };
       story: string;
-      storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
+      storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
       visualBible?: VisualBible;
       sceneDescriptions: SceneDescription[];
       sceneImages: SceneImage[];
@@ -602,8 +604,10 @@ export const storyService = {
         title?: string;
         outline?: string;
         outlinePrompt?: string;
+        outlineModelId?: string;
+        outlineUsage?: { input_tokens: number; output_tokens: number };
         storyText?: string; // Server uses storyText
-        storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
+        storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
         visualBible?: VisualBible;
         sceneDescriptions?: SceneDescription[];
         sceneImages?: SceneImage[];
@@ -636,6 +640,8 @@ export const storyService = {
         title: resultData.title || '',
         outline: resultData.outline || '',
         outlinePrompt: resultData.outlinePrompt,
+        outlineModelId: resultData.outlineModelId,
+        outlineUsage: resultData.outlineUsage,
         story: resultData.storyText || '', // Map storyText -> story
         storyTextPrompts: resultData.storyTextPrompts,
         visualBible: resultData.visualBible,
