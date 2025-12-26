@@ -452,31 +452,40 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     log.debug(`🖼️  [IMAGE GEN] Added cropped previous scene image for visual continuity (SEQUENTIAL MODE)`);
   }
 
-  // Add character photos as reference images
+  // Add character photos as reference images (compressed and cached for token efficiency)
   // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
   if (characterPhotos && characterPhotos.length > 0) {
     let addedCount = 0;
     let skippedCount = 0;
+    let cacheHits = 0;
     const characterNames = [];
     const apiImageHashes = [];  // Track hashes of images actually sent to API
 
-    characterPhotos.forEach((photoData, index) => {
+    for (const photoData of characterPhotos) {
       // Handle both formats: string URL or {name, photoUrl} object
       const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
       const characterName = typeof photoData === 'object' ? photoData?.name : null;
       const providedHash = typeof photoData === 'object' ? photoData?.photoHash : null;
 
       if (photoUrl && photoUrl.startsWith('data:image')) {
-        const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
-        const mimeType = photoUrl.match(/^data:(image\/\w+);base64,/) ?
-          photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+        // Check cache first using hash of original image
+        const imageHash = hashImageData(photoUrl);
+        let compressedBase64 = compressedRefCache.get(imageHash);
 
-        // Calculate hash of the actual data being sent to API
-        const apiHash = hashImageData(photoUrl);
+        if (compressedBase64) {
+          cacheHits++;
+        } else {
+          // Compress and cache (768px for image gen - slightly larger than quality eval)
+          const compressed = await compressImageToJPEG(photoUrl, 85, 768);
+          compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+          compressedRefCache.set(imageHash, compressedBase64);
+        }
+
+        // Calculate hash of the compressed data being sent to API
         apiImageHashes.push({
-          name: characterName || `photo_${index + 1}`,
-          hash: apiHash,
-          matchesProvided: providedHash ? apiHash === providedHash : null
+          name: characterName || `photo_${addedCount + 1}`,
+          hash: imageHash,
+          matchesProvided: providedHash ? imageHash === providedHash : null
         });
 
         // Option A: Add text label BEFORE the image if we have a name
@@ -487,8 +496,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
         parts.push({
           inline_data: {
-            mime_type: mimeType,
-            data: base64Data
+            mime_type: 'image/jpeg',
+            data: compressedBase64
           }
         });
         addedCount++;
@@ -496,9 +505,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         skippedCount++;
         // Log warning for skipped photos to help diagnose issues
         const preview = photoUrl ? photoUrl.substring(0, 50) : 'null/undefined';
-        log.warn(`[IMAGE GEN] Skipping character photo ${index + 1}: not a valid data URL (starts with: ${preview}...)`);
+        log.warn(`[IMAGE GEN] Skipping character photo ${addedCount + skippedCount}: not a valid data URL (starts with: ${preview}...)`);
       }
-    });
+    }
 
     // Log hashes of images being sent to API
     if (apiImageHashes.length > 0) {
@@ -506,9 +515,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
 
     if (characterNames.length > 0) {
-      log.debug(`🖼️  [IMAGE GEN] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')}`);
+      log.debug(`🖼️  [IMAGE GEN] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')} (${cacheHits} cached)`);
     } else {
-      log.debug(`🖼️  [IMAGE GEN] Added ${addedCount}/${characterPhotos.length} character reference images (unlabeled)`);
+      log.debug(`🖼️  [IMAGE GEN] Added ${addedCount}/${characterPhotos.length} character reference images (${cacheHits} cached)`);
     }
     if (skippedCount > 0) {
       log.warn(`[IMAGE GEN] WARNING: ${skippedCount} photos were SKIPPED (not base64 data URLs)`);
