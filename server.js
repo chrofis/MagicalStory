@@ -1696,7 +1696,11 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
 
     // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
-    const imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene');
+    // User-initiated regenerations use Gemini 3 Pro for higher quality
+    const imageResult = await generateImageWithQualityRetry(
+      imagePrompt, referencePhotos, null, 'scene', null, null, null,
+      { imageModel: 'gemini-3-pro-image-preview' }
+    );
 
     // Update the image in story data
     const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
@@ -2018,7 +2022,11 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     }
 
     // Generate new cover with quality retry (automatically retries on text errors)
-    const coverResult = await generateImageWithQualityRetry(coverPrompt, coverCharacterPhotos, null, 'cover');
+    // User-initiated regenerations use Gemini 3 Pro for higher quality
+    const coverResult = await generateImageWithQualityRetry(
+      coverPrompt, coverCharacterPhotos, null, 'cover', null, null, null,
+      { imageModel: 'gemini-3-pro-image-preview' }
+    );
 
     // Update the cover in story data with new structure including quality, description, prompt, and previous version
     const coverData = {
@@ -5262,12 +5270,28 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     }
   };
 
-  // Pricing per million tokens (as of Dec 2024)
-  const PRICING = {
-    anthropic: { input: 3.00, output: 15.00 },      // Claude Sonnet 4.5
-    gemini_image: { input: 0.30, output: 30.00 },   // Gemini 2.5 Flash Image
-    gemini_quality: { input: 0.075, output: 0.30 }, // Gemini 2.5 Flash (text)
-    gemini_text: { input: 0.075, output: 0.30 }     // Gemini 2.5 Flash (text)
+  // Pricing per million tokens by model (as of Dec 2025)
+  const MODEL_PRICING = {
+    // Anthropic models
+    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
+    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+    'claude-opus-4-5': { input: 5.00, output: 25.00 },
+    // Gemini text models
+    'gemini-2.5-flash': { input: 0.075, output: 0.30 },
+    'gemini-2.5-pro': { input: 1.25, output: 10.00 },
+    'gemini-2.0-flash': { input: 0.10, output: 0.40 },
+    // Gemini image models
+    'gemini-2.5-flash-image': { input: 0.30, output: 30.00 },
+    'gemini-3-pro-image-preview': { input: 2.00, output: 120.00 },
+    'gemini-2.0-flash-exp-image-generation': { input: 0.10, output: 0.40 }  // Image editing
+  };
+
+  // Fallback pricing by provider (if model not found)
+  const PROVIDER_PRICING = {
+    anthropic: { input: 3.00, output: 15.00 },
+    gemini_image: { input: 0.30, output: 30.00 },
+    gemini_quality: { input: 0.10, output: 0.40 },
+    gemini_text: { input: 0.075, output: 0.30 }
   };
 
   // Helper to add usage - now supports function-level tracking with model names
@@ -5288,9 +5312,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     }
   };
 
-  // Helper to calculate cost for a usage entry
-  const calculateCost = (provider, inputTokens, outputTokens) => {
-    const pricing = PRICING[provider] || { input: 0, output: 0 };
+  // Helper to calculate cost - uses model-specific pricing if available
+  const calculateCost = (modelOrProvider, inputTokens, outputTokens) => {
+    // Try model-specific pricing first, then fall back to provider pricing
+    const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };
     const inputCost = (inputTokens / 1000000) * pricing.input;
     const outputCost = (outputTokens / 1000000) * pricing.output;
     return { input: inputCost, output: outputCost, total: inputCost + outputCost };
@@ -6448,12 +6473,28 @@ async function processStoryJob(jobId) {
     }
   };
 
-  // Pricing per million tokens (as of Dec 2024)
-  const PRICING = {
-    anthropic: { input: 3.00, output: 15.00 },      // Claude Sonnet 4.5
-    gemini_image: { input: 0.30, output: 30.00 },   // Gemini 2.5 Flash Image
-    gemini_quality: { input: 0.075, output: 0.30 }, // Gemini 2.5 Flash (text)
-    gemini_text: { input: 0.075, output: 0.30 }     // Gemini 2.5 Flash (text)
+  // Pricing per million tokens by model (as of Dec 2025)
+  const MODEL_PRICING = {
+    // Anthropic models
+    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
+    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+    'claude-opus-4-5': { input: 5.00, output: 25.00 },
+    // Gemini text models
+    'gemini-2.5-flash': { input: 0.075, output: 0.30 },
+    'gemini-2.5-pro': { input: 1.25, output: 10.00 },
+    'gemini-2.0-flash': { input: 0.10, output: 0.40 },
+    // Gemini image models
+    'gemini-2.5-flash-image': { input: 0.30, output: 30.00 },
+    'gemini-3-pro-image-preview': { input: 2.00, output: 120.00 },
+    'gemini-2.0-flash-exp-image-generation': { input: 0.10, output: 0.40 }  // Image editing
+  };
+
+  // Fallback pricing by provider (if model not found)
+  const PROVIDER_PRICING = {
+    anthropic: { input: 3.00, output: 15.00 },
+    gemini_image: { input: 0.30, output: 30.00 },
+    gemini_quality: { input: 0.10, output: 0.40 },
+    gemini_text: { input: 0.075, output: 0.30 }
   };
 
   // Helper to add usage - now supports function-level tracking with model names
@@ -6474,9 +6515,10 @@ async function processStoryJob(jobId) {
     }
   };
 
-  // Helper to calculate cost for a usage entry
-  const calculateCost = (provider, inputTokens, outputTokens) => {
-    const pricing = PRICING[provider] || { input: 0, output: 0 };
+  // Helper to calculate cost - uses model-specific pricing if available
+  const calculateCost = (modelOrProvider, inputTokens, outputTokens) => {
+    // Try model-specific pricing first, then fall back to provider pricing
+    const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };
     const inputCost = (inputTokens / 1000000) * pricing.input;
     const outputCost = (outputTokens / 1000000) * pricing.output;
     return { input: inputCost, output: outputCost, total: inputCost + outputCost };
