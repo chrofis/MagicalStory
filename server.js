@@ -5264,10 +5264,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
   // Pricing per million tokens (as of Dec 2024)
   const PRICING = {
-    anthropic: { input: 3.00, output: 15.00 },      // Claude Sonnet 4
-    gemini_image: { input: 0.075, output: 0.30 },   // Gemini Flash
-    gemini_quality: { input: 0.075, output: 0.30 }, // Gemini Flash
-    gemini_text: { input: 0.075, output: 0.30 }     // Gemini Flash
+    anthropic: { input: 3.00, output: 15.00 },      // Claude Sonnet 4.5
+    gemini_image: { input: 0.30, output: 30.00 },   // Gemini 2.5 Flash Image
+    gemini_quality: { input: 0.075, output: 0.30 }, // Gemini 2.5 Flash (text)
+    gemini_text: { input: 0.075, output: 0.30 }     // Gemini 2.5 Flash (text)
   };
 
   // Helper to add usage - now supports function-level tracking with model names
@@ -6450,10 +6450,10 @@ async function processStoryJob(jobId) {
 
   // Pricing per million tokens (as of Dec 2024)
   const PRICING = {
-    anthropic: { input: 3.00, output: 15.00 },      // Claude Sonnet 4
-    gemini_image: { input: 0.075, output: 0.30 },   // Gemini Flash
-    gemini_quality: { input: 0.075, output: 0.30 }, // Gemini Flash
-    gemini_text: { input: 0.075, output: 0.30 }     // Gemini Flash
+    anthropic: { input: 3.00, output: 15.00 },      // Claude Sonnet 4.5
+    gemini_image: { input: 0.30, output: 30.00 },   // Gemini 2.5 Flash Image
+    gemini_quality: { input: 0.075, output: 0.30 }, // Gemini 2.5 Flash (text)
+    gemini_text: { input: 0.075, output: 0.30 }     // Gemini 2.5 Flash (text)
   };
 
   // Helper to add usage - now supports function-level tracking with model names
