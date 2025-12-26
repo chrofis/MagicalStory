@@ -5749,7 +5749,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       // Build scene description (for scenes not already processed during streaming)
       allSceneDescriptions.push({
         pageNumber: pageNum,
-        description: sceneDesc
+        description: sceneDesc,
+        textModelId: streamingTextModelId
       });
 
       log.debug(`📖 [STORYBOOK] Page ${pageNum}: ${pageText.substring(0, 50)}...`);
