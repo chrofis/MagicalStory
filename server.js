@@ -5390,7 +5390,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalImage: imageResult.originalImage || null,
           originalScore: imageResult.originalScore || null,
           originalReasoning: imageResult.originalReasoning || null,
-          referencePhotos  // Dev mode: which photos were used
+          referencePhotos,  // Dev mode: which photos were used
+          modelId: imageResult.modelId || null
         };
 
         // Save final result with quality score (overwrites immediate save)
@@ -6651,21 +6652,21 @@ async function processStoryJob(jobId) {
           log.debug(`📕 [COVER-PARALLEL] Starting front cover (${frontCoverCharacters.length} chars, clothing: ${frontCoverClothing})`);
           const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
           console.log(`✅ [COVER-PARALLEL] Front cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
-          await saveCheckpoint(jobId, 'partial_cover', { type: 'frontCover', imageData: result.imageData, storyTitle }, 0);
+          await saveCheckpoint(jobId, 'partial_cover', { type: 'frontCover', imageData: result.imageData, storyTitle, modelId: result.modelId || null }, 0);
           return { type: 'frontCover', result, photos: frontCoverPhotos, scene: titlePageScene, prompt: frontCoverPrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting initial page (${initialPagePhotos.length} chars, clothing: ${initialPageClothing})`);
           const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
           console.log(`✅ [COVER-PARALLEL] Initial page complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
-          await saveCheckpoint(jobId, 'partial_cover', { type: 'initialPage', imageData: result.imageData }, 1);
+          await saveCheckpoint(jobId, 'partial_cover', { type: 'initialPage', imageData: result.imageData, modelId: result.modelId || null }, 1);
           return { type: 'initialPage', result, photos: initialPagePhotos, scene: initialPageScene, prompt: initialPagePrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting back cover (${backCoverPhotos.length} chars, clothing: ${backCoverClothing})`);
           const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
           console.log(`✅ [COVER-PARALLEL] Back cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
-          await saveCheckpoint(jobId, 'partial_cover', { type: 'backCover', imageData: result.imageData }, 2);
+          await saveCheckpoint(jobId, 'partial_cover', { type: 'backCover', imageData: result.imageData, modelId: result.modelId || null }, 2);
           return { type: 'backCover', result, photos: backCoverPhotos, scene: backCoverScene, prompt: backCoverPrompt };
         })()
       ]);
@@ -7259,7 +7260,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               originalImage: imageResult.originalImage || null,
               originalScore: imageResult.originalScore || null,
               originalReasoning: imageResult.originalReasoning || null,
-              referencePhotos: referencePhotos  // Dev mode: which photos were used
+              referencePhotos: referencePhotos,  // Dev mode: which photos were used
+              modelId: imageResult.modelId || null
             };
 
             // Save final result with quality score (overwrites immediate save)
@@ -7277,7 +7279,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               originalImage: imageResult.originalImage || null,
               originalScore: imageResult.originalScore || null,
               originalReasoning: imageResult.originalReasoning || null,
-              referencePhotos: referencePhotos
+              referencePhotos: referencePhotos,
+              modelId: imageResult.modelId || null
             }, pageNum);
             log.debug(`💾 [PARTIAL] Saved final result for page ${pageNum} (score: ${imageResult.score})`);
 
@@ -7684,7 +7687,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                   wasRegenerated: data.wasRegenerated,
                   originalImage: data.originalImage,
                   originalScore: data.originalScore,
-                  originalReasoning: data.originalReasoning
+                  originalReasoning: data.originalReasoning,
+                  modelId: data.modelId || null
                 });
               }
             } else if (cp.step_name === 'cover') {
@@ -7695,7 +7699,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                   description: data.description || '',
                   prompt: data.prompt || '',
                   qualityScore: data.score,
-                  qualityReasoning: data.reasoning
+                  qualityReasoning: data.reasoning,
+                  modelId: data.modelId || null
                 };
               }
             }
@@ -7878,7 +7883,8 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
         [userId]
       );
 
-      if (emailCheckResult.rows.length > 0 && !emailCheckResult.rows[0].email_verified) {
+      // Check for explicit FALSE (not NULL - legacy users before this feature have NULL and should be treated as verified)
+      if (emailCheckResult.rows.length > 0 && emailCheckResult.rows[0].email_verified === false) {
         log.warn(`User ${req.user.username} attempted story generation without verified email`);
 
         // Send/resend verification email
