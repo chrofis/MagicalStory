@@ -1295,6 +1295,18 @@ export default function StoryWizard() {
   useEffect(() => {
     if (pendingAutoGenerate.current && isAuthenticated && characters.length > 0 && step === 4 && !isGenerating) {
       pendingAutoGenerate.current = false;
+
+      // Check if another window already started generation
+      const generationStarted = localStorage.getItem('verificationGenerationStarted');
+      if (generationStarted) {
+        // Another window already started - don't duplicate
+        console.log('Another window already started generation, skipping auto-generate');
+        return;
+      }
+
+      // Mark that we're starting generation (prevents other window from also starting)
+      localStorage.setItem('verificationGenerationStarted', Date.now().toString());
+
       // Refresh user to get updated emailVerified status, then generate
       const autoGen = async () => {
         await refreshUser(); // Ensure we have fresh email verification status
@@ -1748,6 +1760,7 @@ export default function StoryWizard() {
                 localStorage.removeItem('story_main_characters');
                 localStorage.removeItem('story_excluded_characters');
                 localStorage.removeItem('wizard_step');
+                localStorage.removeItem('verificationGenerationStarted');
 
                 // Go back to step 1
                 setStep(1);
@@ -2238,13 +2251,21 @@ export default function StoryWizard() {
         isOpen={showEmailVerificationModal}
         onClose={() => setShowEmailVerificationModal(false)}
         onVerified={() => {
-          // Email verified! Now trigger story generation
-          // Skip email check since we just verified (React state may not have updated yet)
-          // Clear pending flags so new window (from email link) doesn't also try to generate
+          // Email verified! Check if another window already started generation
+          const generationStarted = localStorage.getItem('verificationGenerationStarted');
+          if (generationStarted) {
+            // Another window already started - just close modal and refresh
+            setShowEmailVerificationModal(false);
+            return;
+          }
+          // Mark that we're starting generation (prevents other window from also starting)
+          localStorage.setItem('verificationGenerationStarted', Date.now().toString());
+          // Clear pending flags
           localStorage.removeItem('pendingStoryGeneration');
           localStorage.removeItem('pending_story_type');
           localStorage.removeItem('pending_art_style');
           setShowEmailVerificationModal(false);
+          // Skip email check since we just verified (React state may not have updated yet)
           generateStory({ skipEmailCheck: true });
         }}
       />
