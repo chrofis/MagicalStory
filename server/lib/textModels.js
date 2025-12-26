@@ -254,6 +254,116 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
 }
 
 /**
+ * Call Google Gemini API for text generation with streaming
+ * @param {string} prompt - The prompt to send
+ * @param {number} maxTokens - Maximum tokens to generate
+ * @param {string} modelId - The model ID to use
+ * @param {function} onChunk - Callback function called with each text chunk
+ * @returns {Promise<{text: string, usage: object}>}
+ */
+async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
+  }
+
+  console.log(`🌊 [STREAM] Starting streaming request to Gemini (${maxTokens} max tokens)...`);
+
+  // Use streamGenerateContent endpoint for streaming
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{ text: prompt }]
+      }],
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.7
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini API error (${response.status}): ${error}`);
+  }
+
+  // Process the SSE stream
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        log.debug('🌊 [GEMINI STREAM] Stream complete');
+        break;
+      }
+
+      // Decode the chunk and add to buffer
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete events from buffer
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+
+        const data = line.slice(6); // Remove 'data: ' prefix
+
+        if (data === '[DONE]' || data.trim() === '') continue;
+
+        try {
+          const event = JSON.parse(data);
+
+          // Extract text from candidates
+          if (event.candidates?.[0]?.content?.parts?.[0]?.text) {
+            const chunk = event.candidates[0].content.parts[0].text;
+            fullText += chunk;
+            if (onChunk) {
+              onChunk(chunk, fullText);
+            }
+          }
+
+          // Extract usage metadata (usually in the last chunk)
+          if (event.usageMetadata) {
+            inputTokens = event.usageMetadata.promptTokenCount || inputTokens;
+            outputTokens = event.usageMetadata.candidatesTokenCount || outputTokens;
+          }
+        } catch {
+          // Skip malformed JSON
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (inputTokens > 0 || outputTokens > 0) {
+    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  }
+
+  return {
+    text: fullText,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens
+    },
+    modelId
+  };
+}
+
+/**
  * Call Google Gemini API for text generation
  */
 async function callGeminiTextAPI(prompt, maxTokens, modelId) {
@@ -366,19 +476,23 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
 
   log.verbose(`🌊 [TEXT STREAM] Calling ${modelName} (${model.modelId}) with max ${effectiveMaxTokens} tokens`);
 
-  // Only Anthropic supports streaming currently
-  if (model.provider === 'anthropic') {
-    const result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
-    return { ...result, modelId: model.modelId };
-  } else {
-    // Fall back to non-streaming for other providers
-    log.debug(`🌊 [TEXT STREAM] Provider ${model.provider} doesn't support streaming, falling back to regular call`);
-    const result = await callTextModel(prompt, maxTokens, modelOverride);
-    if (onChunk) {
-      onChunk(result.text, result.text);
-    }
-    return { ...result, modelId: model.modelId };
+  let result;
+  switch (model.provider) {
+    case 'anthropic':
+      result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
+      break;
+    case 'google':
+      result = await callGeminiTextAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
+      break;
+    default:
+      // Fall back to non-streaming for unknown providers
+      log.debug(`🌊 [TEXT STREAM] Provider ${model.provider} doesn't support streaming, falling back to regular call`);
+      result = await callTextModel(prompt, maxTokens, modelOverride);
+      if (onChunk) {
+        onChunk(result.text, result.text);
+      }
   }
+  return { ...result, modelId: model.modelId };
 }
 
 /**
@@ -401,5 +515,6 @@ module.exports = {
   callAnthropicAPI,
   callAnthropicAPIStreaming,
   callGeminiTextAPI,
+  callGeminiTextAPIStreaming,
   callClaudeAPI
 };
