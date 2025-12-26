@@ -1,14 +1,2 @@
-Edit this children's storybook illustration according to the following instruction:
-
-USER'S EDIT REQUEST: "{EDIT_INSTRUCTION}"
-
-Instructions:
-1. Make ONLY the changes requested by the user
-2. Keep the EXACT same artistic style, colors, and overall composition
-3. Maintain ALL character appearances EXACTLY as they are - do not change any person or character
-4. Preserve the children's book illustration style
-5. Do NOT change anything else in the image beyond what was requested
-6. Do NOT crop, resize, or remove any part of the image
-7. The result should still be appropriate for a children's storybook
-
-IMPORTANT: Only apply the specific edit requested. Keep everything else EXACTLY the same.
+Edit this children's storybook illustration: {EDIT_INSTRUCTION}
+Maintain the same artistic style and character appearances.
