@@ -842,6 +842,9 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   log.debug(`   - Reading Level: ${readingLevel}`);
   log.debug(`   - Pages: ${pageCount}`);
 
+  // Extract character names for Visual Bible exclusion warning
+  const characterNames = characterSummary.map(c => c.name).join(', ');
+
   // Use template if available, otherwise fall back to hardcoded prompt
   if (PROMPT_TEMPLATES.outline) {
     const prompt = fillTemplate(PROMPT_TEMPLATES.outline, {
@@ -852,6 +855,7 @@ function buildStoryPrompt(inputData, sceneCount = null) {
       LANGUAGE: inputData.language || 'en',
       READING_LEVEL: readingLevel,
       CHARACTERS: JSON.stringify(characterSummary),
+      CHARACTER_NAMES: characterNames,  // For Visual Bible exclusion warning
       STORY_TYPE: inputData.storyType || 'adventure',
       STORY_DETAILS: inputData.storyDetails || 'None',
       DEDICATION: inputData.dedication || 'None'

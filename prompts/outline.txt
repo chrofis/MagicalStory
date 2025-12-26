@@ -143,12 +143,14 @@ In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for th
 
 # Part 5: Visual Bible (for Illustration Consistency)
 
-List ALL recurring visual elements that appear in MORE THAN ONE scene. This is CRITICAL for maintaining consistent illustrations throughout the book.
+List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensures consistent illustrations throughout the book.
 
 **Why this matters:** Each illustration is generated independently. Without detailed descriptions, a white cat in scene 3 might become a brown cat in scene 8. The Visual Bible ensures consistency.
 
+**DO NOT include main characters here.** The characters listed in the "Characters" section above ({CHARACTER_NAMES}) are already tracked separately with their reference photos. The Visual Bible is ONLY for NEW elements not already provided.
+
 ## Secondary Characters
-For each person who is NOT a main character but appears in multiple scenes:
+For each person who is NOT listed in the "Characters" section above but appears in multiple scenes (e.g., a shopkeeper, a teacher, a neighbor):
 - **Name/Role**: How they are referred to (e.g., "Fireman Fred" or "the friendly firefighter")
 - **Appears in pages**: List all page numbers
 - **Physical description**: Age, height, build, hair color/style, eye color, skin tone, distinguishing features
@@ -176,7 +178,7 @@ For specific places that appear multiple times with unique visual features:
 - **Appears in pages**: List all page numbers
 - **Key visual features**: Colors, shapes, distinctive elements
 
-**NOTE:** Only include elements that appear in 2+ scenes. Main characters from the Characters list are already tracked separately.
+**NOTE:** Only include elements that appear in 2+ scenes. Never include {CHARACTER_NAMES} here - they are main characters with reference photos.
 
 ---
 
