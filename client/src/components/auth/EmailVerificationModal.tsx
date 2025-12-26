@@ -81,6 +81,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
   // Polling ref to track interval
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const cooldownRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSentRef = useRef(false);
 
   // Cooldown timer effect
   useEffect(() => {
@@ -95,6 +96,41 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
       }
     };
   }, [cooldownSeconds]);
+
+  // Auto-send verification email when modal opens
+  useEffect(() => {
+    if (isOpen && !autoSentRef.current && !emailSent) {
+      autoSentRef.current = true;
+      // Small delay to let modal animate in, then auto-send
+      const timer = setTimeout(async () => {
+        setIsLoading(true);
+        try {
+          const response = await api.post<{ cooldown?: number }>('/api/auth/send-verification', {});
+          setEmailSent(true);
+          setSuccess(t.emailSent);
+          if (response.cooldown) {
+            setCooldownSeconds(response.cooldown);
+          }
+        } catch (err: unknown) {
+          const error = err as { retryAfter?: number; message?: string };
+          if (error.retryAfter) {
+            setCooldownSeconds(error.retryAfter);
+            // Don't show error for rate limit on auto-send - just show cooldown
+            setEmailSent(true); // Assume previous send worked
+          } else {
+            setError(error.message || 'Failed to send verification email');
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    if (!isOpen) {
+      // Reset auto-sent flag when modal closes
+      autoSentRef.current = false;
+    }
+  }, [isOpen, emailSent, t.emailSent]);
 
   // Poll for email verification status when modal is open
   useEffect(() => {

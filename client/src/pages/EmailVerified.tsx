@@ -50,11 +50,31 @@ export default function EmailVerified() {
 
   useEffect(() => {
     const handleVerification = async () => {
+      // First check if original window already started generation
+      // (this can happen before we even start due to race condition)
+      const alreadyStarted = localStorage.getItem('verificationGenerationStarted');
+      if (alreadyStarted) {
+        setStatus('other_window');
+        localStorage.removeItem('pendingStoryGeneration');
+        return;
+      }
+
+      // Check if there's a pending generation (before refreshUser, as it might get cleared)
+      const pendingGeneration = localStorage.getItem('pendingStoryGeneration');
+      const hasPending = pendingGeneration === 'true';
+
       // Refresh user state so emailVerified is updated
       await refreshUser();
 
-      const pendingGeneration = localStorage.getItem('pendingStoryGeneration');
-      if (pendingGeneration !== 'true') {
+      // Re-check if generation started during refreshUser
+      const startedDuringRefresh = localStorage.getItem('verificationGenerationStarted');
+      if (startedDuringRefresh) {
+        setStatus('other_window');
+        localStorage.removeItem('pendingStoryGeneration');
+        return;
+      }
+
+      if (!hasPending) {
         // No pending generation - just show verified message
         setStatus('idle');
         return;
@@ -72,7 +92,6 @@ export default function EmailVerified() {
       if (generationStarted) {
         // Original window is handling it - show message
         setStatus('other_window');
-        // Clear the pending flag since original window is handling it
         localStorage.removeItem('pendingStoryGeneration');
       } else {
         // Original window didn't start (probably closed) - we'll handle it
