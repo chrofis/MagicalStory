@@ -79,6 +79,7 @@ const {
   generateImageWithQualityRetry,
   clearImageCache,
   deleteFromImageCache,
+  compressImageToJPEG,
   IMAGE_QUALITY_THRESHOLD
 } = require('./server/lib/images');
 const {
