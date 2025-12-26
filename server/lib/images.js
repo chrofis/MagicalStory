@@ -182,27 +182,32 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     ];
 
-    // Add reference images if provided
+    // Add reference images if provided (compressed for token efficiency)
     // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
     if (referenceImages && referenceImages.length > 0) {
       let addedCount = 0;
-      referenceImages.forEach(refImg => {
+      let totalSaved = 0;
+      for (const refImg of referenceImages) {
         // Handle both formats: string URL or {name, photoUrl} object
         const photoUrl = typeof refImg === 'string' ? refImg : refImg?.photoUrl;
         if (photoUrl && photoUrl.startsWith('data:image')) {
-          const refBase64 = photoUrl.replace(/^data:image\/\w+;base64,/, '');
-          const refMimeType = photoUrl.match(/^data:(image\/\w+);base64,/) ?
-            photoUrl.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+          // Compress reference image to reduce tokens
+          const originalSize = Math.round(photoUrl.length * 0.75 / 1024); // Approximate KB
+          const compressed = await compressImageToJPEG(photoUrl, 80, 512); // 80% quality, max 512px
+          const compressedSize = Math.round(compressed.length * 0.75 / 1024);
+          totalSaved += originalSize - compressedSize;
+
+          const refBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
           parts.push({
             inline_data: {
-              mime_type: refMimeType,
+              mime_type: 'image/jpeg',
               data: refBase64
             }
           });
           addedCount++;
         }
-      });
-      log.verbose(`⭐ [QUALITY] Added ${addedCount}/${referenceImages.length} reference images for evaluation`);
+      }
+      log.verbose(`⭐ [QUALITY] Added ${addedCount}/${referenceImages.length} reference images (saved ~${totalSaved}KB via compression)`);
     }
 
     // Add evaluation prompt text
