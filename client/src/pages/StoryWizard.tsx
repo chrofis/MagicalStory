@@ -1144,8 +1144,14 @@ export default function StoryWizard() {
             log.debug(`Progress: ${status.progress.current}% - ${status.progress.message || ''}`);
             lastProgress = status.progress.current;
           }
-          // Server progress is already in { current, total, message } format
-          setGenerationProgress(status.progress);
+          // Only update progress if new value >= current (never go backwards)
+          setGenerationProgress(prev => {
+            if (status.progress!.current >= prev.current) {
+              return status.progress!;
+            }
+            // Keep current progress but update message if provided
+            return status.progress!.message ? { ...prev, message: status.progress!.message } : prev;
+          });
         }
 
         // Update cover images progressively as they become available during streaming
