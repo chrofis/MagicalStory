@@ -5255,6 +5255,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     log.debug(`📖 [STORYBOOK] Prompt length: ${storybookPrompt.length} chars`);
 
     let fullStoryText = '';
+    let streamingTextModelId = null;  // Track which model was used for streaming text generation
     const allSceneDescriptions = [];  // Only story pages (1, 2, 3...), NOT cover pages
     const allImages = [];
     const imagePrompts = {};
@@ -5601,8 +5602,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         sceneParser.processChunk(chunk, fullText);
       });
       response = streamResult.text;
-      addUsage('anthropic', streamResult.usage, 'story_text', streamResult.modelId || getActiveTextModel().modelId);
-      log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars`);
+      streamingTextModelId = streamResult.modelId || getActiveTextModel().modelId;
+      addUsage('anthropic', streamResult.usage, 'story_text', streamingTextModelId);
+      log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars (model: ${streamingTextModelId})`);
       log.debug(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
       log.debug(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
     } catch (apiError) {

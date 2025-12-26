@@ -11,6 +11,8 @@ interface RegisterFormProps {
   onSwitchToLogin: () => void;
   error?: string;
   isLoading?: boolean;
+  initialEmail?: string;
+  onEmailChange?: (email: string) => void;
 }
 
 export function RegisterForm({
@@ -19,10 +21,17 @@ export function RegisterForm({
   onSwitchToLogin,
   error,
   isLoading,
+  initialEmail = '',
+  onEmailChange,
 }: RegisterFormProps) {
   const { t } = useLanguage();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    onEmailChange?.(value);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -70,7 +79,7 @@ export function RegisterForm({
           type="email"
           label={t.email}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => handleEmailChange(e.target.value)}
           placeholder="your@email.com"
           required
           disabled={isLoading}

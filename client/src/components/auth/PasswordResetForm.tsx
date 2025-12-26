@@ -9,6 +9,8 @@ interface PasswordResetFormProps {
   onBack: () => void;
   error?: string;
   isLoading?: boolean;
+  initialEmail?: string;
+  onEmailChange?: (email: string) => void;
 }
 
 export function PasswordResetForm({
@@ -16,9 +18,16 @@ export function PasswordResetForm({
   onBack,
   error,
   isLoading,
+  initialEmail = '',
+  onEmailChange,
 }: PasswordResetFormProps) {
   const { t } = useLanguage();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    onEmailChange?.(value);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -43,7 +52,7 @@ export function PasswordResetForm({
           type="email"
           label={t.email}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => handleEmailChange(e.target.value)}
           placeholder="your@email.com"
           required
           disabled={isLoading}

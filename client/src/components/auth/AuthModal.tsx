@@ -42,6 +42,7 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
   const [mode, setMode] = useState<AuthMode>('login');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sharedEmail, setSharedEmail] = useState('');
 
   const errors = errorMessages[language as keyof typeof errorMessages] || errorMessages.en;
 
@@ -141,6 +142,8 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
             onBack={() => switchMode('login')}
             error={error}
             isLoading={isLoading}
+            initialEmail={sharedEmail}
+            onEmailChange={setSharedEmail}
           />
         ) : mode === 'register' ? (
           <RegisterForm
@@ -149,6 +152,8 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
             onSwitchToLogin={() => switchMode('login')}
             error={error}
             isLoading={isLoading}
+            initialEmail={sharedEmail}
+            onEmailChange={setSharedEmail}
           />
         ) : (
           <LoginForm
@@ -158,6 +163,8 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
             onForgotPassword={() => switchMode('reset')}
             error={error}
             isLoading={isLoading}
+            initialEmail={sharedEmail}
+            onEmailChange={setSharedEmail}
           />
         )}
       </div>

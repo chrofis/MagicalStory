@@ -146,7 +146,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="h-screen overflow-y-auto snap-y snap-mandatory bg-gray-50">
+    <div className="h-screen overflow-y-auto snap-y snap-proximity bg-gray-50">
       {/* Navigation - Fixed at top */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-gray-50">
         <Navigation currentStep={0} />
