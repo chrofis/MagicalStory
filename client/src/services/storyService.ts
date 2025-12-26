@@ -726,6 +726,54 @@ export const storyService = {
     return response;
   },
 
+  // Save edited story text (bulk update)
+  async saveStoryText(storyId: string, storyText: string): Promise<{
+    success: boolean;
+    message: string;
+    hasOriginal: boolean;
+  }> {
+    const response = await api.put<{
+      success: boolean;
+      message: string;
+      hasOriginal: boolean;
+    }>(`/api/stories/${storyId}/text`, { story: storyText });
+    return response;
+  },
+
+  // Regenerate image for a page (costs credits)
+  async regenerateImage(storyId: string, pageNumber: number): Promise<{
+    success: boolean;
+    pageNumber: number;
+    imageData: string;
+    versionCount: number;
+    creditsUsed: number;
+    creditsRemaining: number;
+  }> {
+    const response = await api.post<{
+      success: boolean;
+      pageNumber: number;
+      imageData: string;
+      versionCount: number;
+      creditsUsed: number;
+      creditsRemaining: number;
+    }>(`/api/stories/${storyId}/regenerate/image/${pageNumber}`, {});
+    return response;
+  },
+
+  // Select which image version is active
+  async setActiveImage(storyId: string, pageNumber: number, versionIndex: number): Promise<{
+    success: boolean;
+    activeVersion: number;
+    pageNumber: number;
+  }> {
+    const response = await api.put<{
+      success: boolean;
+      activeVersion: number;
+      pageNumber: number;
+    }>(`/api/stories/${storyId}/pages/${pageNumber}/active-image`, { versionIndex });
+    return response;
+  },
+
 };
 
 export default storyService;

@@ -33,6 +33,8 @@ data/files.json
 
 # User content and uploads
 # Images/ - now included in git for Railway deployment
+# But keep originals out (large files)
+images/originals/
 Magical-Story-images/
 Geschichten, Prompts, Inputs/
 MagicalStory/

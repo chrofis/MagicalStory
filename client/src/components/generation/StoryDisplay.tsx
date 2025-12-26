@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X, Coins, Images } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt, ReferencePhoto } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt, ReferencePhoto, ImageVersion } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 
@@ -243,6 +243,13 @@ interface StoryDisplayProps {
     totalPages: number;
   };
   completedPageImages?: Record<number, string>;
+  // Story text editing
+  originalStory?: string;
+  onSaveStoryText?: (text: string) => Promise<void>;
+  // Image regeneration with credits
+  userCredits?: number;
+  imageRegenerationCost?: number;
+  onSelectImageVersion?: (pageNumber: number, versionIndex: number) => Promise<void>;
 }
 
 export function StoryDisplay({
@@ -276,6 +283,13 @@ export function StoryDisplay({
   progressiveMode = false,
   progressiveData,
   completedPageImages = {},
+  // Story text editing
+  originalStory,
+  onSaveStoryText,
+  // Image regeneration with credits
+  userCredits = 0,
+  imageRegenerationCost = 5,
+  onSelectImageVersion,
 }: StoryDisplayProps) {
   const { t, language } = useLanguage();
   const isPictureBook = languageLevel === '1st-grade';
@@ -283,6 +297,58 @@ export function StoryDisplay({
   // Visual Bible editing state (only used in developer mode)
   const [editingEntry, setEditingEntry] = useState<{ type: string; id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
+
+  // Story text editing state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedStory, setEditedStory] = useState(story);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Image history modal state
+  const [imageHistoryModal, setImageHistoryModal] = useState<{ pageNumber: number; versions: ImageVersion[] } | null>(null);
+
+  // Update edited story when story prop changes (e.g., after save)
+  useEffect(() => {
+    if (!isEditMode) {
+      setEditedStory(story);
+    }
+  }, [story, isEditMode]);
+
+  // Handle save story text
+  const handleSaveStory = async () => {
+    if (!onSaveStoryText) return;
+    setIsSaving(true);
+    try {
+      await onSaveStoryText(editedStory);
+      setIsEditMode(false);
+    } catch (err) {
+      console.error('Failed to save story text:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditedStory(story);
+    setIsEditMode(false);
+  };
+
+  // Get image versions for a page
+  const getImageVersions = (pageNumber: number): ImageVersion[] => {
+    const image = sceneImages.find(img => img.pageNumber === pageNumber);
+    return image?.imageVersions || [];
+  };
+
+  // Handle selecting a different image version
+  const handleSelectVersion = async (pageNumber: number, versionIndex: number) => {
+    if (!onSelectImageVersion) return;
+    try {
+      await onSelectImageVersion(pageNumber, versionIndex);
+      setImageHistoryModal(null);
+    } catch (err) {
+      console.error('Failed to select image version:', err);
+    }
+  };
 
   // Helper to start editing a Visual Bible entry
   const startEditing = (type: string, id: string, field: string, currentValue: string) => {
@@ -348,7 +414,9 @@ export function StoryDisplay({
     return pageMatches.slice(1).filter(p => p.trim().length > 0);
   };
 
-  const storyPages = parseStoryPages(story);
+  // Use edited story in edit mode, otherwise use original
+  const displayStory = isEditMode ? editedStory : story;
+  const storyPages = parseStoryPages(displayStory);
   const hasImages = sceneImages.length > 0;
 
   // Progressive mode: Calculate max viewable page
@@ -503,6 +571,19 @@ export function StoryDisplay({
             }`}
           >
             <BookOpen size={20} /> {language === 'de' ? 'Buch drucken (DEV)' : language === 'fr' ? 'Imprimer livre (DEV)' : 'Print Book (DEV)'}
+          </button>
+        )}
+
+        {/* Edit Story - when save callback is available */}
+        {onSaveStoryText && !isEditMode && (
+          <button
+            onClick={() => setIsEditMode(true)}
+            disabled={isGenerating}
+            className={`bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'
+            }`}
+          >
+            <Edit3 size={20} /> {language === 'de' ? 'Geschichte bearbeiten' : language === 'fr' ? 'Modifier l\'histoire' : 'Edit Story'}
           </button>
         )}
 

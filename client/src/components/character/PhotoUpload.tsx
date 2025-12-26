@@ -117,11 +117,11 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
             </span>
             <span className="text-sm text-gray-700 group-hover:text-gray-900">
               {texts.consent2}{' '}
-              <Link to="/terms" className="text-indigo-600 hover:underline" target="_blank">
+              <Link to="/terms" className="text-indigo-600 hover:underline">
                 {texts.termsLink}
               </Link>{' '}
               {texts.and}{' '}
-              <Link to="/privacy" className="text-indigo-600 hover:underline" target="_blank">
+              <Link to="/privacy" className="text-indigo-600 hover:underline">
                 {texts.privacyLink}
               </Link>
               {texts.period}

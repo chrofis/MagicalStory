@@ -49,6 +49,15 @@ export interface ReferencePhoto {
   clothingCategory?: 'winter' | 'summer' | 'formal' | 'standard' | null;
 }
 
+// Individual image version (for user-initiated regenerations)
+export interface ImageVersion {
+  imageData: string;
+  prompt?: string;
+  modelId?: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
 export interface SceneImage {
   pageNumber: number;
   imageData: string;
@@ -68,6 +77,8 @@ export interface SceneImage {
   referencePhotos?: ReferencePhoto[];
   // API model used (for dev mode)
   modelId?: string;
+  // User-initiated image versions (first is original, subsequent are regenerations)
+  imageVersions?: ImageVersion[];
 }
 
 export interface CoverImageData {
@@ -112,6 +123,7 @@ export interface SavedStory {
   outline?: string;
   outlinePrompt?: string;
   story?: string;
+  originalStory?: string;  // Original AI-generated story text (preserved on first edit)
   storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
   visualBible?: Partial<VisualBible>;
   sceneDescriptions?: SceneDescription[];

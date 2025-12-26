@@ -27,6 +27,11 @@ const log = {
   verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args)
 };
 
+// Credit costs for various operations (easy to configure)
+const CREDIT_COSTS = {
+  IMAGE_REGENERATION: 5,  // Cost to regenerate a single scene image
+};
+
 // Initialize BOTH Stripe clients - test for admins/developers, live for regular users
 const stripeTest = process.env.STRIPE_TEST_SECRET_KEY
   ? require('stripe')(process.env.STRIPE_TEST_SECRET_KEY)
@@ -1659,14 +1664,29 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
   }
 });
 
-// Regenerate image for a specific page
+// Regenerate image for a specific page (costs credits)
 app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const { customPrompt } = req.body;
     const pageNumber = parseInt(pageNum);
+    const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
-    log.debug(`🔄 Regenerating image for story ${id}, page ${pageNumber}`);
+    log.debug(`🔄 Regenerating image for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)`);
+
+    // Check user credits first
+    const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userCredits = userResult.rows[0].credits || 0;
+    if (userCredits < creditCost) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        required: creditCost,
+        available: userCredits
+      });
+    }
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -1764,9 +1784,38 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
 
     log.debug(`📸 [REGEN] New image generated - score: ${imageResult.score}, attempts: ${imageResult.totalAttempts}, model: ${imageResult.modelId}`);
 
+    // Initialize imageVersions if not present (migrate existing image as first version)
+    if (existingImage && !existingImage.imageVersions) {
+      existingImage.imageVersions = [{
+        imageData: existingImage.imageData,
+        prompt: existingImage.prompt,
+        modelId: existingImage.modelId,
+        createdAt: storyData.createdAt || new Date().toISOString(),
+        isActive: false  // Will become inactive when new image is added
+      }];
+    }
+
+    // Create new version entry
+    const newVersion = {
+      imageData: imageResult.imageData,
+      prompt: imagePrompt,
+      modelId: imageResult.modelId || null,
+      createdAt: new Date().toISOString(),
+      isActive: true
+    };
+
     if (existingIndex >= 0) {
-      sceneImages[existingIndex] = newImageData;
+      // Set all existing versions to inactive
+      if (sceneImages[existingIndex].imageVersions) {
+        sceneImages[existingIndex].imageVersions.forEach(v => v.isActive = false);
+        sceneImages[existingIndex].imageVersions.push(newVersion);
+      } else {
+        sceneImages[existingIndex].imageVersions = [newVersion];
+      }
+      // Update main fields
+      Object.assign(sceneImages[existingIndex], newImageData);
     } else {
+      newImageData.imageVersions = [newVersion];
       sceneImages.push(newImageData);
       sceneImages.sort((a, b) => a.pageNumber - b.pageNumber);
     }
@@ -1782,7 +1831,23 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, regeneration #${newImageData.regenerationCount})`);
+    // Deduct credits after successful generation
+    await dbPool.query(
+      'UPDATE users SET credits = credits - $1 WHERE id = $2',
+      [creditCost, req.user.id]
+    );
+    // Log credit transaction
+    await dbPool.query(
+      `INSERT INTO credit_transactions (user_id, amount, type, description)
+       VALUES ($1, $2, 'image_regeneration', $3)`,
+      [req.user.id, -creditCost, `Regenerate image for page ${pageNumber}`]
+    );
+
+    const newCredits = userCredits - creditCost;
+    console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
+
+    // Get version count for response
+    const versionCount = sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions?.length || 1;
 
     res.json({
       success: true,
@@ -1796,6 +1861,10 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       retryHistory: imageResult.retryHistory || [],
       wasRegenerated: true,
       regenerationCount: newImageData.regenerationCount,
+      // Version info
+      versionCount,
+      creditsUsed: creditCost,
+      creditsRemaining: newCredits,
       // Previous version (immediate predecessor)
       previousImage: previousImageData,
       previousScore: previousScore,

@@ -360,4 +360,130 @@ router.put('/:id/visual-bible', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/stories/:id/text - Bulk update story text (for edit mode)
+router.put('/:id/text', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { story: newStoryText } = req.body;
+
+    if (!newStoryText) {
+      return res.status(400).json({ error: 'story text is required' });
+    }
+
+    console.log(`📝 PUT /api/stories/${id}/text - Saving edited text`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = JSON.parse(result.rows[0].data);
+
+    // Preserve original story text on first edit
+    if (!storyData.originalStory && storyData.story) {
+      storyData.originalStory = storyData.story;
+      console.log(`📝 Preserved original story text (${storyData.originalStory.length} chars)`);
+    }
+
+    // Update story text
+    storyData.story = newStoryText;
+    storyData.storyText = newStoryText; // Also update storyText for compatibility
+    storyData.updatedAt = new Date().toISOString();
+
+    await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+
+    console.log(`✅ Story text updated for ${id}`);
+    await logActivity(req.user.id, req.user.username, 'STORY_TEXT_EDITED', { storyId: id });
+
+    res.json({
+      success: true,
+      message: 'Story text saved successfully',
+      hasOriginal: !!storyData.originalStory
+    });
+
+  } catch (err) {
+    console.error('Error saving story text:', err);
+    res.status(500).json({ error: 'Failed to save story text: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/pages/:pageNumber/active-image - Select which image version is active
+router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNumber } = req.params;
+    const { versionIndex } = req.body;
+    const pageNum = parseInt(pageNumber);
+
+    if (typeof versionIndex !== 'number' || versionIndex < 0) {
+      return res.status(400).json({ error: 'Valid versionIndex is required' });
+    }
+
+    console.log(`🖼️ PUT /api/stories/${id}/pages/${pageNum}/active-image - Selecting version ${versionIndex}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = JSON.parse(result.rows[0].data);
+    const sceneImages = storyData.sceneImages || [];
+    const sceneIndex = sceneImages.findIndex(s => s.pageNumber === pageNum);
+
+    if (sceneIndex === -1) {
+      return res.status(404).json({ error: 'Scene not found for this page' });
+    }
+
+    const scene = sceneImages[sceneIndex];
+    const versions = scene.imageVersions || [];
+
+    if (versionIndex >= versions.length) {
+      return res.status(400).json({ error: 'Invalid version index' });
+    }
+
+    // Update isActive flags
+    versions.forEach((v, i) => {
+      v.isActive = (i === versionIndex);
+    });
+
+    // Also update the main imageData to the selected version
+    scene.imageData = versions[versionIndex].imageData;
+    scene.imageVersions = versions;
+
+    storyData.sceneImages = sceneImages;
+    storyData.updatedAt = new Date().toISOString();
+
+    await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+
+    console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum}`);
+
+    res.json({
+      success: true,
+      activeVersion: versionIndex,
+      pageNumber: pageNum
+    });
+
+  } catch (err) {
+    console.error('Error setting active image:', err);
+    res.status(500).json({ error: 'Failed to set active image: ' + err.message });
+  }
+});
+
 module.exports = router;
