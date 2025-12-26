@@ -5277,7 +5277,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
     'claude-opus-4-5': { input: 5.00, output: 25.00 },
     // Gemini text models
-    'gemini-2.5-flash': { input: 0.075, output: 0.30 },
+    'gemini-2.5-flash': { input: 0.30, output: 2.50 },
     'gemini-2.5-pro': { input: 1.25, output: 10.00 },
     'gemini-2.0-flash': { input: 0.10, output: 0.40 },
     // Gemini image models
@@ -5291,7 +5291,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     anthropic: { input: 3.00, output: 15.00 },
     gemini_image: { input: 0.30, output: 30.00 },
     gemini_quality: { input: 0.10, output: 0.40 },
-    gemini_text: { input: 0.075, output: 0.30 }
+    gemini_text: { input: 0.30, output: 2.50 }
   };
 
   // Helper to add usage - now supports function-level tracking with model names
@@ -6482,7 +6482,7 @@ async function processStoryJob(jobId) {
     'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
     'claude-opus-4-5': { input: 5.00, output: 25.00 },
     // Gemini text models
-    'gemini-2.5-flash': { input: 0.075, output: 0.30 },
+    'gemini-2.5-flash': { input: 0.30, output: 2.50 },
     'gemini-2.5-pro': { input: 1.25, output: 10.00 },
     'gemini-2.0-flash': { input: 0.10, output: 0.40 },
     // Gemini image models
@@ -6496,7 +6496,7 @@ async function processStoryJob(jobId) {
     anthropic: { input: 3.00, output: 15.00 },
     gemini_image: { input: 0.30, output: 30.00 },
     gemini_quality: { input: 0.10, output: 0.40 },
-    gemini_text: { input: 0.075, output: 0.30 }
+    gemini_text: { input: 0.30, output: 2.50 }
   };
 
   // Helper to add usage - now supports function-level tracking with model names
