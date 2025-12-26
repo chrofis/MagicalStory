@@ -516,17 +516,22 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
       [verificationToken, verificationExpires, user.id]
     );
 
-    if (emailService) {
-      const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-      const emailResult = await emailService.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
-
-      if (!emailResult) {
-        return res.status(500).json({ error: 'Failed to send verification email. Please try again later.' });
-      }
-
-      console.log(`✅ Verification email sent to ${user.email}`);
+    if (!emailService) {
+      console.error('❌ Email service not available - cannot send verification email');
+      return res.status(500).json({ error: 'Email service not configured. Please contact support.' });
     }
 
+    const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+    console.log(`📧 Sending verification email to: ${user.email}, URL: ${verifyUrl}`);
+
+    const emailResult = await emailService.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
+
+    if (!emailResult) {
+      console.error(`❌ Failed to send verification email to ${user.email} - no result returned`);
+      return res.status(500).json({ error: 'Failed to send verification email. Please try again later.' });
+    }
+
+    console.log(`✅ Verification email sent successfully to ${user.email}`);
     res.json({ success: true, message: 'Verification email sent', cooldown: VERIFICATION_EMAIL_COOLDOWN_SECONDS });
   } catch (err) {
     console.error('Send verification error:', err);
