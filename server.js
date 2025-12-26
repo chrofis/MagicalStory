@@ -1005,17 +1005,11 @@ async function initializeDatabase() {
       UPDATE users SET photo_consent_at = CURRENT_TIMESTAMP WHERE photo_consent_at IS NULL;
     `);
 
-    // Mark existing users as email verified (they registered before this feature)
+    // Mark existing users as email verified (only those with NULL - legacy users before this feature)
+    // New users will have email_verified = FALSE set explicitly during registration
     await dbPool.query(`
       UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;
     `);
-
-    // Mark ALL existing users as email verified (migration fix)
-    // Users who registered before email verification was required should be grandfathered in
-    const verifyResult = await dbPool.query(`
-      UPDATE users SET email_verified = TRUE WHERE email_verified = FALSE RETURNING id, username;
-    `);
-    console.log(`[MIGRATION] Set email_verified=TRUE for ${verifyResult.rowCount} users:`, verifyResult.rows.map(r => r.username).join(', '));
 
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS config (
