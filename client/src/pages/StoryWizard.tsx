@@ -1054,9 +1054,10 @@ export default function StoryWizard() {
     return storyType;
   };
 
-  const generateStory = async (overrides?: { skipImages?: boolean }) => {
+  const generateStory = async (overrides?: { skipImages?: boolean; skipEmailCheck?: boolean }) => {
     // Check email verification before generating (emailVerified could be false or undefined)
-    if (user && user.emailVerified !== true) {
+    // Skip this check if we just verified (skipEmailCheck=true) since React state may not have updated yet
+    if (!overrides?.skipEmailCheck && user && user.emailVerified !== true) {
       // Store all story state so we can auto-generate after email verification
       localStorage.setItem('pendingStoryGeneration', 'true');
       localStorage.setItem('pending_story_type', storyType);
@@ -1297,9 +1298,9 @@ export default function StoryWizard() {
       // Refresh user to get updated emailVerified status, then generate
       const autoGen = async () => {
         await refreshUser(); // Ensure we have fresh email verification status
-        // Small delay to ensure UI is ready
+        // Small delay to ensure UI is ready, skip email check since we just verified
         setTimeout(() => {
-          generateStory();
+          generateStory({ skipEmailCheck: true });
         }, 500);
       };
       autoGen();
@@ -2238,8 +2239,9 @@ export default function StoryWizard() {
         onClose={() => setShowEmailVerificationModal(false)}
         onVerified={() => {
           // Email verified! Now trigger story generation
+          // Skip email check since we just verified (React state may not have updated yet)
           setShowEmailVerificationModal(false);
-          generateStory();
+          generateStory({ skipEmailCheck: true });
         }}
       />
     </div>
