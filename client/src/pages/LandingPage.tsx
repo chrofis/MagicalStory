@@ -146,7 +146,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="h-screen overflow-y-auto snap-y snap-proximity bg-gray-50">
+    <div className="h-screen overflow-y-auto snap-y snap-mandatory bg-gray-50">
       {/* Navigation - Fixed at top */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-gray-50">
         <Navigation currentStep={0} />
@@ -252,11 +252,11 @@ export default function LandingPage() {
       </section>
 
       {/* Section 1: Create Your Characters */}
-      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
+      <section className="lg:min-h-screen lg:py-24 px-4 lg:px-8 bg-white lg:snap-start lg:flex lg:flex-col lg:justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-1">
+            <div className="w-full lg:w-1/2 order-2 lg:order-1 min-h-screen lg:min-h-0 flex flex-col justify-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
                   <Camera className="w-6 h-6 text-indigo-600" />
@@ -285,7 +285,7 @@ export default function LandingPage() {
               </ul>
             </div>
             {/* Image */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-2">
+            <div className="w-full lg:w-1/2 order-1 lg:order-2 min-h-screen lg:min-h-0 flex items-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
               <img
                 src={`/images/landing-characters-${language}.jpg`}
                 alt={st.createCharacters}
@@ -297,11 +297,11 @@ export default function LandingPage() {
       </section>
 
       {/* Section 2: Tell Your Story */}
-      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
+      <section className="lg:min-h-screen lg:py-24 px-4 lg:px-8 bg-gray-50 lg:snap-start lg:flex lg:flex-col lg:justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Image */}
-            <div className="w-full lg:w-1/2">
+            <div className="w-full lg:w-1/2 min-h-screen lg:min-h-0 flex items-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
               <img
                 src="/images/landing-story.jpg"
                 alt={st.tellStory}
@@ -309,7 +309,7 @@ export default function LandingPage() {
               />
             </div>
             {/* Text Content */}
-            <div className="w-full lg:w-1/2">
+            <div className="w-full lg:w-1/2 min-h-screen lg:min-h-0 flex flex-col justify-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-amber-100 p-3 rounded-full">
                   <BookOpen className="w-6 h-6 text-amber-600" />
@@ -342,11 +342,11 @@ export default function LandingPage() {
       </section>
 
       {/* Section 3: Choose Your Style */}
-      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
+      <section className="lg:min-h-screen lg:py-24 px-4 lg:px-8 bg-white lg:snap-start lg:flex lg:flex-col lg:justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-1">
+            <div className="w-full lg:w-1/2 order-2 lg:order-1 min-h-screen lg:min-h-0 flex flex-col justify-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-pink-100 p-3 rounded-full">
                   <Palette className="w-6 h-6 text-pink-600" />
@@ -375,7 +375,7 @@ export default function LandingPage() {
               </ul>
             </div>
             {/* Image */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-2">
+            <div className="w-full lg:w-1/2 order-1 lg:order-2 min-h-screen lg:min-h-0 flex items-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
               <img
                 src="/images/landing-styles.jpg"
                 alt={st.chooseStyle}
@@ -387,11 +387,11 @@ export default function LandingPage() {
       </section>
 
       {/* Section 4: Print & Share */}
-      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
+      <section className="lg:min-h-screen lg:py-24 px-4 lg:px-8 bg-gray-50 lg:snap-start lg:flex lg:flex-col lg:justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Image */}
-            <div className="w-full lg:w-1/2">
+            <div className="w-full lg:w-1/2 min-h-screen lg:min-h-0 flex items-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
               <img
                 src="/images/landing-print.jpg"
                 alt={st.printShare}
@@ -399,7 +399,7 @@ export default function LandingPage() {
               />
             </div>
             {/* Text Content */}
-            <div className="w-full lg:w-1/2">
+            <div className="w-full lg:w-1/2 min-h-screen lg:min-h-0 flex flex-col justify-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-emerald-100 p-3 rounded-full">
                   <Printer className="w-6 h-6 text-emerald-600" />
