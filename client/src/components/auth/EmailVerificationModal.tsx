@@ -111,7 +111,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
     setIsPolling(true);
     pollingRef.current = setInterval(async () => {
       try {
-        const response = await api.get('/api/auth/verification-status');
+        const response = await api.get<{ emailVerified: boolean }>('/api/auth/verification-status');
         if (response.emailVerified) {
           // Email verified! Refresh user and trigger callback
           await refreshUser();
@@ -143,7 +143,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
     setIsLoading(true);
     setError('');
     try {
-      const response = await api.post('/api/auth/send-verification', {});
+      const response = await api.post<{ cooldown?: number }>('/api/auth/send-verification', {});
       setEmailSent(true);
       setSuccess(t.emailSent);
       // Start cooldown timer after successful send

@@ -52,7 +52,11 @@ class ApiClient {
       if (errorData.activeJobId) {
         errorMessage += `|ACTIVE_JOB:${errorData.activeJobId}`;
       }
-      throw new Error(errorMessage);
+      // Create error with additional fields preserved (e.g., retryAfter for rate limiting)
+      const error = new Error(errorMessage) as Error & { retryAfter?: number; code?: string };
+      if (errorData.retryAfter) error.retryAfter = errorData.retryAfter;
+      if (errorData.code) error.code = errorData.code;
+      throw error;
     }
 
     // Handle empty responses
