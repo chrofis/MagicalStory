@@ -3229,6 +3229,17 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
       });
 
       if (!analyzerData.success) {
+        // Check if this is an expected user error (no face detected) vs server error
+        if (analyzerData.error === 'no_face_detected') {
+          log.warn('📸 [PHOTO] No face detected in photo');
+          // Return 200 with success: false for expected user errors
+          // This allows the client to show a proper error message
+          return res.json({
+            success: false,
+            error: 'no_face_detected'
+          });
+        }
+        // Unexpected server error
         log.error('📸 [PHOTO] Python analysis failed:', analyzerData.error, analyzerData.traceback);
         return res.status(500).json({
           error: 'Photo analysis failed',
