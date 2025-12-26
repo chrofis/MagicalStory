@@ -2240,6 +2240,10 @@ export default function StoryWizard() {
         onVerified={() => {
           // Email verified! Now trigger story generation
           // Skip email check since we just verified (React state may not have updated yet)
+          // Clear pending flags so new window (from email link) doesn't also try to generate
+          localStorage.removeItem('pendingStoryGeneration');
+          localStorage.removeItem('pending_story_type');
+          localStorage.removeItem('pending_art_style');
           setShowEmailVerificationModal(false);
           generateStory({ skipEmailCheck: true });
         }}
