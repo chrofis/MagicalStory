@@ -145,18 +145,24 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
 
     // Start polling every 3 seconds
     setIsPolling(true);
+    console.log('[EmailVerificationModal] Starting polling');
     pollingRef.current = setInterval(async () => {
       try {
         const response = await api.get<{ emailVerified: boolean }>('/api/auth/verification-status');
+        console.log('[EmailVerificationModal] Poll result:', response.emailVerified);
         if (response.emailVerified) {
+          console.log('[EmailVerificationModal] Email verified! Refreshing user...');
           // Email verified! Refresh user and trigger callback
           await refreshUser();
+          console.log('[EmailVerificationModal] User refreshed, clearing interval');
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
           }
           setIsPolling(false);
+          console.log('[EmailVerificationModal] Calling onVerified callback');
           onVerified?.();
+          console.log('[EmailVerificationModal] Calling onClose');
           onClose();
         }
       } catch (err) {

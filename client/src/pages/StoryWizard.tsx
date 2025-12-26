@@ -1059,9 +1059,13 @@ export default function StoryWizard() {
   };
 
   const generateStory = async (overrides?: { skipImages?: boolean; skipEmailCheck?: boolean }) => {
+    console.log('[generateStory] Called with overrides:', overrides);
+    console.log('[generateStory] user:', user?.email, 'emailVerified:', user?.emailVerified);
+
     // Check email verification before generating (emailVerified could be false or undefined)
     // Skip this check if we just verified (skipEmailCheck=true) since React state may not have updated yet
     if (!overrides?.skipEmailCheck && user && user.emailVerified !== true) {
+      console.log('[generateStory] Email not verified, showing modal');
       // Store all story state so we can auto-generate after email verification
       localStorage.setItem('pendingStoryGeneration', 'true');
       localStorage.setItem('pending_story_type', storyType);
@@ -1070,6 +1074,7 @@ export default function StoryWizard() {
       return;
     }
 
+    console.log('[generateStory] Starting generation, setting step to 5');
     setIsGenerating(true);
     setStep(5);
     // Reset ALL story state for new generation - must clear old story to show popup
@@ -2265,6 +2270,8 @@ export default function StoryWizard() {
         isOpen={showEmailVerificationModal}
         onClose={() => setShowEmailVerificationModal(false)}
         onVerified={() => {
+          console.log('[EmailVerification] onVerified callback triggered');
+
           // Email verified! Check if another window already started generation
           const generationStarted = localStorage.getItem('verificationGenerationStarted');
           if (generationStarted) {
@@ -2273,21 +2280,29 @@ export default function StoryWizard() {
             const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
             if (startedTime > twoMinutesAgo) {
               // Another window recently started - just close modal
+              console.log('[EmailVerification] Another window started recently, skipping');
               setShowEmailVerificationModal(false);
               return;
             }
             // Flag is stale, clear it and proceed
+            console.log('[EmailVerification] Clearing stale flag');
             localStorage.removeItem('verificationGenerationStarted');
           }
+
           // Mark that we're starting generation (prevents other window from also starting)
           localStorage.setItem('verificationGenerationStarted', Date.now().toString());
           // Clear pending flags
           localStorage.removeItem('pendingStoryGeneration');
           localStorage.removeItem('pending_story_type');
           localStorage.removeItem('pending_art_style');
-          setShowEmailVerificationModal(false);
+
+          console.log('[EmailVerification] Calling generateStory with skipEmailCheck: true');
           // Skip email check since we just verified (React state may not have updated yet)
+          // Call generateStory BEFORE closing modal to ensure it runs
           generateStory({ skipEmailCheck: true });
+
+          // Close modal after starting generation
+          setShowEmailVerificationModal(false);
         }}
       />
     </div>
