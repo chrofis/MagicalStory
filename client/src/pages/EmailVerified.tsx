@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
 import { Button } from '@/components/common/Button';
-import { CheckCircle, Loader2, Monitor } from 'lucide-react';
+import { CheckCircle, Loader2, Monitor, Sparkles } from 'lucide-react';
 
 const translations = {
   en: {
@@ -12,7 +12,8 @@ const translations = {
     checkingOtherWindow: 'Checking if your story is starting in the other window...',
     generatingInOtherWindow: 'Your story is being generated in your other browser window!',
     otherWindowHint: 'You can close this tab and return to your original window.',
-    autoGenerating: 'Starting your story generation...',
+    manualHint: 'Your original window may have been closed. Click below to create your story.',
+    createStory: 'Create Your Story',
     goHome: 'Go to Homepage',
   },
   de: {
@@ -20,7 +21,8 @@ const translations = {
     checkingOtherWindow: 'Prüfe, ob Ihre Geschichte im anderen Fenster startet...',
     generatingInOtherWindow: 'Ihre Geschichte wird im anderen Browserfenster generiert!',
     otherWindowHint: 'Sie können diesen Tab schließen und zu Ihrem ursprünglichen Fenster zurückkehren.',
-    autoGenerating: 'Starte Ihre Geschichte...',
+    manualHint: 'Ihr ursprüngliches Fenster wurde möglicherweise geschlossen. Klicken Sie unten, um Ihre Geschichte zu erstellen.',
+    createStory: 'Geschichte erstellen',
     goHome: 'Zur Startseite',
   },
   fr: {
@@ -28,12 +30,13 @@ const translations = {
     checkingOtherWindow: 'Verification si votre histoire demarre dans l\'autre fenetre...',
     generatingInOtherWindow: 'Votre histoire est en cours de generation dans votre autre fenetre!',
     otherWindowHint: 'Vous pouvez fermer cet onglet et retourner a votre fenetre d\'origine.',
-    autoGenerating: 'Demarrage de votre histoire...',
+    manualHint: 'Votre fenetre d\'origine a peut-etre ete fermee. Cliquez ci-dessous pour creer votre histoire.',
+    createStory: 'Creer votre histoire',
     goHome: 'Aller a l\'accueil',
   },
 };
 
-type Status = 'checking' | 'other_window' | 'redirecting';
+type Status = 'checking' | 'other_window' | 'manual';
 
 export default function EmailVerified() {
   const navigate = useNavigate();
@@ -104,15 +107,10 @@ export default function EmailVerified() {
         setStatus('other_window');
         localStorage.removeItem('pendingStoryGeneration');
       } else {
-        // Original window didn't start (probably closed) - redirect to auto-generate
-        setStatus('redirecting');
+        // Original window didn't start (probably closed) - show manual button
+        // DON'T auto-redirect to prevent duplicate generation
+        setStatus('manual');
         localStorage.removeItem('pendingStoryGeneration');
-        // Small delay so user sees the message
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            navigate('/create?autoGenerate=true');
-          }
-        }, 1000);
       }
     };
 
@@ -161,12 +159,28 @@ export default function EmailVerified() {
             </div>
           )}
 
-          {status === 'redirecting' && (
+          {status === 'manual' && (
             <div className="mb-8">
-              <p className="text-indigo-600 font-medium flex items-center justify-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                {t.autoGenerating}
+              <p className="text-gray-600 mb-4">
+                {t.manualHint}
               </p>
+              <div className="space-y-3">
+                <Button
+                  onClick={() => navigate('/create')}
+                  variant="primary"
+                  className="w-full"
+                >
+                  <Sparkles size={18} className="mr-2" />
+                  {t.createStory}
+                </Button>
+                <Button
+                  onClick={() => navigate('/')}
+                  variant="secondary"
+                  className="w-full"
+                >
+                  {t.goHome}
+                </Button>
+              </div>
             </div>
           )}
 
