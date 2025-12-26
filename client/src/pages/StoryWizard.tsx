@@ -1302,12 +1302,18 @@ export default function StoryWizard() {
     if (pendingAutoGenerate.current && isAuthenticated && characters.length > 0 && step === 4 && !isGenerating) {
       pendingAutoGenerate.current = false;
 
-      // Check if another window already started generation
+      // Check if another window already started generation (within last 2 minutes)
       const generationStarted = localStorage.getItem('verificationGenerationStarted');
       if (generationStarted) {
-        // Another window already started - don't duplicate
-        console.log('Another window already started generation, skipping auto-generate');
-        return;
+        const startedTime = parseInt(generationStarted, 10);
+        const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+        if (startedTime > twoMinutesAgo) {
+          // Another window recently started - don't duplicate
+          console.log('Another window already started generation, skipping auto-generate');
+          return;
+        }
+        // Flag is stale, clear it and proceed
+        localStorage.removeItem('verificationGenerationStarted');
       }
 
       // Mark that we're starting generation (prevents other window from also starting)
@@ -2262,9 +2268,16 @@ export default function StoryWizard() {
           // Email verified! Check if another window already started generation
           const generationStarted = localStorage.getItem('verificationGenerationStarted');
           if (generationStarted) {
-            // Another window already started - just close modal and refresh
-            setShowEmailVerificationModal(false);
-            return;
+            // Check if the flag is recent (within last 2 minutes) - old flags should be ignored
+            const startedTime = parseInt(generationStarted, 10);
+            const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+            if (startedTime > twoMinutesAgo) {
+              // Another window recently started - just close modal
+              setShowEmailVerificationModal(false);
+              return;
+            }
+            // Flag is stale, clear it and proceed
+            localStorage.removeItem('verificationGenerationStarted');
           }
           // Mark that we're starting generation (prevents other window from also starting)
           localStorage.setItem('verificationGenerationStarted', Date.now().toString());

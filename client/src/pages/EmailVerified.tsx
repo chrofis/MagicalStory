@@ -55,10 +55,18 @@ export default function EmailVerified() {
       return;
     }
 
+    // Helper to check if generation flag is recent (within last 2 minutes)
+    const isRecentGeneration = (timestamp: string | null): boolean => {
+      if (!timestamp) return false;
+      const startedTime = parseInt(timestamp, 10);
+      const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+      return startedTime > twoMinutesAgo;
+    };
+
     const handleVerification = async () => {
-      // First check if original window already started generation
+      // First check if original window already started generation (recently)
       const alreadyStarted = localStorage.getItem('verificationGenerationStarted');
-      if (alreadyStarted) {
+      if (isRecentGeneration(alreadyStarted)) {
         if (isMountedRef.current) {
           hasHandledRef.current = true;
           setStatus('other_window');
@@ -74,7 +82,7 @@ export default function EmailVerified() {
 
       // Re-check if generation started during refreshUser
       const startedDuringRefresh = localStorage.getItem('verificationGenerationStarted');
-      if (startedDuringRefresh) {
+      if (isRecentGeneration(startedDuringRefresh)) {
         hasHandledRef.current = true;
         setStatus('other_window');
         localStorage.removeItem('pendingStoryGeneration');
@@ -91,7 +99,7 @@ export default function EmailVerified() {
 
       hasHandledRef.current = true;
 
-      if (generationStarted) {
+      if (isRecentGeneration(generationStarted)) {
         // Original window is handling it
         setStatus('other_window');
         localStorage.removeItem('pendingStoryGeneration');

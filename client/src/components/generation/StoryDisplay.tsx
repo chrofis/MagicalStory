@@ -567,7 +567,7 @@ export function StoryDisplay({
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <ShoppingCart size={16} /> {language === 'de' ? 'Zum Buch' : language === 'fr' ? 'Ajouter' : 'Add to Book'}
+            <ShoppingCart size={16} /> {language === 'de' ? 'Zum Buch hinzufügen' : language === 'fr' ? 'Ajouter au livre' : 'Add to Book'}
           </button>
         )}
 
@@ -580,7 +580,7 @@ export function StoryDisplay({
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <FileText size={16} /> PDF
+            <FileText size={16} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
           </button>
         )}
 
@@ -593,7 +593,7 @@ export function StoryDisplay({
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <Edit3 size={16} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+            <Edit3 size={16} /> {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
           </button>
         )}
 
@@ -606,7 +606,7 @@ export function StoryDisplay({
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <Plus size={16} /> {language === 'de' ? 'Neu' : language === 'fr' ? 'Nouveau' : 'New'}
+            <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
           </button>
         )}
       </div>
@@ -2043,7 +2043,7 @@ export function StoryDisplay({
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <ShoppingCart size={16} /> {language === 'de' ? 'Zum Buch' : language === 'fr' ? 'Ajouter' : 'Add to Book'}
+                <ShoppingCart size={16} /> {language === 'de' ? 'Zum Buch hinzufügen' : language === 'fr' ? 'Ajouter au livre' : 'Add to Book'}
               </button>
             )}
 
@@ -2056,7 +2056,7 @@ export function StoryDisplay({
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <FileText size={16} /> PDF
+                <FileText size={16} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
               </button>
             )}
 
@@ -2069,7 +2069,7 @@ export function StoryDisplay({
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <Edit3 size={16} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+                <Edit3 size={16} /> {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
               </button>
             )}
 
@@ -2082,7 +2082,7 @@ export function StoryDisplay({
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <Plus size={16} /> {language === 'de' ? 'Neu' : language === 'fr' ? 'Nouveau' : 'New'}
+                <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
               </button>
             )}
           </div>
