@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -43,22 +43,39 @@ export default function EmailVerified() {
   // Always start with 'checking' - user should never see buttons
   const [status, setStatus] = useState<Status>('checking');
 
+  // Track if component is still mounted to prevent navigation after unmount
+  const isMountedRef = useRef(true);
+  const hasHandledRef = useRef(false);
+
   useEffect(() => {
+    isMountedRef.current = true;
+
+    // Prevent duplicate handling (React Strict Mode runs effects twice)
+    if (hasHandledRef.current) {
+      return;
+    }
+
     const handleVerification = async () => {
       // First check if original window already started generation
       const alreadyStarted = localStorage.getItem('verificationGenerationStarted');
       if (alreadyStarted) {
-        setStatus('other_window');
-        localStorage.removeItem('pendingStoryGeneration');
+        if (isMountedRef.current) {
+          hasHandledRef.current = true;
+          setStatus('other_window');
+          localStorage.removeItem('pendingStoryGeneration');
+        }
         return;
       }
 
       // Refresh user state so emailVerified is updated
       await refreshUser();
 
+      if (!isMountedRef.current) return;
+
       // Re-check if generation started during refreshUser
       const startedDuringRefresh = localStorage.getItem('verificationGenerationStarted');
       if (startedDuringRefresh) {
+        hasHandledRef.current = true;
         setStatus('other_window');
         localStorage.removeItem('pendingStoryGeneration');
         return;
@@ -67,8 +84,12 @@ export default function EmailVerified() {
       // Wait 5 seconds for original window (polling every 3s) to detect verification and start
       await new Promise(resolve => setTimeout(resolve, 5000));
 
+      if (!isMountedRef.current) return;
+
       // Final check - did the original window start generation?
       const generationStarted = localStorage.getItem('verificationGenerationStarted');
+
+      hasHandledRef.current = true;
 
       if (generationStarted) {
         // Original window is handling it
@@ -80,12 +101,18 @@ export default function EmailVerified() {
         localStorage.removeItem('pendingStoryGeneration');
         // Small delay so user sees the message
         setTimeout(() => {
-          navigate('/create?autoGenerate=true');
+          if (isMountedRef.current) {
+            navigate('/create?autoGenerate=true');
+          }
         }, 1000);
       }
     };
 
     handleVerification();
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [navigate, refreshUser]);
 
   return (
