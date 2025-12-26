@@ -217,27 +217,27 @@ export function StorySettings({
         {/* Reading Level Selection */}
         <div>
           <label className="block text-xl font-semibold mb-3">{t.readingLevel}</label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex overflow-x-auto gap-3 pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
             {readingLevels.map((level) => (
               <button
                 key={level.value}
                 onClick={() => onLanguageLevelChange(level.value)}
-                className={`text-left rounded-lg border-2 transition-all overflow-hidden ${
+                className={`flex-shrink-0 w-40 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
                   languageLevel === level.value
                     ? 'border-indigo-600 ring-2 ring-indigo-200'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
-                <div className="w-full bg-gray-100 p-2 aspect-square md:aspect-auto">
+                <div className="w-full bg-gray-100 p-2 h-28 md:h-auto">
                   <img
                     src={level.image}
                     alt={level.label}
-                    className="w-full h-full md:h-auto object-contain"
+                    className="w-full h-full object-contain"
                   />
                 </div>
-                <div className="p-3">
-                  <div className="font-semibold text-base">{level.label}</div>
-                  <div className="text-sm text-gray-500">{level.desc}</div>
+                <div className="p-2 md:p-3">
+                  <div className="font-semibold text-sm md:text-base">{level.label}</div>
+                  <div className="text-xs md:text-sm text-gray-500 line-clamp-2">{level.desc}</div>
                 </div>
               </button>
             ))}

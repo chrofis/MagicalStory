@@ -12,6 +12,9 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 // Image cache to avoid regenerating identical images
 const imageCache = new Map();
 
+// Cache for compressed reference images (to avoid re-compressing same photo/avatar)
+const compressedRefCache = new Map();
+
 // Quality threshold from environment or default
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
 
@@ -182,32 +185,38 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       }
     ];
 
-    // Add reference images if provided (compressed for token efficiency)
+    // Add reference images if provided (compressed and cached for token efficiency)
     // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
     if (referenceImages && referenceImages.length > 0) {
       let addedCount = 0;
-      let totalSaved = 0;
+      let cacheHits = 0;
       for (const refImg of referenceImages) {
         // Handle both formats: string URL or {name, photoUrl} object
         const photoUrl = typeof refImg === 'string' ? refImg : refImg?.photoUrl;
         if (photoUrl && photoUrl.startsWith('data:image')) {
-          // Compress reference image to reduce tokens
-          const originalSize = Math.round(photoUrl.length * 0.75 / 1024); // Approximate KB
-          const compressed = await compressImageToJPEG(photoUrl, 80, 512); // 80% quality, max 512px
-          const compressedSize = Math.round(compressed.length * 0.75 / 1024);
-          totalSaved += originalSize - compressedSize;
+          // Check cache first using hash of original image
+          const imageHash = hashImageData(photoUrl);
+          let compressedBase64 = compressedRefCache.get(imageHash);
 
-          const refBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+          if (compressedBase64) {
+            cacheHits++;
+          } else {
+            // Compress and cache
+            const compressed = await compressImageToJPEG(photoUrl, 80, 512); // 80% quality, max 512px
+            compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+            compressedRefCache.set(imageHash, compressedBase64);
+          }
+
           parts.push({
             inline_data: {
               mime_type: 'image/jpeg',
-              data: refBase64
+              data: compressedBase64
             }
           });
           addedCount++;
         }
       }
-      log.verbose(`⭐ [QUALITY] Added ${addedCount}/${referenceImages.length} reference images (saved ~${totalSaved}KB via compression)`);
+      log.verbose(`⭐ [QUALITY] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
     }
 
     // Add evaluation prompt text
