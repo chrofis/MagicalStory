@@ -7883,11 +7883,12 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
         [userId]
       );
 
-      // Check for explicit FALSE (not NULL - legacy users before this feature have NULL and should be treated as verified)
-      if (emailCheckResult.rows.length > 0 && emailCheckResult.rows[0].email_verified === false) {
-        log.warn(`User ${req.user.username} attempted story generation without verified email`);
+      // Check if email is NOT verified (NULL or FALSE both require verification, only TRUE passes)
+      if (emailCheckResult.rows.length > 0 && emailCheckResult.rows[0].email_verified !== true) {
+        log.warn(`User ${req.user.username} attempted story generation without verified email (value: ${emailCheckResult.rows[0].email_verified})`);
 
         // Send/resend verification email
+        let emailSent = false;
         try {
           const userResult = await dbPool.query(
             'SELECT id, username, email FROM users WHERE id = $1',
@@ -7904,17 +7905,26 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
             );
 
             const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-            await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
-            console.log(`📧 Verification email resent to: ${user.email}`);
+            console.log(`📧 Attempting to send verification email to: ${user.email}`);
+            const result = await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
+            if (result) {
+              console.log(`📧 ✓ Verification email sent successfully to: ${user.email}`);
+              emailSent = true;
+            } else {
+              console.error(`📧 ✗ Verification email failed for: ${user.email} (no result returned)`);
+            }
           }
         } catch (emailErr) {
-          log.error('Failed to send verification email:', emailErr.message);
+          console.error('📧 ✗ Failed to send verification email:', emailErr.message);
         }
 
         return res.status(403).json({
           error: 'Email verification required',
           code: 'EMAIL_NOT_VERIFIED',
-          message: 'Please verify your email first. We just sent you a verification link - story generation will start as soon as you verify your email.'
+          emailSent: emailSent,
+          message: emailSent
+            ? 'Please verify your email first. We just sent you a verification link - story generation will start as soon as you verify your email.'
+            : 'Email verification required. Please check your email for a verification link, or contact support if you did not receive one.'
         });
       }
     }
