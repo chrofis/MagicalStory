@@ -28,11 +28,11 @@ export function Footer() {
     <footer className="bg-gray-100 border-t border-gray-200 py-4 px-4">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-600">
         <div className="flex items-center gap-4">
-          <Link to="/terms" className="hover:text-indigo-600 hover:underline">
+          <Link to="/terms" className="hover:text-indigo-600 hover:underline" target="_blank" rel="noopener noreferrer">
             {texts.terms}
           </Link>
           <span className="text-gray-300">|</span>
-          <Link to="/privacy" className="hover:text-indigo-600 hover:underline">
+          <Link to="/privacy" className="hover:text-indigo-600 hover:underline" target="_blank" rel="noopener noreferrer">
             {texts.privacy}
           </Link>
         </div>

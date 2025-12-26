@@ -270,7 +270,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                 <div className="flex flex-wrap gap-2 text-xs">
                   <button
                     onClick={() => {
-                      navigate('/terms');
+                      window.open('/terms', '_blank', 'noopener,noreferrer');
                       setShowMenu(false);
                     }}
                     className="text-gray-400 hover:text-white"
@@ -280,7 +280,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                   <span className="text-gray-600">•</span>
                   <button
                     onClick={() => {
-                      navigate('/privacy');
+                      window.open('/privacy', '_blank', 'noopener,noreferrer');
                       setShowMenu(false);
                     }}
                     className="text-gray-400 hover:text-white"
@@ -290,7 +290,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                   <span className="text-gray-600">•</span>
                   <button
                     onClick={() => {
-                      navigate('/impressum');
+                      window.open('/impressum', '_blank', 'noopener,noreferrer');
                       setShowMenu(false);
                     }}
                     className="text-gray-400 hover:text-white"
