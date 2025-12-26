@@ -79,6 +79,8 @@ export default function BookBuilder() {
       orderBook: 'Order Book',
       tooManyPages: 'Too many pages',
       tooManyPagesDesc: 'Maximum is 100 pages. Please remove some stories.',
+      tooFewPages: 'Few pages selected',
+      tooFewPagesDesc: (pages: number) => `You have selected stories with only ${pages} pages. The minimum book length is 30 pages, so there will be empty pages. Consider adding another story to your book.`,
       processing: 'Processing...',
       printPdf: 'Print PDF (Test)',
       generatingPdf: 'Generating PDF...',
@@ -108,6 +110,8 @@ export default function BookBuilder() {
       orderBook: 'Buch bestellen',
       tooManyPages: 'Zu viele Seiten',
       tooManyPagesDesc: 'Maximal 100 Seiten erlaubt. Bitte entferne einige Geschichten.',
+      tooFewPages: 'Wenige Seiten ausgewählt',
+      tooFewPagesDesc: (pages: number) => `Du hast Geschichten mit nur ${pages} Seiten ausgewählt. Die Mindestbuchlänge beträgt 30 Seiten, es wird also leere Seiten geben. Erwäge, eine weitere Geschichte hinzuzufügen.`,
       processing: 'Wird verarbeitet...',
       printPdf: 'Druck-PDF (Test)',
       generatingPdf: 'PDF wird erstellt...',
@@ -137,6 +141,8 @@ export default function BookBuilder() {
       orderBook: 'Commander le livre',
       tooManyPages: 'Trop de pages',
       tooManyPagesDesc: 'Maximum 100 pages. Veuillez retirer quelques histoires.',
+      tooFewPages: 'Peu de pages sélectionnées',
+      tooFewPagesDesc: (pages: number) => `Vous avez sélectionné des histoires avec seulement ${pages} pages. La longueur minimale du livre est de 30 pages, il y aura donc des pages vides. Pensez à ajouter une autre histoire.`,
       processing: 'Traitement en cours...',
       printPdf: 'PDF impression (Test)',
       generatingPdf: 'Génération du PDF...',
@@ -173,6 +179,8 @@ export default function BookBuilder() {
   }, [totalPages, coverType, pricingTiers]);
 
   const isOverLimit = totalPages > MAX_BOOK_PAGES;
+  const MIN_BOOK_PAGES = 30;
+  const isUnderMinimum = totalPages > 0 && totalPages < MIN_BOOK_PAGES;
 
   // Move story up/down
   const moveStory = (index: number, direction: 'up' | 'down') => {
@@ -398,6 +406,17 @@ export default function BookBuilder() {
                 <div className="mt-2 flex items-center gap-2 text-red-700">
                   <AlertTriangle size={16} />
                   <span className="text-sm">{t.tooManyPagesDesc}</span>
+                </div>
+              )}
+              {isUnderMinimum && !isOverLimit && (
+                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-2 text-amber-700">
+                    <Info size={18} className="flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-semibold text-sm">{t.tooFewPages}</div>
+                      <span className="text-sm">{t.tooFewPagesDesc(totalPages)}</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
