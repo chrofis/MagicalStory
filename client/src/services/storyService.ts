@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, Language, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt } from '@/types/story';
+import type { SavedStory, Language, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, ImageVersion } from '@/types/story';
 
 interface StoryDraft {
   storyType: string;
@@ -346,6 +346,7 @@ export const storyService = {
     versionCount?: number;
     creditsUsed?: number;
     creditsRemaining?: number;
+    imageVersions?: ImageVersion[];
   }> {
     const response = await api.post<{
       imageData: string;
@@ -359,6 +360,7 @@ export const storyService = {
       versionCount?: number;
       creditsUsed?: number;
       creditsRemaining?: number;
+      imageVersions?: ImageVersion[];
     }>(
       `/api/stories/${storyId}/regenerate/image/${pageNum}`
     );
@@ -373,6 +375,8 @@ export const storyService = {
     qualityReasoning?: string;
     totalAttempts?: number;
     retryHistory?: RetryAttempt[];
+    creditsUsed?: number;
+    creditsRemaining?: number;
   }> {
     const response = await api.post<{
       imageData: string;
@@ -382,6 +386,8 @@ export const storyService = {
       qualityReasoning?: string;
       totalAttempts?: number;
       retryHistory?: RetryAttempt[];
+      creditsUsed?: number;
+      creditsRemaining?: number;
     }>(
       `/api/stories/${storyId}/regenerate/cover/${coverType}`
     );

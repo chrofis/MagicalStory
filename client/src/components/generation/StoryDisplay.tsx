@@ -1084,35 +1084,42 @@ export function StoryDisplay({
               alt="Front Cover"
               className="w-full rounded-lg shadow-lg"
             />
+            {/* Regenerate Cover - visible to all users */}
+            {_onRegenerateCover && (
+              <div className="mt-3">
+                <button
+                  onClick={() => _onRegenerateCover('front')}
+                  disabled={isGenerating || userCredits < imageRegenerationCost}
+                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                  }`}
+                  title={userCredits < imageRegenerationCost
+                    ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
+                    : ''
+                  }
+                >
+                  <RefreshCw size={14} />
+                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  <span className="flex items-center gap-1 text-xs opacity-80">
+                    <Coins size={12} /> {imageRegenerationCost}
+                  </span>
+                </button>
+              </div>
+            )}
             {/* Developer Mode Features for Front Cover */}
             {developerMode && frontCoverObj && (
               <div className="mt-3 space-y-2">
-                {/* Regenerate/Edit Buttons */}
-                {(_onRegenerateCover || _onEditCover) && (
-                  <div className="flex gap-2">
-                    {_onRegenerateCover && (
-                      <button
-                        onClick={() => _onRegenerateCover('front')}
-                        disabled={isGenerating}
-                        className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                        }`}
-                      >
-                        <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
-                      </button>
-                    )}
-                    {_onEditCover && (
-                      <button
-                        onClick={() => _onEditCover('front')}
-                        disabled={isGenerating}
-                        className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
-                        }`}
-                      >
-                        <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                      </button>
-                    )}
-                  </div>
+                {/* Edit Button - dev only */}
+                {_onEditCover && (
+                  <button
+                    onClick={() => _onEditCover('front')}
+                    disabled={isGenerating}
+                    className={`w-full bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                    }`}
+                  >
+                    <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                  </button>
                 )}
 
                 {/* Scene Description */}
@@ -1197,35 +1204,42 @@ export function StoryDisplay({
               alt="Dedication Page"
               className="w-full rounded-lg shadow-lg"
             />
+            {/* Regenerate Cover - visible to all users */}
+            {_onRegenerateCover && (
+              <div className="mt-3">
+                <button
+                  onClick={() => _onRegenerateCover('initial')}
+                  disabled={isGenerating || userCredits < imageRegenerationCost}
+                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                  }`}
+                  title={userCredits < imageRegenerationCost
+                    ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
+                    : ''
+                  }
+                >
+                  <RefreshCw size={14} />
+                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  <span className="flex items-center gap-1 text-xs opacity-80">
+                    <Coins size={12} /> {imageRegenerationCost}
+                  </span>
+                </button>
+              </div>
+            )}
             {/* Developer Mode Features for Initial Page */}
             {developerMode && initialPageObj && (
               <div className="mt-3 space-y-2">
-                {/* Regenerate/Edit Buttons */}
-                {(_onRegenerateCover || _onEditCover) && (
-                  <div className="flex gap-2">
-                    {_onRegenerateCover && (
-                      <button
-                        onClick={() => _onRegenerateCover('initial')}
-                        disabled={isGenerating}
-                        className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                        }`}
-                      >
-                        <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
-                      </button>
-                    )}
-                    {_onEditCover && (
-                      <button
-                        onClick={() => _onEditCover('initial')}
-                        disabled={isGenerating}
-                        className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
-                        }`}
-                      >
-                        <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                      </button>
-                    )}
-                  </div>
+                {/* Edit Button - dev only */}
+                {_onEditCover && (
+                  <button
+                    onClick={() => _onEditCover('initial')}
+                    disabled={isGenerating}
+                    className={`w-full bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                    }`}
+                  >
+                    <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                  </button>
                 )}
 
                 {/* Scene Description */}
@@ -1824,35 +1838,42 @@ export function StoryDisplay({
               alt="Back Cover"
               className="w-full rounded-lg shadow-lg"
             />
+            {/* Regenerate Cover - visible to all users */}
+            {_onRegenerateCover && (
+              <div className="mt-3">
+                <button
+                  onClick={() => _onRegenerateCover('back')}
+                  disabled={isGenerating || userCredits < imageRegenerationCost}
+                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                    isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                  }`}
+                  title={userCredits < imageRegenerationCost
+                    ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
+                    : ''
+                  }
+                >
+                  <RefreshCw size={14} />
+                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  <span className="flex items-center gap-1 text-xs opacity-80">
+                    <Coins size={12} /> {imageRegenerationCost}
+                  </span>
+                </button>
+              </div>
+            )}
             {/* Developer Mode Features for Back Cover */}
             {developerMode && backCoverObj && (
               <div className="mt-3 space-y-2">
-                {/* Regenerate/Edit Buttons */}
-                {(_onRegenerateCover || _onEditCover) && (
-                  <div className="flex gap-2">
-                    {_onRegenerateCover && (
-                      <button
-                        onClick={() => _onRegenerateCover('back')}
-                        disabled={isGenerating}
-                        className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                        }`}
-                      >
-                        <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
-                      </button>
-                    )}
-                    {_onEditCover && (
-                      <button
-                        onClick={() => _onEditCover('back')}
-                        disabled={isGenerating}
-                        className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                          isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
-                        }`}
-                      >
-                        <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
-                      </button>
-                    )}
-                  </div>
+                {/* Edit Button - dev only */}
+                {_onEditCover && (
+                  <button
+                    onClick={() => _onEditCover('back')}
+                    disabled={isGenerating}
+                    className={`w-full bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                    }`}
+                  >
+                    <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                  </button>
                 )}
 
                 {/* Scene Description */}

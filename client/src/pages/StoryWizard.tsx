@@ -34,9 +34,12 @@ export default function StoryWizard() {
   const { showSuccess, showInfo } = useToast();
 
   // Wizard state - start at step 5 with loading if we have a storyId in URL
+  // Otherwise restore from localStorage to preserve step when navigating away and back
   const [step, setStep] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('storyId') ? 5 : 1;
+    if (params.get('storyId')) return 5;
+    const savedStep = localStorage.getItem('wizard_step');
+    return savedStep ? parseInt(savedStep, 10) : 1;
   });
   const [isLoading, setIsLoading] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -510,6 +513,14 @@ export default function StoryWizard() {
   useEffect(() => {
     localStorage.setItem('story_art_style', artStyle);
   }, [artStyle]);
+
+  // Persist wizard step to localStorage (so navigating away and back preserves position)
+  useEffect(() => {
+    // Only persist steps 1-4, not step 5 (which is story viewing/generation)
+    if (step >= 1 && step <= 4) {
+      localStorage.setItem('wizard_step', step.toString());
+    }
+  }, [step]);
 
   // Initialize relationships when moving to step 3 (only once per character set)
   // Wait until not loading to ensure API data is loaded first
@@ -1515,12 +1526,12 @@ export default function StoryWizard() {
                   log.info('Regenerating image for page:', pageNumber);
                   setIsGenerating(true);
                   const result = await storyService.regenerateImage(storyId, pageNumber);
-                  log.info('Regenerate result:', { hasImageData: !!result?.imageData, length: result?.imageData?.length });
+                  log.info('Regenerate result:', { hasImageData: !!result?.imageData, length: result?.imageData?.length, versionCount: result?.versionCount, creditsRemaining: result?.creditsRemaining });
                   if (!result?.imageData) {
                     log.error('No imageData in response!', result);
                     throw new Error('No image data returned from server');
                   }
-                  // Update the scene images array with all returned data (including quality evaluation and previous image)
+                  // Update the scene images array with all returned data (including quality evaluation and imageVersions)
                   setSceneImages(prev => prev.map(img =>
                     img.pageNumber === pageNumber ? {
                       ...img,
@@ -1532,17 +1543,23 @@ export default function StoryWizard() {
                       wasRegenerated: true,
                       originalImage: result.originalImage,
                       originalScore: result.originalScore,
-                      originalReasoning: result.originalReasoning
+                      originalReasoning: result.originalReasoning,
+                      imageVersions: result.imageVersions
                     } : img
                   ));
+                  // Update user credits if we got the new balance
+                  if (result.creditsRemaining !== undefined && updateCredits) {
+                    updateCredits(result.creditsRemaining);
+                  }
                   log.info('Image regenerated successfully, updated state');
                 } catch (error) {
                   log.error('Image regeneration failed:', error);
+                  const errorMsg = error instanceof Error ? error.message : String(error);
                   alert(language === 'de'
-                    ? 'Bildgenerierung fehlgeschlagen'
+                    ? `Bildgenerierung fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
-                    ? 'Échec de la régénération de l\'image'
-                    : 'Image regeneration failed');
+                    ? `Échec de la régénération: ${errorMsg}`
+                    : `Image regeneration failed: ${errorMsg}`);
                 } finally {
                   setIsGenerating(false);
                 }
@@ -1724,6 +1741,7 @@ export default function StoryWizard() {
                 localStorage.removeItem('story_details');
                 localStorage.removeItem('story_main_characters');
                 localStorage.removeItem('story_excluded_characters');
+                localStorage.removeItem('wizard_step');
 
                 // Go back to step 1
                 setStep(1);
@@ -1747,14 +1765,19 @@ export default function StoryWizard() {
                       retryHistory: result.retryHistory
                     } };
                   });
+                  // Update user credits if we got the new balance
+                  if (result.creditsRemaining !== undefined && updateCredits) {
+                    updateCredits(result.creditsRemaining);
+                  }
                   log.info('Cover regenerated successfully');
                 } catch (error) {
                   log.error('Cover regeneration failed:', error);
+                  const errorMsg = error instanceof Error ? error.message : String(error);
                   alert(language === 'de'
-                    ? 'Cover-Generierung fehlgeschlagen'
+                    ? `Cover-Generierung fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
-                    ? 'Échec de la régénération de la couverture'
-                    : 'Cover regeneration failed');
+                    ? `Échec de la régénération: ${errorMsg}`
+                    : `Cover regeneration failed: ${errorMsg}`);
                 } finally {
                   setIsRegenerating(false);
                 }
@@ -1769,6 +1792,46 @@ export default function StoryWizard() {
                 setEditPromptText('');
                 setEditModalOpen(true);
               }}
+              // Story text editing
+              onSaveStoryText={storyId ? async (text: string) => {
+                try {
+                  log.info('Saving story text for story:', storyId);
+                  await storyService.saveStoryText(storyId, text);
+                  setGeneratedStory(text);
+                  log.info('Story text saved successfully');
+                } catch (error) {
+                  log.error('Failed to save story text:', error);
+                  throw error; // Re-throw so StoryDisplay can show error
+                }
+              } : undefined}
+              // Image regeneration with credits
+              userCredits={user?.credits || 0}
+              imageRegenerationCost={5}
+              onSelectImageVersion={storyId ? async (pageNumber: number, versionIndex: number) => {
+                try {
+                  log.info('Selecting image version:', { pageNumber, versionIndex });
+                  const result = await storyService.setActiveImage(storyId, pageNumber, versionIndex);
+                  // Update local state with the active version's image data
+                  setSceneImages(prev => prev.map(img => {
+                    if (img.pageNumber === pageNumber && img.imageVersions) {
+                      const activeVersion = img.imageVersions[versionIndex];
+                      return {
+                        ...img,
+                        imageData: activeVersion?.imageData || img.imageData,
+                        imageVersions: img.imageVersions.map((v, i) => ({
+                          ...v,
+                          isActive: i === versionIndex
+                        }))
+                      };
+                    }
+                    return img;
+                  }));
+                  log.info('Image version selected:', result);
+                } catch (error) {
+                  log.error('Failed to select image version:', error);
+                  throw error;
+                }
+              } : undefined}
               isPartial={isPartialStory}
               failureReason={failureReason}
               generatedPages={generatedPages}
