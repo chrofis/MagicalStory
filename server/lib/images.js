@@ -730,8 +730,8 @@ async function editImageWithPrompt(imageData, editInstruction) {
       { text: editPrompt }
     ];
 
-    // Use Gemini 2.0 Flash for image editing (supports image generation/editing)
-    const modelId = 'gemini-2.0-flash-exp-image-generation';
+    // Use Gemini 2.5 Flash Image for editing (optimized for pixel-level manipulation and inpainting)
+    const modelId = 'gemini-2.5-flash-image';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
