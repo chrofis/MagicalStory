@@ -467,6 +467,9 @@ router.post('/change-password', authenticateToken, async (req, res) => {
 });
 
 // POST /api/auth/send-verification - Send email verification
+// Rate limited: 60 seconds between emails
+const VERIFICATION_EMAIL_COOLDOWN_SECONDS = 60;
+
 router.post('/send-verification', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -476,7 +479,10 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
     }
 
     const pool = getPool();
-    const result = await pool.query('SELECT id, username, email, email_verified FROM users WHERE id = $1', [userId]);
+    const result = await pool.query(
+      'SELECT id, username, email, email_verified, email_verification_expires, last_verification_email_sent FROM users WHERE id = $1',
+      [userId]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -488,11 +494,25 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
       return res.json({ success: true, message: 'Email already verified' });
     }
 
+    // Check cooldown - prevent spamming verification emails
+    if (user.last_verification_email_sent) {
+      const lastSent = new Date(user.last_verification_email_sent);
+      const secondsSinceLastSent = (Date.now() - lastSent.getTime()) / 1000;
+      const remainingCooldown = Math.ceil(VERIFICATION_EMAIL_COOLDOWN_SECONDS - secondsSinceLastSent);
+
+      if (remainingCooldown > 0) {
+        return res.status(429).json({
+          error: 'Please wait before requesting another verification email',
+          retryAfter: remainingCooldown
+        });
+      }
+    }
+
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await pool.query(
-      'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
+      'UPDATE users SET email_verification_token = $1, email_verification_expires = $2, last_verification_email_sent = NOW() WHERE id = $3',
       [verificationToken, verificationExpires, user.id]
     );
 
@@ -507,7 +527,7 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
       console.log(`✅ Verification email sent to ${user.email}`);
     }
 
-    res.json({ success: true, message: 'Verification email sent' });
+    res.json({ success: true, message: 'Verification email sent', cooldown: VERIFICATION_EMAIL_COOLDOWN_SECONDS });
   } catch (err) {
     console.error('Send verification error:', err);
     res.status(500).json({ error: 'Failed to send verification email' });

@@ -72,6 +72,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isPolling, setIsPolling] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   // Change email form
   const [newEmail, setNewEmail] = useState('');
@@ -79,6 +80,21 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
 
   // Polling ref to track interval
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const cooldownRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownSeconds > 0) {
+      cooldownRef.current = setTimeout(() => {
+        setCooldownSeconds(prev => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (cooldownRef.current) {
+        clearTimeout(cooldownRef.current);
+      }
+    };
+  }, [cooldownSeconds]);
 
   // Poll for email verification status when modal is open
   useEffect(() => {
@@ -127,11 +143,26 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
     setIsLoading(true);
     setError('');
     try {
-      await api.post('/api/auth/send-verification', {});
+      const response = await api.post('/api/auth/send-verification', {});
       setEmailSent(true);
       setSuccess(t.emailSent);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send verification email');
+      // Start cooldown timer after successful send
+      if (response.cooldown) {
+        setCooldownSeconds(response.cooldown);
+      }
+    } catch (err: unknown) {
+      // Check if it's a rate limit error with retryAfter
+      const error = err as { retryAfter?: number; message?: string };
+      if (error.retryAfter) {
+        setCooldownSeconds(error.retryAfter);
+        setError(
+          language === 'de' ? `Bitte warten Sie ${error.retryAfter} Sekunden` :
+          language === 'fr' ? `Veuillez patienter ${error.retryAfter} secondes` :
+          `Please wait ${error.retryAfter} seconds`
+        );
+      } else {
+        setError(error.message || 'Failed to send verification email');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -212,10 +243,13 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
               onClick={handleSendVerification}
               variant="primary"
               loading={isLoading}
+              disabled={cooldownSeconds > 0}
               className="w-full"
             >
               <RefreshCw size={16} className="mr-2" />
-              {emailSent ? t.resendVerification : t.sendVerification}
+              {cooldownSeconds > 0
+                ? `${language === 'de' ? 'Warten' : language === 'fr' ? 'Patienter' : 'Wait'} ${cooldownSeconds}s`
+                : emailSent ? t.resendVerification : t.sendVerification}
             </Button>
 
             <button
