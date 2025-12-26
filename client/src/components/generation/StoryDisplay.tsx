@@ -333,6 +333,33 @@ export function StoryDisplay({
     setIsEditMode(false);
   };
 
+  // Handle page text change - updates the specific page in editedStory
+  const handlePageTextChange = (pageIndex: number, newText: string) => {
+    // Split story into sections (keeps the separators)
+    const sections = editedStory.split(/(?=---\s*(?:Page|Seite)\s+\d+\s*---|(?=##\s*(?:Page|Seite)\s+\d+))/i);
+
+    // First section might be empty or contain header info
+    // Page sections start from index 1 (or 0 if no header)
+    let pageStartIndex = 0;
+    for (let i = 0; i < sections.length; i++) {
+      if (/^(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i.test(sections[i].trim())) {
+        pageStartIndex = i;
+        break;
+      }
+    }
+
+    const targetSectionIndex = pageStartIndex + pageIndex;
+    if (targetSectionIndex < sections.length) {
+      // Extract the page separator (e.g., "--- Page 1 ---" or "## Page 1")
+      const separatorMatch = sections[targetSectionIndex].match(/^(---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i);
+      const separator = separatorMatch ? separatorMatch[0] : '';
+      // Replace the section content, keeping the separator
+      sections[targetSectionIndex] = separator + '\n' + newText.trim() + '\n';
+    }
+
+    setEditedStory(sections.join(''));
+  };
+
   // Get image versions for a page
   const getImageVersions = (pageNumber: number): ImageVersion[] => {
     const image = sceneImages.find(img => img.pageNumber === pageNumber);
@@ -1565,9 +1592,18 @@ export function StoryDisplay({
 
                     {/* Text below */}
                     <div className="w-full bg-indigo-50 rounded-lg p-6 border-2 border-indigo-200">
-                      <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl text-center">
-                        {pageText.trim()}
-                      </p>
+                      {isEditMode ? (
+                        <textarea
+                          value={pageText.trim()}
+                          onChange={(e) => handlePageTextChange(index, e.target.value)}
+                          className="w-full min-h-[150px] p-3 text-gray-800 leading-snug font-serif text-xl text-center bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
+                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
+                        />
+                      ) : (
+                        <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl text-center">
+                          {pageText.trim()}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1769,12 +1805,21 @@ export function StoryDisplay({
                     )}
 
                     {/* Text on the right */}
-                    <div className="flex items-start">
-                      <div className="prose max-w-none">
-                        <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl">
-                          {pageText.trim()}
-                        </p>
-                      </div>
+                    <div className="flex items-start w-full">
+                      {isEditMode ? (
+                        <textarea
+                          value={pageText.trim()}
+                          onChange={(e) => handlePageTextChange(index, e.target.value)}
+                          className="w-full min-h-[200px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
+                          placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
+                        />
+                      ) : (
+                        <div className="prose max-w-none">
+                          <p className="text-gray-800 leading-snug whitespace-pre-wrap font-serif text-xl">
+                            {pageText.trim()}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

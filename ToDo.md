@@ -1,28 +1,24 @@
 **Bugs / Features**
 
-Szene prompt to be restructured. Instructions what to do first, characters \& bible 2nd, story 3rd
+verify Email sends back to login screen not generating the story
 
-Character count completely wrong.
+No 2nd Email is sent
 
-Token count seems off
+generate pdf button colour
 
+Legal - add email legal@magicalstory.ch \& privacy@magicalstory.ch
 
+Legal - block US
 
+Home page snaps below the step 1
 
+Home page, last button like first button
 
 
 
 
 
 **Ideas:**
-
-No person detected
-
-Legal shit
-
-
-
-Scene prompt to use previous page and scene text as input, not just current page.
 
 Allow user to edit how avatar should be, hair, build \& clothing
 
@@ -34,13 +30,27 @@ Avatar generation only upon Email verification
 
 Image evalution for cover images
 
+Home page convert pictures to animated gifs
+
+Szene prompt to be restructured. Instructions what to do first, characters \& bible 2nd, story 3rd
+
 
 
 
 
 **Test:**
 
+Allow users to edit text
 
+Allow users to regenerate image
+
+Show which model was used in developer view
+
+When going back status is not checked
+
+Back buttons don't point back
+
+Scene prompt to use previous page and scene text as input, not just current page.
 
 Email verification before generating story
 
@@ -56,9 +66,9 @@ story generation does not work anymore
 
 Allow to select characters
 
+Character count completely wrong.
 
-
-
+Token count seems off
 
 
 
@@ -149,4 +159,24 @@ Pages do not appear in story generation
 Hardcover und Softcover
 
 Buy credits to create more stories
+
+generate story prompt
+
+art styles missing images
+
+art styles, missing prompts
+
+generate story button change colour and location
+
+home page add pictures
+
+removing character does not remove relations
+
+Even if user has approved privacy it is asked again
+
+Click for the accept is below the box
+
+No person detected
+
+
 

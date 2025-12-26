@@ -442,10 +442,10 @@ export default function LandingPage() {
           </p>
           <button
             onClick={handleStartJourney}
-            className="bg-white hover:bg-gray-100 text-indigo-600 px-10 lg:px-14 py-5 lg:py-6 rounded-xl text-xl lg:text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all inline-flex items-center gap-3"
+            className="bg-white hover:bg-gray-100 text-indigo-600 px-8 lg:px-12 py-4 lg:py-6 rounded-xl text-lg lg:text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all inline-flex items-center gap-3"
           >
             <Sparkles size={28} />
-            Start Your Story
+            {t.startJourney}
             <ArrowRight size={28} />
           </button>
         </div>
