@@ -242,8 +242,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`📊 [QUALITY] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}`);
     }
 
+    // Log finish reason to diagnose early stops
+    const finishReason = data.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== 'STOP') {
+      log.warn(`⚠️  [QUALITY] Gemini finish reason: ${finishReason}`);
+    }
+
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
       log.warn('⚠️  [QUALITY] No text response from Gemini');
+      if (data.candidates?.[0]) {
+        log.warn('⚠️  [QUALITY] Candidate info:', JSON.stringify({
+          finishReason: data.candidates[0].finishReason,
+          finishMessage: data.candidates[0].finishMessage,
+          safetyRatings: data.candidates[0].safetyRatings
+        }));
+      }
       return null;
     }
 
@@ -258,7 +271,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100 (legacy format)`);
         return score;
       }
-      log.warn('⚠️  [QUALITY] Could not parse score from response:', responseText.substring(0, 100));
+      log.warn(`⚠️  [QUALITY] Could not parse score from response (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 100));
       return null;
     }
 

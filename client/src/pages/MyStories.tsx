@@ -354,16 +354,13 @@ export default function MyStories() {
     if (loadAttemptedRef.current) return;
     loadAttemptedRef.current = true;
 
-    // Small delay to ensure auth token is propagated to API client
-    const timer = setTimeout(() => {
-      loadStories();
-    }, 50);
-
-    return () => clearTimeout(timer);
+    // Load stories immediately - auth token is already set when isAuthenticated is true
+    loadStories();
   }, [isAuthenticated, authLoading, navigate]);
 
   const loadStories = async (options: { loadMore?: boolean; loadAll?: boolean } = {}) => {
     const { loadMore = false, loadAll = false } = options;
+    const startTime = Date.now();
     log.debug('Loading stories...', { loadMore, loadAll });
     try {
       setLoadError(null);
@@ -371,7 +368,8 @@ export default function MyStories() {
       // Check cache first (only for initial load)
       const now = Date.now();
       if (!loadMore && !loadAll && storiesCache.data && (now - storiesCache.timestamp) < CACHE_DURATION) {
-        log.debug('Using cached stories');
+        const cacheAge = Math.round((now - storiesCache.timestamp) / 1000);
+        log.debug(`Using cached stories (${storiesCache.data.length} stories, cache age: ${cacheAge}s)`);
         setStories(storiesCache.data);
         setTotalStories(storiesCache.total);
         setHasMore(storiesCache.data.length < storiesCache.total);
@@ -392,7 +390,8 @@ export default function MyStories() {
         limit,
         offset,
       });
-      log.info('Loaded stories:', newStories.length, 'total:', pagination.total);
+      const loadTime = Date.now() - startTime;
+      log.info(`Loaded ${newStories.length} stories in ${loadTime}ms (total: ${pagination.total})`);
 
       const storyList = newStories as unknown as StoryListItem[];
 
@@ -438,19 +437,26 @@ export default function MyStories() {
   const loadCover = useCallback(async (storyId: string) => {
     try {
       const coverImage = await storyService.getStoryCover(storyId);
-      if (coverImage) {
-        setStories(prev => prev.map(s =>
-          s.id === storyId ? { ...s, thumbnail: coverImage } : s
-        ));
-        // Update cache
-        if (storiesCache.data) {
-          storiesCache.data = storiesCache.data.map(s =>
-            s.id === storyId ? { ...s, thumbnail: coverImage } : s
-          );
-        }
+      // Update story with cover image (or mark as no thumbnail if null)
+      const updateFn = (s: StoryListItem) =>
+        s.id === storyId
+          ? { ...s, thumbnail: coverImage || undefined, hasThumbnail: !!coverImage }
+          : s;
+
+      setStories(prev => prev.map(updateFn));
+      // Update cache
+      if (storiesCache.data) {
+        storiesCache.data = storiesCache.data.map(updateFn);
       }
     } catch (error) {
       log.error('Failed to load cover for story:', storyId, error);
+      // Mark as no thumbnail so we don't keep retrying and spinner stops
+      const updateFn = (s: StoryListItem) =>
+        s.id === storyId ? { ...s, hasThumbnail: false } : s;
+      setStories(prev => prev.map(updateFn));
+      if (storiesCache.data) {
+        storiesCache.data = storiesCache.data.map(updateFn);
+      }
     }
   }, []);
 
