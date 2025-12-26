@@ -34,7 +34,7 @@ export function ArtStyleSelector({ selectedStyle, onSelect }: ArtStyleSelectorPr
               <img
                 src={style.image}
                 alt={style.name[language as keyof typeof style.name]}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             </div>
 
