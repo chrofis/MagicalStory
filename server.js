@@ -891,7 +891,8 @@ async function initializeDatabase() {
     await dbPool.query('SELECT 1');
     console.log('✓ Database connection successful');
 
-    // PostgreSQL table creation
+    // PostgreSQL table creation - includes all columns
+    // Note: All migrations have been run, this is just for fresh database setup
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(255) PRIMARY KEY,
@@ -904,111 +905,14 @@ async function initializeDatabase() {
         credits INT DEFAULT 500,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP,
-        preferred_language VARCHAR(20) DEFAULT 'English'
+        preferred_language VARCHAR(20) DEFAULT 'English',
+        email_verified BOOLEAN DEFAULT FALSE,
+        email_verification_token VARCHAR(255),
+        email_verification_expires TIMESTAMP,
+        password_reset_token VARCHAR(255),
+        password_reset_expires TIMESTAMP,
+        photo_consent_at TIMESTAMP
       )
-    `);
-
-    // Add last_login column if it doesn't exist
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='last_login') THEN
-          ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
-        END IF;
-      END $$;
-    `);
-
-    // Add preferred_language column if it doesn't exist
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='preferred_language') THEN
-          ALTER TABLE users ADD COLUMN preferred_language VARCHAR(20) DEFAULT 'English';
-        END IF;
-      END $$;
-    `);
-
-    // Add credits column to existing users table if it doesn't exist
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='credits') THEN
-          ALTER TABLE users ADD COLUMN credits INT DEFAULT 500;
-        END IF;
-      END $$;
-    `);
-
-    // Update existing users with NULL credits: admins get -1 (unlimited), users get 1000
-    await dbPool.query(`
-      UPDATE users SET credits = -1 WHERE credits IS NULL AND role = 'admin';
-    `);
-    await dbPool.query(`
-      UPDATE users SET credits = 1000 WHERE credits IS NULL AND role = 'user';
-    `);
-
-    // Add email verification columns
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email_verified') THEN
-          ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
-        END IF;
-      END $$;
-    `);
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email_verification_token') THEN
-          ALTER TABLE users ADD COLUMN email_verification_token VARCHAR(255);
-        END IF;
-      END $$;
-    `);
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='email_verification_expires') THEN
-          ALTER TABLE users ADD COLUMN email_verification_expires TIMESTAMP;
-        END IF;
-      END $$;
-    `);
-
-    // Add password reset columns
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password_reset_token') THEN
-          ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(255);
-        END IF;
-      END $$;
-    `);
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password_reset_expires') THEN
-          ALTER TABLE users ADD COLUMN password_reset_expires TIMESTAMP;
-        END IF;
-      END $$;
-    `);
-
-    // Add photo consent column
-    await dbPool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='photo_consent_at') THEN
-          ALTER TABLE users ADD COLUMN photo_consent_at TIMESTAMP;
-        END IF;
-      END $$;
-    `);
-
-    // Set existing users as having consented (retroactive consent for users before this feature)
-    await dbPool.query(`
-      UPDATE users SET photo_consent_at = CURRENT_TIMESTAMP WHERE photo_consent_at IS NULL;
-    `);
-
-    // Mark existing users as email verified (only those with NULL - legacy users before this feature)
-    // New users will have email_verified = FALSE set explicitly during registration
-    await dbPool.query(`
-      UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;
     `);
 
     await dbPool.query(`
