@@ -235,7 +235,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
-          maxOutputTokens: 1500,  // Increased from 800 to allow full evaluation format
+          maxOutputTokens: 2500,  // Increased to allow full evaluation format with reasoning
           temperature: 0.3
         }
       })

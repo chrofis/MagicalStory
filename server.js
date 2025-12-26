@@ -5709,13 +5709,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     let response;
     try {
       // Use streaming API call with progressive parsers
+      // Pass textModel override if provided (e.g., gemini-2.5-flash)
+      const textModelOverride = modelOverrides.textModel || null;
       const streamResult = await callTextModelStreaming(storybookPrompt, 16000, (chunk, fullText) => {
         // Process each chunk to detect complete scenes AND cover scenes
         coverParser.processChunk(chunk, fullText);
         sceneParser.processChunk(chunk, fullText);
-      });
+      }, textModelOverride);
       response = streamResult.text;
-      streamingTextModelId = streamResult.modelId || getActiveTextModel().modelId;
+      streamingTextModelId = streamResult.modelId || (textModelOverride ? textModelOverride : getActiveTextModel().modelId);
       addUsage('anthropic', streamResult.usage, 'story_text', streamingTextModelId);
       log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars (model: ${streamingTextModelId})`);
       log.debug(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
