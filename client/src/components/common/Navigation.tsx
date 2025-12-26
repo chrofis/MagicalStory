@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, LogOut, BookOpen, Settings, Users, Code, Package, CreditCard, KeyRound, Loader2 } from 'lucide-react';
+import { Menu, LogOut, BookOpen, Settings, Users, Code, Package, CreditCard, KeyRound, Loader2, Scale } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
@@ -254,12 +254,51 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                     navigate('/?login=true');
                     setShowMenu(false);
                   }}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2"
+                  className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
                 >
                   <LogOut size={16} />
                   <span>{t.login}</span>
                 </button>
               )}
+
+              {/* Legal Links */}
+              <div className="border-t border-gray-700 px-4 py-2">
+                <div className="text-xs text-gray-400 mb-2 flex items-center gap-1">
+                  <Scale size={12} />
+                  {language === 'de' ? 'Rechtliches' : language === 'fr' ? 'Mentions légales' : 'Legal'}
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <button
+                    onClick={() => {
+                      navigate('/terms');
+                      setShowMenu(false);
+                    }}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    {language === 'de' ? 'AGB' : language === 'fr' ? 'CGU' : 'Terms'}
+                  </button>
+                  <span className="text-gray-600">•</span>
+                  <button
+                    onClick={() => {
+                      navigate('/privacy');
+                      setShowMenu(false);
+                    }}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    {language === 'de' ? 'Datenschutz' : language === 'fr' ? 'Confidentialité' : 'Privacy'}
+                  </button>
+                  <span className="text-gray-600">•</span>
+                  <button
+                    onClick={() => {
+                      navigate('/impressum');
+                      setShowMenu(false);
+                    }}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    Impressum
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           </div>

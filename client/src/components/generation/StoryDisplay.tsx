@@ -1362,34 +1362,56 @@ export function StoryDisplay({
                           alt={`Scene for page ${pageNumber}`}
                           className="w-full rounded-lg shadow-md object-cover"
                         />
-                        {/* Developer Mode Features */}
-                        {developerMode && (
+                        {/* Image action buttons - shown to all users */}
+                        {onRegenerateImage && (
                           <div className="mt-3 space-y-2">
-                            {/* Action Buttons */}
-                            <div className="flex gap-2">
-                              {onRegenerateImage && (
+                            {/* Regenerate and Version buttons */}
+                            <div className="flex gap-2 items-center">
+                              <button
+                                onClick={() => onRegenerateImage(pageNumber)}
+                                disabled={isGenerating || userCredits < imageRegenerationCost}
+                                className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                }`}
+                                title={userCredits < imageRegenerationCost
+                                  ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
+                                  : ''
+                                }
+                              >
+                                <RefreshCw size={14} />
+                                {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                                <span className="flex items-center gap-1 text-xs opacity-80">
+                                  <Coins size={12} /> {imageRegenerationCost}
+                                </span>
+                              </button>
+                              {getImageVersions(pageNumber).length > 1 && (
                                 <button
-                                  onClick={() => onRegenerateImage(pageNumber)}
-                                  disabled={isGenerating}
-                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                  }`}
+                                  onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
+                                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
                                 >
-                                  <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
-                                </button>
-                              )}
-                              {onEditImage && (
-                                <button
-                                  onClick={() => onEditImage(pageNumber)}
-                                  disabled={isGenerating}
-                                  className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
-                                  }`}
-                                >
-                                  <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                                  <Images size={14} />
+                                  {getImageVersions(pageNumber).length}
                                 </button>
                               )}
                             </div>
+                          </div>
+                        )}
+
+                        {/* Developer Mode Features */}
+                        {developerMode && (
+                          <div className="mt-3 space-y-2">
+                            {/* Edit button - dev only */}
+                            {onEditImage && (
+                              <button
+                                onClick={() => onEditImage(pageNumber)}
+                                disabled={isGenerating}
+                                className={`w-full bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                                }`}
+                              >
+                                <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                              </button>
+                            )}
 
                             {/* 1. Outline Extract */}
                             {getOutlineExtract(pageNumber) && (
@@ -1545,34 +1567,56 @@ export function StoryDisplay({
                           alt={`Scene for page ${pageNumber}`}
                           className="w-full rounded-lg shadow-md object-cover"
                         />
-                        {/* Developer Mode Features */}
-                        {developerMode && (
+                        {/* Image action buttons - shown to all users */}
+                        {onRegenerateImage && (
                           <div className="mt-3 space-y-2">
-                            {/* Action Buttons */}
-                            <div className="flex gap-2">
-                              {onRegenerateImage && (
+                            {/* Regenerate and Version buttons */}
+                            <div className="flex gap-2 items-center">
+                              <button
+                                onClick={() => onRegenerateImage(pageNumber)}
+                                disabled={isGenerating || userCredits < imageRegenerationCost}
+                                className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                }`}
+                                title={userCredits < imageRegenerationCost
+                                  ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
+                                  : ''
+                                }
+                              >
+                                <RefreshCw size={14} />
+                                {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                                <span className="flex items-center gap-1 text-xs opacity-80">
+                                  <Coins size={12} /> {imageRegenerationCost}
+                                </span>
+                              </button>
+                              {getImageVersions(pageNumber).length > 1 && (
                                 <button
-                                  onClick={() => onRegenerateImage(pageNumber)}
-                                  disabled={isGenerating}
-                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                  }`}
+                                  onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
+                                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
                                 >
-                                  <RefreshCw size={14} /> {language === 'de' ? 'Neu generieren' : 'Regenerate'}
-                                </button>
-                              )}
-                              {onEditImage && (
-                                <button
-                                  onClick={() => onEditImage(pageNumber)}
-                                  disabled={isGenerating}
-                                  className={`flex-1 bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
-                                  }`}
-                                >
-                                  <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                                  <Images size={14} />
+                                  {getImageVersions(pageNumber).length}
                                 </button>
                               )}
                             </div>
+                          </div>
+                        )}
+
+                        {/* Developer Mode Features */}
+                        {developerMode && (
+                          <div className="mt-3 space-y-2">
+                            {/* Edit button - dev only */}
+                            {onEditImage && (
+                              <button
+                                onClick={() => onEditImage(pageNumber)}
+                                disabled={isGenerating}
+                                className={`w-full bg-gray-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+                                }`}
+                              >
+                                <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
+                              </button>
+                            )}
 
                             {/* 1. Outline Extract */}
                             {getOutlineExtract(pageNumber) && (
@@ -1925,6 +1969,114 @@ export function StoryDisplay({
                 <Plus size={20} /> {t.createAnotherStory}
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Save/Cancel overlay when in edit mode */}
+      {isEditMode && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 shadow-lg p-4 z-50">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-amber-600">
+              <Edit3 size={20} />
+              <span className="font-semibold">
+                {language === 'de' ? 'Bearbeitungsmodus' : language === 'fr' ? 'Mode édition' : 'Edit Mode'}
+              </span>
+              {originalStory && (
+                <span className="text-xs text-gray-500 ml-2">
+                  ({language === 'de' ? 'Original gespeichert' : language === 'fr' ? 'Original sauvegardé' : 'Original saved'})
+                </span>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelEdit}
+                disabled={isSaving}
+                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold flex items-center gap-2"
+              >
+                <X size={18} />
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleSaveStory}
+                disabled={isSaving}
+                className={`px-6 py-2 bg-green-500 text-white rounded-lg font-semibold flex items-center gap-2 ${
+                  isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
+                }`}
+              >
+                <Save size={18} />
+                {isSaving
+                  ? (language === 'de' ? 'Speichern...' : language === 'fr' ? 'Sauvegarde...' : 'Saving...')
+                  : (language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : 'Save Changes')
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image History Modal */}
+      {imageHistoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Images size={20} />
+                {language === 'de' ? `Bildversionen - Seite ${imageHistoryModal.pageNumber}` :
+                 language === 'fr' ? `Versions d'image - Page ${imageHistoryModal.pageNumber}` :
+                 `Image Versions - Page ${imageHistoryModal.pageNumber}`}
+              </h3>
+              <button
+                onClick={() => setImageHistoryModal(null)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {imageHistoryModal.versions.map((version, idx) => (
+                  <div
+                    key={idx}
+                    className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                      version.isActive
+                        ? 'border-green-500 ring-2 ring-green-200'
+                        : 'border-gray-200 hover:border-indigo-300'
+                    }`}
+                    onClick={() => handleSelectVersion(imageHistoryModal.pageNumber, idx)}
+                  >
+                    <img
+                      src={version.imageData}
+                      alt={`Version ${idx + 1}`}
+                      className="w-full aspect-square object-cover"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-2">
+                      <div className="flex items-center justify-between">
+                        <span>
+                          {idx === 0
+                            ? (language === 'de' ? 'Original' : language === 'fr' ? 'Original' : 'Original')
+                            : `V${idx + 1}`
+                          }
+                        </span>
+                        {version.isActive && (
+                          <span className="bg-green-500 px-2 py-0.5 rounded text-[10px] font-bold">
+                            {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-gray-300 mt-1">
+                        {new Date(version.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-200 text-sm text-gray-500">
+              {language === 'de' ? 'Klicken Sie auf ein Bild, um es auszuwählen' :
+               language === 'fr' ? 'Cliquez sur une image pour la sélectionner' :
+               'Click an image to select it'}
+            </div>
           </div>
         </div>
       )}

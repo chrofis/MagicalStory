@@ -343,6 +343,9 @@ export const storyService = {
     originalImage?: string;
     originalScore?: number;
     originalReasoning?: string;
+    versionCount?: number;
+    creditsUsed?: number;
+    creditsRemaining?: number;
   }> {
     const response = await api.post<{
       imageData: string;
@@ -353,6 +356,9 @@ export const storyService = {
       originalImage?: string;
       originalScore?: number;
       originalReasoning?: string;
+      versionCount?: number;
+      creditsUsed?: number;
+      creditsRemaining?: number;
     }>(
       `/api/stories/${storyId}/regenerate/image/${pageNum}`
     );
@@ -737,26 +743,6 @@ export const storyService = {
       message: string;
       hasOriginal: boolean;
     }>(`/api/stories/${storyId}/text`, { story: storyText });
-    return response;
-  },
-
-  // Regenerate image for a page (costs credits)
-  async regenerateImage(storyId: string, pageNumber: number): Promise<{
-    success: boolean;
-    pageNumber: number;
-    imageData: string;
-    versionCount: number;
-    creditsUsed: number;
-    creditsRemaining: number;
-  }> {
-    const response = await api.post<{
-      success: boolean;
-      pageNumber: number;
-      imageData: string;
-      versionCount: number;
-      creditsUsed: number;
-      creditsRemaining: number;
-    }>(`/api/stories/${storyId}/regenerate/image/${pageNumber}`, {});
     return response;
   },
 

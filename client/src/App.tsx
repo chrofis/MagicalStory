@@ -15,6 +15,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const EmailVerified = lazy(() => import('./pages/EmailVerified'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const Impressum = lazy(() => import('./pages/Impressum'));
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
           <Route path="/email-verified" element={<EmailVerified />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/impressum" element={<Impressum />} />
         </Routes>
       </Suspense>
     </>
