@@ -9,23 +9,11 @@ const impressumContent = {
     lastUpdated: 'Last updated: January 2025',
     sections: [
       {
-        title: 'Company Information',
-        content: `[Company Name]
-[Street Address]
-[Postal Code] [City]
-Switzerland
+        title: 'Contact',
+        content: `Roger Fischer
+Ennetbaden, Switzerland
 
-Email: contact@magicalstory.ch
-Phone: [Phone Number]`
-      },
-      {
-        title: 'Represented by',
-        content: `[Name of responsible person / Managing Director]`
-      },
-      {
-        title: 'Commercial Register',
-        content: `[UID Number if applicable]
-Commercial Register of [Canton]`
+Email: info@magicalstory.ch`
       },
       {
         title: 'Disclaimer',
@@ -44,23 +32,11 @@ Obligations to remove or block the use of information in accordance with general
     lastUpdated: 'Zuletzt aktualisiert: Januar 2025',
     sections: [
       {
-        title: 'Angaben gemäss Schweizer Recht',
-        content: `[Firmenname]
-[Strasse]
-[PLZ] [Ort]
-Schweiz
+        title: 'Kontakt',
+        content: `Roger Fischer
+Ennetbaden, Schweiz
 
-E-Mail: contact@magicalstory.ch
-Telefon: [Telefonnummer]`
-      },
-      {
-        title: 'Vertretungsberechtigte Person',
-        content: `[Name der verantwortlichen Person / Geschäftsführer]`
-      },
-      {
-        title: 'Handelsregister',
-        content: `[UID-Nummer falls vorhanden]
-Handelsregister des Kantons [Kanton]`
+E-Mail: info@magicalstory.ch`
       },
       {
         title: 'Haftungsausschluss',
@@ -79,23 +55,11 @@ Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach 
     lastUpdated: 'Dernière mise à jour : Janvier 2025',
     sections: [
       {
-        title: 'Informations sur l\'entreprise',
-        content: `[Nom de l'entreprise]
-[Adresse]
-[Code postal] [Ville]
-Suisse
+        title: 'Contact',
+        content: `Roger Fischer
+Ennetbaden, Suisse
 
-Email : contact@magicalstory.ch
-Téléphone : [Numéro de téléphone]`
-      },
-      {
-        title: 'Représenté par',
-        content: `[Nom de la personne responsable / Directeur]`
-      },
-      {
-        title: 'Registre du commerce',
-        content: `[Numéro IDE si applicable]
-Registre du commerce du canton de [Canton]`
+Email : info@magicalstory.ch`
       },
       {
         title: 'Clause de non-responsabilité',
@@ -139,17 +103,6 @@ export default function Impressum() {
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{content.title}</h1>
         <p className="text-gray-500 mb-8">{content.lastUpdated}</p>
-
-        {/* Placeholder Notice */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
-          <p className="text-yellow-800 text-sm">
-            {language === 'de'
-              ? '⚠️ Dies ist ein Platzhalter. Bitte ersetzen Sie die Angaben in [Klammern] durch Ihre tatsächlichen Unternehmensdaten.'
-              : language === 'fr'
-              ? '⚠️ Ceci est un espace réservé. Veuillez remplacer les informations entre [crochets] par vos données réelles.'
-              : '⚠️ This is a placeholder. Please replace the information in [brackets] with your actual company details.'}
-          </p>
-        </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 md:p-8 space-y-8">
           {content.sections.map((section, index) => (
