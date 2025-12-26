@@ -11,30 +11,30 @@ interface PhotoUploadProps {
 
 const consentTexts = {
   en: {
-    consent1: 'I confirm I have the right to use this photo and, for photos of minors, I am the parent/guardian or have obtained their consent.',
+    consent1: 'I confirm I have the right to use the uploaded photos and, for photos of minors, I am the parent/guardian or have obtained their consent.',
     consent2: 'I agree to the',
     termsLink: 'Terms of Service',
     and: 'and',
     privacyLink: 'Privacy Policy',
-    period: ', including the processing of this photo by AI to create an illustrated avatar.',
+    period: ', including the processing of these photos by AI to create illustrated avatars.',
     pleaseAccept: 'Please accept the terms above to upload a photo',
   },
   de: {
-    consent1: 'Ich bestätige, dass ich das Recht habe, dieses Foto zu verwenden, und bei Fotos von Minderjährigen bin ich der Elternteil/Vormund oder habe deren Zustimmung eingeholt.',
+    consent1: 'Ich bestätige, dass ich das Recht habe, die hochgeladenen Fotos zu verwenden, und bei Fotos von Minderjährigen bin ich der Elternteil/Vormund oder habe deren Zustimmung eingeholt.',
     consent2: 'Ich stimme den',
     termsLink: 'Nutzungsbedingungen',
     and: 'und der',
     privacyLink: 'Datenschutzrichtlinie',
-    period: ' zu, einschliesslich der Verarbeitung dieses Fotos durch KI zur Erstellung eines illustrierten Avatars.',
+    period: ' zu, einschliesslich der Verarbeitung dieser Fotos durch KI zur Erstellung illustrierter Avatare.',
     pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
   },
   fr: {
-    consent1: 'Je confirme que j\'ai le droit d\'utiliser cette photo et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
+    consent1: 'Je confirme que j\'ai le droit d\'utiliser les photos téléchargées et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
     consent2: 'J\'accepte les',
     termsLink: 'Conditions d\'Utilisation',
     and: 'et la',
     privacyLink: 'Politique de Confidentialité',
-    period: ', y compris le traitement de cette photo par l\'IA pour créer un avatar illustré.',
+    period: ', y compris le traitement de ces photos par l\'IA pour créer des avatars illustrés.',
     pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour télécharger une photo',
   },
 };
