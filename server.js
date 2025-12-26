@@ -1108,6 +1108,41 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_checkpoints_job ON story_job_checkpoints(job_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_checkpoints_step ON story_job_checkpoints(step_name)`);
 
+    // Pricing tiers table - single source of truth for book pricing
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS pricing_tiers (
+        id SERIAL PRIMARY KEY,
+        max_pages INT NOT NULL UNIQUE,
+        label VARCHAR(20) NOT NULL,
+        softcover_price INT NOT NULL,
+        hardcover_price INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed default pricing tiers if table is empty
+    const pricingCheck = await dbPool.query('SELECT COUNT(*) as count FROM pricing_tiers');
+    if (parseInt(pricingCheck.rows[0].count) === 0) {
+      const defaultTiers = [
+        { maxPages: 30, label: '1-30', softcover: 38, hardcover: 53 },
+        { maxPages: 40, label: '31-40', softcover: 45, hardcover: 60 },
+        { maxPages: 50, label: '41-50', softcover: 51, hardcover: 66 },
+        { maxPages: 60, label: '51-60', softcover: 57, hardcover: 72 },
+        { maxPages: 70, label: '61-70', softcover: 63, hardcover: 78 },
+        { maxPages: 80, label: '71-80', softcover: 69, hardcover: 84 },
+        { maxPages: 90, label: '81-90', softcover: 75, hardcover: 90 },
+        { maxPages: 100, label: '91-100', softcover: 81, hardcover: 96 },
+      ];
+      for (const tier of defaultTiers) {
+        await dbPool.query(
+          'INSERT INTO pricing_tiers (max_pages, label, softcover_price, hardcover_price) VALUES ($1, $2, $3, $4)',
+          [tier.maxPages, tier.label, tier.softcover, tier.hardcover]
+        );
+      }
+      console.log('✓ Default pricing tiers seeded');
+    }
+
     console.log('✓ Database tables initialized');
 
     // Run database migrations
