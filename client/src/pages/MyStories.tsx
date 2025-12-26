@@ -192,7 +192,7 @@ export default function MyStories() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { showSuccess, showInfo } = useToast();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -340,12 +340,15 @@ export default function MyStories() {
   const t = translations[language as keyof typeof translations] || translations.en;
 
   useEffect(() => {
+    // Wait for auth to load before checking authentication
+    if (authLoading) return;
+
     if (!isAuthenticated) {
       navigate('/');
       return;
     }
     loadStories();
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, authLoading, navigate]);
 
   const loadStories = async (options: { loadMore?: boolean; loadAll?: boolean } = {}) => {
     const { loadMore = false, loadAll = false } = options;
@@ -511,7 +514,7 @@ export default function MyStories() {
     navigate('/book-builder', { state: { selectedStories: selectedData } });
   };
 
-  if (!isAuthenticated) {
+  if (authLoading || !isAuthenticated) {
     return <LoadingSpinner fullScreen />;
   }
 

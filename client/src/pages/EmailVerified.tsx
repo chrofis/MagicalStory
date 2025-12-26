@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
 import { Button } from '@/components/common/Button';
-import { CheckCircle, Loader2, Monitor, Sparkles } from 'lucide-react';
+import { CheckCircle, Loader2, Monitor, Sparkles, LogIn } from 'lucide-react';
 
 const translations = {
   en: {
@@ -13,7 +13,9 @@ const translations = {
     generatingInOtherWindow: 'Your story is being generated in your other browser window!',
     otherWindowHint: 'You can close this tab and return to your original window.',
     manualHint: 'Your original window may have been closed. Click below to create your story.',
+    notLoggedInHint: 'Please log in to create your story.',
     createStory: 'Create Your Story',
+    login: 'Log In',
     goHome: 'Go to Homepage',
   },
   de: {
@@ -22,7 +24,9 @@ const translations = {
     generatingInOtherWindow: 'Ihre Geschichte wird im anderen Browserfenster generiert!',
     otherWindowHint: 'Sie können diesen Tab schließen und zu Ihrem ursprünglichen Fenster zurückkehren.',
     manualHint: 'Ihr ursprüngliches Fenster wurde möglicherweise geschlossen. Klicken Sie unten, um Ihre Geschichte zu erstellen.',
+    notLoggedInHint: 'Bitte melden Sie sich an, um Ihre Geschichte zu erstellen.',
     createStory: 'Geschichte erstellen',
+    login: 'Anmelden',
     goHome: 'Zur Startseite',
   },
   fr: {
@@ -31,7 +35,9 @@ const translations = {
     generatingInOtherWindow: 'Votre histoire est en cours de generation dans votre autre fenetre!',
     otherWindowHint: 'Vous pouvez fermer cet onglet et retourner a votre fenetre d\'origine.',
     manualHint: 'Votre fenetre d\'origine a peut-etre ete fermee. Cliquez ci-dessous pour creer votre histoire.',
+    notLoggedInHint: 'Veuillez vous connecter pour creer votre histoire.',
     createStory: 'Creer votre histoire',
+    login: 'Se connecter',
     goHome: 'Aller a l\'accueil',
   },
 };
@@ -41,8 +47,9 @@ type Status = 'checking' | 'other_window' | 'manual';
 export default function EmailVerified() {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const t = translations[language as keyof typeof translations] || translations.en;
+  const isLoggedIn = !!user;
   // Always start with 'checking' - user should never see buttons
   const [status, setStatus] = useState<Status>('checking');
 
@@ -162,17 +169,28 @@ export default function EmailVerified() {
           {status === 'manual' && (
             <div className="mb-8">
               <p className="text-gray-600 mb-4">
-                {t.manualHint}
+                {isLoggedIn ? t.manualHint : t.notLoggedInHint}
               </p>
               <div className="space-y-3">
-                <Button
-                  onClick={() => navigate('/create')}
-                  variant="primary"
-                  className="w-full"
-                >
-                  <Sparkles size={18} className="mr-2" />
-                  {t.createStory}
-                </Button>
+                {isLoggedIn ? (
+                  <Button
+                    onClick={() => navigate('/create')}
+                    variant="primary"
+                    className="w-full"
+                  >
+                    <Sparkles size={18} className="mr-2" />
+                    {t.createStory}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => navigate('/?login=true&redirect=%2Fcreate')}
+                    variant="primary"
+                    className="w-full"
+                  >
+                    <LogIn size={18} className="mr-2" />
+                    {t.login}
+                  </Button>
+                )}
                 <Button
                   onClick={() => navigate('/')}
                   variant="secondary"
