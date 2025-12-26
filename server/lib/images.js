@@ -740,8 +740,11 @@ async function editImageWithPrompt(imageData, editInstruction) {
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
-          responseModalities: ['image', 'text'],
-          temperature: 0.6
+          responseModalities: ["TEXT", "IMAGE"],
+          temperature: 0.6,
+          imageConfig: {
+            aspectRatio: "1:1"
+          }
         }
       })
     });
