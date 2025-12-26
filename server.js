@@ -1618,13 +1618,14 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
 
     log.debug(`🔄 Regenerating image for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)`);
 
-    // Check user credits first
+    // Check user credits first (-1 means infinite/unlimited)
     const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     const userCredits = userResult.rows[0].credits || 0;
-    if (userCredits < creditCost) {
+    const hasInfiniteCredits = userCredits === -1;
+    if (!hasInfiniteCredits && userCredits < creditCost) {
       return res.status(402).json({
         error: 'Insufficient credits',
         required: creditCost,
@@ -1779,19 +1780,23 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       [JSON.stringify(storyData), id]
     );
 
-    // Deduct credits after successful generation
-    const newCredits = userCredits - creditCost;
-    await dbPool.query(
-      'UPDATE users SET credits = credits - $1 WHERE id = $2',
-      [creditCost, req.user.id]
-    );
-    // Log credit transaction
-    await dbPool.query(
-      `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-       VALUES ($1, $2, $3, 'image_regeneration', $4)`,
-      [req.user.id, -creditCost, newCredits, `Regenerate image for page ${pageNumber}`]
-    );
-    console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
+    // Deduct credits after successful generation (skip for infinite credits)
+    if (!hasInfiniteCredits) {
+      const newCredits = userCredits - creditCost;
+      await dbPool.query(
+        'UPDATE users SET credits = credits - $1 WHERE id = $2',
+        [creditCost, req.user.id]
+      );
+      // Log credit transaction
+      await dbPool.query(
+        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+         VALUES ($1, $2, $3, 'image_regeneration', $4)`,
+        [req.user.id, -creditCost, newCredits, `Regenerate image for page ${pageNumber}`]
+      );
+      console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
+    } else {
+      console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, unlimited credits)`);
+    }
 
     // Get version count for response
     const versionCount = sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions?.length || 1;
@@ -1847,8 +1852,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     }
     const userCredits = userResult.rows[0].credits || 0;
     const requiredCredits = CREDIT_COSTS.IMAGE_REGENERATION;
+    const hasInfiniteCredits = userCredits === -1;
 
-    if (userCredits < requiredCredits) {
+    if (!hasInfiniteCredits && userCredits < requiredCredits) {
       return res.status(402).json({
         error: 'Insufficient credits',
         required: requiredCredits,
@@ -1856,8 +1862,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       });
     }
 
-    log.debug(`🔄 Regenerating ${normalizedCoverType} cover for story ${id} (user credits: ${userCredits})`);
-
+    log.debug(`🔄 Regenerating ${normalizedCoverType} cover for story ${id} (user credits: ${hasInfiniteCredits ? 'unlimited' : userCredits})`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -2068,16 +2073,19 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       [JSON.stringify(storyData), id]
     );
 
-    // Deduct credits and log transaction
-    const newCredits = userCredits - requiredCredits;
-    await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, req.user.id]);
-    await dbPool.query(
-      `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [req.user.id, -requiredCredits, newCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`]
-    );
-
-    console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
+    // Deduct credits and log transaction (skip for infinite credits)
+    if (!hasInfiniteCredits) {
+      const newCredits = userCredits - requiredCredits;
+      await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, req.user.id]);
+      await dbPool.query(
+        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [req.user.id, -requiredCredits, newCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`]
+      );
+      console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
+    } else {
+      console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, unlimited credits)`);
+    }
 
     res.json({
       success: true,
