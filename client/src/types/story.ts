@@ -66,6 +66,7 @@ export interface SceneImage {
   prompt?: string;  // The actual prompt sent to image generation API
   qualityScore?: number;
   qualityReasoning?: string;
+  qualityModelId?: string;  // Model used for quality evaluation
   // Regeneration info (for dev mode)
   wasRegenerated?: boolean;
   totalAttempts?: number;
@@ -87,6 +88,7 @@ export interface CoverImageData {
   prompt?: string;       // The actual prompt sent to image generation API
   qualityScore?: number;
   qualityReasoning?: string;
+  qualityModelId?: string;  // Model used for quality evaluation
   // Regeneration info (for dev mode)
   wasRegenerated?: boolean;
   totalAttempts?: number;
@@ -107,6 +109,12 @@ export interface CoverImages {
   backCover: string | CoverImageData | null;
 }
 
+// Token usage info for dev mode display
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+}
+
 export interface SavedStory {
   id: string;
   title: string;
@@ -122,9 +130,18 @@ export interface SavedStory {
   relationshipTexts: RelationshipTextMap;
   outline?: string;
   outlinePrompt?: string;
+  outlineModelId?: string;  // Model used for outline generation
+  outlineUsage?: TokenUsage;  // Token usage for outline
   story?: string;
   originalStory?: string;  // Original AI-generated story text (preserved on first edit)
-  storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
+  storyTextPrompts?: Array<{
+    batch: number;
+    startPage: number;
+    endPage: number;
+    prompt: string;
+    modelId?: string;  // Model used for this batch
+    usage?: TokenUsage;  // Token usage for this batch
+  }>;
   visualBible?: Partial<VisualBible>;
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];

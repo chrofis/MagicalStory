@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X, Coins, Images } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X, Images, RotateCcw } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt, ReferencePhoto, ImageVersion } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
@@ -202,6 +202,8 @@ interface StoryTextPrompt {
   startPage: number;
   endPage: number;
   prompt: string;
+  modelId?: string;
+  usage?: { input_tokens: number; output_tokens: number };
 }
 
 interface StoryDisplayProps {
@@ -209,6 +211,8 @@ interface StoryDisplayProps {
   story: string;
   outline?: string;
   outlinePrompt?: string;
+  outlineModelId?: string;
+  outlineUsage?: { input_tokens: number; output_tokens: number };
   storyTextPrompts?: StoryTextPrompt[];
   visualBible?: VisualBible;
   sceneImages: SceneImage[];
@@ -257,6 +261,8 @@ export function StoryDisplay({
   story,
   outline,
   outlinePrompt,
+  outlineModelId,
+  outlineUsage,
   storyTextPrompts = [],
   visualBible,
   sceneImages,
@@ -550,67 +556,44 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Action Buttons Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {/* TXT Download - Developer mode only */}
-        {developerMode && onDownloadTxt && (
-          <button
-            onClick={onDownloadTxt}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2"
-          >
-            <Download size={20} /> {t.downloadTXT}
-          </button>
-        )}
-
-        {/* PDF Download - All users when images exist */}
-        {hasImages && onDownloadPdf && (
-          <button
-            onClick={onDownloadPdf}
-            disabled={isGenerating}
-            className={`bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'
-            }`}
-          >
-            <FileText size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
-          </button>
-        )}
-
-        {/* Add to Book - All users when images exist and story is saved */}
+      {/* Action Buttons Grid - Order: Add to Book, PDF, Edit, Create Another */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        {/* Add to Book */}
         {hasImages && storyId && onAddToBook && (
           <button
             onClick={onAddToBook}
             disabled={isGenerating}
-            className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+            className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <ShoppingCart size={20} /> {language === 'de' ? 'Zum Buch hinzufügen' : language === 'fr' ? 'Ajouter au livre' : 'Add to Book'}
+            <ShoppingCart size={16} /> {language === 'de' ? 'Zum Buch' : language === 'fr' ? 'Ajouter' : 'Add to Book'}
           </button>
         )}
 
-        {/* Print Book - Developer mode only (bypasses payment) */}
-        {developerMode && hasImages && storyId && onPrintBook && (
+        {/* PDF Download */}
+        {hasImages && onDownloadPdf && (
           <button
-            onClick={onPrintBook}
+            onClick={onDownloadPdf}
             disabled={isGenerating}
-            className={`bg-yellow-500 text-black px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-yellow-600'
+            className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <BookOpen size={20} /> {language === 'de' ? 'Buch drucken (DEV)' : language === 'fr' ? 'Imprimer livre (DEV)' : 'Print Book (DEV)'}
+            <FileText size={16} /> PDF
           </button>
         )}
 
-        {/* Edit Story - when save callback is available */}
+        {/* Edit Story */}
         {onSaveStoryText && !isEditMode && (
           <button
             onClick={() => setIsEditMode(true)}
             disabled={isGenerating}
-            className={`bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'
+            className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <Edit3 size={20} /> {language === 'de' ? 'Geschichte bearbeiten' : language === 'fr' ? 'Modifier l\'histoire' : 'Edit Story'}
+            <Edit3 size={16} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
           </button>
         )}
 
@@ -619,14 +602,39 @@ export function StoryDisplay({
           <button
             onClick={onCreateAnother}
             disabled={isGenerating}
-            className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 sm:col-span-2 lg:col-span-1 ${
+            className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <Plus size={20} /> {t.createAnotherStory}
+            <Plus size={16} /> {language === 'de' ? 'Neu' : language === 'fr' ? 'Nouveau' : 'New'}
           </button>
         )}
       </div>
+
+      {/* Developer Mode Buttons */}
+      {developerMode && (
+        <div className="flex gap-2 mt-2">
+          {onDownloadTxt && (
+            <button
+              onClick={onDownloadTxt}
+              className="bg-gray-500 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 hover:bg-gray-600"
+            >
+              <Download size={14} /> TXT
+            </button>
+          )}
+          {hasImages && storyId && onPrintBook && (
+            <button
+              onClick={onPrintBook}
+              disabled={isGenerating}
+              className={`bg-yellow-500 text-black px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 ${
+                isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-yellow-600'
+              }`}
+            >
+              <BookOpen size={14} /> Print (DEV)
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Developer Mode: Story Overview and Full Text */}
       {developerMode && (
@@ -689,6 +697,12 @@ export function StoryDisplay({
               <summary className="cursor-pointer text-lg font-bold text-cyan-800 hover:text-cyan-900 flex items-center gap-2">
                 <FileText size={20} />
                 {language === 'de' ? 'API-Prompt: Outline' : language === 'fr' ? 'Prompt API: Plan' : 'API Prompt: Outline'}
+                {outlineModelId && <span className="ml-2 text-sm font-normal text-cyan-600">({outlineModelId})</span>}
+                {outlineUsage && (
+                  <span className="ml-2 text-xs font-normal text-cyan-500">
+                    [{outlineUsage.input_tokens.toLocaleString()} in / {outlineUsage.output_tokens.toLocaleString()} out]
+                  </span>
+                )}
               </summary>
               <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-cyan-200 overflow-x-auto max-h-96 overflow-y-auto">
                 {outlinePrompt}
@@ -706,8 +720,16 @@ export function StoryDisplay({
               <div className="mt-4 space-y-4">
                 {storyTextPrompts.map((batch) => (
                   <details key={batch.batch} className="bg-white border border-teal-200 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-teal-700">
-                      {language === 'de' ? `Batch ${batch.batch}: Seiten ${batch.startPage}-${batch.endPage}` : language === 'fr' ? `Lot ${batch.batch}: Pages ${batch.startPage}-${batch.endPage}` : `Batch ${batch.batch}: Pages ${batch.startPage}-${batch.endPage}`}
+                    <summary className="cursor-pointer text-sm font-semibold text-teal-700 flex items-center gap-2 flex-wrap">
+                      <span>
+                        {language === 'de' ? `Batch ${batch.batch}: Seiten ${batch.startPage}-${batch.endPage}` : language === 'fr' ? `Lot ${batch.batch}: Pages ${batch.startPage}-${batch.endPage}` : `Batch ${batch.batch}: Pages ${batch.startPage}-${batch.endPage}`}
+                      </span>
+                      {batch.modelId && <span className="text-xs font-normal text-teal-500">({batch.modelId})</span>}
+                      {batch.usage && (
+                        <span className="text-xs font-normal text-teal-400">
+                          [{batch.usage.input_tokens.toLocaleString()} in / {batch.usage.output_tokens.toLocaleString()} out]
+                        </span>
+                      )}
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border overflow-x-auto max-h-64 overflow-y-auto">
                       {batch.prompt}
@@ -1127,8 +1149,8 @@ export function StoryDisplay({
                 >
                   <RefreshCw size={14} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                  <span className="flex items-center gap-1 text-xs opacity-80">
-                    <Coins size={12} /> {imageRegenerationCost}
+                  <span className="text-xs opacity-80">
+                    ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                   </span>
                 </button>
               </div>
@@ -1186,7 +1208,10 @@ export function StoryDisplay({
                 {frontCoverObj.qualityScore !== undefined && (
                   <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                     <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                      <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                      <span className="flex items-center gap-2">
+                        {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                        {frontCoverObj.qualityModelId && <span className="text-xs font-normal text-indigo-500">({frontCoverObj.qualityModelId})</span>}
+                      </span>
                       <span className={`text-lg font-bold ${
                         frontCoverObj.qualityScore >= 70 ? 'text-green-600' :
                         frontCoverObj.qualityScore >= 50 ? 'text-yellow-600' :
@@ -1247,8 +1272,8 @@ export function StoryDisplay({
                 >
                   <RefreshCw size={14} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                  <span className="flex items-center gap-1 text-xs opacity-80">
-                    <Coins size={12} /> {imageRegenerationCost}
+                  <span className="text-xs opacity-80">
+                    ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                   </span>
                 </button>
               </div>
@@ -1306,7 +1331,10 @@ export function StoryDisplay({
                 {initialPageObj.qualityScore !== undefined && (
                   <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                     <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                      <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                      <span className="flex items-center gap-2">
+                        {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                        {initialPageObj.qualityModelId && <span className="text-xs font-normal text-indigo-500">({initialPageObj.qualityModelId})</span>}
+                      </span>
                       <span className={`text-lg font-bold ${
                         initialPageObj.qualityScore >= 70 ? 'text-green-600' :
                         initialPageObj.qualityScore >= 50 ? 'text-yellow-600' :
@@ -1421,8 +1449,8 @@ export function StoryDisplay({
                               >
                                 <RefreshCw size={14} />
                                 {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                                <span className="flex items-center gap-1 text-xs opacity-80">
-                                  <Coins size={12} /> {imageRegenerationCost}
+                                <span className="text-xs opacity-80">
+                                  ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                                 </span>
                               </button>
                               {getImageVersions(pageNumber).length > 1 && (
@@ -1516,7 +1544,10 @@ export function StoryDisplay({
                             {image?.qualityScore !== undefined && (
                               <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                                  <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                                  <span className="flex items-center gap-2">
+                                    {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                                    {image?.qualityModelId && <span className="text-xs font-normal text-indigo-500">({image.qualityModelId})</span>}
+                                  </span>
                                   <span className={`text-lg font-bold ${
                                     (image?.qualityScore ?? 0) >= 70 ? 'text-green-600' :
                                     (image?.qualityScore ?? 0) >= 50 ? 'text-yellow-600' :
@@ -1635,8 +1666,8 @@ export function StoryDisplay({
                               >
                                 <RefreshCw size={14} />
                                 {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                                <span className="flex items-center gap-1 text-xs opacity-80">
-                                  <Coins size={12} /> {imageRegenerationCost}
+                                <span className="text-xs opacity-80">
+                                  ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                                 </span>
                               </button>
                               {getImageVersions(pageNumber).length > 1 && (
@@ -1730,7 +1761,10 @@ export function StoryDisplay({
                             {image.qualityScore !== undefined && (
                               <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                                 <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                                  <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                                  <span className="flex items-center gap-2">
+                                    {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                                    {image.qualityModelId && <span className="text-xs font-normal text-indigo-500">({image.qualityModelId})</span>}
+                                  </span>
                                   <span className={`text-lg font-bold ${
                                     image.qualityScore >= 70 ? 'text-green-600' :
                                     image.qualityScore >= 50 ? 'text-yellow-600' :
@@ -1899,8 +1933,8 @@ export function StoryDisplay({
                 >
                   <RefreshCw size={14} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                  <span className="flex items-center gap-1 text-xs opacity-80">
-                    <Coins size={12} /> {imageRegenerationCost}
+                  <span className="text-xs opacity-80">
+                    ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                   </span>
                 </button>
               </div>
@@ -1958,7 +1992,10 @@ export function StoryDisplay({
                 {backCoverObj.qualityScore !== undefined && (
                   <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
                     <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
-                      <span>{language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}</span>
+                      <span className="flex items-center gap-2">
+                        {language === 'de' ? 'Qualitätsbewertung' : language === 'fr' ? 'Score de qualité' : 'Quality Score'}
+                        {backCoverObj.qualityModelId && <span className="text-xs font-normal text-indigo-500">({backCoverObj.qualityModelId})</span>}
+                      </span>
                       <span className={`text-lg font-bold ${
                         backCoverObj.qualityScore >= 70 ? 'text-green-600' :
                         backCoverObj.qualityScore >= 50 ? 'text-yellow-600' :
@@ -1992,34 +2029,47 @@ export function StoryDisplay({
 
       {/* Bottom Action Buttons - for users who scrolled to the end */}
       {hasImages && story && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-6 mt-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4 mt-6">
+          <h3 className="text-base font-bold text-gray-800 mb-3 text-center">
             {language === 'de' ? 'Was möchten Sie als Nächstes tun?' : language === 'fr' ? 'Que souhaitez-vous faire ensuite ?' : 'What would you like to do next?'}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Download PDF */}
-            {onDownloadPdf && (
-              <button
-                onClick={onDownloadPdf}
-                disabled={isGenerating}
-                className={`bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'
-                }`}
-              >
-                <FileText size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
-              </button>
-            )}
-
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {/* Add to Book */}
             {storyId && onAddToBook && (
               <button
                 onClick={onAddToBook}
                 disabled={isGenerating}
-                className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <ShoppingCart size={20} /> {language === 'de' ? 'Zum Buch hinzufügen' : language === 'fr' ? 'Ajouter au livre' : 'Add to Book'}
+                <ShoppingCart size={16} /> {language === 'de' ? 'Zum Buch' : language === 'fr' ? 'Ajouter' : 'Add to Book'}
+              </button>
+            )}
+
+            {/* PDF Download */}
+            {onDownloadPdf && (
+              <button
+                onClick={onDownloadPdf}
+                disabled={isGenerating}
+                className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                }`}
+              >
+                <FileText size={16} /> PDF
+              </button>
+            )}
+
+            {/* Edit Story */}
+            {onSaveStoryText && !isEditMode && (
+              <button
+                onClick={() => setIsEditMode(true)}
+                disabled={isGenerating}
+                className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                }`}
+              >
+                <Edit3 size={16} /> {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
               </button>
             )}
 
@@ -2028,11 +2078,11 @@ export function StoryDisplay({
               <button
                 onClick={onCreateAnother}
                 disabled={isGenerating}
-                className={`bg-indigo-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <Plus size={20} /> {t.createAnotherStory}
+                <Plus size={16} /> {language === 'de' ? 'Neu' : language === 'fr' ? 'Nouveau' : 'New'}
               </button>
             )}
           </div>
@@ -2054,26 +2104,36 @@ export function StoryDisplay({
                 </span>
               )}
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={handleCancelEdit}
                 disabled={isSaving}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold flex items-center gap-2"
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-semibold flex items-center gap-1.5"
               >
-                <X size={18} />
+                <X size={16} />
                 {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
               </button>
+              {originalStory && editedStory !== originalStory && (
+                <button
+                  onClick={() => setEditedStory(originalStory)}
+                  disabled={isSaving}
+                  className="px-4 py-2 border border-amber-400 text-amber-700 rounded-lg hover:bg-amber-50 text-sm font-semibold flex items-center gap-1.5"
+                >
+                  <RotateCcw size={16} />
+                  {language === 'de' ? 'Zurücksetzen' : language === 'fr' ? 'Restaurer' : 'Restore'}
+                </button>
+              )}
               <button
                 onClick={handleSaveStory}
                 disabled={isSaving}
-                className={`px-6 py-2 bg-green-500 text-white rounded-lg font-semibold flex items-center gap-2 ${
+                className={`px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 ${
                   isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
                 }`}
               >
-                <Save size={18} />
+                <Save size={16} />
                 {isSaving
                   ? (language === 'de' ? 'Speichern...' : language === 'fr' ? 'Sauvegarde...' : 'Saving...')
-                  : (language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : 'Save Changes')
+                  : (language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : 'Save')
                 }
               </button>
             </div>

@@ -4,64 +4,54 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
 import { Button } from '@/components/common/Button';
-import { CheckCircle, Sparkles, Loader2, Monitor } from 'lucide-react';
+import { CheckCircle, Loader2, Monitor } from 'lucide-react';
 
 const translations = {
   en: {
     title: 'Email Verified!',
-    description: 'Your email has been verified successfully. You can now create your magical story.',
     checkingOtherWindow: 'Checking if your story is starting in the other window...',
     generatingInOtherWindow: 'Your story is being generated in your other browser window!',
     otherWindowHint: 'You can close this tab and return to your original window.',
     autoGenerating: 'Starting your story generation...',
-    createStory: 'Create Your Story',
     goHome: 'Go to Homepage',
   },
   de: {
     title: 'E-Mail bestätigt!',
-    description: 'Ihre E-Mail wurde erfolgreich bestätigt. Sie können jetzt Ihre magische Geschichte erstellen.',
     checkingOtherWindow: 'Prüfe, ob Ihre Geschichte im anderen Fenster startet...',
     generatingInOtherWindow: 'Ihre Geschichte wird im anderen Browserfenster generiert!',
     otherWindowHint: 'Sie können diesen Tab schließen und zu Ihrem ursprünglichen Fenster zurückkehren.',
     autoGenerating: 'Starte Ihre Geschichte...',
-    createStory: 'Geschichte erstellen',
     goHome: 'Zur Startseite',
   },
   fr: {
     title: 'E-mail verifie!',
-    description: 'Votre e-mail a ete verifie avec succes. Vous pouvez maintenant creer votre histoire magique.',
     checkingOtherWindow: 'Verification si votre histoire demarre dans l\'autre fenetre...',
     generatingInOtherWindow: 'Votre histoire est en cours de generation dans votre autre fenetre!',
     otherWindowHint: 'Vous pouvez fermer cet onglet et retourner a votre fenetre d\'origine.',
     autoGenerating: 'Demarrage de votre histoire...',
-    createStory: 'Creer votre histoire',
     goHome: 'Aller a l\'accueil',
   },
 };
 
-type Status = 'checking' | 'other_window' | 'redirecting' | 'idle';
+type Status = 'checking' | 'other_window' | 'redirecting';
 
 export default function EmailVerified() {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { refreshUser } = useAuth();
   const t = translations[language as keyof typeof translations] || translations.en;
-  const [status, setStatus] = useState<Status>('idle');
+  // Always start with 'checking' - user should never see buttons
+  const [status, setStatus] = useState<Status>('checking');
 
   useEffect(() => {
     const handleVerification = async () => {
       // First check if original window already started generation
-      // (this can happen before we even start due to race condition)
       const alreadyStarted = localStorage.getItem('verificationGenerationStarted');
       if (alreadyStarted) {
         setStatus('other_window');
         localStorage.removeItem('pendingStoryGeneration');
         return;
       }
-
-      // Check if there's a pending generation (before refreshUser, as it might get cleared)
-      const pendingGeneration = localStorage.getItem('pendingStoryGeneration');
-      const hasPending = pendingGeneration === 'true';
 
       // Refresh user state so emailVerified is updated
       await refreshUser();
@@ -74,27 +64,18 @@ export default function EmailVerified() {
         return;
       }
 
-      if (!hasPending) {
-        // No pending generation - just show verified message
-        setStatus('idle');
-        return;
-      }
-
-      // There's a pending generation - give the original window 5 seconds to start
-      setStatus('checking');
-
-      // Wait 5 seconds for the original window (polling every 3s) to detect verification
+      // Wait 5 seconds for original window (polling every 3s) to detect verification and start
       await new Promise(resolve => setTimeout(resolve, 5000));
 
-      // Check if the original window started generation
+      // Final check - did the original window start generation?
       const generationStarted = localStorage.getItem('verificationGenerationStarted');
 
       if (generationStarted) {
-        // Original window is handling it - show message
+        // Original window is handling it
         setStatus('other_window');
         localStorage.removeItem('pendingStoryGeneration');
       } else {
-        // Original window didn't start (probably closed) - we'll handle it
+        // Original window didn't start (probably closed) - redirect to auto-generate
         setStatus('redirecting');
         localStorage.removeItem('pendingStoryGeneration');
         // Small delay so user sees the message
@@ -152,31 +133,6 @@ export default function EmailVerified() {
                 {t.autoGenerating}
               </p>
             </div>
-          )}
-
-          {status === 'idle' && (
-            <>
-              <p className="text-gray-500 mb-8">{t.description}</p>
-
-              <div className="space-y-3">
-                <Button
-                  onClick={() => navigate('/create')}
-                  variant="primary"
-                  className="w-full"
-                >
-                  <Sparkles size={18} className="mr-2" />
-                  {t.createStory}
-                </Button>
-
-                <Button
-                  onClick={() => navigate('/')}
-                  variant="secondary"
-                  className="w-full"
-                >
-                  {t.goHome}
-                </Button>
-              </div>
-            </>
           )}
 
           {status === 'other_window' && (

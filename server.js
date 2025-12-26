@@ -5472,6 +5472,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           text: pageTextContent,
           qualityScore: imageResult.score,
           qualityReasoning: imageResult.reasoning || null,
+          qualityModelId: imageResult.qualityModelId || null,  // Model used for quality eval
           wasRegenerated: imageResult.wasRegenerated || false,
           totalAttempts: imageResult.totalAttempts || 1,
           retryHistory: imageResult.retryHistory || [],
@@ -6558,11 +6559,12 @@ async function processStoryJob(jobId) {
     const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens, null, outlineModelOverride);
     const outline = outlineResult.text;
     // Get the actual model used (override or default)
-    const outlineModelUsed = outlineModelOverride ? TEXT_MODELS[outlineModelOverride]?.modelId : getActiveTextModel().modelId;
+    const outlineModelUsed = outlineResult.modelId || (outlineModelOverride ? TEXT_MODELS[outlineModelOverride]?.modelId : getActiveTextModel().modelId);
+    const outlineUsage = outlineResult.usage || { input_tokens: 0, output_tokens: 0 };
     addUsage('anthropic', outlineResult.usage, 'outline', outlineModelUsed || getActiveTextModel().modelId);
 
-    // Save checkpoint: outline (include prompt for debugging)
-    await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt });
+    // Save checkpoint: outline (include prompt, model, and token usage for debugging)
+    await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt, outlineModelId: outlineModelUsed, outlineUsage });
 
     // Extract short scene descriptions from outline for better image generation
     const shortSceneDescriptions = extractShortSceneDescriptions(outline);
@@ -7725,6 +7727,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           // Reconstruct story data from checkpoints
           let outline = '';
           let outlinePrompt = '';
+          let outlineModelId = null;
+          let outlineUsage = null;
           let fullStoryText = '';
           let sceneDescriptions = [];
           let sceneImages = [];
@@ -7738,6 +7742,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             if (cp.step_name === 'outline') {
               outline = data.outline || '';
               outlinePrompt = data.outlinePrompt || '';
+              outlineModelId = data.outlineModelId || null;
+              outlineUsage = data.outlineUsage || null;
             } else if (cp.step_name === 'scene_hints' && data.visualBible) {
               visualBible = data.visualBible;
             } else if (cp.step_name === 'story_batch') {
@@ -7813,6 +7819,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               relationshipTexts: inputData?.relationshipTexts || {},
               outline: outline,
               outlinePrompt: outlinePrompt,
+              outlineModelId: outlineModelId,
+              outlineUsage: outlineUsage,
               story: fullStoryText,
               storyTextPrompts: storyTextPrompts,
               visualBible: visualBible,

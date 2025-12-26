@@ -76,9 +76,18 @@ interface StoryDetailsServer {
   relationshipTexts: RelationshipTextMap;
   outline?: string;
   outlinePrompt?: string;
+  outlineModelId?: string;  // Model used for outline generation
+  outlineUsage?: { input_tokens: number; output_tokens: number };  // Token usage for outline
   storyText?: string; // New stories use this
   story?: string; // Old stories use this
-  storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string }>;
+  storyTextPrompts?: Array<{
+    batch: number;
+    startPage: number;
+    endPage: number;
+    prompt: string;
+    modelId?: string;
+    usage?: { input_tokens: number; output_tokens: number };
+  }>;
   visualBible?: VisualBible;
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];
@@ -177,6 +186,8 @@ export const storyService = {
         relationshipTexts: s.relationshipTexts,
         outline: s.outline,
         outlinePrompt: s.outlinePrompt,
+        outlineModelId: s.outlineModelId,
+        outlineUsage: s.outlineUsage,
         story: storyContent,
         storyTextPrompts: s.storyTextPrompts,
         visualBible: s.visualBible,
