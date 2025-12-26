@@ -279,6 +279,11 @@ router.post('/firebase', authLimiter, async (req, res) => {
 
     if (existingUser.length > 0) {
       user = existingUser[0];
+      // Firebase/Google users are already verified by Google - ensure email_verified is TRUE
+      if (user.email_verified !== true) {
+        await dbQuery('UPDATE users SET email_verified = TRUE WHERE id = $1', [user.id]);
+        user.email_verified = true;
+      }
       await logActivity(user.id, username, 'USER_LOGIN_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
     } else {
       // Create new user
