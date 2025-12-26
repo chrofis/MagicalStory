@@ -300,8 +300,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // Fallback to old format (just a number)
       const score = parseFloat(responseText);
       if (!isNaN(score) && score >= 0 && score <= 100) {
-        log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100 (legacy format)`);
-        return score;
+        log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100 (legacy format, model: ${modelId})`);
+        return {
+          score,
+          reasoning: responseText,
+          usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+          modelId: modelId
+        };
       }
       log.warn(`⚠️  [QUALITY] Could not parse score from response (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 100));
       return null;
