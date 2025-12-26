@@ -6306,32 +6306,34 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     log.debug(`   BY FUNCTION:`);
     const byFunc = tokenUsage.byFunction;
     const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
+    // Use first model for cost calculation (model-specific pricing), fall back to provider
+    const getCostModel = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models)[0] : funcData.provider;
     if (byFunc.outline.calls > 0) {
-      const cost = calculateCost(byFunc.outline.provider, byFunc.outline.input_tokens, byFunc.outline.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.outline), byFunc.outline.input_tokens, byFunc.outline.output_tokens);
       log.debug(`   Outline:       ${byFunc.outline.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.outline.output_tokens.toLocaleString().padStart(8)} out (${byFunc.outline.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.outline)}]`);
     }
     if (byFunc.story_text.calls > 0) {
-      const cost = calculateCost(byFunc.story_text.provider, byFunc.story_text.input_tokens, byFunc.story_text.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.story_text), byFunc.story_text.input_tokens, byFunc.story_text.output_tokens);
       log.debug(`   Story Text:    ${byFunc.story_text.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.story_text.output_tokens.toLocaleString().padStart(8)} out (${byFunc.story_text.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.story_text)}]`);
     }
     if (byFunc.scene_descriptions.calls > 0) {
-      const cost = calculateCost(byFunc.scene_descriptions.provider, byFunc.scene_descriptions.input_tokens, byFunc.scene_descriptions.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.scene_descriptions), byFunc.scene_descriptions.input_tokens, byFunc.scene_descriptions.output_tokens);
       log.debug(`   Scene Desc:    ${byFunc.scene_descriptions.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_descriptions.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_descriptions.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_descriptions)}]`);
     }
     if (byFunc.cover_images.calls > 0) {
-      const cost = calculateCost(byFunc.cover_images.provider, byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.cover_images), byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
       log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_images)}]`);
     }
     if (byFunc.cover_quality.calls > 0) {
-      const cost = calculateCost(byFunc.cover_quality.provider, byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens);
       log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
     }
     if (byFunc.page_images.calls > 0) {
-      const cost = calculateCost(byFunc.page_images.provider, byFunc.page_images.input_tokens, byFunc.page_images.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.page_images), byFunc.page_images.input_tokens, byFunc.page_images.output_tokens);
       log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_images)}]`);
     }
     if (byFunc.page_quality.calls > 0) {
-      const cost = calculateCost(byFunc.page_quality.provider, byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens);
       log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
     log.trace(`   ─────────────────────────────────────────────────────────────`);
@@ -7631,32 +7633,34 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     log.debug(`   BY FUNCTION:`);
     const byFunc = tokenUsage.byFunction;
     const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
+    // Use first model for cost calculation (model-specific pricing), fall back to provider
+    const getCostModel = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models)[0] : funcData.provider;
     if (byFunc.outline.calls > 0) {
-      const cost = calculateCost(byFunc.outline.provider, byFunc.outline.input_tokens, byFunc.outline.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.outline), byFunc.outline.input_tokens, byFunc.outline.output_tokens);
       log.debug(`   Outline:       ${byFunc.outline.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.outline.output_tokens.toLocaleString().padStart(8)} out (${byFunc.outline.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.outline)}]`);
     }
     if (byFunc.scene_descriptions.calls > 0) {
-      const cost = calculateCost(byFunc.scene_descriptions.provider, byFunc.scene_descriptions.input_tokens, byFunc.scene_descriptions.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.scene_descriptions), byFunc.scene_descriptions.input_tokens, byFunc.scene_descriptions.output_tokens);
       log.debug(`   Scene Desc:    ${byFunc.scene_descriptions.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_descriptions.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_descriptions.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_descriptions)}]`);
     }
     if (byFunc.story_text.calls > 0) {
-      const cost = calculateCost(byFunc.story_text.provider, byFunc.story_text.input_tokens, byFunc.story_text.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.story_text), byFunc.story_text.input_tokens, byFunc.story_text.output_tokens);
       log.debug(`   Story Text:    ${byFunc.story_text.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.story_text.output_tokens.toLocaleString().padStart(8)} out (${byFunc.story_text.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.story_text)}]`);
     }
     if (byFunc.cover_images.calls > 0) {
-      const cost = calculateCost(byFunc.cover_images.provider, byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.cover_images), byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens);
       log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_images)}]`);
     }
     if (byFunc.cover_quality.calls > 0) {
-      const cost = calculateCost(byFunc.cover_quality.provider, byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens);
       log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
     }
     if (byFunc.page_images.calls > 0) {
-      const cost = calculateCost(byFunc.page_images.provider, byFunc.page_images.input_tokens, byFunc.page_images.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.page_images), byFunc.page_images.input_tokens, byFunc.page_images.output_tokens);
       log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_images)}]`);
     }
     if (byFunc.page_quality.calls > 0) {
-      const cost = calculateCost(byFunc.page_quality.provider, byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens);
+      const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens);
       log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
     log.trace(`   ─────────────────────────────────────────────────────────────`);
