@@ -255,8 +255,8 @@ export default function LandingPage() {
       <section className="lg:min-h-screen lg:py-24 px-4 lg:px-8 bg-white lg:snap-start lg:flex lg:flex-col lg:justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
-            {/* Text Content */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-1 min-h-screen lg:min-h-0 flex flex-col justify-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
+            {/* Text Content - First on mobile */}
+            <div className="w-full lg:w-1/2 order-1 lg:order-1 min-h-[70vh] lg:min-h-0 flex flex-col justify-center pt-8 pb-4 lg:py-0">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
                   <Camera className="w-6 h-6 text-indigo-600" />
@@ -284,8 +284,8 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
-            {/* Image */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-2 min-h-screen lg:min-h-0 flex items-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
+            {/* Image - Second on mobile, peeks from below */}
+            <div className="w-full lg:w-1/2 order-2 lg:order-2 lg:min-h-0 flex items-center pb-8 lg:py-0">
               <img
                 src={`/images/landing-characters-${language}.jpg`}
                 alt={st.createCharacters}
@@ -300,16 +300,8 @@ export default function LandingPage() {
       <section className="lg:min-h-screen lg:py-24 px-4 lg:px-8 bg-gray-50 lg:snap-start lg:flex lg:flex-col lg:justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
-            {/* Image */}
-            <div className="w-full lg:w-1/2 min-h-screen lg:min-h-0 flex items-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
-              <img
-                src="/images/landing-story.jpg"
-                alt={st.tellStory}
-                className="w-full h-auto rounded-2xl shadow-lg"
-              />
-            </div>
-            {/* Text Content */}
-            <div className="w-full lg:w-1/2 min-h-screen lg:min-h-0 flex flex-col justify-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
+            {/* Text Content - First on mobile */}
+            <div className="w-full lg:w-1/2 order-1 lg:order-2 min-h-[70vh] lg:min-h-0 flex flex-col justify-center pt-8 pb-4 lg:py-0">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-amber-100 p-3 rounded-full">
                   <BookOpen className="w-6 h-6 text-amber-600" />
@@ -337,6 +329,14 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
+            {/* Image - Second on mobile, peeks from below */}
+            <div className="w-full lg:w-1/2 order-2 lg:order-1 lg:min-h-0 flex items-center pb-8 lg:py-0">
+              <img
+                src="/images/landing-story.jpg"
+                alt={st.tellStory}
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -345,8 +345,8 @@ export default function LandingPage() {
       <section className="lg:min-h-screen lg:py-24 px-4 lg:px-8 bg-white lg:snap-start lg:flex lg:flex-col lg:justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
-            {/* Text Content */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-1 min-h-screen lg:min-h-0 flex flex-col justify-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
+            {/* Text Content - First on mobile */}
+            <div className="w-full lg:w-1/2 order-1 lg:order-1 min-h-[70vh] lg:min-h-0 flex flex-col justify-center pt-8 pb-4 lg:py-0">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-pink-100 p-3 rounded-full">
                   <Palette className="w-6 h-6 text-pink-600" />
@@ -374,8 +374,8 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
-            {/* Image */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-2 min-h-screen lg:min-h-0 flex items-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
+            {/* Image - Second on mobile, peeks from below */}
+            <div className="w-full lg:w-1/2 order-2 lg:order-2 lg:min-h-0 flex items-center pb-8 lg:py-0">
               <img
                 src="/images/landing-styles.jpg"
                 alt={st.chooseStyle}
@@ -390,16 +390,8 @@ export default function LandingPage() {
       <section className="lg:min-h-screen lg:py-24 px-4 lg:px-8 bg-gray-50 lg:snap-start lg:flex lg:flex-col lg:justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
-            {/* Image */}
-            <div className="w-full lg:w-1/2 min-h-screen lg:min-h-0 flex items-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
-              <img
-                src="/images/landing-print.jpg"
-                alt={st.printShare}
-                className="w-full h-auto rounded-2xl shadow-lg"
-              />
-            </div>
-            {/* Text Content */}
-            <div className="w-full lg:w-1/2 min-h-screen lg:min-h-0 flex flex-col justify-center py-16 lg:py-0 snap-start lg:[scroll-snap-align:none]">
+            {/* Text Content - First on mobile */}
+            <div className="w-full lg:w-1/2 order-1 lg:order-2 min-h-[70vh] lg:min-h-0 flex flex-col justify-center pt-8 pb-4 lg:py-0">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-emerald-100 p-3 rounded-full">
                   <Printer className="w-6 h-6 text-emerald-600" />
@@ -426,6 +418,14 @@ export default function LandingPage() {
                   <span className="text-gray-600">{st.shipping}</span>
                 </li>
               </ul>
+            </div>
+            {/* Image - Second on mobile, peeks from below */}
+            <div className="w-full lg:w-1/2 order-2 lg:order-1 lg:min-h-0 flex items-center pb-8 lg:py-0">
+              <img
+                src="/images/landing-print.jpg"
+                alt={st.printShare}
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
             </div>
           </div>
         </div>

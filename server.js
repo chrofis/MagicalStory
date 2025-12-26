@@ -1887,7 +1887,24 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       return res.status(400).json({ error: 'Invalid cover type. Must be: front, initial/initialPage, or back' });
     }
 
-    log.debug(`🔄 Regenerating ${normalizedCoverType} cover for story ${id}`);
+    // Check user credits before proceeding
+    const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userCredits = userResult.rows[0].credits || 0;
+    const requiredCredits = CREDIT_COSTS.IMAGE_REGENERATION;
+
+    if (userCredits < requiredCredits) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        required: requiredCredits,
+        available: userCredits
+      });
+    }
+
+    log.debug(`🔄 Regenerating ${normalizedCoverType} cover for story ${id} (user credits: ${userCredits})`);
+
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -2094,7 +2111,16 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, regeneration #${coverData.regenerationCount})`);
+    // Deduct credits and log transaction
+    const newCredits = userCredits - requiredCredits;
+    await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, req.user.id]);
+    await dbPool.query(
+      `INSERT INTO credit_transactions (user_id, amount, type, description, balance_after)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [req.user.id, -requiredCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`, newCredits]
+    );
+
+    console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
 
     res.json({
       success: true,
@@ -2116,7 +2142,10 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       // True original (from initial generation)
       originalImage: trueOriginalImage,
       originalScore: trueOriginalScore,
-      originalReasoning: trueOriginalReasoning
+      originalReasoning: trueOriginalReasoning,
+      // Credit info
+      creditsUsed: requiredCredits,
+      creditsRemaining: newCredits
     });
 
   } catch (err) {
