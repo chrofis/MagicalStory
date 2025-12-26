@@ -252,7 +252,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 1: Create Your Characters */}
-      <section className="min-h-screen lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
+      <section className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -297,7 +297,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 2: Tell Your Story */}
-      <section className="min-h-screen lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
+      <section className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -342,7 +342,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 3: Choose Your Style */}
-      <section className="min-h-screen lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
+      <section className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -387,7 +387,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 4: Print & Share */}
-      <section className="min-h-screen lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
+      <section className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}

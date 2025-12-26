@@ -567,8 +567,8 @@ export function StoryDisplay({
           <button
             onClick={onDownloadPdf}
             disabled={isGenerating}
-            className={`bg-green-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
+            className={`bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'
             }`}
           >
             <FileText size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
@@ -2002,8 +2002,8 @@ export function StoryDisplay({
               <button
                 onClick={onDownloadPdf}
                 disabled={isGenerating}
-                className={`bg-green-500 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
+                className={`bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'
                 }`}
               >
                 <FileText size={20} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
