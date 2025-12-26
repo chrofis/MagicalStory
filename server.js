@@ -7013,7 +7013,13 @@ Output Format:
             return imageData;
           } catch (error) {
             log.error(`❌ [PAGE ${pageNum}] Failed to generate:`, error.message);
-            throw error;
+            // Return error result instead of throwing to prevent unhandled rejection crash
+            return {
+              pageNumber: pageNum,
+              imageData: null,
+              error: error.message,
+              failed: true
+            };
           }
         });
 
@@ -7182,6 +7188,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         );
 
         let completedCount = 0;
+        let failedCount = 0;
         const imageResults = await Promise.all(
           activeImagePromises.map(async (promise) => {
             const result = await promise;
@@ -7194,7 +7201,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               [imageProgress, `Image ${completedCount}/${sceneCount}...`, jobId]
             );
 
-            allImages.push(result);
+            // Only add successful results to allImages
+            if (result.failed) {
+              failedCount++;
+              log.warn(`⚠️  [PARALLEL] Page ${result.pageNumber} failed: ${result.error}`);
+            } else {
+              allImages.push(result);
+            }
             return result;
           })
         );
@@ -7203,7 +7216,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         allImages.sort((a, b) => a.pageNumber - b.pageNumber);
         allSceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
 
-        log.debug(`🚀 [STREAMING] All ${allImages.length} images generated (PARALLEL MODE)!`);
+        if (failedCount > 0) {
+          log.warn(`⚠️  [STREAMING] ${failedCount}/${sceneCount} images failed to generate`);
+        }
+        log.debug(`🚀 [STREAMING] ${allImages.length}/${sceneCount} images generated (PARALLEL MODE)!`);
       } else {
         // SEQUENTIAL MODE: Generate images one at a time, passing previous image to next
         log.debug(`📚 [STREAMING] All story batches complete. Starting SEQUENTIAL image generation...`);
