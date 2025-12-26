@@ -1,4 +1,4 @@
-import{c as R,u as q,a as W,j as e,e as A,I as G,T as Y,b as Z}from"./index-DYskVzc6.js";import{u as J,e as X,b as c}from"./vendor-react-CHhk3aw2.js";import{N as j,s as I}from"./Textarea-BSSqjHvA.js";import{a as Q}from"./api-BKmh5VLe.js";import{g as w,B as N,M as ee}from"./Pricing-3xTdhpva.js";import{A as se}from"./arrow-left-Bg2m2cO4.js";import{S as te}from"./shopping-cart-ciuimgi9.js";import{P as re}from"./printer-C_0TZGWB.js";import"./vendor-firebase-DTVMaYMy.js";import"./check-BFIw-eKG.js";/**
+import{c as R,u as q,a as W,j as e,e as A,I as G,T as Y,b as Z}from"./index-DMhOpvgv.js";import{u as J,e as X,b as c}from"./vendor-react-CHhk3aw2.js";import{N as j,s as I}from"./Textarea-DABqE2ws.js";import{a as Q}from"./api-DH6woWwe.js";import{g as w,B as N,M as ee}from"./Pricing-B5dOIgyi.js";import{A as se}from"./arrow-left-DxnRjAQy.js";import{S as te}from"./shopping-cart-BBLLMtOc.js";import{P as re}from"./printer-TAdk7lrX.js";import"./vendor-firebase-DTVMaYMy.js";import"./check-CtVazsFe.js";/**
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

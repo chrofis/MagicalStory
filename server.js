@@ -6253,6 +6253,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       outline: '',
       visualBible: visualBible, // Recurring visual elements for consistency
       storyText: fullStoryText,
+      originalStory: fullStoryText, // Store original for restore functionality
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
@@ -6897,11 +6898,17 @@ Output Format:
         // Start scene description + image generation (don't await)
         const imagePromise = limit(async () => {
           try {
-            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)${sceneModelOverride ? ` [model: ${sceneModelOverride}]` : ''}`);
+            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${sceneModelOverride ? ` [model: ${sceneModelOverride}]` : ''}`);
 
-            // Generate detailed scene description
-            const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000, null, sceneModelOverride);
-            const sceneDescription = sceneDescResult.text;
+            // Generate detailed scene description (non-streaming for reliability with parallel calls)
+            const sceneDescResult = await callTextModel(scenePrompt, 4000, sceneModelOverride);
+            let sceneDescription = sceneDescResult.text;
+
+            // Fallback to outline extract if scene description is empty or too short
+            if (!sceneDescription || sceneDescription.trim().length < 50) {
+              log.warn(`⚠️  [PAGE ${pageNum}] Scene description empty or too short (${sceneDescription?.length || 0} chars), using outline extract`);
+              sceneDescription = shortSceneDesc || `Scene for page ${pageNum}`;
+            }
             addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', sceneModelConfig?.modelId || getActiveTextModel().modelId);
 
             allSceneDescriptions.push({
@@ -7261,9 +7268,15 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Pass visualBible so recurring elements are included in scene description
             const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes);
 
-            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description... (streaming)${seqSceneModelOverride ? ` [model: ${seqSceneModelOverride}]` : ''}`);
-            const sceneDescResult = await callTextModelStreaming(scenePrompt, 4000, null, seqSceneModelOverride);
-            const sceneDescription = sceneDescResult.text;
+            log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${seqSceneModelOverride ? ` [model: ${seqSceneModelOverride}]` : ''}`);
+            const sceneDescResult = await callTextModel(scenePrompt, 4000, seqSceneModelOverride);
+            let sceneDescription = sceneDescResult.text;
+
+            // Fallback to outline extract if scene description is empty or too short
+            if (!sceneDescription || sceneDescription.trim().length < 50) {
+              log.warn(`⚠️  [PAGE ${pageNum}] Scene description empty or too short (${sceneDescription?.length || 0} chars), using outline extract`);
+              sceneDescription = shortSceneDesc || `Scene for page ${pageNum}`;
+            }
             addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', seqSceneModelConfig?.modelId || getActiveTextModel().modelId);
 
             allSceneDescriptions.push({
@@ -7531,6 +7544,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       outlinePrompt: outlinePrompt, // API prompt for outline (dev mode)
       storyTextPrompts: storyTextPrompts, // API prompts for story text (dev mode)
       storyText: fullStoryText,
+      originalStory: fullStoryText, // Store original for restore functionality
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
@@ -7822,6 +7836,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               outlineModelId: outlineModelId,
               outlineUsage: outlineUsage,
               story: fullStoryText,
+              originalStory: fullStoryText, // Store original for restore functionality
               storyTextPrompts: storyTextPrompts,
               visualBible: visualBible,
               sceneDescriptions: sceneDescriptions,

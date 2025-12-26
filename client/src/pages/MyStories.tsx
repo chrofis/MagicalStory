@@ -199,6 +199,8 @@ export default function MyStories() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalStories, setTotalStories] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadAttemptedRef = useRef(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     // Restore selection from sessionStorage
     try {
@@ -347,13 +349,25 @@ export default function MyStories() {
       navigate('/');
       return;
     }
-    loadStories();
+
+    // Prevent duplicate loads (React StrictMode can cause double effects)
+    if (loadAttemptedRef.current) return;
+    loadAttemptedRef.current = true;
+
+    // Small delay to ensure auth token is propagated to API client
+    const timer = setTimeout(() => {
+      loadStories();
+    }, 50);
+
+    return () => clearTimeout(timer);
   }, [isAuthenticated, authLoading, navigate]);
 
   const loadStories = async (options: { loadMore?: boolean; loadAll?: boolean } = {}) => {
     const { loadMore = false, loadAll = false } = options;
     log.debug('Loading stories...', { loadMore, loadAll });
     try {
+      setLoadError(null);
+
       // Check cache first (only for initial load)
       const now = Date.now();
       if (!loadMore && !loadAll && storiesCache.data && (now - storiesCache.timestamp) < CACHE_DURATION) {
@@ -400,6 +414,13 @@ export default function MyStories() {
       setHasMore(pagination.hasMore);
     } catch (error) {
       log.error('Failed to load stories:', error);
+      setLoadError(language === 'de'
+        ? 'Geschichten konnten nicht geladen werden'
+        : language === 'fr'
+        ? 'Impossible de charger les histoires'
+        : 'Failed to load stories');
+      // Invalidate cache on error
+      storiesCache = { data: null, total: 0, timestamp: 0 };
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -587,6 +608,22 @@ export default function MyStories() {
 
         {isLoading ? (
           <LoadingSpinner message={language === 'de' ? 'Laden...' : language === 'fr' ? 'Chargement...' : 'Loading...'} />
+        ) : loadError ? (
+          <div className="text-center py-12">
+            <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+            <p className="text-gray-700 text-lg mb-4">{loadError}</p>
+            <button
+              onClick={() => {
+                loadAttemptedRef.current = false;
+                setLoadError(null);
+                setIsLoading(true);
+                loadStories();
+              }}
+              className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
+            >
+              {language === 'de' ? 'Erneut versuchen' : language === 'fr' ? 'Réessayer' : 'Try Again'}
+            </button>
+          </div>
         ) : stories.length === 0 ? (
           <div className="text-center py-12">
             <Book className="w-16 h-16 text-gray-300 mx-auto mb-4" />

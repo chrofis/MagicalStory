@@ -139,6 +139,7 @@ export default function StoryWizard() {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
+  const [originalStory, setOriginalStory] = useState(''); // Original AI-generated story for restore functionality
   const [storyOutline, setStoryOutline] = useState(''); // Outline for dev mode display
   const [outlinePrompt, setOutlinePrompt] = useState(''); // API prompt for outline (dev mode)
   const [outlineModelId, setOutlineModelId] = useState<string | undefined>(); // Model used for outline (dev mode)
@@ -241,6 +242,7 @@ export default function StoryWizard() {
           setTotalPages(story.totalPages);
           // Set generatedStory last, then step, then isLoading - ensures story is ready before showing
           setGeneratedStory(story.story || '');
+          setOriginalStory(story.originalStory || story.story || ''); // Original for restore functionality
           setStep(5);
           // Small delay to ensure React has processed all state updates
           setTimeout(() => {
@@ -1237,6 +1239,7 @@ export default function StoryWizard() {
             setVisualBible(null);
           }
           setGeneratedStory(status.result.story);
+          setOriginalStory(status.result.story); // Store original for restore functionality
           setSceneDescriptions(status.result.sceneDescriptions || []);
           setSceneImages(status.result.sceneImages || []);
           setCoverImages(status.result.coverImages || { frontCover: null, initialPage: null, backCover: null });
@@ -1532,6 +1535,7 @@ export default function StoryWizard() {
             <StoryDisplay
               title={storyTitle}
               story={displayStory}
+              originalStory={originalStory}
               outline={storyOutline}
               outlinePrompt={outlinePrompt}
               outlineModelId={outlineModelId}
