@@ -716,18 +716,19 @@ async function editImageWithPrompt(imageData, editInstruction) {
 
     // Build the editing prompt from template
     const editPrompt = fillTemplate(PROMPT_TEMPLATES.illustrationEdit, {
-      '{EDIT_INSTRUCTION}': editInstruction
+      EDIT_INSTRUCTION: editInstruction
     });
+    log.debug(`✏️  [IMAGE EDIT] Full prompt: "${editPrompt}"`);
 
-    // Build parts array with ONLY the image and prompt - no character references
+    // Build parts array with text FIRST, then image (helps model understand it's an edit instruction)
     const parts = [
+      { text: editPrompt },
       {
         inline_data: {
           mime_type: mimeType,
           data: base64Data
         }
-      },
-      { text: editPrompt }
+      }
     ];
 
     // Use Gemini 2.5 Flash Image for editing (optimized for pixel-level manipulation and inpainting)
