@@ -300,6 +300,9 @@ export function StoryDisplay({
   const { t, language } = useLanguage();
   const isPictureBook = languageLevel === '1st-grade';
 
+  // Check if user has enough credits (-1 means infinite/unlimited)
+  const hasEnoughCredits = userCredits === -1 || userCredits >= imageRegenerationCost;
+
   // Visual Bible editing state (only used in developer mode)
   const [editingEntry, setEditingEntry] = useState<{ type: string; id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -1138,11 +1141,11 @@ export function StoryDisplay({
               <div className="mt-3">
                 <button
                   onClick={() => _onRegenerateCover('front')}
-                  disabled={isGenerating || userCredits < imageRegenerationCost}
+                  disabled={isGenerating || !hasEnoughCredits}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    isGenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
-                  title={userCredits < imageRegenerationCost
+                  title={!hasEnoughCredits
                     ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
                     : ''
                   }
@@ -1261,11 +1264,11 @@ export function StoryDisplay({
               <div className="mt-3">
                 <button
                   onClick={() => _onRegenerateCover('initial')}
-                  disabled={isGenerating || userCredits < imageRegenerationCost}
+                  disabled={isGenerating || !hasEnoughCredits}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    isGenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
-                  title={userCredits < imageRegenerationCost
+                  title={!hasEnoughCredits
                     ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
                     : ''
                   }
@@ -1438,11 +1441,11 @@ export function StoryDisplay({
                             <div className="flex gap-2 items-center">
                               <button
                                 onClick={() => onRegenerateImage(pageNumber)}
-                                disabled={isGenerating || userCredits < imageRegenerationCost}
+                                disabled={isGenerating || !hasEnoughCredits}
                                 className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  isGenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                 }`}
-                                title={userCredits < imageRegenerationCost
+                                title={!hasEnoughCredits
                                   ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
                                   : ''
                                 }
@@ -1655,11 +1658,11 @@ export function StoryDisplay({
                             <div className="flex gap-2 items-center">
                               <button
                                 onClick={() => onRegenerateImage(pageNumber)}
-                                disabled={isGenerating || userCredits < imageRegenerationCost}
+                                disabled={isGenerating || !hasEnoughCredits}
                                 className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  isGenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                 }`}
-                                title={userCredits < imageRegenerationCost
+                                title={!hasEnoughCredits
                                   ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
                                   : ''
                                 }
@@ -1922,11 +1925,11 @@ export function StoryDisplay({
               <div className="mt-3">
                 <button
                   onClick={() => _onRegenerateCover('back')}
-                  disabled={isGenerating || userCredits < imageRegenerationCost}
+                  disabled={isGenerating || !hasEnoughCredits}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || userCredits < imageRegenerationCost ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    isGenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
-                  title={userCredits < imageRegenerationCost
+                  title={!hasEnoughCredits
                     ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
                     : ''
                   }
