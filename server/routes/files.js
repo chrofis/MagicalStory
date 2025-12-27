@@ -81,13 +81,19 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/files/:fileId - Serve a file
-router.get('/:fileId', async (req, res) => {
+// GET /api/files/:fileId - Serve a file (requires authentication and ownership)
+router.get('/:fileId', authenticateToken, async (req, res) => {
   try {
     const { fileId } = req.params;
 
     if (isDatabaseMode()) {
-      const rows = await dbQuery('SELECT mime_type, file_data, filename FROM files WHERE id = $1', [fileId]);
+      // Admins can access any file, regular users can only access their own files
+      let rows;
+      if (req.user.role === 'admin') {
+        rows = await dbQuery('SELECT mime_type, file_data, filename FROM files WHERE id = $1', [fileId]);
+      } else {
+        rows = await dbQuery('SELECT mime_type, file_data, filename FROM files WHERE id = $1 AND user_id = $2', [fileId, req.user.id]);
+      }
 
       if (rows.length === 0) {
         return res.status(404).json({ error: 'File not found' });

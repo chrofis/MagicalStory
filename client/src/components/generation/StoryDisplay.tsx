@@ -418,17 +418,23 @@ export function StoryDisplay({
   const extractImageSummary = (fullDescription: string): string => {
     if (!fullDescription) return '';
 
-    // Try to extract just the Image Summary section
-    // Format: "1.  **Image Summary**\n    [summary text]\n\n2.  **Setting"
-    const summaryMatch = fullDescription.match(/\*\*Image Summary\*\*\s*\n\s*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*|$)/i);
-    if (summaryMatch && summaryMatch[1]) {
-      return summaryMatch[1].trim();
+    // Try to extract just the Image Summary section (supports EN, DE, FR)
+    // Format: "1. **Image Summary**\n[summary text]\n\n2. **Setting"
+    // German: "1. **Bildzusammenfassung**\n[summary text]\n\n2. **Setting"
+    // French: "1. **Résumé de l'Image**\n[summary text]\n\n2. **Décor"
+    const summaryMatch = fullDescription.match(
+      /\*\*(Image Summary|Bildzusammenfassung|Résumé de l'Image)\*\*\s*\n\s*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*|$)/i
+    );
+    if (summaryMatch && summaryMatch[2]) {
+      return summaryMatch[2].trim();
     }
 
     // Fallback: if no Image Summary header, take first paragraph or first 500 chars
     const firstParagraph = fullDescription.split(/\n\n/)[0];
     if (firstParagraph && firstParagraph.length < 1000) {
-      return firstParagraph.trim();
+      // Strip any leading "1. **Header**" pattern
+      const cleaned = firstParagraph.replace(/^\d+\.\s*\*\*[^*]+\*\*\s*\n?/, '').trim();
+      return cleaned || firstParagraph.trim();
     }
 
     return fullDescription.substring(0, 500).trim() + '...';

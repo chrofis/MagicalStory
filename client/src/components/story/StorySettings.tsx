@@ -236,8 +236,8 @@ export function StorySettings({
                   />
                 </div>
                 <div className="p-2 md:p-3">
-                  <div className="font-semibold text-sm md:text-base">{level.label}</div>
-                  <div className="text-xs md:text-sm text-gray-500 line-clamp-2">{level.desc}</div>
+                  <div className="font-semibold text-sm md:text-base mb-1">{level.label}</div>
+                  <div className="text-xs md:text-sm text-gray-500 whitespace-pre-line">{level.desc}</div>
                 </div>
               </button>
             ))}

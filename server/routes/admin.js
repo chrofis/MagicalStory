@@ -9,11 +9,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 
 const { dbQuery, getPool } = require('../services/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-
-// Get JWT secret from environment
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Helper to check if using database mode
 const isDatabaseMode = () => {
@@ -319,7 +316,7 @@ router.get('/users/:userId/details', authenticateToken, requireAdmin, async (req
       return res.status(400).json({ error: 'User details requires database mode' });
     }
 
-    // Get user info
+    // Get user info first (required to verify user exists)
     const userResult = await dbQuery(
       'SELECT id, username, email, role, credits, story_quota, stories_generated, created_at, last_login FROM users WHERE id = $1',
       [targetUserId]
@@ -329,25 +326,40 @@ router.get('/users/:userId/details', authenticateToken, requireAdmin, async (req
     }
     const user = userResult[0];
 
-    // Get story count and list
-    const storiesResult = await dbQuery(
-      `SELECT id, data, created_at FROM stories WHERE user_id = $1 ORDER BY created_at DESC`,
-      [targetUserId]
-    );
+    // Run remaining queries in parallel for better performance
+    const [storiesResult, characterCountResult, ordersResult, creditsResult] = await Promise.all([
+      // Get story count and list
+      dbQuery(
+        `SELECT id, data, created_at FROM stories WHERE user_id = $1 ORDER BY created_at DESC`,
+        [targetUserId]
+      ),
+      // Count characters using database aggregation (avoids fetching all rows)
+      dbQuery(`
+        SELECT COALESCE(SUM(
+          CASE
+            WHEN data::jsonb -> 'characters' IS NOT NULL
+            THEN jsonb_array_length(data::jsonb -> 'characters')
+            ELSE 0
+          END
+        ), 0) as total_characters
+        FROM characters
+        WHERE user_id = $1
+      `, [targetUserId]),
+      // Get purchase history
+      dbQuery(
+        `SELECT id, story_id, amount_total, currency, payment_status, gelato_order_id, created_at
+         FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [targetUserId]
+      ),
+      // Get credit transactions
+      dbQuery(
+        `SELECT id, amount, balance_after, transaction_type, description, created_at
+         FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+        [targetUserId]
+      )
+    ]);
 
-    // Count characters from the characters table for this user (matches main dashboard)
-    const characterDataResult = await dbQuery('SELECT data FROM characters WHERE user_id = $1', [targetUserId]);
-    let totalCharacters = 0;
-    for (const row of characterDataResult) {
-      try {
-        const charData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
-        if (charData.characters && Array.isArray(charData.characters)) {
-          totalCharacters += charData.characters.length;
-        }
-      } catch (err) {
-        // Skip malformed character data
-      }
-    }
+    const totalCharacters = parseInt(characterCountResult[0]?.total_characters) || 0;
 
     // Calculate totals
     let totalImages = 0;
@@ -407,12 +419,7 @@ router.get('/users/:userId/details', authenticateToken, requireAdmin, async (req
       }
     });
 
-    // Get purchase history
-    const ordersResult = await dbQuery(
-      `SELECT id, story_id, amount_total, currency, payment_status, gelato_order_id, created_at
-       FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
-      [targetUserId]
-    );
+    // Map orders and credit transactions (already fetched in parallel above)
     const purchases = ordersResult.map(o => ({
       id: o.id,
       storyId: o.story_id,
@@ -423,12 +430,6 @@ router.get('/users/:userId/details', authenticateToken, requireAdmin, async (req
       createdAt: o.created_at
     }));
 
-    // Get credit transactions
-    const creditsResult = await dbQuery(
-      `SELECT id, amount, balance_after, transaction_type, description, created_at
-       FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [targetUserId]
-    );
     const creditHistory = creditsResult.map(t => ({
       id: t.id,
       amount: t.amount,
@@ -1036,55 +1037,61 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
     console.log('📊 [ADMIN] Fetching dashboard statistics...');
 
     const pool = getPool();
-    const userCountResult = await pool.query('SELECT COUNT(*) as count FROM users');
-    const storyCountResult = await pool.query('SELECT COUNT(*) as count FROM stories');
-    const fileCountResult = await pool.query('SELECT COUNT(*) as count FROM files');
 
-    // Count individual characters
-    const characterDataResult = await pool.query('SELECT data FROM characters');
-    let totalCharacters = 0;
-    for (const row of characterDataResult.rows) {
-      try {
-        const charData = JSON.parse(row.data);
-        if (charData.characters && Array.isArray(charData.characters)) {
-          totalCharacters += charData.characters.length;
-        }
-      } catch (err) {
-        console.warn('⚠️ Skipping malformed character data');
-      }
-    }
+    // Run all stats queries in parallel for better performance
+    const [
+      userCountResult,
+      storyCountResult,
+      fileCountResult,
+      characterCountResult,
+      orphanedFilesResult,
+      imageFilesResult,
+      embeddedImagesResult
+    ] = await Promise.all([
+      pool.query('SELECT COUNT(*) as count FROM users'),
+      pool.query('SELECT COUNT(*) as count FROM stories'),
+      pool.query('SELECT COUNT(*) as count FROM files'),
+      // Count individual characters using database aggregation
+      pool.query(`
+        SELECT COALESCE(SUM(
+          CASE
+            WHEN data::jsonb -> 'characters' IS NOT NULL
+            THEN jsonb_array_length(data::jsonb -> 'characters')
+            ELSE 0
+          END
+        ), 0) as total_characters
+        FROM characters
+      `),
+      // Get orphaned files
+      pool.query(`
+        SELECT f.id, f.story_id, f.file_type, f.file_size, f.filename, f.created_at
+        FROM files f
+        WHERE f.story_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM stories s WHERE s.id = f.story_id
+          )
+        ORDER BY f.created_at DESC
+        LIMIT 100
+      `),
+      // Count images in files table
+      pool.query(
+        "SELECT COUNT(*) as count FROM files WHERE file_type = 'image' OR mime_type LIKE 'image/%'"
+      ),
+      // Count images embedded in story data using database aggregation
+      pool.query(`
+        SELECT COALESCE(SUM(
+          CASE
+            WHEN data::jsonb -> 'sceneImages' IS NOT NULL
+            THEN jsonb_array_length(data::jsonb -> 'sceneImages')
+            ELSE 0
+          END
+        ), 0) as embedded_images
+        FROM stories
+      `)
+    ]);
 
-    // Get orphaned files
-    const orphanedFilesResult = await pool.query(`
-      SELECT f.id, f.story_id, f.file_type, f.file_size, f.filename, f.created_at
-      FROM files f
-      WHERE f.story_id IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM stories s WHERE s.id = f.story_id
-        )
-      ORDER BY f.created_at DESC
-      LIMIT 100
-    `);
-
-    // Count images in files table
-    const imageFilesResult = await pool.query(
-      "SELECT COUNT(*) as count FROM files WHERE file_type = 'image' OR mime_type LIKE 'image/%'"
-    );
-
-    // Count images embedded in story data
-    const storiesWithData = await pool.query('SELECT data FROM stories');
-    let embeddedImagesCount = 0;
-
-    for (const row of storiesWithData.rows) {
-      try {
-        const storyData = JSON.parse(row.data);
-        if (storyData.sceneImages && Array.isArray(storyData.sceneImages)) {
-          embeddedImagesCount += storyData.sceneImages.length;
-        }
-      } catch (err) {
-        console.warn('⚠️ Skipping malformed story data');
-      }
-    }
+    const totalCharacters = parseInt(characterCountResult.rows[0].total_characters) || 0;
+    const embeddedImagesCount = parseInt(embeddedImagesResult.rows[0].embedded_images) || 0;
 
     // Get database size
     let databaseSize = 'N/A';
@@ -1246,7 +1253,7 @@ router.get('/user-storage', authenticateToken, requireAdmin, async (req, res) =>
 // =============================================
 
 // POST /api/admin/fix-shipping-columns
-router.post('/fix-shipping-columns', async (req, res) => {
+router.post('/fix-shipping-columns', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const results = [];
     const columns = [
@@ -1529,9 +1536,12 @@ router.get('/config', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // GET /api/admin/token-usage - Token usage statistics
+// Query params: days (default 30), limit (default 1000)
 router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    console.log('📊 [ADMIN] Fetching token usage statistics...');
+    const days = parseInt(req.query.days) || 30; // Default to last 30 days
+    const limit = Math.min(parseInt(req.query.limit) || 1000, 5000); // Default 1000, max 5000
+    console.log(`📊 [ADMIN] Fetching token usage statistics (last ${days} days, limit ${limit})...`);
 
     if (!isDatabaseMode()) {
       return res.status(400).json({ error: 'Token usage requires database mode' });
@@ -1548,8 +1558,10 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
         u.username as user_name
       FROM stories s
       LEFT JOIN users u ON s.user_id = u.id
+      WHERE s.created_at >= NOW() - INTERVAL '${days} days'
       ORDER BY s.created_at DESC
-    `);
+      LIMIT $1
+    `, [limit]);
 
     // Aggregate token usage (including thinking tokens for Gemini 2.5)
     const totals = {

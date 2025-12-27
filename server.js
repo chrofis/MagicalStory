@@ -30,6 +30,7 @@ const log = {
 // Credit costs for various operations (easy to configure)
 const CREDIT_COSTS = {
   IMAGE_REGENERATION: 5,  // Cost to regenerate a single scene image
+  SCENE_DESCRIPTION_REGENERATION: 2,  // Cost to regenerate a scene description (uses Claude API)
 };
 
 // Initialize BOTH Stripe clients - test for admins/developers, live for regular users
@@ -247,7 +248,13 @@ const app = express();
 app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+
+// JWT_SECRET must be set in environment - no fallback for security
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Database Configuration - PostgreSQL (Railway)
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -343,6 +350,17 @@ const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 100, // 100 requests per minute
   message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// AI proxy endpoints rate limiter (prevents abuse of direct AI API calls)
+// Generous limit: 60 requests/minute per IP to allow legitimate use
+// while preventing runaway costs from abuse
+const aiProxyLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 requests per minute per IP
+  message: { error: 'Too many AI API requests. Please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -1307,7 +1325,7 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
 });
 
 // Proxy endpoint for Claude API
-app.post('/api/claude', authenticateToken, async (req, res) => {
+app.post('/api/claude', aiProxyLimiter, authenticateToken, async (req, res) => {
   log.debug('📖 === CLAUDE/ANTHROPIC ENDPOINT CALLED ===');
   log.debug(`  User: ${req.user?.username || 'unknown'}`);
   log.debug(`  Time: ${new Date().toISOString()}`);
@@ -1382,7 +1400,7 @@ app.post('/api/claude', authenticateToken, async (req, res) => {
 });
 
 // Proxy endpoint for Gemini API
-app.post('/api/gemini', authenticateToken, async (req, res) => {
+app.post('/api/gemini', aiProxyLimiter, authenticateToken, async (req, res) => {
   log.debug('🎨 === GEMINI ENDPOINT CALLED ===');
   log.debug(`  User: ${req.user?.username || 'unknown'}`);
   log.debug(`  Time: ${new Date().toISOString()}`);
@@ -1524,13 +1542,35 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
 // NOT MIGRATED - These remain active in server.js (AI generation dependencies)
 // =============================================================================
 
-// Regenerate scene description for a specific page
+// Regenerate scene description for a specific page (costs credits)
 app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
+    const creditCost = CREDIT_COSTS.SCENE_DESCRIPTION_REGENERATION;
 
-    log.debug(`🔄 Regenerating scene description for story ${id}, page ${pageNumber}`);
+    // Check if admin is impersonating - they get free regenerations
+    const isImpersonating = req.user.impersonating === true;
+    if (isImpersonating) {
+      log.info(`🔄 [IMPERSONATE] Admin regenerating scene description for story ${id}, page ${pageNumber} (FREE - impersonating)`);
+    } else {
+      log.debug(`🔄 Regenerating scene description for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)`);
+    }
+
+    // Check user credits first (-1 means infinite/unlimited, impersonating admins also skip)
+    const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userCredits = userResult.rows[0].credits || 0;
+    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
+    if (!hasInfiniteCredits && userCredits < creditCost) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        required: creditCost,
+        available: userCredits
+      });
+    }
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -1600,12 +1640,31 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
       [JSON.stringify(storyData), id]
     );
 
-    console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber}`);
+    // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
+    let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
+    if (!hasInfiniteCredits) {
+      await dbPool.query(
+        'UPDATE users SET credits = credits - $1 WHERE id = $2',
+        [creditCost, req.user.id]
+      );
+      // Log credit transaction
+      await dbPool.query(
+        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+         VALUES ($1, $2, $3, 'scene_description_regeneration', $4)`,
+        [req.user.id, -creditCost, newCredits, `Regenerate scene description for page ${pageNumber}`]
+      );
+      console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber} (cost: ${creditCost} credits, remaining: ${newCredits})`);
+    } else if (isImpersonating) {
+      console.log(`✅ [IMPERSONATE] Scene description regenerated for story ${id}, page ${pageNumber} (FREE - admin impersonating)`);
+    } else {
+      console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber} (unlimited credits)`);
+    }
 
     res.json({
       success: true,
       pageNumber,
-      sceneDescription: newSceneDescription
+      sceneDescription: newSceneDescription,
+      creditsRemaining: newCredits
     });
 
   } catch (err) {

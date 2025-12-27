@@ -37,9 +37,21 @@ const storyGenerationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// AI proxy endpoints rate limiter (prevents abuse of direct AI API calls)
+// Generous limit: 60 requests/minute per user to allow legitimate use
+// while preventing runaway costs from abuse
+const aiProxyLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 requests per minute per IP
+  message: { error: 'Too many AI API requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   authLimiter,
   registerLimiter,
   apiLimiter,
-  storyGenerationLimiter
+  storyGenerationLimiter,
+  aiProxyLimiter
 };
