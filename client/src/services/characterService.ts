@@ -254,6 +254,71 @@ export const characterService = {
     }
   },
 
+  /**
+   * Generate clothing avatars WITH physical traits included in the prompt.
+   * This passes all user-modified traits (glasses, hair color, etc.) to avatar generation.
+   * Use this to compare results with the standard generation method.
+   */
+  async generateClothingAvatarsWithTraits(character: Character): Promise<{
+    success: boolean;
+    avatars?: CharacterAvatars;
+    error?: string;
+  }> {
+    try {
+      // Build physical description from character data
+      const age = parseInt(character.age) || 10;
+      const gender = character.gender || 'child';
+      let genderLabel;
+      if (gender === 'male') {
+        genderLabel = age >= 18 ? 'man' : 'boy';
+      } else if (gender === 'female') {
+        genderLabel = age >= 18 ? 'woman' : 'girl';
+      } else {
+        genderLabel = age >= 18 ? 'person' : 'child';
+      }
+
+      let physicalDescription = `${character.name} is a ${age}-year-old ${genderLabel}`;
+      if (character.physical) {
+        if (character.physical.hair) physicalDescription += `, ${character.physical.hair}`;
+        if (character.physical.face) physicalDescription += `, ${character.physical.face}`;
+        if (character.physical.build) physicalDescription += `, ${character.physical.build}`;
+        if (character.physical.other) physicalDescription += `, ${character.physical.other}`;
+      }
+
+      // Prefer body with no background for best avatar generation results
+      const inputPhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
+      log.info(`Generating clothing avatars WITH TRAITS for ${character.name} (id: ${character.id}), using: ${character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : 'original'}`);
+      log.info(`Physical traits: ${JSON.stringify(character.physical)}`);
+
+      const response = await api.post<{
+        success: boolean;
+        clothingAvatars?: CharacterAvatars;
+        error?: string;
+      }>('/api/generate-clothing-avatars', {
+        characterId: character.id,
+        facePhoto: inputPhoto,
+        physicalDescription,
+        name: character.name,
+        age: character.age,
+        gender: character.gender,
+        build: character.physical?.build || 'average',
+        // NEW: Pass all physical traits to include in the avatar generation prompt
+        physicalTraits: character.physical,
+      });
+
+      if (response.success && response.clothingAvatars) {
+        log.success(`Clothing avatars WITH TRAITS generated for ${character.name}`);
+        return { success: true, avatars: response.clothingAvatars };
+      } else {
+        log.error(`Failed to generate avatars with traits: ${response.error}`);
+        return { success: false, error: response.error };
+      }
+    } catch (error) {
+      log.error('Clothing avatar generation with traits failed:', error);
+      return { success: false, error: String(error) };
+    }
+  },
+
   async analyzePhoto(imageData: string): Promise<{
     success: boolean;
     error?: string;  // Error code (e.g., 'no_face_detected')

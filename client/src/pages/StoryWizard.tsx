@@ -82,6 +82,7 @@ export default function StoryWizard() {
   const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits'>('photo');
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
   const [isRegeneratingAvatars, setIsRegeneratingAvatars] = useState(false);
+  const [isRegeneratingAvatarsWithTraits, setIsRegeneratingAvatarsWithTraits] = useState(false);
 
   // Step 3: Relationships - loaded from API with characters
   const [relationships, setRelationships] = useState<RelationshipMap>({});
@@ -766,6 +767,53 @@ export default function StoryWizard() {
     }
   };
 
+  // Handler for regenerating avatars WITH physical traits (glasses, hair color, etc.)
+  // Uses the new service function that passes all traits to the prompt
+  const handleRegenerateAvatarsWithTraits = async () => {
+    if (!currentCharacter) return;
+
+    // Clear existing avatars in UI
+    setCurrentCharacter(prev => prev ? { ...prev, avatars: undefined } : prev);
+    setIsRegeneratingAvatarsWithTraits(true);
+
+    try {
+      log.info(`🔄 Regenerating avatars WITH TRAITS for ${currentCharacter.name}...`);
+      log.info(`Physical traits: ${JSON.stringify(currentCharacter.physical)}`);
+
+      // Use the new service function that includes physical traits
+      const result = await characterService.generateClothingAvatarsWithTraits(currentCharacter);
+
+      if (result.success && result.avatars) {
+        // Update local state with new avatars (explicitly clear stale flag)
+        const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
+        setCharacters(prev => prev.map(c =>
+          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
+        ));
+
+        // Save the updated avatars to storage
+        const currentData = await characterService.getCharacterData();
+        const updatedCharacters = currentData.characters.map(c =>
+          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
+        );
+        await characterService.saveCharacterData({
+          ...currentData,
+          characters: updatedCharacters,
+        });
+
+        log.success(`✅ Avatars WITH TRAITS regenerated for ${currentCharacter.name}`);
+      } else {
+        log.error(`❌ Failed to regenerate avatars with traits: ${result.error}`);
+        alert(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      log.error(`❌ Failed to regenerate avatars with traits for ${currentCharacter.name}:`, error);
+      alert(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsRegeneratingAvatarsWithTraits(false);
+    }
+  };
+
   const saveCharacter = async () => {
     if (!currentCharacter) return;
 
@@ -1410,9 +1458,11 @@ export default function StoryWizard() {
                   onPhotoChange={handlePhotoSelect}
                   onContinueToTraits={() => setCharacterStep('traits')}
                   onRegenerateAvatars={handleRegenerateAvatars}
+                  onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
                   isLoading={isLoading}
                   isAnalyzingPhoto={isAnalyzingPhoto}
                   isRegeneratingAvatars={isRegeneratingAvatars}
+                  isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
                   step="name"
                   developerMode={developerMode}
                 />
@@ -1433,9 +1483,11 @@ export default function StoryWizard() {
                 onCancel={() => setCurrentCharacter(null)}
                 onPhotoChange={handlePhotoSelect}
                 onRegenerateAvatars={handleRegenerateAvatars}
+                onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
                 isLoading={isLoading}
                 isAnalyzingPhoto={isAnalyzingPhoto}
                 isRegeneratingAvatars={isRegeneratingAvatars}
+                isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
                 step="traits"
                 developerMode={developerMode}
               />

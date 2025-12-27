@@ -3571,7 +3571,7 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
 // Prompts based on reference implementation - see prompts/clothing-avatars.txt
 app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    const { characterId, facePhoto, physicalDescription, name, age, gender, build } = req.body;
+    const { characterId, facePhoto, physicalDescription, name, age, gender, build, physicalTraits } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
@@ -3582,7 +3582,21 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       return res.status(503).json({ error: 'Avatar generation service unavailable' });
     }
 
-    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})`);
+    // Build physical traits section if provided (for "Generate with Traits" mode)
+    let physicalTraitsSection = '';
+    if (physicalTraits) {
+      const traitParts = [];
+      if (physicalTraits.hair) traitParts.push(`Hair: ${physicalTraits.hair}`);
+      if (physicalTraits.face) traitParts.push(`Face: ${physicalTraits.face}`);
+      if (physicalTraits.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
+      if (physicalTraits.height) traitParts.push(`Height: ${physicalTraits.height}cm`);
+      if (traitParts.length > 0) {
+        physicalTraitsSection = `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
+      }
+      log.debug(`👔 [CLOTHING AVATARS] Including physical traits: ${traitParts.join(', ')}`);
+    }
+
+    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})${physicalTraits ? ' WITH TRAITS' : ''}`);
 
     // Parse clothing styles from the template file
     const isFemale = gender === 'female';
@@ -3640,10 +3654,14 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
         const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
         const clothingStyle = getClothingStylePrompt(category);
         log.debug(`   [CLOTHING] Style for ${category}: "${clothingStyle}"`);
-        const avatarPrompt = fillTemplate(promptPart, {
+        let avatarPrompt = fillTemplate(promptPart, {
           'CLOTHING_STYLE': clothingStyle,
           'BUILD': build || 'average'
         });
+        // Append physical traits section if provided
+        if (physicalTraitsSection) {
+          avatarPrompt += physicalTraitsSection;
+        }
         log.debug(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStyle.substring(0, 50)}..."`);
 
         // Prepare the request with reference photo

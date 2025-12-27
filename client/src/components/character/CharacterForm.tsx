@@ -113,9 +113,11 @@ interface CharacterFormProps {
   onPhotoChange: (file: File) => void;
   onContinueToTraits?: () => void;
   onRegenerateAvatars?: () => void;
+  onRegenerateAvatarsWithTraits?: () => void;
   isLoading?: boolean;
   isAnalyzingPhoto?: boolean;
   isRegeneratingAvatars?: boolean;
+  isRegeneratingAvatarsWithTraits?: boolean;
   step: 'name' | 'traits';
   developerMode?: boolean;
 }
@@ -128,9 +130,11 @@ export function CharacterForm({
   onPhotoChange,
   onContinueToTraits,
   onRegenerateAvatars,
+  onRegenerateAvatarsWithTraits,
   isLoading,
   isAnalyzingPhoto,
   isRegeneratingAvatars,
+  isRegeneratingAvatarsWithTraits,
   step,
   developerMode,
 }: CharacterFormProps) {
@@ -514,28 +518,47 @@ export function CharacterForm({
               </div>
             ))}
           </div>
-          <div className="mt-3 flex items-center justify-between">
+          <div className="mt-3 flex flex-col gap-2">
             {character.avatars?.generatedAt && (
               <div className="text-xs text-teal-500">
                 Generated: {new Date(character.avatars.generatedAt).toLocaleString()}
               </div>
             )}
-            {onRegenerateAvatars && (
-              <button
-                onClick={onRegenerateAvatars}
-                disabled={isRegeneratingAvatars || character.avatars?.status === 'generating'}
-                className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-              >
-                {isRegeneratingAvatars ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {language === 'de' ? 'Generiere...' : 'Generating...'}
-                  </>
-                ) : (
-                  <>{language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}</>
-                )}
-              </button>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {onRegenerateAvatars && (
+                <button
+                  onClick={onRegenerateAvatars}
+                  disabled={isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                  className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                >
+                  {isRegeneratingAvatars ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {language === 'de' ? 'Generiere...' : 'Generating...'}
+                    </>
+                  ) : (
+                    <>{language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}</>
+                  )}
+                </button>
+              )}
+              {onRegenerateAvatarsWithTraits && (
+                <button
+                  onClick={onRegenerateAvatarsWithTraits}
+                  disabled={isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                  className="px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  title={language === 'de' ? 'Generiert Avatare mit allen physischen Merkmalen (Brille, Haarfarbe, etc.)' : 'Generates avatars with all physical traits (glasses, hair color, etc.)'}
+                >
+                  {isRegeneratingAvatarsWithTraits ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {language === 'de' ? 'Generiere...' : 'Generating...'}
+                    </>
+                  ) : (
+                    <>{language === 'de' ? 'Mit Merkmalen' : language === 'fr' ? 'Avec traits' : 'With Traits'}</>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
