@@ -22,7 +22,15 @@ function initializePool() {
         ssl: false
       };
 
-  dbPool = new Pool(connectionConfig);
+  // Pool configuration for better resource management
+  const poolConfig = {
+    ...connectionConfig,
+    max: parseInt(process.env.DB_POOL_MAX) || 20, // Maximum connections
+    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000, // Close idle connections after 30s
+    connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT) || 10000, // Timeout connecting after 10s
+  };
+
+  dbPool = new Pool(poolConfig);
 
   dbPool.on('error', (err) => {
     console.error('Unexpected database pool error:', err);
@@ -279,6 +287,22 @@ async function initializeDatabase() {
           ALTER TABLE story_jobs ADD COLUMN credits_reserved INT DEFAULT 0;
         END IF;
       END $$;
+    `);
+
+    // Add idempotency_key column for preventing duplicate job creation
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='story_jobs' AND column_name='idempotency_key') THEN
+          ALTER TABLE story_jobs ADD COLUMN idempotency_key VARCHAR(100);
+        END IF;
+      END $$;
+    `);
+    // Create unique index on user_id + idempotency_key (only where key is not null)
+    await dbPool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_story_jobs_idempotency
+      ON story_jobs(user_id, idempotency_key)
+      WHERE idempotency_key IS NOT NULL
     `);
 
     // Story job checkpoints table

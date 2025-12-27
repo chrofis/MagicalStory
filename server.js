@@ -3576,7 +3576,7 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
 
       let tag;
       if (cat === 'winter') {
-        tag = '[WINTER]';
+        tag = isFemale ? '[WINTER_FEMALE]' : '[WINTER_MALE]';
       } else if (cat === 'standard') {
         tag = isFemale ? '[STANDARD_FEMALE]' : '[STANDARD_MALE]';
       } else if (cat === 'summer') {
@@ -3668,7 +3668,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       // Build the tag to look for based on category and gender
       let tag;
       if (category === 'winter') {
-        tag = '[WINTER]';
+        tag = isFemale ? '[WINTER_FEMALE]' : '[WINTER_MALE]';
       } else if (category === 'standard') {
         tag = isFemale ? '[STANDARD_FEMALE]' : '[STANDARD_MALE]';
       } else if (category === 'summer') {
@@ -8450,8 +8450,34 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 // Create a new story generation job
 app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.createStory), async (req, res) => {
   try {
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const userId = req.user.id;
+
+    // Extract and validate idempotency key (optional but recommended)
+    const idempotencyKey = req.body.idempotencyKey ? sanitizeString(req.body.idempotencyKey, 100) : null;
+
+    // If idempotency key provided, check for existing job first
+    if (idempotencyKey && STORAGE_MODE === 'database') {
+      const existingJob = await dbPool.query(
+        `SELECT id, status, progress, progress_message, created_at
+         FROM story_jobs
+         WHERE user_id = $1 AND idempotency_key = $2`,
+        [userId, idempotencyKey]
+      );
+
+      if (existingJob.rows.length > 0) {
+        const job = existingJob.rows[0];
+        log.debug(`🔄 Returning existing job ${job.id} for idempotency key ${idempotencyKey}`);
+        return res.json({
+          success: true,
+          jobId: job.id,
+          existing: true,
+          status: job.status,
+          message: 'Story generation already started with this request.'
+        });
+      }
+    }
+
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Sanitize and validate input data
     const inputData = {
@@ -8464,8 +8490,10 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
       storyDetails: sanitizeString(req.body.storyDetails || '', 2000),
       dedication: sanitizeString(req.body.dedication || '', 500)
     };
+    // Remove idempotencyKey from input_data as it's stored separately
+    delete inputData.idempotencyKey;
 
-    log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}`);
+    log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}${idempotencyKey ? ` (idempotency: ${idempotencyKey})` : ''}`);
 
     // Check email verification (skip for admins)
     if (req.user.role !== 'admin' && STORAGE_MODE === 'database') {
@@ -8634,9 +8662,9 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
       }
 
       await dbPool.query(
-        `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', userCredits === -1 ? 0 : creditsNeeded]
+        `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved, idempotency_key)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', userCredits === -1 ? 0 : creditsNeeded, idempotencyKey]
       );
 
       // Update user's preferred language based on their story language choice
