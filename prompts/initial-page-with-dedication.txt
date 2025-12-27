@@ -11,7 +11,7 @@ Create an introduction page illustration for a children's book.
 - Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
 - Render in artistic style - NOT photo-realistic copies
 - ALL characters in the SAME consistent style
-- Character CLOTHING: Use clothing described in the scene below. If not specified, use EXACTLY as shown in the reference images
+- Character CLOTHING: Use EXACTLY what is shown in the reference images (the correct outfit has been pre-selected)
 
 {CHARACTER_REFERENCE_LIST}
 

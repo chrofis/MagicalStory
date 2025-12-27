@@ -7,7 +7,7 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 - Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
 - Render in artistic style - NOT photo-realistic copies
 - ALL characters in the SAME consistent style
-- Character CLOTHING: Use clothing described in the scene below. If not specified, use EXACTLY as shown in the reference images
+- Character CLOTHING: Use EXACTLY what is shown in the reference images (the correct outfit has been pre-selected)
 
 **VISUAL CONTINUITY:**
 From previous scene image COPY: props, furniture, background elements, art style, color palette, CHARACTER CLOTHING

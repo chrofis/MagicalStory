@@ -5440,9 +5440,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     // By function (for detailed breakdown)
     byFunction: {
-      outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      story_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      scene_descriptions: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
+      outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      story_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      scene_descriptions: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
       cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
@@ -5488,6 +5488,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
       tokenUsage.byFunction[functionName].thinking_tokens += usage.thinking_tokens || 0;
       tokenUsage.byFunction[functionName].calls += 1;
+      tokenUsage.byFunction[functionName].provider = provider; // Track actual provider used
       if (modelName) {
         tokenUsage.byFunction[functionName].models.add(modelName);
       }
@@ -6709,6 +6710,7 @@ async function processStoryJob(jobId) {
       tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
       tokenUsage.byFunction[functionName].thinking_tokens += usage.thinking_tokens || 0;
       tokenUsage.byFunction[functionName].calls += 1;
+      tokenUsage.byFunction[functionName].provider = provider; // Track actual provider used
       if (modelName) {
         tokenUsage.byFunction[functionName].models.add(modelName);
       }
@@ -6743,7 +6745,14 @@ async function processStoryJob(jobId) {
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
 
     // Developer mode: model overrides (admin only)
-    const modelOverrides = inputData.modelOverrides || {};
+    // Apply default models for cost optimization:
+    // - Outline: gemini-2.5-pro (cheaper than Claude, good quality)
+    // - Scene descriptions: claude-haiku (fast, cost-effective)
+    const modelOverrides = {
+      outlineModel: 'gemini-2.5-pro',
+      sceneDescriptionModel: 'claude-haiku',
+      ...inputData.modelOverrides  // User overrides take precedence
+    };
     if (Object.keys(modelOverrides).some(k => modelOverrides[k])) {
       log.debug(`🔧 [PIPELINE] Model overrides: ${JSON.stringify(modelOverrides)}`);
     }
@@ -6796,19 +6805,20 @@ async function processStoryJob(jobId) {
       ['Writing story...', jobId]
     );
 
-    // Step 1: Generate story outline (using Claude API)
+    // Step 1: Generate story outline
     // Pass sceneCount to ensure outline matches the number of scenes we'll generate
     const outlinePrompt = buildStoryPrompt(inputData, sceneCount);
-    // Claude can handle up to 64,000 output tokens - use generous limit for outlines
     const outlineTokens = 16000;
     const outlineModelOverride = modelOverrides.outlineModel || null;
+    const outlineModelConfig = outlineModelOverride ? TEXT_MODELS[outlineModelOverride] : getActiveTextModel();
+    const outlineProvider = outlineModelConfig?.provider === 'google' ? 'gemini_text' : 'anthropic';
     log.debug(`📋 [PIPELINE] Generating outline for ${sceneCount} scenes (max tokens: ${outlineTokens}) - STREAMING${outlineModelOverride ? ` [model: ${outlineModelOverride}]` : ''}`);
     const outlineResult = await callTextModelStreaming(outlinePrompt, outlineTokens, null, outlineModelOverride);
     const outline = outlineResult.text;
     // Get the actual model used (override or default)
-    const outlineModelUsed = outlineResult.modelId || (outlineModelOverride ? TEXT_MODELS[outlineModelOverride]?.modelId : getActiveTextModel().modelId);
+    const outlineModelUsed = outlineResult.modelId || outlineModelConfig?.modelId;
     const outlineUsage = outlineResult.usage || { input_tokens: 0, output_tokens: 0 };
-    addUsage('anthropic', outlineResult.usage, 'outline', outlineModelUsed || getActiveTextModel().modelId);
+    addUsage(outlineProvider, outlineResult.usage, 'outline', outlineModelUsed);
 
     // Save checkpoint: outline (include prompt, model, and token usage for debugging)
     await saveCheckpoint(jobId, 'outline', { outline, outlinePrompt, outlineModelId: outlineModelUsed, outlineUsage });
