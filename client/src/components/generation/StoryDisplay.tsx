@@ -258,6 +258,7 @@ interface StoryDisplayProps {
   // Image regeneration with credits
   userCredits?: number;
   imageRegenerationCost?: number;
+  isImpersonating?: boolean;
   onSelectImageVersion?: (pageNumber: number, versionIndex: number) => Promise<void>;
 }
 
@@ -301,13 +302,14 @@ export function StoryDisplay({
   // Image regeneration with credits
   userCredits = 0,
   imageRegenerationCost = 5,
+  isImpersonating = false,
   onSelectImageVersion,
 }: StoryDisplayProps) {
   const { t, language } = useLanguage();
   const isPictureBook = languageLevel === '1st-grade';
 
-  // Check if user has enough credits (-1 means infinite/unlimited)
-  const hasEnoughCredits = userCredits === -1 || userCredits >= imageRegenerationCost;
+  // Check if user has enough credits (-1 means infinite/unlimited, impersonating admins also bypass)
+  const hasEnoughCredits = isImpersonating || userCredits === -1 || userCredits >= imageRegenerationCost;
 
   // Visual Bible editing state (only used in developer mode)
   const [editingEntry, setEditingEntry] = useState<{ type: string; id: string; field: string } | null>(null);

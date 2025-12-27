@@ -49,7 +49,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   };
 
   const credits = user?.credits ?? 0;
-  const isUnlimited = user?.credits === -1;
+  const isUnlimited = user?.credits === -1 || isImpersonating;
 
   return (
     <nav className="bg-black text-white px-3 py-3">

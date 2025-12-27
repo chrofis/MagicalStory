@@ -30,7 +30,7 @@ export default function StoryWizard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { showSuccess, showInfo } = useToast();
 
   // Wizard state - start at step 5 with loading if we have a storyId in URL
@@ -1887,6 +1887,7 @@ export default function StoryWizard() {
               // Image regeneration with credits
               userCredits={user?.credits || 0}
               imageRegenerationCost={5}
+              isImpersonating={isImpersonating}
               onSelectImageVersion={storyId ? async (pageNumber: number, versionIndex: number) => {
                 try {
                   log.info('Selecting image version:', { pageNumber, versionIndex });
