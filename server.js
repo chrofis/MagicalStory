@@ -1562,15 +1562,20 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     const visualBible = storyData.visualBible || null;
 
     // Build previous scenes context (last 2 pages)
+    const sceneDescriptions = storyData.sceneDescriptions || [];
     const previousScenes = [];
     for (let prevPage = pageNumber - 2; prevPage < pageNumber; prevPage++) {
       if (prevPage >= 1) {
         const prevText = getPageText(storyData.storyText, prevPage);
         if (prevText) {
+          // Get clothing from existing scene description if available
+          const prevSceneDesc = sceneDescriptions.find(s => s.pageNumber === prevPage);
+          const prevClothing = prevSceneDesc ? parseClothingCategory(prevSceneDesc.description) : null;
           previousScenes.push({
             pageNumber: prevPage,
             text: prevText,
-            sceneHint: ''
+            sceneHint: '',
+            clothing: prevClothing
           });
         }
       }
@@ -1581,8 +1586,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     const sceneResult = await callClaudeAPI(scenePrompt, 2048);
     const newSceneDescription = sceneResult.text;
 
-    // Update the scene description in story data
-    let sceneDescriptions = storyData.sceneDescriptions || [];
+    // Update the scene description in story data (sceneDescriptions already loaded above)
     const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
 
     if (existingIndex >= 0) {
@@ -7124,6 +7128,8 @@ Output Format:
       const pagesStarted = new Set();
       // Track page texts for passing previous scenes context
       const pageTextsForContext = {};
+      // Track clothing categories for previous scenes context (for consistency)
+      const pageClothingForContext = {};
 
       // Scene description model override
       const sceneModelOverride = modelOverrides.sceneDescriptionModel || null;
@@ -7148,7 +7154,8 @@ Output Format:
             previousScenes.push({
               pageNumber: prevPage,
               text: pageTextsForContext[prevPage],
-              sceneHint: shortSceneDescriptions[prevPage] || ''
+              sceneHint: shortSceneDescriptions[prevPage] || '',
+              clothing: pageClothingForContext[prevPage] || null
             });
           }
         }
@@ -7183,6 +7190,8 @@ Output Format:
             // Detect which characters appear in this scene
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
             const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
+            // Store clothing for future pages' context (clothing consistency)
+            pageClothingForContext[pageNum] = clothingCategory;
             const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingCategory})...`);
 
@@ -7552,6 +7561,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
         let previousImage = null;
         const pageTextsForContext = {}; // Track page texts for previous scenes context
+        const pageClothingForContext = {}; // Track clothing for consistency
 
         // Scene description model override for sequential mode
         const seqSceneModelOverride = modelOverrides.sceneDescriptionModel || null;
@@ -7574,7 +7584,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               previousScenes.push({
                 pageNumber: prevPage,
                 text: pageTextsForContext[prevPage],
-                sceneHint: shortSceneDescriptions[prevPage] || ''
+                sceneHint: shortSceneDescriptions[prevPage] || '',
+                clothing: pageClothingForContext[prevPage] || null
               });
             }
           }
@@ -7609,6 +7620,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
             // Parse clothing category from scene description
             const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
+            // Store clothing for future pages' context (clothing consistency)
+            pageClothingForContext[pageNum] = clothingCategory;
             // Use detailed photo info (with names) for labeled reference images
             const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);

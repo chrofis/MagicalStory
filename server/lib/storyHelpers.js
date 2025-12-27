@@ -997,7 +997,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     recurringElements = '(None available)';
   }
 
-  // Build previous scenes context (for narrative continuity)
+  // Build previous scenes context (for narrative continuity and clothing consistency)
   let previousScenesText = '';
   if (previousScenes && previousScenes.length > 0) {
     previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
@@ -1006,6 +1006,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       previousScenesText += `Page ${prev.pageNumber}: ${prev.text}\n`;
       if (prev.sceneHint) {
         previousScenesText += `  Scene: ${prev.sceneHint}\n`;
+      }
+      if (prev.clothing) {
+        previousScenesText += `  Clothing: ${prev.clothing}\n`;
       }
     }
     previousScenesText += '\n';
