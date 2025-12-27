@@ -330,6 +330,9 @@ export function StoryDisplay({
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
 
+  // Enlarged image modal for repair before/after comparison
+  const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
+
   // Update edited story when story prop changes (e.g., after save)
   useEffect(() => {
     if (!isEditMode) {
@@ -1630,11 +1633,23 @@ export function StoryDisplay({
                                             <div className="flex gap-4">
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Vorher:' : 'Before:'}</strong>
-                                                <img src={repair.beforeImage} alt="Before repair" className="w-48 h-48 object-contain border rounded bg-gray-100" />
+                                                <img
+                                                  src={repair.beforeImage}
+                                                  alt="Before repair"
+                                                  className="w-48 h-48 object-contain border rounded bg-gray-100 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-amber-400"
+                                                  onClick={() => setEnlargedImage({ src: repair.beforeImage!, title: language === 'de' ? 'Vorher' : 'Before' })}
+                                                  title={language === 'de' ? 'Klicken zum Vergrößern' : 'Click to enlarge'}
+                                                />
                                               </div>
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Nachher:' : 'After:'}</strong>
-                                                <img src={repair.afterImage} alt="After repair" className="w-48 h-48 object-contain border rounded bg-gray-100" />
+                                                <img
+                                                  src={repair.afterImage}
+                                                  alt="After repair"
+                                                  className="w-48 h-48 object-contain border rounded bg-gray-100 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-amber-400"
+                                                  onClick={() => setEnlargedImage({ src: repair.afterImage!, title: language === 'de' ? 'Nachher' : 'After' })}
+                                                  title={language === 'de' ? 'Klicken zum Vergrößern' : 'Click to enlarge'}
+                                                />
                                               </div>
                                             </div>
                                           )}
@@ -1928,11 +1943,23 @@ export function StoryDisplay({
                                             <div className="flex gap-4">
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Vorher:' : 'Before:'}</strong>
-                                                <img src={repair.beforeImage} alt="Before repair" className="w-48 h-48 object-contain border rounded bg-gray-100" />
+                                                <img
+                                                  src={repair.beforeImage}
+                                                  alt="Before repair"
+                                                  className="w-48 h-48 object-contain border rounded bg-gray-100 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-amber-400"
+                                                  onClick={() => setEnlargedImage({ src: repair.beforeImage!, title: language === 'de' ? 'Vorher' : 'Before' })}
+                                                  title={language === 'de' ? 'Klicken zum Vergrößern' : 'Click to enlarge'}
+                                                />
                                               </div>
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Nachher:' : 'After:'}</strong>
-                                                <img src={repair.afterImage} alt="After repair" className="w-48 h-48 object-contain border rounded bg-gray-100" />
+                                                <img
+                                                  src={repair.afterImage}
+                                                  alt="After repair"
+                                                  className="w-48 h-48 object-contain border rounded bg-gray-100 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-amber-400"
+                                                  onClick={() => setEnlargedImage({ src: repair.afterImage!, title: language === 'de' ? 'Nachher' : 'After' })}
+                                                  title={language === 'de' ? 'Klicken zum Vergrößern' : 'Click to enlarge'}
+                                                />
                                               </div>
                                             </div>
                                           )}
@@ -2561,6 +2588,33 @@ export function StoryDisplay({
               {language === 'de' ? 'Klicken Sie auf ein Bild, um es auszuwählen' :
                language === 'fr' ? 'Cliquez sur une image pour la sélectionner' :
                'Click an image to select it'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enlarged Image Modal for repair before/after comparison */}
+      {enlargedImage && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => setEnlargedImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gray-100 px-4 py-2 flex items-center justify-between border-b">
+              <h3 className="font-semibold text-gray-800">{enlargedImage.title}</h3>
+              <button
+                onClick={() => setEnlargedImage(null)}
+                className="text-gray-500 hover:text-gray-700 p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 bg-gray-50">
+              <img
+                src={enlargedImage.src}
+                alt={enlargedImage.title}
+                className="max-w-full max-h-[80vh] object-contain mx-auto"
+              />
             </div>
           </div>
         </div>
