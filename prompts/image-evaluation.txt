@@ -48,12 +48,39 @@ Do NOT penalize for missing prints/patterns when character is seen from behind.
 
 ---
 
-**STEP 3: CHECK FOR ISSUES**
+**STEP 3: SCAN FOR VISUAL ARTIFACTS (CRITICAL - check the ENTIRE image carefully)**
 
-1. Artifacts - Extra fingers, melted faces, floating limbs, crossed eyes, merged bodies?
-2. Missing Characters - Is anyone mentioned in the PROMPT missing from the image?
-3. Style Consistency - All characters in same art style?
-4. Prompt Adherence - Does scene match what was requested?
+Examine the ENTIRE image systematically for physics/anatomy errors:
+
+HANDS & FINGERS:
+- Count fingers on each visible hand (should be 5)
+- Check for fused, extra, or missing fingers
+- Look for unnatural hand poses or melted hands
+
+FACES & BODIES:
+- Crossed or misaligned eyes
+- Melted or distorted facial features
+- Extra or missing limbs
+- Merged/fused body parts between characters
+
+FLOATING/DISCONNECTED OBJECTS:
+- Objects floating in air without support
+- Limbs or body parts disconnected from bodies
+- Props that clip through characters or environment
+- Shadows that don't match objects
+
+BACKGROUND ARTIFACTS:
+- Distorted architecture (warped doors, impossible stairs)
+- Text/signs that are garbled or nonsensical
+- Repeating patterns that shouldn't repeat
+
+---
+
+**STEP 4: CHECK SCENE REQUIREMENTS**
+
+1. Missing Characters - Is anyone mentioned in the PROMPT missing from the image?
+2. Style Consistency - All characters in same art style?
+3. Prompt Adherence - Does scene match what was requested?
 
 ---
 
@@ -83,8 +110,16 @@ Step 2 - Reference Matching:
 1. [brief description] → matches [reference name/number] because [reason]
 2. [brief description] → matches [reference name/number] because [reason]
 
-Issues Found:
-- [List specific issues - or "None"]
+Step 3 - Artifact Scan:
+- Hands: [OK / issues found - describe]
+- Faces: [OK / issues found - describe]
+- Floating objects: [None / describe any]
+- Background: [OK / issues found - describe]
+
+Step 4 - Scene Check:
+- Missing characters: [None / list missing]
+- Style consistency: [OK / issues]
+- Prompt match: [OK / issues]
 
 Score: [0-10]/10
 Verdict: [PASS/SOFT_FAIL/HARD_FAIL]
