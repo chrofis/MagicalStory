@@ -2169,8 +2169,8 @@ export default function StoryWizard() {
                     </div>
                   )}
 
-                  {/* Developer Model Selection - Admin only */}
-                  {developerMode && user?.role === 'admin' && (
+                  {/* Developer Model Selection - Admin only (or admin impersonating) */}
+                  {developerMode && (user?.role === 'admin' || isImpersonating) && (
                     <ModelSelector
                       selections={modelSelections}
                       onChange={setModelSelections}
