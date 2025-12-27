@@ -1111,27 +1111,21 @@ router.get('/database-size', authenticateToken, requireAdmin, async (req, res) =
     }
 
     const pool = getPool();
+
+    // Use a single query to get table sizes AND row counts (using pg_stat_user_tables for efficiency)
+    // This avoids N+1 queries by getting all stats in one query
     const tableSizes = await pool.query(`
       SELECT
-        schemaname,
-        tablename,
-        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
-        pg_total_relation_size(schemaname||'.'||tablename) AS size_bytes
-      FROM pg_tables
-      WHERE schemaname = 'public'
-      ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
+        t.schemaname,
+        t.tablename,
+        pg_size_pretty(pg_total_relation_size(t.schemaname||'.'||t.tablename)) AS size,
+        pg_total_relation_size(t.schemaname||'.'||t.tablename) AS size_bytes,
+        COALESCE(s.n_live_tup, 0) AS row_count
+      FROM pg_tables t
+      LEFT JOIN pg_stat_user_tables s ON t.tablename = s.relname AND t.schemaname = s.schemaname
+      WHERE t.schemaname = 'public'
+      ORDER BY pg_total_relation_size(t.schemaname||'.'||t.tablename) DESC
     `);
-
-    const rowCountMap = {};
-    for (const table of tableSizes.rows) {
-      try {
-        const result = await pool.query(`SELECT COUNT(*) as row_count FROM ${table.tablename}`);
-        rowCountMap[table.tablename] = parseInt(result.rows[0].row_count);
-      } catch (err) {
-        log.warn(`Could not get row count for table ${table.tablename}:`, err.message);
-        rowCountMap[table.tablename] = 0;
-      }
-    }
 
     const dbSize = await pool.query(`
       SELECT pg_size_pretty(pg_database_size(current_database())) as total_size,
@@ -1145,7 +1139,7 @@ router.get('/database-size', authenticateToken, requireAdmin, async (req, res) =
         tablename: row.tablename,
         size: row.size,
         size_bytes: parseInt(row.size_bytes),
-        row_count: rowCountMap[row.tablename] || 0
+        row_count: parseInt(row.row_count) || 0
       }))
     });
   } catch (err) {

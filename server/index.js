@@ -50,7 +50,7 @@ const corsOptions = {
       callback(null, true);
     } else {
       log.warn(`CORS blocked origin: ${origin}`);
-      callback(null, true); // Allow anyway for now, but log it
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
   credentials: true

@@ -7231,6 +7231,7 @@ Output Format:
         const shortSceneDesc = shortSceneDescriptions[pageNum] || '';
 
         // Build previous scenes context (last 2 pages)
+        // Use pageClothingData from outline (reliable) for clothing, not pageClothingForContext (which may not be ready in parallel mode)
         const previousScenes = [];
         for (let prevPage = pageNum - 2; prevPage < pageNum; prevPage++) {
           if (prevPage >= 1 && pageTextsForContext[prevPage]) {
@@ -7238,7 +7239,7 @@ Output Format:
               pageNumber: prevPage,
               text: pageTextsForContext[prevPage],
               sceneHint: shortSceneDescriptions[prevPage] || '',
-              clothing: pageClothingForContext[prevPage] || null
+              clothing: pageClothingData?.pageClothing?.[prevPage] || pageClothingForContext[prevPage] || null
             });
           }
         }
@@ -7661,6 +7662,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           pageTextsForContext[pageNum] = pageContent;
 
           // Build previous scenes context (last 2 pages)
+          // Use pageClothingData from outline (reliable) for clothing
           const previousScenes = [];
           for (let prevPage = pageNum - 2; prevPage < pageNum; prevPage++) {
             if (prevPage >= 1 && pageTextsForContext[prevPage]) {
@@ -7668,7 +7670,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 pageNumber: prevPage,
                 text: pageTextsForContext[prevPage],
                 sceneHint: shortSceneDescriptions[prevPage] || '',
-                clothing: pageClothingForContext[prevPage] || null
+                clothing: pageClothingData?.pageClothing?.[prevPage] || pageClothingForContext[prevPage] || null
               });
             }
           }

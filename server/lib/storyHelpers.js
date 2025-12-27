@@ -1200,17 +1200,25 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   if (sceneCharacters && sceneCharacters.length > 0) {
     log.debug(`[IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
 
-    // Build a numbered list of characters with full physical descriptions
+    // Build a numbered list of characters with full physical descriptions INCLUDING CLOTHING
     const charDescriptions = sceneCharacters.map((char, index) => {
       const age = char.age ? `${char.age} years old` : '';
       const gender = char.gender === 'male' ? 'boy/man' : char.gender === 'female' ? 'girl/woman' : '';
       // Include physical traits with labels (excluding height - AI doesn't understand it for images)
       const physical = char.physical;
+      // Get clothing from character analysis - critical for consistency
+      const clothing = char.clothing?.current || char.clothing || physical?.clothing;
+      if (clothing) {
+        log.debug(`[IMAGE PROMPT] ${char.name} clothing: "${clothing}"`);
+      } else {
+        log.debug(`[IMAGE PROMPT] ${char.name} has no clothing info (char.clothing=${char.clothing}, physical.clothing=${physical?.clothing})`);
+      }
       const physicalParts = [
         physical?.build ? `Build: ${physical.build}` : '',
         physical?.face ? `Face: ${physical.face}` : '',
         physical?.hair ? `Hair: ${physical.hair}` : '',
-        physical?.other ? `Other: ${physical.other}` : ''
+        physical?.other ? `Other: ${physical.other}` : '',
+        clothing ? `CLOTHING (MUST MATCH): ${clothing}` : ''
       ].filter(Boolean);
       const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
       const brief = [char.name, age, gender, physicalDesc].filter(Boolean).join(', ');

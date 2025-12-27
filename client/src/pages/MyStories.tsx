@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Book, Trash2, Eye, AlertTriangle, BookOpen, Tag } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -37,7 +37,8 @@ interface StoryListItem {
 }
 
 // Story card component with lazy loading and individual image loading state
-function StoryCard({
+// Wrapped with React.memo to prevent unnecessary re-renders when parent state changes
+const StoryCard = memo(function StoryCard({
   story,
   language,
   onView,
@@ -187,7 +188,7 @@ function StoryCard({
       </div>
     </div>
   );
-}
+});
 
 export default function MyStories() {
   const navigate = useNavigate();
