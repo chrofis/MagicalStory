@@ -71,11 +71,15 @@ function RetryHistoryDisplay({
               </div>
             )}
 
-            {attempt.reasoning && (
+            {attempt.reasoning ? (
               <details className="text-xs text-gray-600 mb-2">
                 <summary className="cursor-pointer">{language === 'de' ? 'Feedback' : 'Feedback'}</summary>
                 <p className="mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded">{attempt.reasoning}</p>
               </details>
+            ) : attempt.score === 0 && (
+              <div className="text-xs text-gray-500 italic mb-2">
+                {language === 'de' ? 'Qualitätsbewertung fehlgeschlagen' : language === 'fr' ? 'Évaluation de qualité échouée' : 'Quality evaluation failed'}
+              </div>
             )}
 
             {attempt.imageData && (
