@@ -906,7 +906,7 @@ export function StoryDisplay({
                     <div className="space-y-2">
                       {visualBible.secondaryCharacters.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
+                          <div className="font-semibold text-rose-800">{entry.name} {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}</div>
                           {editingEntry?.type === 'secondaryCharacter' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
                             <div className="mt-1">
                               <textarea
@@ -958,7 +958,7 @@ export function StoryDisplay({
                     <div className="space-y-2">
                       {visualBible.animals.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
+                          <div className="font-semibold text-rose-800">{entry.name} {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}</div>
                           {editingEntry?.type === 'animal' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
                             <div className="mt-1">
                               <textarea
@@ -1010,7 +1010,7 @@ export function StoryDisplay({
                     <div className="space-y-2">
                       {visualBible.artifacts.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
+                          <div className="font-semibold text-rose-800">{entry.name} {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}</div>
                           {editingEntry?.type === 'artifact' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
                             <div className="mt-1">
                               <textarea
@@ -1062,7 +1062,7 @@ export function StoryDisplay({
                     <div className="space-y-2">
                       {visualBible.locations.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800">{entry.name} <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span></div>
+                          <div className="font-semibold text-rose-800">{entry.name} {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}</div>
                           {editingEntry?.type === 'location' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
                             <div className="mt-1">
                               <textarea
