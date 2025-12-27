@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Mail, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Mail, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
@@ -15,6 +15,8 @@ interface GenerationProgressProps {
   jobId?: string;  // Job ID for cancellation
   onCancel?: () => void;  // Callback when job is cancelled
   characters?: Character[];  // Characters to show avatars from
+  isStalled?: boolean;  // Whether progress appears stalled
+  onDismissStalled?: () => void;  // Callback to dismiss stalled warning and continue waiting
 }
 
 // Translate server messages to user language
@@ -72,6 +74,8 @@ export function GenerationProgress({
   jobId,
   onCancel,
   characters = [],
+  isStalled = false,
+  onDismissStalled,
 }: GenerationProgressProps) {
   const { language } = useLanguage();
   const { user } = useAuth();
@@ -273,6 +277,9 @@ export function GenerationProgress({
       backCover: 'Back',
       cancelJob: 'Cancel Generation',
       cancelling: 'Cancelling...',
+      stalled: 'Generation seems stuck',
+      stalledDesc: 'No progress for a while. This can happen due to high server load.',
+      continueWaiting: 'Keep Waiting',
     },
     de: {
       title: 'Geschichte wird erstellt!',
@@ -289,6 +296,9 @@ export function GenerationProgress({
       backCover: 'Hinten',
       cancelJob: 'Generierung abbrechen',
       cancelling: 'Wird abgebrochen...',
+      stalled: 'Generierung scheint hängen zu bleiben',
+      stalledDesc: 'Seit einer Weile kein Fortschritt. Dies kann bei hoher Serverlast passieren.',
+      continueWaiting: 'Weiter warten',
     },
     fr: {
       title: 'Création de votre histoire!',
@@ -305,6 +315,9 @@ export function GenerationProgress({
       backCover: 'Arrière',
       cancelJob: 'Annuler la génération',
       cancelling: 'Annulation...',
+      stalled: 'La génération semble bloquée',
+      stalledDesc: 'Aucun progrès depuis un moment. Cela peut arriver en cas de forte charge serveur.',
+      continueWaiting: 'Continuer à attendre',
     },
   };
 
@@ -433,6 +446,46 @@ export function GenerationProgress({
         {/* Current step message */}
         {translatedMessage && (
           <p className="text-indigo-600 text-sm text-center font-medium mb-4">{translatedMessage}</p>
+        )}
+
+        {/* Stalled warning */}
+        {isStalled && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-medium text-amber-800 mb-1">{t.stalled}</h4>
+                <p className="text-sm text-amber-700 mb-3">{t.stalledDesc}</p>
+                <div className="flex gap-2">
+                  {onDismissStalled && (
+                    <button
+                      onClick={onDismissStalled}
+                      className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      {t.continueWaiting}
+                    </button>
+                  )}
+                  {onCancel && (
+                    <button
+                      onClick={() => {
+                        if (isCancelling) return;
+                        setIsCancelling(true);
+                        try {
+                          onCancel();
+                        } finally {
+                          setIsCancelling(false);
+                        }
+                      }}
+                      disabled={isCancelling}
+                      className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {isCancelling ? t.cancelling : t.cancelJob}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Cancel button - admin only */}

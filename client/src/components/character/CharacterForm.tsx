@@ -8,19 +8,31 @@ import type { Character, PhysicalTraits } from '@/types/character';
 import { api } from '@/services/api';
 
 // Component to fetch and display avatar prompt from server
-function AvatarPromptDisplay({ category, gender }: { category: string; gender: string | undefined }) {
+function AvatarPromptDisplay({ category, gender, physical }: {
+  category: string;
+  gender: string | undefined;
+  physical?: PhysicalTraits;
+}) {
   const [prompt, setPrompt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showWithTraits, setShowWithTraits] = useState(false);
 
   useEffect(() => {
     const fetchPrompt = async () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get<{ success: boolean; prompt: string }>(
-          `/api/avatar-prompt?category=${category}&gender=${gender || 'male'}`
-        );
+        // Build query params
+        let url = `/api/avatar-prompt?category=${category}&gender=${gender || 'male'}`;
+        if (showWithTraits && physical) {
+          url += `&withTraits=true`;
+          if (physical.hair) url += `&hair=${encodeURIComponent(physical.hair)}`;
+          if (physical.face) url += `&face=${encodeURIComponent(physical.face)}`;
+          if (physical.other) url += `&other=${encodeURIComponent(physical.other)}`;
+          if (physical.height) url += `&height=${encodeURIComponent(physical.height)}`;
+        }
+        const response = await api.get<{ success: boolean; prompt: string }>(url);
         if (response.success) {
           setPrompt(response.prompt);
         } else {
@@ -33,14 +45,33 @@ function AvatarPromptDisplay({ category, gender }: { category: string; gender: s
       }
     };
     fetchPrompt();
-  }, [category, gender]);
+  }, [category, gender, showWithTraits, physical]);
 
-  if (loading) return <div className="text-[9px] text-gray-400">Loading...</div>;
-  if (error) return <div className="text-[9px] text-red-400">{error}</div>;
+  const hasTraits = physical && (physical.hair || physical.face || physical.other || physical.height);
+
   return (
-    <pre className="mt-1 p-2 bg-gray-100 rounded text-[9px] text-gray-600 whitespace-pre-wrap overflow-auto max-h-48 border">
-      {prompt}
-    </pre>
+    <div>
+      {hasTraits && (
+        <label className="flex items-center gap-1 text-[9px] text-gray-500 mb-1 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showWithTraits}
+            onChange={(e) => setShowWithTraits(e.target.checked)}
+            className="w-3 h-3"
+          />
+          Show with traits
+        </label>
+      )}
+      {loading ? (
+        <div className="text-[9px] text-gray-400">Loading...</div>
+      ) : error ? (
+        <div className="text-[9px] text-red-400">{error}</div>
+      ) : (
+        <pre className={`mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border ${showWithTraits ? 'bg-amber-50 border-amber-300' : 'bg-gray-100 border-gray-200'}`}>
+          {prompt}
+        </pre>
+      )}
+    </div>
   );
 }
 
@@ -183,6 +214,15 @@ export function CharacterForm({
       const parts = editingStyleField.split('.');
       if (parts[0] === 'physical') {
         updatePhysical(parts[1] as keyof PhysicalTraits, editStyleValue);
+      } else if (parts[0] === 'clothing') {
+        // Update clothing fields (e.g., clothing.colors)
+        onChange({
+          ...character,
+          clothing: {
+            ...character.clothing,
+            [parts[1]]: editStyleValue,
+          },
+        });
       }
     }
     setEditingStyleField(null);
@@ -451,6 +491,17 @@ export function CharacterForm({
               onSave={saveStyleEdit}
               onCancel={cancelStyleEdit}
             />
+            <EditableStyleField
+              label={language === 'de' ? 'Kleidungsfarben' : language === 'fr' ? 'Couleurs des vêtements' : 'Clothing Colors'}
+              value={character.clothing?.colors || ''}
+              placeholder={language === 'de' ? 'z.B. schwarz, blau gestreift' : language === 'fr' ? 'ex. noir, rayures bleues' : 'e.g. black, blue stripes'}
+              isEditing={editingStyleField === 'clothing.colors'}
+              editValue={editStyleValue}
+              onEditValueChange={setEditStyleValue}
+              onStartEdit={() => handleStartEdit('clothing.colors', character.clothing?.colors || '')}
+              onSave={saveStyleEdit}
+              onCancel={cancelStyleEdit}
+            />
           </div>
         </div>
       </details>
@@ -512,7 +563,7 @@ export function CharacterForm({
                 {developerMode && (
                   <details className="mt-1 text-left">
                     <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
-                    <AvatarPromptDisplay category={category} gender={character.gender} />
+                    <AvatarPromptDisplay category={category} gender={character.gender} physical={character.physical} />
                   </details>
                 )}
               </div>
@@ -622,11 +673,7 @@ export function CharacterForm({
 
       {!canSaveCharacter && (
         <p className="text-sm text-red-500 text-center">
-          {language === 'de'
-            ? 'Bitte mindestens 3 Stärken und 2 Schwächen wählen'
-            : language === 'fr'
-            ? 'Veuillez sélectionner au moins 3 forces et 2 défauts'
-            : 'Please select at least 3 strengths and 2 flaws'}
+          {t.selectStrengthsFlaws}
         </p>
       )}
     </div>

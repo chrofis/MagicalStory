@@ -3503,6 +3503,10 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.clothing) {
           analyzerData.attributes.clothing = traits.clothing;
         }
+        // Clothing colors (separate from full description - used for avatar color matching)
+        if (traits.clothingColors) {
+          analyzerData.attributes.clothingColors = traits.clothingColors;
+        }
       }
 
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
@@ -3594,10 +3598,22 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
     // Build the prompt from template
     const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
     const clothingStyle = getClothingStylePrompt(category);
-    const avatarPrompt = fillTemplate(promptPart, {
+    let avatarPrompt = fillTemplate(promptPart, {
       'CLOTHING_STYLE': clothingStyle,
       'BUILD': req.query.build || 'average'
     });
+
+    // If physical traits are provided, append them (for "With Traits" display)
+    if (req.query.withTraits === 'true') {
+      const traitParts = [];
+      if (req.query.hair) traitParts.push(`Hair: ${req.query.hair}`);
+      if (req.query.face) traitParts.push(`Face: ${req.query.face}`);
+      if (req.query.other) traitParts.push(`Distinctive features: ${req.query.other}`);
+      if (req.query.height) traitParts.push(`Height: ${req.query.height}cm`);
+      if (traitParts.length > 0) {
+        avatarPrompt += `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
+      }
+    }
 
     res.json({ success: true, prompt: avatarPrompt });
   } catch (error) {
@@ -6679,32 +6695,29 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const totalCredits = jobResult.rows[0].credits_reserved;
         const progressPercent = jobResult.rows[0].progress || 0;
 
-        // Calculate proportional refund: if 30% done, refund 70%
-        // This accounts for work already completed (images generated, etc.)
-        const refundPercent = Math.max(0, 100 - progressPercent) / 100;
-        const creditsToRefund = Math.floor(totalCredits * refundPercent);
-        const creditsUsed = totalCredits - creditsToRefund;
+        // Full refund if story is not 100% complete - incomplete stories have no value to user
+        const isComplete = progressPercent >= 100;
+        const creditsToRefund = isComplete ? 0 : totalCredits;
 
-        // Get current balance
-        const userResult = await dbPool.query(
-          'SELECT credits FROM users WHERE id = $1',
-          [refundUserId]
-        );
-
-        if (userResult.rows.length > 0 && userResult.rows[0].credits !== -1) {
-          const currentBalance = userResult.rows[0].credits;
-          const newBalance = currentBalance + creditsToRefund;
-
-          // Refund credits
-          await dbPool.query(
-            'UPDATE users SET credits = $1 WHERE id = $2',
-            [newBalance, refundUserId]
+        if (creditsToRefund > 0) {
+          // Get current balance
+          const userResult = await dbPool.query(
+            'SELECT credits FROM users WHERE id = $1',
+            [refundUserId]
           );
 
-          // Create refund transaction record with details about partial completion
-          const description = creditsUsed > 0
-            ? `Partial refund: ${creditsToRefund}/${totalCredits} credits (${progressPercent}% completed, ${creditsUsed} credits used)`
-            : `Full refund: ${creditsToRefund} credits - storybook generation failed`;
+          if (userResult.rows.length > 0 && userResult.rows[0].credits !== -1) {
+            const currentBalance = userResult.rows[0].credits;
+            const newBalance = currentBalance + creditsToRefund;
+
+            // Refund credits
+            await dbPool.query(
+              'UPDATE users SET credits = $1 WHERE id = $2',
+              [newBalance, refundUserId]
+            );
+
+            // Create refund transaction record
+            const description = `Full refund: ${creditsToRefund} credits - storybook generation failed at ${progressPercent}%`;
 
           await dbPool.query(
             `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
@@ -6718,7 +6731,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             [jobId]
           );
 
-          log.info(`💳 [STORYBOOK] Refunded ${creditsToRefund}/${totalCredits} credits for failed job ${jobId} (${progressPercent}% was completed)`);
+            log.info(`💳 [STORYBOOK] Refunded ${creditsToRefund} credits for failed job ${jobId} (failed at ${progressPercent}%)`);
+          }
         }
       }
     } catch (refundErr) {
@@ -8309,7 +8323,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       log.error('❌ Failed to dump partial data:', dumpErr.message);
     }
 
-    // Refund reserved credits on failure - PROPORTIONAL based on work completed
+    // Full refund if story is not 100% complete - incomplete stories have no value to user
     try {
       const jobResult = await dbPool.query(
         'SELECT user_id, credits_reserved, progress FROM story_jobs WHERE id = $1',
@@ -8320,45 +8334,44 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         const totalCredits = jobResult.rows[0].credits_reserved;
         const progressPercent = jobResult.rows[0].progress || 0;
 
-        // Calculate proportional refund: if 30% done, refund 70%
-        const refundPercent = Math.max(0, 100 - progressPercent) / 100;
-        const creditsToRefund = Math.floor(totalCredits * refundPercent);
-        const creditsUsed = totalCredits - creditsToRefund;
+        // Full refund if story is not 100% complete - incomplete stories have no value to user
+        const isComplete = progressPercent >= 100;
+        const creditsToRefund = isComplete ? 0 : totalCredits;
 
-        // Get current balance
-        const userResult = await dbPool.query(
-          'SELECT credits FROM users WHERE id = $1',
-          [refundUserId]
-        );
-
-        if (userResult.rows.length > 0 && userResult.rows[0].credits !== -1) {
-          const currentBalance = userResult.rows[0].credits;
-          const newBalance = currentBalance + creditsToRefund;
-
-          // Refund credits
-          await dbPool.query(
-            'UPDATE users SET credits = $1 WHERE id = $2',
-            [newBalance, refundUserId]
+        if (creditsToRefund > 0) {
+          // Get current balance
+          const userResult = await dbPool.query(
+            'SELECT credits FROM users WHERE id = $1',
+            [refundUserId]
           );
 
-          // Create refund transaction record with details about partial completion
-          const description = creditsUsed > 0
-            ? `Partial refund: ${creditsToRefund}/${totalCredits} credits (${progressPercent}% completed, ${creditsUsed} credits used)`
-            : `Full refund: ${creditsToRefund} credits - story generation failed`;
+          if (userResult.rows.length > 0 && userResult.rows[0].credits !== -1) {
+            const currentBalance = userResult.rows[0].credits;
+            const newBalance = currentBalance + creditsToRefund;
 
-          await dbPool.query(
-            `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, description]
-          );
+            // Refund credits
+            await dbPool.query(
+              'UPDATE users SET credits = $1 WHERE id = $2',
+              [newBalance, refundUserId]
+            );
 
-          // Reset credits_reserved to prevent double refunds
-          await dbPool.query(
-            'UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1',
-            [jobId]
-          );
+            // Create refund transaction record
+            const description = `Full refund: ${creditsToRefund} credits - story generation failed at ${progressPercent}%`;
 
-          log.info(`💳 Refunded ${creditsToRefund}/${totalCredits} credits for failed job ${jobId} (${progressPercent}% was completed)`);
+            await dbPool.query(
+              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, description]
+            );
+
+            // Reset credits_reserved to prevent double refunds
+            await dbPool.query(
+              'UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1',
+              [jobId]
+            );
+
+            log.info(`💳 Refunded ${creditsToRefund} credits for failed job ${jobId} (failed at ${progressPercent}%)`);
+          }
         }
       }
     } catch (refundErr) {

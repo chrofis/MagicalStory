@@ -114,7 +114,7 @@ export function RegisterForm({
           onChange={(e) => setPassword(e.target.value)}
           required
           disabled={isLoading}
-          helperText="Minimum 6 characters"
+          helperText={t.passwordMinChars}
         />
 
         <Button

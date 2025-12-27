@@ -14,6 +14,7 @@ Return a JSON object with this EXACT structure:
     "face": "<facial structure and shape, eye color, skin tone (e.g round face with soft cheeks, angular jaw, freckled complexion)>",
     "hair": "<specific color, length, specific hairstyle, texture (e.g., long, brown, ponytail)>",
     "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>",
-    "clothing": "<brief description of what they are wearing in the photo>"
+    "clothing": "<brief description of what they are wearing in the photo>",
+    "clothingColors": "<ONLY the main colors of their clothing, e.g. 'black and white', 'navy blue', 'red with yellow stripes'>"
   }
 }

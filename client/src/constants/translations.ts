@@ -157,6 +157,18 @@ export interface TranslationStrings {
   hideEditPrompt: string;
   editInstruction: string;
   applyEdit: string;
+  // Validation messages
+  passwordMinChars: string;
+  selectStrengthsFlaws: string;
+  fillAllFields: string;
+  networkError: string;
+  operationTimeout: string;
+  failedGeneric: string;
+  // Generation timeout
+  generationStalled: string;
+  generationStalledDesc: string;
+  continueWaiting: string;
+  cancelGeneration: string;
 }
 
 export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
@@ -319,6 +331,18 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     hideEditPrompt: 'Hide Prompt',
     editInstruction: 'What should be changed?',
     applyEdit: 'Apply Edit',
+    // Validation messages
+    passwordMinChars: 'Minimum 6 characters',
+    selectStrengthsFlaws: 'Please select at least 3 strengths and 2 flaws',
+    fillAllFields: 'Please fill in all fields',
+    networkError: 'Network error. Please check your connection and try again.',
+    operationTimeout: 'The operation timed out. Please try again.',
+    failedGeneric: 'An error occurred. Please try again.',
+    // Generation timeout
+    generationStalled: 'Generation seems stuck',
+    generationStalledDesc: 'No progress for a while. This can happen due to high server load.',
+    continueWaiting: 'Keep Waiting',
+    cancelGeneration: 'Cancel',
   },
   de: {
     title: 'Magical Story',
@@ -479,6 +503,18 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     hideEditPrompt: 'Prompt ausblenden',
     editInstruction: 'Was soll geändert werden?',
     applyEdit: 'Änderung anwenden',
+    // Validation messages
+    passwordMinChars: 'Mindestens 6 Zeichen',
+    selectStrengthsFlaws: 'Bitte mindestens 3 Stärken und 2 Schwächen wählen',
+    fillAllFields: 'Bitte alle Felder ausfüllen',
+    networkError: 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.',
+    operationTimeout: 'Die Anfrage ist abgelaufen. Bitte erneut versuchen.',
+    failedGeneric: 'Ein Fehler ist aufgetreten. Bitte erneut versuchen.',
+    // Generation timeout
+    generationStalled: 'Generierung scheint hängen zu bleiben',
+    generationStalledDesc: 'Seit einer Weile kein Fortschritt. Dies kann bei hoher Serverlast passieren.',
+    continueWaiting: 'Weiter warten',
+    cancelGeneration: 'Abbrechen',
   },
   fr: {
     title: 'Magical Story',
@@ -639,5 +675,17 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     hideEditPrompt: 'Masquer le Prompt',
     editInstruction: 'Que faut-il changer ?',
     applyEdit: 'Appliquer la Modification',
+    // Validation messages
+    passwordMinChars: 'Minimum 6 caractères',
+    selectStrengthsFlaws: 'Veuillez sélectionner au moins 3 forces et 2 défauts',
+    fillAllFields: 'Veuillez remplir tous les champs',
+    networkError: 'Erreur réseau. Veuillez vérifier votre connexion et réessayer.',
+    operationTimeout: "L'opération a expiré. Veuillez réessayer.",
+    failedGeneric: 'Une erreur est survenue. Veuillez réessayer.',
+    // Generation timeout
+    generationStalled: 'La génération semble bloquée',
+    generationStalledDesc: 'Aucun progrès depuis un moment. Cela peut arriver en cas de forte charge serveur.',
+    continueWaiting: 'Continuer à attendre',
+    cancelGeneration: 'Annuler',
   },
 };

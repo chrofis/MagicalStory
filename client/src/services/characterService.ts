@@ -87,7 +87,9 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
 
     avatars: api.clothing_avatars || api.clothingAvatars,
 
-    clothing: api.clothing ? { current: api.clothing } : undefined,
+    clothing: (api.clothing || api.clothing_colors || api.clothingColors)
+      ? { current: api.clothing, colors: api.clothing_colors || api.clothingColors }
+      : undefined,
 
     generatedOutfits: (api.generated_outfits || api.generatedOutfits) as Record<number, GeneratedOutfit> | undefined,
   };
@@ -123,6 +125,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     fears: char.traits?.challenges,
     // Clothing
     clothing: char.clothing?.current,
+    clothing_colors: char.clothing?.colors,
     clothing_avatars: char.avatars,
     // Generated outfits per page
     generated_outfits: char.generatedOutfits,
@@ -395,7 +398,10 @@ export const characterService = {
         age: response.attributes?.age,
         gender: response.attributes?.gender,
         physical: (physical.height || physical.build || physical.face || physical.hair || physical.other) ? physical : undefined,
-        clothing: response.attributes?.clothing ? { current: response.attributes.clothing } : undefined,
+        clothing: (response.attributes?.clothing || response.attributes?.clothingColors) ? {
+          current: response.attributes.clothing,
+          colors: response.attributes.clothingColors
+        } : undefined,
       };
     } catch (error) {
       log.error('Photo analysis failed:', error);

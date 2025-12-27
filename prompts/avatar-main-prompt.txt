@@ -15,6 +15,7 @@ IDENTITY PERSISTENCE:
 WARDROBE DETAILS:
 - Style Transfer Rule: Copy the EXACT pattern AND colors from the input image. Just change from short to long sleeves / legs, etc.
 - If parts of the clothing are not visible in the input picture use plain/solid neutral colors (black, navy, khaki, gray, brown) to create them. Added / invented parts of the clothing MUST be DIFFERENT from input image. NEVER apply the shirt's pattern or bright colors to the pants.
+- NO LAYERED CLOTHING: Generate single-layer outfits only. Coats, hoodies, and jackets must be CLOSED/ZIPPED - no visible garments underneath. One top garment only.
 - Outfit: {CLOTHING_STYLE}
 
 Output Quality: 4k, Photorealistic.

@@ -1206,19 +1206,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       const gender = char.gender === 'male' ? 'boy/man' : char.gender === 'female' ? 'girl/woman' : '';
       // Include physical traits with labels (excluding height - AI doesn't understand it for images)
       const physical = char.physical;
-      // Get clothing from character analysis - critical for consistency
-      const clothing = char.clothing?.current || char.clothing || physical?.clothing;
-      if (clothing) {
-        log.debug(`[IMAGE PROMPT] ${char.name} clothing: "${clothing}"`);
+      // Get clothing COLORS from character analysis - used for avatar color matching
+      // Avatar determines the style (coat, hoodie, t-shirt), we just need the colors to match
+      const clothingColors = char.clothingColors || char.clothing_colors || char.clothing?.colors;
+      if (clothingColors) {
+        log.debug(`[IMAGE PROMPT] ${char.name} clothing colors: "${clothingColors}"`);
       } else {
-        log.debug(`[IMAGE PROMPT] ${char.name} has no clothing info (char.clothing=${char.clothing}, physical.clothing=${physical?.clothing})`);
+        log.debug(`[IMAGE PROMPT] ${char.name} has no clothing color info`);
       }
       const physicalParts = [
         physical?.build ? `Build: ${physical.build}` : '',
         physical?.face ? `Face: ${physical.face}` : '',
         physical?.hair ? `Hair: ${physical.hair}` : '',
         physical?.other ? `Other: ${physical.other}` : '',
-        clothing ? `CLOTHING (MUST MATCH): ${clothing}` : ''
+        clothingColors ? `CLOTHING COLORS (MUST MATCH): ${clothingColors}` : ''
       ].filter(Boolean);
       const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
       const brief = [char.name, age, gender, physicalDesc].filter(Boolean).join(', ');

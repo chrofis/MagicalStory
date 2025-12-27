@@ -138,6 +138,7 @@ export default function StoryWizard() {
   const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
   const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
+  const [isProgressStalled, setIsProgressStalled] = useState(false); // Track if generation seems stuck
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
   const [originalStory, setOriginalStory] = useState(''); // Original AI-generated story for restore functionality
@@ -1183,6 +1184,9 @@ export default function StoryWizard() {
       // Poll for job status
       let completed = false;
       let lastProgress = 0;
+      let lastProgressTime = Date.now();
+      const STALL_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes without progress change
+      setIsProgressStalled(false); // Reset stalled state
       while (!completed) {
         await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
 
@@ -1193,6 +1197,14 @@ export default function StoryWizard() {
           if (status.progress.current !== lastProgress) {
             log.debug(`Progress: ${status.progress.current}% - ${status.progress.message || ''}`);
             lastProgress = status.progress.current;
+            lastProgressTime = Date.now(); // Reset stall timer on progress
+            setIsProgressStalled(false); // Clear stalled state on progress
+          } else {
+            // Check if stalled (no progress for threshold period)
+            const timeSinceProgress = Date.now() - lastProgressTime;
+            if (timeSinceProgress >= STALL_THRESHOLD_MS) {
+              setIsProgressStalled(true);
+            }
           }
           // Only update progress if new value >= current (never go backwards)
           setGenerationProgress(prev => {
@@ -1355,6 +1367,7 @@ export default function StoryWizard() {
           : `Generation failed: ${errorMessage}`);
       }
     } finally {
+      setIsProgressStalled(false); // Reset stalled state
       setTimeout(() => setIsGenerating(false), 500);
     }
   };
@@ -2208,12 +2221,15 @@ export default function StoryWizard() {
           coverImages={coverImages}
           characters={characters}
           jobId={jobId || undefined}
+          isStalled={isProgressStalled}
+          onDismissStalled={() => setIsProgressStalled(false)}
           onCancel={jobId ? async () => {
             try {
               await storyService.cancelJob(jobId);
               log.info('Job cancelled by user');
               setIsGenerating(false);
               setJobId(null);
+              setIsProgressStalled(false);
               setGenerationProgress({ current: 0, total: 0, message: '' });
               alert(language === 'de'
                 ? 'Generierung abgebrochen'

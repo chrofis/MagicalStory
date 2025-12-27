@@ -28,6 +28,7 @@ const translations = {
     cancel: 'Cancel',
     emailChanged: 'Email changed! Please check your new inbox for verification.',
     checkSpam: 'Don\'t see it? Check your spam folder.',
+    fillAllFields: 'Please fill in all fields',
   },
   de: {
     title: 'E-Mail prüfen',
@@ -43,6 +44,7 @@ const translations = {
     cancel: 'Abbrechen',
     emailChanged: 'E-Mail geändert! Bitte prüfen Sie Ihren neuen Posteingang für die Bestätigung.',
     checkSpam: 'Nicht gefunden? Prüfen Sie Ihren Spam-Ordner.',
+    fillAllFields: 'Bitte alle Felder ausfüllen',
   },
   fr: {
     title: 'Verifiez votre e-mail',
@@ -58,6 +60,7 @@ const translations = {
     cancel: 'Annuler',
     emailChanged: 'E-mail change! Veuillez verifier votre nouvelle boite de reception pour la verification.',
     checkSpam: 'Pas trouve? Verifiez votre dossier spam.',
+    fillAllFields: 'Veuillez remplir tous les champs',
   },
 };
 
@@ -212,7 +215,7 @@ export function EmailVerificationModal({ isOpen, onClose, onVerified }: EmailVer
 
   const handleChangeEmail = async () => {
     if (!newEmail || !password) {
-      setError('Please fill in all fields');
+      setError(t.fillAllFields);
       return;
     }
 
