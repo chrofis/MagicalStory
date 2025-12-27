@@ -92,6 +92,7 @@ const {
 } = require('./server/lib/images');
 const {
   TEXT_MODELS,
+  MODEL_DEFAULTS,
   getActiveTextModel,
   getTextModelName,
   calculateOptimalBatchSize,
@@ -456,7 +457,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
         if (fullSession.metadata?.type === 'credits') {
           log.debug('💰 [STRIPE WEBHOOK] Processing credits purchase');
           const userId = parseInt(fullSession.metadata?.userId);
-          const creditsToAdd = parseInt(fullSession.metadata?.credits) || 100;
+
+          // SERVER-SIDE VALIDATION: Calculate credits from amount paid, don't trust metadata
+          // Pricing: CHF 5 = 100 credits, CHF 10 = 200 credits, etc.
+          const amountPaid = fullSession.amount_total || 0; // in cents
+          const creditsToAdd = Math.floor(amountPaid / 5); // 5 cents = 1 credit (CHF 5 = 500 cents = 100 credits)
+
+          // Sanity check - metadata credits should roughly match calculated credits (allow 10% variance)
+          const metadataCredits = parseInt(fullSession.metadata?.credits) || 0;
+          if (metadataCredits > 0 && Math.abs(metadataCredits - creditsToAdd) > creditsToAdd * 0.1) {
+            log.warn(`⚠️ [STRIPE WEBHOOK] Credit mismatch! Metadata: ${metadataCredits}, Calculated: ${creditsToAdd}. Using calculated value.`);
+          }
 
           if (!userId || isNaN(userId)) {
             log.error('❌ [STRIPE WEBHOOK] Invalid userId for credits purchase:', fullSession.metadata);
@@ -464,6 +475,18 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           }
 
           if (STORAGE_MODE === 'database') {
+            // IDEMPOTENCY CHECK: Check if this credit purchase was already processed
+            const existingTransaction = await dbPool.query(
+              'SELECT id FROM credit_transactions WHERE reference_id = $1 AND transaction_type = $2',
+              [fullSession.id, 'purchase']
+            );
+
+            if (existingTransaction.rows.length > 0) {
+              log.warn('⚠️ [STRIPE WEBHOOK] Credits already added for this session, skipping duplicate:', fullSession.id);
+              res.json({ received: true, type: 'credits', duplicate: true });
+              return;
+            }
+
             // Get current credits
             const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [userId]);
             if (userResult.rows.length === 0) {
@@ -484,7 +507,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             await dbPool.query(`
               INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
               VALUES ($1, $2, $3, 'purchase', $4, $5)
-            `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe`]);
+            `, [userId, creditsToAdd, newCredits, fullSession.id, `Purchased ${creditsToAdd} credits via Stripe (CHF ${(amountPaid / 100).toFixed(2)})`]);
 
             log.debug('💾 [STRIPE WEBHOOK] Credits transaction recorded');
           }
@@ -548,6 +571,18 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
           // Use first story ID as the primary for orders table (for backwards compatibility)
           const primaryStoryId = validatedStoryIds[0];
+
+          // IDEMPOTENCY CHECK: Check if this order was already processed
+          const existingOrder = await dbPool.query(
+            'SELECT id FROM orders WHERE stripe_session_id = $1',
+            [fullSession.id]
+          );
+
+          if (existingOrder.rows.length > 0) {
+            log.warn('⚠️ [STRIPE WEBHOOK] Order already processed, skipping duplicate:', fullSession.id);
+            res.json({ received: true, duplicate: true });
+            return;
+          }
 
           await dbPool.query(`
             INSERT INTO orders (
@@ -654,11 +689,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 // IMPORTANT: This MUST be defined BEFORE express.json() middleware
 app.post('/api/gelato/webhook', express.json(), async (req, res) => {
   try {
-    // Verify webhook authorization
+    // Verify webhook authorization - REQUIRED for security
     const webhookSecret = process.env.GELATO_WEBHOOK_SECRET;
     const receivedSecret = req.headers['x-gelato-webhook-secret'];
 
-    if (webhookSecret && receivedSecret !== webhookSecret) {
+    // Webhook secret is now REQUIRED - reject if not configured
+    if (!webhookSecret) {
+      log.error('❌ [GELATO WEBHOOK] GELATO_WEBHOOK_SECRET not configured - rejecting webhook');
+      return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
+
+    if (receivedSecret !== webhookSecret) {
       log.warn('⚠️ [GELATO WEBHOOK] Invalid or missing authorization header');
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -6783,16 +6824,20 @@ async function processStoryJob(jobId) {
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
 
     // Developer mode: model overrides (admin only)
-    // Apply default models for cost optimization:
-    // - Outline: gemini-2.5-pro (cheaper than Claude, good quality)
-    // - Scene descriptions: claude-haiku (fast, cost-effective)
+    // Use centralized MODEL_DEFAULTS from textModels.js
     const modelOverrides = {
-      outlineModel: 'gemini-2.5-pro',
-      sceneDescriptionModel: 'claude-haiku',
+      outlineModel: MODEL_DEFAULTS.outline,
+      textModel: MODEL_DEFAULTS.storyText,
+      sceneDescriptionModel: MODEL_DEFAULTS.sceneDescription,
+      imageModel: MODEL_DEFAULTS.pageImage,
+      coverImageModel: MODEL_DEFAULTS.coverImage,
+      qualityModel: MODEL_DEFAULTS.qualityEval,
       ...inputData.modelOverrides  // User overrides take precedence
     };
-    if (Object.keys(modelOverrides).some(k => modelOverrides[k])) {
-      log.debug(`🔧 [PIPELINE] Model overrides: ${JSON.stringify(modelOverrides)}`);
+    // Always log model defaults being used
+    log.debug(`🔧 [PIPELINE] Model defaults: outline=${MODEL_DEFAULTS.outline}, text=${MODEL_DEFAULTS.storyText}, scene=${MODEL_DEFAULTS.sceneDescription}, quality=${MODEL_DEFAULTS.qualityEval}`);
+    if (inputData.modelOverrides && Object.keys(inputData.modelOverrides).length > 0) {
+      log.debug(`🔧 [PIPELINE] User overrides: ${JSON.stringify(inputData.modelOverrides)}`);
     }
 
     // Check if this is a picture book (1st-grade) - use simplified combined flow
@@ -8521,12 +8566,23 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
           });
         }
 
-        // Reserve credits (deduct from balance)
-        const newBalance = userCredits - creditsNeeded;
-        await dbPool.query(
-          'UPDATE users SET credits = $1 WHERE id = $2',
-          [newBalance, userId]
+        // Reserve credits atomically - this prevents race conditions
+        // The UPDATE only succeeds if credits >= creditsNeeded, preventing overdraw
+        const updateResult = await dbPool.query(
+          'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
+          [creditsNeeded, userId]
         );
+
+        if (updateResult.rows.length === 0) {
+          // Race condition occurred - another request already used the credits
+          return res.status(402).json({
+            error: 'Insufficient credits',
+            creditsNeeded: creditsNeeded,
+            message: 'Credits were used by another request. Please try again.'
+          });
+        }
+
+        const newBalance = updateResult.rows[0].credits;
 
         // Create transaction record for credit reservation
         await dbPool.query(

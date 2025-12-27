@@ -9,6 +9,7 @@
 
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { MODEL_DEFAULTS } = require('./textModels');
 
 // ============================================================================
 // PARSING FUNCTIONS
@@ -566,8 +567,8 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
       { text: analysisPrompt }
     ];
 
-    // Use Gemini Flash for analysis
-    const modelId = 'gemini-2.0-flash';
+    // Use utility model for fast photo analysis
+    const modelId = MODEL_DEFAULTS.utility;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {

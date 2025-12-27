@@ -46,9 +46,37 @@ const TEXT_MODELS = {
   }
 };
 
-// Get active model from environment
+// ============================================
+// CENTRALIZED MODEL DEFAULTS
+// Change these to update models across the entire pipeline
+// ============================================
+const MODEL_DEFAULTS = {
+  // Text generation models
+  outline: 'gemini-2.5-pro',           // Story outline generation
+  storyText: 'claude-sonnet',          // Story narrative text
+  sceneDescription: 'claude-haiku',    // Scene description for images
+
+  // Image models
+  pageImage: 'gemini-2.5-flash-image',       // Regular page images
+  coverImage: 'gemini-3-pro-image-preview',  // Cover images (higher quality)
+
+  // Quality evaluation models
+  qualityEval: 'gemini-2.5-flash',     // Image quality evaluation
+
+  // Utility models (inspection, visual bible, etc.)
+  utility: 'gemini-2.0-flash'          // Fast utility tasks
+};
+
+// Get active model from environment (legacy - prefer MODEL_DEFAULTS)
 const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
 const activeTextModel = TEXT_MODELS[TEXT_MODEL] || TEXT_MODELS['claude-sonnet'];
+
+/**
+ * Get model defaults - single source of truth for all model selections
+ */
+function getModelDefaults() {
+  return { ...MODEL_DEFAULTS };
+}
 
 /**
  * Get the currently active text model configuration
@@ -535,6 +563,8 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
 module.exports = {
   // Configuration
   TEXT_MODELS,
+  MODEL_DEFAULTS,
+  getModelDefaults,
   getActiveTextModel,
   getTextModelName,
   calculateOptimalBatchSize,

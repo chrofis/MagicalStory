@@ -8,12 +8,82 @@ const sharp = require('sharp');
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { MODEL_DEFAULTS } = require('./textModels');
 
-// Image cache to avoid regenerating identical images
-const imageCache = new Map();
+// =============================================================================
+// LRU CACHE IMPLEMENTATION
+// Prevents memory leaks by limiting cache size and implementing eviction
+// =============================================================================
 
-// Cache for compressed reference images (to avoid re-compressing same photo/avatar)
-const compressedRefCache = new Map();
+const IMAGE_CACHE_MAX_SIZE = parseInt(process.env.IMAGE_CACHE_MAX_SIZE) || 100;
+const REF_CACHE_MAX_SIZE = parseInt(process.env.REF_CACHE_MAX_SIZE) || 200;
+const CACHE_TTL_MS = parseInt(process.env.IMAGE_CACHE_TTL_MS) || 60 * 60 * 1000; // 1 hour default
+
+/**
+ * Simple LRU Cache with TTL support
+ * Evicts least recently used entries when max size is reached
+ */
+class LRUCache {
+  constructor(maxSize, ttlMs = 0) {
+    this.maxSize = maxSize;
+    this.ttlMs = ttlMs;
+    this.cache = new Map();
+  }
+
+  get(key) {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+
+    // Check TTL expiration
+    if (this.ttlMs > 0 && Date.now() - entry.timestamp > this.ttlMs) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    // Move to end (most recently used)
+    this.cache.delete(key);
+    this.cache.set(key, { value: entry.value, timestamp: entry.timestamp });
+    return entry.value;
+  }
+
+  set(key, value) {
+    // Delete first to update position
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+
+    // Evict oldest entries if at capacity
+    while (this.cache.size >= this.maxSize) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+      log.debug(`🗑️ [CACHE] Evicted oldest entry: ${oldestKey?.substring(0, 16)}...`);
+    }
+
+    this.cache.set(key, { value, timestamp: Date.now() });
+  }
+
+  has(key) {
+    return this.get(key) !== undefined;
+  }
+
+  delete(key) {
+    return this.cache.delete(key);
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+
+  get size() {
+    return this.cache.size;
+  }
+}
+
+// Image cache to avoid regenerating identical images (with LRU eviction)
+const imageCache = new LRUCache(IMAGE_CACHE_MAX_SIZE, CACHE_TTL_MS);
+
+// Cache for compressed reference images (with LRU eviction)
+const compressedRefCache = new LRUCache(REF_CACHE_MAX_SIZE, CACHE_TTL_MS);
 
 // Quality threshold from environment or default
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
@@ -251,8 +321,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Add evaluation prompt text
     parts.push({ text: evaluationPrompt });
 
-    // Use Gemini 2.5 Flash for quality evaluation (or override if provided)
-    let modelId = qualityModelOverride || 'gemini-2.5-flash';
+    // Use centralized default for quality evaluation (or override if provided)
+    let modelId = qualityModelOverride || MODEL_DEFAULTS.qualityEval;
     if (qualityModelOverride) {
       log.debug(`🔧 [QUALITY] Using model override: ${modelId}`);
     }
@@ -743,7 +813,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // Use model override if provided, otherwise default based on type:
   // - Covers: Gemini 3 Pro Image (higher quality)
   // - Scenes: Gemini 2.5 Flash Image (faster)
-  const defaultModel = evaluationType === 'cover' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+  const defaultModel = evaluationType === 'cover' ? MODEL_DEFAULTS.coverImage : MODEL_DEFAULTS.pageImage;
   const modelId = imageModelOverride || defaultModel;
   if (imageModelOverride) {
     log.debug(`🔧 [IMAGE GEN] Using model override: ${modelId}`);
@@ -912,8 +982,8 @@ async function editImageWithPrompt(imageData, editInstruction) {
       }
     ];
 
-    // Use Gemini 2.5 Flash Image for editing (optimized for pixel-level manipulation and inpainting)
-    const modelId = 'gemini-2.5-flash-image';
+    // Use page image model for editing (optimized for pixel-level manipulation and inpainting)
+    const modelId = MODEL_DEFAULTS.pageImage;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
@@ -1233,8 +1303,8 @@ async function inspectImageForErrors(imageData) {
       }
     ];
 
-    // Use Gemini 2.0 Flash for fast analysis
-    const modelId = 'gemini-2.0-flash';
+    // Use utility model for fast analysis
+    const modelId = MODEL_DEFAULTS.utility;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
@@ -1485,8 +1555,8 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
       }
     ];
 
-    // Use Gemini 2.5 Flash Image for editing
-    const modelId = 'gemini-2.5-flash-image';
+    // Use page image model for editing
+    const modelId = MODEL_DEFAULTS.pageImage;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
