@@ -1343,6 +1343,74 @@ async function createMaskFromBoundingBox(width, height, boundingBox) {
 }
 
 /**
+ * Create a combined mask from multiple bounding boxes
+ * @param {number} width - Image width in pixels
+ * @param {number} height - Image height in pixels
+ * @param {Array<number[]>} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0.0-1.0
+ * @returns {Promise<string>} Base64 mask image (black background, white rectangles for all boxes)
+ */
+async function createCombinedMask(width, height, boundingBoxes) {
+  if (!boundingBoxes || boundingBoxes.length === 0) {
+    throw new Error('No bounding boxes provided');
+  }
+
+  log.debug(`🎭 [MASK] Creating combined mask with ${boundingBoxes.length} regions`);
+
+  // Create black background
+  const blackBackground = await sharp({
+    create: {
+      width: width,
+      height: height,
+      channels: 3,
+      background: { r: 0, g: 0, b: 0 }
+    }
+  }).png().toBuffer();
+
+  // Create white rectangles for each bounding box
+  const compositeInputs = [];
+  for (let i = 0; i < boundingBoxes.length; i++) {
+    const [ymin, xmin, ymax, xmax] = boundingBoxes[i];
+
+    // Handle both 0.0-1.0 format (from FIX_TARGETS) and 0-1000 format (legacy)
+    const scale = (ymin <= 1 && xmin <= 1 && ymax <= 1 && xmax <= 1) ? 1 : 1000;
+
+    const left = Math.floor((xmin / scale) * width);
+    const top = Math.floor((ymin / scale) * height);
+    const rectWidth = Math.max(1, Math.floor(((xmax - xmin) / scale) * width));
+    const rectHeight = Math.max(1, Math.floor(((ymax - ymin) / scale) * height));
+
+    log.debug(`🎭 [MASK] Box ${i + 1}: [${left},${top},${rectWidth},${rectHeight}]`);
+
+    // Create white rectangle for this box
+    const whiteRect = await sharp({
+      create: {
+        width: rectWidth,
+        height: rectHeight,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 }
+      }
+    }).png().toBuffer();
+
+    compositeInputs.push({
+      input: whiteRect,
+      left: left,
+      top: top
+    });
+  }
+
+  // Composite all white rectangles onto black background
+  const maskBuffer = await sharp(blackBackground)
+    .composite(compositeInputs)
+    .png()
+    .toBuffer();
+
+  const maskBase64 = `data:image/png;base64,${maskBuffer.toString('base64')}`;
+  log.info(`🎭 [MASK] Combined mask created with ${boundingBoxes.length} regions`);
+
+  return maskBase64;
+}
+
+/**
  * Inpaint an image using a mask and fix prompt
  * @param {string} originalImage - Base64 original image
  * @param {string} maskImage - Base64 mask (white = area to fix)
@@ -1440,10 +1508,10 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
 
 /**
  * Auto-repair using pre-computed fix targets from quality evaluation
- * Skips the inspection API call when bounding boxes are already known
+ * Combines ALL fix targets into ONE mask and ONE API call for efficiency
  * @param {string} imageData - Base64 image data URL
  * @param {Array} fixTargets - Array of {boundingBox, issue, fixPrompt} from evaluation
- * @param {number} maxAdditionalAttempts - Extra inspection-based attempts after targets (default 0)
+ * @param {number} maxAdditionalAttempts - Extra inspection-based attempts after combined fix (default 0)
  * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
  */
 async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0) {
@@ -1460,64 +1528,82 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
     };
   }
 
-  log.info(`🔄 [AUTO-REPAIR] Starting targeted repair with ${fixTargets.length} pre-computed bounding boxes...`);
+  log.info(`🔄 [AUTO-REPAIR] Combining ${fixTargets.length} fix targets into ONE repair call...`);
 
-  // Phase 1: Fix all pre-computed targets (no inspection API call needed)
-  for (let i = 0; i < fixTargets.length; i++) {
-    const target = fixTargets[i];
-    const attempt = i + 1;
-    log.debug(`🔄 [AUTO-REPAIR] Target ${attempt}/${fixTargets.length}: ${target.issue}`);
-
-    // Get image dimensions and create mask from pre-computed bounding box
+  try {
+    // Get image dimensions
     const dimensions = await getImageDimensions(currentImage);
-    const mask = await createMaskFromBoundingBox(
+
+    // Collect all bounding boxes
+    const boundingBoxes = fixTargets.map(t => t.boundingBox);
+
+    // Create combined mask with ALL regions
+    const combinedMask = await createCombinedMask(
       dimensions.width,
       dimensions.height,
-      target.boundingBox
+      boundingBoxes
     );
 
-    // Inpaint the masked area
+    // Build combined fix prompt with numbered issues
+    const combinedPrompt = fixTargets.length === 1
+      ? fixTargets[0].fixPrompt
+      : `Fix the following issues in the masked areas:\n${fixTargets.map((t, i) => `${i + 1}. ${t.fixPrompt}`).join('\n')}`;
+
+    log.debug(`🔄 [AUTO-REPAIR] Combined prompt: ${combinedPrompt}`);
+
+    // Single inpaint call for ALL fixes
     const repaired = await inpaintWithMask(
       currentImage,
-      mask,
-      target.fixPrompt
+      combinedMask,
+      combinedPrompt
     );
 
     if (!repaired || !repaired.imageData) {
-      log.warn(`⚠️ [AUTO-REPAIR] Inpainting failed for target ${attempt}: ${target.issue}`);
+      log.warn(`⚠️ [AUTO-REPAIR] Combined inpainting failed for ${fixTargets.length} targets`);
       repairHistory.push({
-        attempt,
-        errorType: 'pre-computed',
-        description: target.issue,
-        boundingBox: target.boundingBox,
-        fixPrompt: target.fixPrompt,
-        maskImage: mask,
+        attempt: 1,
+        errorType: 'combined-pre-computed',
+        description: fixTargets.map(t => t.issue).join('; '),
+        boundingBoxes: boundingBoxes,
+        fixPrompt: combinedPrompt,
+        maskImage: combinedMask,
         beforeImage: currentImage,
         afterImage: null,
         success: false,
         skippedInspection: true,
+        targetCount: fixTargets.length,
         timestamp: new Date().toISOString()
       });
-      continue; // Try next target even if this one failed
-    }
+    } else {
+      // Record successful combined repair
+      repairHistory.push({
+        attempt: 1,
+        errorType: 'combined-pre-computed',
+        description: fixTargets.map(t => t.issue).join('; '),
+        boundingBoxes: boundingBoxes,
+        fixPrompt: combinedPrompt,
+        maskImage: combinedMask,
+        beforeImage: currentImage,
+        afterImage: repaired.imageData,
+        success: true,
+        skippedInspection: true,
+        targetCount: fixTargets.length,
+        timestamp: new Date().toISOString()
+      });
 
-    // Record the successful repair
+      currentImage = repaired.imageData;
+      log.info(`✅ [AUTO-REPAIR] Fixed ${fixTargets.length} targets in ONE API call`);
+    }
+  } catch (error) {
+    log.error(`❌ [AUTO-REPAIR] Combined repair failed:`, error.message);
     repairHistory.push({
-      attempt,
-      errorType: 'pre-computed',
-      description: target.issue,
-      boundingBox: target.boundingBox,
-      fixPrompt: target.fixPrompt,
-      maskImage: mask,
-      beforeImage: currentImage,
-      afterImage: repaired.imageData,
-      success: true,
-      skippedInspection: true,
+      attempt: 1,
+      errorType: 'combined-pre-computed',
+      description: `Error: ${error.message}`,
+      success: false,
+      targetCount: fixTargets.length,
       timestamp: new Date().toISOString()
     });
-
-    currentImage = repaired.imageData;
-    log.info(`✅ [AUTO-REPAIR] Fixed target ${attempt}: ${target.issue}`);
   }
 
   // Phase 2: Optional additional inspection-based repairs
@@ -1531,7 +1617,7 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
   }
 
   const successCount = repairHistory.filter(r => r.success).length;
-  log.info(`✅ [AUTO-REPAIR] Targeted repair complete: ${successCount}/${fixTargets.length} fixes applied`);
+  log.info(`✅ [AUTO-REPAIR] Targeted repair complete: ${successCount > 0 ? 'success' : 'failed'}`);
 
   return {
     imageData: currentImage,
@@ -1650,6 +1736,7 @@ module.exports = {
   // Auto-repair functions
   inspectImageForErrors,
   createMaskFromBoundingBox,
+  createCombinedMask,
   inpaintWithMask,
   autoRepairImage,
   autoRepairWithTargets,
