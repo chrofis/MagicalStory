@@ -8608,8 +8608,9 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
 
     log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}${idempotencyKey ? ` (idempotency: ${idempotencyKey})` : ''}`);
 
-    // Check email verification (skip for admins)
-    if (req.user.role !== 'admin' && STORAGE_MODE === 'database') {
+    // Check email verification (skip for admins and impersonating admins)
+    const isImpersonating = req.user.impersonating === true;
+    if (req.user.role !== 'admin' && !isImpersonating && STORAGE_MODE === 'database') {
       const emailCheckResult = await dbPool.query(
         'SELECT email_verified FROM users WHERE id = $1',
         [userId]
