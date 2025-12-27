@@ -334,13 +334,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         return null;
       }
       data = await response.json();
-
-      // Log token usage for fallback call
-      const fallbackInputTokens = data.usageMetadata?.promptTokenCount || 0;
-      const fallbackOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-      if (fallbackInputTokens > 0 || fallbackOutputTokens > 0) {
-        log.verbose(`📊 [QUALITY] Fallback token usage - input: ${fallbackInputTokens.toLocaleString()}, output: ${fallbackOutputTokens.toLocaleString()}`);
-      }
     }
 
     // Log finish reason to diagnose early stops
@@ -350,19 +343,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      log.warn('⚠️  [QUALITY] No text response from Gemini (after fallback attempted)');
-      if (data.candidates?.[0]) {
-        log.warn('⚠️  [QUALITY] Candidate info:', JSON.stringify({
-          finishReason: data.candidates[0].finishReason,
-          finishMessage: data.candidates[0].finishMessage,
-          safetyRatings: data.candidates[0].safetyRatings
-        }));
-      } else if (data.promptFeedback) {
-        // No candidates at all - likely blocked by safety
-        log.warn('⚠️  [QUALITY] Prompt blocked:', JSON.stringify(data.promptFeedback));
-      } else {
-        log.warn('⚠️  [QUALITY] Unexpected response structure:', JSON.stringify(data).substring(0, 500));
-      }
+      const reason = data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason || 'unknown';
+      log.warn(`⚠️  [QUALITY] No text response (reason: ${reason})`);
       return null;
     }
 
@@ -507,15 +489,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
   if (imageCache.has(cacheKey)) {
-    log.verbose('💾 [IMAGE CACHE] Cache HIT - reusing previously generated image');
-    log.debug('💾 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
-    log.debug('💾 [IMAGE CACHE] Cache size:', imageCache.size, 'images');
+    log.debug(`💾 [IMAGE CACHE] HIT (${imageCache.size} cached)`);
     const cachedResult = imageCache.get(cacheKey);
     // Call onImageReady for cache hits too (for progressive display)
     if (onImageReady && cachedResult.imageData) {
       try {
         await onImageReady(cachedResult.imageData, cachedResult.modelId);
-        log.debug('📤 [IMAGE CACHE] Cached image sent for immediate display');
       } catch (callbackError) {
         log.error('⚠️ [IMAGE CACHE] onImageReady callback error:', callbackError.message);
       }
@@ -523,8 +502,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     return cachedResult;
   }
 
-  log.verbose('🆕 [IMAGE CACHE] Cache MISS - generating new image');
-  log.debug('🆕 [IMAGE CACHE] Cache key:', cacheKey.substring(0, 16) + '...');
+  log.debug(`🆕 [IMAGE CACHE] MISS - key: ${cacheKey.substring(0, 16)}...`);
 
   // Call Gemini API for image generation with optional character reference images
   const apiKey = process.env.GEMINI_API_KEY;
@@ -681,31 +659,16 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}`);
   }
 
-  // Log response structure (without base64 data to avoid massive logs)
-  log.debug('🖼️  [IMAGE GEN] Response structure:', {
-    hasCandidates: !!data.candidates,
-    candidatesCount: data.candidates?.length || 0,
-    responseKeys: Object.keys(data)
-  });
-
   if (!data.candidates || data.candidates.length === 0) {
-    log.error('❌ [IMAGE GEN] No candidates in response. Response keys:', Object.keys(data));
+    log.error('❌ [IMAGE GEN] No candidates in response');
     throw new Error('No image generated - no candidates in response');
   }
 
   // Extract image data
   const candidate = data.candidates[0];
-  log.debug('🖼️  [IMAGE GEN] Candidate structure:', {
-    hasContent: !!candidate.content,
-    hasParts: !!candidate.content?.parts,
-    partsCount: candidate.content?.parts?.length || 0,
-    candidateKeys: Object.keys(candidate)
-  });
 
   if (candidate.content && candidate.content.parts) {
-    log.debug('🖼️  [IMAGE GEN] Found', candidate.content.parts.length, 'parts in candidate');
     for (const part of candidate.content.parts) {
-      log.debug('🖼️  [IMAGE GEN] Part keys:', Object.keys(part));
       // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API may vary
       const inlineData = part.inlineData || part.inline_data;
       if (inlineData && inlineData.data) {
@@ -763,20 +726,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       }
     }
   } else {
-    log.error('❌ [IMAGE GEN] Unexpected candidate structure. Keys:', Object.keys(candidate));
-    // Log the finishReason and finishMessage to understand why image was blocked
-    if (candidate.finishReason) {
-      log.error('🚫 [IMAGE GEN] FINISH REASON:', candidate.finishReason);
-    }
-    if (candidate.finishMessage) {
-      log.error('🚫 [IMAGE GEN] FINISH MESSAGE:', candidate.finishMessage);
-    }
-    // Log the full candidate for debugging
-    log.error('🚫 [IMAGE GEN] FULL CANDIDATE DUMP:', JSON.stringify(candidate, null, 2));
-
-    // Throw with more context about why it failed
     const reason = candidate.finishReason || 'unknown';
     const message = candidate.finishMessage || 'no message';
+    log.error(`❌ [IMAGE GEN] Image blocked: reason=${reason}, message=${message}`);
     throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
   }
 
@@ -862,7 +814,6 @@ async function editImageWithPrompt(imageData, editInstruction) {
       log.debug(`✏️  [IMAGE EDIT] Found ${responseParts.length} parts in response`);
 
       for (const part of responseParts) {
-        log.debug('✏️  [IMAGE EDIT] Part keys:', Object.keys(part));
         // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API varies
         const inlineData = part.inlineData || part.inline_data;
         if (inlineData && inlineData.data) {
@@ -871,17 +822,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
           console.log(`✅ [IMAGE EDIT] Successfully edited image`);
           return { imageData: editedImageData };
         }
-        if (part.text) {
-          log.debug('✏️  [IMAGE EDIT] Text response:', part.text.substring(0, 200));
-        }
       }
-    } else if (data.candidates && data.candidates[0]) {
-      const candidate = data.candidates[0];
-      log.debug('✏️  [IMAGE EDIT] Candidate structure:', {
-        hasContent: !!candidate.content,
-        finishReason: candidate.finishReason,
-        finishMessage: candidate.finishMessage
-      });
     }
 
     log.warn('⚠️  [IMAGE EDIT] No edited image in response');
