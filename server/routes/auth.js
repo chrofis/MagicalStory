@@ -10,7 +10,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
-const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool } = require('../services/database');
 const { authenticateToken, generateToken, JWT_SECRET } = require('../middleware/auth');
 const { authLimiter, registerLimiter, passwordResetLimiter } = require('../middleware/rateLimit');
 const { validateBody, schemas, sanitizeString } = require('../middleware/validation');
