@@ -345,6 +345,20 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       };
     }
 
+    // Parse "Score: X/10" format (new simplified format)
+    const score10Match = responseText.match(/Score:\s*(\d+)\/10\b/i);
+    if (score10Match) {
+      const rawScore = parseInt(score10Match[1]);
+      const score = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
+      log.verbose(`⭐ [QUALITY] Image quality score: ${rawScore}/10 (${score}/100)`);
+      return {
+        score,
+        reasoning: responseText,
+        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+        modelId: modelId
+      };
+    }
+
     // Fallback: Parse legacy format "Score: XX/100"
     const scoreMatch = responseText.match(/Score:\s*(\d+)\/100/i);
     if (scoreMatch) {
