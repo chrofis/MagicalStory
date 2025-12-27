@@ -48,10 +48,20 @@ const aiProxyLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Password reset rate limiter (prevent enumeration and abuse)
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // Max 3 password reset requests per hour per IP
+  message: { error: 'Too many password reset attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   authLimiter,
   registerLimiter,
   apiLimiter,
   storyGenerationLimiter,
-  aiProxyLimiter
+  aiProxyLimiter,
+  passwordResetLimiter
 };

@@ -3503,9 +3503,12 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.clothing) {
           analyzerData.attributes.clothing = traits.clothing;
         }
-        // Clothing colors (separate from full description - used for avatar color matching)
-        if (traits.clothingColors) {
-          analyzerData.attributes.clothingColors = traits.clothingColors;
+        // Clothing style (colors + patterns - used for avatar style matching)
+        if (traits.clothingStyle) {
+          analyzerData.attributes.clothingStyle = traits.clothingStyle;
+        } else if (traits.clothingColors) {
+          // Backward compatibility
+          analyzerData.attributes.clothingStyle = traits.clothingColors;
         }
       }
 

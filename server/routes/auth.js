@@ -12,7 +12,7 @@ const crypto = require('crypto');
 
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken, generateToken, JWT_SECRET } = require('../middleware/auth');
-const { authLimiter, registerLimiter } = require('../middleware/rateLimit');
+const { authLimiter, registerLimiter, passwordResetLimiter } = require('../middleware/rateLimit');
 const { validateBody, schemas, sanitizeString } = require('../middleware/validation');
 const { log } = require('../utils/logger');
 
@@ -318,7 +318,7 @@ router.post('/firebase', authLimiter, async (req, res) => {
 });
 
 // POST /api/auth/reset-password - Request password reset
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', passwordResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -364,7 +364,7 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // POST /api/auth/reset-password/confirm - Confirm password reset
-router.post('/reset-password/confirm', async (req, res) => {
+router.post('/reset-password/confirm', passwordResetLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
 

@@ -15,6 +15,6 @@ Return a JSON object with this EXACT structure:
     "hair": "<specific color, length, specific hairstyle, texture (e.g., long, brown, ponytail)>",
     "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>",
     "clothing": "<brief description of what they are wearing in the photo>",
-    "clothingColors": "<ONLY the main colors of their clothing, e.g. 'black and white', 'navy blue', 'red with yellow stripes'>"
+    "clothingStyle": "<colors AND patterns/prints of their clothing, e.g. 'black with dinosaur print', 'navy blue with white stripes', 'red plaid', 'pink with floral pattern'>"
   }
 }

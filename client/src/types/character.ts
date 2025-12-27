@@ -49,7 +49,7 @@ export interface CharacterAvatars {
 // Clothing information
 export interface CharacterClothing {
   current?: string;  // What they're wearing in the reference photo
-  colors?: string;   // Main colors of their clothing (e.g. "black and white", "navy blue")
+  style?: string;    // Colors AND patterns (e.g. "black with dinosaur print", "navy blue with white stripes")
 }
 
 // Generated outfit for a specific page

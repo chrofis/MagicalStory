@@ -492,13 +492,13 @@ export function CharacterForm({
               onCancel={cancelStyleEdit}
             />
             <EditableStyleField
-              label={language === 'de' ? 'Kleidungsfarben' : language === 'fr' ? 'Couleurs des vêtements' : 'Clothing Colors'}
-              value={character.clothing?.colors || ''}
-              placeholder={language === 'de' ? 'z.B. schwarz, blau gestreift' : language === 'fr' ? 'ex. noir, rayures bleues' : 'e.g. black, blue stripes'}
-              isEditing={editingStyleField === 'clothing.colors'}
+              label={language === 'de' ? 'Kleidungsstil' : language === 'fr' ? 'Style vestimentaire' : 'Clothing Style'}
+              value={character.clothing?.style || ''}
+              placeholder={language === 'de' ? 'z.B. schwarz mit Dino-Muster' : language === 'fr' ? 'ex. noir avec motif dinosaure' : 'e.g. black with dinosaur print'}
+              isEditing={editingStyleField === 'clothing.style'}
               editValue={editStyleValue}
               onEditValueChange={setEditStyleValue}
-              onStartEdit={() => handleStartEdit('clothing.colors', character.clothing?.colors || '')}
+              onStartEdit={() => handleStartEdit('clothing.style', character.clothing?.style || '')}
               onSave={saveStyleEdit}
               onCancel={cancelStyleEdit}
             />

@@ -309,9 +309,9 @@ router.get('/users/:userId/details', authenticateToken, requireAdmin, async (req
 
     // Run remaining queries in parallel for better performance
     const [storiesResult, characterCountResult, ordersResult, creditsResult] = await Promise.all([
-      // Get story count and list
+      // Get story count and list (limit to most recent 50)
       dbQuery(
-        `SELECT id, data, created_at FROM stories WHERE user_id = $1 ORDER BY created_at DESC`,
+        `SELECT id, data, created_at FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
         [targetUserId]
       ),
       // Count characters using database aggregation (avoids fetching all rows)
