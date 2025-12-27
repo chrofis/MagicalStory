@@ -1111,11 +1111,12 @@ export default function StoryWizard() {
 
   const generateStory = async (overrides?: { skipImages?: boolean; skipEmailCheck?: boolean }) => {
     console.log('[generateStory] Called with overrides:', overrides);
-    console.log('[generateStory] user:', user?.email, 'emailVerified:', user?.emailVerified);
+    console.log('[generateStory] user:', user?.email, 'emailVerified:', user?.emailVerified, 'isImpersonating:', isImpersonating);
 
     // Check email verification before generating (emailVerified could be false or undefined)
     // Skip this check if we just verified (skipEmailCheck=true) since React state may not have updated yet
-    if (!overrides?.skipEmailCheck && user && user.emailVerified !== true) {
+    // Also skip if admin is impersonating - they should be able to generate without the user's email being verified
+    if (!overrides?.skipEmailCheck && !isImpersonating && user && user.emailVerified !== true) {
       console.log('[generateStory] Email not verified, showing modal');
       // Store all story state so we can auto-generate after email verification
       localStorage.setItem('pendingStoryGeneration', 'true');
