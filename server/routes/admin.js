@@ -652,6 +652,7 @@ router.post('/impersonate/:userId', authenticateToken, requireAdmin, async (req,
     }
 
     log.info(`👤 [ADMIN] ${req.user.username} is impersonating user ${targetUser.username}`);
+    log.info(`👤 [ADMIN] [DEBUG] Impersonation token user ID: "${targetUser.id}" (type: ${typeof targetUser.id})`);
 
     const impersonationToken = jwt.sign(
       {
@@ -1546,12 +1547,12 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       ORDER BY s.created_at DESC
     `);
 
-    // Aggregate token usage
+    // Aggregate token usage (including thinking tokens for Gemini 2.5)
     const totals = {
-      anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
-      gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
-      gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-      gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+      anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+      gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+      gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+      gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 }
     };
 
     const byUser = {};
@@ -1573,6 +1574,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
             if (tokenUsage[provider]) {
               totals[provider].input_tokens += tokenUsage[provider].input_tokens || 0;
               totals[provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+              totals[provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
               totals[provider].calls += tokenUsage[provider].calls || 0;
             }
           }
@@ -1589,10 +1591,10 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               name: row.user_name,
               storyCount: 0,
               totalBookPages: 0,
-              anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+              anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 }
             };
           }
           byUser[userKey].storyCount++;
@@ -1601,6 +1603,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
             if (tokenUsage[provider]) {
               byUser[userKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
               byUser[userKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+              byUser[userKey][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
               byUser[userKey][provider].calls += tokenUsage[provider].calls || 0;
             }
           }
@@ -1611,10 +1614,10 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
             byStoryType[storyType] = {
               storyCount: 0,
               totalBookPages: 0,
-              anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+              anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 }
             };
           }
           byStoryType[storyType].storyCount++;
@@ -1623,6 +1626,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
             if (tokenUsage[provider]) {
               byStoryType[storyType][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
               byStoryType[storyType][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+              byStoryType[storyType][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
               byStoryType[storyType][provider].calls += tokenUsage[provider].calls || 0;
             }
           }
@@ -1633,10 +1637,10 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
             byMonth[monthKey] = {
               storyCount: 0,
               totalBookPages: 0,
-              anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-              gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 }
+              anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 }
             };
           }
           byMonth[monthKey].storyCount++;
@@ -1645,6 +1649,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
             if (tokenUsage[provider]) {
               byMonth[monthKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
               byMonth[monthKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+              byMonth[monthKey][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
               byMonth[monthKey][provider].calls += tokenUsage[provider].calls || 0;
             }
           }
@@ -1669,33 +1674,37 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       }
     }
 
-    // Calculate costs (approximate)
+    // Calculate costs (approximate) - thinking tokens billed at output rate for Gemini
     const costs = {
       anthropic: {
         input: (totals.anthropic.input_tokens / 1000000) * 3,
         output: (totals.anthropic.output_tokens / 1000000) * 15,
+        thinking: 0, // Anthropic doesn't have separate thinking tokens
         total: 0
       },
       gemini_text: {
         input: (totals.gemini_text.input_tokens / 1000000) * 0.075,
         output: (totals.gemini_text.output_tokens / 1000000) * 0.30,
+        thinking: (totals.gemini_text.thinking_tokens / 1000000) * 0.30,
         total: 0
       },
       gemini_image: {
         input: (totals.gemini_image.input_tokens / 1000000) * 0.075,
         output: (totals.gemini_image.output_tokens / 1000000) * 0.30,
+        thinking: (totals.gemini_image.thinking_tokens / 1000000) * 0.30,
         total: 0
       },
       gemini_quality: {
         input: (totals.gemini_quality.input_tokens / 1000000) * 0.075,
         output: (totals.gemini_quality.output_tokens / 1000000) * 0.30,
+        thinking: (totals.gemini_quality.thinking_tokens / 1000000) * 0.30,
         total: 0
       }
     };
     costs.anthropic.total = costs.anthropic.input + costs.anthropic.output;
-    costs.gemini_text.total = costs.gemini_text.input + costs.gemini_text.output;
-    costs.gemini_image.total = costs.gemini_image.input + costs.gemini_image.output;
-    costs.gemini_quality.total = costs.gemini_quality.input + costs.gemini_quality.output;
+    costs.gemini_text.total = costs.gemini_text.input + costs.gemini_text.output + costs.gemini_text.thinking;
+    costs.gemini_image.total = costs.gemini_image.input + costs.gemini_image.output + costs.gemini_image.thinking;
+    costs.gemini_quality.total = costs.gemini_quality.input + costs.gemini_quality.output + costs.gemini_quality.thinking;
     costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total;
 
     const totalBookPages = Object.values(byUser).reduce((sum, u) => sum + u.totalBookPages, 0);

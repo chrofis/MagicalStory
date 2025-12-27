@@ -39,6 +39,19 @@ export interface RetryAttempt {
   timestamp: string;
 }
 
+export interface RepairAttempt {
+  attempt: number;
+  errorType: string;
+  description: string;
+  boundingBox: number[];
+  fixPrompt: string;
+  maskImage?: string;
+  beforeImage?: string;
+  afterImage?: string | null;
+  success: boolean;
+  timestamp: string;
+}
+
 export interface ReferencePhoto {
   name: string;
   id: number;
@@ -81,6 +94,10 @@ export interface SceneImage {
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)
   imageVersions?: ImageVersion[];
+  // Auto-repair history (dev mode)
+  wasAutoRepaired?: boolean;
+  repairHistory?: RepairAttempt[];
+  repairedAt?: string;
 }
 
 export interface CoverImageData {

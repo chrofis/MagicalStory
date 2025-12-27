@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X, Images, RotateCcw } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X, Images, RotateCcw, Wrench, Loader } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt, ReferencePhoto, ImageVersion } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
@@ -233,6 +233,7 @@ interface StoryDisplayProps {
   onRegenerateCover?: (coverType: 'front' | 'back' | 'initial') => Promise<void>;
   onEditImage?: (pageNumber: number) => void;
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
+  onRepairImage?: (pageNumber: number) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
   developerMode?: boolean;
@@ -283,6 +284,7 @@ export function StoryDisplay({
   onRegenerateCover: _onRegenerateCover,
   onEditImage,
   onEditCover: _onEditCover,
+  onRepairImage,
   onVisualBibleChange,
   storyId,
   developerMode = false,
@@ -323,6 +325,9 @@ export function StoryDisplay({
   const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
+  // Auto-repair state (dev mode only)
+  const [repairingPage, setRepairingPage] = useState<number | null>(null);
+
   // Update edited story when story prop changes (e.g., after save)
   useEffect(() => {
     if (!isEditMode) {
@@ -348,6 +353,19 @@ export function StoryDisplay({
   const handleCancelEdit = () => {
     setEditedStory(story);
     setIsEditMode(false);
+  };
+
+  // Handle auto-repair image (dev mode)
+  const handleRepairImage = async (pageNumber: number) => {
+    if (!onRepairImage || repairingPage !== null) return;
+    setRepairingPage(pageNumber);
+    try {
+      await onRepairImage(pageNumber);
+    } catch (err) {
+      console.error('Failed to repair image:', err);
+    } finally {
+      setRepairingPage(null);
+    }
   };
 
   // Handle page text change - updates the specific page in editedStory
@@ -1537,6 +1555,87 @@ export function StoryDisplay({
                               </button>
                             )}
 
+                            {/* Auto-Repair button - dev only */}
+                            {onRepairImage && (
+                              <button
+                                onClick={() => handleRepairImage(pageNumber)}
+                                disabled={isGenerating || repairingPage !== null}
+                                className={`w-full bg-amber-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'
+                                }`}
+                                title={language === 'de' ? 'Physik-Fehler automatisch erkennen und reparieren' : language === 'fr' ? 'Détecter et réparer automatiquement les erreurs physiques' : 'Automatically detect and fix physics errors'}
+                              >
+                                {repairingPage === pageNumber ? (
+                                  <>
+                                    <Loader size={14} className="animate-spin" />
+                                    {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : 'Repairing...'}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Wrench size={14} />
+                                    {language === 'de' ? 'Auto-Reparatur' : language === 'fr' ? 'Auto-Réparation' : 'Auto-Repair'}
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            {/* Repair History - show if image was auto-repaired */}
+                            {image?.repairHistory && image.repairHistory.length > 0 && (
+                              <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900 flex items-center gap-2">
+                                  <Wrench size={14} />
+                                  {language === 'de' ? 'Reparatur-Historie' : language === 'fr' ? 'Historique de réparation' : 'Repair History'}
+                                  <span className="text-amber-600 font-normal">({image.repairHistory.length} {language === 'de' ? 'Reparaturen' : 'repairs'})</span>
+                                </summary>
+                                <div className="mt-3 space-y-3">
+                                  {image.repairHistory.map((repair: { attempt: number; errorType: string; description: string; fixPrompt: string; maskImage?: string; beforeImage?: string; afterImage?: string; success: boolean; timestamp: string }, idx: number) => (
+                                    <div key={idx} className={`border rounded-lg p-3 ${repair.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold text-sm">
+                                          {language === 'de' ? `Reparatur ${repair.attempt}` : `Repair ${repair.attempt}`}
+                                          <span className={`ml-2 text-xs ${repair.success ? 'text-green-600' : 'text-red-600'}`}>
+                                            ({repair.success ? '✓' : '✗'} {repair.errorType})
+                                          </span>
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-gray-600 mb-2">{repair.description}</p>
+                                      <details className="text-xs">
+                                        <summary className="cursor-pointer text-amber-700">
+                                          {language === 'de' ? 'Details anzeigen' : 'Show details'}
+                                        </summary>
+                                        <div className="mt-2 space-y-2">
+                                          <div className="bg-white p-2 rounded border">
+                                            <strong>{language === 'de' ? 'Fix-Anweisung:' : 'Fix instruction:'}</strong> {repair.fixPrompt}
+                                          </div>
+                                          {repair.maskImage && (
+                                            <div>
+                                              <strong className="block mb-1">{language === 'de' ? 'Maske:' : 'Mask:'}</strong>
+                                              <img src={repair.maskImage} alt="Repair mask" className="w-32 h-32 object-contain border rounded" />
+                                            </div>
+                                          )}
+                                          {repair.beforeImage && repair.afterImage && (
+                                            <div className="flex gap-2">
+                                              <div>
+                                                <strong className="block mb-1 text-xs">{language === 'de' ? 'Vorher:' : 'Before:'}</strong>
+                                                <img src={repair.beforeImage} alt="Before repair" className="w-24 h-24 object-cover border rounded" />
+                                              </div>
+                                              <div>
+                                                <strong className="block mb-1 text-xs">{language === 'de' ? 'Nachher:' : 'After:'}</strong>
+                                                <img src={repair.afterImage} alt="After repair" className="w-24 h-24 object-cover border rounded" />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </details>
+                                      <div className="text-xs text-gray-400 mt-1">
+                                        {new Date(repair.timestamp).toLocaleTimeString()}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+
                             {/* 1. Outline Extract */}
                             {getOutlineExtract(pageNumber) && (
                               <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
@@ -1752,6 +1851,87 @@ export function StoryDisplay({
                               >
                                 <Edit3 size={14} /> {language === 'de' ? 'Bearbeiten' : 'Edit'}
                               </button>
+                            )}
+
+                            {/* Auto-Repair button - dev only */}
+                            {onRepairImage && (
+                              <button
+                                onClick={() => handleRepairImage(pageNumber)}
+                                disabled={isGenerating || repairingPage !== null}
+                                className={`w-full bg-amber-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'
+                                }`}
+                                title={language === 'de' ? 'Physik-Fehler automatisch erkennen und reparieren' : language === 'fr' ? 'Détecter et réparer automatiquement les erreurs physiques' : 'Automatically detect and fix physics errors'}
+                              >
+                                {repairingPage === pageNumber ? (
+                                  <>
+                                    <Loader size={14} className="animate-spin" />
+                                    {language === 'de' ? 'Repariere...' : language === 'fr' ? 'Réparation...' : 'Repairing...'}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Wrench size={14} />
+                                    {language === 'de' ? 'Auto-Reparatur' : language === 'fr' ? 'Auto-Réparation' : 'Auto-Repair'}
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            {/* Repair History - show if image was auto-repaired */}
+                            {image?.repairHistory && image.repairHistory.length > 0 && (
+                              <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900 flex items-center gap-2">
+                                  <Wrench size={14} />
+                                  {language === 'de' ? 'Reparatur-Historie' : language === 'fr' ? 'Historique de réparation' : 'Repair History'}
+                                  <span className="text-amber-600 font-normal">({image.repairHistory.length} {language === 'de' ? 'Reparaturen' : 'repairs'})</span>
+                                </summary>
+                                <div className="mt-3 space-y-3">
+                                  {image.repairHistory.map((repair: { attempt: number; errorType: string; description: string; fixPrompt: string; maskImage?: string; beforeImage?: string; afterImage?: string; success: boolean; timestamp: string }, idx: number) => (
+                                    <div key={idx} className={`border rounded-lg p-3 ${repair.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold text-sm">
+                                          {language === 'de' ? `Reparatur ${repair.attempt}` : `Repair ${repair.attempt}`}
+                                          <span className={`ml-2 text-xs ${repair.success ? 'text-green-600' : 'text-red-600'}`}>
+                                            ({repair.success ? '✓' : '✗'} {repair.errorType})
+                                          </span>
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-gray-600 mb-2">{repair.description}</p>
+                                      <details className="text-xs">
+                                        <summary className="cursor-pointer text-amber-700">
+                                          {language === 'de' ? 'Details anzeigen' : 'Show details'}
+                                        </summary>
+                                        <div className="mt-2 space-y-2">
+                                          <div className="bg-white p-2 rounded border">
+                                            <strong>{language === 'de' ? 'Fix-Anweisung:' : 'Fix instruction:'}</strong> {repair.fixPrompt}
+                                          </div>
+                                          {repair.maskImage && (
+                                            <div>
+                                              <strong className="block mb-1">{language === 'de' ? 'Maske:' : 'Mask:'}</strong>
+                                              <img src={repair.maskImage} alt="Repair mask" className="w-32 h-32 object-contain border rounded" />
+                                            </div>
+                                          )}
+                                          {repair.beforeImage && repair.afterImage && (
+                                            <div className="flex gap-2">
+                                              <div>
+                                                <strong className="block mb-1 text-xs">{language === 'de' ? 'Vorher:' : 'Before:'}</strong>
+                                                <img src={repair.beforeImage} alt="Before repair" className="w-24 h-24 object-cover border rounded" />
+                                              </div>
+                                              <div>
+                                                <strong className="block mb-1 text-xs">{language === 'de' ? 'Nachher:' : 'After:'}</strong>
+                                                <img src={repair.afterImage} alt="After repair" className="w-24 h-24 object-cover border rounded" />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </details>
+                                      <div className="text-xs text-gray-400 mt-1">
+                                        {new Date(repair.timestamp).toLocaleTimeString()}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
                             )}
 
                             {/* 1. Outline Extract */}

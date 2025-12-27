@@ -39,6 +39,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
     log.debug(`📚 GET /api/stories - User: ${req.user.username}, limit: ${limit}, offset: ${offset}`);
+    log.debug(`📚 [DEBUG] Stories query user ID: "${req.user.id}" (type: ${typeof req.user.id})`);
     let userStories = [];
     let totalCount = 0;
 

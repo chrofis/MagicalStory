@@ -478,6 +478,48 @@ export const storyService = {
     return response;
   },
 
+  // Auto-repair image (detect and fix physics errors) - DEV ONLY
+  async repairImage(storyId: string, pageNumber: number): Promise<{
+    success: boolean;
+    repaired: boolean;
+    noErrorsFound: boolean;
+    imageData: string;
+    repairHistory: Array<{
+      attempt: number;
+      errorType: string;
+      description: string;
+      boundingBox: number[];
+      fixPrompt: string;
+      maskImage: string;
+      beforeImage: string;
+      afterImage: string | null;
+      success: boolean;
+      timestamp: string;
+    }>;
+  }> {
+    const response = await api.post<{
+      success: boolean;
+      repaired: boolean;
+      noErrorsFound: boolean;
+      imageData: string;
+      repairHistory: Array<{
+        attempt: number;
+        errorType: string;
+        description: string;
+        boundingBox: number[];
+        fixPrompt: string;
+        maskImage: string;
+        beforeImage: string;
+        afterImage: string | null;
+        success: boolean;
+        timestamp: string;
+      }>;
+    }>(
+      `/api/stories/${storyId}/repair/image/${pageNumber}`
+    );
+    return response;
+  },
+
   // AI Generation
   async callClaude(prompt: string, maxTokens = 8192): Promise<string> {
     const response = await api.post<{ content: string }>('/api/claude', {

@@ -299,6 +299,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
   let buffer = '';
   let inputTokens = 0;
   let outputTokens = 0;
+  let thinkingTokens = 0;
 
   try {
     while (true) {
@@ -339,6 +340,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
           if (event.usageMetadata) {
             inputTokens = event.usageMetadata.promptTokenCount || inputTokens;
             outputTokens = event.usageMetadata.candidatesTokenCount || outputTokens;
+            thinkingTokens = event.usageMetadata.thoughtsTokenCount || thinkingTokens;
           }
         } catch {
           // Skip malformed JSON
@@ -350,14 +352,16 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
   }
 
   if (inputTokens > 0 || outputTokens > 0) {
-    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
+    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
   }
 
   return {
     text: fullText,
     usage: {
       input_tokens: inputTokens,
-      output_tokens: outputTokens
+      output_tokens: outputTokens,
+      thinking_tokens: thinkingTokens
     },
     modelId
   };
@@ -365,6 +369,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
 
 /**
  * Call Google Gemini API for text generation
+ * Includes retry logic with fallback to gemini-2.0-flash on empty responses
  */
 async function callGeminiTextAPI(prompt, maxTokens, modelId) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -373,46 +378,71 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
     throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+  const callAPI = async (model) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: 0.7
+        }
+      })
+    });
+  };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        maxOutputTokens: maxTokens,
-        temperature: 0.7
-      }
-    })
-  });
+  let response = await callAPI(modelId);
 
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`Gemini API error (${response.status}): ${error}`);
   }
 
-  const data = await response.json();
+  let data = await response.json();
 
-  // Extract token usage
+  // Extract token usage (including thinking tokens for Gemini 2.5)
   const inputTokens = data.usageMetadata?.promptTokenCount || 0;
   const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
 
   if (inputTokens > 0 || outputTokens > 0) {
-    log.debug(`📊 [GEMINI] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
+    log.debug(`📊 [GEMINI] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
   }
 
+  // Check for empty/blocked response and retry with fallback model
   if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-    throw new Error('No text in Gemini response');
+    const blockReason = data.promptFeedback?.blockReason || 'empty response';
+
+    // Try fallback to gemini-2.0-flash if using a different model
+    if (modelId !== 'gemini-2.0-flash') {
+      log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with gemini-2.0-flash...`);
+      response = await callAPI('gemini-2.0-flash');
+
+      if (!response.ok) {
+        throw new Error('No text in Gemini response (fallback also failed)');
+      }
+
+      data = await response.json();
+
+      if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+        throw new Error('No text in Gemini response (both models failed)');
+      }
+    } else {
+      throw new Error('No text in Gemini response');
+    }
   }
 
   return {
     text: data.candidates[0].content.parts[0].text,
     usage: {
       input_tokens: inputTokens,
-      output_tokens: outputTokens
+      output_tokens: outputTokens,
+      thinking_tokens: thinkingTokens
     }
   };
 }

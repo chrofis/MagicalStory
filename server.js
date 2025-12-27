@@ -85,6 +85,7 @@ const {
   clearImageCache,
   deleteFromImageCache,
   compressImageToJPEG,
+  autoRepairImage,
   IMAGE_QUALITY_THRESHOLD
 } = require('./server/lib/images');
 const {
@@ -1616,15 +1617,21 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const pageNumber = parseInt(pageNum);
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
-    log.debug(`🔄 Regenerating image for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)${editedScene ? ' [EDITED SCENE]' : ''}`);
+    // Check if admin is impersonating - they get free regenerations
+    const isImpersonating = req.user.impersonating === true;
+    if (isImpersonating) {
+      log.info(`🔄 [IMPERSONATE] Admin regenerating image for story ${id}, page ${pageNumber} (FREE - impersonating)`);
+    } else {
+      log.debug(`🔄 Regenerating image for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)${editedScene ? ' [EDITED SCENE]' : ''}`);
+    }
 
-    // Check user credits first (-1 means infinite/unlimited)
+    // Check user credits first (-1 means infinite/unlimited, impersonating admins also skip)
     const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     const userCredits = userResult.rows[0].credits || 0;
-    const hasInfiniteCredits = userCredits === -1;
+    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
     if (!hasInfiniteCredits && userCredits < creditCost) {
       return res.status(402).json({
         error: 'Insufficient credits',
@@ -1802,7 +1809,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       [JSON.stringify(storyData), id]
     );
 
-    // Deduct credits after successful generation (skip for infinite credits)
+    // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
       await dbPool.query(
@@ -1816,6 +1823,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
         [req.user.id, -creditCost, newCredits, `Regenerate image for page ${pageNumber}`]
       );
       console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
+    } else if (isImpersonating) {
+      console.log(`✅ [IMPERSONATE] Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, FREE - admin impersonating)`);
     } else {
       console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, unlimited credits)`);
     }
@@ -1875,6 +1884,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       return res.status(400).json({ error: 'Invalid cover type. Must be: front, initial/initialPage, or back' });
     }
 
+    // Check if admin is impersonating - they get free regenerations
+    const isImpersonating = req.user.impersonating === true;
+
     // Check user credits before proceeding
     const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
     if (userResult.rows.length === 0) {
@@ -1882,7 +1894,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
     }
     const userCredits = userResult.rows[0].credits || 0;
     const requiredCredits = CREDIT_COSTS.IMAGE_REGENERATION;
-    const hasInfiniteCredits = userCredits === -1;
+    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
 
     if (!hasInfiniteCredits && userCredits < requiredCredits) {
       return res.status(402).json({
@@ -1892,7 +1904,11 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       });
     }
 
-    log.debug(`🔄 Regenerating ${normalizedCoverType} cover for story ${id} (user credits: ${hasInfiniteCredits ? 'unlimited' : userCredits})`);
+    if (isImpersonating) {
+      log.info(`🔄 [IMPERSONATE] Admin regenerating ${normalizedCoverType} cover for story ${id} (FREE - impersonating)`);
+    } else {
+      log.debug(`🔄 Regenerating ${normalizedCoverType} cover for story ${id} (user credits: ${hasInfiniteCredits ? 'unlimited' : userCredits})`);
+    }
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -2252,6 +2268,89 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
   } catch (err) {
     log.error('Error editing image:', err);
     res.status(500).json({ error: 'Failed to edit image: ' + err.message });
+  }
+});
+
+// Auto-repair image (detect and fix physics errors) - DEV ONLY
+app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+
+    // Admin-only endpoint (dev mode feature)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    log.info(`🔧 [REPAIR] Starting auto-repair for story ${id}, page ${pageNumber}`);
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
+
+    // Get the current image
+    const sceneImages = storyData.sceneImages || [];
+    const currentImage = sceneImages.find(img => img.pageNumber === pageNumber);
+
+    if (!currentImage || !currentImage.imageData) {
+      return res.status(404).json({ error: 'No image found for this page' });
+    }
+
+    // Run auto-repair (up to 2 attempts)
+    const repairResult = await autoRepairImage(currentImage.imageData, 2);
+
+    if (!repairResult) {
+      return res.status(500).json({ error: 'Auto-repair failed' });
+    }
+
+    // Update the image in story data if repaired
+    if (repairResult.repaired) {
+      const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
+      if (existingIndex >= 0) {
+        sceneImages[existingIndex] = {
+          ...sceneImages[existingIndex],
+          imageData: repairResult.imageData,
+          wasAutoRepaired: true,
+          repairHistory: repairResult.repairHistory,
+          repairedAt: new Date().toISOString()
+        };
+      }
+
+      // Save updated story
+      storyData.sceneImages = sceneImages;
+      await dbPool.query(
+        'UPDATE stories SET data = $1 WHERE id = $2',
+        [JSON.stringify(storyData), id]
+      );
+
+      log.info(`✅ [REPAIR] Image repaired for story ${id}, page ${pageNumber}`);
+    } else {
+      log.info(`ℹ️ [REPAIR] No repairs needed for story ${id}, page ${pageNumber}`);
+    }
+
+    res.json({
+      success: true,
+      pageNumber,
+      repaired: repairResult.repaired,
+      noErrorsFound: repairResult.noErrorsFound,
+      imageData: repairResult.imageData,
+      repairHistory: repairResult.repairHistory
+    });
+
+  } catch (err) {
+    log.error('Error in auto-repair:', err);
+    res.status(500).json({ error: 'Failed to auto-repair image: ' + err.message });
   }
 });
 

@@ -1842,6 +1842,36 @@ export default function StoryWizard() {
                 setEditPromptText('');
                 setEditModalOpen(true);
               }}
+              // Auto-repair image (dev mode only)
+              onRepairImage={storyId && user?.role === 'admin' ? async (pageNumber: number) => {
+                try {
+                  log.info('Starting auto-repair for page:', pageNumber);
+                  const result = await storyService.repairImage(storyId, pageNumber);
+
+                  if (result.repaired) {
+                    // Update the scene image with the repaired version
+                    setSceneImages(prev => prev.map(img => {
+                      if (img.pageNumber === pageNumber) {
+                        return {
+                          ...img,
+                          imageData: result.imageData,
+                          wasAutoRepaired: true,
+                          repairHistory: result.repairHistory,
+                          repairedAt: new Date().toISOString()
+                        };
+                      }
+                      return img;
+                    }));
+                    log.info('Auto-repair completed successfully:', { repaired: result.repaired, repairs: result.repairHistory.length });
+                  } else if (result.noErrorsFound) {
+                    log.info('No physics errors detected in the image');
+                    // Could show a toast/notification here
+                  }
+                } catch (error) {
+                  log.error('Auto-repair failed:', error);
+                  throw error;
+                }
+              } : undefined}
               // Story text editing
               onSaveStoryText={storyId ? async (text: string) => {
                 try {

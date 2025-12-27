@@ -1,0 +1,52 @@
+Analyze this children's book illustration for physics and visual errors.
+
+**SPECIFICALLY CHECK FOR:**
+
+1. **Slack ropes/strings**: Ropes, strings, or cords that should be taut but appear loose, wavy, or sagging when being pulled or held tight
+
+2. **Hand-object fusion**: Hands merging into objects they're holding with no clear boundary between skin and object material
+
+3. **Wrong facing direction**: Characters facing the camera/viewer when the scene context suggests they should be facing away (e.g., running away, leaving, watching something in the distance)
+
+4. **Gravity violations**: Heavy objects not causing visible strain on the holder, floating items that should fall, objects defying physics
+
+5. **Anatomical errors**: Extra/missing fingers (not exactly 5 per hand), extra/missing limbs, arms or legs at impossible angles
+
+6. **Material boundary issues**: Two touching objects with unclear separation (e.g., where does the sword end and the hand begin?)
+
+**OUTPUT FORMAT (JSON only):**
+
+If error found, return:
+```json
+{
+  "error_found": true,
+  "error_type": "slack_rope" | "hand_fusion" | "wrong_facing" | "gravity" | "anatomy" | "material_boundary",
+  "description": "Brief description of what's wrong",
+  "bounding_box": [ymin, xmin, ymax, xmax],
+  "fix_prompt": "Specific instruction to fix this error"
+}
+```
+
+If NO error found, return:
+```json
+{
+  "error_found": false
+}
+```
+
+**IMPORTANT NOTES:**
+
+- Bounding box coordinates are normalized 0-1000 (relative to image dimensions)
+  - Example: [250, 100, 750, 400] means top-left at 25% down/10% right, bottom-right at 75% down/40% right
+- Only report the SINGLE MOST SIGNIFICANT error if multiple exist
+- Be CONSERVATIVE - only flag CLEAR physics/visual violations
+- Artistic style choices are NOT errors (e.g., stylized proportions, cartoon physics that's intentional)
+- This is a children's book - minor imperfections are acceptable if the overall image works
+
+**FIX PROMPT EXAMPLES:**
+
+- For slack rope: "Make the rope taut and straight, pulled tight with visible tension"
+- For wrong facing: "Turn the character around to show their back, facing away from the viewer"
+- For hand fusion: "Add clear separation between the hand and the [object], showing distinct skin and [material] textures"
+- For anatomy: "Correct the hand to show exactly 5 fingers"
+- For gravity: "Show the character straining under the weight, with bent knees and visible effort"

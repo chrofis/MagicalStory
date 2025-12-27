@@ -266,7 +266,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            maxOutputTokens: 4000,  // Increased further to prevent MAX_TOKENS cutoff
+            maxOutputTokens: 16000,  // High limit to accommodate Gemini 2.5 thinking tokens
             temperature: 0.3
           },
           safetySettings: [
@@ -318,8 +318,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Extract and log token usage for quality evaluation
     const qualityInputTokens = data.usageMetadata?.promptTokenCount || 0;
     const qualityOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const qualityThinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
     if (qualityInputTokens > 0 || qualityOutputTokens > 0) {
-      log.verbose(`📊 [QUALITY] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}`);
+      const thinkingInfo = qualityThinkingTokens > 0 ? `, thinking: ${qualityThinkingTokens.toLocaleString()}` : '';
+      log.verbose(`📊 [QUALITY] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}${thinkingInfo}`);
     }
 
     // Fallback: If content was blocked and we haven't tried 2.0 yet
@@ -396,7 +398,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         analysis,
         evaluation,
         textIssue,
-        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
     }
@@ -410,7 +412,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       return {
         score,
         reasoning: responseText,
-        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
     }
@@ -423,7 +425,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       return {
         score,
         reasoning: responseText,
-        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
     }
@@ -435,7 +437,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       return {
         score: numericScore,
         reasoning: responseText,
-        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
     }
@@ -650,13 +652,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   const data = await response.json();
 
-  // Extract token usage from response
+  // Extract token usage from response (including thinking tokens for Gemini 2.5)
   const imageUsage = {
     input_tokens: data.usageMetadata?.promptTokenCount || 0,
-    output_tokens: data.usageMetadata?.candidatesTokenCount || 0
+    output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+    thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
   };
   if (imageUsage.input_tokens > 0 || imageUsage.output_tokens > 0) {
-    log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}`);
+    const thinkingInfo = imageUsage.thinking_tokens > 0 ? `, thinking: ${imageUsage.thinking_tokens.toLocaleString()}` : '';
+    log.debug(`📊 [IMAGE GEN] Token usage - input: ${imageUsage.input_tokens.toLocaleString()}, output: ${imageUsage.output_tokens.toLocaleString()}${thinkingInfo}`);
   }
 
   if (!data.candidates || data.candidates.length === 0) {
@@ -1057,6 +1061,362 @@ function getImageCacheSize() {
   return imageCache.size;
 }
 
+// ============================================
+// AUTO-REPAIR (INPAINTING) FUNCTIONS
+// ============================================
+
+/**
+ * Inspect an image for physics/visual errors using Gemini Flash
+ * @param {string} imageData - Base64 image data URL
+ * @returns {Promise<{errorFound: boolean, errorType?: string, description?: string, boundingBox?: number[], fixPrompt?: string}>}
+ */
+async function inspectImageForErrors(imageData) {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key not configured');
+    }
+
+    log.debug('🔍 [INSPECT] Analyzing image for physics errors...');
+
+    // Extract base64 and mime type
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Load the inspection prompt
+    const inspectionPrompt = PROMPT_TEMPLATES.imageInspection ||
+      'Analyze this image for physics errors. Return JSON with error_found (boolean), error_type, description, bounding_box [ymin,xmin,ymax,xmax], and fix_prompt.';
+
+    // Build parts array
+    const parts = [
+      { text: inspectionPrompt },
+      {
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      }
+    ];
+
+    // Use Gemini 2.0 Flash for fast analysis
+    const modelId = 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1024
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      log.error('❌ [INSPECT] Gemini API error:', error);
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Extract text response
+    if (data.candidates && data.candidates[0]?.content?.parts) {
+      const textPart = data.candidates[0].content.parts.find(p => p.text);
+      if (textPart) {
+        const responseText = textPart.text.trim();
+        log.debug('🔍 [INSPECT] Raw response:', responseText.substring(0, 300));
+
+        // Parse JSON from response (handle markdown code blocks)
+        let jsonStr = responseText;
+        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+          jsonStr = jsonMatch[1].trim();
+        }
+
+        try {
+          const result = JSON.parse(jsonStr);
+
+          if (result.error_found) {
+            log.info(`🔍 [INSPECT] Error detected: ${result.error_type} - ${result.description}`);
+            return {
+              errorFound: true,
+              errorType: result.error_type,
+              description: result.description,
+              boundingBox: result.bounding_box,
+              fixPrompt: result.fix_prompt
+            };
+          } else {
+            log.info('🔍 [INSPECT] No errors detected');
+            return { errorFound: false };
+          }
+        } catch (parseError) {
+          log.warn('⚠️ [INSPECT] Failed to parse JSON response:', parseError.message);
+          return { errorFound: false };
+        }
+      }
+    }
+
+    log.warn('⚠️ [INSPECT] No valid response from inspection');
+    return { errorFound: false };
+  } catch (error) {
+    log.error('❌ [INSPECT] Error inspecting image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get image dimensions from base64 data
+ * @param {string} imageData - Base64 image data URL
+ * @returns {Promise<{width: number, height: number}>}
+ */
+async function getImageDimensions(imageData) {
+  const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const buffer = Buffer.from(base64Data, 'base64');
+  const metadata = await sharp(buffer).metadata();
+  return { width: metadata.width, height: metadata.height };
+}
+
+/**
+ * Create a black/white mask from bounding box coordinates
+ * @param {number} width - Image width in pixels
+ * @param {number} height - Image height in pixels
+ * @param {number[]} boundingBox - [ymin, xmin, ymax, xmax] normalized 0-1000
+ * @returns {Promise<string>} Base64 mask image (black background, white rectangle)
+ */
+async function createMaskFromBoundingBox(width, height, boundingBox) {
+  const [ymin, xmin, ymax, xmax] = boundingBox;
+
+  // Convert normalized coordinates (0-1000) to pixel coordinates
+  const left = Math.floor((xmin / 1000) * width);
+  const top = Math.floor((ymin / 1000) * height);
+  const rectWidth = Math.floor(((xmax - xmin) / 1000) * width);
+  const rectHeight = Math.floor(((ymax - ymin) / 1000) * height);
+
+  log.debug(`🎭 [MASK] Creating mask: ${width}x${height}, box: [${left},${top},${rectWidth},${rectHeight}]`);
+
+  // Create black background
+  const blackBackground = await sharp({
+    create: {
+      width: width,
+      height: height,
+      channels: 3,
+      background: { r: 0, g: 0, b: 0 }
+    }
+  }).png().toBuffer();
+
+  // Create white rectangle
+  const whiteRect = await sharp({
+    create: {
+      width: rectWidth,
+      height: rectHeight,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 }
+    }
+  }).png().toBuffer();
+
+  // Composite white rectangle onto black background
+  const maskBuffer = await sharp(blackBackground)
+    .composite([{
+      input: whiteRect,
+      left: left,
+      top: top
+    }])
+    .png()
+    .toBuffer();
+
+  const maskBase64 = `data:image/png;base64,${maskBuffer.toString('base64')}`;
+  log.debug('🎭 [MASK] Mask created successfully');
+
+  return maskBase64;
+}
+
+/**
+ * Inpaint an image using a mask and fix prompt
+ * @param {string} originalImage - Base64 original image
+ * @param {string} maskImage - Base64 mask (white = area to fix)
+ * @param {string} fixPrompt - Instruction for what to fix
+ * @returns {Promise<{imageData: string}|null>}
+ */
+async function inpaintWithMask(originalImage, maskImage, fixPrompt) {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key not configured');
+    }
+
+    log.debug(`🔧 [INPAINT] Inpainting with prompt: "${fixPrompt}"`);
+
+    // Extract base64 and mime type for original image
+    const origBase64 = originalImage.replace(/^data:image\/\w+;base64,/, '');
+    const origMimeType = originalImage.match(/^data:(image\/\w+);base64,/) ?
+      originalImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Extract base64 for mask
+    const maskBase64 = maskImage.replace(/^data:image\/\w+;base64,/, '');
+
+    // Build the inpainting prompt
+    const inpaintPrompt = `Edit this image. The white area in the mask shows what needs to be changed.
+
+CHANGE ONLY THE MASKED AREA: ${fixPrompt}
+
+Keep everything outside the masked area exactly the same. Maintain the same art style and colors.`;
+
+    // Build parts array: prompt, original image, mask
+    const parts = [
+      { text: inpaintPrompt },
+      {
+        inline_data: {
+          mime_type: origMimeType,
+          data: origBase64
+        }
+      },
+      { text: '[MASK - white area shows what to edit]:' },
+      {
+        inline_data: {
+          mime_type: 'image/png',
+          data: maskBase64
+        }
+      }
+    ];
+
+    // Use Gemini 2.5 Flash Image for editing
+    const modelId = 'gemini-2.5-flash-image';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          responseModalities: ["TEXT", "IMAGE"],
+          temperature: 0.6
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      log.error('❌ [INPAINT] Gemini API error:', error);
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Extract the edited image from the response
+    if (data.candidates && data.candidates[0]?.content?.parts) {
+      const responseParts = data.candidates[0].content.parts;
+
+      for (const part of responseParts) {
+        const inlineData = part.inlineData || part.inline_data;
+        if (inlineData && inlineData.data) {
+          const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+          const editedImageData = `data:${respMimeType};base64,${inlineData.data}`;
+          log.info('✅ [INPAINT] Successfully inpainted image');
+          return { imageData: editedImageData };
+        }
+      }
+    }
+
+    log.warn('⚠️ [INPAINT] No edited image in response');
+    return null;
+  } catch (error) {
+    log.error('❌ [INPAINT] Error inpainting image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Auto-repair an image by detecting and fixing physics errors
+ * Runs up to maxAttempts cycles of inspect → mask → fix
+ * @param {string} imageData - Base64 image data URL
+ * @param {number} maxAttempts - Maximum repair cycles (default 2)
+ * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
+ */
+async function autoRepairImage(imageData, maxAttempts = 2) {
+  const repairHistory = [];
+  let currentImage = imageData;
+
+  log.info(`🔄 [AUTO-REPAIR] Starting auto-repair (max ${maxAttempts} attempts)...`);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    log.debug(`🔄 [AUTO-REPAIR] Attempt ${attempt}/${maxAttempts}`);
+
+    // 1. Inspect the image for errors
+    const inspection = await inspectImageForErrors(currentImage);
+
+    if (!inspection.errorFound) {
+      log.info(`✅ [AUTO-REPAIR] No errors found after ${attempt - 1} repairs`);
+      return {
+        imageData: currentImage,
+        repaired: attempt > 1,
+        noErrorsFound: true,
+        repairHistory
+      };
+    }
+
+    // 2. Get image dimensions and create mask
+    const dimensions = await getImageDimensions(currentImage);
+    const mask = await createMaskFromBoundingBox(
+      dimensions.width,
+      dimensions.height,
+      inspection.boundingBox
+    );
+
+    // 3. Inpaint the masked area
+    const repaired = await inpaintWithMask(
+      currentImage,
+      mask,
+      inspection.fixPrompt
+    );
+
+    if (!repaired || !repaired.imageData) {
+      log.warn(`⚠️ [AUTO-REPAIR] Inpainting failed at attempt ${attempt}`);
+      repairHistory.push({
+        attempt,
+        errorType: inspection.errorType,
+        description: inspection.description,
+        boundingBox: inspection.boundingBox,
+        fixPrompt: inspection.fixPrompt,
+        maskImage: mask,
+        beforeImage: currentImage,
+        afterImage: null,
+        success: false,
+        timestamp: new Date().toISOString()
+      });
+      break;
+    }
+
+    // Record the repair
+    repairHistory.push({
+      attempt,
+      errorType: inspection.errorType,
+      description: inspection.description,
+      boundingBox: inspection.boundingBox,
+      fixPrompt: inspection.fixPrompt,
+      maskImage: mask,
+      beforeImage: currentImage,
+      afterImage: repaired.imageData,
+      success: true,
+      timestamp: new Date().toISOString()
+    });
+
+    currentImage = repaired.imageData;
+    log.info(`✅ [AUTO-REPAIR] Repair ${attempt} complete: fixed ${inspection.errorType}`);
+  }
+
+  return {
+    imageData: currentImage,
+    repaired: repairHistory.length > 0 && repairHistory.some(r => r.success),
+    noErrorsFound: false,
+    repairHistory
+  };
+}
+
 module.exports = {
   // Utility functions
   hashImageData,
@@ -1075,6 +1435,12 @@ module.exports = {
   clearImageCache,
   deleteFromImageCache,
   getImageCacheSize,
+
+  // Auto-repair functions
+  inspectImageForErrors,
+  createMaskFromBoundingBox,
+  inpaintWithMask,
+  autoRepairImage,
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD

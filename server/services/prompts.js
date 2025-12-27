@@ -42,6 +42,8 @@ async function loadPromptTemplates() {
     // Visual Bible and editing prompts
     PROMPT_TEMPLATES.visualBibleAnalysis = await fs.readFile(path.join(promptsDir, 'visual-bible-analysis.txt'), 'utf-8');
     PROMPT_TEMPLATES.illustrationEdit = await fs.readFile(path.join(promptsDir, 'illustration-edit.txt'), 'utf-8');
+    // Auto-repair / Inpainting prompt
+    PROMPT_TEMPLATES.imageInspection = await fs.readFile(path.join(promptsDir, 'image-inspection.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
