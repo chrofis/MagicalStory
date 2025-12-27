@@ -1160,6 +1160,22 @@ async function initializeDatabase() {
       END $$;
     `);
 
+    // Add idempotency_key column for preventing duplicate job creation
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='story_jobs' AND column_name='idempotency_key') THEN
+          ALTER TABLE story_jobs ADD COLUMN idempotency_key VARCHAR(100);
+        END IF;
+      END $$;
+    `);
+    // Create unique index on user_id + idempotency_key (only where key is not null)
+    await dbPool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_story_jobs_idempotency
+      ON story_jobs(user_id, idempotency_key)
+      WHERE idempotency_key IS NOT NULL
+    `);
+
     // Story job checkpoints for fault tolerance and intermediate data access
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS story_job_checkpoints (
