@@ -4,9 +4,14 @@ import logger from '@/services/logger';
 import storage, { STORAGE_KEYS } from '@/services/storage';
 import { signInWithGoogle, getIdToken, firebaseSignOut, handleRedirectResult, type FirebaseUser } from '@/services/firebase';
 
+interface BotProtectionData {
+  website?: string;
+  _formStartTime?: number;
+}
+
 interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, email?: string) => Promise<void>;
+  register: (username: string, password: string, email?: string, botProtection?: BotProtectionData) => Promise<void>;
   loginWithGoogle: (redirectUrl?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -246,11 +251,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logger.success(`Logged in as ${user.username} (${user.role})`);
   }, [saveAuthData]);
 
-  const register = useCallback(async (username: string, password: string, email?: string) => {
+  const register = useCallback(async (username: string, password: string, email?: string, botProtection?: BotProtectionData) => {
     const response = await fetch(`${API_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, email }),
+      body: JSON.stringify({
+        username,
+        password,
+        email,
+        // Bot protection fields
+        website: botProtection?.website,
+        _formStartTime: botProtection?._formStartTime,
+      }),
     });
 
     if (!response.ok) {

@@ -1,12 +1,17 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { Alert } from '@/components/common/Alert';
 import GoogleIcon from './GoogleIcon';
 
+interface BotProtectionData {
+  website?: string;
+  _formStartTime?: number;
+}
+
 interface RegisterFormProps {
-  onSubmit: (email: string, password: string) => Promise<void>;
+  onSubmit: (email: string, password: string, botProtection?: BotProtectionData) => Promise<void>;
   onGoogleSignIn: () => Promise<void>;
   onSwitchToLogin: () => void;
   error?: string;
@@ -27,6 +32,8 @@ export function RegisterForm({
   const { t } = useLanguage();
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
+  const [honeypot, setHoneypot] = useState('');
+  const formStartTime = useRef(Date.now());
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
@@ -35,7 +42,10 @@ export function RegisterForm({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    await onSubmit(email, password);
+    await onSubmit(email, password, {
+      website: honeypot,
+      _formStartTime: formStartTime.current,
+    });
   };
 
   return (
@@ -75,6 +85,18 @@ export function RegisterForm({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Honeypot field - hidden from users, bots will fill it */}
+        <div className="absolute -left-[9999px]" aria-hidden="true">
+          <input
+            type="text"
+            name="website"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+          />
+        </div>
+
         <Input
           type="email"
           label={t.email}

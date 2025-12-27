@@ -9,55 +9,90 @@ This is a quality assurance check for a personalized children's book service. Yo
 - This style transformation is INTENTIONAL and EXPECTED
 - Do NOT penalize for the artistic style being different from the photos
 - Characters should be RECOGNIZABLE (same identity, hair color, approximate age, general features) but in the requested art style
-- Clothing may vary by scene - only penalize if prompt specifically describes clothing that's missing
+- NOT ALL reference photos need to appear in every scene - check the PROMPT to see who should be present
 
 **INPUTS**
 1. GENERATED_IMAGE (the illustration to evaluate)
 2. USER_PROMPT: "{ORIGINAL_PROMPT}"
-3. REF_IMAGES (real photos of characters to compare against)
+3. REF_IMAGES (real photos of characters - NOT all may appear in this scene)
 
-**EVALUATION CRITERIA**
-1. Character Count - Correct number of people? No missing, no duplicates.
-2. Recognizability - Each character recognizable from reference (hair, skin, gender, age)?
-3. No Artifacts - No extra fingers, melted faces, floating limbs, crossed eyes?
-4. Style Consistency - All characters in same art style?
-5. Prompt Adherence - Scene matches what was requested?
+---
+
+**STEP 1: DESCRIBE VISIBLE CHARACTERS (do this FIRST, before looking at references)**
+
+Look ONLY at the generated image. For EACH distinct person/character visible, describe:
+- Position in scene (left, center, right, foreground, background)
+- Approximate age (toddler/child ~Xyo/teen/adult/elderly)
+- Gender (boy/girl/man/woman)
+- Build (slim, average, stocky)
+- Hair (color, length, style)
+- What they are doing (action/pose)
+- Camera angle (front view, side view, back view, 3/4 view)
+
+You MUST describe each character individually. Do not just state a count.
+
+---
+
+**STEP 2: MATCH VISIBLE CHARACTERS TO REFERENCES**
+
+For each character you described in Step 1, identify which reference photo they match:
+- State which reference photo (by name if in prompt, or by order "reference 1, 2, 3...")
+- Explain why: matching hair, face shape, age, gender
+- If no match: state "no matching reference" or "extra character"
+
+**CAMERA ANGLE RULES FOR CLOTHING:**
+- BACK VIEW: Only verify clothing COLOR (cannot see prints, logos, patterns on front)
+- SIDE VIEW: Partial clothing details visible
+- FRONT VIEW: Full clothing verification possible
+Do NOT penalize for missing prints/patterns when character is seen from behind.
+
+---
+
+**STEP 3: CHECK FOR ISSUES**
+
+1. Artifacts - Extra fingers, melted faces, floating limbs, crossed eyes, merged bodies?
+2. Missing Characters - Is anyone mentioned in the PROMPT missing from the image?
+3. Style Consistency - All characters in same art style?
+4. Prompt Adherence - Does scene match what was requested?
+
+---
 
 **SCORING GUIDE (0-10)**
-- 10: Perfect. All characters recognizable, no artifacts, scene matches prompt.
-- 8-9: Good. Minor style/clothing deviations.
+- 10: Perfect. All expected characters present and recognizable, no artifacts.
+- 8-9: Good. Minor issues (slight style variation, minor clothing difference).
 - 5-7: Acceptable. Characters resemble references but some details wrong.
-- 3-4: Poor. One major issue (wrong count, unrecognizable character).
+- 3-4: Poor. One major issue (missing expected character, unrecognizable character, bad artifact).
 - 1-2: Bad. Multiple major issues.
-- 0: Severe artifacts or completely wrong.
+- 0: Severe artifacts or completely wrong scene.
 
 **VERDICT**
 - PASS: Score 5+ (usable image)
 - SOFT_FAIL: Score 3-4 (consider retry)
 - HARD_FAIL: Score 0-2 (must retry)
 
+---
+
 **OUTPUT FORMAT**
 
-Scene: [Brief description of the setting/location]
+Step 1 - Visible Characters:
+1. [position] - [age], [gender], [build], [hair description], [action], [camera angle]
+2. [position] - [age], [gender], [build], [hair description], [action], [camera angle]
+(continue for each visible character)
 
-Characters:
-- [Name/Role]: [What they're doing, where in the scene, recognizable? matches reference?]
-- [Name/Role]: [What they're doing, where in the scene, recognizable? matches reference?]
+Step 2 - Reference Matching:
+1. [brief description] → matches [reference name/number] because [reason]
+2. [brief description] → matches [reference name/number] because [reason]
 
-Fixes needed: [List specific, actionable fixes - or "None"]
-- [e.g., "Remove extra finger on Sophie's left hand"]
-- [e.g., "Change Max's hair from blonde to brown to match reference"]
-- [e.g., "Add missing character Emma on the right side of the scene"]
+Issues Found:
+- [List specific issues - or "None"]
 
 Score: [0-10]/10
 Verdict: [PASS/SOFT_FAIL/HARD_FAIL]
 
-FIX_TARGETS: [Only include if Score < 8 and there are fixable issues. One JSON object per line.]
-{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief issue description", "fix": "what to draw instead"}
+FIX_TARGETS: [Only if Score < 8 and fixable issues exist]
+{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief issue", "fix": "what to draw instead"}
 
 **BOUNDING BOX FORMAT:**
 - Coordinates are normalized 0.0-1.0 (not pixels)
 - Format: [ymin, xmin, ymax, xmax] where 0,0 is top-left
-- Example: {"bbox": [0.4, 0.2, 0.6, 0.4], "issue": "extra finger", "fix": "Draw a natural 5-fingered hand"}
-- Example: {"bbox": [0.1, 0.5, 0.3, 0.8], "issue": "elephant in wrong position", "fix": "Move elephant under left arm"}
-- Only include issues that can be fixed by redrawing a region (not global issues like "wrong art style")
+- Only include issues fixable by redrawing a region

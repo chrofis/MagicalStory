@@ -73,11 +73,11 @@ export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModal
     }
   };
 
-  const handleRegister = async (email: string, password: string) => {
+  const handleRegister = async (email: string, password: string, botProtection?: { website?: string; _formStartTime?: number }) => {
     setError('');
     setIsLoading(true);
     try {
-      await register(email, password);
+      await register(email, password, undefined, botProtection);
       // After registration, login automatically happens in register()
       handleLoginSuccess();
     } catch (err) {
