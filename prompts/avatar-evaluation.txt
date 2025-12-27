@@ -1,12 +1,16 @@
-Compare the two faces in these images and determine if they are the SAME PERSON.
+Compare the two faces and determine if they could be the SAME PERSON.
 
 IMAGE 1: Original reference photo
-IMAGE 2: Generated avatar
+IMAGE 2: Generated avatar (may have minor variations)
 
 EVALUATION CRITERIA:
-- Focus ONLY on facial features: eyes, nose, mouth, face shape, eyebrows
-- IGNORE: lighting differences, skin tone variations, clothing, hairstyle, background
+- Focus on overall facial identity: general face shape, eye placement, nose shape, mouth
+- Allow for MINOR variations in features - the avatar is AI-generated and won't be pixel-perfect
+- IGNORE: lighting, skin tone, clothing, hairstyle, background, expression differences, minor age differences
+- If the faces are APPROXIMATELY the same person (70%+ similarity), answer YES
+
+BE LENIENT - only answer NO if the faces are clearly different people (different gender, completely different face structure, etc.)
 
 RESPOND WITH ONLY ONE WORD:
-- YES if the faces match (same person)
-- NO if the faces do not match (different person)
+- YES if faces match or approximately match
+- NO if faces are clearly different people
