@@ -1208,27 +1208,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       };
     }
 
-    // Check if quality is good enough (and no text errors for covers)
-    if (score >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
-      console.log(`✅ [QUALITY RETRY] Success on attempt ${attempts}! Score ${score}% >= ${IMAGE_QUALITY_THRESHOLD}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}`);
-      return {
-        ...result,
-        wasRegenerated: attempts > 1,
-        retryHistory: retryHistory,
-        totalAttempts: attempts
-      };
-    }
-
-    // Log why we're retrying
-    if (hasTextError) {
-      log.debug(`⚠️  [QUALITY RETRY] Retrying due to text error: ${result.textIssue}`);
-    } else {
-      log.debug(`⚠️  [QUALITY RETRY] Score ${score}% < ${IMAGE_QUALITY_THRESHOLD}%, retrying...`);
-    }
-
-    // AUTO-REPAIR: If there are fix targets and not a text error, try repair before regenerating
-    if (!hasTextError && result.fixTargets && result.fixTargets.length > 0) {
-      log.info(`🔧 [QUALITY RETRY] Attempting auto-repair on ${result.fixTargets.length} fix targets before regeneration...`);
+    // AUTO-REPAIR: Run if score <= 90% AND there are fix targets (even if above regeneration threshold)
+    // This tries to improve the image before deciding whether to accept or regenerate
+    const AUTO_REPAIR_THRESHOLD = 90;
+    if (!hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0) {
+      log.info(`🔧 [QUALITY RETRY] Score ${score}% <= ${AUTO_REPAIR_THRESHOLD}%, attempting auto-repair on ${result.fixTargets.length} fix targets...`);
       try {
         const repairResult = await autoRepairWithTargets(
           result.imageData,
@@ -1239,6 +1223,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
         if (repairResult.repaired && repairResult.imageData !== result.imageData) {
           log.info(`✅ [QUALITY RETRY] Auto-repair completed, re-evaluating quality...`);
+
+          // Track usage from repair
+          if (usageTracker && repairResult.usage) {
+            usageTracker(repairResult.usage, null, repairResult.modelId, null);
+          }
 
           // Re-evaluate the repaired image
           const qualityModelOverride = modelOverrides?.qualityModel || null;
@@ -1254,7 +1243,12 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             const repairedScore = reEvalResult.score;
             log.info(`🔧 [QUALITY RETRY] Post-repair score: ${repairedScore}% (was ${score}%)`);
 
-            // Record repair attempt in history
+            // Track quality eval usage
+            if (usageTracker && reEvalResult.usage) {
+              usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
+            }
+
+            // Record repair attempt in history with usage
             retryHistory.push({
               attempt: attempts,
               type: 'auto_repair',
@@ -1262,37 +1256,33 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               postRepairScore: repairedScore,
               fixTargetsCount: result.fixTargets.length,
               imageData: repairResult.imageData,
+              repairUsage: repairResult.usage,
+              reEvalUsage: reEvalResult.usage,
               timestamp: new Date().toISOString()
             });
 
-            // If repair improved score above threshold, use repaired image
-            if (repairedScore >= IMAGE_QUALITY_THRESHOLD) {
-              log.info(`✅ [QUALITY RETRY] Auto-repair success! Score improved from ${score}% to ${repairedScore}%`);
-              return {
-                imageData: repairResult.imageData,
-                score: repairedScore,
-                reasoning: reEvalResult.reasoning,
-                wasRegenerated: attempts > 1,
-                wasRepaired: true,
-                retryHistory: retryHistory,
-                totalAttempts: attempts,
-                modelId: result.modelId,
-                qualityModelId: reEvalResult.modelId
-              };
-            }
-
-            // If repair improved score but not enough, update bestResult if better
-            if (repairedScore > bestScore) {
-              bestScore = repairedScore;
-              bestResult = {
+            // Update result with repaired image if improved
+            if (repairedScore > score) {
+              result = {
                 ...result,
                 imageData: repairResult.imageData,
                 score: repairedScore,
                 reasoning: reEvalResult.reasoning,
-                wasRepaired: true
+                wasRepaired: true,
+                fixTargets: reEvalResult.fixTargets || []  // Use new fix targets from re-eval
               };
+              score = repairedScore;  // Update score for threshold check
+              log.info(`✅ [QUALITY RETRY] Using repaired image (score improved from ${retryHistory[retryHistory.length - 1].preRepairScore}% to ${score}%)`);
+            }
+
+            // Update best result if this is now best
+            if (score > bestScore) {
+              bestScore = score;
+              bestResult = result;
             }
           }
+        } else {
+          log.info(`ℹ️  [QUALITY RETRY] Auto-repair did not change the image`);
         }
       } catch (repairError) {
         log.warn(`⚠️  [QUALITY RETRY] Auto-repair failed: ${repairError.message}`);
@@ -1303,6 +1293,24 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
           timestamp: new Date().toISOString()
         });
       }
+    }
+
+    // Check if quality is good enough (and no text errors for covers)
+    if (score >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
+      console.log(`✅ [QUALITY RETRY] Success on attempt ${attempts}! Score ${score}% >= ${IMAGE_QUALITY_THRESHOLD}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}${result.wasRepaired ? ' (after auto-repair)' : ''}`);
+      return {
+        ...result,
+        wasRegenerated: attempts > 1,
+        retryHistory: retryHistory,
+        totalAttempts: attempts
+      };
+    }
+
+    // Log why we're retrying
+    if (hasTextError) {
+      log.debug(`⚠️  [QUALITY RETRY] Retrying due to text error: ${result.textIssue}`);
+    } else {
+      log.debug(`⚠️  [QUALITY RETRY] Score ${score}% < ${IMAGE_QUALITY_THRESHOLD}%, retrying with new generation...`);
     }
   }
 
@@ -1688,13 +1696,21 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
     if (data.candidates && data.candidates[0]?.content?.parts) {
       const responseParts = data.candidates[0].content.parts;
 
+      // Extract token usage from response
+      const usageMetadata = data.usageMetadata || {};
+      const usage = {
+        input_tokens: usageMetadata.promptTokenCount || 0,
+        output_tokens: usageMetadata.candidatesTokenCount || 0,
+        thinking_tokens: usageMetadata.thoughtsTokenCount || 0
+      };
+
       for (const part of responseParts) {
         const inlineData = part.inlineData || part.inline_data;
         if (inlineData && inlineData.data) {
           const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
           const editedImageData = `data:${respMimeType};base64,${inlineData.data}`;
-          log.info('✅ [INPAINT] Successfully inpainted image');
-          return { imageData: editedImageData };
+          log.info(`✅ [INPAINT] Successfully inpainted image (tokens: ${usage.input_tokens} in, ${usage.output_tokens} out)`);
+          return { imageData: editedImageData, usage, modelId };
         }
       }
     }
@@ -1778,7 +1794,7 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
         timestamp: new Date().toISOString()
       });
     } else {
-      // Record successful combined repair
+      // Record successful combined repair with usage
       repairHistory.push({
         attempt: 1,
         errorType: 'combined-pre-computed',
@@ -1791,11 +1807,19 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
         success: true,
         skippedInspection: true,
         targetCount: fixTargets.length,
+        usage: repaired.usage,
+        modelId: repaired.modelId,
         timestamp: new Date().toISOString()
       });
 
       currentImage = repaired.imageData;
-      log.info(`✅ [AUTO-REPAIR] Fixed ${fixTargets.length} targets in ONE API call`);
+
+      // Log token usage for repair
+      if (repaired.usage) {
+        log.info(`✅ [AUTO-REPAIR] Fixed ${fixTargets.length} targets (tokens: ${repaired.usage.input_tokens} in, ${repaired.usage.output_tokens} out) [${repaired.modelId}]`);
+      } else {
+        log.info(`✅ [AUTO-REPAIR] Fixed ${fixTargets.length} targets in ONE API call`);
+      }
     }
   } catch (error) {
     log.error(`❌ [AUTO-REPAIR] Combined repair failed:`, error.message);
@@ -1820,13 +1844,26 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
   }
 
   const successCount = repairHistory.filter(r => r.success).length;
-  log.info(`✅ [AUTO-REPAIR] Targeted repair complete: ${successCount > 0 ? 'success' : 'failed'}`);
+
+  // Sum up total usage from all repair attempts
+  const totalUsage = repairHistory.reduce((acc, r) => {
+    if (r.usage) {
+      acc.input_tokens += r.usage.input_tokens || 0;
+      acc.output_tokens += r.usage.output_tokens || 0;
+      acc.thinking_tokens += r.usage.thinking_tokens || 0;
+    }
+    return acc;
+  }, { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 });
+
+  log.info(`✅ [AUTO-REPAIR] Targeted repair complete: ${successCount > 0 ? 'success' : 'failed'} (total tokens: ${totalUsage.input_tokens} in, ${totalUsage.output_tokens} out)`);
 
   return {
     imageData: currentImage,
     repaired: successCount > 0,
     noErrorsFound: false,
-    repairHistory
+    repairHistory,
+    usage: totalUsage,
+    modelId: repairHistory.find(r => r.modelId)?.modelId
   };
 }
 
