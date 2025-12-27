@@ -62,6 +62,18 @@ Include COMPLETE physical descriptions of all characters, objects, and locations
      - Good: "The rope is in the center of the scene running from top to bottom. The character is at the center bottom, pulling himself upwards on the rope"
      - Good: "The bird is at the right of the scene, flying towards the right as if leaving. The character is in the middle, turned to the right, watching the bird"
 
+**PHYSICS & CAMERA LOGIC:**
+- **Camera Orientation:**
+  - If characters are moving away from the viewer (running away, leaving): Use "Back view, seen from behind"
+  - If characters are interacting (fighting, talking, playing together): Use "Side profile view" or "Wide angle action shot"
+  - Never default to front-facing for action scenes
+- **Physics Enforcement:**
+  - Tension: If pulling/towing, add: "Taut rope," "Straight line tension," "Leaning body weight back"
+  - Gravity: If carrying heavy objects, add: "Posture straining," "Knees bent," "Heavy weight"
+- **Object Separation:**
+  - If two objects touch (hand holding tool, character gripping object), assign distinct materials/colors to define boundaries
+  - Example: "A [wooden-brown] stick in a [pink-skin] hand" (Use hyphens to bind attributes to objects)
+
 4. **Clothing:** Select ONE category that best matches the scene:
    - **winter** - Cold weather scenes (coats, scarves, boots)
    - **summer** - Warm weather scenes (t-shirts, shorts, light clothes)

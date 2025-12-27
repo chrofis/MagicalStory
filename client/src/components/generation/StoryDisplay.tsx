@@ -394,12 +394,34 @@ export function StoryDisplay({
     }
   };
 
+  // Extract just the Image Summary from a full scene description
+  const extractImageSummary = (fullDescription: string): string => {
+    if (!fullDescription) return '';
+
+    // Try to extract just the Image Summary section
+    // Format: "1.  **Image Summary**\n    [summary text]\n\n2.  **Setting"
+    const summaryMatch = fullDescription.match(/\*\*Image Summary\*\*\s*\n\s*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*|$)/i);
+    if (summaryMatch && summaryMatch[1]) {
+      return summaryMatch[1].trim();
+    }
+
+    // Fallback: if no Image Summary header, take first paragraph or first 500 chars
+    const firstParagraph = fullDescription.split(/\n\n/)[0];
+    if (firstParagraph && firstParagraph.length < 1000) {
+      return firstParagraph.trim();
+    }
+
+    return fullDescription.substring(0, 500).trim() + '...';
+  };
+
   // Open scene edit modal for regeneration
   const openSceneEditModal = (pageNumber: number) => {
     const image = sceneImages.find(img => img.pageNumber === pageNumber);
     const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
-    const currentScene = image?.description || sceneDesc?.description || '';
-    setSceneEditModal({ pageNumber, scene: currentScene });
+    const fullDescription = image?.description || sceneDesc?.description || '';
+    // Extract just the summary for editing
+    const summary = extractImageSummary(fullDescription);
+    setSceneEditModal({ pageNumber, scene: summary });
   };
 
   // Handle regenerate with edited scene
