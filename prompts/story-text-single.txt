@@ -13,6 +13,21 @@ Your task is to create a complete, compelling, well-structured story.
 Here is the story outline:
 {OUTLINE}
 
+# Current Visual Bible
+{VISUAL_BIBLE}
+
+# Your Task
+
+**STEP 1: Check for missing Visual Bible entries (output FIRST)**
+Before writing the story, scan the outline for recurring elements NOT already in the Visual Bible:
+- Animals/pets appearing on 2+ pages
+- Important objects (magical items, toys, tools) that recur
+- Secondary characters (not main characters) who appear multiple times
+- Distinctive locations appearing repeatedly
+
+Output any missing entries at the START of your response. If none are missing, write "None".
+
+**STEP 2: Write the complete story**
 IMPORTANT: Now write the complete story following the outline above.
 Your goal is to write a complete, engaging story.
 
@@ -31,6 +46,35 @@ FORMATTING:
 - Create a readable, engaging style appropriate for the target age
 
 Output Format:
+
+---NEW VISUAL BIBLE ENTRIES---
+(List any missing recurring elements, or "None" if the Visual Bible is complete)
+
+ANIMAL: [Name]
+- Species: [type]
+- Coloring: [colors and patterns]
+- Size: [relative size]
+- Features: [distinctive details]
+- Pages: [page numbers where it appears]
+
+ARTIFACT: [Name]
+- Type: [what it is]
+- Appearance: [color, material, size]
+- Features: [distinctive details]
+- Pages: [page numbers]
+
+LOCATION: [Name]
+- Setting: [indoor/outdoor, type]
+- Features: [key visual elements]
+- Pages: [page numbers]
+
+SECONDARY CHARACTER: [Name/Role]
+- Physical: [age, build, hair, distinctive features]
+- Clothing: [typical outfit]
+- Pages: [page numbers]
+
+---STORY TEXT---
+
 --- Page 1 ---
 [Story text for page 1...]
 

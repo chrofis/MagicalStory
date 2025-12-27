@@ -33,7 +33,8 @@ function requireAdmin(req, res, next) {
 function generateToken(user, expiresIn = '7d') {
   return jwt.sign(
     {
-      userId: user.id,
+      id: user.id,           // Use 'id' so req.user.id works in routes
+      userId: user.id,       // Keep for backwards compatibility
       username: user.username,
       role: user.role,
       email: user.email,

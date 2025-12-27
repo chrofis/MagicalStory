@@ -112,7 +112,11 @@ const {
   buildFullVisualBiblePrompt,
   analyzeVisualBibleElements,
   updateVisualBibleWithExtracted,
-  getElementsNeedingAnalysis
+  getElementsNeedingAnalysis,
+  formatVisualBibleForStoryText,
+  parseNewVisualBibleEntries,
+  mergeNewVisualBibleEntries,
+  extractStoryTextFromOutput
 } = require('./server/lib/visualBible');
 const {
   ART_STYLES,
@@ -7011,6 +7015,9 @@ async function processStoryJob(jobId) {
 
       log.debug(`📝 [BATCH ${batchNum + 1}] Reading level: ${inputData.languageLevel || 'standard'} - ${readingLevel}`);
 
+      // Format Visual Bible for story text prompt
+      const visualBibleForPrompt = formatVisualBibleForStoryText(visualBible);
+
       const batchPrompt = PROMPT_TEMPLATES.storyTextBatch
         ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
             BASE_PROMPT: basePrompt,
@@ -7019,6 +7026,7 @@ async function processStoryJob(jobId) {
             START_PAGE: startScene,
             END_PAGE: endScene,
             READING_LEVEL: readingLevel,
+            VISUAL_BIBLE: visualBibleForPrompt,
             INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning.' : 'Start directly with the page content (no title/dedication).'
           })
         : `${basePrompt}
@@ -7228,6 +7236,10 @@ Output Format:
 
       // PROGRESSIVE STREAMING: Start image generation as pages complete during text streaming
       let batchText = '';
+
+      // Track if we've parsed Visual Bible entries from this batch (only do once per batch)
+      let visualBibleParsedForBatch = false;
+
       if (!skipImages && imageGenMode === 'parallel') {
         // Create progressive parser that starts image generation as pages stream in
         const progressiveParser = new ProgressiveStoryPageParser((page) => {
@@ -7237,6 +7249,24 @@ Output Format:
 
         // Stream with progressive parsing
         const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded, (chunk, fullText) => {
+          // Check for Visual Bible entries BEFORE pages start (only for first batch)
+          if (!visualBibleParsedForBatch && batchNum === 0) {
+            // Look for either ---STORY TEXT--- marker or first page marker
+            const hasStoryMarker = fullText.includes('---STORY TEXT---');
+            const hasPageMarker = fullText.match(/--- Page \d+ ---/i);
+
+            if (hasStoryMarker || hasPageMarker) {
+              // Parse and merge new Visual Bible entries BEFORE page 1 image generates
+              const newEntries = parseNewVisualBibleEntries(fullText);
+              const totalNew = newEntries.animals.length + newEntries.artifacts.length +
+                               newEntries.locations.length + newEntries.secondaryCharacters.length;
+              if (totalNew > 0) {
+                log.debug(`📖 [VISUAL BIBLE] Found ${totalNew} new entries from story text, merging before image generation`);
+                mergeNewVisualBibleEntries(visualBible, newEntries);
+              }
+              visualBibleParsedForBatch = true;
+            }
+          }
           progressiveParser.processChunk(chunk, fullText);
         }, textModelOverride);
         batchText = batchResult.text;
@@ -7250,6 +7280,17 @@ Output Format:
         const batchResult = await callTextModelStreaming(batchPrompt, batchTokensNeeded, null, textModelOverride);
         batchText = batchResult.text;
         addUsage('anthropic', batchResult.usage, 'story_text', textModelConfig?.modelId || getActiveTextModel().modelId);
+
+        // Parse Visual Bible entries for non-progressive mode (first batch only)
+        if (batchNum === 0) {
+          const newEntries = parseNewVisualBibleEntries(batchText);
+          const totalNew = newEntries.animals.length + newEntries.artifacts.length +
+                           newEntries.locations.length + newEntries.secondaryCharacters.length;
+          if (totalNew > 0) {
+            log.debug(`📖 [VISUAL BIBLE] Found ${totalNew} new entries from story text, merging`);
+            mergeNewVisualBibleEntries(visualBible, newEntries);
+          }
+        }
       }
 
       fullStoryText += batchText + '\n\n';
@@ -7351,6 +7392,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         [storyProgress, progressMsg, jobId]
       );
     }
+
+    // Clean up fullStoryText to remove Visual Bible section (keep only story pages)
+    fullStoryText = extractStoryTextFromOutput(fullStoryText);
 
     // Save story_text checkpoint so client can display text while images generate
     // Parse all pages from the full story text and build page text map

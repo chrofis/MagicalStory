@@ -643,6 +643,275 @@ function updateVisualBibleWithExtracted(visualBible, pageNumber, extractedDescri
 }
 
 // ============================================================================
+// STORY TEXT VISUAL BIBLE FUNCTIONS
+// ============================================================================
+
+/**
+ * Format Visual Bible entries for inclusion in story text prompt.
+ * Shows what's already defined so the model knows what NOT to add.
+ */
+function formatVisualBibleForStoryText(visualBible) {
+  if (!visualBible) return 'None defined yet.';
+
+  const sections = [];
+
+  // Main characters (just names, full details in base prompt)
+  if (visualBible.mainCharacters?.length > 0) {
+    const names = visualBible.mainCharacters.map(c => c.name).join(', ');
+    sections.push(`Main Characters: ${names}`);
+  }
+
+  // Secondary characters
+  if (visualBible.secondaryCharacters?.length > 0) {
+    sections.push('Secondary Characters:');
+    for (const char of visualBible.secondaryCharacters) {
+      sections.push(`- ${char.name} (pages ${char.pages?.join(', ') || 'multiple'}): ${char.description}`);
+    }
+  }
+
+  // Animals
+  if (visualBible.animals?.length > 0) {
+    sections.push('Animals:');
+    for (const animal of visualBible.animals) {
+      sections.push(`- ${animal.name} (pages ${animal.pages?.join(', ') || 'multiple'}): ${animal.description}`);
+    }
+  }
+
+  // Artifacts
+  if (visualBible.artifacts?.length > 0) {
+    sections.push('Artifacts:');
+    for (const artifact of visualBible.artifacts) {
+      sections.push(`- ${artifact.name} (pages ${artifact.pages?.join(', ') || 'multiple'}): ${artifact.description}`);
+    }
+  }
+
+  // Locations
+  if (visualBible.locations?.length > 0) {
+    sections.push('Locations:');
+    for (const loc of visualBible.locations) {
+      sections.push(`- ${loc.name} (pages ${loc.pages?.join(', ') || 'multiple'}): ${loc.description}`);
+    }
+  }
+
+  if (sections.length === 0) {
+    return 'None defined yet.';
+  }
+
+  return sections.join('\n');
+}
+
+/**
+ * Parse new Visual Bible entries from story text output.
+ * Looks for ---NEW VISUAL BIBLE ENTRIES--- section at the beginning.
+ */
+function parseNewVisualBibleEntries(text) {
+  const newEntries = {
+    secondaryCharacters: [],
+    animals: [],
+    artifacts: [],
+    locations: []
+  };
+
+  if (!text) return newEntries;
+
+  // Find the NEW VISUAL BIBLE ENTRIES section
+  const match = text.match(/---NEW VISUAL BIBLE ENTRIES---\s*([\s\S]*?)(?=---STORY TEXT---|--- Page \d+ ---|$)/i);
+  if (!match) return newEntries;
+
+  const section = match[1].trim();
+  log.debug(`[VISUAL BIBLE] Found new entries section: ${section.substring(0, 200)}...`);
+
+  // Check for "None" or empty
+  if (!section || section.toLowerCase() === 'none') {
+    log.debug('[VISUAL BIBLE] No new entries to add');
+    return newEntries;
+  }
+
+  // Parse each type of entry
+  // ANIMAL: Name
+  // - Species: ...
+  // - Coloring: ...
+  // - Pages: 3, 5, 7
+  const animalMatches = section.matchAll(/ANIMAL:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
+  for (const m of animalMatches) {
+    const name = m[1].trim();
+    const details = m[2];
+    const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
+    const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+
+    // Build description from other fields
+    const species = details.match(/Species:\s*(.+)/i)?.[1]?.trim() || '';
+    const coloring = details.match(/Coloring:\s*(.+)/i)?.[1]?.trim() || '';
+    const size = details.match(/Size:\s*(.+)/i)?.[1]?.trim() || '';
+    const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+
+    const descParts = [species, coloring, size, features].filter(Boolean);
+    const description = descParts.join('. ');
+
+    if (name && description) {
+      newEntries.animals.push({ name, description, pages });
+      log.debug(`[VISUAL BIBLE] Parsed animal: ${name} (pages ${pages.join(',')})`);
+    }
+  }
+
+  // ARTIFACT: Name
+  const artifactMatches = section.matchAll(/ARTIFACT:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
+  for (const m of artifactMatches) {
+    const name = m[1].trim();
+    const details = m[2];
+    const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
+    const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+
+    const type = details.match(/Type:\s*(.+)/i)?.[1]?.trim() || '';
+    const appearance = details.match(/Appearance:\s*(.+)/i)?.[1]?.trim() || '';
+    const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+
+    const descParts = [type, appearance, features].filter(Boolean);
+    const description = descParts.join('. ');
+
+    if (name && description) {
+      newEntries.artifacts.push({ name, description, pages });
+      log.debug(`[VISUAL BIBLE] Parsed artifact: ${name} (pages ${pages.join(',')})`);
+    }
+  }
+
+  // LOCATION: Name
+  const locationMatches = section.matchAll(/LOCATION:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
+  for (const m of locationMatches) {
+    const name = m[1].trim();
+    const details = m[2];
+    const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
+    const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+
+    const setting = details.match(/Setting:\s*(.+)/i)?.[1]?.trim() || '';
+    const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+
+    const descParts = [setting, features].filter(Boolean);
+    const description = descParts.join('. ');
+
+    if (name && description) {
+      newEntries.locations.push({ name, description, pages });
+      log.debug(`[VISUAL BIBLE] Parsed location: ${name} (pages ${pages.join(',')})`);
+    }
+  }
+
+  // SECONDARY CHARACTER: Name
+  const charMatches = section.matchAll(/SECONDARY CHARACTER:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
+  for (const m of charMatches) {
+    const name = m[1].trim();
+    const details = m[2];
+    const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
+    const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+
+    const physical = details.match(/Physical:\s*(.+)/i)?.[1]?.trim() || '';
+    const clothing = details.match(/Clothing:\s*(.+)/i)?.[1]?.trim() || '';
+
+    const descParts = [physical, clothing].filter(Boolean);
+    const description = descParts.join('. Typically wears: ');
+
+    if (name && description) {
+      newEntries.secondaryCharacters.push({ name, description, pages });
+      log.debug(`[VISUAL BIBLE] Parsed secondary character: ${name} (pages ${pages.join(',')})`);
+    }
+  }
+
+  const totalNew = newEntries.animals.length + newEntries.artifacts.length +
+                   newEntries.locations.length + newEntries.secondaryCharacters.length;
+  log.debug(`[VISUAL BIBLE] Parsed ${totalNew} new entries from story text`);
+
+  return newEntries;
+}
+
+/**
+ * Merge new Visual Bible entries into existing Visual Bible.
+ * Avoids duplicates by name (case-insensitive).
+ */
+function mergeNewVisualBibleEntries(visualBible, newEntries) {
+  if (!visualBible || !newEntries) return visualBible;
+
+  const existingNames = new Set();
+
+  // Collect all existing names (case-insensitive)
+  for (const arr of [visualBible.secondaryCharacters, visualBible.animals, visualBible.artifacts, visualBible.locations]) {
+    for (const entry of arr || []) {
+      existingNames.add(entry.name.toLowerCase());
+    }
+  }
+  // Also exclude main character names
+  for (const char of visualBible.mainCharacters || []) {
+    existingNames.add(char.name.toLowerCase());
+  }
+
+  let addedCount = 0;
+
+  // Merge each category
+  for (const char of newEntries.secondaryCharacters || []) {
+    if (!existingNames.has(char.name.toLowerCase())) {
+      visualBible.secondaryCharacters.push(char);
+      addVisualBibleChangeLog(visualBible, `Added secondary character from story text: ${char.name}`);
+      addedCount++;
+    }
+  }
+
+  for (const animal of newEntries.animals || []) {
+    if (!existingNames.has(animal.name.toLowerCase())) {
+      visualBible.animals.push(animal);
+      addVisualBibleChangeLog(visualBible, `Added animal from story text: ${animal.name}`);
+      addedCount++;
+    }
+  }
+
+  for (const artifact of newEntries.artifacts || []) {
+    if (!existingNames.has(artifact.name.toLowerCase())) {
+      visualBible.artifacts.push(artifact);
+      addVisualBibleChangeLog(visualBible, `Added artifact from story text: ${artifact.name}`);
+      addedCount++;
+    }
+  }
+
+  for (const loc of newEntries.locations || []) {
+    if (!existingNames.has(loc.name.toLowerCase())) {
+      visualBible.locations.push(loc);
+      addVisualBibleChangeLog(visualBible, `Added location from story text: ${loc.name}`);
+      addedCount++;
+    }
+  }
+
+  if (addedCount > 0) {
+    log.debug(`[VISUAL BIBLE] Merged ${addedCount} new entries from story text`);
+  }
+
+  return visualBible;
+}
+
+/**
+ * Extract story text from output that may contain Visual Bible additions.
+ * Returns just the story pages without the Visual Bible section.
+ */
+function extractStoryTextFromOutput(text) {
+  if (!text) return '';
+
+  // If output has ---STORY TEXT--- marker, extract from there
+  const storyMarker = text.indexOf('---STORY TEXT---');
+  if (storyMarker !== -1) {
+    return text.substring(storyMarker + '---STORY TEXT---'.length).trim();
+  }
+
+  // If output has ---NEW VISUAL BIBLE ENTRIES--- but no STORY TEXT marker,
+  // look for first page marker
+  const newEntriesMarker = text.indexOf('---NEW VISUAL BIBLE ENTRIES---');
+  if (newEntriesMarker !== -1) {
+    const pageMatch = text.match(/--- Page \d+ ---/i);
+    if (pageMatch) {
+      return text.substring(pageMatch.index).trim();
+    }
+  }
+
+  // No special markers, return as-is
+  return text;
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -669,5 +938,11 @@ module.exports = {
 
   // Image analysis
   analyzeVisualBibleElements,
-  updateVisualBibleWithExtracted
+  updateVisualBibleWithExtracted,
+
+  // Story text Visual Bible additions
+  formatVisualBibleForStoryText,
+  parseNewVisualBibleEntries,
+  mergeNewVisualBibleEntries,
+  extractStoryTextFromOutput
 };
