@@ -3602,13 +3602,13 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
     const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
     const clothingStyle = getClothingStylePrompt(category);
     let avatarPrompt = fillTemplate(promptPart, {
-      'CLOTHING_STYLE': clothingStyle,
-      'BUILD': req.query.build || 'average'
+      'CLOTHING_STYLE': clothingStyle
     });
 
     // If physical traits are provided, append them (for "With Traits" display)
-    if (req.query.withTraits === 'true') {
+    if (req.query.withTraits === 'true' || req.query.build) {
       const traitParts = [];
+      if (req.query.build) traitParts.push(`Build: ${req.query.build}`);
       if (req.query.hair) traitParts.push(`Hair: ${req.query.hair}`);
       if (req.query.face) traitParts.push(`Face: ${req.query.face}`);
       if (req.query.other) traitParts.push(`Distinctive features: ${req.query.other}`);
@@ -3644,12 +3644,16 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
     // Build physical traits section if provided (for "Generate with Traits" mode)
     let physicalTraitsSection = '';
-    if (physicalTraits) {
+    if (physicalTraits || build) {
       const traitParts = [];
-      if (physicalTraits.hair) traitParts.push(`Hair: ${physicalTraits.hair}`);
-      if (physicalTraits.face) traitParts.push(`Face: ${physicalTraits.face}`);
-      if (physicalTraits.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
-      if (physicalTraits.height) traitParts.push(`Height: ${physicalTraits.height}cm`);
+      // Build first (body type)
+      if (build) traitParts.push(`Build: ${build}`);
+      else if (physicalTraits?.build) traitParts.push(`Build: ${physicalTraits.build}`);
+      // Then other traits
+      if (physicalTraits?.hair) traitParts.push(`Hair: ${physicalTraits.hair}`);
+      if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
+      if (physicalTraits?.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
+      if (physicalTraits?.height) traitParts.push(`Height: ${physicalTraits.height}cm`);
       if (traitParts.length > 0) {
         physicalTraitsSection = `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
       }
@@ -3715,8 +3719,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
         const clothingStyle = getClothingStylePrompt(category);
         log.debug(`   [CLOTHING] Style for ${category}: "${clothingStyle}"`);
         let avatarPrompt = fillTemplate(promptPart, {
-          'CLOTHING_STYLE': clothingStyle,
-          'BUILD': build || 'average'
+          'CLOTHING_STYLE': clothingStyle
         });
         // Append physical traits section if provided
         if (physicalTraitsSection) {

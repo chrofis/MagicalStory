@@ -576,13 +576,14 @@ export function CharacterForm({
               </div>
             )}
             <div className="flex items-center gap-2 flex-wrap">
-              {onRegenerateAvatars && (
+              {onRegenerateAvatarsWithTraits && (
                 <button
-                  onClick={onRegenerateAvatars}
+                  onClick={onRegenerateAvatarsWithTraits}
                   disabled={isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
                   className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  title={language === 'de' ? 'Generiert Avatare mit allen physischen Merkmalen (Brille, Haarfarbe, etc.)' : 'Generates avatars with all physical traits (glasses, hair color, etc.)'}
                 >
-                  {isRegeneratingAvatars ? (
+                  {isRegeneratingAvatarsWithTraits ? (
                     <>
                       <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       {language === 'de' ? 'Generiere...' : 'Generating...'}
@@ -592,20 +593,20 @@ export function CharacterForm({
                   )}
                 </button>
               )}
-              {onRegenerateAvatarsWithTraits && (
+              {onRegenerateAvatars && (
                 <button
-                  onClick={onRegenerateAvatarsWithTraits}
+                  onClick={onRegenerateAvatars}
                   disabled={isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
-                  className="px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                  title={language === 'de' ? 'Generiert Avatare mit allen physischen Merkmalen (Brille, Haarfarbe, etc.)' : 'Generates avatars with all physical traits (glasses, hair color, etc.)'}
+                  className="px-3 py-1.5 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  title={language === 'de' ? 'Alte Methode ohne physische Merkmale' : 'Old method without physical traits'}
                 >
-                  {isRegeneratingAvatarsWithTraits ? (
+                  {isRegeneratingAvatars ? (
                     <>
                       <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       {language === 'de' ? 'Generiere...' : 'Generating...'}
                     </>
                   ) : (
-                    <>{language === 'de' ? 'Mit Merkmalen' : language === 'fr' ? 'Avec traits' : 'With Traits'}</>
+                    <>{language === 'de' ? 'Ohne Merkmale (alt)' : language === 'fr' ? 'Sans traits (ancien)' : 'Without Traits (old)'}</>
                   )}
                 </button>
               )}
