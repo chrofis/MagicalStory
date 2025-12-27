@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, History, Save, X, Images, RotateCcw, Wrench, Loader } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt, ReferencePhoto, ImageVersion } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, RetryAttempt, ReferencePhoto, ImageVersion, RepairAttempt } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 
@@ -1588,7 +1588,7 @@ export function StoryDisplay({
                                   <span className="text-amber-600 font-normal">({image.repairHistory.length} {language === 'de' ? 'Reparaturen' : 'repairs'})</span>
                                 </summary>
                                 <div className="mt-3 space-y-3">
-                                  {image.repairHistory.map((repair: { attempt: number; errorType: string; description: string; fixPrompt: string; maskImage?: string; beforeImage?: string; afterImage?: string; success: boolean; timestamp: string }, idx: number) => (
+                                  {image.repairHistory.map((repair: RepairAttempt, idx: number) => (
                                     <div key={idx} className={`border rounded-lg p-3 ${repair.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
                                       <div className="flex items-center justify-between mb-2">
                                         <span className="font-semibold text-sm">
@@ -1886,7 +1886,7 @@ export function StoryDisplay({
                                   <span className="text-amber-600 font-normal">({image.repairHistory.length} {language === 'de' ? 'Reparaturen' : 'repairs'})</span>
                                 </summary>
                                 <div className="mt-3 space-y-3">
-                                  {image.repairHistory.map((repair: { attempt: number; errorType: string; description: string; fixPrompt: string; maskImage?: string; beforeImage?: string; afterImage?: string; success: boolean; timestamp: string }, idx: number) => (
+                                  {image.repairHistory.map((repair: RepairAttempt, idx: number) => (
                                     <div key={idx} className={`border rounded-lg p-3 ${repair.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
                                       <div className="flex items-center justify-between mb-2">
                                         <span className="font-semibold text-sm">
