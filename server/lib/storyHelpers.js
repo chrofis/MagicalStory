@@ -154,9 +154,10 @@ function getCharacterPhotos(characters, clothingCategory = null) {
  * Parse clothing category from scene description
  * Looks for patterns like "Clothing: winter" or "**Clothing:** standard"
  * @param {string} sceneDescription - The scene description text
+ * @param {boolean} warnOnInvalid - Log warning if keyword found but no valid value (default: true)
  * @returns {string|null} Clothing category (winter, summer, formal, standard) or null if not found
  */
-function parseClothingCategory(sceneDescription) {
+function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   if (!sceneDescription) return null;
 
   // Generic approach: find "Clothing" keyword (in any language) and look for value nearby
@@ -198,6 +199,14 @@ function parseClothingCategory(sceneDescription) {
     if (valueMatch) {
       return valueMatch[1].toLowerCase();
     }
+
+    // Found keyword but no valid value - log warning
+    if (warnOnInvalid) {
+      // Extract what value was actually there (first word after colon)
+      const invalidValueMatch = nearbyText.match(/:\s*\*{0,2}(\w+)/i);
+      const invalidValue = invalidValueMatch ? invalidValueMatch[1] : 'unknown';
+      log.warn(`[CLOTHING] Invalid clothing value "${invalidValue}" found, defaulting to standard. Valid values: winter, summer, formal, standard`);
+    }
   }
 
   return null;
@@ -211,6 +220,15 @@ function parseClothingCategory(sceneDescription) {
  */
 function getCharacterPhotoDetails(characters, clothingCategory = null) {
   if (!characters || characters.length === 0) return [];
+
+  // Fallback priority for clothing avatars when exact match not found
+  const clothingFallbackOrder = {
+    winter: ['standard', 'formal', 'summer'],
+    summer: ['standard', 'formal', 'winter'],
+    formal: ['standard', 'winter', 'summer'],
+    standard: ['formal', 'summer', 'winter']
+  };
+
   return characters
     .map(char => {
       let photoType = 'none';
@@ -220,20 +238,38 @@ function getCharacterPhotoDetails(characters, clothingCategory = null) {
       const avatars = char.avatars || char.clothingAvatars;
       const photos = char.photos || {};
 
-      // Check for clothing avatar first
+      // Check for exact clothing avatar first
       if (clothingCategory && avatars && avatars[clothingCategory]) {
         photoType = `clothing-${clothingCategory}`;
         photoUrl = avatars[clothingCategory];
-      } else if (photos.bodyNoBg || char.bodyNoBgUrl) {
-        photoType = 'bodyNoBg';
-        photoUrl = photos.bodyNoBg || char.bodyNoBgUrl;
-      } else if (photos.body || char.bodyPhotoUrl) {
-        photoType = 'body';
-        photoUrl = photos.body || char.bodyPhotoUrl;
-      } else if (photos.face || photos.original || char.photoUrl) {
-        photoType = 'face';
-        photoUrl = photos.face || photos.original || char.photoUrl;
       }
+      // Try fallback clothing avatars before falling back to body photo
+      else if (clothingCategory && avatars) {
+        const fallbacks = clothingFallbackOrder[clothingCategory] || ['standard', 'formal', 'summer', 'winter'];
+        for (const fallbackCategory of fallbacks) {
+          if (avatars[fallbackCategory]) {
+            photoType = `clothing-${fallbackCategory}`;
+            photoUrl = avatars[fallbackCategory];
+            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${clothingCategory}, using ${fallbackCategory}`);
+            break;
+          }
+        }
+      }
+
+      // If still no avatar, fall back to body photos
+      if (!photoUrl) {
+        if (photos.bodyNoBg || char.bodyNoBgUrl) {
+          photoType = 'bodyNoBg';
+          photoUrl = photos.bodyNoBg || char.bodyNoBgUrl;
+        } else if (photos.body || char.bodyPhotoUrl) {
+          photoType = 'body';
+          photoUrl = photos.body || char.bodyPhotoUrl;
+        } else if (photos.face || photos.original || char.photoUrl) {
+          photoType = 'face';
+          photoUrl = photos.face || photos.original || char.photoUrl;
+        }
+      }
+
       return {
         name: char.name,
         id: char.id,

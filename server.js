@@ -2352,7 +2352,7 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, async (req
       repairResult = await autoRepairWithTargets(currentImage.imageData, currentImage.fixTargets, 0);
     } else {
       log.info(`🔄 [REPAIR] No pre-computed targets, using inspection-based repair for story ${id}, page ${pageNumber}`);
-      repairResult = await autoRepairImage(currentImage.imageData, 2);
+      repairResult = await autoRepairImage(currentImage.imageData, 1);  // Only 1 repair cycle
     }
 
     if (!repairResult) {
