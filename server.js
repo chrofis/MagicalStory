@@ -7772,19 +7772,23 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       updatedAt: new Date().toISOString()
     };
 
-    // Log token usage summary with costs
+    // Log token usage summary with costs (including thinking tokens)
     const totalInputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].input_tokens, 0);
     const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].output_tokens, 0);
-    const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens);
-    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens);
-    const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens);
+    const totalThinkingTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].thinking_tokens, 0);
+    const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens, tokenUsage.anthropic.thinking_tokens);
+    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens, tokenUsage.gemini_image.thinking_tokens);
+    const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens, tokenUsage.gemini_quality.thinking_tokens);
     const totalCost = anthropicCost.total + geminiImageCost.total + geminiQualityCost.total;
     log.debug(`📊 [PIPELINE] Token usage & cost summary:`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY PROVIDER:`);
-    log.debug(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_image.calls} calls)  $${geminiImageCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
+    const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` / ${tokenUsage.anthropic.thinking_tokens.toLocaleString().padStart(6)} think` : '';
+    const thinkingImageStr = tokenUsage.gemini_image.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_image.thinking_tokens.toLocaleString().padStart(6)} think` : '';
+    const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString().padStart(6)} think` : '';
+    log.debug(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr} (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out${thinkingImageStr} (${tokenUsage.gemini_image.calls} calls)  $${geminiImageCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr} (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY FUNCTION:`);
     const byFunc = tokenUsage.byFunction;
