@@ -152,7 +152,8 @@ router.post('/login', authLimiter, async (req, res) => {
         storiesGenerated: dbUser.stories_generated,
         credits: dbUser.credits !== undefined ? dbUser.credits : 500,
         preferredLanguage: dbUser.preferred_language || 'English',
-        emailVerified: dbUser.email_verified !== false
+        emailVerified: dbUser.email_verified !== false,
+        photoConsentAt: dbUser.photo_consent_at || null
       };
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -181,7 +182,8 @@ router.post('/login', authLimiter, async (req, res) => {
         storiesGenerated: user.storiesGenerated || 0,
         credits: user.credits != null ? user.credits : 500,
         preferredLanguage: user.preferredLanguage || 'English',
-        emailVerified: user.emailVerified !== false
+        emailVerified: user.emailVerified !== false,
+        photoConsentAt: user.photoConsentAt || null
       }
     });
   } catch (err) {
@@ -305,7 +307,8 @@ router.post('/firebase', authLimiter, async (req, res) => {
         storiesGenerated: user.stories_generated || 0,
         credits: user.credits != null ? user.credits : 500,
         preferredLanguage: user.preferred_language || 'English',
-        emailVerified: true
+        emailVerified: true,
+        photoConsentAt: user.photo_consent_at || null
       }
     });
   } catch (err) {
@@ -657,7 +660,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, email, role, credits, preferred_language, email_verified FROM users WHERE id = $1',
+      'SELECT id, username, email, role, credits, preferred_language, email_verified, photo_consent_at FROM users WHERE id = $1',
       [userId]
     );
 
@@ -683,6 +686,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
         credits: user.credits,
         preferredLanguage: user.preferred_language,
         emailVerified: user.email_verified,
+        photoConsentAt: user.photo_consent_at || null,
       },
     });
   } catch (err) {
@@ -755,57 +759,6 @@ router.post('/logout', authenticateToken, async (req, res) => {
     // Even if logging fails, consider logout successful
     console.error('Logout logging error:', err);
     res.json({ success: true, message: 'Logged out' });
-  }
-});
-
-// POST /api/auth/refresh - Refresh access token
-// Allows refreshing token before it expires (within last 24 hours of validity)
-router.post('/refresh', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-
-    if (!isDatabaseMode()) {
-      return res.status(501).json({ error: 'Database mode required' });
-    }
-
-    // Get fresh user data from database
-    const userResult = await dbQuery(
-      'SELECT id, username, email, role, email_verified, credits FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (userResult.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const user = userResult[0];
-
-    // Generate new token with fresh user data
-    const newToken = generateToken({
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      email_verified: user.email_verified
-    });
-
-    log.debug(`Token refreshed for user ${user.username}`);
-
-    res.json({
-      success: true,
-      token: newToken,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        emailVerified: user.email_verified,
-        credits: user.credits
-      }
-    });
-  } catch (err) {
-    console.error('Token refresh error:', err);
-    res.status(500).json({ error: 'Failed to refresh token' });
   }
 });
 
