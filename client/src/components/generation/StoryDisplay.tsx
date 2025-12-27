@@ -419,17 +419,22 @@ export function StoryDisplay({
     if (!fullDescription) return '';
 
     // Try to extract just the Image Summary section (supports EN, DE, FR)
-    // Format: "1. **Image Summary**\n[summary text]\n\n2. **Setting"
-    // German: "1. **Bildzusammenfassung**\n[summary text]\n\n2. **Setting"
-    // French: "1. **Résumé de l'Image**\n[summary text]\n\n2. **Décor"
+    // Handles both newline and same-line formats:
+    // "1. **Bildzusammenfassung**\nSophie steht..." OR "1. **Bildzusammenfassung** Sophie steht..."
     const summaryMatch = fullDescription.match(
-      /\*\*(Image Summary|Bildzusammenfassung|Résumé de l'Image)\*\*\s*\n\s*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*|$)/i
+      /\*\*(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\*\*[\s\n]*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*|$)/i
     );
-    if (summaryMatch && summaryMatch[2]) {
+    if (summaryMatch && summaryMatch[2] && summaryMatch[2].trim()) {
       return summaryMatch[2].trim();
     }
 
-    // Fallback: if no Image Summary header, take first paragraph or first 500 chars
+    // Fallback: if no Image Summary header found, check if it's a simple description
+    // (no markdown headers at all - just return as-is if short enough)
+    if (!fullDescription.includes('**') && fullDescription.length < 1000) {
+      return fullDescription.trim();
+    }
+
+    // Last fallback: strip leading header and take first paragraph
     const firstParagraph = fullDescription.split(/\n\n/)[0];
     if (firstParagraph && firstParagraph.length < 1000) {
       // Strip any leading "1. **Header**" pattern

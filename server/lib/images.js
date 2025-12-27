@@ -216,12 +216,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     // Add reference images if provided (compressed and cached for token efficiency)
     // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
+    const characterNames = [];
     if (referenceImages && referenceImages.length > 0) {
       let addedCount = 0;
       let cacheHits = 0;
       for (const refImg of referenceImages) {
         // Handle both formats: string URL or {name, photoUrl} object
         const photoUrl = typeof refImg === 'string' ? refImg : refImg?.photoUrl;
+        const charName = typeof refImg === 'object' ? refImg?.name : null;
+        if (charName) characterNames.push(charName);
+
         if (photoUrl && photoUrl.startsWith('data:image')) {
           // Check cache first using hash of original image
           const imageHash = hashImageData(photoUrl);
@@ -245,11 +249,18 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           addedCount++;
         }
       }
-      log.verbose(`⭐ [QUALITY] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
+      log.verbose(`⭐ [QUALITY] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed) for: ${characterNames.join(', ') || 'unnamed'}`);
+    }
+
+    // Add character list to prompt so model knows EXACTLY which characters are expected
+    let finalPrompt = evaluationPrompt;
+    if (characterNames.length > 0) {
+      const charList = `\n\n**EXPECTED CHARACTERS IN THIS SCENE:** ${characterNames.join(', ')}\nOnly evaluate these ${characterNames.length} character(s). Do NOT report characters as missing if they are not in the expected list above.\n`;
+      finalPrompt = charList + evaluationPrompt;
     }
 
     // Add evaluation prompt text
-    parts.push({ text: evaluationPrompt });
+    parts.push({ text: finalPrompt });
 
     // Use Gemini Flash for fast quality evaluation (or override if provided)
     let modelId = qualityModelOverride || 'gemini-2.0-flash';
