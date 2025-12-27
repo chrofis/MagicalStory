@@ -6671,9 +6671,9 @@ async function processStoryJob(jobId) {
     // 2. "# Title\nTitle: Actual Title" - "Title:" prefix on next line
     // 3. "# Title\nActual Title" - plain text on next line (not "# " or "---")
     // 4. "TITLE: Actual Title" - inline format
-    const boldTitleMatch = outline.match(/^#\s*Title\s*\n+\*\*(.+?)\*\*/im);
-    const prefixTitleMatch = outline.match(/^#\s*Title\s*\n+Title:\s*(.+?)$/im);
-    const plainTitleMatch = outline.match(/^#\s*Title\s*\n+([^#\-\n].+?)$/im);
+    const boldTitleMatch = outline.match(/^#{1,2}\s*Title\s*\n+\*\*(.+?)\*\*/im);
+    const prefixTitleMatch = outline.match(/^#{1,2}\s*Title\s*\n+Title:\s*(.+?)$/im);
+    const plainTitleMatch = outline.match(/^#{1,2}\s*Title\s*\n+([^#\-\n].+?)$/im);
     const inlineTitleMatch = outline.match(/TITLE:\s*(.+)/i);
 
     const titleMatch = boldTitleMatch || prefixTitleMatch || plainTitleMatch || inlineTitleMatch;
