@@ -10,8 +10,9 @@ ILLUSTRATION DE LIVRE POUR ENFANTS - Contenu sûr et familial.
 - VÊTEMENTS des personnages: Utiliser les vêtements décrits dans la scène. Si non spécifié, EXACTEMENT comme sur les images de référence
 
 **CONTINUITÉ VISUELLE:**
-De l'image précédente COPIER: accessoires, meubles, éléments d'arrière-plan, style artistique, palette de couleurs
+De l'image précédente COPIER: accessoires, meubles, éléments d'arrière-plan, style artistique, palette de couleurs, VÊTEMENTS DES PERSONNAGES
 NE PAS COPIER: poses, positions, expressions faciales - celles-ci doivent être NOUVELLES pour la scène actuelle
+RÈGLE VESTIMENTAIRE: Les personnages portent les MÊMES vêtements que dans la scène précédente, sauf si la description de scène indique explicitement un changement de tenue (coucher, jour suivant, changement de costume)
 
 ---
 

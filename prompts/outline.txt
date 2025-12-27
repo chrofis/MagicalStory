@@ -66,6 +66,21 @@ Identify 2-3 major themes the story will explore that are appropriate for the ta
 ## Tone and Genre
 Describe the overall tone (e.g., adventurous, heartwarming, playful, magical) and genre elements that will shape the storytelling.
 
+## Clothing Continuity
+
+Determine the PRIMARY clothing context for the story based on the overall setting and adventure type:
+
+**Primary Clothing:** [winter | summer | formal | standard]
+- This is the DEFAULT clothing for all scenes unless a change is explicitly needed
+
+**Clothing Change Events:** List any pages where clothing CHANGES and why:
+- Only mark changes for: going to bed/waking up, major time skip (next day/season), explicit costume change in story, moving between drastically different environments (beach → snowy mountain)
+- Moving between similar environments does NOT require a change (meadow → forest → river = same clothing)
+
+Example:
+- Primary Clothing: summer (outdoor summer adventure)
+- Changes: Page 8 (bedtime scene → standard), Page 9 (next morning, back outside → summer)
+
 ---
 
 # Part 2: Character Development Arcs
@@ -112,11 +127,9 @@ For EACH of the {PAGES} story pages, provide:
 
 **Scene**: One sentence describing the key visual moment for the illustrator
 
-**Clothing**: Select the appropriate clothing category based on the scene setting:
-- **winter**: Cold weather, snow, ice, outdoor winter activities (coats, scarves, boots, warm layers)
-- **summer**: Warm weather, beach, swimming, outdoor summer activities (t-shirts, shorts, light dresses, sandals)
-- **formal**: Special occasions, celebrations, parties, church, weddings (suits, dresses, fancy clothes)
-- **standard**: All other situations - everyday casual clothing (jeans, casual tops, sneakers)
+**Clothing**: Use the PRIMARY clothing from "Clothing Continuity" section above, unless this page has a clothing change event.
+- Write **[same]** if clothing matches the previous page
+- Write **[change to: winter|summer|formal|standard]** if clothing changes, with brief reason
 
 
 ---
@@ -217,13 +230,13 @@ Title: [Story title]
 ## Cover Scenes
 
 Title Page Scene: [2-3 sentences: Main character doing something that captures the story's spirit. Simple setting description. Mood/atmosphere.]
-Clothing: [winter|summer|formal|standard]
+Clothing: [Use PRIMARY clothing from Clothing Continuity]
 
 Initial Page Scene: [2-3 sentences: All characters together in a warm, welcoming moment. Simple group scene with positive atmosphere.]
-Clothing: [winter|summer|formal|standard]
+Clothing: [Use PRIMARY clothing from Clothing Continuity]
 
 Back Cover Scene: [2-3 sentences: Characters together at the story's happy conclusion. Focus on emotional satisfaction and togetherness.]
-Clothing: [winter|summer|formal|standard]
+Clothing: [Use PRIMARY clothing from Clothing Continuity]
 
 ## Plot Structure
 Inciting Incident: [Description]
@@ -263,14 +276,14 @@ Challenge: [One scene where this character shines]
 Page 1: [Key Action/Plot Point]
 Character Focus: [Which character(s) and what trait/development is shown]
 Scene: [One sentence - the key visual moment]
-Clothing: [winter|summer|formal|standard]
+Clothing: [same] or [change to: X - reason]
 
 Page 2: [Key Action/Plot Point]
 Character Focus: [Description]
 Scene: [One sentence - the key visual moment]
-Clothing: [winter|summer|formal|standard]
+Clothing: [same]
 
-...and so on for all {PAGES} pages.
+...and so on for all {PAGES} pages. Use [same] for most pages; only use [change to: X] when there's an explicit reason.
 
 ---
 

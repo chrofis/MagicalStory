@@ -75,11 +75,27 @@ Include COMPLETE physical descriptions of all characters, objects, and locations
   - If two objects touch (hand holding tool, character gripping object), assign distinct materials/colors to define boundaries
   - Example: "A [wooden-brown] stick in a [pink-skin] hand" (Use hyphens to bind attributes to objects)
 
-4. **Clothing:** Select ONE category that best matches the scene:
+4. **Clothing:**
+
+   **CONSISTENCY RULE - CRITICAL:**
+   - Check the PREVIOUS SCENE's clothing category (from PREVIOUS SCENES above)
+   - Use the SAME clothing category unless there is an EXPLICIT change event:
+     ✓ Bedtime/sleepwear scene
+     ✓ Major time skip (next day, next season)
+     ✓ Story explicitly mentions changing clothes
+     ✓ Drastic environment change (indoor winter → outdoor summer)
+   - Moving through similar outdoor areas = SAME clothing (meadow → forest → clearing)
+
+   If previous scene: [winter] → This scene: [winter] (unless change event)
+   If previous scene: [summer] → This scene: [summer] (unless change event)
+
+   Select ONE category:
    - **winter** - Cold weather scenes (coats, scarves, boots)
    - **summer** - Warm weather scenes (t-shirts, shorts, light clothes)
    - **formal** - Special occasions (suits, dresses, fancy attire)
    - **standard** - Everyday casual scenes (casual clothes)
+
+   If clothing changes from previous scene, state: "CHANGE from [previous] to [new] because [reason]"
 
 5. **Characters:** For EACH character present, include:
    * **[Character Name]:**

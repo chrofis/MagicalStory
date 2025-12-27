@@ -10,8 +10,9 @@ KINDERBUCH-ILLUSTRATION - Sichere, familienfreundliche Inhalte.
 - KLEIDUNG der Charaktere: Verwende die in der Szene beschriebene Kleidung. Falls nicht angegeben, EXAKT wie in den Referenzbildern
 
 **VISUELLE KONTINUITÄT:**
-Vom vorherigen Szenenbild KOPIEREN: Requisiten, Möbel, Hintergrundelemente, Kunststil, Farbpalette
+Vom vorherigen Szenenbild KOPIEREN: Requisiten, Möbel, Hintergrundelemente, Kunststil, Farbpalette, KLEIDUNG DER CHARAKTERE
 NICHT KOPIEREN: Posen, Positionen, Gesichtsausdrücke - diese müssen NEU sein für die aktuelle Szene
+KLEIDUNGSREGEL: Charaktere tragen DIESELBE Kleidung wie in der vorherigen Szene, ausser die Szenenbeschreibung gibt explizit einen Kleidungswechsel an (Schlafenszeit, nächster Tag, Kostümwechsel)
 
 ---
 
