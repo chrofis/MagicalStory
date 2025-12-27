@@ -2119,7 +2119,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       [JSON.stringify(storyData), id]
     );
 
-    // Deduct credits and log transaction (skip for infinite credits)
+    // Deduct credits and log transaction (skip for infinite credits or impersonating admin)
     let newCredits = hasInfiniteCredits ? -1 : userCredits - requiredCredits;
     if (!hasInfiniteCredits) {
       await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, req.user.id]);
@@ -2129,6 +2129,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
         [req.user.id, -requiredCredits, newCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`]
       );
       console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
+    } else if (isImpersonating) {
+      console.log(`✅ [IMPERSONATE] ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, FREE - admin impersonating)`);
     } else {
       console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, unlimited credits)`);
     }
@@ -5390,20 +5392,20 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
   // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {
-    // By provider (for backwards compatibility)
-    anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
-    gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
-    gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-    gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    // By provider (for backwards compatibility) - includes thinking_tokens for Gemini 2.5
+    anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     // By function (for detailed breakdown)
     byFunction: {
-      outline: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      story_text: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      scene_descriptions: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      cover_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      cover_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      page_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      page_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() }
+      outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
+      story_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
+      scene_descriptions: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
+      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() }
     }
   };
 
@@ -5431,17 +5433,19 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     gemini_text: { input: 0.30, output: 2.50 }
   };
 
-  // Helper to add usage - now supports function-level tracking with model names
+  // Helper to add usage - now supports function-level tracking with model names and thinking tokens
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
     if (usage && tokenUsage[provider]) {
       tokenUsage[provider].input_tokens += usage.input_tokens || 0;
       tokenUsage[provider].output_tokens += usage.output_tokens || 0;
+      tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
       tokenUsage[provider].calls += 1;
     }
     // Also track by function if specified
     if (functionName && tokenUsage.byFunction[functionName]) {
       tokenUsage.byFunction[functionName].input_tokens += usage.input_tokens || 0;
       tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
+      tokenUsage.byFunction[functionName].thinking_tokens += usage.thinking_tokens || 0;
       tokenUsage.byFunction[functionName].calls += 1;
       if (modelName) {
         tokenUsage.byFunction[functionName].models.add(modelName);
@@ -5450,12 +5454,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
   };
 
   // Helper to calculate cost - uses model-specific pricing if available
-  const calculateCost = (modelOrProvider, inputTokens, outputTokens) => {
+  // Thinking tokens are billed at output rate for Gemini 2.5 models
+  const calculateCost = (modelOrProvider, inputTokens, outputTokens, thinkingTokens = 0) => {
     // Try model-specific pricing first, then fall back to provider pricing
     const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };
     const inputCost = (inputTokens / 1000000) * pricing.input;
     const outputCost = (outputTokens / 1000000) * pricing.output;
-    return { input: inputCost, output: outputCost, total: inputCost + outputCost };
+    const thinkingCost = (thinkingTokens / 1000000) * pricing.output; // Thinking billed at output rate
+    return { input: inputCost, output: outputCost, thinking: thinkingCost, total: inputCost + outputCost + thinkingCost };
   };
 
   // For Picture Book: pages = scenes (each page has image + text)
@@ -6427,19 +6433,23 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       updatedAt: new Date().toISOString()
     };
 
-    // Log token usage summary with costs
+    // Log token usage summary with costs (including thinking tokens)
     const totalInputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].input_tokens, 0);
     const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].output_tokens, 0);
-    const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens);
-    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens);
-    const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens);
+    const totalThinkingTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].thinking_tokens, 0);
+    const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens, tokenUsage.anthropic.thinking_tokens);
+    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens, tokenUsage.gemini_image.thinking_tokens);
+    const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens, tokenUsage.gemini_quality.thinking_tokens);
     const totalCost = anthropicCost.total + geminiImageCost.total + geminiQualityCost.total;
     log.debug(`📊 [STORYBOOK] Token usage & cost summary:`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY PROVIDER:`);
-    log.debug(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_image.calls} calls)  $${geminiImageCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
+    const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` / ${tokenUsage.anthropic.thinking_tokens.toLocaleString().padStart(6)} think` : '';
+    const thinkingImageStr = tokenUsage.gemini_image.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_image.thinking_tokens.toLocaleString().padStart(6)} think` : '';
+    const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString().padStart(6)} think` : '';
+    log.debug(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr} (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out${thinkingImageStr} (${tokenUsage.gemini_image.calls} calls)  $${geminiImageCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr} (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY FUNCTION:`);
     const byFunc = tokenUsage.byFunction;
@@ -6596,20 +6606,20 @@ async function processStoryJob(jobId) {
 
   // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {
-    // By provider (for backwards compatibility)
-    anthropic: { input_tokens: 0, output_tokens: 0, calls: 0 },
-    gemini_text: { input_tokens: 0, output_tokens: 0, calls: 0 },
-    gemini_image: { input_tokens: 0, output_tokens: 0, calls: 0 },
-    gemini_quality: { input_tokens: 0, output_tokens: 0, calls: 0 },
+    // By provider (for backwards compatibility) - includes thinking_tokens for Gemini 2.5
+    anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     // By function (for detailed breakdown)
     byFunction: {
-      outline: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      scene_descriptions: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      story_text: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
-      cover_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      cover_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      page_images: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      page_quality: { input_tokens: 0, output_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() }
+      outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
+      scene_descriptions: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
+      story_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
+      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() }
     }
   };
 
@@ -6637,17 +6647,19 @@ async function processStoryJob(jobId) {
     gemini_text: { input: 0.30, output: 2.50 }
   };
 
-  // Helper to add usage - now supports function-level tracking with model names
+  // Helper to add usage - now supports function-level tracking with model names and thinking tokens
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
     if (usage && tokenUsage[provider]) {
       tokenUsage[provider].input_tokens += usage.input_tokens || 0;
       tokenUsage[provider].output_tokens += usage.output_tokens || 0;
+      tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
       tokenUsage[provider].calls += 1;
     }
     // Also track by function if specified
     if (functionName && tokenUsage.byFunction[functionName]) {
       tokenUsage.byFunction[functionName].input_tokens += usage.input_tokens || 0;
       tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
+      tokenUsage.byFunction[functionName].thinking_tokens += usage.thinking_tokens || 0;
       tokenUsage.byFunction[functionName].calls += 1;
       if (modelName) {
         tokenUsage.byFunction[functionName].models.add(modelName);
@@ -6656,12 +6668,14 @@ async function processStoryJob(jobId) {
   };
 
   // Helper to calculate cost - uses model-specific pricing if available
-  const calculateCost = (modelOrProvider, inputTokens, outputTokens) => {
+  // Thinking tokens are billed at output rate for Gemini 2.5 models
+  const calculateCost = (modelOrProvider, inputTokens, outputTokens, thinkingTokens = 0) => {
     // Try model-specific pricing first, then fall back to provider pricing
     const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };
     const inputCost = (inputTokens / 1000000) * pricing.input;
     const outputCost = (outputTokens / 1000000) * pricing.output;
-    return { input: inputCost, output: outputCost, total: inputCost + outputCost };
+    const thinkingCost = (thinkingTokens / 1000000) * pricing.output; // Thinking billed at output rate
+    return { input: inputCost, output: outputCost, thinking: thinkingCost, total: inputCost + outputCost + thinkingCost };
   };
 
   try {
