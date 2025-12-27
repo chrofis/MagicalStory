@@ -7128,6 +7128,7 @@ Output Format:
       // Scene description model override
       const sceneModelOverride = modelOverrides.sceneDescriptionModel || null;
       const sceneModelConfig = sceneModelOverride ? TEXT_MODELS[sceneModelOverride] : getActiveTextModel();
+      const sceneDescProvider = sceneModelConfig?.provider === 'google' ? 'gemini_text' : 'anthropic';
 
       // Helper function to start image generation for a page
       const startPageImageGeneration = (pageNum, pageContent) => {
@@ -7169,7 +7170,7 @@ Output Format:
               log.warn(`⚠️  [PAGE ${pageNum}] Scene description empty or too short (${sceneDescription?.length || 0} chars), using outline extract`);
               sceneDescription = shortSceneDesc || `Scene for page ${pageNum}`;
             }
-            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', sceneModelConfig?.modelId || getActiveTextModel().modelId);
+            addUsage(sceneDescProvider, sceneDescResult.usage, 'scene_descriptions', sceneModelConfig?.modelId || getActiveTextModel().modelId);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
@@ -7555,6 +7556,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         // Scene description model override for sequential mode
         const seqSceneModelOverride = modelOverrides.sceneDescriptionModel || null;
         const seqSceneModelConfig = seqSceneModelOverride ? TEXT_MODELS[seqSceneModelOverride] : getActiveTextModel();
+        const seqSceneDescProvider = seqSceneModelConfig?.provider === 'google' ? 'gemini_text' : 'anthropic';
 
         for (let i = 0; i < allPages.length; i++) {
           const page = allPages[i];
@@ -7593,7 +7595,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               log.warn(`⚠️  [PAGE ${pageNum}] Scene description empty or too short (${sceneDescription?.length || 0} chars), using outline extract`);
               sceneDescription = shortSceneDesc || `Scene for page ${pageNum}`;
             }
-            addUsage('anthropic', sceneDescResult.usage, 'scene_descriptions', seqSceneModelConfig?.modelId || getActiveTextModel().modelId);
+            addUsage(seqSceneDescProvider, sceneDescResult.usage, 'scene_descriptions', seqSceneModelConfig?.modelId || getActiveTextModel().modelId);
 
             allSceneDescriptions.push({
               pageNumber: pageNum,
