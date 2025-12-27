@@ -42,6 +42,8 @@ interface CharacterApiResponse {
   fears?: string[];
   // Clothing (snake_case + camelCase legacy)
   clothing?: string;
+  clothing_colors?: string;
+  clothingColors?: string;
   clothing_avatars?: CharacterAvatars;
   clothingAvatars?: CharacterAvatars;
   // Generated outfits per page
@@ -344,6 +346,7 @@ export const characterService = {
     };
     clothing?: {
       current?: string;
+      colors?: string;
     };
   }> {
     try {
@@ -362,6 +365,7 @@ export const characterService = {
           face?: string;  // Face description
           hair_color?: string;
           clothing?: string;
+          clothingColors?: string;  // Main colors of clothing
           other_features?: string;  // Distinctive markings (glasses, etc.)
         };
         error?: string;
@@ -398,10 +402,9 @@ export const characterService = {
         age: response.attributes?.age,
         gender: response.attributes?.gender,
         physical: (physical.height || physical.build || physical.face || physical.hair || physical.other) ? physical : undefined,
-        clothing: (response.attributes?.clothing || response.attributes?.clothingColors) ? {
-          current: response.attributes.clothing,
-          colors: response.attributes.clothingColors
-        } : undefined,
+        clothing: response.attributes?.clothing || response.attributes?.clothingColors
+          ? { current: response.attributes.clothing, colors: response.attributes.clothingColors }
+          : undefined,
       };
     } catch (error) {
       log.error('Photo analysis failed:', error);
