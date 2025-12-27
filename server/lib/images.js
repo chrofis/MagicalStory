@@ -334,21 +334,47 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // - No detailed physical descriptions (age, body type, etc.)
       // - No mention of "children" or ages
       // - Focus purely on artistic/technical quality
-      const sanitizedPrompt = `You are evaluating an AI-generated illustration for a storybook.
+      // - KEEP the FIX_TARGETS format for auto-repair functionality
+      const sanitizedPrompt = `You are evaluating an AI-generated cartoon illustration for artistic quality.
 
-TASK: Check the artistic quality of this cartoon-style illustration.
+**TASK**: Check the artistic quality of this illustration. Compare illustrated characters to reference photos if provided.
 
-EVALUATION CRITERIA:
+**EVALUATION CRITERIA**:
 1. Art Quality - Is it well-rendered with no visual artifacts?
-2. Character Consistency - Do the illustrated characters match the reference style photos?
-3. Scene Composition - Is the scene well-composed and visually appealing?
-4. Technical Quality - No extra limbs, distorted faces, or rendering errors?
+2. Character Consistency - Do illustrated characters match the reference photos? (hair, clothing, general features)
+3. Scene Composition - Is the scene well-composed?
+4. Technical Quality - Check for:
+   - Extra or missing fingers (should be 5 per hand)
+   - Distorted faces or merged features
+   - Extra/missing limbs
+   - Floating objects or disconnected body parts
 
-OUTPUT FORMAT:
-Scene: [Brief description]
-Quality Issues: [List any problems, or "None"]
+**SCORING (0-10)**:
+- 10: Perfect, no issues
+- 8-9: Good, minor issues only
+- 5-7: Acceptable, some issues
+- 3-4: Poor, major issues
+- 0-2: Bad, multiple major issues
+
+**OUTPUT FORMAT**:
+Scene: [Brief description of what's shown]
+
+Artifact Scan:
+- Hands: [OK / count fingers, note issues]
+- Faces: [OK / issues found]
+- Floating objects: [None / describe]
+
+Quality Issues: [List problems, or "None"]
+
 Score: [0-10]/10
-Verdict: [PASS if 5+, SOFT_FAIL if 3-4, HARD_FAIL if 0-2]`;
+Verdict: [PASS if 5+, SOFT_FAIL if 3-4, HARD_FAIL if 0-2]
+
+FIX_TARGETS: [Only if Score < 8 and fixable issues exist. One JSON per line]
+{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief issue", "fix": "what to draw instead"}
+
+**BOUNDING BOX FORMAT:**
+- Coordinates are normalized 0.0-1.0 (not pixels)
+- Format: [ymin, xmin, ymax, xmax] where 0,0 is top-left`;
 
       // Rebuild parts with sanitized prompt (keep images, replace text)
       const sanitizedParts = parts.slice(0, -1); // Remove original prompt

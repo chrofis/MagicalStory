@@ -1627,14 +1627,14 @@ export function StoryDisplay({
                                             </div>
                                           )}
                                           {repair.beforeImage && repair.afterImage && (
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-4">
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Vorher:' : 'Before:'}</strong>
-                                                <img src={repair.beforeImage} alt="Before repair" className="w-24 h-24 object-cover border rounded" />
+                                                <img src={repair.beforeImage} alt="Before repair" className="w-48 h-48 object-contain border rounded bg-gray-100" />
                                               </div>
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Nachher:' : 'After:'}</strong>
-                                                <img src={repair.afterImage} alt="After repair" className="w-24 h-24 object-cover border rounded" />
+                                                <img src={repair.afterImage} alt="After repair" className="w-48 h-48 object-contain border rounded bg-gray-100" />
                                               </div>
                                             </div>
                                           )}
@@ -1925,14 +1925,14 @@ export function StoryDisplay({
                                             </div>
                                           )}
                                           {repair.beforeImage && repair.afterImage && (
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-4">
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Vorher:' : 'Before:'}</strong>
-                                                <img src={repair.beforeImage} alt="Before repair" className="w-24 h-24 object-cover border rounded" />
+                                                <img src={repair.beforeImage} alt="Before repair" className="w-48 h-48 object-contain border rounded bg-gray-100" />
                                               </div>
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Nachher:' : 'After:'}</strong>
-                                                <img src={repair.afterImage} alt="After repair" className="w-24 h-24 object-cover border rounded" />
+                                                <img src={repair.afterImage} alt="After repair" className="w-48 h-48 object-contain border rounded bg-gray-100" />
                                               </div>
                                             </div>
                                           )}
