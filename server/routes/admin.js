@@ -641,7 +641,7 @@ router.post('/impersonate/:userId', authenticateToken, requireAdmin, async (req,
     }
 
     const pool = getPool();
-    const result = await pool.query('SELECT id, username, email, role FROM users WHERE id = $1', [targetUserId]);
+    const result = await pool.query('SELECT id, username, email, role, email_verified FROM users WHERE id = $1', [targetUserId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -658,7 +658,9 @@ router.post('/impersonate/:userId', authenticateToken, requireAdmin, async (req,
       {
         id: targetUser.id,
         username: targetUser.username,
+        email: targetUser.email,
         role: targetUser.role,
+        emailVerified: targetUser.email_verified,
         impersonating: true,
         originalAdminId: req.user.id,
         originalAdminUsername: req.user.username,
@@ -702,7 +704,7 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
     }
 
     const pool = getPool();
-    const result = await pool.query('SELECT id, username, email, role, credits FROM users WHERE id = $1', [originalAdminId]);
+    const result = await pool.query('SELECT id, username, email, role, credits, email_verified FROM users WHERE id = $1', [originalAdminId]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Original admin user not found' });
     }
@@ -714,7 +716,9 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
       {
         id: adminUser.id,
         username: adminUser.username,
-        role: adminUser.role
+        email: adminUser.email,
+        role: adminUser.role,
+        emailVerified: adminUser.email_verified
       },
       JWT_SECRET,
       { expiresIn: '7d' }

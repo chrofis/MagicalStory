@@ -11,7 +11,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 const { dbQuery, getPool } = require('../services/database');
-const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const { authenticateToken, generateToken, JWT_SECRET } = require('../middleware/auth');
 const { authLimiter, registerLimiter } = require('../middleware/rateLimit');
 const { log } = require('../utils/logger');
 
@@ -105,11 +105,7 @@ router.post('/register', registerLimiter, async (req, res) => {
 
     await logActivity(newUser.id, username, 'USER_REGISTERED', { email });
 
-    const token = jwt.sign(
-      { id: newUser.id, username: newUser.username, role: newUser.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = generateToken(newUser);
 
     console.log(`✅ User registered: ${newUser.username} (role: ${newUser.role})`);
 
@@ -173,11 +169,7 @@ router.post('/login', authLimiter, async (req, res) => {
     await logActivity(user.id, username, 'USER_LOGIN', {});
     await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = generateToken(user);
 
     console.log(`✅ User logged in: ${user.username} (role: ${user.role})`);
 
@@ -301,11 +293,7 @@ router.post('/firebase', authLimiter, async (req, res) => {
 
     await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
-    const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = generateToken(user);
 
     console.log(`✅ Firebase user authenticated: ${username}`);
 
@@ -683,15 +671,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
     const user = result.rows[0];
 
     // Generate new token with same 7-day expiry
-    const newToken = jwt.sign(
-      {
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const newToken = generateToken(user);
 
     // Log the refresh
     await logActivity(userId, user.username, 'TOKEN_REFRESHED', {});
