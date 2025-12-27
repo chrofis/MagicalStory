@@ -8691,7 +8691,8 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
     const characters = inputData.characters || [];
     const charsWithoutAvatars = characters.filter(char => {
       const avatars = char.avatars || char.clothingAvatars || {};
-      const hasAnyAvatar = Object.values(avatars).some(url => url && url.startsWith('data:image'));
+      // Only check actual avatar URLs (winter, standard, summer, formal), not metadata like status/stale/faceMatch
+      const hasAnyAvatar = Object.values(avatars).some(url => typeof url === 'string' && url.startsWith('data:image'));
       return !hasAnyAvatar && (char.photoUrl || char.bodyPhotoUrl); // Has photo but no avatars
     });
     if (charsWithoutAvatars.length > 0) {
