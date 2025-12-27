@@ -10,6 +10,8 @@ This is a quality assurance check for a personalized children's book service. Yo
 - Do NOT penalize for the artistic style being different from the photos
 - Characters should be RECOGNIZABLE (same identity, hair color, approximate age, general features) but in the requested art style
 - NOT ALL reference photos need to appear in every scene - check the PROMPT to see who should be present
+- CLOTHING must match what is shown in the reference photo for each character (color, type, style)
+- Do NOT invent "hierarchies" or excuses - if clothing doesn't match reference, it's an issue
 
 **INPUTS**
 1. GENERATED_IMAGE (the illustration to evaluate)
@@ -38,6 +40,7 @@ You MUST describe each character individually. Do not just state a count.
 For each character you described in Step 1, identify which reference photo they match:
 - State which reference photo (by name if in prompt, or by order "reference 1, 2, 3...")
 - Explain why: matching hair, face shape, age, gender
+- **Check clothing**: Does it match the reference photo? (color, type, style)
 - If no match: state "no matching reference" or "extra character"
 
 **CAMERA ANGLE RULES FOR CLOTHING:**
@@ -45,6 +48,7 @@ For each character you described in Step 1, identify which reference photo they 
 - SIDE VIEW: Partial clothing details visible
 - FRONT VIEW: Full clothing verification possible
 Do NOT penalize for missing prints/patterns when character is seen from behind.
+If clothing is DIFFERENT from reference photo, note it as an issue (e.g., "wearing blue shirt but reference shows red jacket").
 
 ---
 
