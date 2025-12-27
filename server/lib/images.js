@@ -251,8 +251,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Add evaluation prompt text
     parts.push({ text: evaluationPrompt });
 
-    // Use Gemini Flash for fast quality evaluation (or override if provided)
-    let modelId = qualityModelOverride || 'gemini-2.0-flash';
+    // Use Gemini 2.5 Flash for quality evaluation (or override if provided)
+    let modelId = qualityModelOverride || 'gemini-2.5-flash';
     if (qualityModelOverride) {
       log.debug(`🔧 [QUALITY] Using model override: ${modelId}`);
     }
@@ -303,8 +303,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Fallback: If 2.5 model fails at HTTP level, try 2.0
     if (!response.ok && modelId.includes('2.5')) {
       const error = await response.text();
-      log.warn(`⚠️  [QUALITY] Model ${modelId} failed (HTTP ${response.status}), falling back to gemini-2.0-flash. Error: ${error.substring(0, 200)}`);
-      modelId = 'gemini-2.0-flash';
+      log.warn(`⚠️  [QUALITY] Model ${modelId} failed (HTTP ${response.status}), falling back to gemini-2.0-flash-lite. Error: ${error.substring(0, 200)}`);
+      modelId = 'gemini-2.0-flash-lite';
       response = await callQualityAPI(modelId);
     }
 
@@ -408,8 +408,8 @@ FIX_TARGETS: [Only if Score < 8 and fixable issues exist. One JSON per line]
           data = retryData;
         } else {
           // Still blocked, now fall back to 2.0
-          log.warn(`⚠️  [QUALITY] Sanitized prompt still blocked, falling back to gemini-2.0-flash...`);
-          modelId = 'gemini-2.0-flash';
+          log.warn(`⚠️  [QUALITY] Sanitized prompt still blocked, falling back to gemini-2.0-flash-lite...`);
+          modelId = 'gemini-2.0-flash-lite';
           response = await callQualityAPI(modelId);
           if (!response.ok) {
             const error = await response.text();
@@ -420,8 +420,8 @@ FIX_TARGETS: [Only if Score < 8 and fixable issues exist. One JSON per line]
         }
       } else {
         // HTTP error on retry, fall back to 2.0
-        log.warn(`⚠️  [QUALITY] Sanitized prompt HTTP error, falling back to gemini-2.0-flash...`);
-        modelId = 'gemini-2.0-flash';
+        log.warn(`⚠️  [QUALITY] Sanitized prompt HTTP error, falling back to gemini-2.0-flash-lite...`);
+        modelId = 'gemini-2.0-flash-lite';
         response = await callQualityAPI(modelId);
         if (!response.ok) {
           const error = await response.text();
