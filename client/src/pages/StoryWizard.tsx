@@ -46,8 +46,20 @@ export default function StoryWizard() {
     return !!params.get('storyId');
   });
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total: number | null } | null>(null);
-  const [developerMode, setDeveloperMode] = useState(false);
+  const [developerMode, setDeveloperMode] = useState(() => {
+    // Persist dev mode in localStorage for admins
+    return localStorage.getItem('developer_mode') === 'true';
+  });
   const [imageGenMode, setImageGenMode] = useState<'parallel' | 'sequential' | null>(null); // null = server default
+
+  // Persist developer mode changes
+  useEffect(() => {
+    if (developerMode) {
+      localStorage.setItem('developer_mode', 'true');
+    } else {
+      localStorage.removeItem('developer_mode');
+    }
+  }, [developerMode]);
 
   // Developer skip options for faster testing
   const [devSkipOutline, setDevSkipOutline] = useState(false);
@@ -1137,6 +1149,65 @@ export default function StoryWizard() {
     setProgressiveStoryData(null);
     setCompletedPageImages({});
     setCoverImages({ frontCover: null, initialPage: null, backCover: null });
+
+    // Check for characters with stale or missing avatars
+    const charactersNeedingAvatars = characters
+      .filter(c => !excludedCharacters.includes(c.id))
+      .filter(c => !c.avatars || c.avatars.stale || c.avatars.status !== 'complete');
+
+    if (charactersNeedingAvatars.length > 0) {
+      console.log('[generateStory] Characters needing avatar regeneration:', charactersNeedingAvatars.map(c => c.name));
+      setGenerationProgress({
+        current: 1,
+        total: 100,
+        message: language === 'de'
+          ? `Aktualisiere Avatare für ${charactersNeedingAvatars.length} Charakter(e)...`
+          : language === 'fr'
+          ? `Mise à jour des avatars pour ${charactersNeedingAvatars.length} personnage(s)...`
+          : `Updating avatars for ${charactersNeedingAvatars.length} character(s)...`
+      });
+
+      // Regenerate avatars for each character that needs it
+      for (let i = 0; i < charactersNeedingAvatars.length; i++) {
+        const char = charactersNeedingAvatars[i];
+        try {
+          console.log(`[generateStory] Regenerating avatars for ${char.name} (${i + 1}/${charactersNeedingAvatars.length})`);
+          setGenerationProgress({
+            current: 2,
+            total: 100,
+            message: language === 'de'
+              ? `Generiere Avatare für ${char.name}...`
+              : language === 'fr'
+              ? `Génération des avatars pour ${char.name}...`
+              : `Generating avatars for ${char.name}...`
+          });
+
+          const result = await characterService.generateClothingAvatarsWithTraits(char);
+
+          if (result.success && result.avatars) {
+            const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
+            // Update characters state
+            setCharacters(prev => prev.map(c =>
+              c.id === char.id ? { ...c, avatars: freshAvatars } : c
+            ));
+            // Also update currentCharacter if it matches
+            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars } : prev);
+            // Save to storage
+            const currentData = await characterService.getCharacterData();
+            const updatedCharacters = currentData.characters.map(c =>
+              c.id === char.id ? { ...c, avatars: freshAvatars } : c
+            );
+            await characterService.saveCharacterData({ ...currentData, characters: updatedCharacters });
+            console.log(`[generateStory] ✅ Avatars regenerated for ${char.name}`);
+          } else {
+            console.warn(`[generateStory] ⚠️ Failed to regenerate avatars for ${char.name}: ${result.error}`);
+          }
+        } catch (error) {
+          console.error(`[generateStory] ❌ Error regenerating avatars for ${char.name}:`, error);
+        }
+      }
+    }
+
     // Use 0-100 scale to match server progress
     setGenerationProgress({
       current: 5,
