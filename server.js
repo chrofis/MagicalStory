@@ -6668,15 +6668,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
   } catch (error) {
     log.error(`❌ [STORYBOOK] Job ${jobId} failed:`, error);
 
-    // Refund reserved credits on failure
+    // Refund reserved credits on failure - PROPORTIONAL based on work completed
     try {
       const jobResult = await dbPool.query(
-        'SELECT user_id, credits_reserved FROM story_jobs WHERE id = $1',
+        'SELECT user_id, credits_reserved, progress FROM story_jobs WHERE id = $1',
         [jobId]
       );
       if (jobResult.rows.length > 0 && jobResult.rows[0].credits_reserved > 0) {
         const refundUserId = jobResult.rows[0].user_id;
-        const creditsToRefund = jobResult.rows[0].credits_reserved;
+        const totalCredits = jobResult.rows[0].credits_reserved;
+        const progressPercent = jobResult.rows[0].progress || 0;
+
+        // Calculate proportional refund: if 30% done, refund 70%
+        // This accounts for work already completed (images generated, etc.)
+        const refundPercent = Math.max(0, 100 - progressPercent) / 100;
+        const creditsToRefund = Math.floor(totalCredits * refundPercent);
+        const creditsUsed = totalCredits - creditsToRefund;
 
         // Get current balance
         const userResult = await dbPool.query(
@@ -6694,11 +6701,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             [newBalance, refundUserId]
           );
 
-          // Create refund transaction record
+          // Create refund transaction record with details about partial completion
+          const description = creditsUsed > 0
+            ? `Partial refund: ${creditsToRefund}/${totalCredits} credits (${progressPercent}% completed, ${creditsUsed} credits used)`
+            : `Full refund: ${creditsToRefund} credits - storybook generation failed`;
+
           await dbPool.query(
             `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, `Refunded ${creditsToRefund} credits - storybook generation failed`]
+            [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, description]
           );
 
           // Reset credits_reserved to prevent double refunds
@@ -6707,7 +6718,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             [jobId]
           );
 
-          log.info(`💳 [STORYBOOK] Refunded ${creditsToRefund} credits for failed job ${jobId}`);
+          log.info(`💳 [STORYBOOK] Refunded ${creditsToRefund}/${totalCredits} credits for failed job ${jobId} (${progressPercent}% was completed)`);
         }
       }
     } catch (refundErr) {
@@ -8298,15 +8309,21 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       log.error('❌ Failed to dump partial data:', dumpErr.message);
     }
 
-    // Refund reserved credits on failure
+    // Refund reserved credits on failure - PROPORTIONAL based on work completed
     try {
       const jobResult = await dbPool.query(
-        'SELECT user_id, credits_reserved FROM story_jobs WHERE id = $1',
+        'SELECT user_id, credits_reserved, progress FROM story_jobs WHERE id = $1',
         [jobId]
       );
       if (jobResult.rows.length > 0 && jobResult.rows[0].credits_reserved > 0) {
         const refundUserId = jobResult.rows[0].user_id;
-        const creditsToRefund = jobResult.rows[0].credits_reserved;
+        const totalCredits = jobResult.rows[0].credits_reserved;
+        const progressPercent = jobResult.rows[0].progress || 0;
+
+        // Calculate proportional refund: if 30% done, refund 70%
+        const refundPercent = Math.max(0, 100 - progressPercent) / 100;
+        const creditsToRefund = Math.floor(totalCredits * refundPercent);
+        const creditsUsed = totalCredits - creditsToRefund;
 
         // Get current balance
         const userResult = await dbPool.query(
@@ -8324,11 +8341,15 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             [newBalance, refundUserId]
           );
 
-          // Create refund transaction record
+          // Create refund transaction record with details about partial completion
+          const description = creditsUsed > 0
+            ? `Partial refund: ${creditsToRefund}/${totalCredits} credits (${progressPercent}% completed, ${creditsUsed} credits used)`
+            : `Full refund: ${creditsToRefund} credits - story generation failed`;
+
           await dbPool.query(
             `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, `Refunded ${creditsToRefund} credits - story generation failed`]
+            [refundUserId, creditsToRefund, newBalance, 'story_refund', jobId, description]
           );
 
           // Reset credits_reserved to prevent double refunds
@@ -8337,7 +8358,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             [jobId]
           );
 
-          log.error(`💳 Refunded ${creditsToRefund} credits for failed job ${jobId} (user balance: ${currentBalance} -> ${newBalance})`);
+          log.info(`💳 Refunded ${creditsToRefund}/${totalCredits} credits for failed job ${jobId} (${progressPercent}% was completed)`);
         }
       }
     } catch (refundErr) {
