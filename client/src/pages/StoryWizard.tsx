@@ -1568,11 +1568,11 @@ export default function StoryWizard() {
                     : 'Failed to update Visual Bible');
                 }
               } : undefined}
-              onRegenerateImage={storyId ? async (pageNumber: number) => {
+              onRegenerateImage={storyId ? async (pageNumber: number, editedScene?: string) => {
                 try {
-                  log.info('Regenerating image for page:', pageNumber);
+                  log.info('Regenerating image for page:', pageNumber, editedScene ? '(scene edited)' : '');
                   setIsGenerating(true);
-                  const result = await storyService.regenerateImage(storyId, pageNumber);
+                  const result = await storyService.regenerateImage(storyId, pageNumber, editedScene);
                   log.info('Regenerate result:', { hasImageData: !!result?.imageData, length: result?.imageData?.length, versionCount: result?.versionCount, creditsRemaining: result?.creditsRemaining });
                   if (!result?.imageData) {
                     log.error('No imageData in response!', result);
@@ -1583,6 +1583,8 @@ export default function StoryWizard() {
                     img.pageNumber === pageNumber ? {
                       ...img,
                       imageData: result.imageData,
+                      description: result.newDescription || img.description,  // Update description if scene was edited
+                      prompt: result.newPrompt,  // Store the prompt for dev mode
                       qualityScore: result.qualityScore,
                       qualityReasoning: result.qualityReasoning,
                       totalAttempts: result.totalAttempts,

@@ -1612,11 +1612,11 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
 app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { customPrompt } = req.body;
+    const { customPrompt, editedScene } = req.body;
     const pageNumber = parseInt(pageNum);
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
-    log.debug(`🔄 Regenerating image for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)`);
+    log.debug(`🔄 Regenerating image for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)${editedScene ? ' [EDITED SCENE]' : ''}`);
 
     // Check user credits first (-1 means infinite/unlimited)
     const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
@@ -1656,8 +1656,20 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       return res.status(400).json({ error: 'No scene description found. Please provide customPrompt.' });
     }
 
+    // Determine scene description to use
+    const originalDescription = sceneDesc?.description || '';
+    const newDescription = editedScene || customPrompt || originalDescription;
+    const sceneWasEdited = editedScene && editedScene !== originalDescription;
+
+    // Log scene changes for dev mode visibility
+    if (sceneWasEdited) {
+      console.log(`📝 [REGEN] SCENE EDITED for page ${pageNumber}:`);
+      console.log(`   Original: ${originalDescription.substring(0, 100)}${originalDescription.length > 100 ? '...' : ''}`);
+      console.log(`   New:      ${newDescription.substring(0, 100)}${newDescription.length > 100 ? '...' : ''}`);
+    }
+
     // Detect which characters appear in this scene
-    const sceneText = customPrompt || sceneDesc?.description || '';
+    const sceneText = newDescription;
     const sceneCharacters = getCharactersInScene(sceneText, storyData.characters || []);
     // Parse clothing category from scene description
     const clothingCategory = parseClothingCategory(sceneText) || 'standard';
@@ -1673,7 +1685,14 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     }
 
     // Build image prompt with scene-specific characters and visual bible
-    const imagePrompt = customPrompt || buildImagePrompt(sceneDesc.description, storyData, sceneCharacters, false, visualBible, pageNumber);
+    const originalPrompt = originalDescription ? buildImagePrompt(originalDescription, storyData, sceneCharacters, false, visualBible, pageNumber) : null;
+    const imagePrompt = customPrompt || buildImagePrompt(newDescription, storyData, sceneCharacters, false, visualBible, pageNumber);
+
+    // Log prompt changes for debugging
+    if (sceneWasEdited) {
+      console.log(`📝 [REGEN] PROMPT BUILT for page ${pageNumber}:`);
+      console.log(`   Prompt length: ${imagePrompt.length} chars`);
+    }
 
     // Clear the image cache for this prompt to force a new generation
     const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
@@ -1738,6 +1757,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     if (existingImage && !existingImage.imageVersions) {
       existingImage.imageVersions = [{
         imageData: existingImage.imageData,
+        description: existingImage.description || originalDescription,  // Scene description for this version
         prompt: existingImage.prompt,
         modelId: existingImage.modelId,
         createdAt: storyData.createdAt || new Date().toISOString(),
@@ -1748,6 +1768,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     // Create new version entry
     const newVersion = {
       imageData: imageResult.imageData,
+      description: newDescription,  // Scene description used for this version
       prompt: imagePrompt,
       modelId: imageResult.modelId || null,
       createdAt: new Date().toISOString(),
@@ -1825,7 +1846,15 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       // True original (from initial generation)
       originalImage: trueOriginalImage,
       originalScore: trueOriginalScore,
-      originalReasoning: trueOriginalReasoning
+      originalReasoning: trueOriginalReasoning,
+      // Scene editing info (for dev mode)
+      originalDescription,
+      newDescription,
+      originalPrompt,
+      newPrompt: imagePrompt,
+      sceneWasEdited,
+      // All image versions
+      imageVersions: sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions || []
     });
 
   } catch (err) {

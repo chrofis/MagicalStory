@@ -345,7 +345,7 @@ export const storyService = {
     return response;
   },
 
-  async regenerateImage(storyId: string, pageNum: number): Promise<{
+  async regenerateImage(storyId: string, pageNum: number, editedScene?: string): Promise<{
     imageData: string;
     qualityScore?: number;
     qualityReasoning?: string;
@@ -358,6 +358,11 @@ export const storyService = {
     creditsUsed?: number;
     creditsRemaining?: number;
     imageVersions?: ImageVersion[];
+    // Scene editing info for dev mode
+    originalDescription?: string;
+    newDescription?: string;
+    originalPrompt?: string;
+    newPrompt?: string;
   }> {
     const response = await api.post<{
       imageData: string;
@@ -372,8 +377,13 @@ export const storyService = {
       creditsUsed?: number;
       creditsRemaining?: number;
       imageVersions?: ImageVersion[];
+      originalDescription?: string;
+      newDescription?: string;
+      originalPrompt?: string;
+      newPrompt?: string;
     }>(
-      `/api/stories/${storyId}/regenerate/image/${pageNum}`
+      `/api/stories/${storyId}/regenerate/image/${pageNum}`,
+      { editedScene }
     );
     return response;
   },

@@ -52,7 +52,8 @@ export interface ReferencePhoto {
 // Individual image version (for user-initiated regenerations)
 export interface ImageVersion {
   imageData: string;
-  prompt?: string;
+  description?: string;  // Scene description (what user sees/edits)
+  prompt?: string;       // Full API prompt (for dev mode)
   modelId?: string;
   createdAt: string;
   isActive: boolean;
