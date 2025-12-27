@@ -681,7 +681,7 @@ export default function StoryWizard() {
               // Gender: only fill if blank (preserve user value)
               gender: prev.gender || (analysis.gender as 'male' | 'female' | 'other'),
               // Age: only fill if blank (preserve user value)
-              age: prev.age || analysis.age,
+              age: prev.age || analysis.age || '',
               // Photos
               photos: {
                 original: analysis.photos?.face || originalPhotoUrl,

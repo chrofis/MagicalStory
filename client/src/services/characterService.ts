@@ -42,6 +42,8 @@ interface CharacterApiResponse {
   fears?: string[];
   // Clothing (snake_case + camelCase legacy)
   clothing?: string;
+  clothing_style?: string;
+  clothingStyle?: string;
   clothing_colors?: string;
   clothingColors?: string;
   clothing_avatars?: CharacterAvatars;
@@ -346,7 +348,7 @@ export const characterService = {
     };
     clothing?: {
       current?: string;
-      colors?: string;
+      style?: string;
     };
   }> {
     try {
@@ -365,7 +367,8 @@ export const characterService = {
           face?: string;  // Face description
           hair_color?: string;
           clothing?: string;
-          clothingColors?: string;  // Main colors of clothing
+          clothingStyle?: string;  // Colors and patterns of clothing
+          clothingColors?: string;  // Legacy: main colors of clothing
           other_features?: string;  // Distinctive markings (glasses, etc.)
         };
         error?: string;
