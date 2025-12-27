@@ -29,8 +29,7 @@ const log = {
 
 // Credit costs for various operations (easy to configure)
 const CREDIT_COSTS = {
-  IMAGE_REGENERATION: 5,  // Cost to regenerate a single scene image
-  SCENE_DESCRIPTION_REGENERATION: 2,  // Cost to regenerate a scene description (uses Claude API)
+  IMAGE_REGENERATION: 5,  // Cost to regenerate a single scene image (includes scene description)
 };
 
 // Initialize BOTH Stripe clients - test for admins/developers, live for regular users
@@ -1523,35 +1522,13 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
 // NOT MIGRATED - These remain active in server.js (AI generation dependencies)
 // =============================================================================
 
-// Regenerate scene description for a specific page (costs credits)
+// Regenerate scene description for a specific page (no credit cost - image regeneration covers it)
 app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
-    const creditCost = CREDIT_COSTS.SCENE_DESCRIPTION_REGENERATION;
 
-    // Check if admin is impersonating - they get free regenerations
-    const isImpersonating = req.user.impersonating === true;
-    if (isImpersonating) {
-      log.info(`🔄 [IMPERSONATE] Admin regenerating scene description for story ${id}, page ${pageNumber} (FREE - impersonating)`);
-    } else {
-      log.debug(`🔄 Regenerating scene description for story ${id}, page ${pageNumber} (cost: ${creditCost} credits)`);
-    }
-
-    // Check user credits first (-1 means infinite/unlimited, impersonating admins also skip)
-    const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const userCredits = userResult.rows[0].credits || 0;
-    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
-    if (!hasInfiniteCredits && userCredits < creditCost) {
-      return res.status(402).json({
-        error: 'Insufficient credits',
-        required: creditCost,
-        available: userCredits
-      });
-    }
+    log.debug(`🔄 Regenerating scene description for story ${id}, page ${pageNumber}`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -1621,31 +1598,12 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
       [JSON.stringify(storyData), id]
     );
 
-    // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
-    let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
-    if (!hasInfiniteCredits) {
-      await dbPool.query(
-        'UPDATE users SET credits = credits - $1 WHERE id = $2',
-        [creditCost, req.user.id]
-      );
-      // Log credit transaction
-      await dbPool.query(
-        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
-         VALUES ($1, $2, $3, 'scene_description_regeneration', $4)`,
-        [req.user.id, -creditCost, newCredits, `Regenerate scene description for page ${pageNumber}`]
-      );
-      console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber} (cost: ${creditCost} credits, remaining: ${newCredits})`);
-    } else if (isImpersonating) {
-      console.log(`✅ [IMPERSONATE] Scene description regenerated for story ${id}, page ${pageNumber} (FREE - admin impersonating)`);
-    } else {
-      console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber} (unlimited credits)`);
-    }
+    console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber}`);
 
     res.json({
       success: true,
       pageNumber,
-      sceneDescription: newSceneDescription,
-      creditsRemaining: newCredits
+      sceneDescription: newSceneDescription
     });
 
   } catch (err) {
