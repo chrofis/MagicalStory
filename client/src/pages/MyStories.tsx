@@ -12,7 +12,8 @@ import { createLogger } from '@/services/logger';
 const log = createLogger('MyStories');
 
 // Simple cache for stories to prevent reload on navigation
-let storiesCache: { data: StoryListItem[] | null; total: number; timestamp: number } = { data: null, total: 0, timestamp: 0 };
+// Includes userId to invalidate cache when user changes (login/logout/impersonation)
+let storiesCache: { data: StoryListItem[] | null; total: number; timestamp: number; userId: string | null } = { data: null, total: 0, timestamp: 0, userId: null };
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const STORIES_PER_PAGE = 6;
 const AUTO_LOAD_LIMIT = 18; // Auto-load first 18 stories, then show "Load All"
@@ -192,7 +193,7 @@ export default function MyStories() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { showSuccess, showInfo } = useToast();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -341,6 +342,19 @@ export default function MyStories() {
 
   const t = translations[language as keyof typeof translations] || translations.en;
 
+  // Clear stories and reset load state when user changes (login/logout/impersonation)
+  useEffect(() => {
+    // If user changed, reset everything to force fresh load
+    const currentUserId = user?.id || null;
+    if (storiesCache.userId !== null && storiesCache.userId !== currentUserId) {
+      log.debug(`User changed (${storiesCache.userId} -> ${currentUserId}), clearing stories`);
+      setStories([]);
+      setTotalStories(0);
+      loadAttemptedRef.current = false;
+      storiesCache = { data: null, total: 0, timestamp: 0, userId: null };
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     // Wait for auth to load before checking authentication
     if (authLoading) return;
@@ -365,14 +379,19 @@ export default function MyStories() {
     try {
       setLoadError(null);
 
-      // Check cache first (only for initial load)
+      // Check cache first (only for initial load, and only if same user)
       const now = Date.now();
-      if (!loadMore && !loadAll && storiesCache.data && (now - storiesCache.timestamp) < CACHE_DURATION) {
+      const currentUserId = user?.id || null;
+      const cacheValid = storiesCache.data &&
+        storiesCache.userId === currentUserId &&
+        (now - storiesCache.timestamp) < CACHE_DURATION;
+
+      if (!loadMore && !loadAll && cacheValid) {
         const cacheAge = Math.round((now - storiesCache.timestamp) / 1000);
-        log.debug(`Using cached stories (${storiesCache.data.length} stories, cache age: ${cacheAge}s)`);
-        setStories(storiesCache.data);
+        log.debug(`Using cached stories (${storiesCache.data!.length} stories, cache age: ${cacheAge}s, user: ${currentUserId})`);
+        setStories(storiesCache.data!);
         setTotalStories(storiesCache.total);
-        setHasMore(storiesCache.data.length < storiesCache.total);
+        setHasMore(storiesCache.data!.length < storiesCache.total);
         setIsLoading(false);
         return;
       }
@@ -400,13 +419,13 @@ export default function MyStories() {
         setStories(prev => {
           const updatedStories = [...prev, ...storyList];
           // Update cache with merged data
-          storiesCache = { data: updatedStories, total: pagination.total, timestamp: now };
+          storiesCache = { data: updatedStories, total: pagination.total, timestamp: now, userId: currentUserId };
           return updatedStories;
         });
       } else {
         setStories(storyList);
         // Update cache
-        storiesCache = { data: storyList, total: pagination.total, timestamp: now };
+        storiesCache = { data: storyList, total: pagination.total, timestamp: now, userId: currentUserId };
       }
 
       setTotalStories(pagination.total);
@@ -419,7 +438,7 @@ export default function MyStories() {
         ? 'Impossible de charger les histoires'
         : 'Failed to load stories');
       // Invalidate cache on error
-      storiesCache = { data: null, total: 0, timestamp: 0 };
+      storiesCache = { data: null, total: 0, timestamp: 0, userId: null };
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -475,7 +494,7 @@ export default function MyStories() {
       setStories(updatedStories);
       setTotalStories(prev => Math.max(0, prev - 1));
       // Invalidate cache
-      storiesCache = { data: updatedStories, total: Math.max(0, totalStories - 1), timestamp: Date.now() };
+      storiesCache = { data: updatedStories, total: Math.max(0, totalStories - 1), timestamp: Date.now(), userId: user?.id || null };
       // Remove from selection if selected
       setSelectedIds(prev => {
         const newSet = new Set(prev);
