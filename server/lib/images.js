@@ -294,86 +294,84 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
     const responseText = data.candidates[0].content.parts[0].text.trim();
 
-    // Parse the new format: "Score: XX/100\n\nReasoning: ..."
+    // Try to parse as JSON (new format with 0-10 scale)
+    let parsedJson = null;
+    try {
+      // Extract JSON from response (may have markdown code blocks)
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedJson = JSON.parse(jsonMatch[0]);
+      }
+    } catch (e) {
+      log.debug(`⭐ [QUALITY] Response is not JSON, trying legacy format`);
+    }
+
+    if (parsedJson && typeof parsedJson.score === 'number') {
+      // New JSON format with 0-10 scale
+      const rawScore = parsedJson.score;
+      const score = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
+      const verdict = parsedJson.final_verdict || 'UNKNOWN';
+      const reasoning = parsedJson.reasoning || '';
+      const analysis = parsedJson.analysis || null;
+      const evaluation = parsedJson.evaluation || {};
+
+      log.verbose(`⭐ [QUALITY] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
+      if (reasoning) {
+        log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning}`);
+      }
+      if (analysis?.defects && analysis.defects !== 'None') {
+        log.verbose(`⭐ [QUALITY] Defects: ${analysis.defects}`);
+      }
+
+      // For covers, check if there are text issues in the analysis
+      let textIssue = null;
+      if (evaluationType === 'cover' && analysis?.defects) {
+        const defects = analysis.defects.toLowerCase();
+        if (defects.includes('text') || defects.includes('spell') || defects.includes('letter')) {
+          textIssue = 'TEXT_ERROR';
+        }
+      }
+
+      return {
+        score,
+        rawScore, // Original 0-10 score
+        verdict,
+        reasoning: responseText,
+        analysis,
+        evaluation,
+        textIssue,
+        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+        modelId: modelId
+      };
+    }
+
+    // Fallback: Parse legacy format "Score: XX/100"
     const scoreMatch = responseText.match(/Score:\s*(\d+)\/100/i);
-    if (!scoreMatch) {
-      // Fallback to old format (just a number)
-      const score = parseFloat(responseText);
-      if (!isNaN(score) && score >= 0 && score <= 100) {
-        log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100 (legacy format, model: ${modelId})`);
-        return {
-          score,
-          reasoning: responseText,
-          usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
-          modelId: modelId
-        };
-      }
-      log.warn(`⚠️  [QUALITY] Could not parse score from response (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 100));
-      return null;
+    if (scoreMatch) {
+      const score = parseInt(scoreMatch[1]);
+      log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100 (legacy format)`);
+      return {
+        score,
+        reasoning: responseText,
+        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+        modelId: modelId
+      };
     }
 
-    const score = parseInt(scoreMatch[1]);
-    // Match "Reasoning:" or "Reasoning" (with or without colon) - captures until "Score:" at end
-    const reasoningMatch = responseText.match(/Reasoning:?\s*([\s\S]*?)(?=\nScore:|$)/i);
-    const reasoning = reasoningMatch ? reasoningMatch[1].trim() : '';
-
-    // Parse cover-specific fields (text error detection)
-    const textErrorOnlyMatch = responseText.match(/Text_Error_Only:\s*(YES|NO)/i);
-    const expectedTextMatch = responseText.match(/Expected_Text:\s*([^\n]+)/i);
-    const actualTextMatch = responseText.match(/Actual_Text:\s*([^\n]+)/i);
-    const textIssueMatch = responseText.match(/Text_Issue:\s*(NONE|MISSPELLED|WRONG_WORDS|MISSING|ILLEGIBLE|PARTIAL|UNWANTED)/i);
-
-    const textErrorOnly = textErrorOnlyMatch ? textErrorOnlyMatch[1].toUpperCase() === 'YES' : false;
-    const expectedText = expectedTextMatch ? expectedTextMatch[1].trim() : null;
-    const actualText = actualTextMatch ? actualTextMatch[1].trim() : null;
-    const textIssue = textIssueMatch ? textIssueMatch[1].toUpperCase() : null;
-
-    // Debug logging for quality parsing
-    if (evaluationType === 'cover') {
-      log.verbose(`⭐ [QUALITY PARSE] Raw score: ${score}, Text_Issue: ${textIssue || 'not found'}, Expected_Text: ${expectedText || 'not found'}, Actual_Text: ${actualText || 'not found'}`);
-      // If score is 0 but no text issue detected, log full response for debugging
-      if (score === 0 && (!textIssue || textIssue === 'NONE')) {
-        log.warn(`⚠️  [QUALITY] AI returned score 0 but no text issue detected! Full response (first 500 chars):\n${responseText.substring(0, 500)}`);
-      }
+    // Fallback: Try parsing just a number (0-100)
+    const numericScore = parseFloat(responseText);
+    if (!isNaN(numericScore) && numericScore >= 0 && numericScore <= 100) {
+      log.verbose(`⭐ [QUALITY] Image quality score: ${numericScore}/100 (numeric format)`);
+      return {
+        score: numericScore,
+        reasoning: responseText,
+        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
+        modelId: modelId
+      };
     }
 
-    // ENFORCE text error = score 0 for covers (Gemini sometimes ignores this instruction)
-    let finalScore = score;
-
-    // Exception: If no text was expected and text is missing, that's correct behavior
-    const noTextExpected = expectedText && expectedText.toUpperCase() === 'NO TEXT';
-    const isExpectedNoText = noTextExpected && textIssue === 'MISSING';
-
-    if (evaluationType === 'cover' && textIssue && textIssue !== 'NONE' && !isExpectedNoText) {
-      log.warn(`⚠️  [QUALITY] Cover text error detected (${textIssue}) - enforcing score = 0`);
-      log.warn(`⚠️  [QUALITY] Expected: "${expectedText}" | Actual: "${actualText}"`);
-      log.warn(`⚠️  [QUALITY] Original Gemini score was ${score}, overriding to 0`);
-      finalScore = 0;
-    } else if (isExpectedNoText) {
-      log.verbose(`✅ [QUALITY] No text expected and none found - correct behavior`);
-    }
-
-    log.verbose(`⭐ [QUALITY] Image quality score: ${finalScore}/100`);
-    if (textIssue && textIssue !== 'NONE') {
-      log.verbose(`⭐ [QUALITY] Text issue detected: ${textIssue}`);
-      log.verbose(`⭐ [QUALITY] Expected: "${expectedText}" | Actual: "${actualText}"`);
-      log.verbose(`⭐ [QUALITY] Text error only: ${textErrorOnly}`);
-    }
-    if (reasoning) {
-      log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning.substring(0, 150)}...`);
-    }
-
-    // Return score, full raw response, text-specific info, usage, and model for covers
-    return {
-      score: finalScore,
-      reasoning: responseText, // Return full raw API response for transparency
-      textErrorOnly,
-      expectedText,
-      actualText,
-      textIssue,
-      usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens },
-      modelId: modelId  // Include quality model for usage tracking
-    };
+    log.warn(`⚠️  [QUALITY] Could not parse score from response (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 200));
+    return null;
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
     return null;
