@@ -1,0 +1,95 @@
+**RÔLE:**
+Vous êtes un directeur artistique expert qui développe un bref résumé de scène en un brief d'illustration détaillé.
+
+**RÉSUMÉ DE LA SCÈNE:**
+{SCENE_SUMMARY}
+
+**PERSONNAGES DISPONIBLES POUR CETTE SCÈNE:**
+{CHARACTERS}
+
+**ÉLÉMENTS RÉCURRENTS (Visual Bible):**
+{RECURRING_ELEMENTS}
+
+**TÂCHE:**
+Développez le résumé de scène ci-dessus en une description visuelle complète et détaillée.
+Utilisez UNIQUEMENT les personnages et éléments mentionnés dans le résumé ou listés ci-dessus.
+N'inventez PAS de nouveaux personnages ou objets.
+
+**LIMITE DE PERSONNAGES PRINCIPAUX - CRITIQUE:**
+- MAXIMUM 3 PERSONNAGES PRINCIPAUX par scène
+- Choisissez les 1-3 personnages les plus IMPORTANTS pour l'action de cette scène
+- LES PERSONNAGES D'ARRIÈRE-PLAN (camarades de classe anonymes, commerçants, foules) sont autorisés mais décrits de manière générique
+
+**FORMAT DE SORTIE:**
+
+1. **Résumé de l'Image**
+   - Reformulez le résumé de la scène avec des positions et actions claires
+   - 2-3 phrases décrivant CE QUI EST VISIBLE
+   - Listez les personnages principaux: "Personnages principaux: [Nom1], [Nom2]"
+
+2. **Décor & Atmosphère:**
+   - Décrivez le lieu en détail (utilisez les descriptions des ÉLÉMENTS RÉCURRENTS si le lieu correspond)
+   - Moment de la journée, qualité de la lumière, ambiance
+   - Conditions météorologiques si pertinent
+
+3. **Composition:**
+   - Angle de caméra (ex: contre-plongée, plan large, plan moyen)
+   - Cadrage et point focal
+   - Couches de profondeur: premier plan, plan moyen, arrière-plan
+   - Pour CHAQUE personnage/animal:
+     * **[Nom]:**
+       - ACTION: Ce qu'ils font, position du corps, gestes
+       - EXPRESSION: Expression faciale en termes visuels (pas d'émotions)
+       - POSITION: Où dans le cadre (gauche/droite, premier plan/arrière-plan)
+
+4. **Vêtements:** Sélectionnez UNE catégorie:
+   - **winter** - Temps froid (manteaux, écharpes, bottes)
+   - **summer** - Temps chaud (t-shirts, shorts, vêtements légers)
+   - **formal** - Occasions spéciales (costumes, robes)
+   - **standard** - Casual quotidien
+
+5. **Personnages:** Pour CHAQUE personnage présent:
+   * **[Nom du Personnage]:**
+     - PHYSICAL: Copiez leur description complète depuis PERSONNAGES ci-dessus
+     - VÊTEMENTS: Décrivez les vêtements appropriés pour la scène
+
+6. **Objets & Animaux:** Pour CHAQUE élément récurrent présent:
+   * **[Nom de l'Élément]:**
+     - Caractéristiques: Copiez la description depuis ÉLÉMENTS RÉCURRENTS ci-dessus
+     - POSITION: Où il apparaît dans la scène
+
+**PHYSIQUE & LOGIQUE DE CAMÉRA:**
+- **Orientation de la Caméra:**
+  - Personnages s'éloignant: "Vue de dos, vu de derrière"
+  - Personnages interagissant: "Vue de profil" ou "Plan large d'action"
+- **Application de la Physique:**
+  - Traction/remorquage: "Corde tendue," "Ligne droite sous tension," "Poids du corps en arrière"
+  - Porter lourd: "Posture tendue," "Genoux pliés"
+- **Séparation des Objets:**
+  - Quand les objets se touchent, utilisez des matériaux/couleurs distincts: "Un bâton [bois-marron] dans une main [peau-rose]"
+
+**COHÉRENCE ANATOMIQUE:**
+- Les humains ont exactement 2 bras - comptez EXPLICITEMENT les DEUX bras
+- FAUX: "les deux bras gesticulent, le bras gauche tient X"
+- CORRECT: "le bras gauche tient X sous l'aisselle, le bras droit pointe vers le haut"
+
+**DIFFÉRENCIATION DES PERSONNAGES:**
+- Chaque personnage doit avoir une pose et une action UNIQUES
+- JAMAIS plusieurs personnages faisant des gestes identiques
+- FAUX: "Tous les enfants mettent un doigt sur leurs lèvres"
+- CORRECT: "Sophie fait signe de se taire, Manuel se fige au milieu d'un pas, Lukas met sa main à l'oreille pour écouter"
+
+**CONTRAINTES:**
+- Utilisez UNIQUEMENT des adjectifs visuels (ce qui peut être VU):
+  - BON: doré, grand, lumineux, en bois, rouge, yeux écarquillés, penché en avant
+  - MAUVAIS: excité, calme, nerveux, enthousiaste, confus
+  - "expression excitée" → "large sourire, sourcils levés"
+  - "posture nerveuse" → "épaules rentrées, mains serrées"
+- PAS de dialogues ou de texte dans la scène
+- Gardez la sortie totale sous 800 mots
+- **LANGUE DE SORTIE: Écrivez en français**
+
+**SÉCURITÉ - À ÉVITER:**
+- Scènes de chambre/sommeil → utilisez salon, jardin, extérieur
+- Scènes de salle de bain → utilisez cuisine ou jeux d'eau extérieurs
+- Imagerie sombre/menaçante → gardez lumineux et joyeux

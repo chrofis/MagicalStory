@@ -137,7 +137,8 @@ const {
   buildBasePrompt,
   buildStoryPrompt,
   buildSceneDescriptionPrompt,
-  buildImagePrompt
+  buildImagePrompt,
+  buildSceneExpansionPrompt
 } = require('./server/lib/storyHelpers');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
@@ -1669,24 +1670,15 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
 
     // Determine scene description to use
     const originalDescription = sceneDesc?.description || '';
-    const newDescription = editedScene || customPrompt || originalDescription;
+    const inputDescription = editedScene || customPrompt || originalDescription;
     const sceneWasEdited = editedScene && editedScene !== originalDescription;
 
     // Log scene changes for dev mode visibility
     if (sceneWasEdited) {
       console.log(`📝 [REGEN] SCENE EDITED for page ${pageNumber}:`);
       console.log(`   Original: ${originalDescription.substring(0, 100)}${originalDescription.length > 100 ? '...' : ''}`);
-      console.log(`   New:      ${newDescription.substring(0, 100)}${newDescription.length > 100 ? '...' : ''}`);
+      console.log(`   New:      ${inputDescription.substring(0, 100)}${inputDescription.length > 100 ? '...' : ''}`);
     }
-
-    // Detect which characters appear in this scene
-    const sceneText = newDescription;
-    const sceneCharacters = getCharactersInScene(sceneText, storyData.characters || []);
-    // Parse clothing category from scene description
-    const clothingCategory = parseClothingCategory(sceneText) || 'standard';
-    // Use detailed photo info (with names) for labeled reference images
-    const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
-    log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}`);
 
     // Get visual bible from stored story (for recurring elements)
     const visualBible = storyData.visualBible || null;
@@ -1695,9 +1687,40 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       log.debug(`📖 [REGEN] Visual Bible: ${relevantEntries.length} entries relevant to page ${pageNumber}`);
     }
 
+    // Detect which characters appear in this scene (from input description)
+    const sceneCharacters = getCharactersInScene(inputDescription, storyData.characters || []);
+
+    // Expand short scene summary to full Art Director format
+    // This ensures regenerated images have the same detailed prompts as original generation
+    let expandedDescription = inputDescription;
+    const isShortSummary = inputDescription.length < 500 && !inputDescription.includes('**Setting');
+
+    if (isShortSummary) {
+      console.log(`📝 [REGEN] Expanding short scene summary (${inputDescription.length} chars) to full Art Director format...`);
+      const language = storyData.language || 'English';
+      const expansionPrompt = buildSceneExpansionPrompt(inputDescription, storyData, sceneCharacters, visualBible, language);
+
+      try {
+        const expansionResult = await callClaudeAPI(expansionPrompt, 2048);
+        expandedDescription = expansionResult.text;
+        console.log(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
+        log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
+      } catch (expansionError) {
+        log.error(`⚠️  [REGEN] Scene expansion failed, using original summary:`, expansionError.message);
+        // Continue with short summary if expansion fails
+      }
+    }
+
+    // Parse clothing category from expanded description
+    const clothingCategory = parseClothingCategory(expandedDescription) || 'standard';
+    // Use detailed photo info (with names) for labeled reference images
+    const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+    log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}`);
+
     // Build image prompt with scene-specific characters and visual bible
-    const originalPrompt = originalDescription ? buildImagePrompt(originalDescription, storyData, sceneCharacters, false, visualBible, pageNumber) : null;
-    const imagePrompt = customPrompt || buildImagePrompt(newDescription, storyData, sceneCharacters, false, visualBible, pageNumber);
+    // Use isStorybook=true to include Visual Bible section in prompt
+    const originalPrompt = originalDescription ? buildImagePrompt(originalDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true) : null;
+    const imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true);
 
     // Log prompt changes for debugging
     if (sceneWasEdited) {
@@ -1739,7 +1762,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     const newImageData = {
       pageNumber,
       imageData: imageResult.imageData,
-      description: sceneDesc?.description || customPrompt,
+      description: expandedDescription,  // Store the full expanded scene description
       prompt: imagePrompt,  // Store the prompt used for this regeneration
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning || null,
@@ -1779,7 +1802,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     // Create new version entry
     const newVersion = {
       imageData: imageResult.imageData,
-      description: newDescription,  // Scene description used for this version
+      description: expandedDescription,  // Full expanded scene description used for this version
       prompt: imagePrompt,
       modelId: imageResult.modelId || null,
       createdAt: new Date().toISOString(),
@@ -1862,10 +1885,12 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       originalReasoning: trueOriginalReasoning,
       // Scene editing info (for dev mode)
       originalDescription,
-      newDescription,
+      newDescription: expandedDescription,  // Full expanded description
+      inputDescription,  // What user provided (before expansion)
       originalPrompt,
       newPrompt: imagePrompt,
       sceneWasEdited,
+      sceneWasExpanded: isShortSummary,  // Flag if expansion was done
       // All image versions
       imageVersions: sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions || []
     });

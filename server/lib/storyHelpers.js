@@ -1163,6 +1163,99 @@ Important:
 - Age-appropriate for ${inputData.ageFrom || 3}-${inputData.ageTo || 8} years old`;
 }
 
+/**
+ * Build scene expansion prompt for regeneration
+ * Takes a short scene summary and expands it to full Art Director format
+ */
+function buildSceneExpansionPrompt(sceneSummary, inputData, sceneCharacters, visualBible, language = 'en') {
+  // Build character details for prompt
+  let characterDetails = '';
+  if (sceneCharacters && sceneCharacters.length > 0) {
+    characterDetails = sceneCharacters.map(char => {
+      const physicalDesc = buildCharacterPhysicalDescription(char);
+      return `* **${char.name}:** ${physicalDesc}`;
+    }).join('\n');
+  } else {
+    characterDetails = '(No main characters with reference photos in this scene)';
+  }
+
+  // Build recurring elements from Visual Bible
+  let recurringElements = '';
+  if (visualBible) {
+    const elements = [];
+
+    // Add animals
+    if (visualBible.animals && visualBible.animals.length > 0) {
+      visualBible.animals.forEach(animal => {
+        elements.push(`* **${animal.name}:** ${animal.description}`);
+      });
+    }
+
+    // Add artifacts
+    if (visualBible.artifacts && visualBible.artifacts.length > 0) {
+      visualBible.artifacts.forEach(artifact => {
+        elements.push(`* **${artifact.name}:** ${artifact.description}`);
+      });
+    }
+
+    // Add locations
+    if (visualBible.locations && visualBible.locations.length > 0) {
+      visualBible.locations.forEach(location => {
+        elements.push(`* **${location.name}:** ${location.description}`);
+      });
+    }
+
+    // Add secondary characters
+    if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
+      visualBible.secondaryCharacters.forEach(char => {
+        elements.push(`* **${char.name}:** ${char.description}`);
+      });
+    }
+
+    recurringElements = elements.length > 0 ? elements.join('\n') : '(No recurring elements defined)';
+  } else {
+    recurringElements = '(No recurring elements defined)';
+  }
+
+  // Select language-appropriate template
+  const langCode = (language || 'en').toLowerCase();
+  let template = null;
+
+  if (langCode === 'de' && PROMPT_TEMPLATES.sceneExpansionDe) {
+    template = PROMPT_TEMPLATES.sceneExpansionDe;
+  } else if (langCode === 'fr' && PROMPT_TEMPLATES.sceneExpansionFr) {
+    template = PROMPT_TEMPLATES.sceneExpansionFr;
+  } else if (PROMPT_TEMPLATES.sceneExpansion) {
+    template = PROMPT_TEMPLATES.sceneExpansion;
+  }
+
+  if (template) {
+    return fillTemplate(template, {
+      SCENE_SUMMARY: sceneSummary,
+      CHARACTERS: characterDetails,
+      RECURRING_ELEMENTS: recurringElements,
+      LANGUAGE: langCode === 'de' ? 'Deutsch' : langCode === 'fr' ? 'Français' : 'English'
+    });
+  }
+
+  // Fallback if templates not loaded
+  return `Expand this scene summary into a detailed illustration brief:
+
+Scene Summary: ${sceneSummary}
+
+Characters: ${characterDetails}
+
+Recurring Elements: ${recurringElements}
+
+Output a detailed scene description with:
+1. Image Summary
+2. Setting & Atmosphere
+3. Composition (with character positions and actions)
+4. Clothing category
+5. Characters (with full physical descriptions)
+6. Objects & Animals (if applicable)`;
+}
+
 // ============================================================================
 // EXPORTS
 // ============================================================================
@@ -1197,5 +1290,6 @@ module.exports = {
   buildBasePrompt,
   buildStoryPrompt,
   buildSceneDescriptionPrompt,
-  buildImagePrompt
+  buildImagePrompt,
+  buildSceneExpansionPrompt
 };

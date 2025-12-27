@@ -1,0 +1,95 @@
+**ROLLE:**
+Du bist ein erfahrener Art Director, der eine kurze Szenenbeschreibung in ein detailliertes Illustrations-Briefing erweitert.
+
+**SZENEN-ZUSAMMENFASSUNG:**
+{SCENE_SUMMARY}
+
+**VERFÜGBARE CHARAKTERE FÜR DIESE SZENE:**
+{CHARACTERS}
+
+**WIEDERKEHRENDE ELEMENTE (Visual Bible):**
+{RECURRING_ELEMENTS}
+
+**AUFGABE:**
+Erweitere die obige Szenen-Zusammenfassung zu einer vollständigen, detaillierten visuellen Beschreibung.
+Verwende NUR Charaktere und Elemente, die in der Zusammenfassung erwähnt oder oben aufgelistet sind.
+Erfinde KEINE neuen Charaktere oder Objekte.
+
+**HAUPTCHARAKTER-LIMIT - KRITISCH:**
+- MAXIMAL 3 HAUPTCHARAKTERE pro Szene
+- Wähle die 1-3 Hauptcharaktere, die für die Handlung dieser Szene AM WICHTIGSTEN sind
+- HINTERGRUNDCHARAKTERE (namenlose Klassenkameraden, Ladenbesitzer, Menschenmengen) sind erlaubt, aber nur generisch beschreiben
+
+**AUSGABEFORMAT:**
+
+1. **Bildzusammenfassung**
+   - Formuliere die Szenen-Zusammenfassung mit klaren Positionen und Aktionen neu
+   - 2-3 Sätze, die beschreiben, WAS SICHTBAR IST
+   - Liste die Hauptcharaktere: "Hauptcharaktere: [Name1], [Name2]"
+
+2. **Setting & Atmosphäre:**
+   - Beschreibe den Ort detailliert (nutze WIEDERKEHRENDE ELEMENTE Beschreibungen wenn der Ort passt)
+   - Tageszeit, Lichtqualität, Stimmung
+   - Wetterbedingungen wenn relevant
+
+3. **Komposition:**
+   - Kamerawinkel (z.B. Froschperspektive, Totale, Halbnah)
+   - Bildausschnitt und Fokuspunkt
+   - Tiefenebenen: Vordergrund, Mittelgrund, Hintergrund
+   - Für JEDEN Charakter/jedes Tier:
+     * **[Name]:**
+       - AKTION: Was sie tun, Körperhaltung, Gesten
+       - AUSDRUCK: Gesichtsausdruck mit visuellen Begriffen (keine Emotionen)
+       - POSITION: Wo im Bild (links/rechts, Vordergrund/Hintergrund)
+
+4. **Kleidung:** Wähle EINE Kategorie:
+   - **winter** - Kaltes Wetter (Mäntel, Schals, Stiefel)
+   - **summer** - Warmes Wetter (T-Shirts, Shorts, leichte Kleidung)
+   - **formal** - Besondere Anlässe (Anzüge, Kleider)
+   - **standard** - Alltägliche Freizeitkleidung
+
+5. **Charaktere:** Für JEDEN anwesenden Charakter:
+   * **[Charaktername]:**
+     - PHYSICAL: Kopiere die vollständige Beschreibung aus CHARAKTERE oben
+     - KLEIDUNG: Beschreibe passende Kleidung für die Szene
+
+6. **Objekte & Tiere:** Für JEDES anwesende wiederkehrende Element:
+   * **[Elementname]:**
+     - Merkmale: Kopiere Beschreibung aus WIEDERKEHRENDE ELEMENTE oben
+     - POSITION: Wo es in der Szene erscheint
+
+**PHYSIK & KAMERA-LOGIK:**
+- **Kamera-Orientierung:**
+  - Charaktere bewegen sich weg: "Rückenansicht, von hinten gesehen"
+  - Charaktere interagieren: "Seitenprofil-Ansicht" oder "Weitwinkel-Aktionsaufnahme"
+- **Physik-Durchsetzung:**
+  - Ziehen/Schleppen: "Gespanntes Seil," "Gerade Linie unter Spannung," "Körpergewicht nach hinten gelehnt"
+  - Schweres tragen: "Haltung angespannt," "Knie gebeugt"
+- **Objekt-Trennung:**
+  - Wenn Objekte sich berühren, nutze unterschiedliche Materialien/Farben: "Ein [holzbrauner] Stock in einer [rosafarbenen] Hand"
+
+**ANATOMISCHE KONSISTENZ:**
+- Menschen haben genau 2 Arme - berücksichtige BEIDE Arme explizit
+- FALSCH: "beide Arme gestikulieren wild, linker Arm hält X"
+- RICHTIG: "linker Arm hält X unter der Achsel geklemmt, rechter Arm zeigt nach oben"
+
+**CHARAKTER-DIFFERENZIERUNG:**
+- Jeder Charakter muss EINZIGARTIGE Pose und Aktion haben
+- NIE mehrere Charaktere mit identischen Gesten
+- FALSCH: "Alle Kinder halten einen Finger an die Lippen"
+- RICHTIG: "Sophie signalisiert Stille, Manuel erstarrt mitten im Schritt, Lukas hält die Hand ans Ohr und lauscht"
+
+**EINSCHRÄNKUNGEN:**
+- Verwende NUR visuelle Adjektive (was GESEHEN werden kann):
+  - GUT: golden, gross, hell, hölzern, rot, mit grossen Augen, nach vorne gelehnt
+  - SCHLECHT: aufgeregt, ruhig, nervös, begeistert, verwirrt
+  - "aufgeregter Ausdruck" → "breites Lächeln, hochgezogene Augenbrauen"
+  - "nervöse Haltung" → "eingezogene Schultern, fest verschränkte Hände"
+- KEINE Dialoge oder Text in der Szene
+- Halte die Gesamtausgabe unter 800 Wörtern
+- **AUSGABESPRACHE: Schreibe auf Deutsch**
+
+**SICHERHEIT - VERMEIDEN:**
+- Schlafzimmer-/Schlafszenen → verwende Wohnzimmer, Garten, Draussen
+- Badezimmerszenen → verwende Küche oder Wasserspiele im Freien
+- Dunkle/bedrohliche Bilder → halte es hell und fröhlich

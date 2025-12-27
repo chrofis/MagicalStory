@@ -44,6 +44,10 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.illustrationEdit = await fs.readFile(path.join(promptsDir, 'illustration-edit.txt'), 'utf-8');
     // Auto-repair / Inpainting prompt
     PROMPT_TEMPLATES.imageInspection = await fs.readFile(path.join(promptsDir, 'image-inspection.txt'), 'utf-8');
+    // Scene expansion for regeneration
+    PROMPT_TEMPLATES.sceneExpansion = await fs.readFile(path.join(promptsDir, 'scene-expansion.txt'), 'utf-8');
+    PROMPT_TEMPLATES.sceneExpansionDe = await fs.readFile(path.join(promptsDir, 'scene-expansion-de.txt'), 'utf-8');
+    PROMPT_TEMPLATES.sceneExpansionFr = await fs.readFile(path.join(promptsDir, 'scene-expansion-fr.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
