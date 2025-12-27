@@ -7,7 +7,7 @@ import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as def
 import type { Character, PhysicalTraits } from '@/types/character';
 import { api } from '@/services/api';
 
-// Component to fetch and display avatar prompt from server
+// Component to fetch and display avatar prompt from server (always shows with traits)
 function AvatarPromptDisplay({ category, gender, physical }: {
   category: string;
   gender: string | undefined;
@@ -16,17 +16,15 @@ function AvatarPromptDisplay({ category, gender, physical }: {
   const [prompt, setPrompt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showWithTraits, setShowWithTraits] = useState(false);
 
   useEffect(() => {
     const fetchPrompt = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Build query params
-        let url = `/api/avatar-prompt?category=${category}&gender=${gender || 'male'}`;
-        if (showWithTraits && physical) {
-          url += `&withTraits=true`;
+        // Always fetch with traits (that's the default generation mode now)
+        let url = `/api/avatar-prompt?category=${category}&gender=${gender || 'male'}&withTraits=true`;
+        if (physical) {
           if (physical.hair) url += `&hair=${encodeURIComponent(physical.hair)}`;
           if (physical.face) url += `&face=${encodeURIComponent(physical.face)}`;
           if (physical.other) url += `&other=${encodeURIComponent(physical.other)}`;
@@ -45,29 +43,16 @@ function AvatarPromptDisplay({ category, gender, physical }: {
       }
     };
     fetchPrompt();
-  }, [category, gender, showWithTraits, physical]);
-
-  const hasTraits = physical && (physical.hair || physical.face || physical.other || physical.height);
+  }, [category, gender, physical]);
 
   return (
     <div>
-      {hasTraits && (
-        <label className="flex items-center gap-1 text-[9px] text-gray-500 mb-1 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showWithTraits}
-            onChange={(e) => setShowWithTraits(e.target.checked)}
-            className="w-3 h-3"
-          />
-          Show with traits
-        </label>
-      )}
       {loading ? (
         <div className="text-[9px] text-gray-400">Loading...</div>
       ) : error ? (
         <div className="text-[9px] text-red-400">{error}</div>
       ) : (
-        <pre className={`mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border ${showWithTraits ? 'bg-amber-50 border-amber-300' : 'bg-gray-100 border-gray-200'}`}>
+        <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
           {prompt}
         </pre>
       )}

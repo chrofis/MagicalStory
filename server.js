@@ -3653,9 +3653,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       }
     };
 
-    // Use gemini-2.0-flash for evaluation (cheaper, text-only output)
+    // Use gemini-2.5-flash for evaluation (better at comparing photos)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3674,7 +3674,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     if (inputTokens > 0) {
-      console.log(`📊 [AVATAR EVAL] model: gemini-2.0-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
     }
 
     if (responseText.includes('YES')) return 'YES';
