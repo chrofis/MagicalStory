@@ -887,9 +887,9 @@ function buildStoryPrompt(inputData, sceneCount = null) {
  * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint} for previous pages (max 2)
  */
 function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null, previousScenes = []) {
-  // Debug: Log Visual Bible mainCharacters status
-  log.debug(`[SCENE PROMPT P${pageNumber}] Building prompt for ${characters.length} characters`);
-  log.debug(`[SCENE PROMPT P${pageNumber}] Visual Bible mainCharacters: ${visualBible?.mainCharacters?.length || 0}`);
+  // Track Visual Bible matches for consolidated logging
+  const vbMatches = [];
+  const vbMisses = [];
 
   // Build detailed character descriptions - include full physical details from Visual Bible
   const characterDetails = characters.map(c => {
@@ -900,14 +900,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         vbc.id === c.id || vbc.name.toLowerCase().trim() === c.name.toLowerCase().trim()
       );
 
-      // Debug logging
-      log.debug(`[SCENE PROMPT P${pageNumber}] Looking for "${c.name}" (id: ${c.id}) in Visual Bible...`);
-      log.debug(`[SCENE PROMPT P${pageNumber}] Found match: ${vbChar ? vbChar.name : 'NO'}, has physical: ${vbChar?.physical ? 'YES' : 'NO'}`);
-      if (vbChar?.physical) {
-        log.debug(`[SCENE PROMPT P${pageNumber}] Physical data: age="${vbChar.physical.age}", gender="${vbChar.physical.gender}", height="${vbChar.physical.height}", build="${vbChar.physical.build}", face="${vbChar.physical.face?.substring(0, 50)}...", hair="${vbChar.physical.hair}", other="${vbChar.physical.other}"`);
-      }
-
       if (vbChar && vbChar.physical) {
+        vbMatches.push(c.name);
         // Build description from Visual Bible physical object - include ALL traits
         const vbParts = [];
         // Basic traits
@@ -922,8 +916,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         if (vbChar.physical.other && vbChar.physical.other !== 'none') vbParts.push(`Other: ${vbChar.physical.other}`);
         if (vbParts.length > 0) {
           visualBibleDesc = vbParts.join(' | ');
-          log.debug(`[SCENE PROMPT P${pageNumber}] Using Visual Bible description for ${c.name}`);
         }
+      } else {
+        vbMisses.push(c.name);
       }
     }
 
@@ -986,8 +981,16 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         recurringElements += `* **${artifact.name}** (object): ${description}\n`;
       }
     }
-    log.debug(`[SCENE PROMPT P${pageNumber}] Including ALL Visual Bible entries in scene description`);
   }
+
+  // Consolidated logging for scene prompt
+  const vbEntryCount = (visualBible?.secondaryCharacters?.length || 0) +
+                       (visualBible?.locations?.length || 0) +
+                       (visualBible?.animals?.length || 0) +
+                       (visualBible?.artifacts?.length || 0);
+  const matchInfo = vbMatches.length > 0 ? vbMatches.join(', ') : 'none';
+  const missInfo = vbMisses.length > 0 ? `, missing: ${vbMisses.join(', ')}` : '';
+  log.debug(`[SCENE PROMPT P${pageNumber}] ${characters.length} chars (VB: ${matchInfo}${missInfo}), ${vbEntryCount} recurring elements`);
 
   // Default message if no recurring elements
   if (!recurringElements) {
