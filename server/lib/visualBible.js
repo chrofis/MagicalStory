@@ -228,7 +228,8 @@ function parseVisualBibleEntries(sectionText) {
         appearsInPages: pages,
         description,
         extractedDescription: null, // Will be filled after first image analysis
-        firstAppearanceAnalyzed: false
+        firstAppearanceAnalyzed: false,
+        source: 'outline' // Track where entry came from
       });
     }
   }
@@ -749,7 +750,7 @@ function parseNewVisualBibleEntries(text) {
     const description = descParts.join('. ');
 
     if (name && description) {
-      newEntries.animals.push({ name, description, pages });
+      newEntries.animals.push({ name, description, pages, source: 'story_text' });
       log.debug(`[VISUAL BIBLE] Parsed animal: ${name} (pages ${pages.join(',')})`);
     }
   }
@@ -770,7 +771,7 @@ function parseNewVisualBibleEntries(text) {
     const description = descParts.join('. ');
 
     if (name && description) {
-      newEntries.artifacts.push({ name, description, pages });
+      newEntries.artifacts.push({ name, description, pages, source: 'story_text' });
       log.debug(`[VISUAL BIBLE] Parsed artifact: ${name} (pages ${pages.join(',')})`);
     }
   }
@@ -790,7 +791,7 @@ function parseNewVisualBibleEntries(text) {
     const description = descParts.join('. ');
 
     if (name && description) {
-      newEntries.locations.push({ name, description, pages });
+      newEntries.locations.push({ name, description, pages, source: 'story_text' });
       log.debug(`[VISUAL BIBLE] Parsed location: ${name} (pages ${pages.join(',')})`);
     }
   }
@@ -810,7 +811,7 @@ function parseNewVisualBibleEntries(text) {
     const description = descParts.join('. Typically wears: ');
 
     if (name && description) {
-      newEntries.secondaryCharacters.push({ name, description, pages });
+      newEntries.secondaryCharacters.push({ name, description, pages, source: 'story_text' });
       log.debug(`[VISUAL BIBLE] Parsed secondary character: ${name} (pages ${pages.join(',')})`);
     }
   }
