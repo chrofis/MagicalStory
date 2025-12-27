@@ -51,3 +51,13 @@ Fixes needed: [List specific, actionable fixes - or "None"]
 
 Score: [0-10]/10
 Verdict: [PASS/SOFT_FAIL/HARD_FAIL]
+
+FIX_TARGETS: [Only include if Score < 8 and there are fixable issues. One JSON object per line.]
+{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief issue description", "fix": "what to draw instead"}
+
+**BOUNDING BOX FORMAT:**
+- Coordinates are normalized 0.0-1.0 (not pixels)
+- Format: [ymin, xmin, ymax, xmax] where 0,0 is top-left
+- Example: {"bbox": [0.4, 0.2, 0.6, 0.4], "issue": "extra finger", "fix": "Draw a natural 5-fingered hand"}
+- Example: {"bbox": [0.1, 0.5, 0.3, 0.8], "issue": "elephant in wrong position", "fix": "Move elephant under left arm"}
+- Only include issues that can be fixed by redrawing a region (not global issues like "wrong art style")

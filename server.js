@@ -87,6 +87,7 @@ const {
   deleteFromImageCache,
   compressImageToJPEG,
   autoRepairImage,
+  autoRepairWithTargets,
   IMAGE_QUALITY_THRESHOLD
 } = require('./server/lib/images');
 const {
@@ -1806,6 +1807,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning || null,
       qualityModelId: imageResult.qualityModelId || null,
+      fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
       wasRegenerated: true,
       totalAttempts: imageResult.totalAttempts || 1,
       retryHistory: imageResult.retryHistory || [],
@@ -1905,6 +1907,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       prompt: imagePrompt,
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning,
+      fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
       modelId: imageResult.modelId || null,
       totalAttempts: imageResult.totalAttempts || 1,
       retryHistory: imageResult.retryHistory || [],
@@ -2154,6 +2157,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       prompt: coverPrompt,
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning || null,
+      fixTargets: coverResult.fixTargets || [],  // Bounding boxes for auto-repair
       modelId: coverResult.modelId || null,
       wasRegenerated: true,
       totalAttempts: coverResult.totalAttempts || 1,
@@ -2211,6 +2215,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
       prompt: coverPrompt,
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning,
+      fixTargets: coverResult.fixTargets || [],  // Bounding boxes for auto-repair
       modelId: coverResult.modelId || null,
       totalAttempts: coverResult.totalAttempts || 1,
       retryHistory: coverResult.retryHistory || [],
@@ -2377,8 +2382,15 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, async (req
       return res.status(404).json({ error: 'No image found for this page' });
     }
 
-    // Run auto-repair (up to 2 attempts)
-    const repairResult = await autoRepairImage(currentImage.imageData, 2);
+    // Run auto-repair - use pre-computed fix targets if available (saves API call)
+    let repairResult;
+    if (currentImage.fixTargets && currentImage.fixTargets.length > 0) {
+      log.info(`🔄 [REPAIR] Using ${currentImage.fixTargets.length} pre-computed fix targets for story ${id}, page ${pageNumber}`);
+      repairResult = await autoRepairWithTargets(currentImage.imageData, currentImage.fixTargets, 0);
+    } else {
+      log.info(`🔄 [REPAIR] No pre-computed targets, using inspection-based repair for story ${id}, page ${pageNumber}`);
+      repairResult = await autoRepairImage(currentImage.imageData, 2);
+    }
 
     if (!repairResult) {
       return res.status(500).json({ error: 'Auto-repair failed' });
@@ -5709,6 +5721,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           qualityScore: imageResult.score,
           qualityReasoning: imageResult.reasoning || null,
           qualityModelId: imageResult.qualityModelId || null,  // Model used for quality eval
+          fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
           wasRegenerated: imageResult.wasRegenerated || false,
           totalAttempts: imageResult.totalAttempts || 1,
           retryHistory: imageResult.retryHistory || [],
@@ -5874,6 +5887,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           prompt: coverPrompt,
           qualityScore: result.score,
           qualityReasoning: result.reasoning || null,
+          fixTargets: result.fixTargets || [],  // Bounding boxes for auto-repair
           wasRegenerated: result.wasRegenerated || false,
           totalAttempts: result.totalAttempts || 1,
           retryHistory: result.retryHistory || [],
@@ -6214,6 +6228,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             qualityScore: imageResult.score,
             qualityReasoning: imageResult.reasoning || null,
             qualityModelId: imageResult.qualityModelId || null,
+            fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
             wasRegenerated: imageResult.wasRegenerated || false,
             totalAttempts: imageResult.totalAttempts || 1,
             retryHistory: imageResult.retryHistory || [],
@@ -6353,6 +6368,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             prompt: frontCoverPrompt,
             qualityScore: frontCoverResult.score,
             qualityReasoning: frontCoverResult.reasoning || null,
+            fixTargets: frontCoverResult.fixTargets || [],  // Bounding boxes for auto-repair
             wasRegenerated: frontCoverResult.wasRegenerated || false,
             totalAttempts: frontCoverResult.totalAttempts || 1,
             retryHistory: frontCoverResult.retryHistory || [],
@@ -6398,6 +6414,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             prompt: initialPrompt,
             qualityScore: initialResult.score,
             qualityReasoning: initialResult.reasoning || null,
+            fixTargets: initialResult.fixTargets || [],  // Bounding boxes for auto-repair
             wasRegenerated: initialResult.wasRegenerated || false,
             totalAttempts: initialResult.totalAttempts || 1,
             retryHistory: initialResult.retryHistory || [],
@@ -6434,6 +6451,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             prompt: backCoverPrompt,
             qualityScore: backCoverResult.score,
             qualityReasoning: backCoverResult.reasoning || null,
+            fixTargets: backCoverResult.fixTargets || [],  // Bounding boxes for auto-repair
             wasRegenerated: backCoverResult.wasRegenerated || false,
             totalAttempts: backCoverResult.totalAttempts || 1,
             retryHistory: backCoverResult.retryHistory || [],
@@ -7252,6 +7270,7 @@ Output Format:
               qualityScore: imageResult.score,
               qualityReasoning: imageResult.reasoning || null,
               qualityModelId: imageResult.qualityModelId || null,
+              fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
               wasRegenerated: imageResult.wasRegenerated || false,
               totalAttempts: imageResult.totalAttempts || 1,
               retryHistory: imageResult.retryHistory || [],
@@ -7272,6 +7291,7 @@ Output Format:
               qualityScore: imageResult.score,
               qualityReasoning: imageResult.reasoning || null,
               qualityModelId: imageResult.qualityModelId || null,
+              fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
               wasRegenerated: imageResult.wasRegenerated || false,
               totalAttempts: imageResult.totalAttempts || 1,
               retryHistory: imageResult.retryHistory || [],
@@ -7683,6 +7703,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               qualityScore: imageResult.score,
               qualityReasoning: imageResult.reasoning || null,
               qualityModelId: imageResult.qualityModelId || null,
+              fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
               wasRegenerated: imageResult.wasRegenerated || false,
               totalAttempts: imageResult.totalAttempts || 1,
               retryHistory: imageResult.retryHistory || [],
@@ -7703,6 +7724,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               qualityScore: imageResult.score,
               qualityReasoning: imageResult.reasoning || null,
               qualityModelId: imageResult.qualityModelId || null,
+              fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
               wasRegenerated: imageResult.wasRegenerated || false,
               totalAttempts: imageResult.totalAttempts || 1,
               retryHistory: imageResult.retryHistory || [],
@@ -7776,6 +7798,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             prompt: frontCover.prompt,
             qualityScore: frontCover.result.score,
             qualityReasoning: frontCover.result.reasoning || null,
+            fixTargets: frontCover.result.fixTargets || [],  // Bounding boxes for auto-repair
             wasRegenerated: frontCover.result.wasRegenerated || false,
             totalAttempts: frontCover.result.totalAttempts || 1,
             retryHistory: frontCover.result.retryHistory || [],
@@ -7791,6 +7814,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             prompt: initialPage.prompt,
             qualityScore: initialPage.result.score,
             qualityReasoning: initialPage.result.reasoning || null,
+            fixTargets: initialPage.result.fixTargets || [],  // Bounding boxes for auto-repair
             wasRegenerated: initialPage.result.wasRegenerated || false,
             totalAttempts: initialPage.result.totalAttempts || 1,
             retryHistory: initialPage.result.retryHistory || [],
@@ -7806,6 +7830,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             prompt: backCover.prompt,
             qualityScore: backCover.result.score,
             qualityReasoning: backCover.result.reasoning || null,
+            fixTargets: backCover.result.fixTargets || [],  // Bounding boxes for auto-repair
             wasRegenerated: backCover.result.wasRegenerated || false,
             totalAttempts: backCover.result.totalAttempts || 1,
             retryHistory: backCover.result.retryHistory || [],

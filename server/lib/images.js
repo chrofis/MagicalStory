@@ -420,6 +420,40 @@ Verdict: [PASS if 5+, SOFT_FAIL if 3-4, HARD_FAIL if 0-2]`;
 
     const responseText = data.candidates[0].content.parts[0].text.trim();
 
+    // Parse FIX_TARGETS section if present (bounding boxes for auto-repair)
+    const parseFixTargets = (text) => {
+      const fixTargets = [];
+      // Look for FIX_TARGETS: section
+      const fixTargetsMatch = text.match(/FIX_TARGETS:[\s\S]*?(?=\n\n|\*\*|$)/i);
+      if (fixTargetsMatch) {
+        // Find all JSON objects on separate lines
+        const lines = fixTargetsMatch[0].split('\n');
+        for (const line of lines) {
+          const jsonMatch = line.match(/\{.*\}/);
+          if (jsonMatch) {
+            try {
+              const target = JSON.parse(jsonMatch[0]);
+              if (target.bbox && Array.isArray(target.bbox) && target.bbox.length === 4) {
+                fixTargets.push({
+                  boundingBox: target.bbox, // [ymin, xmin, ymax, xmax]
+                  issue: target.issue || 'unknown issue',
+                  fixPrompt: target.fix || 'fix the issue'
+                });
+              }
+            } catch (e) {
+              log.debug(`⭐ [QUALITY] Could not parse FIX_TARGET: ${line}`);
+            }
+          }
+        }
+      }
+      if (fixTargets.length > 0) {
+        log.info(`⭐ [QUALITY] Parsed ${fixTargets.length} fix targets with bounding boxes`);
+      }
+      return fixTargets;
+    };
+
+    const fixTargets = parseFixTargets(responseText);
+
     // Try to parse as JSON (new format with 0-10 scale)
     let parsedJson = null;
     try {
@@ -466,6 +500,7 @@ Verdict: [PASS if 5+, SOFT_FAIL if 3-4, HARD_FAIL if 0-2]`;
         analysis,
         evaluation,
         textIssue,
+        fixTargets, // Bounding boxes for auto-repair
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
@@ -480,6 +515,7 @@ Verdict: [PASS if 5+, SOFT_FAIL if 3-4, HARD_FAIL if 0-2]`;
       return {
         score,
         reasoning: responseText,
+        fixTargets, // Bounding boxes for auto-repair
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
@@ -493,6 +529,7 @@ Verdict: [PASS if 5+, SOFT_FAIL if 3-4, HARD_FAIL if 0-2]`;
       return {
         score,
         reasoning: responseText,
+        fixTargets, // Bounding boxes for auto-repair
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
@@ -505,6 +542,7 @@ Verdict: [PASS if 5+, SOFT_FAIL if 3-4, HARD_FAIL if 0-2]`;
       return {
         score: numericScore,
         reasoning: responseText,
+        fixTargets, // Bounding boxes for auto-repair
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
@@ -776,6 +814,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const actualText = qualityResult ? qualityResult.actualText : null;
         const qualityUsage = qualityResult ? qualityResult.usage : null;
         const qualityModelId = qualityResult ? qualityResult.modelId : null;
+        const fixTargets = qualityResult ? qualityResult.fixTargets : [];
 
         // Store in cache (include text error info for covers)
         const result = {
@@ -786,6 +825,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           textErrorOnly,
           expectedText,
           actualText,
+          fixTargets, // Bounding boxes for auto-repair (from evaluation)
           modelId,  // Include which model was used for image generation
           qualityModelId,  // Include which model was used for quality evaluation
           imageUsage: imageUsage,  // Token usage for image generation
@@ -1399,6 +1439,109 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
 }
 
 /**
+ * Auto-repair using pre-computed fix targets from quality evaluation
+ * Skips the inspection API call when bounding boxes are already known
+ * @param {string} imageData - Base64 image data URL
+ * @param {Array} fixTargets - Array of {boundingBox, issue, fixPrompt} from evaluation
+ * @param {number} maxAdditionalAttempts - Extra inspection-based attempts after targets (default 0)
+ * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
+ */
+async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0) {
+  const repairHistory = [];
+  let currentImage = imageData;
+
+  if (!fixTargets || fixTargets.length === 0) {
+    log.info(`🔄 [AUTO-REPAIR] No fix targets provided, skipping repair`);
+    return {
+      imageData: currentImage,
+      repaired: false,
+      noErrorsFound: true,
+      repairHistory
+    };
+  }
+
+  log.info(`🔄 [AUTO-REPAIR] Starting targeted repair with ${fixTargets.length} pre-computed bounding boxes...`);
+
+  // Phase 1: Fix all pre-computed targets (no inspection API call needed)
+  for (let i = 0; i < fixTargets.length; i++) {
+    const target = fixTargets[i];
+    const attempt = i + 1;
+    log.debug(`🔄 [AUTO-REPAIR] Target ${attempt}/${fixTargets.length}: ${target.issue}`);
+
+    // Get image dimensions and create mask from pre-computed bounding box
+    const dimensions = await getImageDimensions(currentImage);
+    const mask = await createMaskFromBoundingBox(
+      dimensions.width,
+      dimensions.height,
+      target.boundingBox
+    );
+
+    // Inpaint the masked area
+    const repaired = await inpaintWithMask(
+      currentImage,
+      mask,
+      target.fixPrompt
+    );
+
+    if (!repaired || !repaired.imageData) {
+      log.warn(`⚠️ [AUTO-REPAIR] Inpainting failed for target ${attempt}: ${target.issue}`);
+      repairHistory.push({
+        attempt,
+        errorType: 'pre-computed',
+        description: target.issue,
+        boundingBox: target.boundingBox,
+        fixPrompt: target.fixPrompt,
+        maskImage: mask,
+        beforeImage: currentImage,
+        afterImage: null,
+        success: false,
+        skippedInspection: true,
+        timestamp: new Date().toISOString()
+      });
+      continue; // Try next target even if this one failed
+    }
+
+    // Record the successful repair
+    repairHistory.push({
+      attempt,
+      errorType: 'pre-computed',
+      description: target.issue,
+      boundingBox: target.boundingBox,
+      fixPrompt: target.fixPrompt,
+      maskImage: mask,
+      beforeImage: currentImage,
+      afterImage: repaired.imageData,
+      success: true,
+      skippedInspection: true,
+      timestamp: new Date().toISOString()
+    });
+
+    currentImage = repaired.imageData;
+    log.info(`✅ [AUTO-REPAIR] Fixed target ${attempt}: ${target.issue}`);
+  }
+
+  // Phase 2: Optional additional inspection-based repairs
+  if (maxAdditionalAttempts > 0) {
+    log.debug(`🔄 [AUTO-REPAIR] Running ${maxAdditionalAttempts} additional inspection-based attempts...`);
+    const additionalResult = await autoRepairImage(currentImage, maxAdditionalAttempts);
+    if (additionalResult.repaired) {
+      currentImage = additionalResult.imageData;
+      repairHistory.push(...additionalResult.repairHistory);
+    }
+  }
+
+  const successCount = repairHistory.filter(r => r.success).length;
+  log.info(`✅ [AUTO-REPAIR] Targeted repair complete: ${successCount}/${fixTargets.length} fixes applied`);
+
+  return {
+    imageData: currentImage,
+    repaired: successCount > 0,
+    noErrorsFound: false,
+    repairHistory
+  };
+}
+
+/**
  * Auto-repair an image by detecting and fixing physics errors
  * Runs up to maxAttempts cycles of inspect → mask → fix
  * @param {string} imageData - Base64 image data URL
@@ -1509,6 +1652,7 @@ module.exports = {
   createMaskFromBoundingBox,
   inpaintWithMask,
   autoRepairImage,
+  autoRepairWithTargets,
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD
