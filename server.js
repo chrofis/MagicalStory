@@ -3643,6 +3643,7 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
 
 
 // Avatar face match evaluation - compares original photo to generated avatar
+// Returns { score: 1-10, details: "full evaluation text" } or null on error
 async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey) {
   try {
     const originalBase64 = originalPhoto.replace(/^data:image\/\w+;base64,/, '');
@@ -3653,7 +3654,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     const avatarMime = generatedAvatar.match(/^data:(image\/\w+);base64,/) ?
       generatedAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    const evalPrompt = PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Are they the same person? Answer YES or NO only.';
+    const evalPrompt = PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Rate similarity 1-10. Output: FINAL SCORE: [number]';
 
     const requestBody = {
       contents: [{
@@ -3665,7 +3666,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       }],
       generationConfig: {
         temperature: 0,
-        maxOutputTokens: 10
+        maxOutputTokens: 500
       }
     };
 
@@ -3684,7 +3685,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     }
 
     const data = await response.json();
-    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || '';
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
     // Log token usage
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
@@ -3693,8 +3694,15 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
     }
 
-    if (responseText.includes('YES')) return 'YES';
-    if (responseText.includes('NO')) return 'NO';
+    // Parse FINAL SCORE from response
+    const scoreMatch = responseText.match(/FINAL SCORE:\s*(\d+)/i);
+    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : null;
+
+    if (score !== null) {
+      log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10`);
+      return { score, details: responseText };
+    }
+
     return null;
   } catch (err) {
     log.error('[AVATAR EVAL] Error evaluating face match:', err.message);
@@ -3947,7 +3955,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
           const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, results[category], geminiApiKey);
           if (faceMatchResult) {
             results.faceMatch[category] = faceMatchResult;
-            log.debug(`🔍 [AVATAR EVAL] ${category} face match: ${faceMatchResult}`);
+            log.debug(`🔍 [AVATAR EVAL] ${category} score: ${faceMatchResult.score}/10`);
           }
         } else {
           log.warn(`[CLOTHING AVATARS] No image in ${category} response`);
@@ -6953,6 +6961,11 @@ async function processStoryJob(jobId) {
 
     // Developer mode: model overrides (admin only)
     // Use centralized MODEL_DEFAULTS from textModels.js
+    // Filter out null/undefined user overrides so they don't overwrite defaults
+    const userOverrides = inputData.modelOverrides || {};
+    const filteredUserOverrides = Object.fromEntries(
+      Object.entries(userOverrides).filter(([_, v]) => v != null)
+    );
     const modelOverrides = {
       outlineModel: MODEL_DEFAULTS.outline,
       textModel: MODEL_DEFAULTS.storyText,
@@ -6960,12 +6973,12 @@ async function processStoryJob(jobId) {
       imageModel: MODEL_DEFAULTS.pageImage,
       coverImageModel: MODEL_DEFAULTS.coverImage,
       qualityModel: MODEL_DEFAULTS.qualityEval,
-      ...inputData.modelOverrides  // User overrides take precedence
+      ...filteredUserOverrides  // Only non-null user overrides
     };
     // Always log model defaults being used
-    log.debug(`🔧 [PIPELINE] Model defaults: outline=${MODEL_DEFAULTS.outline}, text=${MODEL_DEFAULTS.storyText}, scene=${MODEL_DEFAULTS.sceneDescription}, quality=${MODEL_DEFAULTS.qualityEval}`);
-    if (inputData.modelOverrides && Object.keys(inputData.modelOverrides).length > 0) {
-      log.debug(`🔧 [PIPELINE] User overrides: ${JSON.stringify(inputData.modelOverrides)}`);
+    log.debug(`🔧 [PIPELINE] Models: outline=${modelOverrides.outlineModel}, text=${modelOverrides.textModel}, scene=${modelOverrides.sceneDescriptionModel}, quality=${modelOverrides.qualityModel}`);
+    if (Object.keys(filteredUserOverrides).length > 0) {
+      log.debug(`🔧 [PIPELINE] User overrides applied: ${JSON.stringify(filteredUserOverrides)}`);
     }
 
     // Check if this is a picture book (1st-grade) - use simplified combined flow
