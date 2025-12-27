@@ -229,17 +229,18 @@ function BookOrderCard({
 export default function MyOrders() {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (isAuthLoading) return; // Wait for auth to load
     if (!isAuthenticated) {
       navigate('/');
       return;
     }
     loadOrders();
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isAuthLoading, navigate]);
 
   const loadOrders = async () => {
     log.debug('Loading orders...');
@@ -278,7 +279,7 @@ export default function MyOrders() {
     }).format(value);
   }, [language]);
 
-  if (!isAuthenticated) {
+  if (isAuthLoading || !isAuthenticated) {
     return <LoadingSpinner fullScreen />;
   }
 

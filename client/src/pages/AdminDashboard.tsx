@@ -42,7 +42,7 @@ import { Input } from '@/components/common/Input';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, impersonate } = useAuth();
+  const { user, isAuthenticated, impersonate, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { language } = useLanguage();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -380,10 +380,10 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'admin') {
+    if (isAuthenticated && (user?.role === 'admin' || isImpersonating)) {
       fetchData();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, isImpersonating]);
 
   const handleCleanOrphaned = async () => {
     setIsActionLoading(true);
@@ -686,7 +686,17 @@ export default function AdminDashboard() {
     }
   }, [activeTab]);
 
-  if (!isAuthenticated || user?.role !== 'admin') {
+  // Wait for auth to finish loading before showing access denied
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  // Allow access for admins or impersonating admins
+  if (!isAuthenticated || (user?.role !== 'admin' && !isImpersonating)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">

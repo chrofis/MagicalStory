@@ -1511,16 +1511,17 @@ async function createCombinedMask(width, height, boundingBoxes) {
  * @param {string} originalImage - Base64 original image
  * @param {string} maskImage - Base64 mask (white = area to fix)
  * @param {string} fixPrompt - Instruction for what to fix
+ * @param {Array} referenceImages - Reference images for color/clothing matching
  * @returns {Promise<{imageData: string}|null>}
  */
-async function inpaintWithMask(originalImage, maskImage, fixPrompt) {
+async function inpaintWithMask(originalImage, maskImage, fixPrompt, referenceImages = []) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('Gemini API key not configured');
     }
 
-    log.debug(`🔧 [INPAINT] Inpainting with prompt: "${fixPrompt}"`);
+    log.debug(`🔧 [INPAINT] Inpainting with prompt: "${fixPrompt}"${referenceImages.length > 0 ? ` (${referenceImages.length} reference images)` : ''}`);
 
     // Extract base64 and mime type for original image
     const origBase64 = originalImage.replace(/^data:image\/\w+;base64,/, '');
@@ -1530,14 +1531,17 @@ async function inpaintWithMask(originalImage, maskImage, fixPrompt) {
     // Extract base64 for mask
     const maskBase64 = maskImage.replace(/^data:image\/\w+;base64,/, '');
 
-    // Build the inpainting prompt
+    // Build the inpainting prompt - include reference instruction if references provided
+    const refInstruction = referenceImages.length > 0
+      ? `\n\nIMPORTANT: Match clothing colors and details EXACTLY as shown in the reference images below.`
+      : '';
     const inpaintPrompt = `Edit this image. The white area in the mask shows what needs to be changed.
 
-CHANGE ONLY THE MASKED AREA: ${fixPrompt}
+CHANGE ONLY THE MASKED AREA: ${fixPrompt}${refInstruction}
 
-Keep everything outside the masked area exactly the same. Maintain the same art style and colors.`;
+Keep everything outside the masked area exactly the same. Maintain the same art style.`;
 
-    // Build parts array: prompt, original image, mask
+    // Build parts array: prompt, original image, references (if any), mask
     const parts = [
       { text: inpaintPrompt },
       {
@@ -1545,15 +1549,37 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
           mime_type: origMimeType,
           data: origBase64
         }
-      },
-      { text: '[MASK - white area shows what to edit]:' },
-      {
-        inline_data: {
-          mime_type: 'image/png',
-          data: maskBase64
-        }
       }
     ];
+
+    // Add reference images if provided
+    if (referenceImages.length > 0) {
+      parts.push({ text: '[REFERENCE IMAGES - match clothing/colors to these]:' });
+      for (const ref of referenceImages) {
+        // Handle different reference image formats (object with photoData or direct base64)
+        const photoData = ref.photoData || ref;
+        if (photoData) {
+          const refBase64 = photoData.replace(/^data:image\/\w+;base64,/, '');
+          const refMimeType = photoData.match(/^data:(image\/\w+);base64,/) ?
+            photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+          parts.push({
+            inline_data: {
+              mime_type: refMimeType,
+              data: refBase64
+            }
+          });
+        }
+      }
+    }
+
+    // Add mask
+    parts.push({ text: '[MASK - white area shows what to edit]:' });
+    parts.push({
+      inline_data: {
+        mime_type: 'image/png',
+        data: maskBase64
+      }
+    });
 
     // Use page image model for editing
     const modelId = MODEL_DEFAULTS.pageImage;

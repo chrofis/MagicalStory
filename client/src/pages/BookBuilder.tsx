@@ -29,7 +29,7 @@ export default function BookBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
   const isAdmin = user?.role === 'admin';
 
   const [stories, setStories] = useState<SelectedStory[]>([]);
@@ -153,6 +153,7 @@ export default function BookBuilder() {
 
   // Load stories from location state
   useEffect(() => {
+    if (isAuthLoading) return; // Wait for auth to load
     if (!isAuthenticated) {
       navigate('/');
       return;
@@ -166,7 +167,7 @@ export default function BookBuilder() {
       // No stories in state, redirect back
       setIsLoading(false);
     }
-  }, [isAuthenticated, navigate, location.state]);
+  }, [isAuthenticated, isAuthLoading, navigate, location.state]);
 
   // Calculate total pages
   const totalPages = useMemo(() => {
@@ -270,7 +271,7 @@ export default function BookBuilder() {
     }
   };
 
-  if (!isAuthenticated) {
+  if (isAuthLoading || !isAuthenticated) {
     return <LoadingSpinner fullScreen />;
   }
 
