@@ -8684,6 +8684,48 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
         const STALE_JOB_TIMEOUT_MINUTES = 30;
         if (jobAgeMinutes > STALE_JOB_TIMEOUT_MINUTES) {
           log.error(`⏰ Job ${activeJob.id} is stale (${Math.round(jobAgeMinutes)} minutes old), marking as failed`);
+
+          // Refund reserved credits for stale job
+          try {
+            const staleJobResult = await dbPool.query(
+              'SELECT credits_reserved, progress FROM story_jobs WHERE id = $1',
+              [activeJob.id]
+            );
+            if (staleJobResult.rows.length > 0 && staleJobResult.rows[0].credits_reserved > 0) {
+              const creditsToRefund = staleJobResult.rows[0].credits_reserved;
+              const progressPercent = staleJobResult.rows[0].progress || 0;
+
+              // Get current user balance
+              const userBalanceResult = await dbPool.query(
+                'SELECT credits FROM users WHERE id = $1',
+                [userId]
+              );
+
+              if (userBalanceResult.rows.length > 0 && userBalanceResult.rows[0].credits !== -1) {
+                const currentBalance = userBalanceResult.rows[0].credits;
+                const newBalance = currentBalance + creditsToRefund;
+
+                // Refund credits
+                await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newBalance, userId]);
+
+                // Log refund transaction
+                await dbPool.query(
+                  `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+                   VALUES ($1, $2, $3, $4, $5, $6)`,
+                  [userId, creditsToRefund, newBalance, 'story_refund', activeJob.id,
+                   `Auto-refund: stale job timed out after ${Math.round(jobAgeMinutes)} min (progress: ${progressPercent}%)`]
+                );
+
+                log.info(`💳 Auto-refunded ${creditsToRefund} credits for stale job ${activeJob.id}`);
+              }
+
+              // Reset credits_reserved to prevent double refunds
+              await dbPool.query('UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1', [activeJob.id]);
+            }
+          } catch (refundErr) {
+            log.error(`❌ Failed to refund credits for stale job ${activeJob.id}:`, refundErr.message);
+          }
+
           await dbPool.query(
             `UPDATE story_jobs
              SET status = 'failed',
@@ -8948,6 +8990,49 @@ app.post('/api/jobs/:jobId/cancel', authenticateToken, async (req, res) => {
       });
     }
 
+    // Refund reserved credits before cancelling
+    let creditsRefunded = 0;
+    try {
+      const jobCreditsResult = await dbPool.query(
+        'SELECT credits_reserved, progress FROM story_jobs WHERE id = $1',
+        [jobId]
+      );
+      if (jobCreditsResult.rows.length > 0 && jobCreditsResult.rows[0].credits_reserved > 0) {
+        const creditsToRefund = jobCreditsResult.rows[0].credits_reserved;
+        const progressPercent = jobCreditsResult.rows[0].progress || 0;
+
+        // Get current user balance
+        const userBalanceResult = await dbPool.query(
+          'SELECT credits FROM users WHERE id = $1',
+          [userId]
+        );
+
+        if (userBalanceResult.rows.length > 0 && userBalanceResult.rows[0].credits !== -1) {
+          const currentBalance = userBalanceResult.rows[0].credits;
+          const newBalance = currentBalance + creditsToRefund;
+
+          // Refund credits
+          await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newBalance, userId]);
+
+          // Log refund transaction
+          await dbPool.query(
+            `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [userId, creditsToRefund, newBalance, 'story_refund', jobId,
+             `Refund: job cancelled by user (progress: ${progressPercent}%)`]
+          );
+
+          creditsRefunded = creditsToRefund;
+          log.info(`💳 Refunded ${creditsToRefund} credits for cancelled job ${jobId}`);
+        }
+
+        // Reset credits_reserved to prevent double refunds
+        await dbPool.query('UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1', [jobId]);
+      }
+    } catch (refundErr) {
+      log.error(`❌ Failed to refund credits for cancelled job ${jobId}:`, refundErr.message);
+    }
+
     // Mark job as failed (cancelled)
     await dbPool.query(
       `UPDATE story_jobs
@@ -8963,7 +9048,8 @@ app.post('/api/jobs/:jobId/cancel', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       message: 'Job cancelled successfully',
-      jobId: jobId
+      jobId: jobId,
+      creditsRefunded
     });
   } catch (err) {
     log.error('Error cancelling job:', err);
