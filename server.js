@@ -5078,8 +5078,20 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
 // Create Stripe checkout session for credits purchase
 app.post('/api/stripe/create-credits-checkout', authenticateToken, async (req, res) => {
   try {
-    const { credits = 100, amount = 500 } = req.body; // Default: 100 credits for CHF 5.00 (500 cents)
+    const { credits: requestedCredits = 100 } = req.body;
     const userId = req.user.id;
+
+    // Server-side price validation - NEVER trust client-provided amounts
+    // Pricing: 5 CHF per 100 credits (0.05 CHF per credit)
+    const PRICE_PER_CREDIT_CENTS = 5; // 5 cents per credit
+    const MIN_CREDITS = 100;
+    const MAX_CREDITS = 10000;
+
+    // Validate and sanitize credits amount
+    const credits = Math.min(MAX_CREDITS, Math.max(MIN_CREDITS, Math.round(Number(requestedCredits) || MIN_CREDITS)));
+
+    // Calculate amount server-side (never trust client)
+    const amount = credits * PRICE_PER_CREDIT_CENTS;
 
     // Get the appropriate Stripe client for this user
     const userStripe = getStripeForUser(req.user);
@@ -5092,7 +5104,7 @@ app.post('/api/stripe/create-credits-checkout', authenticateToken, async (req, r
 
     console.log(`💳 Creating credits checkout session for user ${userId}`);
     log.debug(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}`);
-    log.debug(`   Credits: ${credits}, Amount: CHF ${(amount / 100).toFixed(2)}`);
+    log.debug(`   Credits: ${credits}, Amount: CHF ${(amount / 100).toFixed(2)} (server-calculated)`);
 
     // Create checkout session
     const session = await userStripe.checkout.sessions.create({
