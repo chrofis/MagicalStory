@@ -121,21 +121,26 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
     const { id } = req.params;
     let coverImage = null;
 
+    log.debug(`🖼️ GET /api/stories/${id}/cover - User: ${req.user.username} (ID: ${req.user.id})`);
+
     if (isDatabaseMode()) {
       const pool = getPool();
       const result = await pool.query(
         'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
         [id, req.user.id]
       );
+      log.debug(`🖼️ Cover query returned ${result.rows.length} rows for story ${id}`);
       if (result.rows.length > 0) {
         const story = JSON.parse(result.rows[0].data);
         coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
+        log.debug(`🖼️ Cover image found: ${coverImage ? 'yes' : 'no'}`);
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
     if (!coverImage) {
+      log.debug(`🖼️ No cover image for story ${id}`);
       return res.status(404).json({ error: 'Cover image not found' });
     }
 
