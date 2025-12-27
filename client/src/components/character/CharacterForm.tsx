@@ -554,6 +554,13 @@ export function CharacterForm({
                         {language === 'de' ? 'Altes Foto' : language === 'fr' ? 'Ancienne' : 'Old photo'}
                       </div>
                     )}
+                    {developerMode && character.avatars?.faceMatch?.[category] && (
+                      <div className={`absolute bottom-1 left-1 text-white text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        character.avatars.faceMatch[category] === 'YES' ? 'bg-green-600' : 'bg-red-600'
+                      }`}>
+                        {character.avatars.faceMatch[category] === 'YES' ? '✓ Match' : '✗ No match'}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="w-full h-64 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">

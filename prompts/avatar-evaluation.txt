@@ -1,0 +1,12 @@
+Compare the two faces in these images and determine if they are the SAME PERSON.
+
+IMAGE 1: Original reference photo
+IMAGE 2: Generated avatar
+
+EVALUATION CRITERIA:
+- Focus ONLY on facial features: eyes, nose, mouth, face shape, eyebrows
+- IGNORE: lighting differences, skin tone variations, clothing, hairstyle, background
+
+RESPOND WITH ONLY ONE WORD:
+- YES if the faces match (same person)
+- NO if the faces do not match (different person)

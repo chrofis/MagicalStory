@@ -3626,6 +3626,67 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
 });
 
 
+// Avatar face match evaluation - compares original photo to generated avatar
+async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey) {
+  try {
+    const originalBase64 = originalPhoto.replace(/^data:image\/\w+;base64,/, '');
+    const originalMime = originalPhoto.match(/^data:(image\/\w+);base64,/) ?
+      originalPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+    const avatarBase64 = generatedAvatar.replace(/^data:image\/\w+;base64,/, '');
+    const avatarMime = generatedAvatar.match(/^data:(image\/\w+);base64,/) ?
+      generatedAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    const evalPrompt = PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Are they the same person? Answer YES or NO only.';
+
+    const requestBody = {
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: originalMime, data: originalBase64 } },
+          { inline_data: { mime_type: avatarMime, data: avatarBase64 } },
+          { text: evalPrompt }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 10
+      }
+    };
+
+    // Use gemini-2.0-flash for evaluation (cheaper, text-only output)
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || '';
+
+    // Log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    if (inputTokens > 0) {
+      console.log(`📊 [AVATAR EVAL] model: gemini-2.0-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    }
+
+    if (responseText.includes('YES')) return 'YES';
+    if (responseText.includes('NO')) return 'NO';
+    return null;
+  } catch (err) {
+    log.error('[AVATAR EVAL] Error evaluating face match:', err.message);
+    return null;
+  }
+}
+
+
 // Generate clothing avatars for a character (4 categories: winter, standard, summer, formal)
 // This creates photorealistic avatars with different clothing for story illustration
 // Prompts based on reference implementation - see prompts/clothing-avatars.txt
@@ -3706,7 +3767,8 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
     const results = {
       status: 'generating',
-      generatedAt: null
+      generatedAt: null,
+      faceMatch: {}
     };
 
     // Generate avatars sequentially to avoid rate limits
@@ -3863,6 +3925,13 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
             // If compression fails, use original
             log.warn(`[CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
             results[category] = imageData;
+          }
+
+          // Evaluate face match (for developer mode display)
+          const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, results[category], geminiApiKey);
+          if (faceMatchResult) {
+            results.faceMatch[category] = faceMatchResult;
+            log.debug(`🔍 [AVATAR EVAL] ${category} face match: ${faceMatchResult}`);
           }
         } else {
           log.warn(`[CLOTHING AVATARS] No image in ${category} response`);

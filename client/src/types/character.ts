@@ -44,6 +44,7 @@ export interface CharacterAvatars {
   generatedAt?: string;
   status?: 'pending' | 'generating' | 'complete' | 'failed';
   stale?: boolean; // True when avatars were generated from a previous photo
+  faceMatch?: Record<ClothingCategory, 'YES' | 'NO'>; // Face match evaluation results (dev mode only)
 }
 
 // Clothing information
