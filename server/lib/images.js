@@ -1225,6 +1225,85 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     } else {
       log.debug(`⚠️  [QUALITY RETRY] Score ${score}% < ${IMAGE_QUALITY_THRESHOLD}%, retrying...`);
     }
+
+    // AUTO-REPAIR: If there are fix targets and not a text error, try repair before regenerating
+    if (!hasTextError && result.fixTargets && result.fixTargets.length > 0) {
+      log.info(`🔧 [QUALITY RETRY] Attempting auto-repair on ${result.fixTargets.length} fix targets before regeneration...`);
+      try {
+        const repairResult = await autoRepairWithTargets(
+          result.imageData,
+          result.fixTargets,
+          0,  // No additional inspection attempts
+          characterPhotos  // Pass reference images for color/clothing matching
+        );
+
+        if (repairResult.repaired && repairResult.imageData !== result.imageData) {
+          log.info(`✅ [QUALITY RETRY] Auto-repair completed, re-evaluating quality...`);
+
+          // Re-evaluate the repaired image
+          const qualityModelOverride = modelOverrides?.qualityModel || null;
+          const reEvalResult = await evaluateImageQuality(
+            repairResult.imageData,
+            currentPrompt,
+            characterPhotos,
+            evaluationType,
+            qualityModelOverride
+          );
+
+          if (reEvalResult && reEvalResult.score !== null) {
+            const repairedScore = reEvalResult.score;
+            log.info(`🔧 [QUALITY RETRY] Post-repair score: ${repairedScore}% (was ${score}%)`);
+
+            // Record repair attempt in history
+            retryHistory.push({
+              attempt: attempts,
+              type: 'auto_repair',
+              preRepairScore: score,
+              postRepairScore: repairedScore,
+              fixTargetsCount: result.fixTargets.length,
+              imageData: repairResult.imageData,
+              timestamp: new Date().toISOString()
+            });
+
+            // If repair improved score above threshold, use repaired image
+            if (repairedScore >= IMAGE_QUALITY_THRESHOLD) {
+              log.info(`✅ [QUALITY RETRY] Auto-repair success! Score improved from ${score}% to ${repairedScore}%`);
+              return {
+                imageData: repairResult.imageData,
+                score: repairedScore,
+                reasoning: reEvalResult.reasoning,
+                wasRegenerated: attempts > 1,
+                wasRepaired: true,
+                retryHistory: retryHistory,
+                totalAttempts: attempts,
+                modelId: result.modelId,
+                qualityModelId: reEvalResult.modelId
+              };
+            }
+
+            // If repair improved score but not enough, update bestResult if better
+            if (repairedScore > bestScore) {
+              bestScore = repairedScore;
+              bestResult = {
+                ...result,
+                imageData: repairResult.imageData,
+                score: repairedScore,
+                reasoning: reEvalResult.reasoning,
+                wasRepaired: true
+              };
+            }
+          }
+        }
+      } catch (repairError) {
+        log.warn(`⚠️  [QUALITY RETRY] Auto-repair failed: ${repairError.message}`);
+        retryHistory.push({
+          attempt: attempts,
+          type: 'auto_repair_failed',
+          error: repairError.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
   }
 
   // All attempts exhausted, return best result
@@ -1634,9 +1713,10 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
  * @param {string} imageData - Base64 image data URL
  * @param {Array} fixTargets - Array of {boundingBox, issue, fixPrompt} from evaluation
  * @param {number} maxAdditionalAttempts - Extra inspection-based attempts after combined fix (default 0)
+ * @param {Array} referenceImages - Reference images for color/clothing matching
  * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
  */
-async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0) {
+async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0, referenceImages = []) {
   const repairHistory = [];
   let currentImage = imageData;
 
@@ -1673,11 +1753,12 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
 
     log.debug(`🔄 [AUTO-REPAIR] Combined prompt: ${combinedPrompt}`);
 
-    // Single inpaint call for ALL fixes
+    // Single inpaint call for ALL fixes (with reference images for color matching)
     const repaired = await inpaintWithMask(
       currentImage,
       combinedMask,
-      combinedPrompt
+      combinedPrompt,
+      referenceImages
     );
 
     if (!repaired || !repaired.imageData) {

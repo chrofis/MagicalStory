@@ -374,36 +374,34 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    const pool = getPool();
-
     // If admin is impersonating, allow access to the impersonated user's stories
     // The impersonation token has req.user.id set to the impersonated user's ID
-    let result;
+    let rows;
     if (req.user.impersonating && req.user.originalAdminId) {
       // Admin impersonating - try with impersonated user's ID first, then allow any story
-      result = await pool.query(
+      rows = await dbQuery(
         'SELECT data, user_id FROM stories WHERE id = $1 AND user_id = $2',
         [id, req.user.id]
       );
       // If not found with user_id, admin can still access any story
-      if (result.rows.length === 0) {
-        result = await pool.query('SELECT data, user_id FROM stories WHERE id = $1', [id]);
-        if (result.rows.length > 0) {
-          console.log(`📝 [IMPERSONATE] Admin accessing story owned by user_id: ${result.rows[0].user_id}`);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
+        if (rows.length > 0) {
+          console.log(`📝 [IMPERSONATE] Admin accessing story owned by user_id: ${rows[0].user_id}`);
         }
       }
     } else {
-      result = await pool.query(
+      rows = await dbQuery(
         'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
         [id, req.user.id]
       );
     }
 
-    if (result.rows.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const storyData = JSON.parse(result.rows[0].data);
+    const storyData = JSON.parse(rows[0].data);
 
     // Preserve original story text on first edit
     if (!storyData.originalStory && storyData.story) {
@@ -416,7 +414,7 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
     storyData.storyText = newStoryText; // Also update storyText for compatibility
     storyData.updatedAt = new Date().toISOString();
 
-    await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+    await dbQuery('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
 
     console.log(`✅ Story text updated for ${id}`);
     await logActivity(req.user.id, req.user.username, 'STORY_TEXT_EDITED', { storyId: id });

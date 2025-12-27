@@ -354,7 +354,7 @@ function getVisualBibleEntriesForPage(visualBible, pageNumber) {
 
   const checkEntries = (entries, type) => {
     for (const entry of entries) {
-      if (entry.appearsInPages.includes(pageNumber)) {
+      if (entry.appearsInPages && entry.appearsInPages.includes(pageNumber)) {
         relevant.push({ ...entry, type });
       }
     }
@@ -378,6 +378,7 @@ function getElementsNeedingAnalysis(visualBible, pageNumber) {
 
   const checkEntries = (entries, type) => {
     for (const entry of entries) {
+      if (!entry.appearsInPages || entry.appearsInPages.length === 0) continue;
       const firstAppearancePage = Math.min(...entry.appearsInPages);
       if (firstAppearancePage === pageNumber && !entry.firstAppearanceAnalyzed) {
         needsAnalysis.push({ ...entry, type });

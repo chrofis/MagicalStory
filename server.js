@@ -2418,11 +2418,16 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, async (req
       return res.status(404).json({ error: 'No image found for this page' });
     }
 
+    // Get character photos for reference-based color matching
+    const characterPhotos = (storyData.characters || [])
+      .filter(c => c.photoData)
+      .map(c => c.photoData);
+
     // Run auto-repair - use pre-computed fix targets if available (saves API call)
     let repairResult;
     if (currentImage.fixTargets && currentImage.fixTargets.length > 0) {
       log.info(`🔄 [REPAIR] Using ${currentImage.fixTargets.length} pre-computed fix targets for story ${id}, page ${pageNumber}`);
-      repairResult = await autoRepairWithTargets(currentImage.imageData, currentImage.fixTargets, 0);
+      repairResult = await autoRepairWithTargets(currentImage.imageData, currentImage.fixTargets, 0, characterPhotos);
     } else {
       log.info(`🔄 [REPAIR] No pre-computed targets, using inspection-based repair for story ${id}, page ${pageNumber}`);
       repairResult = await autoRepairImage(currentImage.imageData, 1);  // Only 1 repair cycle
