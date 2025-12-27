@@ -591,7 +591,11 @@ export const storyService = {
       qualityModel?: string | null;
     };
   }): Promise<{ jobId: string }> {
-    const response = await api.post<{ jobId: string; message: string }>('/api/jobs/create-story', {
+    // Generate idempotency key to prevent duplicate job creation on retries
+    const idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const response = await api.post<{ jobId: string; message: string; existing?: boolean }>('/api/jobs/create-story', {
+      idempotencyKey,
       storyType: data.storyType,
       storyTypeName: data.storyTypeName,
       artStyle: data.artStyle,

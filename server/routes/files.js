@@ -100,6 +100,11 @@ router.get('/:fileId', optionalAuth, async (req, res) => {
       const file = rows[0];
 
       res.set('Content-Type', file.mime_type);
+
+      // Cache headers for immutable resources - files have unique random IDs and never change
+      // Cache for 1 year (31536000 seconds) with immutable flag
+      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+
       if (file.filename) {
         // Sanitize filename for Content-Disposition header
         const safeFilename = file.filename.replace(/[^\x20-\x7E]/g, '_');

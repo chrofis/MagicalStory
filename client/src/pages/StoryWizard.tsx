@@ -590,8 +590,8 @@ export default function StoryWizard() {
     setCurrentCharacter({
       id: Date.now(),
       name: '',
-      gender: 'other',
-      age: '8',
+      gender: undefined as unknown as 'male' | 'female' | 'other',  // Blank - let photo analysis fill
+      age: '',  // Blank - let photo analysis fill
       traits: {
         strengths: [],
         flaws: [],
@@ -678,10 +678,10 @@ export default function StoryWizard() {
 
             return {
               ...prev,
-              // Gender: only update if not already set
-              gender: prev.gender || (analysis.gender as 'male' | 'female' | 'other') || prev.gender,
-              // Age: only update if not already set
-              age: prev.age || analysis.age || prev.age,
+              // Gender: only fill if blank (preserve user value)
+              gender: prev.gender || (analysis.gender as 'male' | 'female' | 'other'),
+              // Age: only fill if blank (preserve user value)
+              age: prev.age || analysis.age,
               // Photos
               photos: {
                 original: analysis.photos?.face || originalPhotoUrl,
