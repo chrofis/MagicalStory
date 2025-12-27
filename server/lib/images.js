@@ -103,11 +103,15 @@ async function cropImageForSequential(imageBase64) {
  * Compress PNG image to JPEG format
  * Converts base64 PNG to JPEG with compression to reduce file size
  * @param {string} pngBase64 - Base64 encoded PNG image (with or without data URI prefix)
+ * @param {number} quality - JPEG quality (1-100, default 85)
+ * @param {number|null} maxDimension - Maximum width/height in pixels (null = no resize)
  * @returns {Promise<string>} Base64 encoded JPEG image with data URI prefix
  */
-async function compressImageToJPEG(pngBase64) {
+async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null) {
   try {
-    // Remove data URI prefix if present
+    // Remove data URI prefix if present and detect original mime type
+    const mimeMatch = pngBase64.match(/^data:(image\/\w+);base64,/);
+    const originalMimeType = mimeMatch ? mimeMatch[1] : 'image/png';
     const base64Data = pngBase64.replace(/^data:image\/\w+;base64,/, '');
 
     // Convert base64 to buffer
@@ -116,16 +120,41 @@ async function compressImageToJPEG(pngBase64) {
     // Get original size
     const originalSizeKB = (imageBuffer.length / 1024).toFixed(2);
 
-    // Compress to JPEG with quality 85 (good balance between quality and size)
-    const compressedBuffer = await sharp(imageBuffer)
-      .jpeg({ quality: 85, progressive: true })
+    // Skip compression for small images (< 100KB) - they're already optimized
+    const SMALL_IMAGE_THRESHOLD_KB = 100;
+    if (imageBuffer.length < SMALL_IMAGE_THRESHOLD_KB * 1024) {
+      log.debug(`🗜️  [COMPRESSION] Skipping - image already small (${originalSizeKB} KB < ${SMALL_IMAGE_THRESHOLD_KB} KB)`);
+      // Return original with correct format
+      if (pngBase64.startsWith('data:')) {
+        return pngBase64;
+      }
+      return `data:${originalMimeType};base64,${base64Data}`;
+    }
+
+    // Build sharp pipeline
+    let pipeline = sharp(imageBuffer);
+
+    // Resize if maxDimension is specified
+    if (maxDimension && maxDimension > 0) {
+      pipeline = pipeline.resize({
+        width: maxDimension,
+        height: maxDimension,
+        fit: 'inside',
+        withoutEnlargement: true
+      });
+    }
+
+    // Compress to JPEG
+    const compressedBuffer = await pipeline
+      .jpeg({ quality: quality, progressive: true })
       .toBuffer();
 
     // Convert back to base64
     const compressedBase64 = compressedBuffer.toString('base64');
     const compressedSizeKB = (compressedBuffer.length / 1024).toFixed(2);
+    const reductionPercent = ((1 - compressedBuffer.length / imageBuffer.length) * 100).toFixed(1);
 
-    log.debug(`🗜️  [COMPRESSION] PNG ${originalSizeKB} KB → JPEG ${compressedSizeKB} KB (${((1 - compressedBuffer.length / imageBuffer.length) * 100).toFixed(1)}% reduction)`);
+    log.debug(`🗜️  [COMPRESSION] PNG ${originalSizeKB} KB → JPEG ${compressedSizeKB} KB (${reductionPercent}% reduction)`);
 
     return `data:image/jpeg;base64,${compressedBase64}`;
   } catch (error) {
@@ -250,12 +279,30 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       });
     };
 
+    // Helper function to check if response indicates blocked content
+    const isBlockedResponse = (responseData) => {
+      // Check promptFeedback for block reason
+      if (responseData.promptFeedback?.blockReason) {
+        return true;
+      }
+      // Check if no candidates due to safety
+      if (!responseData.candidates || responseData.candidates.length === 0) {
+        return true;
+      }
+      // Check candidate-level blocking
+      const finishReason = responseData.candidates[0]?.finishReason;
+      if (finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
+        return true;
+      }
+      return false;
+    };
+
     let response = await callQualityAPI(modelId);
 
-    // Fallback: If 2.5 model fails, try 2.0
+    // Fallback: If 2.5 model fails at HTTP level, try 2.0
     if (!response.ok && modelId.includes('2.5')) {
       const error = await response.text();
-      log.warn(`⚠️  [QUALITY] Model ${modelId} failed, falling back to gemini-2.0-flash. Error: ${error.substring(0, 200)}`);
+      log.warn(`⚠️  [QUALITY] Model ${modelId} failed (HTTP ${response.status}), falling back to gemini-2.0-flash. Error: ${error.substring(0, 200)}`);
       modelId = 'gemini-2.0-flash';
       response = await callQualityAPI(modelId);
     }
@@ -266,13 +313,34 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       return null;
     }
 
-    const data = await response.json();
+    let data = await response.json();
 
     // Extract and log token usage for quality evaluation
     const qualityInputTokens = data.usageMetadata?.promptTokenCount || 0;
     const qualityOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     if (qualityInputTokens > 0 || qualityOutputTokens > 0) {
       log.verbose(`📊 [QUALITY] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}`);
+    }
+
+    // Fallback: If content was blocked and we haven't tried 2.0 yet
+    if (isBlockedResponse(data) && modelId.includes('2.5')) {
+      const blockReason = data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason || 'UNKNOWN';
+      log.warn(`⚠️  [QUALITY] Content blocked by ${modelId} (${blockReason}), falling back to gemini-2.0-flash...`);
+      modelId = 'gemini-2.0-flash';
+      response = await callQualityAPI(modelId);
+      if (!response.ok) {
+        const error = await response.text();
+        log.error('❌ [QUALITY] Fallback model also failed:', error);
+        return null;
+      }
+      data = await response.json();
+
+      // Log token usage for fallback call
+      const fallbackInputTokens = data.usageMetadata?.promptTokenCount || 0;
+      const fallbackOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+      if (fallbackInputTokens > 0 || fallbackOutputTokens > 0) {
+        log.verbose(`📊 [QUALITY] Fallback token usage - input: ${fallbackInputTokens.toLocaleString()}, output: ${fallbackOutputTokens.toLocaleString()}`);
+      }
     }
 
     // Log finish reason to diagnose early stops
@@ -282,7 +350,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      log.warn('⚠️  [QUALITY] No text response from Gemini');
+      log.warn('⚠️  [QUALITY] No text response from Gemini (after fallback attempted)');
       if (data.candidates?.[0]) {
         log.warn('⚠️  [QUALITY] Candidate info:', JSON.stringify({
           finishReason: data.candidates[0].finishReason,
@@ -927,8 +995,16 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       }
       continue;
     }
-    const score = result.score || 0;
-    log.debug(`⭐ [QUALITY RETRY] Attempt ${attempts} score: ${score}%`);
+    // Distinguish between: eval returned null/failed vs eval returned a score
+    // When score is null, the image was generated fine but quality eval was blocked
+    const evalWasBlocked = result.score === null || result.score === undefined;
+    const score = evalWasBlocked ? null : result.score;
+
+    if (evalWasBlocked) {
+      log.debug(`⭐ [QUALITY RETRY] Attempt ${attempts}: quality eval was blocked/failed`);
+    } else {
+      log.debug(`⭐ [QUALITY RETRY] Attempt ${attempts} score: ${score}%`);
+    }
 
     // Check for text errors on covers (but not when "NO TEXT" was expected and is missing)
     const noTextExpected = result.expectedText && result.expectedText.toUpperCase() === 'NO TEXT';
@@ -950,6 +1026,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       attempt: attempts,
       type: 'generation',
       score: score,
+      evalSkipped: evalWasBlocked,
       reasoning: result.reasoning,
       textIssue: result.textIssue,
       expectedText: result.expectedText,
@@ -959,10 +1036,27 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       timestamp: new Date().toISOString()
     });
 
-    // Track if this is the best so far
-    if (score > bestScore) {
+    // Track if this is the best so far (only compare when we have scores)
+    if (score !== null && score > bestScore) {
       bestScore = score;
       bestResult = result;
+    } else if (bestResult === null) {
+      // First result - keep it even if eval was blocked
+      bestResult = result;
+    }
+
+    // If eval was blocked (after fallback attempted in evaluateImageQuality), accept the image
+    // The image itself was generated successfully, only the evaluation failed
+    if (evalWasBlocked) {
+      log.warn(`⚠️  [QUALITY RETRY] Accepting image (quality eval was blocked/failed after fallback)`);
+      return {
+        ...result,
+        wasRegenerated: attempts > 1,
+        retryHistory: retryHistory,
+        totalAttempts: attempts,
+        evalSkipped: true,
+        score: null
+      };
     }
 
     // Check if quality is good enough (and no text errors for covers)
@@ -985,7 +1079,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   }
 
   // All attempts exhausted, return best result
-  console.log(`⚠️  [QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Using best result with score ${bestScore}%`);
+  console.log(`⚠️  [QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Using best result with score ${bestScore === -1 ? 'unknown' : bestScore + '%'}`);
   return {
     ...bestResult,
     wasRegenerated: true,
