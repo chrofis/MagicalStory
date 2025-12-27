@@ -767,6 +767,96 @@ function extractCoverScenes(outline) {
   return coverScenes;
 }
 
+/**
+ * Extract clothing information for all pages from outline
+ * Parses primary clothing and per-page changes
+ * @param {string} outline - The story outline text
+ * @param {number} totalPages - Total number of story pages
+ * @returns {Object} { primaryClothing: string, pageClothing: { [pageNum]: string } }
+ */
+function extractPageClothing(outline, totalPages = 20) {
+  const result = {
+    primaryClothing: 'standard',
+    pageClothing: {}  // { 1: 'summer', 2: 'summer', 8: 'standard', ... }
+  };
+
+  if (!outline) return result;
+
+  const lines = outline.split('\n');
+
+  // Pattern 1: Find Primary Clothing
+  // Matches: "**Primary Clothing:** summer", "Primary Clothing: winter", etc.
+  const primaryMatch = outline.match(/(?:\*\*)?Primary\s+Clothing(?:\*\*)?:\s*\[?\s*(winter|summer|formal|standard)/i);
+  if (primaryMatch) {
+    result.primaryClothing = primaryMatch[1].toLowerCase();
+    log.debug(`[PAGE CLOTHING] Primary clothing: ${result.primaryClothing}`);
+  }
+
+  // Initialize all pages with primary clothing
+  for (let i = 1; i <= totalPages; i++) {
+    result.pageClothing[i] = result.primaryClothing;
+  }
+
+  // Pattern 2: Find Clothing Change Events section
+  // Format: "Page 8 (bedtime scene → standard)" or "Page 8: change to standard"
+  const changeEventsMatch = outline.match(/Clothing\s+Change\s+Events[:\s]*([\s\S]*?)(?=\n\s*\n|\n---|\n#|$)/i);
+  if (changeEventsMatch) {
+    const changesText = changeEventsMatch[1];
+    // Find patterns like "Page 8 (...→ standard)" or "Page 8 (change to: winter)"
+    const changePattern = /Page\s+(\d+)\s*[:\(][^)]*?(?:→|->|change\s+to:?\s*)\s*(winter|summer|formal|standard)/gi;
+    let match;
+    while ((match = changePattern.exec(changesText)) !== null) {
+      const pageNum = parseInt(match[1]);
+      const clothing = match[2].toLowerCase();
+      result.pageClothing[pageNum] = clothing;
+      log.debug(`[PAGE CLOTHING] Page ${pageNum} changes to: ${clothing}`);
+    }
+  }
+
+  // Pattern 3: Parse per-page clothing in page breakdown
+  // Format: "**Clothing:** [same]" or "**Clothing:** [change to: winter]" or "Clothing: summer"
+  let currentPage = 0;
+  let lastClothing = result.primaryClothing;
+
+  for (const line of lines) {
+    // Detect page header: "Page 1:", "**Page 3:**", "---PAGE 5---"
+    const pageHeaderMatch = line.match(/(?:\*\*)?Page\s+(\d+)(?:\*\*)?[:\s]|^---\s*PAGE\s+(\d+)\s*---/i);
+    if (pageHeaderMatch) {
+      currentPage = parseInt(pageHeaderMatch[1] || pageHeaderMatch[2]);
+      continue;
+    }
+
+    // If we're in a page section, look for clothing info
+    if (currentPage > 0) {
+      // Match clothing specification
+      const clothingMatch = line.match(/(?:\*\*)?Clothing(?:\*\*)?:\s*(?:\[|\*\*)?\s*(same|change\s+to:?\s*(winter|summer|formal|standard)|(winter|summer|formal|standard))/i);
+      if (clothingMatch) {
+        if (clothingMatch[1].toLowerCase() === 'same') {
+          result.pageClothing[currentPage] = lastClothing;
+        } else if (clothingMatch[2]) {
+          // "change to: winter" format
+          result.pageClothing[currentPage] = clothingMatch[2].toLowerCase();
+          lastClothing = result.pageClothing[currentPage];
+        } else if (clothingMatch[3]) {
+          // Direct value "Clothing: winter"
+          result.pageClothing[currentPage] = clothingMatch[3].toLowerCase();
+          lastClothing = result.pageClothing[currentPage];
+        }
+      }
+    }
+  }
+
+  // Log summary of clothing changes
+  const changes = Object.entries(result.pageClothing)
+    .filter(([page, clothing]) => clothing !== result.primaryClothing)
+    .map(([page, clothing]) => `P${page}:${clothing}`);
+  if (changes.length > 0) {
+    log.debug(`[PAGE CLOTHING] Changes from primary (${result.primaryClothing}): ${changes.join(', ')}`);
+  }
+
+  return result;
+}
+
 // ============================================================================
 // PROMPT BUILDERS
 // ============================================================================
@@ -1327,6 +1417,7 @@ module.exports = {
   parseSceneDescriptions,
   extractShortSceneDescriptions,
   extractCoverScenes,
+  extractPageClothing,
 
   // Prompt builders
   buildBasePrompt,

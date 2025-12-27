@@ -136,6 +136,7 @@ const {
   parseSceneDescriptions,
   extractShortSceneDescriptions,
   extractCoverScenes,
+  extractPageClothing,
   buildBasePrompt,
   buildStoryPrompt,
   buildSceneDescriptionPrompt,
@@ -1561,6 +1562,9 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Get Visual Bible for recurring elements
     const visualBible = storyData.visualBible || null;
 
+    // Get page clothing from outline (reliable source) or fall back to parsing scene descriptions
+    const pageClothingData = storyData.pageClothing || null;
+
     // Build previous scenes context (last 2 pages)
     const sceneDescriptions = storyData.sceneDescriptions || [];
     const previousScenes = [];
@@ -1568,9 +1572,12 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
       if (prevPage >= 1) {
         const prevText = getPageText(storyData.storyText, prevPage);
         if (prevText) {
-          // Get clothing from existing scene description if available
-          const prevSceneDesc = sceneDescriptions.find(s => s.pageNumber === prevPage);
-          const prevClothing = prevSceneDesc ? parseClothingCategory(prevSceneDesc.description) : null;
+          // Get clothing from pageClothing (outline) first, then fall back to parsing scene description
+          let prevClothing = pageClothingData?.pageClothing?.[prevPage] || null;
+          if (!prevClothing) {
+            const prevSceneDesc = sceneDescriptions.find(s => s.pageNumber === prevPage);
+            prevClothing = prevSceneDesc ? parseClothingCategory(prevSceneDesc.description) : null;
+          }
           previousScenes.push({
             pageNumber: prevPage,
             text: prevText,
@@ -1580,6 +1587,10 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
         }
       }
     }
+
+    // Log expected clothing for this page based on outline
+    const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
+    log.debug(`🔄 [REGEN SCENE ${pageNumber}] Expected clothing from outline: ${expectedClothing}`)
 
     // Generate new scene description (includes Visual Bible recurring elements)
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes);
@@ -1714,11 +1725,16 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       }
     }
 
-    // Parse clothing category from expanded description
-    const clothingCategory = parseClothingCategory(expandedDescription) || 'standard';
+    // Get clothing category - prefer outline pageClothing, then parse from description
+    const pageClothingData = storyData.pageClothing || null;
+    let clothingCategory = pageClothingData?.pageClothing?.[pageNumber] || null;
+    if (!clothingCategory) {
+      clothingCategory = parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
+    }
     // Use detailed photo info (with names) for labeled reference images
     const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
-    log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}`);
+    log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}${pageClothingData ? ' (from outline)' : ' (parsed)'}`);
+
 
     // Build image prompt with scene-specific characters and visual bible
     // Use isStorybook=true to include Visual Bible section in prompt
@@ -6831,6 +6847,10 @@ async function processStoryJob(jobId) {
     const shortSceneDescriptions = extractShortSceneDescriptions(outline);
     log.debug(`📋 [PIPELINE] Extracted ${Object.keys(shortSceneDescriptions).length} short scene descriptions from outline`);
 
+    // Extract page clothing from outline for consistent outfit rendering
+    const pageClothingData = extractPageClothing(outline, sceneCount);
+    log.debug(`👔 [PIPELINE] Primary clothing: ${pageClothingData.primaryClothing}, changes on ${Object.entries(pageClothingData.pageClothing).filter(([p, c]) => c !== pageClothingData.primaryClothing).length} pages`);
+
     // Parse Visual Bible for recurring elements consistency
     const visualBible = parseVisualBible(outline);
     // Filter out main characters from secondary characters (safety net)
@@ -7887,6 +7907,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       sceneImages: allImages,
       coverImages: coverImages,
       visualBible: visualBible, // Visual Bible for recurring element consistency (dev mode)
+      pageClothing: pageClothingData, // Clothing per page extracted from outline
       tokenUsage: tokenUsage, // Token usage statistics for cost tracking
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -8184,6 +8205,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               originalStory: fullStoryText, // Store original for restore functionality
               storyTextPrompts: storyTextPrompts,
               visualBible: visualBible,
+              pageClothing: pageClothingData,
               sceneDescriptions: sceneDescriptions,
               sceneImages: sceneImages,
               coverImages: coverImages,
