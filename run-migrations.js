@@ -2,14 +2,16 @@
 /**
  * Database Migration Runner
  * Automatically runs pending migrations on server startup
+ *
+ * Note: Migration files are kept in database/migrations/ for reference.
+ * Once executed, they are tracked in the schema_migrations table.
+ * This runner is silent when all migrations are already applied.
  */
 
 const fs = require('fs').promises;
 const path = require('path');
 
 async function runMigrations(dbPool, dbType) {
-  console.log('🔄 Running database migrations...');
-
   // Helper to execute queries (handle both PostgreSQL and MySQL)
   const executeQuery = async (query, params = []) => {
     if (dbType === 'postgresql') {
@@ -36,7 +38,6 @@ async function runMigrations(dbPool, dbType) {
         )`;
 
     await executeQuery(createMigrationsTable);
-    console.log('✓ Migrations table ready');
 
     // Read all migration files
     const migrationsDir = path.join(__dirname, 'database', 'migrations');
@@ -51,26 +52,32 @@ async function runMigrations(dbPool, dbType) {
       }
     }).sort(); // Sort to ensure consistent order
 
-    console.log(`Found ${migrationFiles.length} migration files to process`);
-
-    // Execute each migration
+    // Find pending migrations
+    const pendingMigrations = [];
     for (const migrationFile of migrationFiles) {
-      const migrationPath = path.join(migrationsDir, migrationFile);
-
-      // Check if migration already executed
       const checkQuery = dbType === 'postgresql'
         ? 'SELECT migration_name FROM schema_migrations WHERE migration_name = $1'
         : 'SELECT migration_name FROM schema_migrations WHERE migration_name = ?';
 
       const rows = await executeQuery(checkQuery, [migrationFile]);
-
-      if (rows.length > 0) {
-        console.log(`✓ Migration ${migrationFile} already executed`);
-        continue;
+      if (rows.length === 0) {
+        pendingMigrations.push(migrationFile);
       }
+    }
 
-      // Read and execute migration
-      console.log(`📝 Running migration: ${migrationFile}...`);
+    // If no pending migrations, stay silent
+    if (pendingMigrations.length === 0) {
+      return;
+    }
+
+    // Only log when there's work to do
+    console.log(`🔄 Running ${pendingMigrations.length} pending migration(s)...`);
+
+    // Execute pending migrations
+    for (const migrationFile of pendingMigrations) {
+      const migrationPath = path.join(migrationsDir, migrationFile);
+
+      console.log(`📝 Running: ${migrationFile}`);
       const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
 
       // Split by semicolon and execute each statement
@@ -100,7 +107,7 @@ async function runMigrations(dbPool, dbType) {
 
       await executeQuery(insertQuery, [migrationFile]);
 
-      console.log(`✅ Migration ${migrationFile} completed successfully`);
+      console.log(`✅ ${migrationFile} completed`);
     }
 
     console.log('✅ All migrations completed');
