@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken, generateToken, JWT_SECRET } = require('../middleware/auth');
 const { authLimiter, registerLimiter } = require('../middleware/rateLimit');
+const { validateBody, schemas, sanitizeString } = require('../middleware/validation');
 const { log } = require('../utils/logger');
 
 // Firebase Admin SDK - import if available
@@ -32,13 +33,28 @@ try {
 }
 
 // POST /api/auth/register
-router.post('/register', registerLimiter, async (req, res) => {
+router.post('/register', registerLimiter, validateBody(schemas.register), async (req, res) => {
   try {
-    const { username, password, email } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+    // Bot protection: honeypot field (should be empty)
+    if (req.body.website || req.body.url || req.body.homepage) {
+      log.warn(`🤖 Bot detected: honeypot field filled from IP ${req.ip}`);
+      // Return success to confuse bots, but don't actually register
+      return res.json({ success: true, message: 'Registration successful' });
     }
+
+    // Bot protection: form submission time check (too fast = bot)
+    const formStartTime = parseInt(req.body._formStartTime) || 0;
+    if (formStartTime > 0) {
+      const submissionTime = Date.now() - formStartTime;
+      if (submissionTime < 3000) { // Less than 3 seconds = likely bot
+        log.warn(`🤖 Bot detected: form submitted too fast (${submissionTime}ms) from IP ${req.ip}`);
+        return res.json({ success: true, message: 'Registration successful' });
+      }
+    }
+
+    const username = sanitizeString(req.body.username, 30);
+    const password = req.body.password; // Don't sanitize password
+    const email = sanitizeString(req.body.email, 254).toLowerCase();
 
     const hashedPassword = await bcrypt.hash(password, 10);
     let newUser;
@@ -739,6 +755,57 @@ router.post('/logout', authenticateToken, async (req, res) => {
     // Even if logging fails, consider logout successful
     console.error('Logout logging error:', err);
     res.json({ success: true, message: 'Logged out' });
+  }
+});
+
+// POST /api/auth/refresh - Refresh access token
+// Allows refreshing token before it expires (within last 24 hours of validity)
+router.post('/refresh', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'Database mode required' });
+    }
+
+    // Get fresh user data from database
+    const userResult = await dbQuery(
+      'SELECT id, username, email, role, email_verified, credits FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult[0];
+
+    // Generate new token with fresh user data
+    const newToken = generateToken({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      email_verified: user.email_verified
+    });
+
+    log.debug(`Token refreshed for user ${user.username}`);
+
+    res.json({
+      success: true,
+      token: newToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        emailVerified: user.email_verified,
+        credits: user.credits
+      }
+    });
+  } catch (err) {
+    console.error('Token refresh error:', err);
+    res.status(500).json({ error: 'Failed to refresh token' });
   }
 });
 

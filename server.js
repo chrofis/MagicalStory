@@ -72,6 +72,7 @@ const admin = require('firebase-admin');
 
 // Import modular routes and services
 const { initializePool: initModularPool, logActivity, isDatabaseMode } = require('./server/services/database');
+const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
 const { generatePrintPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder } = require('./server/lib/gelato');
@@ -8296,11 +8297,22 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
 
 // Create a new story generation job
-app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
+app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.createStory), async (req, res) => {
   try {
     const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const userId = req.user.id;
-    const inputData = req.body;
+
+    // Sanitize and validate input data
+    const inputData = {
+      ...req.body,
+      pages: sanitizeInteger(req.body.pages, 20, 10, 100),
+      language: sanitizeString(req.body.language || 'en', 50),
+      languageLevel: sanitizeString(req.body.languageLevel || 'standard', 50),
+      storyType: sanitizeString(req.body.storyType || '', 100),
+      artStyle: sanitizeString(req.body.artStyle || 'pixar', 50),
+      storyDetails: sanitizeString(req.body.storyDetails || '', 2000),
+      dedication: sanitizeString(req.body.dedication || '', 500)
+    };
 
     log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}`);
 
@@ -8394,6 +8406,17 @@ app.post('/api/jobs/create-story', authenticateToken, async (req, res) => {
           });
         }
       }
+    }
+
+    // Check for missing clothing avatars (warn but don't block - graceful fallback to regular photos)
+    const characters = inputData.characters || [];
+    const charsWithoutAvatars = characters.filter(char => {
+      const avatars = char.avatars || char.clothingAvatars || {};
+      const hasAnyAvatar = Object.values(avatars).some(url => url && url.startsWith('data:image'));
+      return !hasAnyAvatar && (char.photoUrl || char.bodyPhotoUrl); // Has photo but no avatars
+    });
+    if (charsWithoutAvatars.length > 0) {
+      log.warn(`⚠️ [AVATAR CHECK] ${charsWithoutAvatars.length} character(s) missing clothing avatars: ${charsWithoutAvatars.map(c => c.name).join(', ')}. Using fallback photos.`);
     }
 
     if (STORAGE_MODE === 'database') {
