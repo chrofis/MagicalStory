@@ -1,7 +1,8 @@
 TASK: A full-length documentary-style portrait of the EXACT individual from the reference photos.
 
 VISUAL REQUIREMENTS:
-- Subject: 100% identical face, body type, and AGE to reference.
+- Subject: 100% identical face and AGE to reference.
+- Body: {BUILD} build with healthy, age-appropriate proportions. Do NOT copy body weight/shape from reference photo.
 - Setting: Pure clean white background (#FFFFFF).
 - Lighting: Natural, even, studio-style diffused light.
 - Framing: Full body, head to toe. Shoes visible.

@@ -3534,7 +3534,8 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
     const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
     const clothingStyle = getClothingStylePrompt(category);
     const avatarPrompt = fillTemplate(promptPart, {
-      'CLOTHING_STYLE': clothingStyle
+      'CLOTHING_STYLE': clothingStyle,
+      'BUILD': req.query.build || 'average'
     });
 
     res.json({ success: true, prompt: avatarPrompt });
@@ -3550,7 +3551,7 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
 // Prompts based on reference implementation - see prompts/clothing-avatars.txt
 app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    const { characterId, facePhoto, physicalDescription, name, age, gender } = req.body;
+    const { characterId, facePhoto, physicalDescription, name, age, gender, build } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
@@ -3620,7 +3621,8 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
         const clothingStyle = getClothingStylePrompt(category);
         log.debug(`   [CLOTHING] Style for ${category}: "${clothingStyle}"`);
         const avatarPrompt = fillTemplate(promptPart, {
-          'CLOTHING_STYLE': clothingStyle
+          'CLOTHING_STYLE': clothingStyle,
+          'BUILD': build || 'average'
         });
         log.debug(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStyle.substring(0, 50)}..."`);
 

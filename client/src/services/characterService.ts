@@ -238,6 +238,7 @@ export const characterService = {
         name: character.name,
         age: character.age,
         gender: character.gender,
+        build: character.physical?.build || 'average',
       });
 
       if (response.success && response.clothingAvatars) {
