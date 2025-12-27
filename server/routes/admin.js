@@ -8,28 +8,9 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 
-const { dbQuery, getPool } = require('../services/database');
+const { dbQuery, getPool, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-
-// Helper to check if using database mode
-const isDatabaseMode = () => {
-  return process.env.STORAGE_MODE === 'database' && getPool();
-};
-
-// Helper to log activity
-async function logActivity(userId, username, action, details) {
-  try {
-    if (isDatabaseMode()) {
-      await dbQuery(
-        'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)',
-        [userId, username, action, JSON.stringify(details)]
-      );
-    }
-  } catch (err) {
-    console.error('Failed to log activity:', err);
-  }
-}
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {

@@ -7,14 +7,9 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, getPool } = require('../services/database');
+const { dbQuery, isDatabaseMode } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-
-// Helper to check if using database mode
-const isDatabaseMode = () => {
-  return process.env.STORAGE_MODE === 'database' && getPool();
-};
 
 // GET /api/story-draft - Get user's story draft
 router.get('/', authenticateToken, async (req, res) => {

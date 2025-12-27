@@ -72,7 +72,7 @@ const email = require('./email');
 const admin = require('firebase-admin');
 
 // Import modular routes and services
-const { initializePool: initModularPool } = require('./server/services/database');
+const { initializePool: initModularPool, logActivity, isDatabaseMode } = require('./server/services/database');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
 const { generatePrintPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder } = require('./server/lib/gelato');
@@ -1201,27 +1201,7 @@ async function writeJSON(filePath, data) {
   await fs.writeFile(filePath, JSON.stringify(data, null, 2));
 }
 
-// Logging function
-async function logActivity(userId, username, action, details) {
-  if (STORAGE_MODE === 'database' && dbPool) {
-    try {
-      const insertQuery = 'INSERT INTO logs (user_id, username, action, details) VALUES ($1, $2, $3, $4)';
-      await dbQuery(insertQuery, [userId, username, action, JSON.stringify(details)]);
-    } catch (err) {
-      log.error('Log error:', err);
-    }
-  } else {
-    const logs = await readJSON(LOGS_FILE);
-    logs.push({
-      timestamp: new Date().toISOString(),
-      userId,
-      username,
-      action,
-      details
-    });
-    await writeJSON(LOGS_FILE, logs);
-  }
-}
+// logActivity imported from ./server/services/database
 
 // =============================================================================
 // CHECKPOINT SYSTEM - Save intermediate pipeline state for fault tolerance
