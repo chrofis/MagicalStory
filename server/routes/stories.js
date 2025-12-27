@@ -124,14 +124,13 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
     log.debug(`🖼️ GET /api/stories/${id}/cover - User: ${req.user.username} (ID: ${req.user.id})`);
 
     if (isDatabaseMode()) {
-      const pool = getPool();
-      const result = await pool.query(
+      const result = await dbQuery(
         'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
         [id, req.user.id]
       );
-      log.debug(`🖼️ Cover query returned ${result.rows.length} rows for story ${id}`);
-      if (result.rows.length > 0) {
-        const story = JSON.parse(result.rows[0].data);
+      log.debug(`🖼️ Cover query returned ${result.length} rows for story ${id}`);
+      if (result.length > 0) {
+        const story = JSON.parse(result[0].data);
         coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
         log.debug(`🖼️ Cover image found: ${coverImage ? 'yes' : 'no'}`);
       }
