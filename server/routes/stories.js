@@ -89,12 +89,24 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`📖 GET /api/stories/${id} - User: ${req.user.username}`);
+    console.log(`📖 GET /api/stories/${id} - User: ${req.user.username}, impersonating: ${req.user.impersonating || false}`);
 
     let story = null;
 
     if (isDatabaseMode()) {
-      const rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      let rows;
+      if (req.user.impersonating && req.user.originalAdminId) {
+        // Admin impersonating - try impersonated user first, then any story
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+        if (rows.length === 0) {
+          rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
+          if (rows.length > 0) {
+            console.log(`📖 [IMPERSONATE] Admin viewing story owned by user_id: ${rows[0].user_id}`);
+          }
+        }
+      } else {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      }
 
       if (rows.length > 0) {
         story = JSON.parse(rows[0].data);
@@ -356,17 +368,36 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'story text is required' });
     }
 
-    console.log(`📝 PUT /api/stories/${id}/text - Saving edited text`);
+    console.log(`📝 PUT /api/stories/${id}/text - Saving edited text (user: ${req.user.username}, impersonating: ${req.user.impersonating || false})`);
 
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
     const pool = getPool();
-    const result = await pool.query(
-      'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
-      [id, req.user.id]
-    );
+
+    // If admin is impersonating, allow access to the impersonated user's stories
+    // The impersonation token has req.user.id set to the impersonated user's ID
+    let result;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      // Admin impersonating - try with impersonated user's ID first, then allow any story
+      result = await pool.query(
+        'SELECT data, user_id FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+      // If not found with user_id, admin can still access any story
+      if (result.rows.length === 0) {
+        result = await pool.query('SELECT data, user_id FROM stories WHERE id = $1', [id]);
+        if (result.rows.length > 0) {
+          console.log(`📝 [IMPERSONATE] Admin accessing story owned by user_id: ${result.rows[0].user_id}`);
+        }
+      }
+    } else {
+      result = await pool.query(
+        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+    }
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
