@@ -1,14 +1,16 @@
-Compare the two faces and determine if they are VERY LIKELY the same person.
+Compare the two faces and evaluate if they are the same person.
 
 IMAGE 1: Original reference photo
 IMAGE 2: Generated avatar
 
-EVALUATION CRITERIA:
-- Focus on key identifying features: face shape, eye spacing, nose structure, mouth shape
-- Allow for minor AI generation artifacts
-- IGNORE: lighting, skin tone, clothing, hairstyle, background, expression
+EVALUATE EACH FEATURE (score 1-10, where 10 = perfect match):
 
-Answer YES if the core facial structure matches, even with small variations.
-Answer NO if key features differ significantly (wrong gender, different face shape, different eye/nose type).
+Face Shape: [score] - [brief reason]
+Eyes: [score] - [brief reason]
+Nose: [score] - [brief reason]
+Mouth: [score] - [brief reason]
+Overall Structure: [score] - [brief reason]
 
-RESPOND WITH ONLY ONE WORD: YES or NO
+IGNORE: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts
+
+FINAL SCORE: [1-10]

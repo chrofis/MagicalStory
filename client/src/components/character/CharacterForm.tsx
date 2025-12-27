@@ -541,9 +541,9 @@ export function CharacterForm({
                     )}
                     {developerMode && character.avatars?.faceMatch?.[category] && (
                       <div className={`absolute bottom-1 left-1 text-white text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                        character.avatars.faceMatch[category] === 'YES' ? 'bg-green-600' : 'bg-red-600'
+                        character.avatars.faceMatch[category].score >= 6 ? 'bg-green-600' : 'bg-red-600'
                       }`}>
-                        {character.avatars.faceMatch[category] === 'YES' ? '✓ Match' : '✗ No match'}
+                        {character.avatars.faceMatch[category].score}/10
                       </div>
                     )}
                   </div>
@@ -553,10 +553,22 @@ export function CharacterForm({
                   </div>
                 )}
                 {developerMode && (
-                  <details className="mt-1 text-left">
-                    <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
-                    <AvatarPromptDisplay category={category} gender={character.gender} physical={character.physical} />
-                  </details>
+                  <>
+                    <details className="mt-1 text-left">
+                      <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
+                      <AvatarPromptDisplay category={category} gender={character.gender} physical={character.physical} />
+                    </details>
+                    {character.avatars?.faceMatch?.[category] && (
+                      <details className="mt-1 text-left">
+                        <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">
+                          Face eval ({character.avatars.faceMatch[category].score}/10)
+                        </summary>
+                        <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
+                          {character.avatars.faceMatch[category].details}
+                        </pre>
+                      </details>
+                    )}
+                  </>
                 )}
               </div>
             ))}

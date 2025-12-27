@@ -35,6 +35,12 @@ export interface CharacterPhotos {
 // Clothing categories for scene-appropriate avatars
 export type ClothingCategory = 'winter' | 'standard' | 'summer' | 'formal';
 
+// Face match evaluation result
+export interface FaceMatchResult {
+  score: number;    // 1-10 score
+  details: string;  // Full evaluation text with feature breakdown
+}
+
 // Generated avatars for each clothing category
 export interface CharacterAvatars {
   winter?: string;
@@ -44,7 +50,7 @@ export interface CharacterAvatars {
   generatedAt?: string;
   status?: 'pending' | 'generating' | 'complete' | 'failed';
   stale?: boolean; // True when avatars were generated from a previous photo
-  faceMatch?: Record<ClothingCategory, 'YES' | 'NO'>; // Face match evaluation results (dev mode only)
+  faceMatch?: Record<ClothingCategory, FaceMatchResult>; // Face match evaluation results (dev mode only)
 }
 
 // Clothing information
