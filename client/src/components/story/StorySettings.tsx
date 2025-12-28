@@ -1,8 +1,13 @@
-import { useEffect } from 'react';
-import { Wand2, Star, Sparkles, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Wand2, Star, Sparkles, Loader2, Pencil, ChevronRight, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { Modal } from '@/components/common/Modal';
+import { StoryCategorySelector } from './StoryCategorySelector';
+import { ArtStyleSelector } from './ArtStyleSelector';
+import { storyCategories, storyTypes, lifeChallenges, educationalTopics } from '@/constants/storyTypes';
+import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
-import type { LanguageLevel } from '@/types/story';
+import type { LanguageLevel, Language } from '@/types/story';
 
 // Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
 export type CharacterRole = 'out' | 'in' | 'main';
@@ -26,6 +31,16 @@ interface StorySettingsProps {
   // Generate Ideas
   onGenerateIdeas?: () => Promise<void>;
   isGeneratingIdeas?: boolean;
+  // Story type settings (from step 1)
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
+  storyTopic?: string;
+  storyTheme?: string;
+  artStyle?: string;
+  onCategoryChange?: (category: 'adventure' | 'life-challenge' | 'educational') => void;
+  onTopicChange?: (topic: string) => void;
+  onThemeChange?: (theme: string) => void;
+  onArtStyleChange?: (style: string) => void;
+  onLegacyStoryTypeChange?: (storyType: string) => void;
 }
 
 export function StorySettings({
@@ -46,8 +61,22 @@ export function StorySettings({
   onImageGenModeChange,
   onGenerateIdeas,
   isGeneratingIdeas = false,
+  // Story type settings (from step 1)
+  storyCategory = '',
+  storyTopic = '',
+  storyTheme = '',
+  artStyle = '',
+  onCategoryChange,
+  onTopicChange,
+  onThemeChange,
+  onArtStyleChange,
+  onLegacyStoryTypeChange,
 }: StorySettingsProps) {
   const { t, language } = useLanguage();
+  const lang = language as Language;
+
+  // Modal state for editing story type settings
+  const [isEditSettingsOpen, setIsEditSettingsOpen] = useState(false);
 
   // Helper to determine character's current role
   const getCharacterRole = (charId: number): CharacterRole => {
@@ -115,8 +144,116 @@ export function StorySettings({
     main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : 'Main',
   };
 
+  // Helper functions for display names
+  const getCategoryName = () => {
+    const cat = storyCategories.find(c => c.id === storyCategory);
+    return cat ? (cat.name[lang] || cat.name.en) : '';
+  };
+
+  const getCategoryEmoji = () => {
+    const cat = storyCategories.find(c => c.id === storyCategory);
+    return cat?.emoji || '';
+  };
+
+  const getThemeName = () => {
+    if (!storyTheme || storyTheme === 'realistic') return '';
+    const theme = storyTypes.find(t => t.id === storyTheme);
+    return theme ? (theme.name[lang] || theme.name.en) : '';
+  };
+
+  const getThemeEmoji = () => {
+    if (!storyTheme || storyTheme === 'realistic') return '';
+    const theme = storyTypes.find(t => t.id === storyTheme);
+    return theme?.emoji || '';
+  };
+
+  const getTopicName = () => {
+    if (!storyTopic) return '';
+    const challenge = lifeChallenges.find(c => c.id === storyTopic);
+    if (challenge) return challenge.name[lang] || challenge.name.en;
+    const topic = educationalTopics.find(t => t.id === storyTopic);
+    if (topic) return topic.name[lang] || topic.name.en;
+    return '';
+  };
+
+  const getTopicEmoji = () => {
+    if (!storyTopic) return '';
+    const challenge = lifeChallenges.find(c => c.id === storyTopic);
+    if (challenge) return challenge.emoji;
+    const topic = educationalTopics.find(t => t.id === storyTopic);
+    return topic?.emoji || '';
+  };
+
+  const getArtStyleName = () => {
+    const style = artStyles.find(s => s.id === artStyle);
+    return style ? (style.name[lang] || style.name.en) : '';
+  };
+
+  // Check if we should show the settings summary bar
+  const showSettingsSummary = storyCategory && artStyle && (
+    storyCategory === 'adventure' ? storyTheme : storyTopic
+  );
+
   return (
     <div className="space-y-6">
+      {/* Story Type Settings Summary Bar */}
+      {showSettingsSummary && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            {/* Category */}
+            <span className="inline-flex items-center gap-1 bg-white border border-indigo-200 rounded-lg px-2 py-1">
+              <span>{getCategoryEmoji()}</span>
+              <span className="font-medium text-gray-700">{getCategoryName()}</span>
+            </span>
+
+            <ChevronRight size={16} className="text-gray-400" />
+
+            {/* Theme or Topic */}
+            {storyCategory === 'adventure' ? (
+              <span className="inline-flex items-center gap-1 bg-white border border-indigo-200 rounded-lg px-2 py-1">
+                <span>{getThemeEmoji()}</span>
+                <span className="font-medium text-gray-700">{getThemeName()}</span>
+              </span>
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-1 bg-white border border-green-200 rounded-lg px-2 py-1">
+                  <span>{getTopicEmoji()}</span>
+                  <span className="font-medium text-gray-700">{getTopicName()}</span>
+                </span>
+                {storyTheme && storyTheme !== 'realistic' && (
+                  <>
+                    <span className="text-gray-400">+</span>
+                    <span className="inline-flex items-center gap-1 bg-white border border-amber-200 rounded-lg px-2 py-1">
+                      <span>{getThemeEmoji()}</span>
+                      <span className="font-medium text-gray-700">{getThemeName()}</span>
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+
+            <ChevronRight size={16} className="text-gray-400" />
+
+            {/* Art Style */}
+            <span className="inline-flex items-center gap-1 bg-white border border-purple-200 rounded-lg px-2 py-1">
+              <Palette size={14} className="text-purple-600" />
+              <span className="font-medium text-gray-700">{getArtStyleName()}</span>
+            </span>
+          </div>
+
+          {/* Edit Button */}
+          <button
+            onClick={() => setIsEditSettingsOpen(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 rounded-lg transition-colors"
+          >
+            <Pencil size={14} />
+            <span className="hidden sm:inline">
+              {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
         <Wand2 size={24} /> {t.storySettings}
@@ -396,6 +533,49 @@ export function StorySettings({
           </div>
         )}
       </div>
+
+      {/* Edit Settings Modal */}
+      {isEditSettingsOpen && onCategoryChange && onTopicChange && onThemeChange && onArtStyleChange && onLegacyStoryTypeChange && (
+        <Modal
+          isOpen={isEditSettingsOpen}
+          onClose={() => setIsEditSettingsOpen(false)}
+          title={language === 'de' ? 'Einstellungen bearbeiten' : language === 'fr' ? 'Modifier les paramètres' : 'Edit Settings'}
+          size="xl"
+        >
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Story Category Selector */}
+            <StoryCategorySelector
+              storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | ''}
+              storyTopic={storyTopic}
+              storyTheme={storyTheme}
+              onCategoryChange={onCategoryChange}
+              onTopicChange={onTopicChange}
+              onThemeChange={onThemeChange}
+              onLegacyStoryTypeChange={onLegacyStoryTypeChange}
+            />
+
+            {/* Art Style Selector - only show when story type is fully selected */}
+            {storyCategory && (storyCategory === 'adventure' ? storyTheme : storyTopic) && (
+              <div className="border-t border-gray-200 pt-6">
+                <ArtStyleSelector
+                  selectedStyle={artStyle}
+                  onSelect={onArtStyleChange}
+                />
+              </div>
+            )}
+
+            {/* Done Button */}
+            <div className="flex justify-end pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setIsEditSettingsOpen(false)}
+                className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                {language === 'de' ? 'Fertig' : language === 'fr' ? 'Terminé' : 'Done'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

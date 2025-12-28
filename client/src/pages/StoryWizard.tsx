@@ -1706,6 +1706,16 @@ export default function StoryWizard() {
             onImageGenModeChange={setImageGenMode}
             onGenerateIdeas={generateIdeas}
             isGeneratingIdeas={isGeneratingIdeas}
+            // Story type settings (from step 1)
+            storyCategory={storyCategory}
+            storyTopic={storyTopic}
+            storyTheme={storyTheme}
+            artStyle={artStyle}
+            onCategoryChange={setStoryCategory}
+            onTopicChange={setStoryTopic}
+            onThemeChange={setStoryTheme}
+            onArtStyleChange={setArtStyle}
+            onLegacyStoryTypeChange={setStoryType}
           />
         );
 
