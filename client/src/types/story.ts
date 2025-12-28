@@ -3,10 +3,18 @@ import type { Character, RelationshipMap, RelationshipTextMap, LocalizedString, 
 export type Language = 'en' | 'de' | 'fr';
 export type LanguageLevel = '1st-grade' | 'standard' | 'advanced';
 
+export type AdventureThemeGroupId = 'historical' | 'fantasy' | 'locations' | 'professions' | 'seasonal' | 'custom';
+
 export interface StoryType {
   id: string;
   name: LocalizedString;
   emoji: string;
+  group?: AdventureThemeGroupId;
+}
+
+export interface AdventureThemeGroup {
+  id: AdventureThemeGroupId;
+  name: LocalizedString;
 }
 
 // Story category (Adventure, Life Challenge, Educational)

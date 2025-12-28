@@ -1,4 +1,4 @@
-import type { StoryType, StoryCategory, LifeChallenge, EducationalTopic, LifeChallengeGroup, EducationalGroup } from '@/types/story';
+import type { StoryType, StoryCategory, LifeChallenge, EducationalTopic, LifeChallengeGroup, EducationalGroup, AdventureThemeGroup, AdventureThemeGroupId } from '@/types/story';
 
 // =============================================================================
 // STORY CATEGORIES
@@ -37,47 +37,52 @@ export const storyCategories: StoryCategory[] = [
 ];
 
 // =============================================================================
-// ADVENTURE THEMES (Setting/Wrapper)
+// ADVENTURE THEMES (Setting/Wrapper) - Grouped
 // =============================================================================
+export const adventureThemeGroups: AdventureThemeGroup[] = [
+  { id: 'historical', name: { en: 'Historical Times', de: 'Historische Zeiten', fr: 'Époques historiques' } },
+  { id: 'fantasy', name: { en: 'Fantasy & Magic', de: 'Fantasie & Magie', fr: 'Fantaisie & Magie' } },
+  { id: 'locations', name: { en: 'Exploration', de: 'Entdeckung', fr: 'Exploration' } },
+  { id: 'professions', name: { en: 'Heroes & Helpers', de: 'Helden & Helfer', fr: 'Héros & Aides' } },
+  { id: 'seasonal', name: { en: 'Seasonal', de: 'Jahreszeiten', fr: 'Saisonnier' } },
+  { id: 'custom', name: { en: 'Custom', de: 'Eigenes Thema', fr: 'Personnalisé' } },
+];
+
 export const storyTypes: StoryType[] = [
-  // Seasonal
-  { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël' }, emoji: '🎄' },
-  { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du Nouvel An' }, emoji: '🎆' },
-  { id: 'easter', name: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques' }, emoji: '🐰' },
-  { id: 'halloween', name: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: 'Histoire d\'Halloween' }, emoji: '🎃' },
+  // Historical Times (pirates, knights & princess, wild west, ninja)
+  { id: 'pirate', name: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de Pirates' }, emoji: '🏴‍☠️', group: 'historical' },
+  { id: 'knight', name: { en: 'Knights & Princess', de: 'Ritter & Prinzessin', fr: 'Chevaliers & Princesse' }, emoji: '⚔️', group: 'historical' },
+  { id: 'cowboy', name: { en: 'Wild West', de: 'Wilder Westen', fr: 'Far West' }, emoji: '🤠', group: 'historical' },
+  { id: 'ninja', name: { en: 'Secret Ninja', de: 'Geheimer Ninja', fr: 'Ninja Secret' }, emoji: '🥷', group: 'historical' },
 
-  // Classic Adventure
-  { id: 'pirate', name: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de Pirates' }, emoji: '🏴‍☠️' },
-  { id: 'knight', name: { en: 'Knight Adventure', de: 'Ritter-Abenteuer', fr: 'Aventure de Chevalier' }, emoji: '⚔️' },
-  { id: 'cowboy', name: { en: 'Wild West', de: 'Wilder Westen', fr: 'Far West' }, emoji: '🤠' },
-  { id: 'ninja', name: { en: 'Secret Ninja', de: 'Geheimer Ninja', fr: 'Ninja Secret' }, emoji: '🥷' },
-  { id: 'detective', name: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère de Détective' }, emoji: '🔍' },
+  // Fantasy & Magic (wizard & witch combined, dragon, unicorn, mermaid, dinosaur, superhero)
+  { id: 'wizard', name: { en: 'Wizard & Witch', de: 'Zauberer & Hexe', fr: 'Sorcier & Sorcière' }, emoji: '🧙', group: 'fantasy' },
+  { id: 'dragon', name: { en: 'Dragon Quest', de: 'Drachen-Abenteuer', fr: 'Quête du Dragon' }, emoji: '🐉', group: 'fantasy' },
+  { id: 'unicorn', name: { en: 'Magical Unicorn', de: 'Magisches Einhorn', fr: 'Licorne Magique' }, emoji: '🦄', group: 'fantasy' },
+  { id: 'mermaid', name: { en: 'Mermaid Adventure', de: 'Meerjungfrauen-Abenteuer', fr: 'Aventure de Sirène' }, emoji: '🧜‍♀️', group: 'fantasy' },
+  { id: 'dinosaur', name: { en: 'Dinosaur World', de: 'Dinosaurier-Welt', fr: 'Monde des Dinosaures' }, emoji: '🦖', group: 'fantasy' },
+  { id: 'superhero', name: { en: 'Superhero', de: 'Superheld', fr: 'Super-héros' }, emoji: '🦸', group: 'fantasy' },
 
-  // Fantasy/Magic
-  { id: 'wizard', name: { en: 'Wizard Magic', de: 'Zauberer-Magie', fr: 'Magie de Sorcier' }, emoji: '🧙' },
-  { id: 'fairy', name: { en: 'Fairy Tale', de: 'Feen-Märchen', fr: 'Conte de Fées' }, emoji: '🧚' },
-  { id: 'witch', name: { en: 'Friendly Witch', de: 'Freundliche Hexe', fr: 'Gentille Sorcière' }, emoji: '🧹' },
-  { id: 'dragon', name: { en: 'Dragon Quest', de: 'Drachen-Abenteuer', fr: 'Quête du Dragon' }, emoji: '🐉' },
-  { id: 'unicorn', name: { en: 'Magical Unicorn', de: 'Magisches Einhorn', fr: 'Licorne Magique' }, emoji: '🦄' },
-  { id: 'princess', name: { en: 'Princess Story', de: 'Prinzessinnen-Geschichte', fr: 'Histoire de Princesse' }, emoji: '👑' },
-  { id: 'mermaid', name: { en: 'Mermaid Adventure', de: 'Meerjungfrauen-Abenteuer', fr: 'Aventure de Sirène' }, emoji: '🧜‍♀️' },
+  // Exploration / Locations (space, ocean, jungle, farm, forest)
+  { id: 'space', name: { en: 'Space Explorer', de: 'Weltraum-Entdecker', fr: 'Explorateur Spatial' }, emoji: '🚀', group: 'locations' },
+  { id: 'ocean', name: { en: 'Ocean Explorer', de: 'Ozean-Entdecker', fr: 'Explorateur des Océans' }, emoji: '🌊', group: 'locations' },
+  { id: 'jungle', name: { en: 'Jungle Safari', de: 'Dschungel-Safari', fr: 'Safari dans la Jungle' }, emoji: '🌴', group: 'locations' },
+  { id: 'farm', name: { en: 'Farm Life', de: 'Bauernhof-Leben', fr: 'Vie à la Ferme' }, emoji: '🐄', group: 'locations' },
+  { id: 'forest', name: { en: 'Forest Friends', de: 'Waldfreunde', fr: 'Amis de la Forêt' }, emoji: '🦊', group: 'locations' },
 
-  // Science/Exploration
-  { id: 'space', name: { en: 'Space Explorer', de: 'Weltraum-Entdecker', fr: 'Explorateur Spatial' }, emoji: '🚀' },
-  { id: 'dinosaur', name: { en: 'Dinosaur World', de: 'Dinosaurier-Welt', fr: 'Monde des Dinosaures' }, emoji: '🦖' },
-  { id: 'ocean', name: { en: 'Ocean Explorer', de: 'Ozean-Entdecker', fr: 'Explorateur des Océans' }, emoji: '🌊' },
-  { id: 'jungle', name: { en: 'Jungle Safari', de: 'Dschungel-Safari', fr: 'Safari dans la Jungle' }, emoji: '🌴' },
+  // Heroes & Helpers / Professions (firefighter, doctor, police)
+  { id: 'fireman', name: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier Courageux' }, emoji: '🚒', group: 'professions' },
+  { id: 'doctor', name: { en: 'Helpful Doctor', de: 'Hilfreicher Arzt', fr: 'Docteur Serviable' }, emoji: '👨‍⚕️', group: 'professions' },
+  { id: 'police', name: { en: 'Police Officer', de: 'Polizist', fr: 'Policier' }, emoji: '👮', group: 'professions' },
 
-  // Helpers/Heroes
-  { id: 'fireman', name: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier Courageux' }, emoji: '🚒' },
-  { id: 'doctor', name: { en: 'Helpful Doctor', de: 'Hilfreicher Arzt', fr: 'Docteur Serviable' }, emoji: '👨‍⚕️' },
-  { id: 'superhero', name: { en: 'Superhero', de: 'Superheld', fr: 'Super-héros' }, emoji: '🦸' },
-  { id: 'police', name: { en: 'Police Officer', de: 'Polizist', fr: 'Policier' }, emoji: '👮' },
+  // Seasonal (christmas, new year, easter, halloween)
+  { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël' }, emoji: '🎄', group: 'seasonal' },
+  { id: 'newyear', name: { en: 'New Year Story', de: 'Neujahrs-Geschichte', fr: 'Histoire du Nouvel An' }, emoji: '🎆', group: 'seasonal' },
+  { id: 'easter', name: { en: 'Easter Story', de: 'Oster-Geschichte', fr: 'Histoire de Pâques' }, emoji: '🐰', group: 'seasonal' },
+  { id: 'halloween', name: { en: 'Halloween Story', de: 'Halloween-Geschichte', fr: 'Histoire d\'Halloween' }, emoji: '🎃', group: 'seasonal' },
 
-  // Animals/Nature
-  { id: 'farm', name: { en: 'Farm Life', de: 'Bauernhof-Leben', fr: 'Vie à la Ferme' }, emoji: '🐄' },
-  { id: 'pets', name: { en: 'Pet Friends', de: 'Haustier-Freunde', fr: 'Amis Animaux' }, emoji: '🐕' },
-  { id: 'forest', name: { en: 'Forest Friends', de: 'Waldfreunde', fr: 'Amis de la Forêt' }, emoji: '🦊' },
+  // Custom - user creates their own theme
+  { id: 'custom', name: { en: 'Create Your Own', de: 'Eigenes Thema', fr: 'Créer le vôtre' }, emoji: '✨', group: 'custom' },
 ];
 
 // For life challenges and educational stories, this can be used as optional wrapper
@@ -217,6 +222,10 @@ export const educationalGroups: EducationalGroup[] = [
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+export function getStoryTypesByGroup(groupId: AdventureThemeGroupId): StoryType[] {
+  return storyTypes.filter(t => t.group === groupId);
+}
 
 export function getLifeChallengesByGroup(groupId: string): LifeChallenge[] {
   return lifeChallenges.filter(c => c.ageGroup === groupId);

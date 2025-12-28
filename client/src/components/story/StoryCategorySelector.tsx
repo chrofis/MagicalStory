@@ -9,6 +9,8 @@ import {
   lifeChallengeGroups,
   educationalTopics,
   educationalGroups,
+  adventureThemeGroups,
+  getStoryTypesByGroup,
   getLifeChallengesByGroup,
   getEducationalTopicsByGroup,
 } from '@/constants/storyTypes';
@@ -40,6 +42,7 @@ export function StoryCategorySelector({
   const lang = language as Language;
 
   // Track expanded groups
+  const [expandedAdventureGroups, setExpandedAdventureGroups] = useState<string[]>([]);
   const [expandedLifeGroups, setExpandedLifeGroups] = useState<string[]>([]);
   const [expandedEduGroups, setExpandedEduGroups] = useState<string[]>([]);
 
@@ -85,6 +88,12 @@ export function StoryCategorySelector({
   const t = translations[lang] || translations.en;
 
   // Toggle group expansion
+  const toggleAdventureGroup = (groupId: string) => {
+    setExpandedAdventureGroups(prev =>
+      prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]
+    );
+  };
+
   const toggleLifeGroup = (groupId: string) => {
     setExpandedLifeGroups(prev =>
       prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]
@@ -99,7 +108,9 @@ export function StoryCategorySelector({
 
   // Expand all groups by default when category changes
   useEffect(() => {
-    if (storyCategory === 'life-challenge') {
+    if (storyCategory === 'adventure') {
+      setExpandedAdventureGroups(adventureThemeGroups.map(g => g.id));
+    } else if (storyCategory === 'life-challenge') {
       setExpandedLifeGroups(lifeChallengeGroups.map(g => g.id));
     } else if (storyCategory === 'educational') {
       setExpandedEduGroups(educationalGroups.map(g => g.id));
@@ -196,7 +207,7 @@ export function StoryCategorySelector({
     );
   }
 
-  // Render step 2a: Adventure theme selection
+  // Render step 2a: Adventure theme selection (grouped)
   if (storyCategory === 'adventure' && !storyTheme) {
     return (
       <div className="space-y-4">
@@ -215,17 +226,40 @@ export function StoryCategorySelector({
 
         <h2 className="text-2xl font-bold text-gray-800">{t.chooseTheme}</h2>
 
-        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
-          {storyTypes.map((type) => (
-            <button
-              key={type.id}
-              onClick={() => handleAdventureThemeSelect(type.id)}
-              className="p-3 rounded-lg border-2 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all"
-            >
-              <div className="text-2xl mb-1">{type.emoji}</div>
-              <div className="font-semibold text-xs">{type.name[lang] || type.name.en}</div>
-            </button>
-          ))}
+        <div className="space-y-3">
+          {adventureThemeGroups.map((group) => {
+            const themes = getStoryTypesByGroup(group.id);
+            const isExpanded = expandedAdventureGroups.includes(group.id);
+
+            return (
+              <div key={group.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => toggleAdventureGroup(group.id)}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <span className="font-semibold text-gray-700">
+                    {group.name[lang] || group.name.en}
+                  </span>
+                  {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </button>
+
+                {isExpanded && (
+                  <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3">
+                    {themes.map((type) => (
+                      <button
+                        key={type.id}
+                        onClick={() => handleAdventureThemeSelect(type.id)}
+                        className="p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-center"
+                      >
+                        <div className="text-2xl mb-1">{type.emoji}</div>
+                        <div className="font-semibold text-xs">{type.name[lang] || type.name.en}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -389,8 +423,8 @@ export function StoryCategorySelector({
               <div className="font-semibold text-xs">{t.noTheme}</div>
             </button>
 
-            {/* Theme options */}
-            {storyTypes.map((type) => (
+            {/* Theme options (exclude custom since it doesn't make sense as a wrapper) */}
+            {storyTypes.filter(type => type.group !== 'custom').map((type) => (
               <button
                 key={type.id}
                 onClick={() => handleThemeWrapperSelect(type.id)}
