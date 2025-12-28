@@ -2447,42 +2447,42 @@ export function StoryDisplay({
 
       {/* Floating Save/Cancel overlay when in edit mode */}
       {isEditMode && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 shadow-lg p-4 z-50">
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 shadow-lg p-3 md:p-4 z-50">
+          <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4">
             <div className="flex items-center gap-2 text-amber-600">
-              <Edit3 size={20} />
-              <span className="font-semibold">
+              <Edit3 size={18} className="flex-shrink-0" />
+              <span className="font-semibold text-sm md:text-base">
                 {language === 'de' ? 'Bearbeitungsmodus' : language === 'fr' ? 'Mode édition' : 'Edit Mode'}
               </span>
               {originalStory && (
-                <span className="text-xs text-gray-500 ml-2">
+                <span className="text-xs text-gray-500 hidden sm:inline">
                   ({language === 'de' ? 'Original gespeichert' : language === 'fr' ? 'Original sauvegardé' : 'Original saved'})
                 </span>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full md:w-auto justify-center md:justify-end">
               <button
                 onClick={handleCancelEdit}
                 disabled={isSaving}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-semibold flex items-center gap-1.5"
+                className="px-3 md:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-semibold flex items-center gap-1.5"
               >
                 <X size={16} />
-                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+                <span className="hidden sm:inline">{language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}</span>
               </button>
               {originalStory && editedStory !== originalStory && (
                 <button
                   onClick={() => setEditedStory(originalStory)}
                   disabled={isSaving}
-                  className="px-4 py-2 border border-amber-400 text-amber-700 rounded-lg hover:bg-amber-50 text-sm font-semibold flex items-center gap-1.5"
+                  className="px-3 md:px-4 py-2 border border-amber-400 text-amber-700 rounded-lg hover:bg-amber-50 text-sm font-semibold flex items-center gap-1.5"
                 >
                   <RotateCcw size={16} />
-                  {language === 'de' ? 'Zurücksetzen' : language === 'fr' ? 'Restaurer' : 'Restore'}
+                  <span className="hidden sm:inline">{language === 'de' ? 'Zurücksetzen' : language === 'fr' ? 'Restaurer' : 'Restore'}</span>
                 </button>
               )}
               <button
                 onClick={handleSaveStory}
                 disabled={isSaving}
-                className={`px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 ${
+                className={`px-3 md:px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 ${
                   isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
                 }`}
               >
