@@ -161,6 +161,7 @@ export default function StoryWizard() {
   const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
   const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
+  const [imageLoadProgress, setImageLoadProgress] = useState<{ loaded: number; total: number } | null>(null); // Progressive image loading
   const [isProgressStalled, setIsProgressStalled] = useState(false); // Track if generation seems stuck
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
@@ -216,73 +217,113 @@ export default function StoryWizard() {
     }
   }, [isAuthenticated, isAuthLoading, navigate]);
 
-  // Load saved story from URL parameter
+  // Load saved story from URL parameter - uses progressive loading for better UX
   useEffect(() => {
     const loadSavedStory = async () => {
       const urlStoryId = searchParams.get('storyId');
       if (!urlStoryId || !isAuthenticated) return;
 
-      log.info('Loading saved story:', urlStoryId);
+      log.info('Loading saved story progressively:', urlStoryId);
       setIsLoading(true);
-      setLoadingProgress({ loaded: 0, total: null });
+      setLoadingProgress(null);
+      setImageLoadProgress(null);
 
       try {
-        const story = await storyService.getStoryWithProgress(urlStoryId, (loaded, total) => {
-          setLoadingProgress({ loaded, total });
-        });
-        if (story) {
-          log.info('Loaded story:', story.title, story.isPartial ? '(PARTIAL)' : '');
-          // Populate story data - set generatedStory BEFORE step to avoid flash
-          setStoryId(story.id);
-          setStoryTitle(story.title || '');
-          setStoryType(story.storyType || '');
-          setArtStyle(story.artStyle || 'pixar');
-          setStoryOutline(story.outline || '');
-          setOutlinePrompt(story.outlinePrompt || '');
-          setOutlineModelId(story.outlineModelId);
-          setOutlineUsage(story.outlineUsage);
-          setStoryTextPrompts(story.storyTextPrompts || []);
-          // Ensure visualBible has required fields (backward compatibility)
-          if (story.visualBible) {
-            setVisualBible({
-              mainCharacters: story.visualBible.mainCharacters || [],
-              secondaryCharacters: story.visualBible.secondaryCharacters || [],
-              animals: story.visualBible.animals || [],
-              artifacts: story.visualBible.artifacts || [],
-              locations: story.visualBible.locations || [],
-              changeLog: story.visualBible.changeLog || []
-            });
-          } else {
-            setVisualBible(null);
-          }
-          setSceneImages(story.sceneImages || []);
-          setSceneDescriptions(story.sceneDescriptions || []);
-          setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
-          setLanguageLevel(story.languageLevel || 'standard');
-          setIsGenerating(false);
-          // Set partial story fields
-          setIsPartialStory(story.isPartial || false);
-          setFailureReason(story.failureReason);
-          setGeneratedPages(story.generatedPages);
-          setTotalPages(story.totalPages);
-          // Set generatedStory last, then step, then isLoading - ensures story is ready before showing
-          setGeneratedStory(story.story || '');
-          setOriginalStory(story.originalStory || story.story || ''); // Original for restore functionality
-          setStep(5);
-          // Small delay to ensure React has processed all state updates
-          setTimeout(() => {
+        await storyService.getStoryProgressively(
+          urlStoryId,
+          // Step 1: Metadata loaded - show story immediately (no images yet)
+          (story, totalImages) => {
+            log.info('Metadata loaded:', story.title, `(${totalImages} images to load)`);
+
+            // Populate story data
+            setStoryId(story.id);
+            setStoryTitle(story.title || '');
+            setStoryType(story.storyType || '');
+            setArtStyle(story.artStyle || 'pixar');
+            setStoryOutline(story.outline || '');
+            setOutlinePrompt(story.outlinePrompt || '');
+            setOutlineModelId(story.outlineModelId);
+            setOutlineUsage(story.outlineUsage);
+            setStoryTextPrompts(story.storyTextPrompts || []);
+
+            // Visual Bible
+            if (story.visualBible) {
+              setVisualBible({
+                mainCharacters: story.visualBible.mainCharacters || [],
+                secondaryCharacters: story.visualBible.secondaryCharacters || [],
+                animals: story.visualBible.animals || [],
+                artifacts: story.visualBible.artifacts || [],
+                locations: story.visualBible.locations || [],
+                changeLog: story.visualBible.changeLog || []
+              });
+            } else {
+              setVisualBible(null);
+            }
+
+            // Scene images (without imageData - will be loaded progressively)
+            setSceneImages(story.sceneImages || []);
+            setSceneDescriptions(story.sceneDescriptions || []);
+            setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
+            setLanguageLevel(story.languageLevel || 'standard');
+            setIsGenerating(false);
+
+            // Partial story fields
+            setIsPartialStory(story.isPartial || false);
+            setFailureReason(story.failureReason);
+            setGeneratedPages(story.generatedPages);
+            setTotalPages(story.totalPages);
+
+            // Story text
+            setGeneratedStory(story.story || '');
+            setOriginalStory(story.originalStory || story.story || '');
+
+            // Show the story view immediately - images will load progressively
+            setStep(5);
             setIsLoading(false);
             setLoadingProgress(null);
-          }, 50);
-        } else {
-          log.error('Story not found:', urlStoryId);
-          setIsLoading(false);
-          setLoadingProgress(null);
-        }
+
+            // Start image progress tracking
+            if (totalImages > 0) {
+              setImageLoadProgress({ loaded: 0, total: totalImages });
+            }
+          },
+          // Step 2: Each image loaded - update state progressively
+          (pageNumber, imageData, imageVersions, loadedCount) => {
+            if (typeof pageNumber === 'number') {
+              // Page image
+              setSceneImages(prev => prev.map(img =>
+                img.pageNumber === pageNumber
+                  ? { ...img, imageData, imageVersions: imageVersions as typeof img.imageVersions }
+                  : img
+              ));
+            } else {
+              // Cover image
+              const coverType = pageNumber as 'frontCover' | 'initialPage' | 'backCover';
+              setCoverImages(prev => {
+                const current = prev[coverType];
+                if (typeof current === 'object' && current !== null) {
+                  return { ...prev, [coverType]: { ...current, imageData } };
+                }
+                return { ...prev, [coverType]: imageData };
+              });
+            }
+
+            // Update progress
+            if (loadedCount !== undefined) {
+              setImageLoadProgress(prev => prev ? { ...prev, loaded: loadedCount } : null);
+            }
+          },
+          // Step 3: All images loaded
+          () => {
+            log.info('All images loaded');
+            setImageLoadProgress(null);
+          }
+        );
       } catch (error) {
         log.error('Failed to load story:', error);
         setIsLoading(false);
         setLoadingProgress(null);
+        setImageLoadProgress(null);
       }
     };
 
@@ -1739,7 +1780,27 @@ export default function StoryWizard() {
             .join('\n\n');
 
           return (
-            <StoryDisplay
+            <>
+              {/* Floating image loading progress indicator */}
+              {imageLoadProgress && imageLoadProgress.total > 0 && (
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-white/95 backdrop-blur-sm rounded-full shadow-lg px-4 py-2 flex items-center gap-3 border border-indigo-100">
+                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-500 transition-all duration-300 ease-out"
+                      style={{ width: `${(imageLoadProgress.loaded / imageLoadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm text-gray-600 whitespace-nowrap">
+                    {language === 'de'
+                      ? `Bilder: ${imageLoadProgress.loaded}/${imageLoadProgress.total}`
+                      : language === 'fr'
+                      ? `Images: ${imageLoadProgress.loaded}/${imageLoadProgress.total}`
+                      : `Images: ${imageLoadProgress.loaded}/${imageLoadProgress.total}`
+                    }
+                  </span>
+                </div>
+              )}
+              <StoryDisplay
               title={storyTitle}
               story={displayStory}
               originalStory={originalStory}
@@ -2143,6 +2204,7 @@ export default function StoryWizard() {
               generatedPages={generatedPages}
               totalPages={totalPages}
             />
+            </>
           );
         }
         // If we have a storyId in URL but no story content yet, show loading (story is being fetched)

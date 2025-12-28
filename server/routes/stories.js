@@ -85,6 +85,176 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/stories/:id/metadata - Get story WITHOUT image data (for fast initial load)
+router.get('/:id/metadata', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`📖 GET /api/stories/${id}/metadata - User: ${req.user.username}`);
+
+    let story = null;
+
+    if (isDatabaseMode()) {
+      let rows;
+      if (req.user.impersonating && req.user.originalAdminId) {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+        if (rows.length === 0) {
+          rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
+        }
+      } else {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      }
+
+      if (rows.length > 0) {
+        story = JSON.parse(rows[0].data);
+      }
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Strip out image data but keep metadata
+    const metadata = {
+      ...story,
+      sceneImages: story.sceneImages?.map(img => ({
+        ...img,
+        imageData: undefined, // Remove actual image data
+        hasImage: !!img.imageData,
+        // Keep version info but strip image data
+        imageVersions: img.imageVersions?.map(v => ({
+          ...v,
+          imageData: undefined,
+          hasImage: !!v.imageData
+        }))
+      })),
+      coverImages: story.coverImages ? {
+        frontCover: story.coverImages.frontCover ? {
+          ...(typeof story.coverImages.frontCover === 'object' ? story.coverImages.frontCover : {}),
+          imageData: undefined,
+          hasImage: !!(typeof story.coverImages.frontCover === 'string' ? story.coverImages.frontCover : story.coverImages.frontCover?.imageData)
+        } : null,
+        initialPage: story.coverImages.initialPage ? {
+          ...(typeof story.coverImages.initialPage === 'object' ? story.coverImages.initialPage : {}),
+          imageData: undefined,
+          hasImage: !!(typeof story.coverImages.initialPage === 'string' ? story.coverImages.initialPage : story.coverImages.initialPage?.imageData)
+        } : null,
+        backCover: story.coverImages.backCover ? {
+          ...(typeof story.coverImages.backCover === 'object' ? story.coverImages.backCover : {}),
+          imageData: undefined,
+          hasImage: !!(typeof story.coverImages.backCover === 'string' ? story.coverImages.backCover : story.coverImages.backCover?.imageData)
+        } : null
+      } : null,
+      // Include image count for progress tracking
+      totalImages: (story.sceneImages?.length || 0) + (story.coverImages ? 3 : 0)
+    };
+
+    console.log(`📖 Returning story metadata: ${story.title} (${metadata.totalImages} images to load)`);
+    res.json(metadata);
+  } catch (err) {
+    console.error('❌ Error fetching story metadata:', err);
+    res.status(500).json({ error: 'Failed to fetch story metadata', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/image/:pageNumber - Get individual page image
+router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNumber } = req.params;
+    const pageNum = parseInt(pageNumber, 10);
+
+    let story = null;
+
+    if (isDatabaseMode()) {
+      let rows;
+      if (req.user.impersonating && req.user.originalAdminId) {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+        if (rows.length === 0) {
+          rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+        }
+      } else {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      }
+
+      if (rows.length > 0) {
+        story = JSON.parse(rows[0].data);
+      }
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const sceneImage = story.sceneImages?.find(img => img.pageNumber === pageNum);
+    if (!sceneImage || !sceneImage.imageData) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    res.json({
+      pageNumber: pageNum,
+      imageData: sceneImage.imageData,
+      imageVersions: sceneImage.imageVersions
+    });
+  } catch (err) {
+    console.error('❌ Error fetching page image:', err);
+    res.status(500).json({ error: 'Failed to fetch image', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/cover-image/:coverType - Get individual cover image
+router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) => {
+  try {
+    const { id, coverType } = req.params;
+
+    let story = null;
+
+    if (isDatabaseMode()) {
+      let rows;
+      if (req.user.impersonating && req.user.originalAdminId) {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+        if (rows.length === 0) {
+          rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+        }
+      } else {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      }
+
+      if (rows.length > 0) {
+        story = JSON.parse(rows[0].data);
+      }
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const coverData = story.coverImages?.[coverType];
+    if (!coverData) {
+      return res.status(404).json({ error: 'Cover not found' });
+    }
+
+    // Handle both string (legacy) and object formats
+    const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+    if (!imageData) {
+      return res.status(404).json({ error: 'Cover image not found' });
+    }
+
+    res.json({
+      coverType,
+      imageData,
+      ...(typeof coverData === 'object' ? { description: coverData.description, storyTitle: coverData.storyTitle } : {})
+    });
+  } catch (err) {
+    console.error('❌ Error fetching cover image:', err);
+    res.status(500).json({ error: 'Failed to fetch cover', details: err.message });
+  }
+});
+
 // GET /api/stories/:id - Get single story with ALL data (images included)
 router.get('/:id', authenticateToken, async (req, res) => {
   try {

@@ -294,6 +294,112 @@ export const storyService = {
     };
   },
 
+  // Get story metadata only (no images) for fast initial load
+  async getStoryMetadata(id: string): Promise<(SavedStory & { totalImages: number }) | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${id}/metadata`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const s = await response.json();
+      return {
+        ...this.mapServerStoryToClient(s),
+        totalImages: s.totalImages || 0
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  // Get individual page image
+  async getPageImage(storyId: string, pageNumber: number): Promise<{ imageData: string; imageVersions?: unknown[] } | null> {
+    try {
+      const response = await api.get<{ pageNumber: number; imageData: string; imageVersions?: unknown[] }>(
+        `/api/stories/${storyId}/image/${pageNumber}`
+      );
+      return response;
+    } catch {
+      return null;
+    }
+  },
+
+  // Get individual cover image
+  async getCoverImage(storyId: string, coverType: 'frontCover' | 'initialPage' | 'backCover'): Promise<{ imageData: string; description?: string; storyTitle?: string } | null> {
+    try {
+      const response = await api.get<{ coverType: string; imageData: string; description?: string; storyTitle?: string }>(
+        `/api/stories/${storyId}/cover-image/${coverType}`
+      );
+      return response;
+    } catch {
+      return null;
+    }
+  },
+
+  // Progressive story loading: metadata first, then images one by one
+  async getStoryProgressively(
+    id: string,
+    onMetadataLoaded: (story: SavedStory, totalImages: number) => void,
+    onImageLoaded: (pageNumber: number | string, imageData: string, imageVersions?: unknown[], loadedCount?: number) => void,
+    onComplete: () => void
+  ): Promise<void> {
+    // Step 1: Load metadata (fast - no images)
+    const metadata = await this.getStoryMetadata(id);
+    if (!metadata) {
+      throw new Error('Story not found');
+    }
+
+    // Notify that metadata is ready - UI can render immediately
+    onMetadataLoaded(metadata, metadata.totalImages);
+
+    // Step 2: Load images progressively
+    // Note: hasImage is added by the metadata endpoint but not in the type
+    const pageNumbers = metadata.sceneImages
+      ?.filter(img => (img as { hasImage?: boolean }).hasImage !== false && img.pageNumber)
+      .map(img => img.pageNumber) || [];
+
+    const coverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = [];
+    const fc = metadata.coverImages?.frontCover;
+    const ip = metadata.coverImages?.initialPage;
+    const bc = metadata.coverImages?.backCover;
+    if (fc && (typeof fc === 'string' || (fc as { hasImage?: boolean }).hasImage)) coverTypes.push('frontCover');
+    if (ip && (typeof ip === 'string' || (ip as { hasImage?: boolean }).hasImage)) coverTypes.push('initialPage');
+    if (bc && (typeof bc === 'string' || (bc as { hasImage?: boolean }).hasImage)) coverTypes.push('backCover');
+
+    let loadedCount = 0;
+
+    // Load page images in parallel batches (3 at a time for balance)
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < pageNumbers.length; i += BATCH_SIZE) {
+      const batch = pageNumbers.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(pageNum => this.getPageImage(id, pageNum))
+      );
+
+      results.forEach((result, idx) => {
+        if (result) {
+          loadedCount++;
+          onImageLoaded(batch[idx], result.imageData, result.imageVersions, loadedCount);
+        }
+      });
+    }
+
+    // Load cover images
+    for (const coverType of coverTypes) {
+      const result = await this.getCoverImage(id, coverType);
+      if (result) {
+        loadedCount++;
+        onImageLoaded(coverType, result.imageData, undefined, loadedCount);
+      }
+    }
+
+    onComplete();
+  },
+
   async createStory(data: {
     title: string;
     storyType: string;

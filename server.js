@@ -7216,7 +7216,7 @@ async function processStoryJob(jobId) {
             END_PAGE: endScene,
             READING_LEVEL: readingLevel,
             VISUAL_BIBLE: visualBibleForPrompt,
-            INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication at the beginning.' : 'Start directly with the page content (no title/dedication).'
+            INCLUDE_TITLE: batchNum === 0 ? 'After the ---STORY TEXT--- marker, include the title and dedication before Page 1.' : 'Start directly with Page {START_PAGE} (no title/dedication).'
           })
         : `${basePrompt}
 
