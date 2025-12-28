@@ -1245,14 +1245,12 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     if (!hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0) {
       log.info(`🔧 [QUALITY RETRY] ${pageLabel}Score ${score}% <= ${AUTO_REPAIR_THRESHOLD}%, attempting auto-repair on ${result.fixTargets.length} fix targets...`);
       try {
-        // NOTE: Do NOT pass reference images to inpainting - sending multiple images
-        // confuses the model about which image to edit, causing it to potentially
-        // edit a reference photo instead of the scene image
+        // Inpainting uses text-based coordinates instead of mask images
+        // This avoids confusion when there are multiple similar elements
         const repairResult = await autoRepairWithTargets(
           result.imageData,
           result.fixTargets,
-          0,  // No additional inspection attempts
-          []  // No reference images - they confuse the inpaint model
+          0  // No additional inspection attempts
         );
 
         if (repairResult.repaired && repairResult.imageData !== result.imageData) {
@@ -1678,44 +1676,63 @@ async function createCombinedMask(width, height, boundingBoxes) {
 }
 
 /**
- * Inpaint an image using a mask and fix prompt
+ * Inpaint an image using TEXT-BASED region coordinates (semantic masking)
+ * NOTE: Gemini 2.5 Flash Image uses natural language to identify regions.
+ * We pass coordinates as text in the prompt instead of as a mask image,
+ * which is more reliable when there are multiple similar elements (e.g., multiple hands).
+ *
  * @param {string} originalImage - Base64 original image
- * @param {string} maskImage - Base64 mask (white = area to fix)
+ * @param {Array} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0-1 coordinates
  * @param {string} fixPrompt - Instruction for what to fix
- * @param {Array} referenceImages - Reference images for color/clothing matching
+ * @param {string} maskImage - Optional mask image for dev view only (not sent to API)
  * @returns {Promise<{imageData: string}|null>}
  */
-async function inpaintWithMask(originalImage, maskImage, fixPrompt, referenceImages = []) {
+async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImage = null) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('Gemini API key not configured');
     }
 
-    log.debug(`🔧 [INPAINT] Inpainting with prompt: "${fixPrompt}"`);
-    if (referenceImages.length > 0) {
-      log.warn(`⚠️ [INPAINT] WARNING: ${referenceImages.length} reference images passed - this may confuse the model about which image to edit!`);
-    }
+    // Build coordinate descriptions for each region
+    const regionDescriptions = boundingBoxes.map((bbox, idx) => {
+      const [ymin, xmin, ymax, xmax] = bbox;
+      // Convert to percentages for clearer instruction
+      const top = Math.round(ymin * 100);
+      const left = Math.round(xmin * 100);
+      const bottom = Math.round(ymax * 100);
+      const right = Math.round(xmax * 100);
+      return `Region ${idx + 1}: from top ${top}% to ${bottom}%, left ${left}% to ${right}%`;
+    });
+
+    const coordText = regionDescriptions.join('\n');
+    log.debug(`🔧 [INPAINT] Inpainting ${boundingBoxes.length} region(s) with text coordinates`);
+    log.debug(`🔧 [INPAINT] Regions:\n${coordText}`);
+    log.debug(`🔧 [INPAINT] Fix prompt: "${fixPrompt}"`);
 
     // Extract base64 and mime type for original image
     const origBase64 = originalImage.replace(/^data:image\/\w+;base64,/, '');
     const origMimeType = originalImage.match(/^data:(image\/\w+);base64,/) ?
       originalImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Extract base64 for mask
-    const maskBase64 = maskImage.replace(/^data:image\/\w+;base64,/, '');
+    // Build the inpainting prompt with TEXT-BASED coordinates
+    // This avoids confusion when multiple images are sent
+    const inpaintPrompt = `Edit this image. Make changes ONLY in the specified region(s).
 
-    // Build the inpainting prompt - include reference instruction if references provided
-    const refInstruction = referenceImages.length > 0
-      ? `\n\nIMPORTANT: Match clothing colors and details EXACTLY as shown in the reference images below.`
-      : '';
-    const inpaintPrompt = `Edit this image. The white area in the mask shows what needs to be changed.
+TARGET REGION(S) TO EDIT:
+${coordText}
 
-CHANGE ONLY THE MASKED AREA: ${fixPrompt}${refInstruction}
+WHAT TO FIX IN THESE REGIONS:
+${fixPrompt}
 
-Keep everything outside the masked area exactly the same. Maintain the same art style.`;
+IMPORTANT INSTRUCTIONS:
+- ONLY modify the content within the specified coordinate regions
+- Keep everything outside these regions EXACTLY the same
+- Maintain the same art style and color palette
+- Make minimal changes - just fix the specific issues mentioned`;
 
-    // Build parts array: prompt, original image, references (if any), mask
+    // Build parts array: prompt + ONLY the original image
+    // NOTE: We do NOT send the mask as an image - coordinates are in the text prompt
     const parts = [
       { text: inpaintPrompt },
       {
@@ -1725,44 +1742,6 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
         }
       }
     ];
-
-    // Add reference images if provided
-    if (referenceImages.length > 0) {
-      parts.push({ text: '[REFERENCE IMAGES - match clothing/colors to these]:' });
-      for (const ref of referenceImages) {
-        // Handle multiple formats:
-        // 1. Direct base64 string: "data:image/..."
-        // 2. Object with photoUrl: {name, photoUrl, ...}
-        // 3. Object with photoData: {photoData, ...}
-        let photoData = null;
-        if (typeof ref === 'string' && ref.startsWith('data:image')) {
-          photoData = ref;
-        } else if (typeof ref === 'object') {
-          photoData = ref.photoUrl || ref.photoData;
-        }
-
-        if (photoData && typeof photoData === 'string' && photoData.startsWith('data:image')) {
-          const refBase64 = photoData.replace(/^data:image\/\w+;base64,/, '');
-          const refMimeType = photoData.match(/^data:(image\/\w+);base64,/) ?
-            photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
-          parts.push({
-            inline_data: {
-              mime_type: refMimeType,
-              data: refBase64
-            }
-          });
-        }
-      }
-    }
-
-    // Add mask
-    parts.push({ text: '[MASK - white area shows what to edit]:' });
-    parts.push({
-      inline_data: {
-        mime_type: 'image/png',
-        data: maskBase64
-      }
-    });
 
     // Use page image model for editing
     const modelId = MODEL_DEFAULTS.pageImage;
@@ -1822,13 +1801,13 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
 /**
  * Auto-repair using pre-computed fix targets from quality evaluation
  * Combines ALL fix targets into ONE mask and ONE API call for efficiency
+ * Uses text-based coordinates instead of mask images for reliable region targeting.
  * @param {string} imageData - Base64 image data URL
  * @param {Array} fixTargets - Array of {boundingBox, issue, fixPrompt} from evaluation
  * @param {number} maxAdditionalAttempts - Extra inspection-based attempts after combined fix (default 0)
- * @param {Array} referenceImages - Reference images for color/clothing matching
  * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
  */
-async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0, referenceImages = []) {
+async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0) {
   const repairHistory = [];
   let currentImage = imageData;
 
@@ -1891,12 +1870,15 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
 
     log.debug(`🔄 [AUTO-REPAIR] Combined prompt: ${combinedPrompt}`);
 
-    // Single inpaint call for ALL fixes (with reference images for color matching)
+    // Single inpaint call for ALL fixes
+    // NOTE: We pass bounding boxes as TEXT coordinates (not mask image) to avoid confusing
+    // the model when there are multiple similar elements (e.g., multiple characters/hands)
+    // The combinedMask is still generated for dev view in repairHistory
     const repaired = await inpaintWithMask(
       currentImage,
-      combinedMask,
+      boundingBoxes,  // Pass coordinates as array, not mask image
       combinedPrompt,
-      referenceImages
+      combinedMask    // Mask is kept for dev view only, not sent to API
     );
 
     if (!repaired || !repaired.imageData) {
@@ -2018,7 +2000,7 @@ async function autoRepairImage(imageData, maxAttempts = 2) {
       };
     }
 
-    // 2. Get image dimensions and create mask
+    // 2. Get image dimensions and create mask (for dev view only)
     const dimensions = await getImageDimensions(currentImage);
     const mask = await createMaskFromBoundingBox(
       dimensions.width,
@@ -2026,11 +2008,13 @@ async function autoRepairImage(imageData, maxAttempts = 2) {
       inspection.boundingBox
     );
 
-    // 3. Inpaint the masked area
+    // 3. Inpaint using text-based coordinates
+    // Pass bounding box as array, mask is kept for dev view only
     const repaired = await inpaintWithMask(
       currentImage,
-      mask,
-      inspection.fixPrompt
+      [inspection.boundingBox],  // Single bbox as array
+      inspection.fixPrompt,
+      mask  // Mask for dev view, not sent to API
     );
 
     if (!repaired || !repaired.imageData) {
