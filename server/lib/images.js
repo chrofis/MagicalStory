@@ -405,19 +405,15 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // - No mention of "children" or ages
       // - Focus purely on artistic/technical quality
       // - KEEP the FIX_TARGETS format for auto-repair functionality
-      const sanitizedPrompt = `You are evaluating an AI-generated cartoon illustration for artistic quality.
+      const sanitizedPrompt = `You are a Technical QA Analyst evaluating an AI-generated illustration.
 
-**TASK**: Check the artistic quality of this illustration. Compare illustrated characters to reference photos if provided.
+**TASK**: Audit for rendering errors and character consistency against reference photos.
 
-**EVALUATION CRITERIA**:
-1. Art Quality - Is it well-rendered with no visual artifacts?
-2. Character Consistency - Do illustrated characters match the reference photos? (hair, clothing, general features)
-3. Scene Composition - Is the scene well-composed?
-4. Technical Quality - Check for:
-   - Extra or missing fingers (should be 5 per hand)
-   - Distorted faces or merged features
-   - Extra/missing limbs
-   - Floating objects or disconnected body parts
+**CHECK FOR**:
+1. Digit count - Each hand should have exactly 5 fingers (count: 1,2,3,4,5)
+2. Structural integrity - No merged features, floating objects, missing limbs
+3. Character consistency - Hair, clothing, features match references
+4. Art quality - Clean rendering, no artifacts
 
 **SCORING (0-10)**:
 - 10: Perfect, no issues
@@ -426,25 +422,19 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 - 3-4: Poor, major issues
 - 0-2: Bad, multiple major issues
 
-**OUTPUT FORMAT**:
-Scene: [Brief description of what's shown]
+**OUTPUT**: Return ONLY this JSON (no other text):
+\`\`\`json
+{
+  "score": <0-10>,
+  "verdict": "<PASS|SOFT_FAIL|HARD_FAIL>",
+  "issues": "<brief summary or 'none'>",
+  "fix_targets": [{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief", "fix": "what to render"}]
+}
+\`\`\`
 
-Artifact Scan:
-- Hands: [OK / count fingers, note issues]
-- Faces: [OK / issues found]
-- Floating objects: [None / describe]
-
-Quality Issues: [List problems, or "None"]
-
-Score: [0-10]/10
-Verdict: [PASS if 5+, SOFT_FAIL if 3-4, HARD_FAIL if 0-2]
-
-FIX_TARGETS: [Only if Score < 8 and fixable issues exist. One JSON per line]
-{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief issue", "fix": "what to draw instead"}
-
-**BOUNDING BOX FORMAT:**
-- Coordinates are normalized 0.0-1.0 (not pixels)
-- Format: [ymin, xmin, ymax, xmax] where 0,0 is top-left`;
+**RULES:**
+- fix_targets: only if score < 8 and issues are fixable by re-rendering a region
+- bbox: normalized 0.0-1.0, format [ymin, xmin, ymax, xmax], origin top-left`;
 
       // Rebuild parts with sanitized prompt (keep images, replace text)
       const sanitizedParts = parts.slice(0, -1); // Remove original prompt
@@ -563,27 +553,37 @@ FIX_TARGETS: [Only if Score < 8 and fixable issues exist. One JSON per line]
     }
 
     if (parsedJson && typeof parsedJson.score === 'number') {
-      // New JSON format with 0-10 scale
+      // Compact JSON format with 0-10 scale
       const rawScore = parsedJson.score;
       const score = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
-      const verdict = parsedJson.final_verdict || 'UNKNOWN';
-      const reasoning = parsedJson.reasoning || '';
-      const analysis = parsedJson.analysis || null;
-      const evaluation = parsedJson.evaluation || {};
+      const verdict = parsedJson.verdict || parsedJson.final_verdict || 'UNKNOWN';
+      const issues = parsedJson.issues || '';
 
-      log.verbose(`⭐ [QUALITY] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
-      if (reasoning) {
-        log.verbose(`⭐ [QUALITY] Reasoning: ${reasoning}`);
-      }
-      if (analysis?.defects && analysis.defects !== 'None') {
-        log.verbose(`⭐ [QUALITY] Defects: ${analysis.defects}`);
+      log.info(`⭐ [QUALITY] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
+      if (issues && issues !== 'none') {
+        log.info(`⭐ [QUALITY] Issues: ${issues}`);
       }
 
-      // For covers, check if there are text issues in the analysis
+      // Parse fix_targets from JSON if present (overrides text-based parsing)
+      let jsonFixTargets = fixTargets;
+      if (parsedJson.fix_targets && Array.isArray(parsedJson.fix_targets)) {
+        jsonFixTargets = parsedJson.fix_targets
+          .filter(t => t.bbox && Array.isArray(t.bbox) && t.bbox.length === 4)
+          .map(t => ({
+            boundingBox: t.bbox,
+            issue: t.issue || 'unknown issue',
+            fixPrompt: t.fix || 'fix the issue'
+          }));
+        if (jsonFixTargets.length > 0) {
+          log.info(`⭐ [QUALITY] Parsed ${jsonFixTargets.length} fix targets from JSON`);
+        }
+      }
+
+      // For covers, check if there are text issues
       let textIssue = null;
-      if (evaluationType === 'cover' && analysis?.defects) {
-        const defects = analysis.defects.toLowerCase();
-        if (defects.includes('text') || defects.includes('spell') || defects.includes('letter')) {
+      if (evaluationType === 'cover' && issues) {
+        const issuesLower = issues.toLowerCase();
+        if (issuesLower.includes('text') || issuesLower.includes('spell') || issuesLower.includes('letter')) {
           textIssue = 'TEXT_ERROR';
         }
       }
@@ -592,11 +592,9 @@ FIX_TARGETS: [Only if Score < 8 and fixable issues exist. One JSON per line]
         score,
         rawScore, // Original 0-10 score
         verdict,
-        reasoning: responseText,
-        analysis,
-        evaluation,
+        reasoning: issues || responseText,
         textIssue,
-        fixTargets, // Bounding boxes for auto-repair
+        fixTargets: jsonFixTargets,
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
