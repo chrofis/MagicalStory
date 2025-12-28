@@ -5563,7 +5563,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() }
+      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() }
     }
   };
 
@@ -5770,9 +5771,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           log.debug(`💾 [PARTIAL] Saved partial result for page ${pageNum} (immediate, quality pending)`);
         };
 
-        // Usage tracker for page images
-        const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+        // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
+        const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
+          if (imgUsage) addUsage('gemini_image', imgUsage, isInpaint ? 'inpaint' : 'page_images', imgModel);
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
         };
 
@@ -6650,6 +6651,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
       log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
+    if (byFunc.inpaint.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
+      log.debug(`   Inpaint:       ${byFunc.inpaint.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.inpaint.output_tokens.toLocaleString().padStart(8)} out (${byFunc.inpaint.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.inpaint)}]`);
+    }
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     const thinkingTotal = totalThinkingTokens > 0 ? `, ${totalThinkingTokens.toLocaleString()} thinking` : '';
     log.debug(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output${thinkingTotal} tokens`);
@@ -6795,7 +6800,8 @@ async function processStoryJob(jobId) {
       cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
-      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() }
+      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() }
     }
   };
 
@@ -8068,6 +8074,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     if (byFunc.page_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
       log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
+    }
+    if (byFunc.inpaint.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
+      log.debug(`   Inpaint:       ${byFunc.inpaint.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.inpaint.output_tokens.toLocaleString().padStart(8)} out (${byFunc.inpaint.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.inpaint)}]`);
     }
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     const thinkingTotal = totalThinkingTokens > 0 ? `, ${totalThinkingTokens.toLocaleString()} thinking` : '';

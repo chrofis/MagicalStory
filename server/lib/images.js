@@ -1262,9 +1262,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
           log.info(`✅ [QUALITY RETRY] ${pageLabel}Auto-repair completed, re-evaluating quality...`);
           log.debug(`🔍 [QUALITY RETRY] ${pageLabel}Image hash: original=${originalHash}, repaired=${repairedHash}, different=${originalHash !== repairedHash}`);
 
-          // Track usage from repair
+          // Track usage from repair (5th param = true indicates inpaint)
           if (usageTracker && repairResult.usage) {
-            usageTracker(repairResult.usage, null, repairResult.modelId, null);
+            usageTracker(repairResult.usage, null, repairResult.modelId, null, true);
           }
 
           // Re-evaluate the repaired image (NOT the original!)
