@@ -7124,21 +7124,21 @@ async function processStoryJob(jobId) {
       coverGenerationPromise = Promise.all([
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting front cover (${frontCoverCharacters.length} chars, clothing: ${frontCoverClothing})`);
-          const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
+          const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'FRONT COVER');
           console.log(`✅ [COVER-PARALLEL] Front cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'frontCover', imageData: result.imageData, storyTitle, modelId: result.modelId || null }, 0);
           return { type: 'frontCover', result, photos: frontCoverPhotos, scene: titlePageScene, prompt: frontCoverPrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting initial page (${initialPagePhotos.length} chars, clothing: ${initialPageClothing})`);
-          const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
+          const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'INITIAL PAGE');
           console.log(`✅ [COVER-PARALLEL] Initial page complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'initialPage', imageData: result.imageData, modelId: result.modelId || null }, 1);
           return { type: 'initialPage', result, photos: initialPagePhotos, scene: initialPageScene, prompt: initialPagePrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting back cover (${backCoverPhotos.length} chars, clothing: ${backCoverClothing})`);
-          const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides);
+          const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'BACK COVER');
           console.log(`✅ [COVER-PARALLEL] Back cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'backCover', imageData: result.imageData, modelId: result.modelId || null }, 2);
           return { type: 'backCover', result, photos: backCoverPhotos, scene: backCoverScene, prompt: backCoverPrompt };
@@ -7355,7 +7355,7 @@ Output Format:
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides);
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`);
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -7789,7 +7789,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
                 // Use quality retry to regenerate if score is below threshold
                 const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides);
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`);
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
