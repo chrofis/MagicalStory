@@ -519,13 +519,18 @@ export function CharacterForm({
                 language === 'de' ? 'Neu generieren' : 'Regenerate'
               )}
             </button>
-            {/* Developer mode: show face match score */}
+            {/* Developer mode: show face match score with full details */}
             {developerMode && character.avatars?.faceMatch?.standard && (
-              <div className={`mt-1 text-[9px] font-medium ${
-                character.avatars.faceMatch.standard.score >= 6 ? 'text-green-600' : 'text-red-600'
-              }`}>
-                Face: {character.avatars.faceMatch.standard.score}/10
-              </div>
+              <details className="mt-1 text-left">
+                <summary className={`text-[10px] font-medium cursor-pointer ${
+                  character.avatars.faceMatch.standard.score >= 6 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  Face eval: {character.avatars.faceMatch.standard.score}/10
+                </summary>
+                <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
+                  {character.avatars.faceMatch.standard.details}
+                </pre>
+              </details>
             )}
           </div>
         </div>

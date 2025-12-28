@@ -3790,7 +3790,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
 // Prompts based on reference implementation - see prompts/clothing-avatars.txt
 app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    const { characterId, facePhoto, physicalDescription, name, age, gender, build, physicalTraits } = req.body;
+    const { characterId, facePhoto, physicalDescription, name, age, gender, build, physicalTraits, clothingStyle } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
@@ -3803,7 +3803,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
     // Build physical traits section if provided (for "Generate with Traits" mode)
     let physicalTraitsSection = '';
-    if (physicalTraits || build) {
+    if (physicalTraits || build || clothingStyle) {
       const traitParts = [];
       // Build first (body type)
       if (build) traitParts.push(`Build: ${build}`);
@@ -3813,6 +3813,8 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
       if (physicalTraits?.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
       if (physicalTraits?.height) traitParts.push(`Height: ${physicalTraits.height}cm`);
+      // Clothing style (colors and patterns to use)
+      if (clothingStyle) traitParts.push(`Clothing style/colors: ${clothingStyle}`);
       if (traitParts.length > 0) {
         physicalTraitsSection = `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
       }

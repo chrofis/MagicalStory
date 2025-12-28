@@ -309,8 +309,10 @@ export const characterService = {
         age: character.age,
         gender: character.gender,
         build: character.physical?.build || 'average',
-        // NEW: Pass all physical traits to include in the avatar generation prompt
+        // Pass all physical traits to include in the avatar generation prompt
         physicalTraits: character.physical,
+        // Pass clothing style for consistent outfit patterns/colors
+        clothingStyle: character.clothing?.style,
       });
 
       if (response.success && response.clothingAvatars) {
