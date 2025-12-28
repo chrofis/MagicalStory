@@ -1854,7 +1854,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
 
     // Build image prompt with scene-specific characters and visual bible
     // Use isStorybook=true to include Visual Bible section in prompt
-    const originalPrompt = originalDescription ? buildImagePrompt(originalDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true) : null;
+    // Note: We don't build originalPrompt separately to avoid duplicate logging - originalDescription is stored for comparison
     const imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true);
 
     // Log prompt changes for debugging
@@ -2024,8 +2024,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
       originalDescription,
       newDescription: expandedDescription,  // Full expanded description
       inputDescription,  // What user provided (before expansion)
-      originalPrompt,
-      newPrompt: imagePrompt,
+      prompt: imagePrompt,
       sceneWasEdited,
       sceneWasExpanded: isShortSummary,  // Flag if expansion was done
       // All image versions
