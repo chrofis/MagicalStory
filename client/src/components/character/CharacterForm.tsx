@@ -75,7 +75,8 @@ function AvatarPromptDisplay({ category, gender, physical }: {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchPrompt = async () => {
+    // Debounce API calls to avoid flooding server while typing
+    const timeoutId = setTimeout(async () => {
       setLoading(true);
       setError(null);
       try {
@@ -98,8 +99,9 @@ function AvatarPromptDisplay({ category, gender, physical }: {
       } finally {
         setLoading(false);
       }
-    };
-    fetchPrompt();
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [category, gender, physical]);
 
   return (
