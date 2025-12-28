@@ -1,0 +1,10 @@
+# MagicalStory.ch - Personalized Children's Books
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://magicalstory.ch/sitemap.xml
+
+# Disallow internal/API paths
+Disallow: /api/
+Disallow: /admin/

@@ -9027,6 +9027,30 @@ async function initialize() {
   }
 }
 
+// SEO files - serve before SPA fallback to ensure correct content-type
+app.get('/robots.txt', (req, res) => {
+  const robotsPath = path.join(distPath, 'robots.txt');
+  if (hasDistFolder && require('fs').existsSync(robotsPath)) {
+    res.type('text/plain').sendFile(robotsPath);
+  } else {
+    // Fallback inline robots.txt
+    res.type('text/plain').send(`User-agent: *\nAllow: /\nSitemap: https://magicalstory.ch/sitemap.xml`);
+  }
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const sitemapPath = path.join(distPath, 'sitemap.xml');
+  if (hasDistFolder && require('fs').existsSync(sitemapPath)) {
+    res.type('application/xml').sendFile(sitemapPath);
+  } else {
+    // Fallback inline sitemap
+    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://magicalstory.ch/</loc><priority>1.0</priority></url>
+</urlset>`);
+  }
+});
+
 // SPA fallback - serve index.html for client-side routing
 // This must be the LAST route, after all API routes
 app.get('*', (req, res, next) => {
