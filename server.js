@@ -174,6 +174,7 @@ const {
   buildImagePrompt,
   buildSceneExpansionPrompt
 } = require('./server/lib/storyHelpers');
+const { OutlineParser } = require('./server/lib/outlineParser');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
