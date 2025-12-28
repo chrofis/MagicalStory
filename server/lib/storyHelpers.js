@@ -110,8 +110,9 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
 
 /**
  * Detect which characters are mentioned in a scene description
+ * Prefers parsing structured "Charaktere/Characters" section over text matching
  * @param {string} sceneDescription - The scene text
- * @param {Array} characters - Array of character objects
+ * @param {Array} characters - Array of character objects (main characters with reference photos)
  * @returns {Array} Characters that appear in this scene
  */
 function getCharactersInScene(sceneDescription, characters) {
@@ -119,6 +120,40 @@ function getCharactersInScene(sceneDescription, characters) {
     return [];
   }
 
+  // Try to parse structured "Charaktere" / "Characters" section first
+  // This section lists characters as: **CharacterName:** or * **CharacterName:**
+  // We only want character names that are HEADERS, not mentioned within descriptions
+  const charaktereMatch = sceneDescription.match(/\*\*(?:Charaktere|Characters|Personnages)\s*:?\*\*\s*([\s\S]*?)(?=\n\s*\n\d+\.|$)/i);
+
+  if (charaktereMatch) {
+    const charaktereSection = charaktereMatch[1];
+    // Extract character names from headers like "**Lukas:**" or "* **Lukas:**"
+    const headerNames = [];
+    const headerPattern = /\*\s*\*\*([^*:]+)\*\*\s*:/g;
+    let match;
+    while ((match = headerPattern.exec(charaktereSection)) !== null) {
+      headerNames.push(match[1].trim().toLowerCase());
+    }
+
+    if (headerNames.length > 0) {
+      log.debug(`[CHAR DETECT] Parsed ${headerNames.length} character headers: ${headerNames.join(', ')}`);
+      // Match only main characters whose names appear as headers
+      return characters.filter(char => {
+        if (!char.name) return false;
+        const nameLower = char.name.toLowerCase().trim();
+        const firstName = nameLower.split(' ')[0];
+        return headerNames.some(header =>
+          header === nameLower ||
+          header === firstName ||
+          header.includes(nameLower) ||
+          nameLower.includes(header)
+        );
+      });
+    }
+  }
+
+  // Fallback: text matching (for older scene descriptions without structured section)
+  log.debug(`[CHAR DETECT] No structured section found, using text matching`);
   const sceneLower = sceneDescription.toLowerCase();
   return characters.filter(char => {
     if (!char.name) return false;
