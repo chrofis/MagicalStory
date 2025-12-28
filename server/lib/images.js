@@ -88,6 +88,10 @@ const compressedRefCache = new LRUCache(REF_CACHE_MAX_SIZE, CACHE_TTL_MS);
 // Quality threshold from environment or default
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
 
+// Maximum mask coverage for inpainting (percentage of image area)
+// Masks larger than this will skip repair - inpainting doesn't work well for large areas
+const MAX_MASK_COVERAGE_PERCENT = 25;
+
 /**
  * Hash image data for comparison/caching
  * @param {string} imageData - Base64 image data URL
@@ -242,7 +246,7 @@ async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null)
  * @param {string} evaluationType - Type of evaluation: 'scene' (default) or 'cover' (text-focused)
  * @returns {Promise<number>} Quality score from 0-100
  */
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null) {
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '') {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -398,7 +402,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Fallback: If content was blocked and we're using 2.5, try sanitized prompt first
     if (isBlockedResponse(data) && modelId.includes('2.5')) {
       const blockReason = data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason || 'UNKNOWN';
-      log.warn(`⚠️  [QUALITY] Content blocked by ${modelId} (${blockReason}), retrying with sanitized prompt...`);
+      const pageLabel = pageContext ? `[${pageContext}] ` : '';
+      log.warn(`⚠️  [QUALITY] ${pageLabel}Content blocked by ${modelId} (${blockReason}), retrying with sanitized prompt...`);
 
       // Create a SANITIZED prompt that removes potentially triggering content:
       // - No detailed physical descriptions (age, body type, etc.)
@@ -464,11 +469,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (retryResponse.ok) {
         const retryData = await retryResponse.json();
         if (!isBlockedResponse(retryData)) {
-          log.info(`✅ [QUALITY] Sanitized prompt retry succeeded with ${modelId}`);
+          log.info(`✅ [QUALITY] ${pageLabel}Sanitized prompt retry succeeded with ${modelId}`);
           data = retryData;
         } else {
           // Still blocked, now fall back to 2.0
-          log.warn(`⚠️  [QUALITY] Sanitized prompt still blocked, falling back to gemini-2.0-flash-lite...`);
+          log.warn(`⚠️  [QUALITY] ${pageLabel}Sanitized prompt still blocked, falling back to gemini-2.0-flash-lite...`);
           modelId = 'gemini-2.0-flash-lite';
           response = await callQualityAPI(modelId);
           if (!response.ok) {
@@ -480,7 +485,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       } else {
         // HTTP error on retry, fall back to 2.0
-        log.warn(`⚠️  [QUALITY] Sanitized prompt HTTP error, falling back to gemini-2.0-flash-lite...`);
+        log.warn(`⚠️  [QUALITY] ${pageLabel}Sanitized prompt HTTP error, falling back to gemini-2.0-flash-lite...`);
         modelId = 'gemini-2.0-flash-lite';
         response = await callQualityAPI(modelId);
         if (!response.ok) {
@@ -696,7 +701,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {string|null} qualityModelOverride - Override quality evaluation model
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '') {
   // Check cache first (include previousImage presence in cache key for sequential mode)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
@@ -907,7 +912,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
         // Evaluate image quality with prompt and reference images
         log.debug(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
-        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride);
+        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext);
 
         // Extract score, reasoning, and text error info from quality result
         const score = qualityResult ? qualityResult.score : null;
@@ -1062,9 +1067,10 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @param {Object|null} modelOverrides - Model overrides: { imageModel, qualityModel }
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
-async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null) {
+async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '') {
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
+  const pageLabel = pageContext ? `[${pageContext}] ` : '';
   let bestResult = null;
   let bestScore = -1;
   let attempts = 0;
@@ -1076,7 +1082,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
   while (attempts < MAX_ATTEMPTS) {
     attempts++;
-    log.debug(`🎨 [QUALITY RETRY] Attempt ${attempts}/${MAX_ATTEMPTS} (threshold: ${IMAGE_QUALITY_THRESHOLD}%)...`);
+    log.debug(`🎨 [QUALITY RETRY] ${pageLabel}Attempt ${attempts}/${MAX_ATTEMPTS} (threshold: ${IMAGE_QUALITY_THRESHOLD}%)...`);
 
     // Clear cache for retries to force new generation
     if (attempts > 1) {
@@ -1088,7 +1094,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     try {
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);
@@ -1158,9 +1164,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     let score = evalWasBlocked ? null : result.score;
 
     if (evalWasBlocked) {
-      log.debug(`⭐ [QUALITY RETRY] Attempt ${attempts}: quality eval was blocked/failed`);
+      log.debug(`⭐ [QUALITY RETRY] ${pageLabel}Attempt ${attempts}: quality eval was blocked/failed`);
     } else {
-      log.debug(`⭐ [QUALITY RETRY] Attempt ${attempts} score: ${score}%`);
+      log.debug(`⭐ [QUALITY RETRY] ${pageLabel}Attempt ${attempts} score: ${score}%`);
     }
 
     // Check for text errors on covers (but not when "NO TEXT" was expected and is missing)
@@ -1205,7 +1211,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // If eval was blocked (after fallback attempted in evaluateImageQuality), accept the image
     // The image itself was generated successfully, only the evaluation failed
     if (evalWasBlocked) {
-      log.warn(`⚠️  [QUALITY RETRY] Accepting image (quality eval was blocked/failed after fallback)`);
+      log.warn(`⚠️  [QUALITY RETRY] ${pageLabel}Accepting image (quality eval was blocked/failed after fallback)`);
       return {
         ...result,
         wasRegenerated: attempts > 1,
@@ -1220,7 +1226,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // This tries to improve the image before deciding whether to accept or regenerate
     const AUTO_REPAIR_THRESHOLD = 90;
     if (!hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0) {
-      log.info(`🔧 [QUALITY RETRY] Score ${score}% <= ${AUTO_REPAIR_THRESHOLD}%, attempting auto-repair on ${result.fixTargets.length} fix targets...`);
+      log.info(`🔧 [QUALITY RETRY] ${pageLabel}Score ${score}% <= ${AUTO_REPAIR_THRESHOLD}%, attempting auto-repair on ${result.fixTargets.length} fix targets...`);
       try {
         const repairResult = await autoRepairWithTargets(
           result.imageData,
@@ -1230,7 +1236,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         );
 
         if (repairResult.repaired && repairResult.imageData !== result.imageData) {
-          log.info(`✅ [QUALITY RETRY] Auto-repair completed, re-evaluating quality...`);
+          log.info(`✅ [QUALITY RETRY] ${pageLabel}Auto-repair completed, re-evaluating quality...`);
 
           // Track usage from repair
           if (usageTracker && repairResult.usage) {
@@ -1244,12 +1250,13 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             currentPrompt,
             characterPhotos,
             evaluationType,
-            qualityModelOverride
+            qualityModelOverride,
+            pageContext
           );
 
           if (reEvalResult && reEvalResult.score !== null) {
             const repairedScore = reEvalResult.score;
-            log.info(`🔧 [QUALITY RETRY] Post-repair score: ${repairedScore}% (was ${score}%)`);
+            log.info(`🔧 [QUALITY RETRY] ${pageLabel}Post-repair score: ${repairedScore}% (was ${score}%)`);
 
             // Track quality eval usage
             if (usageTracker && reEvalResult.usage) {
@@ -1548,6 +1555,37 @@ async function createMaskFromBoundingBox(width, height, boundingBox) {
 }
 
 /**
+ * Calculate the percentage of image area covered by bounding boxes
+ * Uses union of boxes to avoid counting overlapping areas twice
+ * @param {Array<number[]>} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0.0-1.0 or 0-1000
+ * @returns {number} Percentage of image covered (0-100)
+ */
+function calculateMaskCoverage(boundingBoxes) {
+  if (!boundingBoxes || boundingBoxes.length === 0) {
+    return 0;
+  }
+
+  // Normalize all boxes to 0.0-1.0 format
+  const normalizedBoxes = boundingBoxes.map(box => {
+    const [ymin, xmin, ymax, xmax] = box;
+    const scale = (ymin <= 1 && xmin <= 1 && ymax <= 1 && xmax <= 1) ? 1 : 1000;
+    return [ymin / scale, xmin / scale, ymax / scale, xmax / scale];
+  });
+
+  // Simple approach: sum areas (may overcount overlaps, but gives upper bound)
+  // For more accuracy, we'd need a sweep line algorithm, but this is good enough
+  let totalArea = 0;
+  for (const [ymin, xmin, ymax, xmax] of normalizedBoxes) {
+    const width = Math.max(0, xmax - xmin);
+    const height = Math.max(0, ymax - ymin);
+    totalArea += width * height;
+  }
+
+  // Cap at 100% (overlaps could theoretically exceed 100%)
+  return Math.min(100, totalArea * 100);
+}
+
+/**
  * Create a combined mask from multiple bounding boxes
  * @param {number} width - Image width in pixels
  * @param {number} height - Image height in pixels
@@ -1777,14 +1815,40 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
     };
   }
 
-  log.info(`🔄 [AUTO-REPAIR] Combining ${fixTargets.length} fix targets into ONE repair call...`);
+  // Collect all bounding boxes
+  const boundingBoxes = fixTargets.map(t => t.boundingBox);
+
+  // Check mask coverage before attempting repair
+  const maskCoverage = calculateMaskCoverage(boundingBoxes);
+  log.info(`🔄 [AUTO-REPAIR] ${fixTargets.length} fix targets covering ${maskCoverage.toFixed(1)}% of image`);
+
+  if (maskCoverage > MAX_MASK_COVERAGE_PERCENT) {
+    log.warn(`⚠️ [AUTO-REPAIR] Mask covers ${maskCoverage.toFixed(1)}% of image (>${MAX_MASK_COVERAGE_PERCENT}%) - too large for inpainting, skipping repair`);
+    log.warn(`   Inpainting works best for small fixes. For large areas, consider regenerating the entire image.`);
+    repairHistory.push({
+      attempt: 1,
+      errorType: 'mask_too_large',
+      description: `Mask coverage ${maskCoverage.toFixed(1)}% exceeds ${MAX_MASK_COVERAGE_PERCENT}% threshold`,
+      boundingBoxes: boundingBoxes,
+      targetCount: fixTargets.length,
+      coverage: maskCoverage,
+      success: false,
+      skipped: true,
+      reason: 'Inpainting is not effective for large masked areas. The image should be regenerated instead.',
+      timestamp: new Date().toISOString()
+    });
+    return {
+      imageData: currentImage,
+      repaired: false,
+      maskTooLarge: true,
+      coverage: maskCoverage,
+      repairHistory
+    };
+  }
 
   try {
     // Get image dimensions
     const dimensions = await getImageDimensions(currentImage);
-
-    // Collect all bounding boxes
-    const boundingBoxes = fixTargets.map(t => t.boundingBox);
 
     // Create combined mask with ALL regions
     const combinedMask = await createCombinedMask(
@@ -2008,10 +2072,12 @@ module.exports = {
   inspectImageForErrors,
   createMaskFromBoundingBox,
   createCombinedMask,
+  calculateMaskCoverage,
   inpaintWithMask,
   autoRepairImage,
   autoRepairWithTargets,
 
   // Constants (for external access if needed)
-  IMAGE_QUALITY_THRESHOLD
+  IMAGE_QUALITY_THRESHOLD,
+  MAX_MASK_COVERAGE_PERCENT
 };

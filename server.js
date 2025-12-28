@@ -1888,7 +1888,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
     // User-initiated regenerations use Gemini 3 Pro for higher quality
     const imageResult = await generateImageWithQualityRetry(
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
-      { imageModel: 'gemini-3-pro-image-preview' }
+      { imageModel: 'gemini-3-pro-image-preview' },
+      `PAGE ${pageNumber}`
     );
 
     // Update the image in story data
@@ -2239,9 +2240,11 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, asyn
 
     // Generate new cover with quality retry (automatically retries on text errors)
     // User-initiated regenerations use Gemini 3 Pro for higher quality
+    const coverLabel = normalizedCoverType === 'front' ? 'FRONT COVER' : normalizedCoverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
     const coverResult = await generateImageWithQualityRetry(
       coverPrompt, coverCharacterPhotos, null, 'cover', null, null, null,
-      { imageModel: 'gemini-3-pro-image-preview' }
+      { imageModel: 'gemini-3-pro-image-preview' },
+      coverLabel
     );
 
     // Update the cover in story data with new structure including quality, description, prompt, and previous version
@@ -5777,7 +5780,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           try {
             // Use quality retry with labeled character photos (name + photoUrl)
             const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides);
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`);
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -5955,7 +5958,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Generate the image (use coverImageModel for covers)
         const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker, null, coverModelOverrides);
+        const streamCoverLabel = coverType === 'front' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker, null, coverModelOverrides, streamCoverLabel);
 
         const coverData = {
           imageData: result.imageData,
@@ -6278,7 +6282,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               // In sequential mode, also pass previous image for consistency
               // Use quality retry to regenerate if score is below threshold
               const seqSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides);
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`);
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -6436,7 +6440,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           });
           coverPrompts.frontCover = frontCoverPrompt;
           const frontCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-          const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, frontCoverModelOverrides);
+          const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, frontCoverModelOverrides, 'FRONT COVER');
           log.debug(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.frontCover = {
             imageData: frontCoverResult.imageData,
@@ -6482,7 +6486,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               });
           coverPrompts.initialPage = initialPrompt;
           const initialPageModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-          const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, initialPageModelOverrides);
+          const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, initialPageModelOverrides, 'INITIAL PAGE');
           log.debug(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.initialPage = {
             imageData: initialResult.imageData,
@@ -6519,7 +6523,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           });
           coverPrompts.backCover = backCoverPrompt;
           const backCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-          const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, backCoverModelOverrides);
+          const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, backCoverModelOverrides, 'BACK COVER');
           log.debug(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.backCover = {
             imageData: backCoverResult.imageData,
