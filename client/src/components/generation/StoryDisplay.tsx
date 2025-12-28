@@ -966,42 +966,41 @@ export function StoryDisplay({
             </details>
           )}
 
-          {/* Full API Output */}
-          {story && (
+          {/* Full Story Text Generation Output */}
+          {story && storyTextPrompts.length > 0 && (
             <details className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-amber-800 hover:text-amber-900 flex items-center gap-2">
                 <BookOpen size={20} />
-                {language === 'de' ? 'Vollständige API-Ausgabe' : language === 'fr' ? 'Sortie API complète' : 'Full API Output'}
+                {language === 'de' ? 'Vollständige API-Ausgabe (Story-Text)' : language === 'fr' ? 'Sortie API complète (Texte)' : 'Full API Output (Story Text)'}
+                {storyTextPrompts[0]?.modelId && (
+                  <span className="ml-2 text-sm font-normal text-amber-600">({storyTextPrompts[0].modelId})</span>
+                )}
+                {storyTextPrompts[0]?.usage && (
+                  <span className="ml-2 text-xs font-normal text-amber-500">
+                    [{storyTextPrompts[0].usage.input_tokens.toLocaleString()} in / {storyTextPrompts[0].usage.output_tokens.toLocaleString()} out]
+                  </span>
+                )}
               </summary>
-              <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[600px] overflow-y-auto">
-                {JSON.stringify({
-                  title,
-                  story,
-                  outline,
-                  sceneDescriptions,
-                  sceneImages: sceneImages.map(img => ({
-                    pageNumber: img.pageNumber,
-                    description: img.description,
-                    prompt: img.prompt,
-                    qualityScore: img.qualityScore,
-                    qualityReasoning: img.qualityReasoning,
-                    wasRegenerated: img.wasRegenerated,
-                    totalAttempts: img.totalAttempts,
-                    hasImage: !!img.imageData
-                  })),
-                  coverImages: coverImages ? {
-                    frontCover: coverImages.frontCover ? { hasImage: true, ...(typeof coverImages.frontCover === 'object' ? { description: coverImages.frontCover.description, storyTitle: coverImages.frontCover.storyTitle } : {}) } : null,
-                    initialPage: coverImages.initialPage ? { hasImage: true, ...(typeof coverImages.initialPage === 'object' ? { description: coverImages.initialPage.description } : {}) } : null,
-                    backCover: coverImages.backCover ? { hasImage: true, ...(typeof coverImages.backCover === 'object' ? { description: coverImages.backCover.description } : {}) } : null
-                  } : null,
-                  visualBible,
-                  languageLevel,
-                  isPartial,
-                  failureReason,
-                  generatedPages,
-                  totalPages
-                }, null, 2)}
-              </pre>
+              <div className="mt-4 space-y-4">
+                {/* Input: The prompt sent to the API */}
+                <div>
+                  <h4 className="text-sm font-bold text-amber-700 mb-2">
+                    {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (Entrée)' : '📤 Prompt (Input)'}
+                  </h4>
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                    {storyTextPrompts[0]?.prompt || 'No prompt available'}
+                  </pre>
+                </div>
+                {/* Output: The generated story */}
+                <div>
+                  <h4 className="text-sm font-bold text-amber-700 mb-2">
+                    {language === 'de' ? '📥 Antwort (Ausgabe)' : language === 'fr' ? '📥 Réponse (Sortie)' : '📥 Response (Output)'}
+                  </h4>
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                    {story}
+                  </pre>
+                </div>
+              </div>
             </details>
           )}
 
