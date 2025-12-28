@@ -1245,11 +1245,14 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     if (!hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0) {
       log.info(`🔧 [QUALITY RETRY] ${pageLabel}Score ${score}% <= ${AUTO_REPAIR_THRESHOLD}%, attempting auto-repair on ${result.fixTargets.length} fix targets...`);
       try {
+        // NOTE: Do NOT pass reference images to inpainting - sending multiple images
+        // confuses the model about which image to edit, causing it to potentially
+        // edit a reference photo instead of the scene image
         const repairResult = await autoRepairWithTargets(
           result.imageData,
           result.fixTargets,
           0,  // No additional inspection attempts
-          characterPhotos  // Pass reference images for color/clothing matching
+          []  // No reference images - they confuse the inpaint model
         );
 
         if (repairResult.repaired && repairResult.imageData !== result.imageData) {
@@ -1689,7 +1692,10 @@ async function inpaintWithMask(originalImage, maskImage, fixPrompt, referenceIma
       throw new Error('Gemini API key not configured');
     }
 
-    log.debug(`🔧 [INPAINT] Inpainting with prompt: "${fixPrompt}"${referenceImages.length > 0 ? ` (${referenceImages.length} reference images)` : ''}`);
+    log.debug(`🔧 [INPAINT] Inpainting with prompt: "${fixPrompt}"`);
+    if (referenceImages.length > 0) {
+      log.warn(`⚠️ [INPAINT] WARNING: ${referenceImages.length} reference images passed - this may confuse the model about which image to edit!`);
+    }
 
     // Extract base64 and mime type for original image
     const origBase64 = originalImage.replace(/^data:image\/\w+;base64,/, '');
