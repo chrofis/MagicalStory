@@ -421,8 +421,89 @@ async function generateCombinedBookPdf(stories) {
   return { pdfBuffer, pageCount: totalStoryPages };
 }
 
+/**
+ * Generate viewable PDF for a single story (for download/viewing, NOT printing)
+ * Layout: Front cover → Initial page → Story pages → Back cover (all separate pages)
+ *
+ * @param {Object} storyData - Story data with coverImages, sceneImages, storyText, etc.
+ * @returns {Promise<Buffer>} PDF buffer
+ */
+async function generateViewPdf(storyData) {
+  const doc = new PDFDocument({
+    size: [PAGE_SIZE, PAGE_SIZE],
+    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    autoFirstPage: false
+  });
+
+  const buffers = [];
+  doc.on('data', buffers.push.bind(buffers));
+  const pdfPromise = new Promise((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+  });
+
+  // 1. FRONT COVER (first page - different from print which has back+front spread)
+  const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+  if (frontCoverImageData) {
+    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    try {
+      const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      doc.image(frontCoverBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+    } catch (err) {
+      log.error('Error adding front cover:', err.message);
+    }
+  }
+
+  // 2. INITIAL PAGE (dedication/intro)
+  const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+  if (initialPageImageData) {
+    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    try {
+      const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      doc.image(initialPageBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+    } catch (err) {
+      log.error('Error adding initial page:', err.message);
+    }
+  }
+
+  // 3. STORY PAGES - reuse the same functions as print
+  const storyPages = parseStoryPages(storyData);
+  if (storyPages.length === 0) {
+    throw new Error('No story pages found');
+  }
+
+  const isPictureBook = storyData.languageLevel === '1st-grade';
+  log.debug(`📄 [VIEW PDF] Generating with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
+
+  if (isPictureBook) {
+    addPictureBookPages(doc, storyData, storyPages);
+  } else {
+    addStandardPages(doc, storyData, storyPages);
+  }
+
+  // 4. BACK COVER (last page)
+  const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+  if (backCoverImageData) {
+    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    try {
+      const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      doc.image(backCoverBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+    } catch (err) {
+      log.error('Error adding back cover:', err.message);
+    }
+  }
+
+  doc.end();
+  const pdfBuffer = await pdfPromise;
+
+  log.debug(`📄 [VIEW PDF] Generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+
+  return pdfBuffer;
+}
+
 module.exports = {
   generatePrintPdf,
+  generateViewPdf,
   generateCombinedBookPdf,
   parseStoryPages,
   getCoverImageData,

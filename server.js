@@ -104,7 +104,7 @@ const { initializePool: initModularPool, logActivity, isDatabaseMode } = require
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { storyGenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
-const { generatePrintPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
+const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder } = require('./server/lib/gelato');
 const {
   hashImageData,
@@ -4024,11 +4024,10 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
 
 // ========================================
-// NOTE: generatePrintPdf and generateCombinedBookPdf moved to server/lib/pdf.js
+// NOTE: PDF generation functions are in server/lib/pdf.js
 
 // GET PDF for a story - for DOWNLOAD/VIEWING (different sequence than print)
-// Sequence: Front cover, Initial page, Story pages, Back cover (all separate pages)
-// This is for viewing/download, NOT for printing - no database storage
+// Uses generateViewPdf from pdf.js library - no code duplication
 app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
   try {
     const storyId = req.params.id;
@@ -4052,169 +4051,8 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
       : storyResult.rows[0].data;
     log.debug(`📄 [PDF DOWNLOAD] Story found: ${storyData.title}`);
 
-    // Parse story into pages
-    const storyText = storyData.storyText || storyData.story || '';
-    const pageMatches = storyText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
-    const storyPages = pageMatches.slice(1).filter(p => p.trim().length > 0);
-
-    if (storyPages.length === 0) {
-      log.debug(`📄 [PDF DOWNLOAD] No story pages found. Story text preview: ${storyText.substring(0, 200)}`);
-      return res.status(400).json({ error: 'No story pages found' });
-    }
-
-    const isPictureBook = storyData.languageLevel === '1st-grade';
-    log.debug(`📄 [PDF DOWNLOAD] Generating PDF with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
-
-    // Helper function to extract image data
-    const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
-
-    const PDFDocument = require('pdfkit');
-    const mmToPoints = (mm) => mm * 2.83465;
-    const pageSize = mmToPoints(200);
-
-    // Create PDF document - start with square pages for viewing
-    const doc = new PDFDocument({
-      size: [pageSize, pageSize],
-      margins: { top: 0, bottom: 0, left: 0, right: 0 },
-      autoFirstPage: false
-    });
-
-    const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
-    const pdfPromise = new Promise((resolve, reject) => {
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-    });
-
-    // 1. FRONT COVER (first page)
-    const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
-    if (frontCoverImageData) {
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      try {
-        const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(frontCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
-      } catch (err) {
-        log.error('Error adding front cover:', err.message);
-      }
-    }
-
-    // 2. INITIAL PAGE (dedication/intro)
-    const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
-    if (initialPageImageData) {
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      try {
-        const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
-      } catch (err) {
-        log.error('Error adding initial page:', err.message);
-      }
-    }
-
-    // 3. STORY PAGES
-    if (isPictureBook) {
-      // Picture Book: combined image + text on same page
-      const textMarginMm = mmToPoints(3);
-      const imageHeight = pageSize * 0.85;
-      const textAreaHeight = pageSize * 0.15;
-      const textWidth = pageSize - (textMarginMm * 2);
-      const availableTextHeight = textAreaHeight - textMarginMm;
-      const lineGap = -2;
-
-      storyPages.forEach((pageText, index) => {
-        const pageNumber = index + 1;
-        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
-        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-
-        if (image && image.imageData) {
-          try {
-            const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            // Full-bleed image (no margin)
-            doc.image(imageBuffer, 0, 0, {
-              fit: [pageSize, imageHeight],
-              align: 'center',
-              valign: 'center'
-            });
-          } catch (err) {
-            log.error(`Error adding image for page ${pageNumber}:`, err.message);
-          }
-        }
-
-        // Add text with vertical centering in text area (text has margin)
-        let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
-        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
-
-        while (textHeight > availableTextHeight && fontSize > 6) {
-          fontSize -= 0.5;
-          doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
-        }
-
-        const textY = imageHeight + (availableTextHeight - textHeight) / 2;
-        doc.text(cleanText, textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
-      });
-    } else {
-      // Standard: separate text and image pages
-      const margin = 28;
-      const availableWidth = pageSize - (margin * 2);
-      const availableHeight = pageSize - (margin * 2);
-      const lineGap = -2;
-
-      storyPages.forEach((pageText, index) => {
-        const pageNumber = index + 1;
-        const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
-        const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
-
-        // Text page with vertical centering (has margin)
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: margin, bottom: margin, left: margin, right: margin } });
-
-        let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
-        doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-        let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
-
-        while (textHeight > availableHeight * 0.9 && fontSize > 6) {
-          fontSize -= 0.5;
-          doc.fontSize(fontSize);
-          textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
-        }
-
-        // Vertically center text
-        const yPosition = margin + (availableHeight - textHeight) / 2;
-        doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
-
-        // Image page (full-bleed, no margin)
-        if (image && image.imageData) {
-          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-          try {
-            const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            doc.image(imageBuffer, 0, 0, {
-              fit: [pageSize, pageSize],
-              align: 'center',
-              valign: 'center'
-            });
-          } catch (err) {
-            log.error(`Error adding image for page ${pageNumber}:`, err.message);
-          }
-        }
-      });
-    }
-
-    // 4. BACK COVER (last page)
-    const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
-    if (backCoverImageData) {
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-      try {
-        const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(backCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
-      } catch (err) {
-        log.error('Error adding back cover:', err.message);
-      }
-    }
-
-    doc.end();
-    const pdfBuffer = await pdfPromise;
+    // Generate PDF using shared library function
+    const pdfBuffer = await generateViewPdf(storyData);
 
     log.debug(`📄 [PDF DOWNLOAD] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 
