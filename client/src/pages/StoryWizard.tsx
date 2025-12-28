@@ -663,7 +663,7 @@ export default function StoryWizard() {
         const originalSize = Math.round(originalPhotoUrl.length / 1024);
         const resizedSize = Math.round(resizedPhoto.length / 1024);
         log.info(`Starting photo analysis... (${originalSize}KB -> ${resizedSize}KB)`);
-        const analysis = await characterService.analyzePhoto(resizedPhoto);
+        const analysis = await characterService.analyzePhoto(resizedPhoto, language);
 
         if (analysis.success) {
           log.info('Photo analysis complete:', {

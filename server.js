@@ -3360,11 +3360,19 @@ app.get('/api/print-provider/products', async (req, res) => {
 // Photo Analysis Endpoint (calls Python DeepFace service)
 app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
   try {
-    const { imageData } = req.body;
+    const { imageData, language } = req.body;
 
     if (!imageData) {
       log.debug('📸 [PHOTO] Missing imageData in request');
       return res.status(400).json({ error: 'Missing imageData' });
+    }
+
+    // Build language instruction for trait extraction
+    let languageInstruction = '';
+    if (language === 'de') {
+      languageInstruction = 'WICHTIG: Beschreibe alle Merkmale (face, hair, build, distinctive markings, clothing, clothingStyle) auf Deutsch. Beispiel: "rundes Gesicht mit weichen Wangen", "lange, braune Haare im Pferdeschwanz", "schlank", "Brille".';
+    } else if (language === 'fr') {
+      languageInstruction = 'IMPORTANT: Décrivez tous les traits (face, hair, build, distinctive markings, clothing, clothingStyle) en français. Exemple: "visage rond avec joues douces", "longs cheveux bruns en queue de cheval", "mince", "lunettes".';
     }
 
     // Log image info
@@ -3401,7 +3409,7 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
               contents: [{
                 parts: [
                   {
-                    text: PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`
+                    text: (PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`).replace('{LANGUAGE_INSTRUCTION}', languageInstruction)
                   },
                   {
                     inlineData: {

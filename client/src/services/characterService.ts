@@ -326,7 +326,7 @@ export const characterService = {
     }
   },
 
-  async analyzePhoto(imageData: string): Promise<{
+  async analyzePhoto(imageData: string, language?: string): Promise<{
     success: boolean;
     error?: string;  // Error code (e.g., 'no_face_detected')
     photos?: {
@@ -373,7 +373,7 @@ export const characterService = {
         };
         error?: string;
         fallback?: boolean;
-      }>('/api/analyze-photo', { imageData });
+      }>('/api/analyze-photo', { imageData, language });
 
       // Extract physical traits from attributes
       const physical = {

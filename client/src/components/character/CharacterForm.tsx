@@ -174,6 +174,7 @@ export function CharacterForm({
   developerMode,
 }: CharacterFormProps) {
   const { t, language } = useLanguage();
+  const [enlargedAvatar, setEnlargedAvatar] = useState(false);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -413,44 +414,51 @@ export function CharacterForm({
             </div>
           </div>
 
-          {/* Physical Features - Compact inline fields */}
-          <div className="space-y-1.5 text-xs">
-            <InlineEditField
-              label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
-              value={character.physical?.face || ''}
-              placeholder={language === 'de' ? 'z.B. rund, oval' : 'e.g. round, oval'}
-              onChange={(v) => updatePhysical('face', v)}
-            />
-            <InlineEditField
-              label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
-              value={character.physical?.hair || ''}
-              placeholder={language === 'de' ? 'z.B. braun, kurz' : 'e.g. brown, short'}
-              onChange={(v) => updatePhysical('hair', v)}
-            />
-            <InlineEditField
-              label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
-              value={character.physical?.build || ''}
-              placeholder={language === 'de' ? 'z.B. schlank' : 'e.g. slim'}
-              onChange={(v) => updatePhysical('build', v)}
-            />
-            <InlineEditField
-              label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
-              value={character.physical?.other || ''}
-              placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
-              onChange={(v) => updatePhysical('other', v)}
-            />
-          </div>
+          {/* Physical Features - Collapsible */}
+          <details className="bg-gray-50 border border-gray-200 rounded-lg mt-2">
+            <summary className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
+              {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
+            </summary>
+            <div className="px-3 pb-3 space-y-1.5 text-xs">
+              <InlineEditField
+                label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
+                value={character.physical?.face || ''}
+                placeholder={language === 'de' ? 'z.B. rund, oval' : 'e.g. round, oval'}
+                onChange={(v) => updatePhysical('face', v)}
+              />
+              <InlineEditField
+                label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
+                value={character.physical?.hair || ''}
+                placeholder={language === 'de' ? 'z.B. braun, kurz' : 'e.g. brown, short'}
+                onChange={(v) => updatePhysical('hair', v)}
+              />
+              <InlineEditField
+                label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
+                value={character.physical?.build || ''}
+                placeholder={language === 'de' ? 'z.B. schlank' : 'e.g. slim'}
+                onChange={(v) => updatePhysical('build', v)}
+              />
+              <InlineEditField
+                label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
+                value={character.physical?.other || ''}
+                placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
+                onChange={(v) => updatePhysical('other', v)}
+              />
+            </div>
+          </details>
         </div>
 
-        {/* Right side: Standard avatar for all users */}
-        <div className="flex-shrink-0 w-32">
+        {/* Right side: Standard avatar for all users - 25% bigger, object-contain to show full body */}
+        <div className="flex-shrink-0 w-40">
           <div className="text-center">
             {character.avatars?.standard ? (
               <div className="relative">
                 <img
                   src={character.avatars.standard}
                   alt={`${character.name} avatar`}
-                  className={`w-32 h-44 object-cover rounded-lg border-2 ${character.avatars?.stale ? 'border-amber-400 opacity-80' : 'border-indigo-300'}`}
+                  className={`w-40 h-56 object-contain rounded-lg border-2 bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'border-amber-400 opacity-80' : 'border-indigo-300'}`}
+                  onClick={() => setEnlargedAvatar(true)}
+                  title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                 />
                 {(isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
@@ -459,7 +467,7 @@ export function CharacterForm({
                 )}
               </div>
             ) : (
-              <div className="w-32 h-44 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
+              <div className="w-40 h-56 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
                 {(isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
                   <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                 ) : (
@@ -467,6 +475,26 @@ export function CharacterForm({
                     {language === 'de' ? 'Kein Avatar' : 'No avatar'}
                   </span>
                 )}
+              </div>
+            )}
+            {/* Enlarged avatar modal */}
+            {enlargedAvatar && character.avatars?.standard && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                onClick={() => setEnlargedAvatar(false)}
+              >
+                <img
+                  src={character.avatars.standard}
+                  alt={`${character.name} avatar`}
+                  className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <button
+                  className="absolute top-4 right-4 text-white text-3xl hover:text-gray-300"
+                  onClick={() => setEnlargedAvatar(false)}
+                >
+                  ×
+                </button>
               </div>
             )}
             {/* Regenerate button for all users */}

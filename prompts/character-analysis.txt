@@ -1,7 +1,9 @@
-You are an expert Image Prompt Engineer specializing in character consistenc
+You are an expert Image Prompt Engineer specializing in character consistency.
 
 Analyze this image of a person.
 Extract visual attributes that will maintain consistency across different scenes.
+
+{LANGUAGE_INSTRUCTION}
 
 Return a JSON object with this EXACT structure:
 

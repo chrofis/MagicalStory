@@ -35,7 +35,7 @@ export const photoService = {
    * Analyze a photo using the Python MediaPipe API
    * Returns face/body bounding boxes and pre-cropped images
    */
-  async analyzePhoto(imageData: string): Promise<PhotoAnalysisResult> {
+  async analyzePhoto(imageData: string, language?: string): Promise<PhotoAnalysisResult> {
     try {
       log.info('Analyzing photo with Python MediaPipe API...');
 
@@ -45,7 +45,7 @@ export const photoService = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
         },
-        body: JSON.stringify({ imageData }),
+        body: JSON.stringify({ imageData, language }),
       });
 
       if (!response.ok) {
