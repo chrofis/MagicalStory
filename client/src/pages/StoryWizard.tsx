@@ -70,6 +70,7 @@ export default function StoryWizard() {
 
   // Developer model selection (admin only)
   const [modelSelections, setModelSelections] = useState<ModelSelections>({
+    ideaModel: null,
     outlineModel: null,
     textModel: null,
     sceneDescriptionModel: null,
@@ -574,11 +575,18 @@ export default function StoryWizard() {
   const prevCategoryRef = useRef(storyCategory);
   const prevTopicRef = useRef(storyTopic);
   const prevThemeRef = useRef(storyTheme);
+  const isInitialMountRef = useRef(true);
   useEffect(() => {
-    // Only clear if one of these actually changed (not on initial mount)
-    const categoryChanged = prevCategoryRef.current !== storyCategory && prevCategoryRef.current !== '';
-    const topicChanged = prevTopicRef.current !== storyTopic && prevTopicRef.current !== '';
-    const themeChanged = prevThemeRef.current !== storyTheme && prevThemeRef.current !== '';
+    // Skip on initial mount to avoid clearing restored localStorage data
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
+    // Clear if any of these changed (including when going back to empty for re-selection)
+    const categoryChanged = prevCategoryRef.current !== storyCategory;
+    const topicChanged = prevTopicRef.current !== storyTopic;
+    const themeChanged = prevThemeRef.current !== storyTheme;
 
     if (categoryChanged || topicChanged || themeChanged) {
       setStoryDetails('');
@@ -1139,6 +1147,8 @@ export default function StoryWizard() {
             relationship: rel,
           };
         }).filter(r => r.character1 && r.character2),
+        // Developer model override (admin only)
+        ideaModel: user?.role === 'admin' ? modelSelections.ideaModel : undefined,
       });
 
       if (result.storyIdea) {
@@ -2219,13 +2229,16 @@ export default function StoryWizard() {
             <div className="mt-6 pt-6 border-t border-gray-200">
               {/* Steps 1-3: Back and Next buttons side by side */}
               {step !== 4 && (
-                <div className="flex justify-between">
-                  <button
-                    onClick={goBack}
-                    className="bg-transparent text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
-                  >
-                    <ArrowLeft size={20} /> {t.back}
-                  </button>
+                <div className={`flex ${step === 1 ? 'justify-end' : 'justify-between'}`}>
+                  {/* Hide back button on step 1 */}
+                  {step > 1 && (
+                    <button
+                      onClick={goBack}
+                      className="bg-transparent text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+                    >
+                      <ArrowLeft size={20} /> {t.back}
+                    </button>
+                  )}
                   <button
                     onClick={goNext}
                     disabled={!canGoNext()}

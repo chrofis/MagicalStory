@@ -1,4 +1,4 @@
-import { ChevronDown, Cpu, Sparkles, Image, Palette, Star, Eye } from 'lucide-react';
+import { ChevronDown, Cpu, Sparkles, Image, Palette, Star, Eye, Lightbulb } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 // Available text models (matches server/lib/textModels.js)
@@ -68,7 +68,8 @@ export type ImageModelKey = keyof typeof IMAGE_MODELS;
 export type QualityModelKey = keyof typeof QUALITY_MODELS;
 
 export interface ModelSelections {
-  outlineModel: TextModelKey | null;  // null = use server default
+  ideaModel: TextModelKey | null;  // null = use server default
+  outlineModel: TextModelKey | null;
   textModel: TextModelKey | null;
   sceneDescriptionModel: TextModelKey | null;
   imageModel: ImageModelKey | null;
@@ -145,6 +146,15 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Text Generation Models */}
+        <ModelDropdown
+          label={language === 'de' ? 'Ideen-Modell' : language === 'fr' ? 'Modèle d\'idées' : 'Idea Model'}
+          icon={<Lightbulb size={12} />}
+          value={selections.ideaModel}
+          options={TEXT_MODELS}
+          onChange={(v) => updateSelection('ideaModel', v)}
+          language={language}
+        />
+
         <ModelDropdown
           label={language === 'de' ? 'Outline-Modell' : language === 'fr' ? 'Modèle de plan' : 'Outline Model'}
           icon={<Sparkles size={12} />}

@@ -206,7 +206,7 @@ export function StoryCategorySelector({
             {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
           </span>
           <button
-            onClick={() => handleCategorySelect('adventure')}
+            onClick={() => onCategoryChange('' as 'adventure' | 'life-challenge' | 'educational')}
             className="text-indigo-600 hover:underline"
           >
             {t.change}

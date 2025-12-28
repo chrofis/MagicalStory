@@ -1546,7 +1546,7 @@ app.post('/api/gemini', aiProxyLimiter, authenticateToken, async (req, res) => {
 // Generate story ideas endpoint - FREE, no credits
 app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}`);
@@ -1614,8 +1614,14 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
       .replace('{LANGUAGE_INSTRUCTION}', langInstructions[language] || langInstructions['en']);
 
     // Call the text model (using the imported function)
-    const { callTextModel } = require('./server/lib/textModels');
-    const result = await callTextModel(prompt, 500);
+    const { callTextModel, getModelDefaults } = require('./server/lib/textModels');
+
+    // Use model override from admin, or fall back to default
+    const modelDefaults = getModelDefaults();
+    const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
+
+    log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
+    const result = await callTextModel(prompt, 500, modelToUse);
 
     res.json({ storyIdea: result.text.trim() });
 

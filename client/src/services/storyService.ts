@@ -558,6 +558,8 @@ export const storyService = {
       character2: string;
       relationship: string;
     }>;
+    // Developer model override (admin only)
+    ideaModel?: string | null;
   }): Promise<{ storyIdea: string }> {
     const response = await api.post<{ storyIdea: string }>('/api/generate-story-ideas', data);
     return response;

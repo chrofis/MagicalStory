@@ -52,6 +52,7 @@ const TEXT_MODELS = {
 // ============================================
 const MODEL_DEFAULTS = {
   // Text generation models
+  idea: 'gemini-2.0-flash',            // Story idea generation (fast)
   outline: 'gemini-2.5-pro',           // Story outline generation
   storyText: 'claude-sonnet',          // Story narrative text
   sceneDescription: 'claude-haiku',    // Scene description for images

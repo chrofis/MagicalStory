@@ -15,19 +15,53 @@ function RetryHistoryDisplay({
   totalAttempts: number;
   language: string;
 }) {
+  const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
+
   if (!retryHistory || retryHistory.length === 0) return null;
 
+  // Count repairs in history
+  const repairCount = retryHistory.filter(a => a.type === 'auto_repair').length;
+
   return (
-    <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
-      <summary className="cursor-pointer text-sm font-semibold text-purple-700 flex items-center justify-between">
-        <span className="flex items-center gap-2">
-          <History size={14} />
-          {language === 'de' ? 'Generierungshistorie' : language === 'fr' ? 'Historique de génération' : 'Generation History'}
-        </span>
-        <span className="text-purple-600">
-          {totalAttempts} {language === 'de' ? 'Versuche' : language === 'fr' ? 'tentatives' : 'attempts'}
-        </span>
-      </summary>
+    <>
+      {/* Enlarged image modal */}
+      {enlargedImg && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setEnlargedImg(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <div className="absolute -top-8 left-0 text-white text-sm">{enlargedImg.title}</div>
+            <img
+              src={enlargedImg.src}
+              alt={enlargedImg.title}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+            />
+            <button
+              className="absolute -top-8 right-0 text-white hover:text-gray-300"
+              onClick={() => setEnlargedImg(null)}
+            >
+              ✕ Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-purple-700 flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <History size={14} />
+            {language === 'de' ? 'Generierungshistorie' : language === 'fr' ? 'Historique de génération' : 'Generation History'}
+            {repairCount > 0 && (
+              <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded">
+                🔧 {repairCount} {language === 'de' ? 'Reparatur' : 'repair'}{repairCount > 1 ? (language === 'de' ? 'en' : 's') : ''}
+              </span>
+            )}
+          </span>
+          <span className="text-purple-600">
+            {totalAttempts} {language === 'de' ? 'Versuche' : language === 'fr' ? 'tentatives' : 'attempts'}
+          </span>
+        </summary>
       <div className="mt-3 space-y-3">
         {retryHistory.map((attempt, idx) => (
           <div key={idx} className={`border rounded-lg p-3 ${
@@ -140,19 +174,34 @@ function RetryHistoryDisplay({
                             {repair.beforeImage && (
                               <div>
                                 <div className="text-[10px] text-gray-500 mb-1">Before</div>
-                                <img src={repair.beforeImage} alt="Before" className="w-32 h-32 object-contain border rounded cursor-pointer hover:ring-2 hover:ring-amber-400" />
+                                <img
+                                  src={repair.beforeImage}
+                                  alt="Before"
+                                  className="w-32 h-32 object-contain border rounded cursor-pointer hover:ring-2 hover:ring-amber-400"
+                                  onClick={() => setEnlargedImg({ src: repair.beforeImage!, title: 'Before Repair' })}
+                                />
                               </div>
                             )}
                             {repair.maskImage && (
                               <div>
                                 <div className="text-[10px] text-gray-500 mb-1">Mask</div>
-                                <img src={repair.maskImage} alt="Mask" className="w-32 h-32 object-contain border rounded bg-black" />
+                                <img
+                                  src={repair.maskImage}
+                                  alt="Mask"
+                                  className="w-32 h-32 object-contain border rounded bg-black cursor-pointer hover:ring-2 hover:ring-gray-400"
+                                  onClick={() => setEnlargedImg({ src: repair.maskImage!, title: 'Repair Mask' })}
+                                />
                               </div>
                             )}
                             {repair.afterImage && (
                               <div>
                                 <div className="text-[10px] text-gray-500 mb-1">After</div>
-                                <img src={repair.afterImage} alt="After" className="w-32 h-32 object-contain border rounded cursor-pointer hover:ring-2 hover:ring-green-400" />
+                                <img
+                                  src={repair.afterImage}
+                                  alt="After"
+                                  className="w-32 h-32 object-contain border rounded cursor-pointer hover:ring-2 hover:ring-green-400"
+                                  onClick={() => setEnlargedImg({ src: repair.afterImage!, title: 'After Repair' })}
+                                />
                               </div>
                             )}
                           </div>
@@ -196,6 +245,7 @@ function RetryHistoryDisplay({
         ))}
       </div>
     </details>
+    </>
   );
 }
 

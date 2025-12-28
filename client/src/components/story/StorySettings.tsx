@@ -334,10 +334,10 @@ export function StorySettings({
           />
           <p className="text-sm text-gray-500 mt-1">
             {language === 'de'
-              ? 'Dieser Text wird auf Seite 0 Ihres Buches gedruckt. Wenn Sie nichts eingeben, wird Seite 0 nur eine Illustration ohne Text enthalten.'
+              ? 'Dieser Text wird auf der Einführungsseite Ihres Buches gedruckt. Wenn Sie nichts eingeben, enthält die Einführungsseite nur eine Illustration ohne Text.'
               : language === 'fr'
-              ? 'Ce texte sera imprimé sur la page 0 de votre livre. Si vous ne saisissez rien, la page 0 ne contiendra qu\'une illustration sans texte.'
-              : 'This text will be printed on page 0 of your book. If you leave it empty, page 0 will contain only an illustration with no text.'}
+              ? 'Ce texte sera imprimé sur la page d\'introduction de votre livre. Si vous ne saisissez rien, la page d\'introduction ne contiendra qu\'une illustration sans texte.'
+              : 'This text will be printed on the initial page of your book. If you leave it empty, the initial page will contain only an illustration with no text.'}
           </p>
         </div>
 
