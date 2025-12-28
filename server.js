@@ -3451,7 +3451,8 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
               }],
               generationConfig: {
                 temperature: 0.2,
-                maxOutputTokens: 2048
+                maxOutputTokens: 2048,
+                responseMimeType: 'application/json'
               }
             }),
             signal: AbortSignal.timeout(20000) // 20 second timeout
@@ -3740,7 +3741,8 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       }],
       generationConfig: {
         temperature: 0,
-        maxOutputTokens: 500
+        maxOutputTokens: 500,
+        responseMimeType: 'application/json'
       }
     };
 
@@ -3768,13 +3770,31 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
     }
 
-    // Parse FINAL SCORE from response
-    const scoreMatch = responseText.match(/FINAL SCORE:\s*(\d+)/i);
-    const score = scoreMatch ? parseInt(scoreMatch[1], 10) : null;
-
-    if (score !== null) {
-      log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10`);
-      return { score, details: responseText };
+    // Parse JSON response
+    try {
+      const evalResult = JSON.parse(responseText);
+      const score = evalResult.finalScore;
+      if (typeof score === 'number' && score >= 1 && score <= 10) {
+        // Format details as readable text for display
+        const details = [
+          `Face Shape: ${evalResult.faceShape?.score}/10 - ${evalResult.faceShape?.reason}`,
+          `Eyes: ${evalResult.eyes?.score}/10 - ${evalResult.eyes?.reason}`,
+          `Nose: ${evalResult.nose?.score}/10 - ${evalResult.nose?.reason}`,
+          `Mouth: ${evalResult.mouth?.score}/10 - ${evalResult.mouth?.reason}`,
+          `Overall: ${evalResult.overallStructure?.score}/10 - ${evalResult.overallStructure?.reason}`,
+          `Final Score: ${score}/10`
+        ].join('\n');
+        log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10`);
+        return { score, details, raw: evalResult };
+      }
+    } catch (parseErr) {
+      log.warn(`[AVATAR EVAL] JSON parse failed, trying text fallback: ${parseErr.message}`);
+      // Fallback: try to extract score from text
+      const scoreMatch = responseText.match(/finalScore["']?\s*:\s*(\d+)/i);
+      if (scoreMatch) {
+        const score = parseInt(scoreMatch[1], 10);
+        return { score, details: responseText };
+      }
     }
 
     return null;
@@ -7216,7 +7236,7 @@ async function processStoryJob(jobId) {
             END_PAGE: endScene,
             READING_LEVEL: readingLevel,
             VISUAL_BIBLE: visualBibleForPrompt,
-            INCLUDE_TITLE: batchNum === 0 ? 'After the ---STORY TEXT--- marker, include the title and dedication before Page 1.' : 'Start directly with Page {START_PAGE} (no title/dedication).'
+            INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication before Page 1.' : 'Start directly with Page {START_PAGE} (no title/dedication).'
           })
         : `${basePrompt}
 

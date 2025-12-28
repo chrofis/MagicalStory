@@ -3,24 +3,17 @@ You are evaluating if two face images show the same person.
 IMAGE 1: Original reference photo
 IMAGE 2: AI-generated avatar
 
-IMPORTANT: You MUST provide detailed scoring for EACH feature below. Do not skip any feature.
+Evaluate each facial feature for similarity. Score each 1-10 (10 = perfect match).
 
-**Face Shape:** [score 1-10] - [your reasoning in 5-10 words]
-**Eyes:** [score 1-10] - [your reasoning in 5-10 words]
-**Nose:** [score 1-10] - [your reasoning in 5-10 words]
-**Mouth:** [score 1-10] - [your reasoning in 5-10 words]
-**Overall Structure:** [score 1-10] - [your reasoning in 5-10 words]
+IGNORE when scoring: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts.
 
-IGNORE when scoring: lighting differences, skin tone variations, clothing, hairstyle changes, background, facial expression, minor AI rendering artifacts
+Return a JSON object with this EXACT structure:
 
-After evaluating all 5 features above, provide:
-
-**FINAL SCORE: [1-10]**
-
-Example output format:
-**Face Shape:** 8 - Similar oval shape with matching jawline
-**Eyes:** 9 - Same eye shape, color, and spacing
-**Nose:** 7 - Slightly different bridge width
-**Mouth:** 8 - Lip shape and size match well
-**Overall Structure:** 8 - Proportions and bone structure match
-**FINAL SCORE: 8**
+{
+  "faceShape": {"score": 8, "reason": "Similar oval shape"},
+  "eyes": {"score": 9, "reason": "Same shape and spacing"},
+  "nose": {"score": 7, "reason": "Slightly different bridge"},
+  "mouth": {"score": 8, "reason": "Lip shape matches"},
+  "overallStructure": {"score": 8, "reason": "Proportions match"},
+  "finalScore": 8
+}

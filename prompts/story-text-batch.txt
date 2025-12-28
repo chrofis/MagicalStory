@@ -111,8 +111,6 @@ SECONDARY CHARACTER: [Name/Role]
 
 ---STORY TEXT---
 
-[If first batch: Title and dedication here, before Page 1]
-
 --- Page {START_PAGE} ---
 [Story text with vivid, unique characters]
 
