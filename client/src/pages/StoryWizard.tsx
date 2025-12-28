@@ -569,6 +569,28 @@ export default function StoryWizard() {
     }
   }, [storyTheme]);
 
+  // Clear story details (plot) when story category, topic, or theme changes
+  // This prevents stale plot from being used with a new category/topic selection
+  const prevCategoryRef = useRef(storyCategory);
+  const prevTopicRef = useRef(storyTopic);
+  const prevThemeRef = useRef(storyTheme);
+  useEffect(() => {
+    // Only clear if one of these actually changed (not on initial mount)
+    const categoryChanged = prevCategoryRef.current !== storyCategory && prevCategoryRef.current !== '';
+    const topicChanged = prevTopicRef.current !== storyTopic && prevTopicRef.current !== '';
+    const themeChanged = prevThemeRef.current !== storyTheme && prevThemeRef.current !== '';
+
+    if (categoryChanged || topicChanged || themeChanged) {
+      setStoryDetails('');
+      localStorage.removeItem('story_details');
+    }
+
+    // Update refs
+    prevCategoryRef.current = storyCategory;
+    prevTopicRef.current = storyTopic;
+    prevThemeRef.current = storyTheme;
+  }, [storyCategory, storyTopic, storyTheme]);
+
   useEffect(() => {
     localStorage.setItem('story_art_style', artStyle);
   }, [artStyle]);
@@ -1095,6 +1117,9 @@ export default function StoryWizard() {
       const result = await storyService.generateStoryIdeas({
         storyType,
         storyTypeName: getStoryTypeName(),
+        storyCategory: storyCategory || undefined,
+        storyTopic: storyTopic || undefined,
+        storyTheme: storyTheme || undefined,
         language: language as 'en' | 'de' | 'fr',
         languageLevel,
         characters: charactersInStory.map(c => ({
@@ -1242,6 +1267,9 @@ export default function StoryWizard() {
       const { jobId: newJobId } = await storyService.createStoryJob({
         storyType,
         storyTypeName: getStoryTypeName(),
+        storyCategory: storyCategory || undefined,
+        storyTopic: storyTopic || undefined,
+        storyTheme: storyTheme || undefined,
         artStyle,
         language: language as Language,
         languageLevel,

@@ -144,6 +144,9 @@ const schemas = {
     language: { type: 'string', maxLength: 50 },
     languageLevel: { type: 'string', maxLength: 50 },
     storyType: { type: 'string', maxLength: 100 },
+    storyCategory: { type: 'string', maxLength: 50 },
+    storyTopic: { type: 'string', maxLength: 200 },
+    storyTheme: { type: 'string', maxLength: 100 },
     artStyle: { type: 'string', maxLength: 50 },
     characters: { type: 'array', maxItems: 10 }
   }

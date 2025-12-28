@@ -541,6 +541,9 @@ export const storyService = {
   async generateStoryIdeas(data: {
     storyType: string;
     storyTypeName: string;
+    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
+    storyTopic?: string;
+    storyTheme?: string;
     language: 'en' | 'de' | 'fr';
     languageLevel: LanguageLevel;
     characters: Array<{
@@ -564,6 +567,9 @@ export const storyService = {
   async createStoryJob(data: {
     storyType: string;
     storyTypeName: string;
+    storyCategory?: 'adventure' | 'life-challenge' | 'educational';
+    storyTopic?: string;
+    storyTheme?: string;
     artStyle: string;
     language: Language;
     languageLevel: LanguageLevel;
@@ -598,6 +604,9 @@ export const storyService = {
       idempotencyKey,
       storyType: data.storyType,
       storyTypeName: data.storyTypeName,
+      storyCategory: data.storyCategory,
+      storyTopic: data.storyTopic,
+      storyTheme: data.storyTheme,
       artStyle: data.artStyle,
       language: data.language,
       languageLevel: data.languageLevel,

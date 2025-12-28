@@ -1546,10 +1546,10 @@ app.post('/api/gemini', aiProxyLimiter, authenticateToken, async (req, res) => {
 // Generate story ideas endpoint - FREE, no credits
 app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
   try {
-    const { storyType, storyTypeName, language, languageLevel, characters, relationships } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
-    log.debug(`  Story type: ${storyTypeName}, Language: ${language}, Characters: ${characters?.length || 0}`);
+    log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}`);
 
     // Build character descriptions
     const characterDescriptions = characters.map(c => {
@@ -1582,13 +1582,35 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
       'standard': 'Standard (7-9 year olds)'
     };
 
+    // Build category-specific instructions
+    let categoryInstructions = '';
+    const effectiveCategory = storyCategory || 'adventure';
+    const effectiveTheme = storyTheme || storyTypeName || 'adventure';
+
+    if (effectiveCategory === 'life-challenge') {
+      categoryInstructions = `IMPORTANT: This is a LIFE SKILLS story about "${storyTopic}".
+The story should help children understand and cope with this topic.
+Show the characters facing this challenge and learning to handle it.
+${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Keep the setting realistic and relatable.'}`;
+    } else if (effectiveCategory === 'educational') {
+      categoryInstructions = `IMPORTANT: This is an EDUCATIONAL story teaching about "${storyTopic}".
+Weave learning about ${storyTopic} naturally into the plot.
+Make the educational content fun and part of the adventure.
+${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Use everyday situations to explore the topic.'}`;
+    } else {
+      categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
+    }
+
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
-      .replace('{STORY_TYPE_NAME}', storyTypeName)
+      .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : 'Adventure')
+      .replace('{STORY_TYPE_NAME}', effectiveTheme)
+      .replace('{STORY_TOPIC}', storyTopic || 'None')
       .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
       .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
       .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
+      .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
       .replace('{LANGUAGE_INSTRUCTION}', langInstructions[language] || langInstructions['en']);
 
     // Call the text model (using the imported function)
