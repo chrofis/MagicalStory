@@ -83,6 +83,7 @@ function AvatarPromptDisplay({ category, gender, physical }: {
         // Always fetch with traits (that's the default generation mode now)
         let url = `/api/avatar-prompt?category=${category}&gender=${gender || 'male'}&withTraits=true`;
         if (physical) {
+          if (physical.build) url += `&build=${encodeURIComponent(physical.build)}`;
           if (physical.hair) url += `&hair=${encodeURIComponent(physical.hair)}`;
           if (physical.face) url += `&face=${encodeURIComponent(physical.face)}`;
           if (physical.other) url += `&other=${encodeURIComponent(physical.other)}`;
