@@ -255,6 +255,8 @@ interface StoryDisplayProps {
   // Story text editing
   originalStory?: string;
   onSaveStoryText?: (text: string) => Promise<void>;
+  // Title editing
+  onSaveTitleChange?: (title: string) => Promise<void>;
   // Image regeneration with credits
   userCredits?: number;
   imageRegenerationCost?: number;
@@ -299,6 +301,8 @@ export function StoryDisplay({
   // Story text editing
   originalStory,
   onSaveStoryText,
+  // Title editing
+  onSaveTitleChange,
   // Image regeneration with credits
   userCredits = 0,
   imageRegenerationCost = 5,
@@ -320,6 +324,11 @@ export function StoryDisplay({
   const [editedStory, setEditedStory] = useState(story);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Title editing state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(title || '');
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+
   // Image history modal state
   const [imageHistoryModal, setImageHistoryModal] = useState<{ pageNumber: number; versions: ImageVersion[] } | null>(null);
 
@@ -340,6 +349,13 @@ export function StoryDisplay({
     }
   }, [story, isEditMode]);
 
+  // Update edited title when title prop changes
+  useEffect(() => {
+    if (!isEditingTitle) {
+      setEditedTitle(title || '');
+    }
+  }, [title, isEditingTitle]);
+
   // Handle save story text
   const handleSaveStory = async () => {
     if (!onSaveStoryText) return;
@@ -351,6 +367,20 @@ export function StoryDisplay({
       console.error('Failed to save story text:', err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Handle save title
+  const handleSaveTitle = async () => {
+    if (!onSaveTitleChange || !editedTitle.trim()) return;
+    setIsSavingTitle(true);
+    try {
+      await onSaveTitleChange(editedTitle.trim());
+      setIsEditingTitle(false);
+    } catch (err) {
+      console.error('Failed to save title:', err);
+    } finally {
+      setIsSavingTitle(false);
     }
   };
 
@@ -610,9 +640,60 @@ export function StoryDisplay({
   return (
     <div className="space-y-6">
       {/* Story Title */}
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 text-center">
-        {title || t.yourStory}
-      </h1>
+      <div className="flex items-center justify-center gap-2">
+        {isEditingTitle ? (
+          <div className="flex items-center gap-2 w-full max-w-2xl">
+            <input
+              type="text"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              className="flex-1 text-2xl md:text-3xl font-bold text-gray-800 text-center border-2 border-indigo-300 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveTitle();
+                if (e.key === 'Escape') {
+                  setEditedTitle(title || '');
+                  setIsEditingTitle(false);
+                }
+              }}
+            />
+            <button
+              onClick={handleSaveTitle}
+              disabled={isSavingTitle || !editedTitle.trim()}
+              className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+              title={language === 'de' ? 'Speichern' : language === 'fr' ? 'Sauvegarder' : 'Save'}
+            >
+              {isSavingTitle ? <Loader className="animate-spin" size={20} /> : <Save size={20} />}
+            </button>
+            <button
+              onClick={() => {
+                setEditedTitle(title || '');
+                setIsEditingTitle(false);
+              }}
+              disabled={isSavingTitle}
+              className="p-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              title={language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+            >
+              <X size={20} />
+            </button>
+          </div>
+        ) : (
+          <>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 text-center">
+              {title || t.yourStory}
+            </h1>
+            {onSaveTitleChange && !isGenerating && (
+              <button
+                onClick={() => setIsEditingTitle(true)}
+                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                title={language === 'de' ? 'Titel bearbeiten' : language === 'fr' ? 'Modifier le titre' : 'Edit title'}
+              >
+                <Edit3 size={18} />
+              </button>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Partial Story Warning Banner */}
       {isPartial && (

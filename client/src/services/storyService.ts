@@ -837,6 +837,20 @@ export const storyService = {
     return response;
   },
 
+  // Save story title
+  async saveStoryTitle(storyId: string, title: string): Promise<{
+    success: boolean;
+    message: string;
+    title: string;
+  }> {
+    const response = await api.put<{
+      success: boolean;
+      message: string;
+      title: string;
+    }>(`/api/stories/${storyId}/title`, { title });
+    return response;
+  },
+
   // Select which image version is active
   async setActiveImage(storyId: string, pageNumber: number, versionIndex: number): Promise<{
     success: boolean;

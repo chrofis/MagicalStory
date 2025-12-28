@@ -1643,9 +1643,18 @@ Keep everything outside the masked area exactly the same. Maintain the same art 
     if (referenceImages.length > 0) {
       parts.push({ text: '[REFERENCE IMAGES - match clothing/colors to these]:' });
       for (const ref of referenceImages) {
-        // Handle different reference image formats (object with photoData or direct base64)
-        const photoData = ref.photoData || ref;
-        if (photoData) {
+        // Handle multiple formats:
+        // 1. Direct base64 string: "data:image/..."
+        // 2. Object with photoUrl: {name, photoUrl, ...}
+        // 3. Object with photoData: {photoData, ...}
+        let photoData = null;
+        if (typeof ref === 'string' && ref.startsWith('data:image')) {
+          photoData = ref;
+        } else if (typeof ref === 'object') {
+          photoData = ref.photoUrl || ref.photoData;
+        }
+
+        if (photoData && typeof photoData === 'string' && photoData.startsWith('data:image')) {
           const refBase64 = photoData.replace(/^data:image\/\w+;base64,/, '');
           const refMimeType = photoData.match(/^data:(image\/\w+);base64,/) ?
             photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';

@@ -2021,6 +2021,18 @@ export default function StoryWizard() {
                   throw error; // Re-throw so StoryDisplay can show error
                 }
               } : undefined}
+              // Title editing
+              onSaveTitleChange={storyId ? async (newTitle: string) => {
+                try {
+                  log.info('Saving title for story:', storyId, newTitle);
+                  await storyService.saveStoryTitle(storyId, newTitle);
+                  setStoryTitle(newTitle);
+                  log.info('Title saved successfully');
+                } catch (error) {
+                  log.error('Failed to save title:', error);
+                  throw error;
+                }
+              } : undefined}
               // Image regeneration with credits
               userCredits={user?.credits || 0}
               imageRegenerationCost={5}

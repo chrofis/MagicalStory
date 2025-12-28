@@ -431,6 +431,66 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/stories/:id/title - Update story title
+router.put('/:id/title', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json({ error: 'title is required' });
+    }
+
+    console.log(`📝 PUT /api/stories/${id}/title - Saving title (user: ${req.user.username})`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Handle impersonation similar to text endpoint
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery(
+        'SELECT data, user_id FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery(
+        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = JSON.parse(rows[0].data);
+
+    // Update title
+    storyData.title = title.trim();
+    storyData.updatedAt = new Date().toISOString();
+
+    await dbQuery('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+
+    console.log(`✅ Story title updated for ${id}: "${title.trim()}"`);
+    await logActivity(req.user.id, req.user.username, 'STORY_TITLE_EDITED', { storyId: id, newTitle: title.trim() });
+
+    res.json({
+      success: true,
+      message: 'Story title saved successfully',
+      title: title.trim()
+    });
+
+  } catch (err) {
+    console.error('Error saving story title:', err);
+    res.status(500).json({ error: 'Failed to save story title: ' + err.message });
+  }
+});
+
 // PUT /api/stories/:id/pages/:pageNumber/active-image - Select which image version is active
 router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req, res) => {
   try {
