@@ -444,6 +444,12 @@ export function CharacterForm({
                 placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
                 onChange={(v) => updatePhysical('other', v)}
               />
+              <InlineEditField
+                label={language === 'de' ? 'Kleidungsstil' : language === 'fr' ? 'Style vestimentaire' : 'Clothing Style'}
+                value={character.clothing?.style || ''}
+                placeholder={language === 'de' ? 'z.B. schwarz mit Dino-Muster' : 'e.g. black with dinosaur print'}
+                onChange={updateClothingStyle}
+              />
             </div>
           </details>
         </div>
@@ -541,16 +547,6 @@ export function CharacterForm({
           </div>
         </div>
       )}
-
-      {/* Clothing Style field */}
-      <div className="text-xs">
-        <InlineEditField
-          label={language === 'de' ? 'Kleidungsstil' : language === 'fr' ? 'Style vestimentaire' : 'Clothing Style'}
-          value={character.clothing?.style || ''}
-          placeholder={language === 'de' ? 'z.B. schwarz mit Dino-Muster' : 'e.g. black with dinosaur print'}
-          onChange={updateClothingStyle}
-        />
-      </div>
 
       {/* Clothing Avatars (developer only - all 4 variants) */}
       {developerMode && (
