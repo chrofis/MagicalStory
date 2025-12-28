@@ -208,14 +208,14 @@ export default function BookBuilder() {
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);
-      showToast(
-        language === 'de'
+      showToast({
+        message: language === 'de'
           ? 'Checkout fehlgeschlagen. Bitte versuche es erneut.'
           : language === 'fr'
           ? 'Échec du paiement. Veuillez réessayer.'
           : 'Checkout failed. Please try again.',
-        'error'
-      );
+        variant: 'error'
+      });
     } finally {
       setIsCheckingOut(false);
     }
@@ -266,14 +266,14 @@ export default function BookBuilder() {
     } catch (error) {
       log.error('Failed to download print PDF:', error);
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      showToast(
-        language === 'de'
+      showToast({
+        message: language === 'de'
           ? `PDF konnte nicht heruntergeladen werden: ${errorMsg}`
           : language === 'fr'
           ? `Impossible de télécharger le PDF: ${errorMsg}`
           : `Failed to download PDF: ${errorMsg}`,
-        'error'
-      );
+        variant: 'error'
+      });
     } finally {
       setIsPrintingPdf(false);
     }
