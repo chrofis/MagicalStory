@@ -103,6 +103,7 @@ export default function StoryWizard() {
   const relationshipsInitialized = useRef<string | null>(null);
   const dataLoadedFromApi = useRef(false);
   const relationshipsDirty = useRef(false); // Track if relationships were modified
+  const [initialCharacterLoadDone, setInitialCharacterLoadDone] = useState(false); // Track if initial API load completed
 
   // Step 4: Story Settings - load from localStorage
   const [mainCharacters, setMainCharacters] = useState<number[]>(() => {
@@ -483,20 +484,25 @@ export default function StoryWizard() {
         log.error('Failed to load character data:', error);
       } finally {
         setIsLoading(false);
+        setInitialCharacterLoadDone(true); // Mark that we've attempted to load characters
       }
     };
 
     if (isAuthenticated) {
       loadCharacterData();
+    } else if (!isAuthLoading) {
+      // Not authenticated and auth is done loading - mark as done (no characters to load)
+      setInitialCharacterLoadDone(true);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isAuthLoading]);
 
   // Auto-start character creation when entering step 2 with no characters
+  // Wait for initial load to complete to avoid creating blank characters on refresh
   useEffect(() => {
-    if (step === 2 && characters.length === 0 && !currentCharacter && !isLoading) {
+    if (step === 2 && characters.length === 0 && !currentCharacter && !isLoading && initialCharacterLoadDone) {
       startNewCharacter();
     }
-  }, [step, characters.length, currentCharacter, isLoading]);
+  }, [step, characters.length, currentCharacter, isLoading, initialCharacterLoadDone]);
 
   // Note: Relationships are now saved with characters to the API, not localStorage
 
