@@ -1253,17 +1253,21 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         );
 
         if (repairResult.repaired && repairResult.imageData !== result.imageData) {
+          // Verify images are actually different by comparing hashes
+          const originalHash = hashImageData(result.imageData);
+          const repairedHash = hashImageData(repairResult.imageData);
           log.info(`✅ [QUALITY RETRY] ${pageLabel}Auto-repair completed, re-evaluating quality...`);
+          log.debug(`🔍 [QUALITY RETRY] ${pageLabel}Image hash: original=${originalHash}, repaired=${repairedHash}, different=${originalHash !== repairedHash}`);
 
           // Track usage from repair
           if (usageTracker && repairResult.usage) {
             usageTracker(repairResult.usage, null, repairResult.modelId, null);
           }
 
-          // Re-evaluate the repaired image
+          // Re-evaluate the repaired image (NOT the original!)
           const qualityModelOverride = modelOverrides?.qualityModel || null;
           const reEvalResult = await evaluateImageQuality(
-            repairResult.imageData,
+            repairResult.imageData,  // IMPORTANT: Use repaired image, not result.imageData
             currentPrompt,
             characterPhotos,
             evaluationType,
