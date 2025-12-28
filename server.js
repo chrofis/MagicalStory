@@ -6962,25 +6962,11 @@ async function processStoryJob(jobId) {
     // Save checkpoint: scene hints and visual bible
     await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions, visualBible });
 
-    // Extract title from outline (for cover generation that starts in parallel)
-    // The outline format is typically:
-    // # Title (or # Titel in German, # Titre in French)
-    // **Actual Title Here** or Title: Actual Title Here
-    let storyTitle = inputData.title || 'My Story';
-    // Try multiple patterns (supporting English, German, French):
-    // 1. "# Title\n**Actual Title**" - bold on next line
-    // 2. "# Title\nTitle: Actual Title" - "Title:" prefix on next line
-    // 3. "# Title\nActual Title" - plain text on next line (not "# " or "---")
-    // 4. "TITLE: Actual Title" - inline format
-    const titleHeaderPattern = /^#{1,2}\s*(?:Title|Titel|Titre)\s*\n+/im;
-    const boldTitleMatch = outline.match(new RegExp(titleHeaderPattern.source + '\\*\\*(.+?)\\*\\*', 'im'));
-    const prefixTitleMatch = outline.match(new RegExp(titleHeaderPattern.source + '(?:Title|Titel|Titre):\\s*(.+?)$', 'im'));
-    const plainTitleMatch = outline.match(new RegExp(titleHeaderPattern.source + '([^#\\-\\n].+?)$', 'im'));
-    const inlineTitleMatch = outline.match(/(?:TITLE|TITEL|TITRE):\s*(.+)/i);
-
-    const titleMatch = boldTitleMatch || prefixTitleMatch || plainTitleMatch || inlineTitleMatch;
-    if (titleMatch) {
-      storyTitle = titleMatch[1].trim();
+    // Extract title from outline using unified OutlineParser
+    const outlineParser = new OutlineParser(outline);
+    const extractedTitle = outlineParser.extractTitle();
+    let storyTitle = extractedTitle || inputData.title || 'My Story';
+    if (extractedTitle) {
       log.debug(`📖 [PIPELINE] Extracted title from outline: "${storyTitle}"`);
     }
 

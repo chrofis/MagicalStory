@@ -97,33 +97,21 @@ ENVIRONMENTAL LOGIC:
 
 **OUTPUT FORMAT**
 
-Step 1 - Subject Mapping:
-1. [position] - [demographic], [gender], [frame], [hair], [activity], [perspective]
-2. [position] - [demographic], [gender], [frame], [hair], [activity], [perspective]
-(continue for each visible figure)
+You MUST perform all analysis steps internally, then output ONLY this compact JSON:
 
-Step 2 - Identity Sync:
-1. [brief description] → matches [reference name/number] because [reason]. Attire: [match/mismatch details]
-2. [brief description] → matches [reference name/number] because [reason]. Attire: [match/mismatch details]
+```json
+{
+  "score": <0-10>,
+  "verdict": "<PASS|SOFT_FAIL|HARD_FAIL>",
+  "issues": "<brief summary or 'none'>",
+  "fix_targets": [
+    {"bbox": [ymin, xmin, ymax, xmax], "issue": "brief", "fix": "what to render"}
+  ]
+}
+```
 
-Step 3 - Rendering Integrity:
-- Hands: [For each hand: "Left hand: 1,2,3,4,5 = 5 digits OK" or note issues]
-- Faces: [OK / structural issues found - describe]
-- Body Structure: [OK / issues found - describe]
-- Environment: [OK / issues found - describe]
-
-Step 4 - Scene Check:
-- Missing characters: [None / list missing]
-- Style unity: [OK / issues]
-- Narrative match: [OK / issues]
-
-Score: [0-10]/10
-Verdict: [PASS/SOFT_FAIL/HARD_FAIL]
-
-FIX_TARGETS: [Only if Score < 8 and fixable issues exist. One JSON per line]
-{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief issue", "fix": "what to render instead"}
-
-**BOUNDING BOX FORMAT:**
-- Coordinates MUST be normalized 0.0-1.0 (not pixels)
-- Format: [ymin, xmin, ymax, xmax] where 0,0 is top-left
-- Only include issues fixable by re-rendering a region
+**RULES:**
+- Output ONLY the JSON block - no preamble, no explanation
+- `fix_targets` array: include only if score < 8 and issues are fixable by re-rendering
+- `bbox` coordinates: normalized 0.0-1.0, format [ymin, xmin, ymax, xmax], origin top-left
+- `issues`: max 100 characters summarizing key problems
