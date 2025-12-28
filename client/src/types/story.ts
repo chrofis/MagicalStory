@@ -9,6 +9,41 @@ export interface StoryType {
   emoji: string;
 }
 
+// Story category (Adventure, Life Challenge, Educational)
+export interface StoryCategory {
+  id: 'adventure' | 'life-challenge' | 'educational';
+  name: LocalizedString;
+  description: LocalizedString;
+  emoji: string;
+}
+
+// Life challenge topic
+export interface LifeChallenge {
+  id: string;
+  name: LocalizedString;
+  emoji: string;
+  ageGroup: 'toddler' | 'preschool' | 'early-school' | 'family' | 'preteen';
+}
+
+export interface LifeChallengeGroup {
+  id: string;
+  name: LocalizedString;
+  ageRange: string;
+}
+
+// Educational topic
+export interface EducationalTopic {
+  id: string;
+  name: LocalizedString;
+  emoji: string;
+  group: 'letters' | 'numbers' | 'colors' | 'science' | 'animals' | 'body' | 'time' | 'geography' | 'arts';
+}
+
+export interface EducationalGroup {
+  id: string;
+  name: LocalizedString;
+}
+
 export interface ArtStyle {
   id: string;
   name: LocalizedString;
@@ -26,9 +61,19 @@ export interface SceneDescription {
   textModelId?: string;     // Text model used to generate the scene description
 }
 
+export interface EvaluationData {
+  score: number;
+  reasoning: string;
+  fixTargets?: Array<{
+    boundingBox: number[];
+    issue: string;
+    fixPrompt: string;
+  }>;
+}
+
 export interface RetryAttempt {
   attempt: number;
-  type: 'generation' | 'text_edit' | 'text_edit_failed';
+  type: 'generation' | 'text_edit' | 'text_edit_failed' | 'auto_repair' | 'auto_repair_failed';
   imageData?: string;
   score?: number;
   reasoning?: string;
@@ -37,6 +82,13 @@ export interface RetryAttempt {
   actualText?: string | null;
   error?: string;
   timestamp: string;
+  // Auto-repair specific fields
+  preRepairScore?: number;
+  postRepairScore?: number;
+  fixTargetsCount?: number;
+  preRepairEval?: EvaluationData;
+  postRepairEval?: EvaluationData;
+  repairDetails?: RepairAttempt[];
 }
 
 export interface RepairAttempt {
@@ -136,7 +188,11 @@ export interface TokenUsage {
 export interface SavedStory {
   id: string;
   title: string;
-  storyType: string;
+  storyType: string;  // Legacy: adventure theme (pirate, knight, etc.)
+  // New story structure
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational';  // What kind of story
+  storyTopic?: string;  // Life challenge or educational topic ID
+  storyTheme?: string;  // Adventure theme wrapper (or 'realistic' for no wrapper)
   artStyle: string;
   language: Language;
   languageLevel: LanguageLevel;

@@ -19,9 +19,15 @@ Your task is to create a compelling, well-structured story outline that will gui
 - **Length**: {PAGES} pages
 - **Language**: {LANGUAGE} (NOTE: If German, use Swiss Standard German spelling (Schweizer Hochdeutsch): use ä, ö, ü normally, but use "ss" instead of "ß". Use standard German vocabulary, not Swiss dialect words.)
 - **Reading Level**: {READING_LEVEL}
-- **Story Type**: {STORY_TYPE}
+- **Story Category**: {STORY_CATEGORY}
+- **Story Theme/Setting**: {STORY_TYPE}
+- **Story Topic**: {STORY_TOPIC}
 - **Story Details**: {STORY_DETAILS}
 - **Characters**: {CHARACTERS}
+
+# Story Category Guidelines
+
+{CATEGORY_GUIDELINES}
 
 # TEXT LENGTH RULES - CRITICAL
 

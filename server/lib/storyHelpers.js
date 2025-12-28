@@ -616,6 +616,44 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   // Extract character names for Visual Bible exclusion warning
   const characterNames = characterSummary.map(c => c.name).join(', ');
 
+  // Determine story category and build category-specific guidelines
+  const storyCategory = inputData.storyCategory || 'adventure';
+  const storyTopic = inputData.storyTopic || '';
+  const storyTheme = inputData.storyTheme || inputData.storyType || 'adventure';
+
+  let categoryGuidelines = '';
+  if (storyCategory === 'life-challenge') {
+    categoryGuidelines = `This is a LIFE SKILLS story about "${storyTopic}".
+
+**IMPORTANT GUIDELINES for Life Skills Stories:**
+- The story should help children understand and cope with the topic: ${storyTopic}
+- Show the main character(s) facing this challenge naturally within the story
+- Provide positive, age-appropriate messages about handling this situation
+- Include practical tips or coping strategies woven into the narrative
+- End with a hopeful, empowering message
+- Avoid being preachy - let the lesson emerge naturally from the story
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - integrate the life lesson into this theme creatively` : '- This is a realistic story set in everyday life situations'}`;
+  } else if (storyCategory === 'educational') {
+    categoryGuidelines = `This is an EDUCATIONAL story teaching about "${storyTopic}".
+
+**IMPORTANT GUIDELINES for Educational Stories:**
+- The story should teach children about: ${storyTopic}
+- Weave the educational content naturally into an engaging narrative
+- Include accurate, age-appropriate information about the topic
+- Use repetition and reinforcement to help children learn
+- Make the learning fun and memorable through story elements
+- Include moments where characters discover or apply what they're learning
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - make learning part of the adventure` : '- Use everyday situations to explore the educational topic'}`;
+  } else {
+    categoryGuidelines = `This is an ADVENTURE story with a ${storyTheme || inputData.storyType || 'adventure'} theme.
+
+**IMPORTANT GUIDELINES for Adventure Stories:**
+- Create an exciting, engaging adventure appropriate for the age group
+- Include elements typical of the ${storyTheme || inputData.storyType || 'adventure'} theme
+- Balance action and excitement with character development
+- Include challenges that the characters must overcome`;
+  }
+
   // Use template if available, otherwise fall back to hardcoded prompt
   if (PROMPT_TEMPLATES.outline) {
     const prompt = fillTemplate(PROMPT_TEMPLATES.outline, {
@@ -627,7 +665,10 @@ function buildStoryPrompt(inputData, sceneCount = null) {
       READING_LEVEL: readingLevel,
       CHARACTERS: JSON.stringify(characterSummary),
       CHARACTER_NAMES: characterNames,  // For Visual Bible exclusion warning
-      STORY_TYPE: inputData.storyType || 'adventure',
+      STORY_CATEGORY: storyCategory,
+      STORY_TYPE: storyTheme || inputData.storyType || 'adventure',
+      STORY_TOPIC: storyTopic || 'None',
+      CATEGORY_GUIDELINES: categoryGuidelines,
       STORY_DETAILS: inputData.storyDetails || 'None',
       DEDICATION: inputData.dedication || 'None'
     });

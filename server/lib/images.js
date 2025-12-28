@@ -1145,7 +1145,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Distinguish between: eval returned null/failed vs eval returned a score
     // When score is null, the image was generated fine but quality eval was blocked
     const evalWasBlocked = result.score === null || result.score === undefined;
-    const score = evalWasBlocked ? null : result.score;
+    let score = evalWasBlocked ? null : result.score;
 
     if (evalWasBlocked) {
       log.debug(`⭐ [QUALITY RETRY] Attempt ${attempts}: quality eval was blocked/failed`);
@@ -1246,7 +1246,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
             }
 
-            // Record repair attempt in history with usage
+            // Record repair attempt in history with full evaluation data
             retryHistory.push({
               attempt: attempts,
               type: 'auto_repair',
@@ -1256,6 +1256,19 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               imageData: repairResult.imageData,
               repairUsage: repairResult.usage,
               reEvalUsage: reEvalResult.usage,
+              // Full evaluation data for dev mode
+              preRepairEval: {
+                score: result.score,
+                reasoning: result.reasoning,
+                fixTargets: result.fixTargets
+              },
+              postRepairEval: {
+                score: reEvalResult.score,
+                reasoning: reEvalResult.reasoning,
+                fixTargets: reEvalResult.fixTargets
+              },
+              // Repair details from autoRepairWithTargets
+              repairDetails: repairResult.repairHistory || [],
               timestamp: new Date().toISOString()
             });
 
@@ -1267,7 +1280,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
                 score: repairedScore,
                 reasoning: reEvalResult.reasoning,
                 wasRepaired: true,
-                fixTargets: reEvalResult.fixTargets || []  // Use new fix targets from re-eval
+                fixTargets: reEvalResult.fixTargets || [],  // Use new fix targets from re-eval
+                repairHistory: repairResult.repairHistory || []  // Include repair details
               };
               score = repairedScore;  // Update score for threshold check
               log.info(`✅ [QUALITY RETRY] Using repaired image (score improved from ${retryHistory[retryHistory.length - 1].preRepairScore}% to ${score}%)`);

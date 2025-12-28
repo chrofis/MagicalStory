@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles, Users } from 'lucide-react';
 
 // Components
 import { Button, LoadingSpinner, Navigation } from '@/components/common';
-import { StoryTypeSelector, ArtStyleSelector, RelationshipEditor, StorySettings } from '@/components/story';
+import { StoryCategorySelector, ArtStyleSelector, RelationshipEditor, StorySettings } from '@/components/story';
 import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
 import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
 import type { ModelSelections } from '@/components/generation';
@@ -82,10 +82,19 @@ export default function StoryWizard() {
   const [storyType, setStoryType] = useState(() => {
     return localStorage.getItem('story_type') || '';
   });
+  // New story category system
+  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | ''>(() => {
+    return (localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | '';
+  });
+  const [storyTopic, setStoryTopic] = useState(() => {
+    return localStorage.getItem('story_topic') || '';
+  });
+  const [storyTheme, setStoryTheme] = useState(() => {
+    return localStorage.getItem('story_theme') || '';
+  });
   const [artStyle, setArtStyle] = useState(() => {
     return localStorage.getItem('story_art_style') || 'pixar';
   });
-  const [customStoryTypes, setCustomStoryTypes] = useState<Array<{ id: string; name: { en: string; de: string; fr: string }; emoji: string }>>([]);
 
   // Step 2: Characters
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -537,6 +546,30 @@ export default function StoryWizard() {
   }, [storyType]);
 
   useEffect(() => {
+    if (storyCategory) {
+      localStorage.setItem('story_category', storyCategory);
+    } else {
+      localStorage.removeItem('story_category');
+    }
+  }, [storyCategory]);
+
+  useEffect(() => {
+    if (storyTopic) {
+      localStorage.setItem('story_topic', storyTopic);
+    } else {
+      localStorage.removeItem('story_topic');
+    }
+  }, [storyTopic]);
+
+  useEffect(() => {
+    if (storyTheme) {
+      localStorage.setItem('story_theme', storyTheme);
+    } else {
+      localStorage.removeItem('story_theme');
+    }
+  }, [storyTheme]);
+
+  useEffect(() => {
     localStorage.setItem('story_art_style', artStyle);
   }, [artStyle]);
 
@@ -953,30 +986,6 @@ export default function StoryWizard() {
     setCustomRelationships(prev => [...prev, relationship]);
   };
 
-  // Add custom story type
-  const addCustomStoryType = () => {
-    const promptMsg = language === 'de' ? 'Name des Story-Typs eingeben:' :
-                     language === 'fr' ? 'Entrez le nom du type d\'histoire:' :
-                     'Enter story type name:';
-    const name = prompt(promptMsg);
-    if (name) {
-      const newType = {
-        id: `custom-${Date.now()}`,
-        name: { en: name, de: name, fr: name },
-        emoji: '✨',
-      };
-      setCustomStoryTypes(prev => [...prev, newType]);
-      setStoryType(newType.id);
-      // Auto-scroll to art style selection
-      setTimeout(() => {
-        const artStyleSection = document.getElementById('art-style-section');
-        if (artStyleSection) {
-          artStyleSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 100);
-    }
-  };
-
   // Character role change handler (out/in/main)
   const handleCharacterRoleChange = (charId: number, role: 'out' | 'in' | 'main') => {
     if (role === 'out') {
@@ -1021,7 +1030,15 @@ export default function StoryWizard() {
   };
 
   const canGoNext = (): boolean => {
-    if (step === 1) return storyType !== '';
+    if (step === 1) {
+      // Must have category, and for adventure need theme, for others need topic
+      if (!storyCategory) return false;
+      if (storyCategory === 'adventure' && !storyTheme) return false;
+      if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && !storyTopic) return false;
+      // Also need art style
+      if (!artStyle) return false;
+      return true;
+    }
     if (step === 2) return characters.length > 0;
     if (step === 3) return areAllRelationshipsDefined();
     // Step 4: At least one character, at least one main character, and story details required
@@ -1118,9 +1135,6 @@ export default function StoryWizard() {
 
   // Get story type name for display
   const getStoryTypeName = () => {
-    // Check custom types first
-    const customType = customStoryTypes.find(t => t.id === storyType);
-    if (customType) return customType.name[language as keyof typeof customType.name];
     // Check built-in types
     const builtInType = storyTypes.find(t => t.id === storyType);
     if (builtInType) return builtInType.name[language as keyof typeof builtInType.name];
@@ -1487,32 +1501,34 @@ export default function StoryWizard() {
   // Render current step content
   const renderStep = () => {
     switch (step) {
-      case 1:
+      case 1: {
+        // Determine if story selection is complete (ready to show art style)
+        const isStorySelectionComplete =
+          (storyCategory === 'adventure' && storyTheme) ||
+          ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic);
+
         return (
           <div className="space-y-6">
-            <StoryTypeSelector
-              selectedType={storyType}
-              onSelect={(id) => {
-                setStoryType(id);
-                // Auto-scroll to art style selection
-                setTimeout(() => {
-                  const artStyleSection = document.getElementById('art-style-section');
-                  if (artStyleSection) {
-                    artStyleSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }, 100);
-              }}
-              customTypes={customStoryTypes}
-              onAddCustom={addCustomStoryType}
+            <StoryCategorySelector
+              storyCategory={storyCategory}
+              storyTopic={storyTopic}
+              storyTheme={storyTheme}
+              onCategoryChange={(cat) => setStoryCategory(cat)}
+              onTopicChange={setStoryTopic}
+              onThemeChange={setStoryTheme}
+              onLegacyStoryTypeChange={setStoryType}
             />
-            {storyType && (
-              <ArtStyleSelector
-                selectedStyle={artStyle}
-                onSelect={setArtStyle}
-              />
+            {isStorySelectionComplete && (
+              <div id="art-style-section">
+                <ArtStyleSelector
+                  selectedStyle={artStyle}
+                  onSelect={setArtStyle}
+                />
+              </div>
             )}
           </div>
         );
+      }
 
       case 2:
         if (currentCharacter) {
@@ -1917,6 +1933,9 @@ export default function StoryWizard() {
 
                 // Reset story settings to defaults
                 setStoryType('');
+                setStoryCategory('' as any);
+                setStoryTopic('');
+                setStoryTheme('');
                 setArtStyle('pixar');
                 setLanguageLevel('standard');
                 setPages(30);
@@ -1926,6 +1945,9 @@ export default function StoryWizard() {
 
                 // Clear localStorage for story settings
                 localStorage.removeItem('story_type');
+                localStorage.removeItem('story_category');
+                localStorage.removeItem('story_topic');
+                localStorage.removeItem('story_theme');
                 localStorage.removeItem('story_art_style');
                 localStorage.removeItem('story_language_level');
                 localStorage.removeItem('story_pages');

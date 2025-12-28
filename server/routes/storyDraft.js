@@ -16,6 +16,9 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     let draftData = {
       storyType: '',
+      storyCategory: '',
+      storyTopic: '',
+      storyTheme: '',
       artStyle: 'pixar',
       storyDetails: '',
       dedication: '',
@@ -45,10 +48,13 @@ router.get('/', authenticateToken, async (req, res) => {
 // POST /api/story-draft - Save user's story draft
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { storyType, artStyle, storyDetails, dedication, pages, languageLevel, mainCharacters } = req.body;
+    const { storyType, storyCategory, storyTopic, storyTheme, artStyle, storyDetails, dedication, pages, languageLevel, mainCharacters } = req.body;
 
     const draftData = {
       storyType: storyType || '',
+      storyCategory: storyCategory || '',
+      storyTopic: storyTopic || '',
+      storyTheme: storyTheme || '',
       artStyle: artStyle || 'pixar',
       storyDetails: storyDetails || '',
       dedication: dedication || '',

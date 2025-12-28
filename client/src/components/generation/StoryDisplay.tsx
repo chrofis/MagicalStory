@@ -31,24 +31,45 @@ function RetryHistoryDisplay({
       <div className="mt-3 space-y-3">
         {retryHistory.map((attempt, idx) => (
           <div key={idx} className={`border rounded-lg p-3 ${
+            attempt.type === 'auto_repair' ? 'bg-amber-50 border-amber-300' :
             idx === retryHistory.length - 1
               ? 'bg-green-50 border-green-300'
               : 'bg-white border-gray-200'
           }`}>
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold text-sm">
-                {language === 'de' ? `Versuch ${attempt.attempt}` : language === 'fr' ? `Tentative ${attempt.attempt}` : `Attempt ${attempt.attempt}`}
+                {attempt.type === 'auto_repair' ? (
+                  <span className="text-amber-700">🔧 Auto-Repair</span>
+                ) : (
+                  <>
+                    {language === 'de' ? `Versuch ${attempt.attempt}` : language === 'fr' ? `Tentative ${attempt.attempt}` : `Attempt ${attempt.attempt}`}
+                  </>
+                )}
                 {attempt.type === 'text_edit' && (
                   <span className="text-xs ml-2 text-blue-600">(text edit)</span>
                 )}
                 {attempt.type === 'text_edit_failed' && (
                   <span className="text-xs ml-2 text-red-600">(text edit failed)</span>
                 )}
-                {idx === retryHistory.length - 1 && (
+                {attempt.type === 'auto_repair_failed' && (
+                  <span className="text-xs ml-2 text-red-600">(auto-repair failed)</span>
+                )}
+                {idx === retryHistory.length - 1 && attempt.type !== 'auto_repair' && (
                   <span className="text-xs ml-2 text-green-600 font-bold">✓ USED</span>
                 )}
               </span>
-              {attempt.score !== undefined && (
+              {/* Show score change for auto-repair */}
+              {attempt.type === 'auto_repair' && attempt.preRepairScore !== undefined && attempt.postRepairScore !== undefined ? (
+                <span className="font-bold text-sm">
+                  <span className={attempt.preRepairScore >= 70 ? 'text-green-600' : attempt.preRepairScore >= 50 ? 'text-yellow-600' : 'text-red-600'}>
+                    {attempt.preRepairScore}%
+                  </span>
+                  <span className="text-gray-400 mx-1">→</span>
+                  <span className={attempt.postRepairScore >= 70 ? 'text-green-600' : attempt.postRepairScore >= 50 ? 'text-yellow-600' : 'text-red-600'}>
+                    {attempt.postRepairScore}%
+                  </span>
+                </span>
+              ) : attempt.score !== undefined && (
                 <span className={`font-bold ${
                   attempt.score >= 70 ? 'text-green-600' :
                   attempt.score >= 50 ? 'text-yellow-600' :
@@ -71,18 +92,91 @@ function RetryHistoryDisplay({
               </div>
             )}
 
-            {attempt.reasoning ? (
+            {/* Auto-repair specific display */}
+            {attempt.type === 'auto_repair' && (
+              <div className="space-y-2">
+                {/* Fix targets count */}
+                {attempt.fixTargetsCount && (
+                  <div className="text-xs text-amber-700">
+                    Fixed {attempt.fixTargetsCount} target{attempt.fixTargetsCount > 1 ? 's' : ''}
+                  </div>
+                )}
+
+                {/* Before/After Evaluations */}
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-amber-700 font-medium">
+                    📊 {language === 'de' ? 'Bewertungen anzeigen' : 'View Evaluations'}
+                  </summary>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {/* Before evaluation */}
+                    <div className="bg-white p-2 rounded border border-red-200">
+                      <div className="font-medium text-red-700 mb-1">Before ({attempt.preRepairScore}%)</div>
+                      <pre className="text-[10px] whitespace-pre-wrap overflow-auto max-h-40 bg-gray-50 p-1 rounded">
+                        {attempt.preRepairEval ? JSON.stringify(attempt.preRepairEval, null, 2) : attempt.reasoning || 'No data'}
+                      </pre>
+                    </div>
+                    {/* After evaluation */}
+                    <div className="bg-white p-2 rounded border border-green-200">
+                      <div className="font-medium text-green-700 mb-1">After ({attempt.postRepairScore}%)</div>
+                      <pre className="text-[10px] whitespace-pre-wrap overflow-auto max-h-40 bg-gray-50 p-1 rounded">
+                        {attempt.postRepairEval ? JSON.stringify(attempt.postRepairEval, null, 2) : 'No data'}
+                      </pre>
+                    </div>
+                  </div>
+                </details>
+
+                {/* Repair Details with images */}
+                {attempt.repairDetails && attempt.repairDetails.length > 0 && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-amber-700 font-medium">
+                      🖼️ {language === 'de' ? 'Reparatur-Details' : 'Repair Details'} ({attempt.repairDetails.length})
+                    </summary>
+                    <div className="mt-2 space-y-2">
+                      {attempt.repairDetails.map((repair, rIdx) => (
+                        <div key={rIdx} className="bg-white p-2 rounded border">
+                          <div className="font-medium mb-1">{repair.description}</div>
+                          <div className="text-gray-600 mb-2">{repair.fixPrompt}</div>
+                          <div className="flex gap-2 flex-wrap">
+                            {repair.beforeImage && (
+                              <div>
+                                <div className="text-[10px] text-gray-500 mb-1">Before</div>
+                                <img src={repair.beforeImage} alt="Before" className="w-32 h-32 object-contain border rounded cursor-pointer hover:ring-2 hover:ring-amber-400" />
+                              </div>
+                            )}
+                            {repair.maskImage && (
+                              <div>
+                                <div className="text-[10px] text-gray-500 mb-1">Mask</div>
+                                <img src={repair.maskImage} alt="Mask" className="w-32 h-32 object-contain border rounded bg-black" />
+                              </div>
+                            )}
+                            {repair.afterImage && (
+                              <div>
+                                <div className="text-[10px] text-gray-500 mb-1">After</div>
+                                <img src={repair.afterImage} alt="After" className="w-32 h-32 object-contain border rounded cursor-pointer hover:ring-2 hover:ring-green-400" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {/* Regular attempt feedback */}
+            {attempt.type !== 'auto_repair' && attempt.reasoning ? (
               <details className="text-xs text-gray-600 mb-2">
                 <summary className="cursor-pointer">{language === 'de' ? 'Feedback' : 'Feedback'}</summary>
-                <p className="mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded">{attempt.reasoning}</p>
+                <pre className="mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded text-[10px] overflow-auto max-h-40">{attempt.reasoning}</pre>
               </details>
-            ) : attempt.score === 0 && (
+            ) : attempt.type !== 'auto_repair' && attempt.score === 0 && (
               <div className="text-xs text-gray-500 italic mb-2">
                 {language === 'de' ? 'Qualitätsbewertung fehlgeschlagen' : language === 'fr' ? 'Évaluation de qualité échouée' : 'Quality evaluation failed'}
               </div>
             )}
 
-            {attempt.imageData && (
+            {attempt.imageData && attempt.type !== 'auto_repair' && (
               <details>
                 <summary className="cursor-pointer text-xs text-blue-600">
                   {language === 'de' ? 'Bild anzeigen' : language === 'fr' ? 'Voir image' : 'View image'}
