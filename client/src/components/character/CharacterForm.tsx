@@ -1,11 +1,68 @@
-import { ChangeEvent, useState, useCallback, useEffect } from 'react';
-import { Upload, Save, ArrowRight, Edit3, X, Check } from 'lucide-react';
+import { ChangeEvent, useState, useEffect } from 'react';
+import { Upload, Save, ArrowRight, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import type { Character, PhysicalTraits } from '@/types/character';
 import { api } from '@/services/api';
+
+// Cooldown logic for avatar regeneration
+// First 2: no delay, next 2: 30s, next 2: 1min, next 2: 2min, etc.
+function getAvatarCooldown(characterId: number): { canRegenerate: boolean; waitSeconds: number; attempts: number } {
+  const key = `avatar_regen_${characterId}`;
+  const data = localStorage.getItem(key);
+  const now = Date.now();
+
+  if (!data) {
+    return { canRegenerate: true, waitSeconds: 0, attempts: 0 };
+  }
+
+  try {
+    const { attempts, lastAttempt } = JSON.parse(data);
+
+    // Calculate required delay based on attempts
+    let requiredDelay = 0;
+    if (attempts >= 2 && attempts < 4) {
+      requiredDelay = 30 * 1000; // 30 seconds
+    } else if (attempts >= 4 && attempts < 6) {
+      requiredDelay = 60 * 1000; // 1 minute
+    } else if (attempts >= 6 && attempts < 8) {
+      requiredDelay = 2 * 60 * 1000; // 2 minutes
+    } else if (attempts >= 8 && attempts < 10) {
+      requiredDelay = 5 * 60 * 1000; // 5 minutes
+    } else if (attempts >= 10) {
+      requiredDelay = 10 * 60 * 1000; // 10 minutes
+    }
+
+    const elapsed = now - lastAttempt;
+    if (elapsed >= requiredDelay) {
+      return { canRegenerate: true, waitSeconds: 0, attempts };
+    }
+
+    return { canRegenerate: false, waitSeconds: Math.ceil((requiredDelay - elapsed) / 1000), attempts };
+  } catch {
+    return { canRegenerate: true, waitSeconds: 0, attempts: 0 };
+  }
+}
+
+function recordAvatarRegeneration(characterId: number) {
+  const key = `avatar_regen_${characterId}`;
+  const data = localStorage.getItem(key);
+  const now = Date.now();
+
+  let attempts = 1;
+  if (data) {
+    try {
+      const parsed = JSON.parse(data);
+      attempts = (parsed.attempts || 0) + 1;
+    } catch {
+      // ignore
+    }
+  }
+
+  localStorage.setItem(key, JSON.stringify({ attempts, lastAttempt: now }));
+}
 
 // Component to fetch and display avatar prompt from server (always shows with traits)
 function AvatarPromptDisplay({ category, gender, physical }: {
@@ -60,63 +117,25 @@ function AvatarPromptDisplay({ category, gender, physical }: {
   );
 }
 
-// Editable field component
-interface EditableStyleFieldProps {
+// Simple inline editable field - click to edit, blur/enter to save
+interface InlineEditFieldProps {
   label: string;
   value: string;
   placeholder?: string;
-  isEditing: boolean;
-  editValue: string;
-  onEditValueChange: (value: string) => void;
-  onStartEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
+  onChange: (value: string) => void;
 }
 
-function EditableStyleField({
-  label,
-  value,
-  placeholder,
-  isEditing,
-  editValue,
-  onEditValueChange,
-  onStartEdit,
-  onSave,
-  onCancel,
-}: EditableStyleFieldProps) {
+function InlineEditField({ label, value, placeholder, onChange }: InlineEditFieldProps) {
   return (
-    <div>
-      <span className="font-medium text-gray-600 text-xs">{label}:</span>
-      {isEditing ? (
-        <div className="flex items-center gap-1 mt-0.5">
-          <input
-            type="text"
-            value={editValue}
-            onChange={(e) => onEditValueChange(e.target.value)}
-            className="flex-1 min-w-0 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:border-indigo-500"
-            autoFocus
-            placeholder={placeholder}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onSave();
-              if (e.key === 'Escape') onCancel();
-            }}
-          />
-          <button onClick={onSave} className="flex-shrink-0 p-1 text-green-600 hover:bg-green-100 rounded">
-            <Check size={14} />
-          </button>
-          <button onClick={onCancel} className="flex-shrink-0 p-1 text-gray-500 hover:bg-gray-100 rounded">
-            <X size={14} />
-          </button>
-        </div>
-      ) : (
-        <div
-          onClick={onStartEdit}
-          className="flex items-center gap-1 cursor-pointer hover:bg-purple-100 rounded px-2 py-1 -mx-2 -my-1 group"
-        >
-          <p className="text-gray-800 text-sm flex-1">{value || <span className="text-gray-400 italic">{placeholder || 'Click to set'}</span>}</p>
-          <Edit3 size={12} className="text-purple-400 group-hover:text-purple-600" />
-        </div>
-      )}
+    <div className="flex items-center gap-2">
+      <span className="font-medium text-gray-600 text-xs whitespace-nowrap">{label}:</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:border-indigo-400 bg-white hover:border-gray-300"
+        placeholder={placeholder}
+      />
     </div>
   );
 }
@@ -190,39 +209,34 @@ export function CharacterForm({
     });
   };
 
-  // Style profile editing state
-  const [editingStyleField, setEditingStyleField] = useState<string | null>(null);
-  const [editStyleValue, setEditStyleValue] = useState('');
+  // Avatar cooldown state
+  const [cooldownInfo, setCooldownInfo] = useState(() => getAvatarCooldown(character.id));
 
-  const saveStyleEdit = () => {
-    if (editingStyleField) {
-      const parts = editingStyleField.split('.');
-      if (parts[0] === 'physical') {
-        updatePhysical(parts[1] as keyof PhysicalTraits, editStyleValue);
-      } else if (parts[0] === 'clothing') {
-        // Update clothing fields (e.g., clothing.colors)
-        onChange({
-          ...character,
-          clothing: {
-            ...character.clothing,
-            [parts[1]]: editStyleValue,
-          },
-        });
-      }
+  // Update cooldown timer every second when waiting
+  useEffect(() => {
+    if (cooldownInfo.waitSeconds > 0) {
+      const timer = setInterval(() => {
+        setCooldownInfo(getAvatarCooldown(character.id));
+      }, 1000);
+      return () => clearInterval(timer);
     }
-    setEditingStyleField(null);
-    setEditStyleValue('');
+  }, [cooldownInfo.waitSeconds, character.id]);
+
+  // Handle avatar regeneration with cooldown
+  const handleUserRegenerate = () => {
+    if (!cooldownInfo.canRegenerate) return;
+    recordAvatarRegeneration(character.id);
+    setCooldownInfo(getAvatarCooldown(character.id));
+    onRegenerateAvatarsWithTraits?.();
   };
 
-  const cancelStyleEdit = () => {
-    setEditingStyleField(null);
-    setEditStyleValue('');
+  // Update clothing style
+  const updateClothingStyle = (value: string) => {
+    onChange({
+      ...character,
+      clothing: { ...character.clothing, style: value },
+    });
   };
-
-  const handleStartEdit = useCallback((path: string, value: string) => {
-    setEditingStyleField(path);
-    setEditStyleValue(value || '');
-  }, []);
 
   const canSaveName = character.name && character.name.trim().length >= 2;
 
@@ -321,46 +335,172 @@ export function CharacterForm({
 
   // Step 2: Traits and characteristics
   return (
-    <div className="space-y-6">
-      {/* Header with photo and name */}
-      <div className="flex items-center gap-4">
-        {/* Photo with change option */}
-        <label className="flex-shrink-0 relative group cursor-pointer">
-          {isAnalyzingPhoto ? (
-            <div className="w-20 h-20 rounded-full bg-indigo-100 border-2 border-indigo-400 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+    <div className="space-y-4">
+      {/* Top section: Header with photo/name on left, avatar on right */}
+      <div className="flex gap-4">
+        {/* Left side: Photo, name, and basic info */}
+        <div className="flex-1 min-w-0">
+          {/* Header with photo and name */}
+          <div className="flex items-center gap-3 mb-3">
+            {/* Photo with change option */}
+            <label className="flex-shrink-0 relative group cursor-pointer">
+              {isAnalyzingPhoto ? (
+                <div className="w-14 h-14 rounded-full bg-indigo-100 border-2 border-indigo-400 flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : displayPhoto ? (
+                <img
+                  src={displayPhoto}
+                  alt={character.name}
+                  className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
+                  <Upload size={18} className="text-gray-400" />
+                </div>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                <Upload size={14} className="text-white" />
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+            <h3 className="text-xl font-bold text-gray-800">{character.name}</h3>
+          </div>
+
+          {/* Basic Info - Compact grid */}
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.gender}</label>
+              <select
+                value={character.gender}
+                onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
+                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs bg-white focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="male">{t.male}</option>
+                <option value="female">{t.female}</option>
+                <option value="other">{t.other}</option>
+              </select>
             </div>
-          ) : displayPhoto ? (
-            <img
-              src={displayPhoto}
-              alt={character.name}
-              className="w-20 h-20 rounded-full object-cover border-2 border-indigo-400"
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.age}</label>
+              <input
+                type="number"
+                value={character.age}
+                onChange={(e) => updateField('age', e.target.value)}
+                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs focus:border-indigo-500 focus:outline-none"
+                min="1"
+                max="120"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
+                {language === 'de' ? 'Grösse' : language === 'fr' ? 'Taille' : 'Height'}
+              </label>
+              <input
+                type="number"
+                value={character.physical?.height || ''}
+                onChange={(e) => updatePhysical('height', e.target.value)}
+                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs focus:border-indigo-500 focus:outline-none"
+                placeholder="cm"
+                min="50"
+                max="250"
+              />
+            </div>
+          </div>
+
+          {/* Physical Features - Compact inline fields */}
+          <div className="space-y-1.5 text-xs">
+            <InlineEditField
+              label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
+              value={character.physical?.face || ''}
+              placeholder={language === 'de' ? 'z.B. rund, oval' : 'e.g. round, oval'}
+              onChange={(v) => updatePhysical('face', v)}
             />
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
-              <Upload size={24} className="text-gray-400" />
-            </div>
-          )}
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-            <Upload size={20} className="text-white" />
+            <InlineEditField
+              label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
+              value={character.physical?.hair || ''}
+              placeholder={language === 'de' ? 'z.B. braun, kurz' : 'e.g. brown, short'}
+              onChange={(v) => updatePhysical('hair', v)}
+            />
+            <InlineEditField
+              label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
+              value={character.physical?.build || ''}
+              placeholder={language === 'de' ? 'z.B. schlank' : 'e.g. slim'}
+              onChange={(v) => updatePhysical('build', v)}
+            />
+            <InlineEditField
+              label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
+              value={character.physical?.other || ''}
+              placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
+              onChange={(v) => updatePhysical('other', v)}
+            />
           </div>
-          <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white rounded-full p-1.5 shadow-lg border-2 border-white">
-            <Upload size={12} />
+        </div>
+
+        {/* Right side: Standard avatar for all users */}
+        <div className="flex-shrink-0 w-32">
+          <div className="text-center">
+            {character.avatars?.standard ? (
+              <div className="relative">
+                <img
+                  src={character.avatars.standard}
+                  alt={`${character.name} avatar`}
+                  className={`w-32 h-44 object-cover rounded-lg border-2 ${character.avatars?.stale ? 'border-amber-400 opacity-80' : 'border-indigo-300'}`}
+                />
+                {(isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="w-32 h-44 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
+                {(isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
+                  <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span className="text-[10px] text-gray-400 text-center px-2">
+                    {language === 'de' ? 'Kein Avatar' : 'No avatar'}
+                  </span>
+                )}
+              </div>
+            )}
+            {/* Regenerate button for all users */}
+            <button
+              onClick={handleUserRegenerate}
+              disabled={!cooldownInfo.canRegenerate || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+              className="mt-2 w-full px-2 py-1 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+              title={!cooldownInfo.canRegenerate ? `Wait ${cooldownInfo.waitSeconds}s` : undefined}
+            >
+              <RefreshCw size={10} />
+              {!cooldownInfo.canRegenerate ? (
+                `${cooldownInfo.waitSeconds}s`
+              ) : (isRegeneratingAvatars || isRegeneratingAvatarsWithTraits) ? (
+                language === 'de' ? 'Generiere...' : 'Generating...'
+              ) : (
+                language === 'de' ? 'Neu generieren' : 'Regenerate'
+              )}
+            </button>
+            {/* Developer mode: show face match score */}
+            {developerMode && character.avatars?.faceMatch?.standard && (
+              <div className={`mt-1 text-[9px] font-medium ${
+                character.avatars.faceMatch.standard.score >= 6 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                Face: {character.avatars.faceMatch.standard.score}/10
+              </div>
+            )}
           </div>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </label>
-        <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
+        </div>
       </div>
 
       {/* Developer Mode: Show body crop with transparent background */}
       {developerMode && character.photos?.bodyNoBg && (
-        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-yellow-700 mb-2">
+        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3">
+          <h4 className="text-xs font-semibold text-yellow-700 mb-2">
             Body Crop (No Background)
           </h4>
           <div className="flex justify-center">
@@ -374,124 +514,17 @@ export function CharacterForm({
         </div>
       )}
 
-      {/* Basic Info - Gender, Age, Height */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-gray-600 mb-3">
-          {language === 'de' ? 'Grundinformationen' : language === 'fr' ? 'Informations de base' : 'Basic Info'}
-        </h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">{t.gender}</label>
-            <select
-              value={character.gender}
-              onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-white focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="male">{t.male}</option>
-              <option value="female">{t.female}</option>
-              <option value="other">{t.other}</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">{t.age}</label>
-            <input
-              type="number"
-              value={character.age}
-              onChange={(e) => updateField('age', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
-              min="1"
-              max="120"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">
-              {language === 'de' ? 'Grösse (cm)' : language === 'fr' ? 'Taille (cm)' : 'Height (cm)'}
-            </label>
-            <input
-              type="number"
-              value={character.physical?.height || ''}
-              onChange={(e) => updatePhysical('height', e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
-              placeholder="cm"
-              min="50"
-              max="250"
-            />
-          </div>
-        </div>
+      {/* Clothing Style field */}
+      <div className="text-xs">
+        <InlineEditField
+          label={language === 'de' ? 'Kleidungsstil' : language === 'fr' ? 'Style vestimentaire' : 'Clothing Style'}
+          value={character.clothing?.style || ''}
+          placeholder={language === 'de' ? 'z.B. schwarz mit Dino-Muster' : 'e.g. black with dinosaur print'}
+          onChange={updateClothingStyle}
+        />
       </div>
 
-      {/* Physical Features */}
-      <details className="bg-gray-50 border border-gray-200 rounded-lg">
-        <summary className="p-4 cursor-pointer hover:bg-gray-100 rounded-lg">
-          <span className="text-sm font-semibold text-gray-600 inline-flex items-center gap-2">
-            {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
-            <span className="text-xs font-normal text-gray-500">
-              ({language === 'de' ? 'klicken zum Bearbeiten' : language === 'fr' ? 'cliquez pour modifier' : 'click to edit'})
-            </span>
-          </span>
-        </summary>
-        <div className="px-4 pb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <EditableStyleField
-              label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
-              value={character.physical?.face || ''}
-              placeholder={language === 'de' ? 'z.B. rund, oval, eckig' : 'e.g. round, oval, square'}
-              isEditing={editingStyleField === 'physical.face'}
-              editValue={editStyleValue}
-              onEditValueChange={setEditStyleValue}
-              onStartEdit={() => handleStartEdit('physical.face', character.physical?.face || '')}
-              onSave={saveStyleEdit}
-              onCancel={cancelStyleEdit}
-            />
-            <EditableStyleField
-              label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
-              value={character.physical?.hair || ''}
-              placeholder={language === 'de' ? 'z.B. braun, kurz, lockig' : 'e.g. brown, short, curly'}
-              isEditing={editingStyleField === 'physical.hair'}
-              editValue={editStyleValue}
-              onEditValueChange={setEditStyleValue}
-              onStartEdit={() => handleStartEdit('physical.hair', character.physical?.hair || '')}
-              onSave={saveStyleEdit}
-              onCancel={cancelStyleEdit}
-            />
-            <EditableStyleField
-              label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
-              value={character.physical?.build || ''}
-              placeholder={language === 'de' ? 'z.B. schlank, athletisch' : 'e.g. slim, athletic'}
-              isEditing={editingStyleField === 'physical.build'}
-              editValue={editStyleValue}
-              onEditValueChange={setEditStyleValue}
-              onStartEdit={() => handleStartEdit('physical.build', character.physical?.build || '')}
-              onSave={saveStyleEdit}
-              onCancel={cancelStyleEdit}
-            />
-            <EditableStyleField
-              label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
-              value={character.physical?.other || ''}
-              placeholder={language === 'de' ? 'z.B. Brille, Muttermal' : language === 'fr' ? 'ex. lunettes, grain de beauté' : 'e.g. glasses, birthmark'}
-              isEditing={editingStyleField === 'physical.other'}
-              editValue={editStyleValue}
-              onEditValueChange={setEditStyleValue}
-              onStartEdit={() => handleStartEdit('physical.other', character.physical?.other || '')}
-              onSave={saveStyleEdit}
-              onCancel={cancelStyleEdit}
-            />
-            <EditableStyleField
-              label={language === 'de' ? 'Kleidungsstil' : language === 'fr' ? 'Style vestimentaire' : 'Clothing Style'}
-              value={character.clothing?.style || ''}
-              placeholder={language === 'de' ? 'z.B. schwarz mit Dino-Muster' : language === 'fr' ? 'ex. noir avec motif dinosaure' : 'e.g. black with dinosaur print'}
-              isEditing={editingStyleField === 'clothing.style'}
-              editValue={editStyleValue}
-              onEditValueChange={setEditStyleValue}
-              onStartEdit={() => handleStartEdit('clothing.style', character.clothing?.style || '')}
-              onSave={saveStyleEdit}
-              onCancel={cancelStyleEdit}
-            />
-          </div>
-        </div>
-      </details>
-
-      {/* Clothing Avatars (developer only) */}
+      {/* Clothing Avatars (developer only - all 4 variants) */}
       {developerMode && (
         <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-2">
