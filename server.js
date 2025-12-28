@@ -102,7 +102,7 @@ const admin = require('firebase-admin');
 // Import modular routes and services
 const { initializePool: initModularPool, logActivity, isDatabaseMode } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
-const { storyGenerationLimiter } = require('./server/middleware/rateLimit');
+const { storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder } = require('./server/lib/gelato');
@@ -1641,7 +1641,7 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
 // =============================================================================
 
 // Regenerate scene description for a specific page (no credit cost - image regeneration covers it)
-app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateToken, async (req, res) => {
+app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
@@ -1745,7 +1745,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
 });
 
 // Regenerate image for a specific page (costs credits)
-app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async (req, res) => {
+app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const { customPrompt, editedScene } = req.body;
@@ -2039,7 +2039,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, async 
 });
 
 // Regenerate cover image (front, initialPage, or back)
-app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, async (req, res) => {
+app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, coverType } = req.params;
     const { customPrompt } = req.body;

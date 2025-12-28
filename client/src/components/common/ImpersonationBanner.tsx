@@ -4,32 +4,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { X, Eye, Loader2 } from 'lucide-react';
 
-const translations = {
-  en: {
-    viewingAs: 'Viewing as',
-    stopViewing: 'Stop viewing',
-    stopping: 'Stopping...',
-  },
-  de: {
-    viewingAs: 'Ansicht als',
-    stopViewing: 'Ansicht beenden',
-    stopping: 'Beenden...',
-  },
-  fr: {
-    viewingAs: 'Vue en tant que',
-    stopViewing: 'Arreter la vue',
-    stopping: 'Arrêt...',
-  },
-};
-
 export function ImpersonationBanner() {
   const navigate = useNavigate();
   const { isImpersonating, user, originalAdmin, stopImpersonating } = useAuth();
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const t = translations[language as keyof typeof translations] || translations.en;
 
   if (!isImpersonating || !user || !originalAdmin) {
     return null;
@@ -54,7 +34,7 @@ export function ImpersonationBanner() {
       <div className="flex items-center gap-2">
         <Eye size={16} />
         <span>
-          {t.viewingAs}: <strong>{user.username}</strong> ({user.email})
+          {t.impersonationViewingAs}: <strong>{user.username}</strong> ({user.email})
         </span>
       </div>
       {error && (
@@ -66,7 +46,7 @@ export function ImpersonationBanner() {
         className="flex items-center gap-1 bg-black/20 hover:bg-black/30 disabled:opacity-50 px-3 py-1 rounded-full transition-colors"
       >
         {isLoading ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-        <span>{isLoading ? t.stopping : t.stopViewing}</span>
+        <span>{isLoading ? t.impersonationStopping : t.impersonationStopViewing}</span>
       </button>
     </div>
   );

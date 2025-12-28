@@ -41,19 +41,29 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     `, [sessionId]);
     console.log('✅ [BACKGROUND] Order status updated to processing');
 
-    // Step 2: Fetch all stories from database
-    const stories = [];
-    for (const sid of allStoryIds) {
-      const storyResult = await dbPool.query('SELECT data FROM stories WHERE id = $1', [sid]);
-      if (storyResult.rows.length === 0) {
-        throw new Error(`Story ${sid} not found`);
-      }
-      let storyData = storyResult.rows[0].data;
+    // Step 2: Fetch all stories from database (batch query for performance)
+    const storyResult = await dbPool.query(
+      'SELECT id, data FROM stories WHERE id = ANY($1::text[])',
+      [allStoryIds]
+    );
+
+    // Check all stories were found
+    if (storyResult.rows.length !== allStoryIds.length) {
+      const foundIds = storyResult.rows.map(r => r.id);
+      const missingIds = allStoryIds.filter(id => !foundIds.includes(id));
+      throw new Error(`Stories not found: ${missingIds.join(', ')}`);
+    }
+
+    // Parse and preserve order from allStoryIds
+    const storiesMap = new Map();
+    for (const row of storyResult.rows) {
+      let storyData = row.data;
       if (typeof storyData === 'string') {
         storyData = JSON.parse(storyData);
       }
-      stories.push({ id: sid, data: storyData });
+      storiesMap.set(row.id, { id: row.id, data: storyData });
     }
+    const stories = allStoryIds.map(id => storiesMap.get(id));
 
     console.log(`✅ [BACKGROUND] Fetched ${stories.length} stories`);
     log.debug('📊 [BACKGROUND] Titles:', stories.map(s => s.data.title).join(', '));

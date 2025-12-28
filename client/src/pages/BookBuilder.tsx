@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, ArrowDown, Book, BookOpen, ShoppingCart, AlertTriangle, Info, Printer } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { Navigation, LoadingSpinner } from '@/components/common';
 import { storyService } from '@/services';
 import { getPriceForPages, MAX_BOOK_PAGES } from './Pricing';
@@ -30,6 +31,7 @@ export default function BookBuilder() {
   const location = useLocation();
   const { language } = useLanguage();
   const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
+  const { showToast } = useToast();
   const isAdmin = user?.role === 'admin';
 
   const [stories, setStories] = useState<SelectedStory[]>([]);
@@ -206,11 +208,14 @@ export default function BookBuilder() {
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);
-      alert(language === 'de'
-        ? 'Checkout fehlgeschlagen. Bitte versuche es erneut.'
-        : language === 'fr'
-        ? 'Échec du paiement. Veuillez réessayer.'
-        : 'Checkout failed. Please try again.');
+      showToast(
+        language === 'de'
+          ? 'Checkout fehlgeschlagen. Bitte versuche es erneut.'
+          : language === 'fr'
+          ? 'Échec du paiement. Veuillez réessayer.'
+          : 'Checkout failed. Please try again.',
+        'error'
+      );
     } finally {
       setIsCheckingOut(false);
     }
@@ -261,11 +266,14 @@ export default function BookBuilder() {
     } catch (error) {
       log.error('Failed to download print PDF:', error);
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      alert(language === 'de'
-        ? `PDF konnte nicht heruntergeladen werden: ${errorMsg}`
-        : language === 'fr'
-        ? `Impossible de télécharger le PDF: ${errorMsg}`
-        : `Failed to download PDF: ${errorMsg}`);
+      showToast(
+        language === 'de'
+          ? `PDF konnte nicht heruntergeladen werden: ${errorMsg}`
+          : language === 'fr'
+          ? `Impossible de télécharger le PDF: ${errorMsg}`
+          : `Failed to download PDF: ${errorMsg}`,
+        'error'
+      );
     } finally {
       setIsPrintingPdf(false);
     }

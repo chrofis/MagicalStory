@@ -167,6 +167,10 @@ export interface TranslationStrings {
   // Generation timeout
   generationStalled: string;
   generationStalledDesc: string;
+  // Impersonation
+  impersonationViewingAs: string;
+  impersonationStopViewing: string;
+  impersonationStopping: string;
   continueWaiting: string;
   cancelGeneration: string;
 }
@@ -341,6 +345,10 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     // Generation timeout
     generationStalled: 'Generation seems stuck',
     generationStalledDesc: 'No progress for a while. This can happen due to high server load.',
+    // Impersonation
+    impersonationViewingAs: 'Viewing as',
+    impersonationStopViewing: 'Stop viewing',
+    impersonationStopping: 'Stopping...',
     continueWaiting: 'Keep Waiting',
     cancelGeneration: 'Cancel',
   },
@@ -513,6 +521,10 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     // Generation timeout
     generationStalled: 'Generierung scheint hängen zu bleiben',
     generationStalledDesc: 'Seit einer Weile kein Fortschritt. Dies kann bei hoher Serverlast passieren.',
+    // Impersonation
+    impersonationViewingAs: 'Ansicht als',
+    impersonationStopViewing: 'Ansicht beenden',
+    impersonationStopping: 'Beenden...',
     continueWaiting: 'Weiter warten',
     cancelGeneration: 'Abbrechen',
   },
@@ -685,6 +697,10 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     // Generation timeout
     generationStalled: 'La génération semble bloquée',
     generationStalledDesc: 'Aucun progrès depuis un moment. Cela peut arriver en cas de forte charge serveur.',
+    // Impersonation
+    impersonationViewingAs: 'Vue en tant que',
+    impersonationStopViewing: 'Arreter la vue',
+    impersonationStopping: 'Arrêt...',
     continueWaiting: 'Continuer à attendre',
     cancelGeneration: 'Annuler',
   },
