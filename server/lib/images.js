@@ -560,7 +560,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const issues = parsedJson.issues || '';
 
       log.info(`⭐ [QUALITY] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
-      if (issues && issues !== 'none') {
+      const hasRealIssues = issues && issues !== 'none' && issues.toLowerCase() !== 'none';
+      if (hasRealIssues) {
         log.info(`⭐ [QUALITY] Issues: ${issues}`);
       }
 
@@ -588,11 +589,20 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       }
 
+      // Build a meaningful reasoning string
+      let reasoning;
+      if (hasRealIssues) {
+        reasoning = issues;
+      } else {
+        // No issues - format the JSON nicely for display
+        reasoning = JSON.stringify({ score: rawScore, verdict, issues: issues || 'none', fix_targets: jsonFixTargets.length }, null, 2);
+      }
+
       return {
         score,
         rawScore, // Original 0-10 score
         verdict,
-        reasoning: issues || responseText,
+        reasoning,
         textIssue,
         fixTargets: jsonFixTargets,
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
