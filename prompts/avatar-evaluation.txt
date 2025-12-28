@@ -1,16 +1,26 @@
-Compare the two faces and evaluate if they are the same person.
+You are evaluating if two face images show the same person.
 
 IMAGE 1: Original reference photo
-IMAGE 2: Generated avatar
+IMAGE 2: AI-generated avatar
 
-EVALUATE EACH FEATURE (score 1-10, where 10 = perfect match):
+IMPORTANT: You MUST provide detailed scoring for EACH feature below. Do not skip any feature.
 
-Face Shape: [score] - [brief reason]
-Eyes: [score] - [brief reason]
-Nose: [score] - [brief reason]
-Mouth: [score] - [brief reason]
-Overall Structure: [score] - [brief reason]
+**Face Shape:** [score 1-10] - [your reasoning in 5-10 words]
+**Eyes:** [score 1-10] - [your reasoning in 5-10 words]
+**Nose:** [score 1-10] - [your reasoning in 5-10 words]
+**Mouth:** [score 1-10] - [your reasoning in 5-10 words]
+**Overall Structure:** [score 1-10] - [your reasoning in 5-10 words]
 
-IGNORE: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts
+IGNORE when scoring: lighting differences, skin tone variations, clothing, hairstyle changes, background, facial expression, minor AI rendering artifacts
 
-FINAL SCORE: [1-10]
+After evaluating all 5 features above, provide:
+
+**FINAL SCORE: [1-10]**
+
+Example output format:
+**Face Shape:** 8 - Similar oval shape with matching jawline
+**Eyes:** 9 - Same eye shape, color, and spacing
+**Nose:** 7 - Slightly different bridge width
+**Mouth:** 8 - Lip shape and size match well
+**Overall Structure:** 8 - Proportions and bone structure match
+**FINAL SCORE: 8**

@@ -3702,7 +3702,7 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
       if (req.query.hair) traitParts.push(`Hair: ${req.query.hair}`);
       if (req.query.face) traitParts.push(`Face: ${req.query.face}`);
       if (req.query.other) traitParts.push(`Distinctive features: ${req.query.other}`);
-      if (req.query.height) traitParts.push(`Height: ${req.query.height}cm`);
+      // Height removed - doesn't help avatar generation
       if (traitParts.length > 0) {
         avatarPrompt += `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
       }
@@ -3812,7 +3812,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       if (physicalTraits?.hair) traitParts.push(`Hair: ${physicalTraits.hair}`);
       if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
       if (physicalTraits?.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
-      if (physicalTraits?.height) traitParts.push(`Height: ${physicalTraits.height}cm`);
+      // Height removed - doesn't help avatar generation
       // Clothing style (colors and patterns to use)
       if (clothingStyle) traitParts.push(`Clothing style/colors: ${clothingStyle}`);
       if (traitParts.length > 0) {
