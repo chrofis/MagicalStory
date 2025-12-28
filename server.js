@@ -3703,6 +3703,7 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
       if (req.query.hair) traitParts.push(`Hair: ${req.query.hair}`);
       if (req.query.face) traitParts.push(`Face: ${req.query.face}`);
       if (req.query.other) traitParts.push(`Distinctive features: ${req.query.other}`);
+      if (req.query.clothingStyle) traitParts.push(`Clothing style/colors: ${req.query.clothingStyle}`);
       // Height removed - doesn't help avatar generation
       if (traitParts.length > 0) {
         avatarPrompt += `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;

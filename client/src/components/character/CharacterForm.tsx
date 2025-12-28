@@ -65,10 +65,11 @@ function recordAvatarRegeneration(characterId: number) {
 }
 
 // Component to fetch and display avatar prompt from server (always shows with traits)
-function AvatarPromptDisplay({ category, gender, physical }: {
+function AvatarPromptDisplay({ category, gender, physical, clothingStyle }: {
   category: string;
   gender: string | undefined;
   physical?: PhysicalTraits;
+  clothingStyle?: string;
 }) {
   const [prompt, setPrompt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,7 @@ function AvatarPromptDisplay({ category, gender, physical }: {
           if (physical.other) url += `&other=${encodeURIComponent(physical.other)}`;
           if (physical.height) url += `&height=${encodeURIComponent(physical.height)}`;
         }
+        if (clothingStyle) url += `&clothingStyle=${encodeURIComponent(clothingStyle)}`;
         const response = await api.get<{ success: boolean; prompt: string }>(url);
         if (response.success) {
           setPrompt(response.prompt);
@@ -103,7 +105,7 @@ function AvatarPromptDisplay({ category, gender, physical }: {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [category, gender, physical]);
+  }, [category, gender, physical, clothingStyle]);
 
   return (
     <div>
@@ -621,7 +623,7 @@ export function CharacterForm({
                   <>
                     <details className="mt-1 text-left">
                       <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
-                      <AvatarPromptDisplay category={category} gender={character.gender} physical={character.physical} />
+                      <AvatarPromptDisplay category={category} gender={character.gender} physical={character.physical} clothingStyle={character.clothing?.style} />
                     </details>
                     {character.avatars?.faceMatch?.[category] && (
                       <details className="mt-1 text-left">
