@@ -66,16 +66,19 @@ Stay within the word count. Count your words. Aim for the middle of the range, n
 
 # Your Task
 
-**STEP 1: Check for missing Visual Bible entries (output FIRST)**
-Before writing the story, scan the outline for recurring elements NOT already in the Visual Bible:
+**CRITICAL: Your response MUST start with the Visual Bible section. Do NOT skip this.**
+
+**STEP 1: Check for missing Visual Bible entries**
+Scan the outline for recurring elements NOT already in the Visual Bible:
 - Animals/pets appearing on 2+ pages
 - Important objects (magical items, toys, tools) that recur
 - Secondary characters (not main characters) who appear multiple times
 - Distinctive locations appearing repeatedly
 
-Output any missing entries at the START of your response. If none are missing, write "None".
+Your response MUST begin with `---NEW VISUAL BIBLE ENTRIES---` followed by entries or "None".
 
 **STEP 2: Write the story pages**
+After the Visual Bible section, write `---STORY TEXT---` then the pages.
 Write pages {START_PAGE} through {END_PAGE} of the story.
 {INCLUDE_TITLE}
 
