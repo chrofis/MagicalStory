@@ -174,16 +174,18 @@ For each person who is NOT listed in the "Characters" section above but appears 
 - **Appears in pages**: List all page numbers
 - **Visual Appearance** (describe what the eye SEES, not backstory):
   - Apparent age category: child (small, round face) | teen (lanky, youthful) | young adult | middle-aged | elderly (grey hair, wrinkles)
-  - Build/size: height relative to main characters, body type
+  - Build/size: use standalone terms (short, average, tall, slim, stocky, muscular) - NO comparisons to other characters
   - Hair: color, style, length, facial hair (ONLY for adults - teens/children cannot have beards)
   - Face: eye color, skin tone, 1-2 distinctive features (scar, glasses, freckles)
 - **Signature Look** (ONE memorable visual element for instant recognition, e.g., "bright red bandana", "gold tooth", "curved wooden cane")
 - **Clothing**: Specific colors and details (be consistent across all scenes)
 
 **IMPORTANT for Secondary Characters**:
+- NEVER reference or compare to main characters (e.g., don't write "taller than Max" or "similar to Emma")
 - Do NOT use specific ages like "16 years old" - use apparent age categories instead
 - Ensure features match the age category (no beards on children/teens, no wrinkles on young adults)
 - The Signature Look should be visually striking and easy for AI to reproduce consistently
+- Each description must be SELF-CONTAINED - readable without knowing who the main characters are
 
 ## Animals & Creatures
 For any animal or creature appearing in multiple scenes:
