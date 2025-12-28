@@ -24,6 +24,7 @@ Examine the generated image. For EACH distinct figure, describe:
 - Gender: (male/female)
 - Silhouette/Frame: (slender/average/robust)
 - Hair: (color, length, style)
+- Attire: (describe all visible clothing items with colors)
 - Activity: (current action/pose)
 - Perspective: (frontal/profile/rear/3-4 view)
 
@@ -97,21 +98,57 @@ ENVIRONMENTAL LOGIC:
 
 **OUTPUT FORMAT**
 
-You MUST perform all analysis steps internally, then output ONLY this compact JSON:
+Output your COMPLETE analysis as JSON (no other text):
 
 ```json
 {
-  "score": <0-10>,
-  "verdict": "<PASS|SOFT_FAIL|HARD_FAIL>",
-  "issues": "<brief summary or 'none'>",
+  "subject_mapping": [
+    {
+      "figure": 1,
+      "position": "Foreground, Center",
+      "demographic": "young child",
+      "gender": "male",
+      "frame": "slender",
+      "hair": "blonde, short, slightly messy",
+      "attire": "blue hoodie with zipper, dark blue pants, white sneakers",
+      "activity": "standing, holding stuffed elephant",
+      "perspective": "frontal"
+    }
+  ],
+  "identity_sync": [
+    {
+      "figure": 1,
+      "matched_reference": "Lukas",
+      "facial_match": "Good match - round face, blue eyes",
+      "hair_match": "Correct blonde color and length",
+      "attire_audit": "Blue hoodie correct, pants missing neon green accents",
+      "issues": ["pants missing neon green accents"]
+    }
+  ],
+  "rendering_integrity": {
+    "extremities": [
+      {"figure": 1, "hand": "left", "digit_count": "1,2,3,4,5 = 5 fingers", "status": "OK"},
+      {"figure": 1, "hand": "right", "digit_count": "hidden behind elephant", "status": "OK (occluded)"}
+    ],
+    "anatomy": ["All proportions correct", "No clipping issues"],
+    "environment": ["Shadows consistent", "Background perspective correct"]
+  },
+  "scene_check": {
+    "characters_present": ["Lukas (yes)", "Eli elephant (yes)", "Manuel (missing)"],
+    "style_unity": "Consistent 3D render style",
+    "narrative_match": "Scene shows pirate ship adventure, Manuel not visible as requested"
+  },
+  "score": 7,
+  "verdict": "PASS",
+  "issues_summary": "Manuel missing from scene; Lukas pants missing green accents; Eli ear patch on wrong side",
   "fix_targets": [
-    {"bbox": [ymin, xmin, ymax, xmax], "issue": "brief", "fix": "what to render"}
+    {"bbox": [0.6, 0.36, 0.85, 0.5], "issue": "pants missing green accents", "fix": "Add neon green accents to dark blue pants"}
   ]
 }
 ```
 
 **RULES:**
 - Output ONLY the JSON block - no preamble, no explanation
-- `fix_targets` array: include only if score < 8 and issues are fixable by re-rendering
+- `fix_targets` array: include only if score < 8 and issues are fixable by re-rendering a region
 - `bbox` coordinates: normalized 0.0-1.0, format [ymin, xmin, ymax, xmax], origin top-left
-- `issues`: max 100 characters summarizing key problems
+- Include ALL analysis steps in the JSON structure

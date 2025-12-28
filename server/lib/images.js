@@ -409,16 +409,20 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // - No detailed physical descriptions (age, body type, etc.)
       // - No mention of "children" or ages
       // - Focus purely on artistic/technical quality
-      // - KEEP the FIX_TARGETS format for auto-repair functionality
+      // - KEEP full analysis structure for auto-repair functionality
       const sanitizedPrompt = `You are a Technical QA Analyst evaluating an AI-generated illustration.
 
 **TASK**: Audit for rendering errors and character consistency against reference photos.
 
-**CHECK FOR**:
-1. Digit count - Each hand should have exactly 5 fingers (count: 1,2,3,4,5)
-2. Structural integrity - No merged features, floating objects, missing limbs
-3. Character consistency - Hair, clothing, features match references
-4. Art quality - Clean rendering, no artifacts
+**ANALYSIS STEPS**:
+
+1. **Subject Mapping**: For each figure, describe position, build, hair, attire, activity, perspective
+2. **Identity Sync**: Match each figure to reference photos, check hair/attire consistency
+3. **Rendering Integrity**:
+   - Count fingers on each visible hand (1,2,3,4,5)
+   - Check for structural issues (floating objects, missing limbs, clipping)
+   - Verify proportions and anatomy
+4. **Scene Check**: Are all expected characters present? Does action match prompt?
 
 **SCORING (0-10)**:
 - 10: Perfect, no issues
@@ -427,12 +431,28 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 - 3-4: Poor, major issues
 - 0-2: Bad, multiple major issues
 
-**OUTPUT**: Return ONLY this JSON (no other text):
+**OUTPUT**: Return your COMPLETE analysis as JSON (no other text):
 \`\`\`json
 {
-  "score": <0-10>,
-  "verdict": "<PASS|SOFT_FAIL|HARD_FAIL>",
-  "issues": "<brief summary or 'none'>",
+  "subject_mapping": [
+    {"figure": 1, "position": "...", "frame": "...", "hair": "...", "attire": "...", "activity": "...", "perspective": "..."}
+  ],
+  "identity_sync": [
+    {"figure": 1, "matched_reference": "...", "hair_match": "...", "attire_audit": "...", "issues": []}
+  ],
+  "rendering_integrity": {
+    "extremities": [{"figure": 1, "hand": "left", "digit_count": "1,2,3,4,5 = 5", "status": "OK"}],
+    "anatomy": ["..."],
+    "environment": ["..."]
+  },
+  "scene_check": {
+    "characters_present": ["Name (yes/missing)"],
+    "style_unity": "...",
+    "narrative_match": "..."
+  },
+  "score": 7,
+  "verdict": "PASS",
+  "issues_summary": "brief summary of issues",
   "fix_targets": [{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief", "fix": "what to render"}]
 }
 \`\`\`
@@ -558,16 +578,17 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     if (parsedJson && typeof parsedJson.score === 'number') {
-      // Compact JSON format with 0-10 scale
+      // Full JSON format with 0-10 scale and detailed analysis
       const rawScore = parsedJson.score;
       const score = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
       const verdict = parsedJson.verdict || parsedJson.final_verdict || 'UNKNOWN';
-      const issues = parsedJson.issues || '';
+      // Support both old 'issues' and new 'issues_summary' field
+      const issuesSummary = parsedJson.issues_summary || parsedJson.issues || '';
 
       log.info(`⭐ [QUALITY] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
-      const hasRealIssues = issues && issues !== 'none' && issues.toLowerCase() !== 'none';
+      const hasRealIssues = issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none';
       if (hasRealIssues) {
-        log.info(`⭐ [QUALITY] Issues: ${issues}`);
+        log.info(`⭐ [QUALITY] Issues: ${issuesSummary}`);
       }
 
       // Parse fix_targets from JSON if present (overrides text-based parsing)
@@ -587,27 +608,23 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
       // For covers, check if there are text issues
       let textIssue = null;
-      if (evaluationType === 'cover' && issues) {
-        const issuesLower = issues.toLowerCase();
+      if (evaluationType === 'cover' && issuesSummary) {
+        const issuesLower = issuesSummary.toLowerCase();
         if (issuesLower.includes('text') || issuesLower.includes('spell') || issuesLower.includes('letter')) {
           textIssue = 'TEXT_ERROR';
         }
       }
 
-      // Build a meaningful reasoning string
-      let reasoning;
-      if (hasRealIssues) {
-        reasoning = issues;
-      } else {
-        // No issues - format the JSON nicely for display
-        reasoning = JSON.stringify({ score: rawScore, verdict, issues: issues || 'none', fix_targets: jsonFixTargets.length }, null, 2);
-      }
+      // Store the FULL analysis JSON as reasoning (for dev mode display)
+      // This includes subject_mapping, identity_sync, rendering_integrity, scene_check
+      const reasoning = JSON.stringify(parsedJson, null, 2);
 
       return {
         score,
         rawScore, // Original 0-10 score
         verdict,
         reasoning,
+        issuesSummary, // Brief summary for quick display
         textIssue,
         fixTargets: jsonFixTargets,
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
