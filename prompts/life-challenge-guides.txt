@@ -1,0 +1,484 @@
+# Life Challenge Story Guides
+#
+# This file contains specific guidance for each life challenge topic.
+# Stories should help children understand and cope with these situations.
+#
+# Format: [challenge-id] followed by the guidance content.
+# Edit freely - changes take effect on next story generation.
+
+# =============================================================================
+# TODDLER (Ages 2-4)
+# =============================================================================
+
+[potty-training]
+Help children feel positive and confident about using the potty/toilet.
+Story guidance:
+- Show that everyone learns to use the potty - it's a normal part of growing up
+- Celebrate small successes without making accidents feel shameful
+- Include the routine: feeling the need to go, getting to the potty, sitting, wiping, flushing, washing hands
+- Normalize that accidents happen and that's okay - just try again
+- Show pride in wearing "big kid" underwear
+- Avoid rushing - every child learns at their own pace
+- End with confidence: "I can do this!"
+Key messages: Growing up is exciting. Accidents are okay. Practice makes perfect.
+
+[washing-hands]
+Teach proper handwashing habits in a fun, engaging way.
+Story guidance:
+- When to wash: before eating, after bathroom, after playing outside, after touching pets
+- The steps: wet hands, add soap, scrub everywhere (palms, between fingers, under nails)
+- How long: sing "Happy Birthday" twice or the ABC song
+- Make bubbles fun - they're catching the germs!
+- Rinse well and dry with a clean towel
+- Show that clean hands keep us healthy and stop germs from spreading
+- Connect to not getting sick and not making others sick
+Key messages: Germs are invisible but real. Washing hands protects everyone.
+
+[brushing-teeth]
+Make tooth brushing a positive daily habit.
+Story guidance:
+- Brush twice a day: morning and before bed
+- Show proper technique: small circles, all teeth, front and back
+- Brush for 2 minutes (a whole song!)
+- Use just a pea-sized amount of toothpaste
+- Don't forget to brush your tongue
+- The "sugar bugs" (cavity germs) don't like clean teeth
+- Visiting the dentist is a good thing - they help keep teeth strong
+- Show the reward: a bright, healthy smile
+Key messages: Strong teeth help us eat yummy food. Brushing keeps the sugar bugs away.
+
+[eating-vegetables]
+Encourage trying and enjoying vegetables.
+Story guidance:
+- Vegetables help us grow strong, see better, and fight sickness
+- Each color vegetable has different superpowers
+- It's okay not to like everything - taste buds change as we grow
+- The "try one bite" rule - you might be surprised!
+- Ways to make veggies fun: dipping, funny shapes, growing your own
+- Show characters enjoying vegetables without forcing
+- Avoid making it a battle - keep it positive and low-pressure
+Key messages: Vegetables are superfoods. Trying new things is brave. Taste buds grow up too.
+
+[going-to-bed]
+Help establish a calm, positive bedtime routine.
+Story guidance:
+- Bedtime routine steps: bath, pajamas, brush teeth, story, goodnight
+- Sleep helps our bodies grow and our brains remember what we learned
+- The bedroom is safe and cozy
+- Address common fears: dark (nightlight is okay), monsters (not real)
+- Comfort objects (stuffed animals, blankets) are helpful friends
+- Staying in bed even when not sleepy yet
+- Dreams can be wonderful adventures
+Key messages: Sleep is good for us. Nighttime is peaceful. Tomorrow will be fun after good rest.
+
+[saying-goodbye]
+Help children cope with separation from parents/caregivers.
+Story guidance:
+- Parents always come back - show the reunion
+- It's okay to feel sad when saying goodbye
+- Give a "hug to keep" or special goodbye ritual
+- Fun things happen while parents are away
+- Caregivers (teachers, grandparents) keep us safe
+- Time passes and parents return
+- Being brave doesn't mean not feeling sad
+Key messages: Goodbye is not forever. Parents always come back. Feelings are okay.
+
+[no-pacifier]
+Support the transition away from pacifiers.
+Story guidance:
+- Growing up means we don't need some things anymore
+- Acknowledge the comfort the pacifier provided
+- Creative goodbye: give to "babies who need it," pacifier fairy, special ceremony
+- Other ways to feel comforted: hugs, stuffed animals, deep breaths
+- Celebrate being a "big kid" without shaming
+- First days are hardest, then it gets easier
+- Show pride in the accomplishment
+Key messages: Growing up is exciting. We can find new ways to feel better. You are brave.
+
+# =============================================================================
+# PRESCHOOL (Ages 4-6)
+# =============================================================================
+
+[cleaning-up]
+Encourage taking responsibility for putting toys away.
+Story guidance:
+- Everything has a home - toys are happier when they're in their spots
+- Cleaning up is part of playing - it's how we finish
+- The "clean up song" or making it a game
+- Start with small tasks, celebrate completion
+- Finding toys is easier when they're organized
+- Helping keeps our space nice for everyone
+- Show satisfaction in a clean room
+Key messages: Cleaning up is part of playing. A tidy space feels good. Helpers are appreciated.
+
+[sitting-still]
+Help children learn to be calm and patient when needed.
+Story guidance:
+- Our bodies sometimes need to be still: story time, meals, class
+- It's hard but we can practice and get better
+- Tricks: take deep breaths, squeeze a stress ball, count silently
+- Wiggles can wait - we can move after
+- Show understanding that it's difficult
+- Short periods first, then longer
+- Praise effort, not perfection
+Key messages: Being still is a skill we can learn. It's okay to find it hard. Practice helps.
+
+[sharing]
+Teach the joy and importance of sharing with others.
+Story guidance:
+- Sharing makes playing more fun - more ideas, more laughter
+- Taking turns is a form of sharing (you'll get it back!)
+- It's okay to have some special things we don't share
+- How sharing makes others feel happy
+- The good feeling when we share
+- Friends like to play with generous people
+- Model asking before taking
+Key messages: Sharing is caring. Taking turns is fair. Sharing makes friendships stronger.
+
+[waiting-turn]
+Help children develop patience and fairness.
+Story guidance:
+- Everyone deserves a turn - waiting is fair
+- Your turn will come - it's worth the wait
+- Things to do while waiting: watch, cheer for others, take deep breaths
+- Cutting in line makes others feel bad
+- The joy of finally getting your turn
+- Patience is a superpower that gets stronger with practice
+- Connect to games, slides, classroom activities
+Key messages: Fair is taking turns. Your turn is coming. Waiting shows respect for others.
+
+[first-kindergarten]
+Prepare children for starting kindergarten.
+Story guidance:
+- New places can feel scary but become familiar
+- Teachers are there to help and keep you safe
+- You'll make new friends who like similar things
+- The fun activities: art, music, playground, stories, learning
+- It's okay to miss home - you'll see family at pickup time
+- Bring something special from home if allowed
+- Everyone else is new too - you're not alone
+Key messages: New adventures are exciting. Teachers and friends will help. Home is waiting after school.
+
+[making-friends]
+Guide children in developing friendship skills.
+Story guidance:
+- How to approach someone new: smile, say hi, ask their name
+- Finding things in common: favorite colors, toys, games
+- Being a good friend: listening, sharing, being kind
+- It's okay if not everyone wants to be friends
+- Friendship takes time - it grows bigger with play
+- Different friends for different activities is okay
+- Standing up for friends when they need help
+Key messages: Everyone wants friends. Be the friend you want to have. Kindness attracts kindness.
+
+[being-brave]
+Help children face fears and try new things.
+Story guidance:
+- Being brave doesn't mean not being scared
+- Being brave means doing things even when we're scared
+- Everyone is afraid of something - even grown-ups
+- We can do hard things (with deep breaths and support)
+- Small brave steps lead to big brave actions
+- It's okay to ask for help when scared
+- Celebrate courage, not just success
+Key messages: Brave means trying even when scared. Everyone feels afraid sometimes. You are braver than you think.
+
+[new-sibling]
+Prepare children for a new baby in the family.
+Story guidance:
+- Parents' love doesn't divide - it multiplies
+- Being a big brother/sister is an important job
+- Babies cry and need lots of attention - it's not forever
+- Special time with parents still happens
+- Things older siblings can do: help, teach, protect
+- It's okay to feel jealous sometimes - talk about it
+- The baby will grow up to be a playmate
+Key messages: Love grows bigger for everyone. Being a big sibling is special. Your feelings matter too.
+
+# =============================================================================
+# EARLY SCHOOL (Ages 6-9)
+# =============================================================================
+
+[first-school]
+Support the transition to "big kid" school.
+Story guidance:
+- Elementary/primary school is where we learn amazing things
+- Bigger school means more opportunities and friends
+- Finding your classroom, locker, cafeteria - it becomes easy
+- Teachers want to help you succeed
+- Making new friends while keeping old ones
+- School routines: homeroom, subjects, lunch, recess
+- Everyone feels nervous at first - you're not alone
+Key messages: School is an adventure in learning. Nervousness fades. You will find your place.
+
+[homework]
+Develop positive homework habits and attitudes.
+Story guidance:
+- Homework helps our brains practice and remember
+- A routine helps: same time, same place, no distractions
+- Break big tasks into smaller pieces
+- Take breaks when frustrated - come back refreshed
+- Ask for help when stuck (parents, teachers, siblings)
+- The satisfaction of completing work
+- Balance: homework first, then play
+Key messages: Practice makes learning stick. A little effort each day adds up. Asking for help is smart.
+
+[reading-alone]
+Encourage independent reading skills and love of books.
+Story guidance:
+- Reading opens doors to any world you can imagine
+- Everyone learns to read at their own pace
+- Sound out words slowly - it gets faster
+- Picture books are great - no shame in any reading level
+- Reading every day, even just 10 minutes, builds skill
+- Find books about topics you love
+- The library is a treasure chest of free books
+Key messages: Reading is a superpower. Every reader started at the beginning. Books are friends.
+
+[losing-game]
+Teach good sportsmanship and handling disappointment.
+Story guidance:
+- Everyone loses sometimes - even champions
+- Losing doesn't mean you're bad - it means you tried
+- How to lose gracefully: congratulate the winner, no tantrums
+- What we learn from losing: what to practice, how to improve
+- Having fun is more important than winning
+- Playing fair matters more than the outcome
+- Tomorrow is another chance
+Key messages: Losing is part of playing. Good sports are good people. We can always try again.
+
+[being-different]
+Celebrate uniqueness and teach acceptance.
+Story guidance:
+- Every person is unique - and that's what makes the world interesting
+- Differences might be: abilities, appearance, family, interests, culture
+- Different is not wrong - it's just different
+- We all have things that make us special
+- Being kind to everyone, even if they're different from us
+- Standing up for those who are treated unfairly
+- The best friends are sometimes the most unexpected
+Key messages: Different is beautiful. Everyone deserves kindness. Your uniqueness is your strength.
+
+[dealing-bully]
+Provide strategies for handling bullying situations.
+Story guidance:
+- Bullying is never okay and is never the victim's fault
+- What bullying looks like: mean words, excluding, physical hurting, spreading rumors
+- Strategies: walk away, use confident voice, find a trusted adult
+- Telling an adult is not tattling - it's getting help
+- Friends can stand together against bullies
+- Bullies often have their own problems - hurt people hurt people
+- You deserve to feel safe
+Key messages: Tell a trusted adult. You are not alone. Standing up (safely) is brave.
+
+[telling-truth]
+Reinforce honesty even when it's difficult.
+Story guidance:
+- Telling the truth, even when scared, is always the right choice
+- Lies grow bigger and harder to maintain
+- People trust those who tell the truth
+- Consequences for honesty are usually smaller than for lying
+- Being honest about mistakes shows courage
+- "I don't know" is better than making something up
+- Rebuilding trust after a lie takes time
+Key messages: Honesty is brave. Trust is earned through truth. Mistakes are forgivable, lies are harder.
+
+[trying-new-things]
+Encourage openness to new experiences.
+Story guidance:
+- New things can feel scary but often become favorites
+- You never know if you like something until you try
+- The first time is usually the hardest
+- Growth happens outside our comfort zone
+- It's okay to try and not like it - at least you tried!
+- New skills take practice - don't give up too soon
+- Each new thing tried is a small victory
+Key messages: New can become favorite. Trying is succeeding. Your world grows with each try.
+
+# =============================================================================
+# FAMILY CHANGES (All ages)
+# =============================================================================
+
+[moving-house]
+Help children cope with moving to a new home.
+Story guidance:
+- Change is hard but can lead to good things
+- Memories come with us - they live in our hearts
+- We can stay in touch with old friends (visits, calls, letters)
+- New home means new adventures, new friends
+- The new room can become special in time
+- It's okay to feel sad about leaving
+- Familiar items (toys, photos) make new places feel like home
+Key messages: Home is where family is. New places become familiar. Friendships can survive distance.
+
+[going-vacation]
+Prepare children for travel and being away from home.
+Story guidance:
+- Vacations are adventures and special family time
+- What to expect: packing, traveling, new places
+- It's okay to miss home - that's normal
+- New experiences: foods, places, activities
+- Keeping a journal or taking photos to remember
+- Different places have different rules - be flexible
+- Coming home feels good too
+Key messages: New experiences are exciting. Memories are treasures. Adventure awaits!
+
+[parents-splitting]
+Support children through parental separation/divorce.
+Story guidance:
+- This is NOT the child's fault - ever
+- Both parents still love the child completely
+- The child will be taken care of
+- Feelings of sadness, anger, confusion are all okay
+- Two homes can both feel like home
+- Parents' problems are adult problems - not for kids to fix
+- Things will feel normal again, just different normal
+Key messages: You are loved by both. This is not your fault. Your feelings are valid.
+
+[visiting-doctor]
+Reduce anxiety about doctor and medical visits.
+Story guidance:
+- Doctors help keep us healthy and fix problems
+- What to expect: waiting room, check-up steps, sometimes shots
+- Shots hurt for a second but protect us from sickness
+- It's okay to feel nervous - tell the doctor
+- Doctors and nurses are kind helpers
+- Being honest with the doctor helps them help us
+- Reward yourself after for being brave
+Key messages: Doctors are helpers. A little discomfort keeps us healthy. Bravery is doing it even when nervous.
+
+[staying-hospital]
+Prepare and comfort children facing hospitalization.
+Story guidance:
+- Hospitals are places where people get better
+- Family can visit, maybe even stay overnight
+- Doctors and nurses take care of you around the clock
+- It's okay to feel scared, sad, or bored
+- Bringing comfort items from home helps
+- Healing takes time - be patient with your body
+- You will go home when your body is ready
+Key messages: Hospitals help us heal. You are not alone. Your body knows how to get better.
+
+[death-pet]
+Help children process grief over losing a pet.
+Story guidance:
+- Death means the body stopped working and can't be fixed
+- Feeling very sad is normal and okay
+- Crying is okay - as many times as needed
+- The pet is not in pain anymore
+- Ways to remember: photos, drawings, talking about happy memories
+- The love you shared is forever
+- Getting a new pet later doesn't mean forgetting
+Key messages: Grief means we loved deeply. Memories live forever. It's okay to be very sad.
+
+[grandparent-sick]
+Support children when grandparents are seriously ill.
+Story guidance:
+- When older people get sick, sometimes it's very serious
+- Feeling scared and sad is completely normal
+- Ways to help: visit if possible, make cards, send love
+- Grown-ups will take care of medical things
+- It's okay to talk about feelings
+- Grandparents want to be remembered for happy times
+- Love doesn't stop, no matter what happens
+Key messages: Your love matters to them. Feelings are okay. Happy memories are treasures.
+
+# =============================================================================
+# PRE-TEEN (Ages 9-12)
+# =============================================================================
+
+[money-saving]
+Teach basic money management and saving habits.
+Story guidance:
+- Money is earned through work and effort
+- Saving means setting aside money for later
+- The difference between needs and wants
+- Setting a goal makes saving easier (something specific to buy)
+- Piggy banks, jars, or kid savings accounts
+- The satisfaction of saving up and reaching the goal
+- Compound interest - money can grow! (basic concept)
+Key messages: Patience pays off. Every little bit adds up. Plan before you spend.
+
+[spending-wisely]
+Teach thoughtful spending decisions.
+Story guidance:
+- Before buying, ask: Do I need it? Can I afford it? Is it worth it?
+- Comparing prices - the same thing can cost different amounts
+- Waiting before buying (the 24-hour rule for impulse purchases)
+- Quality vs. quantity - sometimes one good thing beats many cheap things
+- Advertising tries to make us want things we don't need
+- The difference between spending and wasting
+- Buyer's remorse - and how to avoid it
+Key messages: Think before you buy. Value comes in many forms. It's okay to say no to yourself.
+
+[screen-time]
+Help establish healthy relationships with screens and devices.
+Story guidance:
+- Screens are tools - useful but need balance
+- Too much screen time can affect sleep, eyes, and mood
+- Other activities are important: outside play, reading, family time
+- Taking breaks helps our brains and bodies
+- Being present with people is more important than phones
+- Setting limits and sticking to them
+- Screen-free zones and times (meals, bedtime)
+Key messages: Balance is key. Real life is richer than screens. You control the device, not the other way around.
+
+[peer-pressure]
+Teach resistance to negative peer pressure.
+Story guidance:
+- Peer pressure is when friends try to get you to do something
+- It can be positive (study together) or negative (break rules)
+- True friends respect your choices
+- Ways to say no: "No thanks," blame parents, suggest alternatives
+- It's okay to be different from the crowd
+- Your choices have consequences - you live with them, not your friends
+- Finding friends who share your values
+Key messages: You decide who you are. Real friends respect you. It takes courage to stand alone.
+
+[body-changes]
+Prepare children for puberty changes.
+Story guidance:
+- Bodies change as we grow up - it's completely normal
+- Everyone goes through it, just at different times
+- Changes might include: height, skin, body shape, feelings
+- These changes mean your body is healthy and working correctly
+- Having questions is normal - ask trusted adults
+- Taking care of changing bodies: hygiene, sleep, nutrition
+- Mood changes are part of it - be patient with yourself
+Key messages: Changes are normal. Everyone goes through this. Questions are good.
+
+[responsibility]
+Build a sense of personal responsibility.
+Story guidance:
+- Responsibility means being trusted to do what you're supposed to
+- Start small: homework, chores, pet care
+- Being responsible leads to more privileges and trust
+- Owning mistakes instead of blaming others
+- Following through even when no one is watching
+- The satisfaction of being relied upon
+- Responsibility is a sign of growing up
+Key messages: Responsibility earns trust. Own your actions. Being relied on feels good.
+
+[managing-time]
+Develop time management skills.
+Story guidance:
+- We all have the same 24 hours - how we use them matters
+- Prioritizing: important/urgent things first
+- Making a schedule or to-do list helps
+- Breaking big tasks into smaller chunks
+- Avoiding procrastination (doing easy fun things first)
+- Balancing: school, activities, rest, fun
+- Time wasted is gone forever - use it well
+Key messages: Plan your time. Start early, avoid rush. Balance work and play.
+
+[online-safety]
+Teach safe behavior on the internet.
+Story guidance:
+- Never share personal info: address, school, phone number, passwords
+- Not everyone online is who they say they are
+- If something feels wrong, tell a trusted adult
+- Cyberbullying hurts just like real bullying - tell someone
+- Think before posting: Would grandma approve?
+- Privacy settings are important
+- It's okay to log off when something makes you uncomfortable
+Key messages: Protect your information. Trust your gut feelings. Adults can help with online problems.

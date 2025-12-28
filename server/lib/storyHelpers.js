@@ -5,11 +5,90 @@
  * Used by both processStoryJob and processStorybookJob.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { hashImageData } = require('./images');
 const { buildVisualBiblePrompt } = require('./visualBible');
 const { OutlineParser } = require('./outlineParser');
+
+// ============================================================================
+// TEACHING GUIDES - Loaded from text files for easy editing
+// ============================================================================
+
+/**
+ * Parse a teaching guide file into a map of id -> guide content
+ * Format: [topic-id] followed by content until next [topic-id] or end
+ */
+function parseTeachingGuideFile(filePath) {
+  const guides = new Map();
+  try {
+    if (!fs.existsSync(filePath)) {
+      log.warn(`Teaching guide file not found: ${filePath}`);
+      return guides;
+    }
+
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n');
+
+    let currentId = null;
+    let currentContent = [];
+
+    for (const line of lines) {
+      // Check for new section: [topic-id]
+      const match = line.match(/^\[([a-z0-9-]+)\]$/);
+      if (match) {
+        // Save previous section if exists
+        if (currentId) {
+          guides.set(currentId, currentContent.join('\n').trim());
+        }
+        currentId = match[1];
+        currentContent = [];
+      } else if (currentId) {
+        // Skip comment lines at start of file
+        if (!line.startsWith('#') || currentContent.length > 0) {
+          currentContent.push(line);
+        }
+      }
+    }
+
+    // Save last section
+    if (currentId) {
+      guides.set(currentId, currentContent.join('\n').trim());
+    }
+
+    log.debug(`Loaded ${guides.size} teaching guides from ${path.basename(filePath)}`);
+  } catch (err) {
+    log.error(`Error loading teaching guide file ${filePath}:`, err.message);
+  }
+  return guides;
+}
+
+// Load teaching guides at startup
+const PROMPTS_DIR = path.join(__dirname, '../../prompts');
+const EDUCATIONAL_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'educational-guides.txt'));
+const LIFE_CHALLENGE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
+
+/**
+ * Get teaching guide for a specific topic
+ * @param {string} category - 'educational' or 'life-challenge'
+ * @param {string} topicId - The topic ID (e.g., 'months-year', 'potty-training')
+ * @returns {string|null} The teaching guide content or null if not found
+ */
+function getTeachingGuide(category, topicId) {
+  if (!topicId) return null;
+
+  // Normalize the topic ID (handle display names that might be passed)
+  const normalizedId = topicId.toLowerCase().replace(/\s+/g, '-');
+
+  if (category === 'educational') {
+    return EDUCATIONAL_GUIDES.get(normalizedId) || null;
+  } else if (category === 'life-challenge') {
+    return LIFE_CHALLENGE_GUIDES.get(normalizedId) || null;
+  }
+  return null;
+}
 
 // ============================================================================
 // CONFIGURATION
@@ -656,6 +735,9 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   const storyTopic = inputData.storyTopic || '';
   const storyTheme = inputData.storyTheme || inputData.storyType || 'adventure';
 
+  // Get teaching guide from external file if available
+  const teachingGuide = getTeachingGuide(storyCategory, storyTopic);
+
   let categoryGuidelines = '';
   if (storyCategory === 'life-challenge') {
     categoryGuidelines = `This is a LIFE SKILLS story about "${storyTopic}".
@@ -667,18 +749,23 @@ function buildStoryPrompt(inputData, sceneCount = null) {
 - Include practical tips or coping strategies woven into the narrative
 - End with a hopeful, empowering message
 - Avoid being preachy - let the lesson emerge naturally from the story
-${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - integrate the life lesson into this theme creatively` : '- This is a realistic story set in everyday life situations'}`;
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - integrate the life lesson into this theme creatively` : '- This is a realistic story set in everyday life situations'}
+
+${teachingGuide ? `**SPECIFIC GUIDANCE for "${storyTopic}":**
+${teachingGuide}` : ''}`;
   } else if (storyCategory === 'educational') {
     categoryGuidelines = `This is an EDUCATIONAL story teaching about "${storyTopic}".
 
 **IMPORTANT GUIDELINES for Educational Stories:**
-- The story should teach children about: ${storyTopic}
 - Weave the educational content naturally into an engaging narrative
 - Include accurate, age-appropriate information about the topic
 - Use repetition and reinforcement to help children learn
 - Make the learning fun and memorable through story elements
 - Include moments where characters discover or apply what they're learning
-${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - make learning part of the adventure` : '- Use everyday situations to explore the educational topic'}`;
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - make learning part of the adventure` : '- Use everyday situations to explore the educational topic'}
+
+${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
+${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
   } else {
     categoryGuidelines = `This is an ADVENTURE story with a ${storyTheme || inputData.storyType || 'adventure'} theme.
 
