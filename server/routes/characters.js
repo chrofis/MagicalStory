@@ -68,14 +68,17 @@ router.post('/', authenticateToken, async (req, res) => {
     };
 
     if (isDatabaseMode()) {
-      // Delete old characters and insert new ones
-      const deleteQuery = 'DELETE FROM characters WHERE user_id = $1';
-      await dbQuery(deleteQuery, [req.user.id]);
-
-      // Insert character data as a single record with all information
-      const characterId = `characters_${req.user.id}_${Date.now()}`;
-      const insertQuery = 'INSERT INTO characters (id, user_id, data) VALUES ($1, $2, $3)';
-      await dbQuery(insertQuery, [characterId, req.user.id, JSON.stringify(characterData)]);
+      // Use UPSERT to atomically update or insert character data
+      // We use a stable ID per user to ensure only one record exists
+      const characterId = `characters_${req.user.id}`;
+      const upsertQuery = `
+        INSERT INTO characters (id, user_id, data, created_at)
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+        ON CONFLICT (id) DO UPDATE SET
+          data = EXCLUDED.data,
+          created_at = CURRENT_TIMESTAMP
+      `;
+      await dbQuery(upsertQuery, [characterId, req.user.id, JSON.stringify(characterData)]);
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }

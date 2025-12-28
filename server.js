@@ -27,10 +27,39 @@ const log = {
   verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args)
 };
 
-// Credit costs for various operations (easy to configure)
-const CREDIT_COSTS = {
-  IMAGE_REGENERATION: 5,  // Cost to regenerate a single scene image (includes scene description)
+// Credit costs and pricing configuration (centralized for easy maintenance)
+const CREDIT_CONFIG = {
+  // Credit costs per operation
+  COSTS: {
+    IMAGE_REGENERATION: 5,    // Cost to regenerate a single scene image
+    COVER_REGENERATION: 5,    // Cost to regenerate a cover image
+    PER_PAGE: 10,             // Credits per story page (e.g., 20-page story = 200 credits)
+  },
+
+  // Credit purchase pricing
+  PRICING: {
+    CENTS_PER_CREDIT: 5,      // 5 cents per credit (CHF 0.05)
+    // So CHF 5 = 500 cents = 100 credits
+  },
+
+  // Credit limits
+  LIMITS: {
+    MIN_PURCHASE: 100,        // Minimum credits to purchase
+    MAX_PURCHASE: 10000,      // Maximum credits to purchase
+    INITIAL_USER: 500,        // Credits for new users
+    INITIAL_ADMIN: -1,        // Unlimited credits for admins (-1)
+  },
+
+  // Story page limits
+  STORY_PAGES: {
+    MIN: 10,
+    MAX: 100,
+    DEFAULT: 20,
+  },
 };
+
+// Legacy export for backward compatibility
+const CREDIT_COSTS = CREDIT_CONFIG.COSTS;
 
 // Initialize BOTH Stripe clients - test for admins/developers, live for regular users
 const stripeTest = process.env.STRIPE_TEST_SECRET_KEY
@@ -73,6 +102,7 @@ const admin = require('firebase-admin');
 // Import modular routes and services
 const { initializePool: initModularPool, logActivity, isDatabaseMode } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
+const { storyGenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
 const { generatePrintPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder } = require('./server/lib/gelato');
@@ -459,9 +489,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           const userId = parseInt(fullSession.metadata?.userId);
 
           // SERVER-SIDE VALIDATION: Calculate credits from amount paid, don't trust metadata
-          // Pricing: CHF 5 = 100 credits, CHF 10 = 200 credits, etc.
+          // Use centralized pricing config
           const amountPaid = fullSession.amount_total || 0; // in cents
-          const creditsToAdd = Math.floor(amountPaid / 5); // 5 cents = 1 credit (CHF 5 = 500 cents = 100 credits)
+          const creditsToAdd = Math.floor(amountPaid / CREDIT_CONFIG.PRICING.CENTS_PER_CREDIT);
 
           // Sanity check - metadata credits should roughly match calculated credits (allow 10% variance)
           const metadataCredits = parseInt(fullSession.metadata?.credits) || 0;
@@ -5179,20 +5209,19 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
 // Create Stripe checkout session for credits purchase
 app.post('/api/stripe/create-credits-checkout', authenticateToken, async (req, res) => {
   try {
-    const { credits: requestedCredits = 100 } = req.body;
+    const { credits: requestedCredits = CREDIT_CONFIG.LIMITS.MIN_PURCHASE } = req.body;
     const userId = req.user.id;
 
     // Server-side price validation - NEVER trust client-provided amounts
-    // Pricing: 5 CHF per 100 credits (0.05 CHF per credit)
-    const PRICE_PER_CREDIT_CENTS = 5; // 5 cents per credit
-    const MIN_CREDITS = 100;
-    const MAX_CREDITS = 10000;
+    // Use centralized pricing config
+    const { CENTS_PER_CREDIT } = CREDIT_CONFIG.PRICING;
+    const { MIN_PURCHASE, MAX_PURCHASE } = CREDIT_CONFIG.LIMITS;
 
     // Validate and sanitize credits amount
-    const credits = Math.min(MAX_CREDITS, Math.max(MIN_CREDITS, Math.round(Number(requestedCredits) || MIN_CREDITS)));
+    const credits = Math.min(MAX_PURCHASE, Math.max(MIN_PURCHASE, Math.round(Number(requestedCredits) || MIN_PURCHASE)));
 
     // Calculate amount server-side (never trust client)
-    const amount = credits * PRICE_PER_CREDIT_CENTS;
+    const amount = credits * CENTS_PER_CREDIT;
 
     // Get the appropriate Stripe client for this user
     const userStripe = getStripeForUser(req.user);
@@ -8567,7 +8596,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
 
 // Create a new story generation job
-app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.createStory), async (req, res) => {
+app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, validateBody(schemas.createStory), async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -8598,10 +8627,10 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
 
     const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Sanitize and validate input data
+    // Sanitize and validate input data using centralized config
     const inputData = {
       ...req.body,
-      pages: sanitizeInteger(req.body.pages, 20, 10, 100),
+      pages: sanitizeInteger(req.body.pages, CREDIT_CONFIG.STORY_PAGES.DEFAULT, CREDIT_CONFIG.STORY_PAGES.MIN, CREDIT_CONFIG.STORY_PAGES.MAX),
       language: sanitizeString(req.body.language || 'en', 50),
       languageLevel: sanitizeString(req.body.languageLevel || 'standard', 50),
       storyType: sanitizeString(req.body.storyType || '', 100),
@@ -8762,9 +8791,9 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
     }
 
     if (STORAGE_MODE === 'database') {
-      // Calculate credits needed: 10 credits per page
-      const pages = inputData.pages || 10;
-      const creditsNeeded = pages * 10;
+      // Calculate credits needed using centralized config
+      const pages = inputData.pages || CREDIT_CONFIG.STORY_PAGES.DEFAULT;
+      const creditsNeeded = pages * CREDIT_CONFIG.COSTS.PER_PAGE;
 
       // Check user's credits
       const userResult = await dbPool.query(
@@ -8792,7 +8821,7 @@ app.post('/api/jobs/create-story', authenticateToken, validateBody(schemas.creat
             error: 'Insufficient credits',
             creditsNeeded: creditsNeeded,
             creditsAvailable: userCredits,
-            message: `This story requires ${creditsNeeded} credits (${pages} pages x 10 credits), but you only have ${userCredits} credits.`
+            message: `This story requires ${creditsNeeded} credits (${pages} pages x ${CREDIT_CONFIG.COSTS.PER_PAGE} credits), but you only have ${userCredits} credits.`
           });
         }
 

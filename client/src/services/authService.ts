@@ -1,7 +1,8 @@
 import api from './api';
 import type { User, UserQuota, UserCredits } from '@/types/user';
 
-interface LoginResponse {
+// API response uses snake_case, mapped to camelCase in code
+interface LoginResponseRaw {
   token: string;
   user: {
     id: string;
@@ -9,8 +10,10 @@ interface LoginResponse {
     email?: string;
     role: 'user' | 'admin';
     credits: number;
-    story_quota?: number;
-    stories_generated?: number;
+    storyQuota?: number;      // Server already sends camelCase
+    storiesGenerated?: number;
+    emailVerified?: boolean;
+    photoConsentAt?: string | null;
   };
 }
 
@@ -24,7 +27,7 @@ interface RegisterResponse {
 
 export const authService = {
   async login(username: string, password: string): Promise<{ token: string; user: User }> {
-    const response = await api.post<LoginResponse>('/api/auth/login', {
+    const response = await api.post<LoginResponseRaw>('/api/auth/login', {
       username,
       password,
     }, { skipAuth: true });
@@ -49,7 +52,7 @@ export const authService = {
   },
 
   async loginWithFirebase(idToken: string): Promise<{ token: string; user: User }> {
-    const response = await api.post<LoginResponse>('/api/auth/firebase', {
+    const response = await api.post<LoginResponseRaw>('/api/auth/firebase', {
       idToken,
     }, { skipAuth: true });
 
@@ -65,15 +68,16 @@ export const authService = {
   },
 
   async getQuota(): Promise<UserQuota> {
+    // Server already sends camelCase
     const response = await api.get<{
-      story_quota: number;
-      stories_generated: number;
+      storyQuota: number;
+      storiesGenerated: number;
       remaining: number;
     }>('/api/user/quota');
 
     return {
-      storyQuota: response.story_quota,
-      storiesGenerated: response.stories_generated,
+      storyQuota: response.storyQuota,
+      storiesGenerated: response.storiesGenerated,
       remaining: response.remaining,
     };
   },

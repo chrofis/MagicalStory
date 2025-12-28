@@ -1533,10 +1533,10 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
         u.username as user_name
       FROM stories s
       LEFT JOIN users u ON s.user_id = u.id
-      WHERE s.created_at >= NOW() - INTERVAL '${days} days'
+      WHERE s.created_at >= NOW() - ($2 * INTERVAL '1 day')
       ORDER BY s.created_at DESC
       LIMIT $1
-    `, [limit]);
+    `, [limit, days]);
 
     // Aggregate token usage (including thinking tokens for Gemini 2.5)
     const totals = {
