@@ -9,20 +9,36 @@ const router = express.Router();
 
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
+const { validateBody, schemas, FILE_UPLOAD_CONFIG } = require('../middleware/validation');
 
 // POST /api/files - Upload a file
-router.post('/', authenticateToken, async (req, res) => {
+// Validates file type, MIME type, and size
+router.post('/', authenticateToken, validateBody(schemas.uploadFile), async (req, res) => {
   try {
     const { fileData, fileType, storyId, mimeType, filename } = req.body;
 
-    if (!fileData || !fileType || !mimeType) {
-      return res.status(400).json({ error: 'Missing required fields: fileData, fileType, mimeType' });
-    }
-
     // Extract base64 data (remove data URL prefix if present)
     const base64Data = fileData.replace(/^data:[^;]+;base64,/, '');
+
+    // Check base64 length before decoding (base64 is ~33% larger than binary)
+    const estimatedSize = Math.ceil(base64Data.length * 0.75);
+    if (estimatedSize > FILE_UPLOAD_CONFIG.MAX_FILE_SIZE) {
+      return res.status(413).json({
+        error: 'File too large',
+        maxSize: `${FILE_UPLOAD_CONFIG.MAX_FILE_SIZE / (1024 * 1024)}MB`
+      });
+    }
+
     const buffer = Buffer.from(base64Data, 'base64');
     const fileSize = buffer.length;
+
+    // Final size check after decoding
+    if (fileSize > FILE_UPLOAD_CONFIG.MAX_FILE_SIZE) {
+      return res.status(413).json({
+        error: 'File too large',
+        maxSize: `${FILE_UPLOAD_CONFIG.MAX_FILE_SIZE / (1024 * 1024)}MB`
+      });
+    }
 
     const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 

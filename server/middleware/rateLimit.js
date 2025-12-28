@@ -57,11 +57,31 @@ const passwordResetLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Error logging rate limiter (prevent DoS via log flooding)
+const errorLoggingLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 100, // Max 100 error logs per hour per IP
+  message: { error: 'Too many error logs. Rate limited.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Image regeneration rate limiter (prevent credit drain abuse)
+const imageRegenerationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // Max 10 regenerations per minute
+  message: { error: 'Too many image regeneration requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   authLimiter,
   registerLimiter,
   apiLimiter,
   storyGenerationLimiter,
   aiProxyLimiter,
-  passwordResetLimiter
+  passwordResetLimiter,
+  errorLoggingLimiter,
+  imageRegenerationLimiter
 };

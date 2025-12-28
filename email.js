@@ -14,6 +14,51 @@ const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO || 'info@magicalstory.ch';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@magicalstory.ch';
 
 // ===========================================
+// ERROR HANDLING
+// ===========================================
+
+/**
+ * Email error codes for distinguishing failure types
+ */
+const EmailErrorCode = {
+  NOT_CONFIGURED: 'NOT_CONFIGURED',    // RESEND_API_KEY not set
+  TEMPLATE_NOT_FOUND: 'TEMPLATE_NOT_FOUND',
+  INVALID_EMAIL: 'INVALID_EMAIL',
+  API_ERROR: 'API_ERROR',              // Resend API returned error
+  SEND_FAILED: 'SEND_FAILED',          // Network/timeout error
+  UNEXPECTED: 'UNEXPECTED'
+};
+
+/**
+ * Create a structured email result object
+ * @param {boolean} success - Whether the email was sent
+ * @param {object} data - Email data (id, etc) on success
+ * @param {object} error - Error details on failure
+ */
+function createEmailResult(success, data = null, error = null) {
+  return { success, data, error };
+}
+
+/**
+ * Create a structured error object
+ * @param {string} code - Error code from EmailErrorCode
+ * @param {string} message - Human-readable error message
+ * @param {boolean} isRetryable - Whether the operation can be retried
+ */
+function createEmailError(code, message, isRetryable = false) {
+  return { code, message, isRetryable };
+}
+
+/**
+ * Validate email address format
+ */
+function validateEmailAddress(email) {
+  if (!email || typeof email !== 'string') return false;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+}
+
+// ===========================================
 // EMAIL TEMPLATES
 // ===========================================
 
@@ -339,13 +384,28 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
  * @param {string} userName - User's name or username
  * @param {string} verifyUrl - Verification URL with token
  * @param {string} language - Language for email content (English, German, French)
+ * @returns {object} { success: boolean, data?: object, error?: { code, message, isRetryable } }
  */
 async function sendEmailVerificationEmail(userEmail, userName, verifyUrl, language = 'English') {
   console.log(`📧 [EMAIL] sendEmailVerificationEmail called for ${userEmail}`);
 
+  // Validate email address
+  if (!validateEmailAddress(userEmail)) {
+    console.error('❌ [EMAIL] Invalid email address:', userEmail);
+    return createEmailResult(false, null, createEmailError(
+      EmailErrorCode.INVALID_EMAIL,
+      'Invalid email address format',
+      false
+    ));
+  }
+
   if (!resend) {
     console.error('❌ [EMAIL] Resend API key not configured - RESEND_API_KEY environment variable is missing');
-    return null;
+    return createEmailResult(false, null, createEmailError(
+      EmailErrorCode.NOT_CONFIGURED,
+      'Email service not configured',
+      false
+    ));
   }
 
   // Get template for the specified language
@@ -353,7 +413,11 @@ async function sendEmailVerificationEmail(userEmail, userName, verifyUrl, langua
   if (!template) {
     console.error('❌ [EMAIL] Failed to get email-verification template - template may not be loaded');
     console.error('   Available templates:', Object.keys(EMAIL_TEMPLATES));
-    return null;
+    return createEmailResult(false, null, createEmailError(
+      EmailErrorCode.TEMPLATE_NOT_FOUND,
+      `Template 'email-verification' not found for ${language}`,
+      false
+    ));
   }
 
   console.log(`📧 [EMAIL] Template loaded for ${language}, sending to ${userEmail}...`);
@@ -375,14 +439,22 @@ async function sendEmailVerificationEmail(userEmail, userName, verifyUrl, langua
 
     if (error) {
       console.error('❌ Failed to send email verification email:', error);
-      return null;
+      return createEmailResult(false, null, createEmailError(
+        EmailErrorCode.API_ERROR,
+        error.message || 'Resend API error',
+        true // API errors are often retryable
+      ));
     }
 
     console.log(`📧 Email verification sent to ${userEmail} (${language}), id: ${data.id}`);
-    return data;
+    return createEmailResult(true, data, null);
   } catch (err) {
     console.error('❌ Email send error:', err);
-    return null;
+    return createEmailResult(false, null, createEmailError(
+      EmailErrorCode.SEND_FAILED,
+      err.message || 'Failed to send email',
+      true // Network errors are often retryable
+    ));
   }
 }
 
@@ -392,18 +464,37 @@ async function sendEmailVerificationEmail(userEmail, userName, verifyUrl, langua
  * @param {string} userName - User's name or username
  * @param {string} resetUrl - Password reset URL with token
  * @param {string} language - Language for email content (English, German, French)
+ * @returns {object} { success: boolean, data?: object, error?: { code, message, isRetryable } }
  */
 async function sendPasswordResetEmail(userEmail, userName, resetUrl, language = 'English') {
+  // Validate email address
+  if (!validateEmailAddress(userEmail)) {
+    console.error('❌ [EMAIL] Invalid email address:', userEmail);
+    return createEmailResult(false, null, createEmailError(
+      EmailErrorCode.INVALID_EMAIL,
+      'Invalid email address format',
+      false
+    ));
+  }
+
   if (!resend) {
     console.log('📧 Email not configured - skipping password reset email');
-    return null;
+    return createEmailResult(false, null, createEmailError(
+      EmailErrorCode.NOT_CONFIGURED,
+      'Email service not configured',
+      false
+    ));
   }
 
   // Get template for the specified language
   const template = getTemplateSection('password-reset', language);
   if (!template) {
     console.error('❌ Failed to get password-reset template');
-    return null;
+    return createEmailResult(false, null, createEmailError(
+      EmailErrorCode.TEMPLATE_NOT_FOUND,
+      `Template 'password-reset' not found for ${language}`,
+      false
+    ));
   }
 
   // Fill in placeholders
@@ -423,14 +514,22 @@ async function sendPasswordResetEmail(userEmail, userName, resetUrl, language = 
 
     if (error) {
       console.error('❌ Failed to send password reset email:', error);
-      return null;
+      return createEmailResult(false, null, createEmailError(
+        EmailErrorCode.API_ERROR,
+        error.message || 'Resend API error',
+        true
+      ));
     }
 
     console.log(`📧 Password reset email sent to ${userEmail} (${language}), id: ${data.id}`);
-    return data;
+    return createEmailResult(true, data, null);
   } catch (err) {
     console.error('❌ Email send error:', err);
-    return null;
+    return createEmailResult(false, null, createEmailError(
+      EmailErrorCode.SEND_FAILED,
+      err.message || 'Failed to send email',
+      true
+    ));
   }
 }
 
@@ -560,13 +659,22 @@ async function sendAdminOrderFailureAlert(sessionId, customerEmail, customerName
 
 // Export all functions
 module.exports = {
+  // Error handling utilities
+  EmailErrorCode,
+  createEmailResult,
+  createEmailError,
+  validateEmailAddress,
+  // Config check
   isEmailConfigured,
+  // Customer emails
   sendStoryCompleteEmail,
   sendStoryFailedEmail,
   sendOrderConfirmationEmail,
   sendOrderShippedEmail,
+  // Auth emails (return structured results)
   sendEmailVerificationEmail,
   sendPasswordResetEmail,
+  // Admin emails
   sendAdminStoryFailureAlert,
   sendAdminOrderFailureAlert,
 };

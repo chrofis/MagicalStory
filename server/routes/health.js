@@ -6,6 +6,8 @@
 
 const express = require('express');
 const router = express.Router();
+const { errorLoggingLimiter } = require('../middleware/rateLimit');
+const { validateBody, schemas } = require('../middleware/validation');
 
 // GET /api/health - Health check
 router.get('/health', (req, res) => {
@@ -29,7 +31,8 @@ router.get('/check-ip', async (req, res) => {
 });
 
 // POST /api/log-error - Browser error logging endpoint
-router.post('/log-error', (req, res) => {
+// Rate limited to prevent DoS via log flooding
+router.post('/log-error', errorLoggingLimiter, validateBody(schemas.logError), (req, res) => {
   try {
     const { message, stack, url, line, column, userAgent, userId, timestamp, errorType } = req.body;
 

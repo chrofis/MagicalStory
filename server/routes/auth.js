@@ -355,8 +355,13 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
 
     if (emailService) {
       const resetUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
-      await emailService.sendPasswordResetEmail(user.email, user.username, resetUrl);
-      console.log(`✅ Password reset email sent to ${user.email}`);
+      const emailResult = await emailService.sendPasswordResetEmail(user.email, user.username, resetUrl);
+      if (emailResult.success) {
+        console.log(`✅ Password reset email sent to ${user.email}`);
+      } else {
+        // Log error but don't expose to user (prevent email enumeration)
+        console.error(`❌ Password reset email failed for ${user.email}:`, emailResult.error);
+      }
     }
 
     res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
@@ -367,17 +372,10 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
 });
 
 // POST /api/auth/reset-password/confirm - Confirm password reset
-router.post('/reset-password/confirm', passwordResetLimiter, async (req, res) => {
+// Uses consistent password validation (min 8 chars) via schema
+router.post('/reset-password/confirm', passwordResetLimiter, validateBody(schemas.resetPasswordConfirm), async (req, res) => {
   try {
     const { token, password } = req.body;
-
-    if (!token || !password) {
-      return res.status(400).json({ error: 'Token and password are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    }
 
     if (!isDatabaseMode()) {
       return res.status(400).json({ error: 'Password reset requires database mode' });
@@ -409,18 +407,11 @@ router.post('/reset-password/confirm', passwordResetLimiter, async (req, res) =>
 });
 
 // POST /api/auth/change-password - Change password (authenticated)
-router.post('/change-password', authenticateToken, async (req, res) => {
+// Uses consistent password validation (min 8 chars) via schema
+router.post('/change-password', authenticateToken, validateBody(schemas.changePassword), async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Current password and new password are required' });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters' });
-    }
 
     if (!isDatabaseMode()) {
       return res.status(400).json({ error: 'Password change requires database mode' });
@@ -514,9 +505,15 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
 
     const emailResult = await emailService.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
 
-    if (!emailResult) {
-      console.error(`❌ Failed to send verification email to ${user.email} - no result returned`);
-      return res.status(500).json({ error: 'Failed to send verification email. Please try again later.' });
+    if (!emailResult.success) {
+      console.error(`❌ Failed to send verification email to ${user.email}:`, emailResult.error);
+      // Distinguish between retryable and permanent errors
+      const statusCode = emailResult.error?.isRetryable ? 503 : 500;
+      return res.status(statusCode).json({
+        error: emailResult.error?.isRetryable
+          ? 'Email service temporarily unavailable. Please try again later.'
+          : 'Failed to send verification email.'
+      });
     }
 
     console.log(`✅ Verification email sent successfully to ${user.email}`);
@@ -612,7 +609,12 @@ router.post('/change-email', authenticateToken, async (req, res) => {
 
     if (emailService) {
       const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-      await emailService.sendEmailVerificationEmail(newEmail, user.username, verifyUrl);
+      const emailResult = await emailService.sendEmailVerificationEmail(newEmail, user.username, verifyUrl);
+      if (!emailResult.success) {
+        console.error(`❌ Failed to send verification email for email change:`, emailResult.error);
+        // Email was already changed in DB, but verification email failed
+        // Still return success but log the error
+      }
     }
 
     res.json({

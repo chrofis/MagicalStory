@@ -128,12 +128,22 @@ function validateBody(schema) {
   };
 }
 
+// Password validation helper (reusable for consistency)
+const passwordRules = { required: true, type: 'string', minLength: 8, maxLength: 128 };
+
+// File upload constants
+const FILE_UPLOAD_CONFIG = {
+  MAX_FILE_SIZE: 50 * 1024 * 1024, // 50MB
+  ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+  ALLOWED_FILE_TYPES: ['story-image', 'user-photo', 'cover-image', 'avatar']
+};
+
 // Common validation schemas
 const schemas = {
   register: {
     username: { required: true, type: 'string', minLength: 3, maxLength: 30 },
     email: { required: true, type: 'email' },
-    password: { required: true, type: 'string', minLength: 8, maxLength: 128 }
+    password: passwordRules
   },
   login: {
     email: { required: true, type: 'email' },
@@ -149,6 +159,54 @@ const schemas = {
     storyTheme: { type: 'string', maxLength: 100 },
     artStyle: { type: 'string', maxLength: 50 },
     characters: { type: 'array', maxItems: 10 }
+  },
+  // Password reset confirmation
+  resetPasswordConfirm: {
+    token: { required: true, type: 'string', maxLength: 500 },
+    password: passwordRules
+  },
+  // Change password
+  changePassword: {
+    currentPassword: { required: true, type: 'string', minLength: 1, maxLength: 128 },
+    newPassword: passwordRules
+  },
+  // Error logging (browser errors)
+  logError: {
+    message: { type: 'string', maxLength: 500 },
+    stack: { type: 'string', maxLength: 2000 },
+    url: { type: 'string', maxLength: 2048 },
+    line: { type: 'integer', min: 0, max: 1000000 },
+    column: { type: 'integer', min: 0, max: 10000 },
+    userAgent: { type: 'string', maxLength: 500 },
+    userId: { type: 'string', maxLength: 100 },
+    timestamp: { type: 'string', maxLength: 50 },
+    errorType: { type: 'string', maxLength: 100 }
+  },
+  // File upload
+  uploadFile: {
+    fileData: { required: true, type: 'string' },
+    fileType: {
+      required: true,
+      type: 'string',
+      maxLength: 50,
+      custom: (val) => {
+        if (!FILE_UPLOAD_CONFIG.ALLOWED_FILE_TYPES.includes(val)) {
+          return `fileType must be one of: ${FILE_UPLOAD_CONFIG.ALLOWED_FILE_TYPES.join(', ')}`;
+        }
+      }
+    },
+    mimeType: {
+      required: true,
+      type: 'string',
+      maxLength: 50,
+      custom: (val) => {
+        if (!FILE_UPLOAD_CONFIG.ALLOWED_MIME_TYPES.includes(val)) {
+          return `mimeType must be one of: ${FILE_UPLOAD_CONFIG.ALLOWED_MIME_TYPES.join(', ')}`;
+        }
+      }
+    },
+    storyId: { type: 'string', maxLength: 100 },
+    filename: { type: 'string', maxLength: 255 }
   }
 };
 
@@ -157,5 +215,6 @@ module.exports = {
   sanitizeString,
   sanitizeInteger,
   validateBody,
-  schemas
+  schemas,
+  FILE_UPLOAD_CONFIG
 };
