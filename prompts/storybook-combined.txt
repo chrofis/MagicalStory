@@ -64,32 +64,43 @@ Select ONE clothing category per scene based on the context:
 - **standard** - Everyday casual scenes (regular clothes, indoor activities)
 
 
-# VISUAL BIBLE
+# VISUAL BIBLE (MINIMUM {PAGES} ENTRIES REQUIRED)
+
+You MUST add at least {PAGES} entries to the Visual Bible. Include:
+- **ALL LOCATIONS** - Every distinct place in the story
+- **ALL OBJECTS** - Every important item (toys, tools, magical items, etc.)
+- **ALL ANIMALS/PETS** - Any animals that appear
+- **ALL SECONDARY CHARACTERS** - Anyone who is not a main character
+
+⚠️ DO NOT include these main characters (they are already defined): {MAIN_CHARACTER_NAMES}
 
 ## Secondary Characters
-⚠️ DO NOT include these main characters (they are already defined): {MAIN_CHARACTER_NAMES}
-For each OTHER person who appears in multiple scenes (e.g., teacher, shopkeeper, neighbor):
+For each person NOT a main character:
 - **Name/Role**: (e.g., "Fireman Fred")
-- **Physical description**: Age, height, build, hair color/style, eye color, skin tone, distinguishing features
-- **Clothing**: What they wear (be specific about colors and details)
+- **Visual**: [apparent age], [build: short/average/tall, slim/stocky/muscular], [hair: color, style, length], [face: eye color, skin tone, 1-2 distinctive features]
+- **Signature Look**: [ONE memorable visual element for instant recognition, e.g., "bright red bandana", "gold tooth"]
+- **Clothing**: [specific colors and details - be consistent]
+
+**Apparent age categories:** infant/baby (0-1) | toddler (1-2) | preschooler (3-4) | kindergartner (5-6) | young school-age child (7-8) | school-age child (9-10) | preteen (11-12) | young teen (13-14) | teenager (15-17) | young adult (18-25) | adult (26-39) | middle-aged (40-59) | senior (60-75) | elderly (75+)
+
+**RULES:** Use standalone terms for build/size - NO comparisons. Signature Look must be visually striking.
 
 ## Animals & Creatures
-For any animal or creature appearing in multiple scenes:
-- **Name**: What it's called (e.g., "Whiskers" or "the family cat")
+- **Name**: What it's called (e.g., "Whiskers")
 - **Species**: Type of animal/creature
 - **Coloring**: Exact colors and patterns (e.g., "white fur with orange patches on both ears")
 - **Size**: Relative size description
-- **Distinguishing features**: Collar, markings, accessories
+- **Features**: Collar, markings, accessories, distinguishing details
 
-## Important Artifacts
-For objects that appear in multiple scenes and must look consistent:
-- **Name**: (e.g., "the magic map" or "grandma's locket")
+## Artifacts (Objects)
+- **Name**: (e.g., "the magic map")
+- **Type**: What kind of object
 - **Description**: Size, color, material, condition, distinctive markings
 
-## Recurring Locations (if visually distinctive)
-For specific places that appear multiple times with unique visual features:
+## Locations
 - **Name**: What it's called
-- **Key visual features**: Colors, shapes, distinctive elements
+- **Setting**: Indoor/outdoor, type of place
+- **Features**: Colors, shapes, distinctive visual elements
 
 
 
@@ -113,23 +124,30 @@ You MUST provide output in this EXACT order: TITLE, VISUAL BIBLE, COVER SCENES, 
 TITLE: [Creative story title]
 
 ---VISUAL BIBLE---
-(Track recurring visual elements for consistency across illustrations. Skip any category that doesn't apply.)
+(Add at least {PAGES} entries - all locations, objects, animals, and secondary characters)
 
 ### Secondary Characters
-(Characters who appear but aren't the main characters - describe their appearance)
-- **[Name]** (pages X, Y, Z): [Physical description - hair color, clothing, distinctive features]
+**[Name/Role]** (pages X, Y, Z)
+- Visual: [apparent age], [build], [hair], [face features]
+- Signature Look: [ONE memorable visual element]
+- Clothing: [specific colors and details]
 
 ### Animals & Creatures
-(Pets, magical creatures, animals that appear multiple times)
-- **[Name]** (pages X, Y, Z): [Species, color, size, distinctive features]
+**[Name]** (pages X, Y, Z)
+- Species: [type]
+- Coloring: [exact colors and patterns]
+- Size: [relative size]
+- Features: [distinctive details]
 
-### Artifacts
-(Important objects that appear multiple times)
-- **[Name]** (pages X, Y, Z): [Color, material, size, distinctive details]
+### Artifacts (Objects)
+**[Name]** (pages X, Y, Z)
+- Type: [what kind of object]
+- Description: [size, color, material, distinctive markings]
 
 ### Locations
-(Settings that appear multiple times)
-- **[Name]** (pages X, Y, Z): [Key visual features, colors, atmosphere]
+**[Name]** (pages X, Y, Z)
+- Setting: [indoor/outdoor, type]
+- Features: [distinctive visual elements]
 
 ---TITLE PAGE---
 SCENE: (visual only - do NOT mention title text)
