@@ -1549,8 +1549,9 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Get characters from story data
     const characters = storyData.characters || [];
 
-    // Get language from story data
-    const language = storyData.language || 'English';
+    // Get language from story data (convert code to name)
+    const { getLanguageNameEnglish } = require('./server/lib/languages');
+    const language = getLanguageNameEnglish(storyData.language || 'en');
 
     // Get Visual Bible for recurring elements
     const visualBible = storyData.visualBible || null;
@@ -6104,9 +6105,10 @@ async function processStoryJob(jobId) {
     // Check if this is a picture book (1st-grade) - use simplified combined flow
     const isPictureBook = inputData.languageLevel === '1st-grade';
 
-    // Get language for scene descriptions
+    // Get language for scene descriptions (use centralized config)
     const lang = inputData.language || 'en';
-    const langText = lang === 'de' ? 'German' : lang === 'fr' ? 'French' : 'English';
+    const { getLanguageNameEnglish } = require('./server/lib/languages');
+    const langText = getLanguageNameEnglish(lang);
 
     // Calculate number of story scenes to generate:
     // - Picture Book: 1 scene per page (image + text on same page)

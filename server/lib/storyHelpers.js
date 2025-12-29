@@ -1405,22 +1405,27 @@ function buildSceneExpansionPrompt(sceneSummary, inputData, sceneCharacters, vis
 
   // Select language-appropriate template
   const langCode = (language || 'en').toLowerCase();
+  // Check for German variants (de, de-de, de-ch)
+  const isGerman = langCode.startsWith('de');
+  const isFrench = langCode === 'fr';
   let template = null;
 
-  if (langCode === 'de' && PROMPT_TEMPLATES.sceneExpansionDe) {
+  if (isGerman && PROMPT_TEMPLATES.sceneExpansionDe) {
     template = PROMPT_TEMPLATES.sceneExpansionDe;
-  } else if (langCode === 'fr' && PROMPT_TEMPLATES.sceneExpansionFr) {
+  } else if (isFrench && PROMPT_TEMPLATES.sceneExpansionFr) {
     template = PROMPT_TEMPLATES.sceneExpansionFr;
   } else if (PROMPT_TEMPLATES.sceneExpansion) {
     template = PROMPT_TEMPLATES.sceneExpansion;
   }
 
   if (template) {
+    // Use centralized language functions
+    const { getLanguageNameEnglish } = require('./languages');
     return fillTemplate(template, {
       SCENE_SUMMARY: sceneSummary,
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
-      LANGUAGE: langCode === 'de' ? 'Deutsch' : langCode === 'fr' ? 'Français' : 'English',
+      LANGUAGE: getLanguageNameEnglish(langCode),
       LANGUAGE_NOTE: getLanguageNote(langCode)
     });
   }
