@@ -76,6 +76,83 @@ Token count seems off
 
 
 
+---
+
+# Technical Debt & Refactoring (2024-12-29)
+
+## Completed
+
+### Security & Validation
+- [x] Rate limiting for `/log-error` endpoint
+- [x] File upload validation (size, MIME type)
+- [x] Password validation consistency (min 8 chars)
+- [x] Image regeneration rate limiting
+
+### Frontend
+- [x] Extract wizard step components (WizardStep1-4)
+- [x] Extract StoryDisplay modals (SceneEditModal, ImageHistoryModal, EnlargedImageModal)
+- [x] Replace all alert() calls with Toast notifications
+- [x] Extract CreditsModal from Navigation.tsx
+- [x] Create useDeveloperMode hook
+
+---
+
+## Pending - Server Route Extraction
+
+### Extract Webhook Handlers (~450 lines)
+**From:** `server.js` → **To:** `server/routes/webhooks.js`
+- `POST /api/stripe/webhook`
+- `POST /api/gelato/webhook`
+
+### Extract PDF Generation (~700 lines)
+**From:** `server.js` → **To:** `server/routes/pdf.js`
+- `GET /api/stories/:id/pdf`
+- `GET /api/stories/:id/print-pdf`
+- `POST /api/generate-pdf`
+- `POST /api/generate-book-pdf`
+
+### Extract Payment Endpoints (~250 lines)
+**From:** `server.js` → **To:** `server/routes/payments.js`
+- `GET /api/pricing`
+- `POST /api/stripe/create-checkout-session`
+- `POST /api/stripe/create-credits-checkout`
+
+### Extract Job Management (~530 lines)
+**From:** `server.js` → **To:** `server/routes/jobs.js`
+- `POST /api/jobs/create-story`
+- `GET /api/jobs/:jobId/status`
+- `POST /api/jobs/:jobId/cancel`
+
+---
+
+## Pending - Frontend Refactoring
+
+### StoryWizard.tsx (2555 lines → target <1500)
+- [ ] Extract `useWizardNavigation.ts` hook
+- [ ] Extract `useStoryConfiguration.ts` hook
+- [ ] Extract `useCharacterManagement.ts` hook
+- [ ] Extract `WizardStep5Generation.tsx` component
+
+### StoryDisplay.tsx (2341 lines → target <1500)
+- [ ] Extract `TitleEditor.tsx`
+- [ ] Extract `PageDisplay.tsx`
+- [ ] Extract `CoverSection.tsx`
+
+### CharacterForm.tsx (750 lines → target <400)
+- [ ] Extract `CharacterNameStep.tsx`
+- [ ] Extract `CharacterTraitsStep.tsx`
+- [ ] Extract `AvatarSection.tsx`
+
+---
+
+## Pending - Performance
+
+- [ ] Admin users pagination
+- [ ] Gelato batch queries
+- [ ] Move MODEL_PRICING to config file
+
+---
+
 **done**
 
 Cover image at start of prompt, so this can start to generate early
