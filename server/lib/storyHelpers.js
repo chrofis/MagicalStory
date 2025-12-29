@@ -19,6 +19,25 @@ const { getLanguageNote } = require('./languages');
 // ============================================================================
 
 /**
+ * Strip JSON metadata block from scene description (for image prompts)
+ * Removes the ```json ... ``` block so it doesn't go to the image API
+ * @param {string} sceneDescription - The scene description text
+ * @returns {string} Scene description without JSON metadata block
+ */
+function stripSceneMetadata(sceneDescription) {
+  if (!sceneDescription) return sceneDescription;
+
+  // Remove section header and JSON block: "7. **METADATA (JSON):**\n```json\n...\n```" or just "```json\n...\n```"
+  // Also handle variations like "**METADATA:**" or just the JSON block
+  let stripped = sceneDescription
+    .replace(/\n*\d*\.?\s*\*{0,2}METADATA\s*\(?JSON\)?\*{0,2}:?\s*\n*```json[\s\S]*?```\n*/gi, '\n')
+    .replace(/```json[\s\S]*?```\n*/gi, '')
+    .trim();
+
+  return stripped;
+}
+
+/**
  * Extract JSON metadata block from scene description
  * Looks for ```json ... ``` block containing characters, clothing, objects
  * @param {string} sceneDescription - The scene description text
@@ -1152,6 +1171,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // Build image generation prompt (matches step-by-step format)
   // For storybook mode: visualBible entries are added here since there's no separate scene description step
   // For parallel/sequential modes: Visual Bible is also in scene description, but adding here ensures consistency
+
+  // Strip JSON metadata block from scene description (not needed in image prompt)
+  const cleanSceneDescription = stripSceneMetadata(sceneDescription);
+
   const artStyleId = inputData.artStyle || 'pixar';
   const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
   const language = (inputData.language || 'en').toLowerCase();
@@ -1258,7 +1281,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     // Fill all placeholders in template
     return fillTemplate(template, {
       STYLE_DESCRIPTION: styleDescription,
-      SCENE_DESCRIPTION: sceneDescription,
+      SCENE_DESCRIPTION: cleanSceneDescription,
       CHARACTER_REFERENCE_LIST: characterReferenceList,
       VISUAL_BIBLE: visualBibleSection,
       AGE_FROM: inputData.ageFrom || 3,

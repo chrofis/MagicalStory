@@ -1118,9 +1118,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       }
     } catch (error) {
       // Check if this is a safety/content block error
+      // "no candidates" means Gemini refused to generate - likely safety filter
       const errorMsg = error.message.toLowerCase();
       const isSafetyBlock = errorMsg.includes('blocked') || errorMsg.includes('safety') ||
-                           errorMsg.includes('prohibited') || errorMsg.includes('filtered');
+                           errorMsg.includes('prohibited') || errorMsg.includes('filtered') ||
+                           errorMsg.includes('no candidates');
 
       if (isSafetyBlock && !wasSceneRewritten && attempts < MAX_ATTEMPTS && callTextModel) {
         log.debug(`🚫 [QUALITY RETRY] Image blocked by safety filter, attempting to rewrite scene...`);
