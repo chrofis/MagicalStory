@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
-import { RetryHistoryDisplay, ReferencePhotosDisplay } from './story';
+import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal } from './story';
 
 interface StoryTextPrompt {
   batch: number;
@@ -2304,206 +2304,35 @@ export function StoryDisplay({
 
       {/* Scene Edit Modal - for editing scene before regenerating */}
       {sceneEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full shadow-2xl">
-            <div className="p-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <Edit3 size={20} />
-                {language === 'de' ? `Szene bearbeiten - Seite ${sceneEditModal.pageNumber}` :
-                 language === 'fr' ? `Modifier la scène - Page ${sceneEditModal.pageNumber}` :
-                 `Edit Scene - Page ${sceneEditModal.pageNumber}`}
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {language === 'de' ? 'Bearbeiten Sie die Szenenbeschreibung und generieren Sie das Bild neu.' :
-                 language === 'fr' ? 'Modifiez la description de la scène et régénérez l\'image.' :
-                 'Edit the scene description and regenerate the image.'}
-              </p>
-            </div>
-            <div className="p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {language === 'de' ? 'Szenenbeschreibung:' :
-                 language === 'fr' ? 'Description de la scène:' :
-                 'Scene description:'}
-              </label>
-              <textarea
-                value={sceneEditModal.scene}
-                onChange={(e) => setSceneEditModal({ ...sceneEditModal, scene: e.target.value })}
-                className="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
-                placeholder={language === 'de' ? 'Beschreiben Sie die Szene...' :
-                            language === 'fr' ? 'Décrivez la scène...' :
-                            'Describe the scene...'}
-              />
-              <p className="text-xs text-gray-400 mt-2">
-                {language === 'de' ? 'Tipp: Beschreiben Sie die Charaktere, ihre Aktionen und die Umgebung.' :
-                 language === 'fr' ? 'Conseil: Décrivez les personnages, leurs actions et l\'environnement.' :
-                 'Tip: Describe the characters, their actions, and the environment.'}
-              </p>
-            </div>
-            <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => setSceneEditModal(null)}
-                disabled={isRegenerating}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium disabled:opacity-50"
-              >
-                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
-              </button>
-              <button
-                onClick={handleRegenerateWithScene}
-                disabled={isRegenerating || !sceneEditModal.scene.trim()}
-                className={`px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium flex items-center gap-2 ${
-                  isRegenerating || !sceneEditModal.scene.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'
-                }`}
-              >
-                {isRegenerating ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin" />
-                    {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Generating...'}
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw size={16} />
-                    {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                    <span className="text-xs opacity-80">({imageRegenerationCost} credits)</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SceneEditModal
+          pageNumber={sceneEditModal.pageNumber}
+          scene={sceneEditModal.scene}
+          onSceneChange={(scene) => setSceneEditModal({ ...sceneEditModal, scene })}
+          onClose={() => setSceneEditModal(null)}
+          onRegenerate={handleRegenerateWithScene}
+          isRegenerating={isRegenerating}
+          imageRegenerationCost={imageRegenerationCost}
+        />
       )}
 
       {/* Image History Modal */}
       {imageHistoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <Images size={20} />
-                {language === 'de' ? `Bildversionen - Seite ${imageHistoryModal.pageNumber}` :
-                 language === 'fr' ? `Versions d'image - Page ${imageHistoryModal.pageNumber}` :
-                 `Image Versions - Page ${imageHistoryModal.pageNumber}`}
-              </h3>
-              <button
-                onClick={() => setImageHistoryModal(null)}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {imageHistoryModal.versions.map((version, idx) => (
-                  <div
-                    key={idx}
-                    className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
-                      version.isActive
-                        ? 'border-green-500 ring-2 ring-green-200'
-                        : 'border-gray-200 hover:border-indigo-300'
-                    }`}
-                    onClick={() => handleSelectVersion(imageHistoryModal.pageNumber, idx)}
-                  >
-                    <img
-                      src={version.imageData}
-                      alt={`Version ${idx + 1}`}
-                      className="w-full aspect-square object-cover"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-2">
-                      <div className="flex items-center justify-between">
-                        <span>
-                          {idx === 0
-                            ? (language === 'de' ? 'Original' : language === 'fr' ? 'Original' : 'Original')
-                            : `V${idx + 1}`
-                          }
-                        </span>
-                        {version.isActive && (
-                          <span className="bg-green-500 px-2 py-0.5 rounded text-[10px] font-bold">
-                            {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-gray-300 mt-1">
-                        {new Date(version.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {/* Dev mode: Show scene and prompt comparison */}
-              {developerMode && imageHistoryModal.versions.length > 1 && (
-                <div className="mt-4 space-y-3">
-                  <h4 className="font-semibold text-gray-700">
-                    {language === 'de' ? 'Szenen- und Prompt-Vergleich' : language === 'fr' ? 'Comparaison de scènes et prompts' : 'Scene & Prompt Comparison'}
-                  </h4>
-                  {imageHistoryModal.versions.map((version, idx) => (
-                    <details key={idx} className={`rounded-lg p-3 ${version.isActive ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                      <summary className="cursor-pointer text-sm font-medium text-gray-700">
-                        {idx === 0 ? 'Original' : `V${idx + 1}`}
-                        {version.isActive && <span className="ml-2 text-green-600 text-xs">(Active)</span>}
-                      </summary>
-                      <div className="mt-2 space-y-2">
-                        {version.description && (
-                          <div>
-                            <div className="text-xs font-semibold text-amber-700">
-                              {language === 'de' ? 'Szene:' : language === 'fr' ? 'Scène:' : 'Scene:'}
-                            </div>
-                            <pre className="text-xs text-gray-600 whitespace-pre-wrap bg-white p-2 rounded border border-gray-200 max-h-24 overflow-y-auto">
-                              {version.description}
-                            </pre>
-                          </div>
-                        )}
-                        {version.prompt && (
-                          <div>
-                            <div className="text-xs font-semibold text-blue-700">
-                              {language === 'de' ? 'API-Prompt:' : language === 'fr' ? 'Prompt API:' : 'API Prompt:'}
-                            </div>
-                            <pre className="text-xs text-gray-600 whitespace-pre-wrap bg-white p-2 rounded border border-gray-200 max-h-32 overflow-y-auto">
-                              {version.prompt}
-                            </pre>
-                          </div>
-                        )}
-                        {version.modelId && (
-                          <div className="text-xs text-gray-500">Model: {version.modelId}</div>
-                        )}
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="p-4 border-t border-gray-200 text-sm text-gray-500">
-              {language === 'de' ? 'Klicken Sie auf ein Bild, um es auszuwählen' :
-               language === 'fr' ? 'Cliquez sur une image pour la sélectionner' :
-               'Click an image to select it'}
-            </div>
-          </div>
-        </div>
+        <ImageHistoryModal
+          pageNumber={imageHistoryModal.pageNumber}
+          versions={imageHistoryModal.versions}
+          onClose={() => setImageHistoryModal(null)}
+          onSelectVersion={handleSelectVersion}
+          developerMode={developerMode}
+        />
       )}
 
       {/* Enlarged Image Modal for repair before/after comparison */}
       {enlargedImage && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
-          onClick={() => setEnlargedImage(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-lg overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-gray-100 px-4 py-2 flex items-center justify-between border-b">
-              <h3 className="font-semibold text-gray-800">{enlargedImage.title}</h3>
-              <button
-                onClick={() => setEnlargedImage(null)}
-                className="text-gray-500 hover:text-gray-700 p-1"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-4 bg-gray-50">
-              <img
-                src={enlargedImage.src}
-                alt={enlargedImage.title}
-                className="max-w-full max-h-[80vh] object-contain mx-auto"
-              />
-            </div>
-          </div>
-        </div>
+        <EnlargedImageModal
+          src={enlargedImage.src}
+          title={enlargedImage.title}
+          onClose={() => setEnlargedImage(null)}
+        />
       )}
     </div>
   );
