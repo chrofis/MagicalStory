@@ -311,7 +311,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         originalScore: img.originalScore || null,
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
-        faceEvaluation: img.faceEvaluation || null
+        faceEvaluation: img.faceEvaluation || null,
+        referencePhotos: img.referencePhotos || null
       })) || [],
       // Cover images dev data
       coverImages: story.coverImages ? {
@@ -319,19 +320,22 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           prompt: story.coverImages.frontCover.prompt || null,
           qualityReasoning: story.coverImages.frontCover.qualityReasoning || null,
           retryHistory: story.coverImages.frontCover.retryHistory || [],
-          totalAttempts: story.coverImages.frontCover.totalAttempts || null
+          totalAttempts: story.coverImages.frontCover.totalAttempts || null,
+          referencePhotos: story.coverImages.frontCover.referencePhotos || null
         } : null,
         initialPage: story.coverImages.initialPage && typeof story.coverImages.initialPage === 'object' ? {
           prompt: story.coverImages.initialPage.prompt || null,
           qualityReasoning: story.coverImages.initialPage.qualityReasoning || null,
           retryHistory: story.coverImages.initialPage.retryHistory || [],
-          totalAttempts: story.coverImages.initialPage.totalAttempts || null
+          totalAttempts: story.coverImages.initialPage.totalAttempts || null,
+          referencePhotos: story.coverImages.initialPage.referencePhotos || null
         } : null,
         backCover: story.coverImages.backCover && typeof story.coverImages.backCover === 'object' ? {
           prompt: story.coverImages.backCover.prompt || null,
           qualityReasoning: story.coverImages.backCover.qualityReasoning || null,
           retryHistory: story.coverImages.backCover.retryHistory || [],
-          totalAttempts: story.coverImages.backCover.totalAttempts || null
+          totalAttempts: story.coverImages.backCover.totalAttempts || null,
+          referencePhotos: story.coverImages.backCover.referencePhotos || null
         } : null
       } : null
     };

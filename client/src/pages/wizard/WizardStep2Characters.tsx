@@ -16,6 +16,7 @@ interface WizardStep2Props {
   isRegeneratingAvatarsWithTraits: boolean;
   developerMode: boolean;
   changedTraits?: ChangedTraits;  // Which traits changed from previous photo
+  photoAnalysisDebug?: { rawResponse?: string; error?: string };  // Debug info for dev mode
   onCharacterChange: (character: Character | null) => void;
   onCharacterStepChange: (step: 'photo' | 'name' | 'traits') => void;
   onPhotoSelect: (file: File) => void;
@@ -46,6 +47,7 @@ export function WizardStep2Characters({
   isRegeneratingAvatarsWithTraits,
   developerMode,
   changedTraits,
+  photoAnalysisDebug,
   onCharacterChange,
   onCharacterStepChange,
   onPhotoSelect,
@@ -106,6 +108,7 @@ export function WizardStep2Characters({
             step="name"
             developerMode={developerMode}
             changedTraits={changedTraits}
+            photoAnalysisDebug={photoAnalysisDebug}
           />
         </div>
       );
@@ -134,6 +137,7 @@ export function WizardStep2Characters({
           step="traits"
           developerMode={developerMode}
           changedTraits={changedTraits}
+          photoAnalysisDebug={photoAnalysisDebug}
         />
       </div>
     );

@@ -93,6 +93,7 @@ export default function StoryWizard() {
   const [isRegeneratingAvatars, setIsRegeneratingAvatars] = useState(false);
   const [isRegeneratingAvatarsWithTraits, setIsRegeneratingAvatarsWithTraits] = useState(false);
   const [changedTraits, setChangedTraits] = useState<ChangedTraits | undefined>(undefined);
+  const [photoAnalysisDebug, setPhotoAnalysisDebug] = useState<{ rawResponse?: string; error?: string } | undefined>(undefined);
   const previousTraitsRef = useRef<{ physical?: Character['physical']; gender?: string; age?: string } | null>(null);
 
   // Step 3: Relationships - loaded from API with characters
@@ -871,12 +872,15 @@ export default function StoryWizard() {
             gender: analysis.gender,
           });
 
-          // Log raw API response in dev mode for debugging
-          if (analysis._debug?.rawResponse && import.meta.env.DEV) {
-            console.log('📸 [DEBUG] Raw Gemini response:', analysis._debug.rawResponse);
-          }
-          if (analysis._debug?.error) {
-            console.warn('📸 [DEBUG] Gemini error:', analysis._debug.error);
+          // Store debug info for UI display (dev mode)
+          if (analysis._debug) {
+            setPhotoAnalysisDebug(analysis._debug);
+            if (analysis._debug.rawResponse && import.meta.env.DEV) {
+              console.log('📸 [DEBUG] Raw Gemini response:', analysis._debug.rawResponse);
+            }
+            if (analysis._debug.error) {
+              console.warn('📸 [DEBUG] Gemini error:', analysis._debug.error);
+            }
           }
 
           setCurrentCharacter(prev => {
@@ -1905,6 +1909,7 @@ export default function StoryWizard() {
             isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
             developerMode={developerMode}
             changedTraits={changedTraits}
+            photoAnalysisDebug={photoAnalysisDebug}
             onCharacterChange={setCurrentCharacter}
             onCharacterStepChange={setCharacterStep}
             onPhotoSelect={handlePhotoSelect}

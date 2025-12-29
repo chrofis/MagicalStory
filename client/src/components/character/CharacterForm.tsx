@@ -309,6 +309,7 @@ interface CharacterFormProps {
   step: 'name' | 'traits';
   developerMode?: boolean;
   changedTraits?: ChangedTraits;  // New: which traits changed from previous photo
+  photoAnalysisDebug?: { rawResponse?: string; error?: string };  // Debug info for dev mode
 }
 
 export function CharacterForm({
@@ -330,6 +331,7 @@ export function CharacterForm({
   step,
   developerMode,
   changedTraits,
+  photoAnalysisDebug,
 }: CharacterFormProps) {
   const { t, language } = useLanguage();
   const [enlargedAvatar, setEnlargedAvatar] = useState(false);
@@ -803,6 +805,19 @@ export function CharacterForm({
             />
           </div>
         </div>
+      )}
+
+      {/* Developer Mode: Show raw Gemini response from photo analysis */}
+      {developerMode && photoAnalysisDebug?.rawResponse && (
+        <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+          <summary className="text-xs font-semibold text-purple-700 cursor-pointer">
+            Raw Gemini Response (Photo Analysis)
+            {photoAnalysisDebug.error && <span className="text-red-500 ml-2">⚠️ {photoAnalysisDebug.error}</span>}
+          </summary>
+          <pre className="mt-2 p-2 bg-white rounded text-[10px] whitespace-pre-wrap overflow-auto max-h-64 border border-purple-200 font-mono">
+            {photoAnalysisDebug.rawResponse}
+          </pre>
+        </details>
       )}
 
       {/* Clothing Avatars (developer only - all 4 variants) */}
