@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
 import { Navigation, Footer } from '@/components/common';
+import { storyService } from '@/services';
 
 const sectionTranslations = {
   en: {
@@ -131,17 +132,31 @@ export default function LandingPage() {
     }
   };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = async () => {
     // Check for redirect parameter (e.g., from email link when not logged in)
     // Ignore '/' as a redirect - we want to go to /create after login, not stay on home
     const redirectParam = searchParams.get('redirect');
     const redirectUrl = redirectParam && redirectParam !== '/' && redirectParam !== '%2F'
       ? decodeURIComponent(redirectParam)
       : null;
+
     if (redirectUrl) {
       navigate(redirectUrl);
     } else {
-      navigate('/create');
+      // Check if user has any stories - redirect accordingly
+      try {
+        const { pagination } = await storyService.getStories({ limit: 1 });
+        if (pagination.total > 0) {
+          // Existing user with stories → go to My Stories
+          navigate('/stories');
+        } else {
+          // New user without stories → go to Create
+          navigate('/create');
+        }
+      } catch {
+        // On error, default to create page
+        navigate('/create');
+      }
     }
   };
 

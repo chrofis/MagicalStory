@@ -80,7 +80,7 @@ export default function StoryWizard() {
     return localStorage.getItem('story_custom_theme_text') || '';
   });
   const [artStyle, setArtStyle] = useState(() => {
-    return localStorage.getItem('story_art_style') || 'pixar';
+    return localStorage.getItem('story_art_style') || 'watercolor';
   });
 
   // Step 2: Characters
@@ -2187,7 +2187,7 @@ export default function StoryWizard() {
                 setStoryCategory('' as any);
                 setStoryTopic('');
                 setStoryTheme('');
-                setArtStyle('pixar');
+                setArtStyle('watercolor');
                 setLanguageLevel('standard');
                 setPages(30);
                 setDedication('');

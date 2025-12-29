@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, BookOpen, Settings, Users, Package, CreditCard, KeyRound, Scale } from 'lucide-react';
+import { LogOut, BookOpen, Settings, Users, Package, CreditCard, KeyRound, Scale, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Language } from '@/types/story';
@@ -32,6 +32,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
   const texts = {
     language: language === 'de' ? 'Sprache' : language === 'fr' ? 'Langue' : 'Language',
     credits: language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits',
+    createNewStory: language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'Create New Story',
     myStories: language === 'de' ? 'Meine Geschichten' : language === 'fr' ? 'Mes histoires' : 'My Stories',
     myOrders: language === 'de' ? 'Meine Bestellungen' : language === 'fr' ? 'Mes commandes' : 'My Orders',
     buyCredits: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des crédits' : 'Buy Credits',
@@ -87,6 +88,15 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
 
       {isAuthenticated && (
         <>
+          {/* Create New Story */}
+          <button
+            onClick={() => handleNavigate('/create')}
+            className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
+          >
+            <Sparkles size={16} />
+            <span>{texts.createNewStory}</span>
+          </button>
+
           {/* My Stories */}
           <button
             onClick={() => handleNavigate('/stories')}
