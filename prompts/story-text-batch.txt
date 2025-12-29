@@ -96,13 +96,15 @@ Remember: Characters that feel ALIVE and UNIQUE are what make a great story. Cor
 ### Secondary Characters
 For each person NOT a main character:
 **[Name/Role]** (pages X, Y, Z)
-- Visual: [age category: child/teen/young adult/middle-aged/elderly], [build: short/average/tall, slim/stocky/muscular], [hair: color, style, length], [face: eye color, skin tone, 1-2 distinctive features]
+- Visual: [apparent age], [build: short/average/tall, slim/stocky/muscular], [hair: color, style, length], [face: eye color, skin tone, 1-2 distinctive features]
 - Signature Look: [ONE memorable visual element for instant recognition, e.g., "bright red bandana", "gold tooth", "curved wooden cane"]
 - Clothing: [specific colors and details - be consistent]
 
+**Apparent age categories:** infant/baby (0-1) | toddler (1-2) | preschooler (3-4) | kindergartner (5-6) | young school-age child (7-8) | school-age child (9-10) | preteen (11-12) | young teen (13-14) | teenager (15-17) | young adult (18-25) | adult (26-39) | middle-aged (40-59) | senior (60-75) | elderly (75+)
+
 **RULES for Secondary Characters:**
 - Use standalone terms for build/size - NO comparisons to other characters
-- Use age categories, not specific ages
+- Use apparent age categories above - you may add specific ages for clarity (e.g., "teenager, around 16")
 - Signature Look must be visually striking and easy to reproduce
 
 ### Animals & Creatures
