@@ -491,59 +491,52 @@ router.get('/:userId/stories', authenticateToken, requireAdmin, async (req, res)
     }
     const targetUsername = userResult[0].username;
 
-    // Use JSON operators to extract only metadata (not full image data) for performance
-    // Note: data column is TEXT, so we cast to jsonb for JSON operators
-    const selectQuery = `SELECT
-      d->>'id' as id,
-      d->>'title' as title,
-      d->>'createdAt' as "createdAt",
-      d->>'updatedAt' as "updatedAt",
-      (d->>'pages')::int as pages,
-      d->>'language' as language,
-      d->>'languageLevel' as "languageLevel",
-      d->'characters' as characters_json,
-      COALESCE(jsonb_array_length(d->'sceneImages'), 0) as scene_count,
-      CASE
-        WHEN d->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
-        WHEN d->'coverImages'->'frontCover' IS NOT NULL AND jsonb_typeof(d->'coverImages'->'frontCover') = 'string' THEN true
-        WHEN d->>'thumbnail' IS NOT NULL THEN true
-        ELSE false
-      END as "hasThumbnail"
-    FROM stories, LATERAL (SELECT data::jsonb AS d) AS parsed
-    WHERE user_id = $1
-    ORDER BY created_at DESC`;
+    // Use metadata column for fast queries, fallback to data if metadata is null
+    const selectQuery = 'SELECT metadata, CASE WHEN metadata IS NULL THEN data ELSE NULL END as data FROM stories WHERE user_id = $1 ORDER BY created_at DESC';
     const rows = await dbQuery(selectQuery, [targetUserId]);
 
     const userStories = rows.map(row => {
-      const sceneCount = parseInt(row.scene_count) || 0;
-      const isPictureBook = row.languageLevel === '1st-grade';
+      let meta;
+      if (row.metadata) {
+        meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+      } else if (row.data) {
+        // Fallback: parse full data
+        const story = JSON.parse(row.data);
+        const sceneCount = story.sceneImages?.length || 0;
+        meta = {
+          id: story.id,
+          title: story.title,
+          createdAt: story.createdAt,
+          updatedAt: story.updatedAt,
+          pages: story.pages,
+          language: story.language,
+          languageLevel: story.languageLevel,
+          sceneCount,
+          hasThumbnail: !!(story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail),
+          characters: (story.characters || []).map(c => ({ id: c.id, name: c.name })),
+        };
+      } else {
+        return null;
+      }
+
+      const sceneCount = meta.sceneCount || 0;
+      const isPictureBook = meta.languageLevel === '1st-grade';
       const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
       const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
 
-      // Parse characters from JSON (small data)
-      let characters = [];
-      try {
-        const charsData = typeof row.characters_json === 'string'
-          ? JSON.parse(row.characters_json)
-          : row.characters_json;
-        characters = (charsData || []).map(c => ({ name: c.name, id: c.id }));
-      } catch (e) {
-        // Ignore parse errors
-      }
-
       return {
-        id: row.id,
-        title: row.title,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-        pages: row.pages,
-        language: row.language,
-        languageLevel: row.languageLevel,
-        characters,
+        id: meta.id,
+        title: meta.title,
+        createdAt: meta.createdAt,
+        updatedAt: meta.updatedAt,
+        pages: meta.pages,
+        language: meta.language,
+        languageLevel: meta.languageLevel,
+        characters: meta.characters || [],
         pageCount,
-        hasThumbnail: row.hasThumbnail || false
+        hasThumbnail: meta.hasThumbnail || false
       };
-    });
+    }).filter(Boolean);
 
     log.info(`[ADMIN] Found ${userStories.length} stories for user ${targetUsername} (ID: ${targetUserId})`);
     res.json({ userId: targetUserId, username: targetUsername, stories: userStories });

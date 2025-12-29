@@ -13,6 +13,35 @@ const { dbQuery, isDatabaseMode, logActivity, getPool } = require('../services/d
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 
+/**
+ * Build metadata object from story data for fast list queries.
+ * This extracts only the fields needed for listing stories.
+ */
+function buildStoryMetadata(story) {
+  const sceneCount = story.sceneImages?.length || 0;
+  const hasThumbnail = !!(
+    story.coverImages?.frontCover?.imageData ||
+    story.coverImages?.frontCover ||
+    story.thumbnail
+  );
+
+  return {
+    id: story.id,
+    title: story.title,
+    createdAt: story.createdAt,
+    updatedAt: story.updatedAt,
+    pages: story.pages,
+    language: story.language,
+    languageLevel: story.languageLevel,
+    isPartial: story.isPartial || false,
+    generatedPages: story.generatedPages,
+    totalPages: story.totalPages,
+    sceneCount,
+    hasThumbnail,
+    characters: (story.characters || []).map(c => ({ id: c.id, name: c.name })),
+  };
+}
+
 // GET /api/stories - List user's stories (paginated, metadata only)
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -29,74 +58,49 @@ router.get('/', authenticateToken, async (req, res) => {
       const countResult = await dbQuery('SELECT COUNT(*) as count FROM stories WHERE user_id = $1', [req.user.id]);
       totalCount = parseInt(countResult[0]?.count || 0);
 
-      // Get paginated data using JSON operators to extract only metadata (not full image data)
-      // This is MUCH faster than loading the entire data blob which contains base64 images
-      // Note: data column is TEXT, so we cast to jsonb inline
+      // Get paginated data using metadata column (fast - no image data loaded)
+      // Falls back to full data parsing if metadata is null (for stories created before migration)
       const rows = await dbQuery(
-        `SELECT
-          (data::jsonb)->>'id' as id,
-          (data::jsonb)->>'title' as title,
-          (data::jsonb)->>'createdAt' as "createdAt",
-          (data::jsonb)->>'updatedAt' as "updatedAt",
-          ((data::jsonb)->>'pages')::int as pages,
-          (data::jsonb)->>'language' as language,
-          (data::jsonb)->>'languageLevel' as "languageLevel",
-          (data::jsonb)->'characters' as characters_json,
-          COALESCE(jsonb_array_length((data::jsonb)->'sceneImages'), 0) as scene_count,
-          ((data::jsonb)->>'isPartial')::boolean as "isPartial",
-          ((data::jsonb)->>'generatedPages')::int as "generatedPages",
-          ((data::jsonb)->>'totalPages')::int as "totalPages",
-          CASE
-            WHEN (data::jsonb)->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
-            WHEN (data::jsonb)->'coverImages'->'frontCover' IS NOT NULL AND jsonb_typeof((data::jsonb)->'coverImages'->'frontCover') = 'string' THEN true
-            WHEN (data::jsonb)->>'thumbnail' IS NOT NULL THEN true
-            ELSE false
-          END as "hasThumbnail"
-        FROM stories
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT $2 OFFSET $3`,
+        'SELECT metadata, CASE WHEN metadata IS NULL THEN data ELSE NULL END as data FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
         [req.user.id, limit, offset]
       );
 
-      // Map database results to response format (no JSON parsing needed!)
+      // Map rows to story metadata
       userStories = rows.map(row => {
-        // Calculate page count:
-        // - Picture book (1st-grade): 1 scene = 1 page (image with text below)
-        // - Standard/Advanced: 1 scene = 2 pages (text page + image page)
-        // - Plus 3 cover pages (front, back, initial/dedication)
-        const sceneCount = parseInt(row.scene_count) || 0;
-        const isPictureBook = row.languageLevel === '1st-grade';
+        // Use metadata if available, otherwise parse from data (fallback for old stories)
+        let meta;
+        if (row.metadata) {
+          meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+        } else if (row.data) {
+          // Fallback: parse full data (slow path for stories without metadata)
+          const story = JSON.parse(row.data);
+          meta = buildStoryMetadata(story);
+        } else {
+          return null; // Skip invalid rows
+        }
+
+        // Calculate page count from scene count
+        const sceneCount = meta.sceneCount || 0;
+        const isPictureBook = meta.languageLevel === '1st-grade';
         const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
         const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
 
-        // Parse characters from JSON (small data)
-        let characters = [];
-        try {
-          const charsData = typeof row.characters_json === 'string'
-            ? JSON.parse(row.characters_json)
-            : row.characters_json;
-          characters = (charsData || []).map(c => ({ name: c.name, id: c.id }));
-        } catch (e) {
-          // Ignore parse errors
-        }
-
         return {
-          id: row.id,
-          title: row.title,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-          pages: row.pages,
-          language: row.language,
-          languageLevel: row.languageLevel,
-          characters,
+          id: meta.id,
+          title: meta.title,
+          createdAt: meta.createdAt,
+          updatedAt: meta.updatedAt,
+          pages: meta.pages,
+          language: meta.language,
+          languageLevel: meta.languageLevel,
+          characters: meta.characters || [],
           pageCount,
-          hasThumbnail: row.hasThumbnail || false,
-          isPartial: row.isPartial || false,
-          generatedPages: row.generatedPages,
-          totalPages: row.totalPages
+          hasThumbnail: meta.hasThumbnail || false,
+          isPartial: meta.isPartial || false,
+          generatedPages: meta.generatedPages,
+          totalPages: meta.totalPages
         };
-      });
+      }).filter(Boolean); // Remove null entries
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
@@ -385,10 +389,19 @@ router.post('/', authenticateToken, async (req, res) => {
       const existing = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [story.id, req.user.id]);
       isNewStory = existing.length === 0;
 
+      // Build metadata for fast list queries
+      const metadata = buildStoryMetadata(story);
+
       if (isNewStory) {
-        await dbQuery('INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3)', [story.id, req.user.id, JSON.stringify(story)]);
+        await dbQuery(
+          'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4)',
+          [story.id, req.user.id, JSON.stringify(story), JSON.stringify(metadata)]
+        );
       } else {
-        await dbQuery('UPDATE stories SET data = $1 WHERE id = $2 AND user_id = $3', [JSON.stringify(story), story.id, req.user.id]);
+        await dbQuery(
+          'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3 AND user_id = $4',
+          [JSON.stringify(story), JSON.stringify(metadata), story.id, req.user.id]
+        );
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -500,8 +513,9 @@ router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
       storyData.sceneDescriptions = sceneDescriptions;
     }
 
-    // Save updated story
-    await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+    // Save updated story with metadata
+    const metadata = buildStoryMetadata(storyData);
+    await pool.query('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
 
     console.log(`✅ Page ${pageNumber} updated for story ${id}`);
 
@@ -547,7 +561,9 @@ router.put('/:id/visual-bible', authenticateToken, async (req, res) => {
     storyData.visualBible = visualBible;
     storyData.updatedAt = new Date().toISOString();
 
-    await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+    // Note: visualBible doesn't affect metadata, but update for consistency
+    const metadata = buildStoryMetadata(storyData);
+    await pool.query('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
 
     console.log(`✅ Visual Bible updated for story ${id}`);
 
@@ -618,7 +634,8 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
     storyData.storyText = newStoryText; // Also update storyText for compatibility
     storyData.updatedAt = new Date().toISOString();
 
-    await dbQuery('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+    const metadata = buildStoryMetadata(storyData);
+    await dbQuery('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
 
     console.log(`✅ Story text updated for ${id}`);
     await logActivity(req.user.id, req.user.username, 'STORY_TEXT_EDITED', { storyId: id });
@@ -678,7 +695,9 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
     storyData.title = title.trim();
     storyData.updatedAt = new Date().toISOString();
 
-    await dbQuery('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+    // Title is in metadata, so we need to update it
+    const metadata = buildStoryMetadata(storyData);
+    await dbQuery('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
 
     console.log(`✅ Story title updated for ${id}: "${title.trim()}"`);
     await logActivity(req.user.id, req.user.username, 'STORY_TITLE_EDITED', { storyId: id, newTitle: title.trim() });
@@ -749,7 +768,8 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     storyData.sceneImages = sceneImages;
     storyData.updatedAt = new Date().toISOString();
 
-    await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [JSON.stringify(storyData), id]);
+    const metadata = buildStoryMetadata(storyData);
+    await pool.query('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
 
     console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum}`);
 

@@ -100,7 +100,7 @@ const email = require('./email');
 const admin = require('firebase-admin');
 
 // Import modular routes and services
-const { initializePool: initModularPool, logActivity, isDatabaseMode } = require('./server/services/database');
+const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
@@ -1590,12 +1590,9 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
       sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
     }
 
-    // Save updated story
+    // Save updated story with metadata
     storyData.sceneDescriptions = sceneDescriptions;
-    await dbPool.query(
-      'UPDATE stories SET data = $1 WHERE id = $2',
-      [JSON.stringify(storyData), id]
-    );
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber}`);
 
@@ -1833,12 +1830,9 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     storyData.imagePrompts = storyData.imagePrompts || {};
     storyData.imagePrompts[pageNumber] = imagePrompt;
 
-    // Save updated story
+    // Save updated story with metadata
     storyData.sceneImages = sceneImages;
-    await dbPool.query(
-      'UPDATE stories SET data = $1 WHERE id = $2',
-      [JSON.stringify(storyData), id]
-    );
+    await saveStoryData(id, storyData);
 
     // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
@@ -2151,11 +2145,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       storyData.coverImages.backCover = coverData;
     }
 
-    // Save updated story
-    await dbPool.query(
-      'UPDATE stories SET data = $1 WHERE id = $2',
-      [JSON.stringify(storyData), id]
-    );
+    // Save updated story with metadata
+    await saveStoryData(id, storyData);
 
     // Deduct credits and log transaction (skip for infinite credits or impersonating admin)
     let newCredits = hasInfiniteCredits ? -1 : userCredits - requiredCredits;
@@ -2286,12 +2277,9 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, imageRegener
       };
     }
 
-    // Save updated story
+    // Save updated story with metadata
     storyData.sceneImages = sceneImages;
-    await dbPool.query(
-      'UPDATE stories SET data = $1 WHERE id = $2',
-      [JSON.stringify(storyData), id]
-    );
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore})`);
 
@@ -2380,12 +2368,9 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegen
         };
       }
 
-      // Save updated story
+      // Save updated story with metadata
       storyData.sceneImages = sceneImages;
-      await dbPool.query(
-        'UPDATE stories SET data = $1 WHERE id = $2',
-        [JSON.stringify(storyData), id]
-      );
+      await saveStoryData(id, storyData);
 
       log.info(`✅ [REPAIR] Image repaired for story ${id}, page ${pageNumber}`);
     } else {
@@ -2502,12 +2487,9 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
     };
     coverImages[coverKey] = updatedCover;
 
-    // Save updated story
+    // Save updated story with metadata
     storyData.coverImages = coverImages;
-    await dbPool.query(
-      'UPDATE stories SET data = $1 WHERE id = $2',
-      [JSON.stringify(storyData), id]
-    );
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
 
@@ -2575,11 +2557,8 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
       storyData.sceneDescriptions = sceneDescriptions;
     }
 
-    // Save updated story
-    await dbPool.query(
-      'UPDATE stories SET data = $1 WHERE id = $2',
-      [JSON.stringify(storyData), id]
-    );
+    // Save updated story with metadata
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Page ${pageNumber} updated for story ${id}`);
 
@@ -5870,11 +5849,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     log.debug(`   💰 TOTAL COST: $${totalCost.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
 
-    // Insert into stories table
-    await dbPool.query(
-      'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
-      [storyId, userId, JSON.stringify(storyData)]
-    );
+    // Insert into stories table with metadata for fast list queries
+    await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [STORYBOOK] Story ${storyId} saved to stories table`);
 
     // Log credit completion (credits were already reserved at job creation)
@@ -7310,11 +7286,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     log.debug(`   💰 TOTAL COST: $${totalCost.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
 
-    // Insert into stories table
-    await dbPool.query(
-      'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
-      [storyId, job.user_id, JSON.stringify(storyData)]
-    );
+    // Insert into stories table with metadata for fast list queries
+    await upsertStory(storyId, job.user_id, storyData);
     log.debug(`📚 Story ${storyId} saved to stories table`);
 
     // Log credit completion (credits were already reserved at job creation)
@@ -7557,10 +7530,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               updatedAt: new Date().toISOString()
             };
 
-            await dbPool.query(
-              'INSERT INTO stories (id, user_id, data) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $3',
-              [jobId, userId, JSON.stringify(storyData)]
-            );
+            await upsertStory(jobId, userId, storyData);
             log.debug(`📚 [PARTIAL SAVE] Saved partial story ${jobId} with ${sceneImages.length} images to stories table`);
           } else {
             log.debug('📚 [PARTIAL SAVE] No content to save');

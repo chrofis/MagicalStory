@@ -402,6 +402,66 @@ async function logActivity(userId, username, action, details) {
   }
 }
 
+/**
+ * Build metadata object from story data for fast list queries.
+ * This extracts only the fields needed for listing stories.
+ */
+function buildStoryMetadata(story) {
+  const sceneCount = story.sceneImages?.length || 0;
+  const hasThumbnail = !!(
+    story.coverImages?.frontCover?.imageData ||
+    story.coverImages?.frontCover ||
+    story.thumbnail
+  );
+
+  return {
+    id: story.id,
+    title: story.title,
+    createdAt: story.createdAt,
+    updatedAt: story.updatedAt,
+    pages: story.pages,
+    language: story.language,
+    languageLevel: story.languageLevel,
+    isPartial: story.isPartial || false,
+    generatedPages: story.generatedPages,
+    totalPages: story.totalPages,
+    sceneCount,
+    hasThumbnail,
+    characters: (story.characters || []).map(c => ({ id: c.id, name: c.name })),
+  };
+}
+
+/**
+ * Save story data with metadata column for fast list queries.
+ * Use this instead of raw UPDATE to ensure metadata stays in sync.
+ */
+async function saveStoryData(storyId, storyData) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  const metadata = buildStoryMetadata(storyData);
+  await dbQuery(
+    'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
+    [JSON.stringify(storyData), JSON.stringify(metadata), storyId]
+  );
+}
+
+/**
+ * Insert or update story data with metadata.
+ */
+async function upsertStory(storyId, userId, storyData) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  const metadata = buildStoryMetadata(storyData);
+  await dbQuery(
+    'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET data = $3, metadata = $4',
+    [storyId, userId, JSON.stringify(storyData), JSON.stringify(metadata)]
+  );
+}
+
 module.exports = {
   initializePool,
   initializeDatabase,
@@ -409,5 +469,8 @@ module.exports = {
   getPool,
   closePool,
   isDatabaseMode,
-  logActivity
+  logActivity,
+  buildStoryMetadata,
+  saveStoryData,
+  upsertStory
 };
