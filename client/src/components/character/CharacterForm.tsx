@@ -198,6 +198,7 @@ interface CharacterFormProps {
   onPhotoChange: (file: File) => void;
   onContinueToTraits?: () => void;
   onSaveAndGenerateAvatar?: () => void;  // New: triggers avatar generation
+  onSaveAndRegenerateWithTraits?: () => void;  // Combined save + regenerate with traits
   onRegenerateAvatars?: () => void;
   onRegenerateAvatarsWithTraits?: () => void;
   isLoading?: boolean;
@@ -218,6 +219,7 @@ export function CharacterForm({
   onPhotoChange,
   onContinueToTraits,
   onSaveAndGenerateAvatar,
+  onSaveAndRegenerateWithTraits,
   onRegenerateAvatars,
   onRegenerateAvatarsWithTraits,
   isLoading,
@@ -895,13 +897,27 @@ export function CharacterForm({
         )}
         <Button
           onClick={onSave}
-          disabled={!canSaveCharacter || isLoading}
-          loading={isLoading}
+          disabled={!canSaveCharacter || isLoading || isRegeneratingAvatarsWithTraits}
+          loading={isLoading && !isRegeneratingAvatarsWithTraits}
           icon={Save}
-          className={onCancel ? "flex-1" : "w-full"}
+          className={onCancel ? "flex-1" : (onSaveAndRegenerateWithTraits ? "flex-1" : "w-full")}
         >
           {t.saveCharacter}
         </Button>
+        {onSaveAndRegenerateWithTraits && (
+          <Button
+            onClick={onSaveAndRegenerateWithTraits}
+            disabled={!canSaveCharacter || isLoading || isRegeneratingAvatarsWithTraits}
+            loading={isRegeneratingAvatarsWithTraits}
+            icon={Wand2}
+            variant="primary"
+            className="flex-1"
+          >
+            {language === 'de' ? 'Speichern & Avatar' :
+             language === 'fr' ? 'Enreg. & avatar' :
+             'Save & Avatar'}
+          </Button>
+        )}
       </div>
 
       {!canSaveCharacter && (

@@ -982,6 +982,83 @@ export default function StoryWizard() {
     }
   };
 
+  // Handler for "Save & Regenerate" button - combines save and avatar regeneration
+  const handleSaveAndRegenerateWithTraits = async () => {
+    if (!currentCharacter) return;
+
+    setIsRegeneratingAvatarsWithTraits(true);
+    try {
+      log.info(`💾 Saving character and regenerating avatars for ${currentCharacter.name}...`);
+
+      // First, save the character with current state
+      await saveCharacter();
+
+      // Then regenerate avatars with the new traits
+      log.info(`🔄 Regenerating avatars WITH TRAITS for ${currentCharacter.name}...`);
+
+      // Get the LATEST character from state after save
+      const latestChar = await new Promise<Character | null>(resolve => {
+        setCurrentCharacter(prev => {
+          resolve(prev);
+          return prev;
+        });
+      });
+
+      if (!latestChar) {
+        log.warn('No current character after save');
+        return;
+      }
+
+      // Use the service function that includes physical traits
+      const result = await characterService.generateClothingAvatarsWithTraits(latestChar);
+
+      if (result.success && result.avatars) {
+        // Update local state with new avatars
+        const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
+
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
+        setCharacters(prev => prev.map(c =>
+          c.id === latestChar.id ? { ...c, avatars: freshAvatars } : c
+        ));
+
+        log.success(`✅ Avatars regenerated for ${latestChar.name}`);
+
+        // Save again with the new avatars
+        const updatedChar = { ...latestChar, avatars: freshAvatars };
+        const latestCharacters = await new Promise<Character[]>(resolve => {
+          setCharacters(prev => {
+            resolve(prev);
+            return prev;
+          });
+        });
+        const finalCharacters = latestCharacters.map(c =>
+          c.id === updatedChar.id ? updatedChar : c
+        );
+
+        await characterService.saveCharacterData({
+          characters: finalCharacters,
+          relationships,
+          relationshipTexts,
+          customRelationships,
+          customStrengths: [],
+          customWeaknesses: [],
+          customFears: [],
+        });
+
+        log.success(`💾 Character saved with new avatars`);
+        showSuccess(language === 'de' ? 'Charakter gespeichert und Avatar regeneriert' : 'Character saved and avatar regenerated');
+      } else {
+        log.error(`❌ Failed to regenerate avatars: ${result.error}`);
+        showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      log.error(`❌ Failed to save and regenerate:`, error);
+      showError(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsRegeneratingAvatarsWithTraits(false);
+    }
+  };
+
   // Handler for "Save & Generate Avatar" button
   // Moves to traits step and triggers avatar generation in background
   const handleSaveAndGenerateAvatar = async () => {
@@ -1234,14 +1311,23 @@ export default function StoryWizard() {
 
   // Save all character data including relationships (only if modified)
   const saveAllCharacterData = async () => {
-    if (characters.length === 0) return;
+    // Get LATEST characters from state to avoid stale closure issues
+    const latestCharacters = await new Promise<Character[]>(resolve => {
+      setCharacters(prev => {
+        resolve(prev);
+        return prev;
+      });
+    });
+
+    if (latestCharacters.length === 0) return;
     if (!relationshipsDirty.current) {
       log.debug('Relationships not modified, skipping save');
       return;
     }
     try {
+      log.debug('Auto-saving character data with latest state...');
       await characterService.saveCharacterData({
-        characters,
+        characters: latestCharacters,
         relationships,
         relationshipTexts,
         customRelationships,
@@ -1751,6 +1837,7 @@ export default function StoryWizard() {
             onStartNewCharacter={startNewCharacter}
             onRegenerateAvatars={handleRegenerateAvatars}
             onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
+            onSaveAndRegenerateWithTraits={handleSaveAndRegenerateWithTraits}
             onContinue={goNext}
           />
         );

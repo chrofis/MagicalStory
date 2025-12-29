@@ -26,6 +26,7 @@ interface WizardStep2Props {
   onStartNewCharacter: () => void;
   onRegenerateAvatars: () => void;
   onRegenerateAvatarsWithTraits: () => void;
+  onSaveAndRegenerateWithTraits: () => void;  // Combined save + regenerate with traits
   onContinue: () => void;
 }
 
@@ -55,6 +56,7 @@ export function WizardStep2Characters({
   onStartNewCharacter,
   onRegenerateAvatars,
   onRegenerateAvatarsWithTraits,
+  onSaveAndRegenerateWithTraits,
   onContinue,
 }: WizardStep2Props) {
   const { t, language } = useLanguage();
@@ -123,6 +125,7 @@ export function WizardStep2Characters({
           onPhotoChange={onPhotoSelect}
           onRegenerateAvatars={onRegenerateAvatars}
           onRegenerateAvatarsWithTraits={onRegenerateAvatarsWithTraits}
+          onSaveAndRegenerateWithTraits={onSaveAndRegenerateWithTraits}
           isLoading={isLoading}
           isAnalyzingPhoto={isAnalyzingPhoto}
           isGeneratingAvatar={isGeneratingAvatar}
