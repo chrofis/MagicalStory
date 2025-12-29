@@ -94,6 +94,11 @@ export const adminTranslations = {
     confirmDeleteProduct: 'Are you sure you want to delete this product?',
     editProduct: 'Edit Product',
     editPages: 'Edit Page Range',
+    // Pagination
+    searchUsers: 'Search users...',
+    search: 'Search',
+    showingUsers: 'Showing {from}-{to} of {total}',
+    pageOf: 'Page {page} of {total}',
   },
   de: {
     title: 'Admin-Dashboard',
@@ -186,6 +191,11 @@ export const adminTranslations = {
     confirmDeleteProduct: 'Sind Sie sicher, dass Sie dieses Produkt löschen möchten?',
     editProduct: 'Produkt bearbeiten',
     editPages: 'Seitenbereich bearbeiten',
+    // Pagination
+    searchUsers: 'Benutzer suchen...',
+    search: 'Suchen',
+    showingUsers: 'Zeige {from}-{to} von {total}',
+    pageOf: 'Seite {page} von {total}',
   },
   fr: {
     title: 'Tableau de bord Admin',
@@ -278,6 +288,11 @@ export const adminTranslations = {
     confirmDeleteProduct: 'Etes-vous sur de vouloir supprimer ce produit?',
     editProduct: 'Modifier le produit',
     editPages: 'Modifier la plage de pages',
+    // Pagination
+    searchUsers: 'Rechercher des utilisateurs...',
+    search: 'Rechercher',
+    showingUsers: 'Affichage {from}-{to} sur {total}',
+    pageOf: 'Page {page} sur {total}',
   },
 };
 

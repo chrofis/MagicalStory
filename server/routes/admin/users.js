@@ -19,14 +19,37 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// GET /api/admin/users - List all users
+// GET /api/admin/users - List all users with optional pagination
+// Query params: page (default: 1), limit (default: 50, max: 200), search (optional)
 router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'Database mode required' });
     }
 
+    // Parse pagination params
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const search = req.query.search?.trim() || '';
+
     const pool = getPool();
+
+    // Build WHERE clause for search
+    let whereClause = '';
+    const queryParams = [];
+    if (search) {
+      whereClause = `WHERE u.username ILIKE $1 OR u.email ILIKE $1`;
+      queryParams.push(`%${search}%`);
+    }
+
+    // Get total count for pagination
+    const countQuery = `SELECT COUNT(*) as total FROM users u ${whereClause}`;
+    const countResult = await dbQuery(countQuery, queryParams);
+    const totalUsers = parseInt(countResult[0].total);
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    // Get paginated users
     const selectQuery = `
       SELECT
         u.id, u.username, u.email, u.role, u.story_quota, u.stories_generated, u.credits, u.created_at, u.last_login, u.email_verified, u.photo_consent_at,
@@ -41,11 +64,13 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
         FROM orders
         GROUP BY user_id
       ) order_stats ON u.id::text = order_stats.user_id
+      ${whereClause}
       ORDER BY u.created_at ASC
+      LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
     `;
-    const rows = await dbQuery(selectQuery, []);
+    const rows = await dbQuery(selectQuery, [...queryParams, limit, offset]);
 
-    const safeUsers = rows.map(user => ({
+    const users = rows.map(user => ({
       id: user.id,
       username: user.username,
       email: user.email,
@@ -61,7 +86,17 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
       failedOrders: parseInt(user.failed_orders) || 0
     }));
 
-    res.json(safeUsers);
+    res.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        totalUsers,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (err) {
     console.error('Error fetching users:', err);
     res.status(500).json({ error: 'Failed to fetch users' });

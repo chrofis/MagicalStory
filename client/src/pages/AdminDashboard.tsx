@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct } from '@/services';
+import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo } from '@/services';
 import {
   Users,
   BookOpen,
@@ -48,6 +48,9 @@ export default function AdminDashboard() {
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [userSearch, setUserSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products'>('stats');
@@ -85,21 +88,32 @@ export default function AdminDashboard() {
   // Use extracted translations
   const texts = adminTranslations[language as keyof typeof adminTranslations] || adminTranslations.en;
 
-  const fetchData = async () => {
+  const fetchData = async (page = 1, search = '') => {
     setIsLoading(true);
     setError(null);
     try {
-      const [statsData, usersData] = await Promise.all([
+      const [statsData, usersResponse] = await Promise.all([
         adminService.getStats(),
-        adminService.getUsers().catch(() => [] as AdminUser[]),
+        adminService.getUsers({ page, limit: 50, search }).catch(() => ({ users: [], pagination: null })),
       ]);
       setStats(statsData);
-      setUsers(usersData);
+      setUsers(usersResponse.users || []);
+      setPagination(usersResponse.pagination || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchData(page, userSearch);
+  };
+
+  const handleSearchUsers = () => {
+    setCurrentPage(1);
+    fetchData(1, userSearch);
   };
 
   useEffect(() => {
@@ -456,7 +470,7 @@ export default function AdminDashboard() {
             </button>
             <h1 className="text-3xl font-bold text-gray-800">{texts.title}</h1>
           </div>
-          <Button variant="outline" onClick={fetchData} disabled={isLoading}>
+          <Button variant="outline" onClick={() => fetchData(currentPage, userSearch)} disabled={isLoading}>
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             {texts.refreshStats}
           </Button>
@@ -599,6 +613,31 @@ export default function AdminDashboard() {
 
         {activeTab === 'users' && (
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            {/* Search bar */}
+            <div className="p-4 border-b bg-gray-50 flex gap-2 items-center">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  placeholder={texts.searchUsers || 'Search users...'}
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearchUsers()}
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <Button onClick={handleSearchUsers} variant="secondary" size="sm">
+                {texts.search || 'Search'}
+              </Button>
+              {pagination && (
+                <span className="text-sm text-gray-500 ml-auto">
+                  {texts.showingUsers?.replace('{from}', String((pagination.page - 1) * pagination.limit + 1))
+                    .replace('{to}', String(Math.min(pagination.page * pagination.limit, pagination.totalUsers)))
+                    .replace('{total}', String(pagination.totalUsers)) ||
+                    `Showing ${(pagination.page - 1) * pagination.limit + 1}-${Math.min(pagination.page * pagination.limit, pagination.totalUsers)} of ${pagination.totalUsers}`}
+                </span>
+              )}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
@@ -710,6 +749,47 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            {/* Pagination controls */}
+            {pagination && pagination.totalPages > 1 && (
+              <div className="p-4 border-t bg-gray-50 flex justify-center items-center gap-2">
+                <Button
+                  onClick={() => handlePageChange(1)}
+                  disabled={!pagination.hasPrevPage}
+                  variant="secondary"
+                  size="sm"
+                >
+                  {'<<'}
+                </Button>
+                <Button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={!pagination.hasPrevPage}
+                  variant="secondary"
+                  size="sm"
+                >
+                  {'<'}
+                </Button>
+                <span className="px-4 py-2 text-sm">
+                  {texts.pageOf?.replace('{page}', String(pagination.page)).replace('{total}', String(pagination.totalPages)) ||
+                    `Page ${pagination.page} of ${pagination.totalPages}`}
+                </span>
+                <Button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={!pagination.hasNextPage}
+                  variant="secondary"
+                  size="sm"
+                >
+                  {'>'}
+                </Button>
+                <Button
+                  onClick={() => handlePageChange(pagination.totalPages)}
+                  disabled={!pagination.hasNextPage}
+                  variant="secondary"
+                  size="sm"
+                >
+                  {'>>'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

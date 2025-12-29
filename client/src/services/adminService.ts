@@ -21,6 +21,28 @@ export interface AdminUser {
   lastLogin?: string;
   emailVerified?: boolean;
   photoConsentAt?: string | null;
+  totalOrders?: number;
+  failedOrders?: number;
+}
+
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  totalUsers: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+export interface UsersResponse {
+  users: AdminUser[];
+  pagination: PaginationInfo;
+}
+
+export interface GetUsersParams {
+  page?: number;
+  limit?: number;
+  search?: string;
 }
 
 export interface CreditTransaction {
@@ -127,8 +149,13 @@ export const adminService = {
     return api.get<DashboardStats>('/api/admin/stats');
   },
 
-  async getUsers(): Promise<AdminUser[]> {
-    return api.get<AdminUser[]>('/api/admin/users');
+  async getUsers(params: GetUsersParams = {}): Promise<UsersResponse> {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set('page', String(params.page));
+    if (params.limit) searchParams.set('limit', String(params.limit));
+    if (params.search) searchParams.set('search', params.search);
+    const query = searchParams.toString();
+    return api.get<UsersResponse>(`/api/admin/users${query ? `?${query}` : ''}`);
   },
 
   async updateUserCredits(userId: string, credits: number): Promise<void> {
