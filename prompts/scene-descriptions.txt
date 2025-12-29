@@ -28,7 +28,7 @@ Include COMPLETE physical descriptions of all characters, objects, and locations
   - Bad: "A dog is running, the girl is looking at the dog."
 - Use only characters and recurring elements provided above. Do NOT invent new main characters.
 
-**CHARACTERS IN THIS STORY (copy descriptions exactly as shown):**
+**MAIN CHARACTERS IN THIS STORY (names only - physical traits handled separately):**
 {CHARACTERS}
 
 **RECURRING ELEMENTS (copy descriptions exactly as shown):**
@@ -97,9 +97,8 @@ Include COMPLETE physical descriptions of all characters, objects, and locations
 
    If clothing changes from previous scene, state: "CHANGE from [previous] to [new] because [reason]"
 
-5. **Characters:** For EACH character present, include:
+5. **Characters:** List EACH main character present in this scene (name only, physical traits handled by image system):
    * **[Character Name]:**
-     - PHYSICAL DESCRIPTION: Copy their full physical description (hair color, eye color, skin tone, build, distinctive markings) exactly as provided above
 
 6. **Objects & Animals:** If any RECURRING ELEMENTS appear:
    - Copy their description VERBATIM from above
@@ -132,10 +131,7 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
 5. **Characters:**
 
    * **Sophie:**
-     - PHYSICAL: 12 years old, female, 140 cm tall, average build, round face with soft features, light skin, long light brown straight hair tousled by the wind, small earrings
-
-   * **Prairie Dog (unnamed):**
-     - PHYSICAL: Small rodent, about 30 cm tall when upright, sandy brown fur, small round ears, dark alert eyes, short front paws
+   * **Prairie Dog:** (from recurring elements)
 
 6. **Objects & Animals:**
 
@@ -181,7 +177,7 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
 - Think about realistic group dynamics: one person initiates, others react differently based on their personality
 
 **CONSTRAINTS:**
-- Include COMPLETE physical descriptions for every character - this ensures visual consistency
+- Do NOT include physical descriptions for main characters - these are handled separately by the image system
 - Do not include dialogue, speech bubbles, or any text/words in the scene
 - Focus purely on visual elements
 - **VISUAL ADJECTIVES ONLY:** Use only adjectives that describe what can be SEEN:
@@ -190,7 +186,7 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
   - Instead of "excited expression" → "wide smile, raised eyebrows"
   - Instead of "nervous posture" → "hunched shoulders, hands clasped tightly"
   - Instead of "dynamic interaction" → "leaning toward each other, gesturing"
-- Every character in the scene MUST be named explicitly and fully described
+- Every main character in the scene MUST be named explicitly (but NOT physically described - handled by image system)
 - For RECURRING ELEMENTS, use descriptions EXACTLY as provided
 - Keep total output under 1000 words - be detailed but concise
 - **OUTPUT LANGUAGE: Write the entire scene description in {LANGUAGE}**

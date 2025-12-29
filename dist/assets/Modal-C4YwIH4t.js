@@ -1,4 +1,4 @@
-import{c as a,j as e,X as y}from"./index-DnL9D_A2.js";import{b as o}from"./vendor-react-CHhk3aw2.js";/**
+import{c as a,j as e,X as y}from"./index-HZUaEMNJ.js";import{b as o}from"./vendor-react-CHhk3aw2.js";/**
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.
@@ -43,4 +43,4 @@ import{c as a,j as e,X as y}from"./index-DnL9D_A2.js";import{b as o}from"./vendo
           transform transition-all duration-300 ease-out
           animate-in fade-in zoom-in-95
           ${x[h]}
-        `,children:[(r||l)&&e.jsxs("div",{className:"flex items-center justify-between p-4 border-b border-gray-100",children:[r&&e.jsx("h2",{className:"text-xl font-bold text-gray-800",children:r}),l&&e.jsx("button",{onClick:t,className:"p-2 rounded-full hover:bg-gray-100 transition-colors","aria-label":"Close",children:e.jsx(y,{size:20})})]}),e.jsx("div",{className:"p-4 max-h-[80vh] overflow-y-auto",children:i})]})]}):null}export{v as C,f as F,p as H,b as I,L as M,w as P,j as R,g as a,M as b};
+        `,children:[(r||l)&&e.jsxs("div",{className:"flex items-center justify-between p-4 border-b border-gray-100",children:[r&&e.jsx("h2",{className:"text-xl font-bold text-gray-800",children:r}),l&&e.jsx("button",{onClick:t,className:"p-2 rounded-full hover:bg-gray-100 transition-colors","aria-label":"Close",children:e.jsx(y,{size:20})})]}),e.jsx("div",{className:"p-4 max-h-[80vh] overflow-y-auto",children:i})]})]}):null}export{v as C,f as F,p as H,b as I,M,g as P,j as R,L as a,w as b};

@@ -17,6 +17,7 @@ const KEYWORDS = {
   scene: ['Scene', 'Szene', 'Scène', 'Visual', 'Setting', 'Image'],
   clothing: ['Clothing', 'Kleidung', 'Vêtements', 'Tenue'],
   characterFocus: ['Character Focus', 'Charakterfokus', 'Personnage Principal'],
+  characters: ['Characters', 'Charaktere', 'Personnages'],
   text: ['Text', 'Text', 'Texte'],
   story: ['Story', 'Geschichte', 'Histoire'],
   backCover: ['Back Cover', 'Rückseite', 'Quatrième de couverture'],
@@ -593,6 +594,92 @@ class OutlineParser {
 }
 
 // ============================================================================
+// SCENE DESCRIPTION PARSER - For extracting character names from scene descriptions
+// ============================================================================
+
+/**
+ * Extract character names from a scene description's Characters section
+ * Robust parsing that handles multiple formats:
+ * - "* **Name:**" or "* **Name**:" or "- **Name:**"
+ * - "**Name:**" without bullet
+ * - Numbered: "1. **Name:**"
+ * - With or without trailing content
+ *
+ * @param {string} sceneDescription - The full scene description text
+ * @returns {string[]} - Array of character names found (lowercased, trimmed)
+ */
+function extractCharacterNamesFromScene(sceneDescription) {
+  if (!sceneDescription) return [];
+
+  const characterNames = [];
+  const charactersKeywords = KEYWORDS.characters.join('|');
+
+  // Step 1: Try to find the Characters section
+  // Matches: "5. **Characters:**", "**Characters:**", "## Characters:", etc.
+  const sectionPattern = new RegExp(
+    `(?:^|\\n)\\s*(?:\\d+\\.\\s*)?(?:#{1,3}\\s*)?\\*{0,2}(?:${charactersKeywords})\\*{0,2}\\s*:?\\s*([\\s\\S]*?)(?=\\n\\s*(?:\\d+\\.\\s*)?(?:#{1,3}\\s*)?\\*{0,2}(?:Objects|Animals|Objekte|Tiere|Objets|Animaux|Setting|Composition|Constraints|Safety)\\*{0,2}|$)`,
+    'i'
+  );
+  const sectionMatch = sceneDescription.match(sectionPattern);
+
+  if (sectionMatch && sectionMatch[1]) {
+    const charactersSection = sectionMatch[1];
+
+    // Step 2: Extract names from the section
+    // Pattern handles multiple formats:
+    // - "* **Name:**" or "- **Name:**" (bullet + bold + colon)
+    // - "* **Name**" or "- **Name**" (bullet + bold, no colon)
+    // - "**Name:**" (bold + colon, no bullet)
+    // - "1. **Name:**" (numbered)
+    const namePatterns = [
+      // Bullet or number + bold name with optional colon
+      /^[\s\-\*\u2022]*(?:\d+\.\s*)?\*\*([^*:]+?)\*\*\s*:?/gm,
+      // Bold name at start of line
+      /^\s*\*\*([^*:]+?)\*\*\s*:?/gm,
+    ];
+
+    for (const pattern of namePatterns) {
+      let match;
+      while ((match = pattern.exec(charactersSection)) !== null) {
+        const name = match[1].trim();
+        // Skip if it looks like a section header or is too short
+        if (name.length >= 2 && !name.match(/^(?:Characters|Charaktere|Personnages|Physical|Description)$/i)) {
+          const nameLower = name.toLowerCase();
+          if (!characterNames.includes(nameLower)) {
+            characterNames.push(nameLower);
+          }
+        }
+      }
+    }
+
+    if (characterNames.length > 0) {
+      log.debug(`[SCENE-PARSER] Found ${characterNames.length} characters in section: ${characterNames.join(', ')}`);
+      return characterNames;
+    }
+  }
+
+  // Step 3: Fallback - look for character headers anywhere in the scene
+  // This handles scenes without a dedicated Characters section
+  log.debug(`[SCENE-PARSER] No Characters section found, using fallback pattern matching`);
+
+  // Look for patterns like "* **Name:**" followed by action/position keywords
+  const fallbackPattern = /[\s\-\*\u2022]+\*\*([^*:]+?)\*\*\s*:[\s\S]*?(?:ACTION|POSITION|EXPRESSION|action|position|expression)/gi;
+  let match;
+  while ((match = fallbackPattern.exec(sceneDescription)) !== null) {
+    const name = match[1].trim().toLowerCase();
+    if (name.length >= 2 && !characterNames.includes(name)) {
+      characterNames.push(name);
+    }
+  }
+
+  if (characterNames.length > 0) {
+    log.debug(`[SCENE-PARSER] Fallback found ${characterNames.length} characters: ${characterNames.join(', ')}`);
+  }
+
+  return characterNames;
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -602,5 +689,6 @@ module.exports = {
   CLOTHING_CATEGORIES,
   keywordPattern,
   createPageHeaderPattern,
-  createSectionPattern
+  createSectionPattern,
+  extractCharacterNamesFromScene
 };

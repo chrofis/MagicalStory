@@ -1429,7 +1429,7 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
 
     // Determine language for response (matching other prompts for consistency)
     const langInstructions = {
-      'de': 'You MUST write your response in German. Use Swiss Standard German spelling (Schweizer Hochdeutsch): use ä, ö, ü normally, but use "ss" instead of "ß". Use standard German vocabulary, not Swiss dialect words.',
+      'de': 'You MUST write your response in German. Use Swiss Standard German spelling (Schweizer Hochdeutsch). CRITICAL SPELLING RULES: Use ä, ö, ü (NEVER use ae, oe, ue). Use "ss" instead of "ß". Examples: CORRECT: "schön", "größer", "für", "Mädchen" | WRONG: "schoen", "groesser", "fuer", "Maedchen". Use standard German vocabulary, not Swiss dialect.',
       'fr': 'You MUST write your response in French.',
       'en': 'You MUST write your response in English.'
     };
@@ -1489,7 +1489,7 @@ ${teachingGuide}`
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
-    const result = await callTextModel(prompt, 500, modelToUse);
+    const result = await callTextModel(prompt, 650, modelToUse);
 
     // Return prompt and model for dev mode display
     res.json({ storyIdea: result.text.trim(), prompt, model: modelToUse });

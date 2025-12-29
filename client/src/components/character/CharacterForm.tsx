@@ -397,6 +397,21 @@ export function CharacterForm({
                 </pre>
               </details>
             )}
+            {/* Developer mode: show extracted clothing per avatar */}
+            {developerMode && character.avatars?.clothing && Object.keys(character.avatars.clothing).length > 0 && (
+              <details className="mt-1 text-left">
+                <summary className="text-[10px] font-medium cursor-pointer text-blue-600">
+                  Clothing ({Object.keys(character.avatars.clothing).length} avatars)
+                </summary>
+                <div className="mt-1 p-2 rounded text-[9px] border bg-gray-100 border-gray-200 space-y-1">
+                  {Object.entries(character.avatars.clothing).map(([category, clothing]) => (
+                    <div key={category}>
+                      <span className="font-semibold">{category}:</span> {clothing}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
           </div>
         </div>
       </div>

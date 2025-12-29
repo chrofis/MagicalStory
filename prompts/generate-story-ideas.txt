@@ -16,10 +16,15 @@ READING LEVEL: {READING_LEVEL_DESCRIPTION}
 
 {TOPIC_GUIDE}
 
-Generate a story idea in 3-5 sentences that includes:
+Generate a story idea that includes:
 1. LOCATION and TIME: Where and when does the story take place?
 2. ACTIONS: What happens? Who does what? Focus on the plot events.
 3. OUTLINE: The main conflict and how it gets resolved.
+
+STORY DEPTH (based on reading level):
+- Early readers: 3-4 sentences, simple plot with one problem and solution
+- Standard: 4-6 sentences, include a twist or obstacle, 2-3 key events
+- Advanced: 6-8 sentences, deeper plot with multiple challenges, subplots, character growth
 
 IMPORTANT RULES:
 - NO adjectives allowed! Do not describe things as "magical", "brave", "beautiful", "exciting", etc.

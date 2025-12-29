@@ -11,7 +11,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { hashImageData } = require('./images');
 const { buildVisualBiblePrompt } = require('./visualBible');
-const { OutlineParser } = require('./outlineParser');
+const { OutlineParser, extractCharacterNamesFromScene } = require('./outlineParser');
 
 // ============================================================================
 // TEACHING GUIDES - Loaded from text files for easy editing
@@ -189,7 +189,7 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
 
 /**
  * Detect which characters are mentioned in a scene description
- * Prefers parsing structured "Charaktere/Characters" section over text matching
+ * Uses robust parsing from outlineParser module for multilingual support
  * @param {string} sceneDescription - The scene text
  * @param {Array} characters - Array of character objects (main characters with reference photos)
  * @returns {Array} Characters that appear in this scene
@@ -199,46 +199,42 @@ function getCharactersInScene(sceneDescription, characters) {
     return [];
   }
 
-  // Try to parse structured "Charaktere" / "Characters" section first
-  // This section lists characters as: **CharacterName:** or * **CharacterName:**
-  // We only want character names that are HEADERS, not mentioned within descriptions
-  const charaktereMatch = sceneDescription.match(/\*\*(?:Charaktere|Characters|Personnages)\s*:?\*\*\s*([\s\S]*?)(?=\n\s*\n\d+\.|$)/i);
+  // Step 1: Use robust parser to extract character names from scene description
+  const parsedNames = extractCharacterNamesFromScene(sceneDescription);
 
-  if (charaktereMatch) {
-    const charaktereSection = charaktereMatch[1];
-    // Extract character names from headers like "**Lukas:**" or "* **Lukas:**"
-    const headerNames = [];
-    const headerPattern = /\*\s*\*\*([^*:]+)\*\*\s*:/g;
-    let match;
-    while ((match = headerPattern.exec(charaktereSection)) !== null) {
-      headerNames.push(match[1].trim().toLowerCase());
-    }
+  if (parsedNames.length > 0) {
+    log.debug(`[CHAR DETECT] Parsed ${parsedNames.length} character names: ${parsedNames.join(', ')}`);
 
-    if (headerNames.length > 0) {
-      log.debug(`[CHAR DETECT] Parsed ${headerNames.length} character headers: ${headerNames.join(', ')}`);
-      // Match only main characters whose names appear as headers
-      return characters.filter(char => {
-        if (!char.name) return false;
-        const nameLower = char.name.toLowerCase().trim();
-        const firstName = nameLower.split(' ')[0];
-        return headerNames.some(header =>
-          header === nameLower ||
-          header === firstName ||
-          header.includes(nameLower) ||
-          nameLower.includes(header)
-        );
-      });
+    // Match main characters whose names appear in the parsed list
+    const matchedCharacters = characters.filter(char => {
+      if (!char.name) return false;
+      const nameLower = char.name.toLowerCase().trim();
+      const firstName = nameLower.split(' ')[0];
+
+      return parsedNames.some(parsed =>
+        parsed === nameLower ||
+        parsed === firstName ||
+        parsed.includes(nameLower) ||
+        nameLower.includes(parsed) ||
+        // Handle partial matches (e.g., "sophie" matches "Sophie Miller")
+        parsed.includes(firstName) ||
+        firstName.includes(parsed)
+      );
+    });
+
+    if (matchedCharacters.length > 0) {
+      log.debug(`[CHAR DETECT] Matched ${matchedCharacters.length} main characters: ${matchedCharacters.map(c => c.name).join(', ')}`);
+      return matchedCharacters;
     }
   }
 
-  // Fallback: text matching (for older scene descriptions without structured section)
-  log.debug(`[CHAR DETECT] No structured section found, using text matching`);
+  // Step 2: Fallback to simple text matching if parser found nothing
+  log.debug(`[CHAR DETECT] No structured matches, falling back to text search`);
   const sceneLower = sceneDescription.toLowerCase();
+
   return characters.filter(char => {
     if (!char.name) return false;
-    // Check for character name in scene (case insensitive)
     const nameLower = char.name.toLowerCase();
-    // Also check for first name only (e.g., "Max" from "Max Mustermann")
     const firstName = nameLower.split(' ')[0];
     return sceneLower.includes(nameLower) || sceneLower.includes(firstName);
   });
@@ -839,64 +835,23 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   const vbMatches = [];
   const vbMisses = [];
 
-  // Build detailed character descriptions - include full physical details from Visual Bible
+  // Build character names list ONLY - physical descriptions are passed directly to image generation
+  // This prevents the text model from "copying" and potentially modifying character traits
   const characterDetails = characters.map(c => {
-    // Check if character has detailed description in Visual Bible
-    let visualBibleDesc = null;
+    // Track Visual Bible matches for logging
     if (visualBible && visualBible.mainCharacters) {
       const vbChar = visualBible.mainCharacters.find(vbc =>
         vbc.id === c.id || vbc.name.toLowerCase().trim() === c.name.toLowerCase().trim()
       );
-
-      if (vbChar && vbChar.physical) {
+      if (vbChar) {
         vbMatches.push(c.name);
-        // Build description from Visual Bible physical object - include ALL traits
-        const vbParts = [];
-        // Basic traits
-        if (vbChar.physical.age && vbChar.physical.age !== 'Unknown') vbParts.push(`${vbChar.physical.age} years old`);
-        if (vbChar.physical.gender && vbChar.physical.gender !== 'Unknown') vbParts.push(vbChar.physical.gender);
-        if (vbChar.physical.height && vbChar.physical.height !== 'Unknown') vbParts.push(`${vbChar.physical.height} cm tall`);
-        if (vbChar.physical.build && vbChar.physical.build !== 'Unknown') vbParts.push(`${vbChar.physical.build} build`);
-        // Detailed features
-        if (vbChar.physical.face) vbParts.push(vbChar.physical.face);
-        if (vbChar.physical.hair) vbParts.push(`Hair: ${vbChar.physical.hair}`);
-        // Other physical traits (glasses, birthmarks, always-present accessories)
-        if (vbChar.physical.other && vbChar.physical.other !== 'none') vbParts.push(`Other: ${vbChar.physical.other}`);
-        if (vbParts.length > 0) {
-          visualBibleDesc = vbParts.join(' | ');
-        }
       } else {
         vbMisses.push(c.name);
       }
     }
-
-    // Build comprehensive physical description from character data
-    const physicalParts = [];
-
-    // Basic info
-    if (c.age) physicalParts.push(`${c.age} years old`);
-    if (c.gender) physicalParts.push(c.gender === 'male' ? 'male' : c.gender === 'female' ? 'female' : 'non-binary');
-
-    // Physical traits (support both snake_case and camelCase)
-    const face = c.other_features || c.otherFeatures || c.face;
-    const hair = c.hair_color || c.hairColor;
-    const build = c.build;
-    const other = c.other;
-
-    if (face) physicalParts.push(`Face: ${face}`);
-    if (hair) physicalParts.push(`Hair: ${hair}`);
-    if (build) physicalParts.push(`Build: ${build}`);
-    if (other && other !== 'none') physicalParts.push(`Other: ${other}`);
-
-    // Additional features
-    if (c.otherFeatures) physicalParts.push(c.otherFeatures);
-    if (c.specialDetails) physicalParts.push(c.specialDetails);
-
-    // Use Visual Bible description if available (preferred), otherwise use character data
-    const physicalDesc = visualBibleDesc || physicalParts.join('. ');
-
-    return `* **${c.name}:**\n  PHYSICAL: ${physicalDesc}`;
-  }).join('\n\n');
+    // Only return the character name - NO physical traits (those go directly to image generation)
+    return `* **${c.name}**`;
+  }).join('\n');
 
   // Build Visual Bible recurring elements section - include ALL entries (not filtered by page)
   let recurringElements = '';
