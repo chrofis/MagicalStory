@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Wand2, Star, Sparkles, Loader2, Pencil, ChevronRight, Palette } from 'lucide-react';
+import { Wand2, Star, Sparkles, Loader2, Pencil, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Modal } from '@/components/common/Modal';
 import { StoryCategorySelector } from './StoryCategorySelector';
 import { ArtStyleSelector } from './ArtStyleSelector';
-import { storyCategories, storyTypes, lifeChallenges, educationalTopics } from '@/constants/storyTypes';
+import { storyTypes, lifeChallenges, educationalTopics } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
 import type { LanguageLevel, StoryLanguageCode, UILanguage } from '@/types/story';
@@ -16,9 +16,9 @@ export type CharacterRole = 'out' | 'in' | 'main';
 export type StoryLanguage = StoryLanguageCode;
 
 export const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
-  { code: 'de-ch', name: 'Schweiz', flag: '🇨🇭' },
-  { code: 'de-de', name: 'Deutschland', flag: '🇩🇪' },
-  { code: 'fr', name: 'France', flag: '🇫🇷' },
+  { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
+  { code: 'de-de', name: 'Deutsch (Deutschland)', flag: '🇩🇪' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
 ];
 
@@ -94,6 +94,8 @@ export function StorySettings({
   // Modal state for editing story type settings
   const [isEditSettingsOpen, setIsEditSettingsOpen] = useState(false);
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const [isStoryDropdownOpen, setIsStoryDropdownOpen] = useState(false);
+  const [isArtStyleDropdownOpen, setIsArtStyleDropdownOpen] = useState(false);
 
   // Helper to determine character's current role
   const getCharacterRole = (charId: number): CharacterRole => {
@@ -162,16 +164,6 @@ export function StorySettings({
   };
 
   // Helper functions for display names
-  const getCategoryName = () => {
-    const cat = storyCategories.find(c => c.id === storyCategory);
-    return cat ? (cat.name[lang] || cat.name.en) : '';
-  };
-
-  const getCategoryEmoji = () => {
-    const cat = storyCategories.find(c => c.id === storyCategory);
-    return cat?.emoji || '';
-  };
-
   const getThemeName = () => {
     if (!storyTheme || storyTheme === 'realistic') return '';
     const theme = storyTypes.find(t => t.id === storyTheme);
@@ -217,63 +209,97 @@ export function StorySettings({
 
   return (
     <div className="space-y-6">
-      {/* Story Type Settings Summary Bar */}
+      {/* Story Settings Bar - 3 columns: Story, Art Style, Language */}
       {showSettingsSummary && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap text-sm">
-            {/* Category */}
-            <span className="inline-flex items-center gap-1 bg-white border border-indigo-200 rounded-lg px-2 py-1">
-              <span>{getCategoryEmoji()}</span>
-              <span className="font-medium text-gray-700">{getCategoryName()}</span>
-            </span>
-
-            <ChevronRight size={16} className="text-gray-400" />
-
-            {/* Theme or Topic */}
-            {storyCategory === 'adventure' ? (
-              <span className="inline-flex items-center gap-1 bg-white border border-indigo-200 rounded-lg px-2 py-1">
-                <span>{getThemeEmoji()}</span>
-                <span className="font-medium text-gray-700">{getThemeName()}</span>
-              </span>
-            ) : (
-              <>
-                <span className="inline-flex items-center gap-1 bg-white border border-green-200 rounded-lg px-2 py-1">
-                  <span>{getTopicEmoji()}</span>
-                  <span className="font-medium text-gray-700">{getTopicName()}</span>
-                </span>
-                {storyTheme && storyTheme !== 'realistic' && (
-                  <>
-                    <span className="text-gray-400">+</span>
-                    <span className="inline-flex items-center gap-1 bg-white border border-amber-200 rounded-lg px-2 py-1">
-                      <span>{getThemeEmoji()}</span>
-                      <span className="font-medium text-gray-700">{getThemeName()}</span>
-                    </span>
-                  </>
-                )}
-              </>
-            )}
-
-            <ChevronRight size={16} className="text-gray-400" />
-
-            {/* Art Style */}
-            <span className="inline-flex items-center gap-1 bg-white border border-purple-200 rounded-lg px-2 py-1">
-              <Palette size={14} className="text-purple-600" />
-              <span className="font-medium text-gray-700">{getArtStyleName()}</span>
-            </span>
-
-            <ChevronRight size={16} className="text-gray-400" />
-
-            {/* Story Language - clickable dropdown */}
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-3">
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            {/* LEFT: Story Topic/Theme - clickable */}
             <div className="relative">
               <button
-                onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
-                className="inline-flex items-center gap-1 bg-white border border-blue-200 rounded-lg px-2 py-1 hover:border-blue-400 transition-colors"
+                onClick={() => {
+                  setIsStoryDropdownOpen(!isStoryDropdownOpen);
+                  setIsArtStyleDropdownOpen(false);
+                  setIsLanguageDropdownOpen(false);
+                }}
+                className="w-full inline-flex items-center justify-center gap-1 bg-white border border-green-200 rounded-lg px-2 py-2 hover:border-green-400 transition-colors"
+              >
+                <span>{getTopicEmoji() || getThemeEmoji()}</span>
+                <span className="font-medium text-gray-700 truncate">
+                  {storyCategory === 'adventure' ? getThemeName() : (
+                    <>
+                      {getTopicName()}
+                      {storyTheme && storyTheme !== 'realistic' && ` + ${getThemeName()}`}
+                    </>
+                  )}
+                </span>
+              </button>
+              {isStoryDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-full min-w-[200px]">
+                  <button
+                    onClick={() => {
+                      setIsEditSettingsOpen(true);
+                      setIsStoryDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-3 text-left hover:bg-gray-50 rounded-lg"
+                  >
+                    <Pencil size={14} className="text-gray-500" />
+                    <span className="font-medium text-gray-700">
+                      {language === 'de' ? 'Thema ändern...' : language === 'fr' ? 'Changer le thème...' : 'Change topic...'}
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* MIDDLE: Art Style - clickable */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsArtStyleDropdownOpen(!isArtStyleDropdownOpen);
+                  setIsStoryDropdownOpen(false);
+                  setIsLanguageDropdownOpen(false);
+                }}
+                className="w-full inline-flex items-center justify-center gap-1 bg-white border border-purple-200 rounded-lg px-2 py-2 hover:border-purple-400 transition-colors"
+              >
+                <Palette size={14} className="text-purple-600" />
+                <span className="font-medium text-gray-700 truncate">{getArtStyleName()}</span>
+              </button>
+              {isArtStyleDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-full min-w-[200px] max-h-[300px] overflow-y-auto">
+                  {artStyles.map((style) => (
+                    <button
+                      key={style.id}
+                      onClick={() => {
+                        onArtStyleChange?.(style.id);
+                        setIsArtStyleDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                        artStyle === style.id ? 'bg-purple-50' : ''
+                      }`}
+                    >
+                      <span>{style.emoji}</span>
+                      <span className="font-medium text-gray-700">{style.name[lang] || style.name.en}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT: Story Language - clickable */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsLanguageDropdownOpen(!isLanguageDropdownOpen);
+                  setIsStoryDropdownOpen(false);
+                  setIsArtStyleDropdownOpen(false);
+                }}
+                className="w-full inline-flex items-center justify-center gap-1 bg-white border border-blue-200 rounded-lg px-2 py-2 hover:border-blue-400 transition-colors"
               >
                 <span className="text-base">{getStoryLanguageInfo().flag}</span>
-                <span className="font-medium text-gray-700">{getStoryLanguageInfo().name}</span>
+                <span className="font-medium text-gray-700 truncate">{getStoryLanguageInfo().name}</span>
               </button>
               {isLanguageDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[140px]">
+                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[180px]">
                   {STORY_LANGUAGES.map((langOption) => (
                     <button
                       key={langOption.code}
@@ -293,17 +319,6 @@ export function StorySettings({
               )}
             </div>
           </div>
-
-          {/* Edit Button */}
-          <button
-            onClick={() => setIsEditSettingsOpen(true)}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 rounded-lg transition-colors"
-          >
-            <Pencil size={14} />
-            <span className="hidden sm:inline">
-              {language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
-            </span>
-          </button>
         </div>
       )}
 
