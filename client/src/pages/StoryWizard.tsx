@@ -541,13 +541,21 @@ export default function StoryWizard() {
       }
     };
 
+    // Skip loading characters when viewing a saved story (storyId in URL)
+    // The story's visualBible contains all needed character info
+    const urlStoryId = searchParams.get('storyId');
+    if (urlStoryId) {
+      setInitialCharacterLoadDone(true);
+      return;
+    }
+
     if (isAuthenticated) {
       loadCharacterData();
     } else if (!isAuthLoading) {
       // Not authenticated and auth is done loading - mark as done (no characters to load)
       setInitialCharacterLoadDone(true);
     }
-  }, [isAuthenticated, isAuthLoading]);
+  }, [isAuthenticated, isAuthLoading, searchParams]);
 
   // Auto-start character creation when entering step 2 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh
@@ -986,26 +994,31 @@ export default function StoryWizard() {
   const handleSaveAndRegenerateWithTraits = async () => {
     if (!currentCharacter) return;
 
+    // Capture the character BEFORE saving (saveCharacter clears currentCharacter)
+    const charToRegenerate = { ...currentCharacter };
+    const charId = currentCharacter.id;
+
     setIsRegeneratingAvatarsWithTraits(true);
     try {
-      log.info(`💾 Saving character and regenerating avatars for ${currentCharacter.name}...`);
+      log.info(`💾 Saving character and regenerating avatars for ${charToRegenerate.name}...`);
 
       // First, save the character with current state
       await saveCharacter();
 
       // Then regenerate avatars with the new traits
-      log.info(`🔄 Regenerating avatars WITH TRAITS for ${currentCharacter.name}...`);
+      log.info(`🔄 Regenerating avatars WITH TRAITS for ${charToRegenerate.name}...`);
 
-      // Get the LATEST character from state after save
-      const latestChar = await new Promise<Character | null>(resolve => {
-        setCurrentCharacter(prev => {
+      // Get the saved character from the characters array (currentCharacter is cleared after save)
+      const latestCharacters = await new Promise<Character[]>(resolve => {
+        setCharacters(prev => {
           resolve(prev);
           return prev;
         });
       });
+      const latestChar = latestCharacters.find(c => c.id === charId);
 
       if (!latestChar) {
-        log.warn('No current character after save');
+        log.warn('Character not found in characters array after save');
         return;
       }
 
