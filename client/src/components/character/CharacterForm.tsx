@@ -538,6 +538,18 @@ export function CharacterForm({
                     {character.avatars?.status === 'generating' ? '...' : 'Not generated'}
                   </div>
                 )}
+                {/* Dev mode: Always show clothing description below avatar */}
+                {developerMode && character.avatars?.clothing?.[category] && (
+                  <div className="mt-1 p-1.5 rounded text-[10px] text-left bg-blue-50 border border-blue-200 text-blue-700">
+                    <span className="font-semibold">👕 </span>
+                    {character.avatars.clothing[category]}
+                  </div>
+                )}
+                {developerMode && character.avatars?.[category] && !character.avatars?.clothing?.[category] && (
+                  <div className="mt-1 p-1.5 rounded text-[10px] text-left bg-amber-50 border border-amber-200 text-amber-600">
+                    ⚠️ No clothing data - regenerate avatar
+                  </div>
+                )}
                 {developerMode && (
                   <>
                     {character.avatars?.prompts?.[category] && (
@@ -555,7 +567,6 @@ export function CharacterForm({
                         </summary>
                         <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
                           {character.avatars.faceMatch[category].details}
-                          {character.avatars.clothing?.[category] && `\n\nClothing: ${character.avatars.clothing[category]}`}
                         </pre>
                       </details>
                     )}

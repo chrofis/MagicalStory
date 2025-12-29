@@ -491,8 +491,13 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       prompts: {}
     };
 
-    // Generate avatars sequentially to avoid rate limits
-    for (const [category, config] of Object.entries(clothingCategories)) {
+    // Prepare base64 data once for all requests
+    const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
+      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+    // Helper function to generate a single avatar
+    const generateSingleAvatar = async (category, config) => {
       try {
         log.debug(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'})...`);
 
@@ -506,14 +511,6 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         if (physicalTraitsSection) {
           avatarPrompt += physicalTraitsSection;
         }
-        log.debug(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStylePrompt.substring(0, 50)}..."`);
-
-        results.prompts[category] = avatarPrompt;
-
-        // Prepare the request with reference photo
-        const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
-        const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
-          facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
         const requestBody = {
           systemInstruction: {
@@ -559,7 +556,7 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         if (!response.ok) {
           const errorText = await response.text();
           log.error(`❌ [CLOTHING AVATARS] ${category} generation failed:`, errorText);
-          continue;
+          return { category, prompt: avatarPrompt, imageData: null };
         }
 
         let data = await response.json();
@@ -610,11 +607,11 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
             }
             if (data.promptFeedback?.blockReason) {
               log.warn(`[CLOTHING AVATARS] ${category} retry also blocked:`, data.promptFeedback.blockReason);
-              continue;
+              return { category, prompt: avatarPrompt, imageData: null };
             }
           } else {
             log.error(`❌ [CLOTHING AVATARS] ${category} retry failed`);
-            continue;
+            return { category, prompt: avatarPrompt, imageData: null };
           }
         }
 
@@ -635,34 +632,65 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
             const originalSize = Math.round(imageData.length / 1024);
             const compressedImage = await compressImageToJPEG(imageData);
             const compressedSize = Math.round(compressedImage.length / 1024);
-            results[category] = compressedImage;
             log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated and compressed (${originalSize}KB -> ${compressedSize}KB)`);
+            return { category, prompt: avatarPrompt, imageData: compressedImage };
           } catch (compressErr) {
             log.warn(`[CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
-            results[category] = imageData;
-          }
-
-          // Evaluate face match
-          const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, results[category], geminiApiKey);
-          if (faceMatchResult) {
-            results.faceMatch[category] = { score: faceMatchResult.score, details: faceMatchResult.details };
-            if (faceMatchResult.clothing) {
-              results.clothing[category] = faceMatchResult.clothing;
-              log.debug(`👕 [AVATAR EVAL] ${category} clothing: ${faceMatchResult.clothing}`);
-            }
-            log.debug(`🔍 [AVATAR EVAL] ${category} score: ${faceMatchResult.score}/10`);
+            return { category, prompt: avatarPrompt, imageData };
           }
         } else {
           log.warn(`[CLOTHING AVATARS] No image in ${category} response`);
+          return { category, prompt: avatarPrompt, imageData: null };
         }
-
-        // Small delay between generations
-        await new Promise(resolve => setTimeout(resolve, 500));
-
       } catch (err) {
         log.error(`❌ [CLOTHING AVATARS] Error generating ${category}:`, err.message);
+        return { category, prompt: null, imageData: null };
+      }
+    };
+
+    // PHASE 1: Generate all 4 avatars in parallel
+    log.debug(`🚀 [CLOTHING AVATARS] Starting PARALLEL generation of 4 avatars for ${name}...`);
+    const generationStart = Date.now();
+    const generationPromises = Object.entries(clothingCategories).map(
+      ([category, config]) => generateSingleAvatar(category, config)
+    );
+    const generatedAvatars = await Promise.all(generationPromises);
+    const generationTime = Date.now() - generationStart;
+    log.debug(`⚡ [CLOTHING AVATARS] All 4 avatars generated in ${generationTime}ms (parallel)`);
+
+    // Store prompts and images
+    for (const { category, prompt, imageData } of generatedAvatars) {
+      if (prompt) results.prompts[category] = prompt;
+      if (imageData) results[category] = imageData;
+    }
+
+    // PHASE 2: Evaluate all generated avatars in parallel
+    const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
+    if (avatarsToEvaluate.length > 0) {
+      log.debug(`🔍 [CLOTHING AVATARS] Starting PARALLEL evaluation of ${avatarsToEvaluate.length} avatars...`);
+      const evalStart = Date.now();
+      const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
+        const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageData, geminiApiKey);
+        return { category, faceMatchResult };
+      });
+      const evalResults = await Promise.all(evalPromises);
+      const evalTime = Date.now() - evalStart;
+      log.debug(`⚡ [CLOTHING AVATARS] All evaluations completed in ${evalTime}ms (parallel)`);
+
+      // Store evaluation results
+      for (const { category, faceMatchResult } of evalResults) {
+        if (faceMatchResult) {
+          results.faceMatch[category] = { score: faceMatchResult.score, details: faceMatchResult.details };
+          if (faceMatchResult.clothing) {
+            results.clothing[category] = faceMatchResult.clothing;
+            log.debug(`👕 [AVATAR EVAL] ${category} clothing: ${faceMatchResult.clothing}`);
+          }
+          log.debug(`🔍 [AVATAR EVAL] ${category} score: ${faceMatchResult.score}/10`);
+        }
       }
     }
+
+    log.debug(`✅ [CLOTHING AVATARS] Total time: ${Date.now() - generationStart}ms (was ~25s sequential)`)
 
     // Check if at least one avatar was generated
     const generatedCount = ['winter', 'standard', 'summer', 'formal'].filter(c => results[c]).length;

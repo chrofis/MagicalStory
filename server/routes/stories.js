@@ -31,27 +31,28 @@ router.get('/', authenticateToken, async (req, res) => {
 
       // Get paginated data using JSON operators to extract only metadata (not full image data)
       // This is MUCH faster than loading the entire data blob which contains base64 images
+      // Note: data column is TEXT, so we cast to jsonb for JSON operators
       const rows = await dbQuery(
         `SELECT
-          data->>'id' as id,
-          data->>'title' as title,
-          data->>'createdAt' as "createdAt",
-          data->>'updatedAt' as "updatedAt",
-          (data->>'pages')::int as pages,
-          data->>'language' as language,
-          data->>'languageLevel' as "languageLevel",
-          data->'characters' as characters_json,
-          COALESCE(jsonb_array_length(data->'sceneImages'), 0) as scene_count,
-          (data->>'isPartial')::boolean as "isPartial",
-          (data->>'generatedPages')::int as "generatedPages",
-          (data->>'totalPages')::int as "totalPages",
+          d->>'id' as id,
+          d->>'title' as title,
+          d->>'createdAt' as "createdAt",
+          d->>'updatedAt' as "updatedAt",
+          (d->>'pages')::int as pages,
+          d->>'language' as language,
+          d->>'languageLevel' as "languageLevel",
+          d->'characters' as characters_json,
+          COALESCE(jsonb_array_length(d->'sceneImages'), 0) as scene_count,
+          (d->>'isPartial')::boolean as "isPartial",
+          (d->>'generatedPages')::int as "generatedPages",
+          (d->>'totalPages')::int as "totalPages",
           CASE
-            WHEN data->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
-            WHEN data->'coverImages'->'frontCover' IS NOT NULL AND jsonb_typeof(data->'coverImages'->'frontCover') = 'string' THEN true
-            WHEN data->>'thumbnail' IS NOT NULL THEN true
+            WHEN d->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
+            WHEN d->'coverImages'->'frontCover' IS NOT NULL AND jsonb_typeof(d->'coverImages'->'frontCover') = 'string' THEN true
+            WHEN d->>'thumbnail' IS NOT NULL THEN true
             ELSE false
           END as "hasThumbnail"
-        FROM stories
+        FROM stories, LATERAL (SELECT data::jsonb AS d) AS parsed
         WHERE user_id = $1
         ORDER BY created_at DESC
         LIMIT $2 OFFSET $3`,
