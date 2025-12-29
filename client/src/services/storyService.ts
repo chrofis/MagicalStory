@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, ImageVersion } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion } from '@/types/story';
 
 interface StoryDraft {
   storyType: string;
@@ -312,6 +312,45 @@ export const storyService = {
         totalImages: s.totalImages || 0
       };
     } catch {
+      return null;
+    }
+  },
+
+  // Get developer metadata (prompts, quality reasoning, retry history) - loaded separately for dev mode
+  async getStoryDevMetadata(id: string): Promise<{
+    sceneImages: Array<{
+      pageNumber: number;
+      prompt: string | null;
+      qualityReasoning: string | null;
+      retryHistory: RetryAttempt[];
+      repairHistory: RepairAttempt[];
+      wasRegenerated: boolean;
+      originalImage: boolean;
+      originalScore: number | null;
+      originalReasoning: string | null;
+      totalAttempts: number | null;
+      faceEvaluation: unknown | null;
+    }>;
+    coverImages: {
+      frontCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null } | null;
+      initialPage: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null } | null;
+      backCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null } | null;
+    } | null;
+  } | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${id}/dev-metadata`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch dev metadata: HTTP ${response.status}`);
+        return null;
+      }
+
+      return await response.json();
+    } catch (err) {
+      console.warn('Failed to fetch dev metadata:', err);
       return null;
     }
   },

@@ -164,6 +164,8 @@ export interface SceneImage {
   wasAutoRepaired?: boolean;
   repairHistory?: RepairAttempt[];
   repairedAt?: string;
+  // Face evaluation data (dev mode)
+  faceEvaluation?: unknown;
 }
 
 export interface CoverImageData {

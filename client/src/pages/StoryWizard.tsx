@@ -267,6 +267,10 @@ export default function StoryWizard() {
             setSceneDescriptions(story.sceneDescriptions || []);
             setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
             setLanguageLevel(story.languageLevel || 'standard');
+            // Set story language for correct display labels (Page/Seite/etc)
+            if (story.language) {
+              setStoryLanguage(story.language);
+            }
             setIsGenerating(false);
 
             // Partial story fields
@@ -287,6 +291,58 @@ export default function StoryWizard() {
             // Start image progress tracking
             if (totalImages > 0) {
               setImageLoadProgress({ loaded: 0, total: totalImages });
+            }
+
+            // In developer mode, fetch additional dev metadata (prompts, quality reasoning, etc.)
+            if (developerMode) {
+              storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
+                if (devMetadata) {
+                  // Merge dev metadata into sceneImages
+                  if (devMetadata.sceneImages?.length) {
+                    setSceneImages(prev => prev.map(img => {
+                      const devData = devMetadata.sceneImages.find(d => d.pageNumber === img.pageNumber);
+                      if (devData) {
+                        return {
+                          ...img,
+                          prompt: devData.prompt ?? img.prompt,
+                          qualityReasoning: devData.qualityReasoning ?? img.qualityReasoning,
+                          retryHistory: devData.retryHistory ?? img.retryHistory,
+                          repairHistory: devData.repairHistory ?? img.repairHistory,
+                          wasRegenerated: devData.wasRegenerated ?? img.wasRegenerated,
+                          originalScore: devData.originalScore ?? img.originalScore,
+                          originalReasoning: devData.originalReasoning ?? img.originalReasoning,
+                          totalAttempts: devData.totalAttempts ?? img.totalAttempts,
+                          faceEvaluation: devData.faceEvaluation ?? img.faceEvaluation,
+                        };
+                      }
+                      return img;
+                    }));
+                  }
+                  // Merge dev metadata into coverImages
+                  if (devMetadata.coverImages) {
+                    setCoverImages(prev => {
+                      const updated = { ...prev };
+                      const coverTypes = ['frontCover', 'initialPage', 'backCover'] as const;
+                      for (const coverType of coverTypes) {
+                        const devCover = devMetadata.coverImages?.[coverType];
+                        const currentCover = prev[coverType];
+                        if (devCover && typeof currentCover === 'object' && currentCover !== null) {
+                          updated[coverType] = {
+                            ...currentCover,
+                            prompt: devCover.prompt ?? currentCover.prompt,
+                            qualityReasoning: devCover.qualityReasoning ?? currentCover.qualityReasoning,
+                            retryHistory: devCover.retryHistory ?? currentCover.retryHistory,
+                          };
+                        }
+                      }
+                      return updated;
+                    });
+                  }
+                  log.debug('Dev metadata merged into story');
+                }
+              }).catch(err => {
+                log.warn('Failed to load dev metadata:', err);
+              });
             }
           },
           // Step 2: Each image loaded - update state progressively
@@ -1960,6 +2016,7 @@ export default function StoryWizard() {
               completedPageImages={completedPageImages}
               coverImages={coverImages}
               languageLevel={languageLevel}
+              storyLanguage={storyLanguage}
               isGenerating={isGenerating}
               developerMode={developerMode}
               storyId={storyId}

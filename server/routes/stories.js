@@ -269,6 +269,81 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/stories/:id/dev-metadata - Get developer-only metadata (prompts, quality reasoning, retry history)
+// This is loaded separately to keep the main metadata endpoint fast for normal users
+router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🔧 GET /api/stories/${id}/dev-metadata - User: ${req.user.username}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = JSON.parse(rows[0].data);
+
+    // Extract only dev-relevant fields (no image data, no characters)
+    const devMetadata = {
+      // Scene images dev data
+      sceneImages: story.sceneImages?.map(img => ({
+        pageNumber: img.pageNumber,
+        prompt: img.prompt || null,
+        qualityReasoning: img.qualityReasoning || null,
+        retryHistory: img.retryHistory || [],
+        repairHistory: img.repairHistory || [],
+        wasRegenerated: img.wasRegenerated || false,
+        originalImage: img.originalImage ? true : false, // Just flag, not data
+        originalScore: img.originalScore || null,
+        originalReasoning: img.originalReasoning || null,
+        totalAttempts: img.totalAttempts || null,
+        faceEvaluation: img.faceEvaluation || null
+      })) || [],
+      // Cover images dev data
+      coverImages: story.coverImages ? {
+        frontCover: story.coverImages.frontCover && typeof story.coverImages.frontCover === 'object' ? {
+          prompt: story.coverImages.frontCover.prompt || null,
+          qualityReasoning: story.coverImages.frontCover.qualityReasoning || null,
+          retryHistory: story.coverImages.frontCover.retryHistory || [],
+          totalAttempts: story.coverImages.frontCover.totalAttempts || null
+        } : null,
+        initialPage: story.coverImages.initialPage && typeof story.coverImages.initialPage === 'object' ? {
+          prompt: story.coverImages.initialPage.prompt || null,
+          qualityReasoning: story.coverImages.initialPage.qualityReasoning || null,
+          retryHistory: story.coverImages.initialPage.retryHistory || [],
+          totalAttempts: story.coverImages.initialPage.totalAttempts || null
+        } : null,
+        backCover: story.coverImages.backCover && typeof story.coverImages.backCover === 'object' ? {
+          prompt: story.coverImages.backCover.prompt || null,
+          qualityReasoning: story.coverImages.backCover.qualityReasoning || null,
+          retryHistory: story.coverImages.backCover.retryHistory || [],
+          totalAttempts: story.coverImages.backCover.totalAttempts || null
+        } : null
+      } : null
+    };
+
+    console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries`);
+    res.json(devMetadata);
+  } catch (err) {
+    console.error('❌ Error fetching dev metadata:', err);
+    res.status(500).json({ error: 'Failed to fetch dev metadata', details: err.message });
+  }
+});
+
 // GET /api/stories/:id/image/:pageNumber - Get individual page image
 // Optimized: First tries separate story_images table, falls back to data blob
 router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
