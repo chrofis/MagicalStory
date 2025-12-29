@@ -16,9 +16,9 @@ export type CharacterRole = 'out' | 'in' | 'main';
 export type StoryLanguage = StoryLanguageCode;
 
 export const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
-  { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
-  { code: 'de-de', name: 'Deutsch (Deutschland)', flag: '🇩🇪' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'de-ch', name: 'Schweiz', flag: '🇨🇭' },
+  { code: 'de-de', name: 'Deutschland', flag: '🇩🇪' },
+  { code: 'fr', name: 'France', flag: '🇫🇷' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
 ];
 
@@ -93,6 +93,7 @@ export function StorySettings({
 
   // Modal state for editing story type settings
   const [isEditSettingsOpen, setIsEditSettingsOpen] = useState(false);
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
 
   // Helper to determine character's current role
   const getCharacterRole = (charId: number): CharacterRole => {
@@ -205,6 +206,10 @@ export function StorySettings({
     return style ? (style.name[lang] || style.name.en) : '';
   };
 
+  const getStoryLanguageInfo = () => {
+    return STORY_LANGUAGES.find(l => l.code === storyLanguage) || STORY_LANGUAGES[0];
+  };
+
   // Check if we should show the settings summary bar
   const showSettingsSummary = storyCategory && artStyle && (
     storyCategory === 'adventure' ? storyTheme : storyTopic
@@ -255,6 +260,38 @@ export function StorySettings({
               <Palette size={14} className="text-purple-600" />
               <span className="font-medium text-gray-700">{getArtStyleName()}</span>
             </span>
+
+            <ChevronRight size={16} className="text-gray-400" />
+
+            {/* Story Language - clickable dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+                className="inline-flex items-center gap-1 bg-white border border-blue-200 rounded-lg px-2 py-1 hover:border-blue-400 transition-colors"
+              >
+                <span className="text-base">{getStoryLanguageInfo().flag}</span>
+                <span className="font-medium text-gray-700">{getStoryLanguageInfo().name}</span>
+              </button>
+              {isLanguageDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[140px]">
+                  {STORY_LANGUAGES.map((langOption) => (
+                    <button
+                      key={langOption.code}
+                      onClick={() => {
+                        onStoryLanguageChange(langOption.code);
+                        setIsLanguageDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                        storyLanguage === langOption.code ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <span className="text-base">{langOption.flag}</span>
+                      <span className="font-medium text-gray-700">{langOption.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Edit Button */}
@@ -365,33 +402,6 @@ export function StorySettings({
               );
             })}
           </div>
-        </div>
-
-        {/* Story Language Selection */}
-        <div>
-          <label className="block text-xl font-semibold mb-3">
-            {language === 'de' ? 'Sprache der Geschichte' : language === 'fr' ? 'Langue de l\'histoire' : 'Story Language'}
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {STORY_LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => onStoryLanguageChange(lang.code)}
-                className={`px-4 py-2 rounded-lg border-2 transition-all flex items-center gap-2 ${
-                  storyLanguage === lang.code
-                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-200'
-                    : 'border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                <span className="text-lg">{lang.flag}</span>
-                <span className="font-medium">{lang.name}</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-sm text-gray-500 mt-2">
-            {storyLanguage === 'de-ch' && (language === 'de' ? 'Schweizer Hochdeutsch: verwendet "ss" statt "ß"' : 'Swiss German: uses "ss" instead of "ß"')}
-            {storyLanguage === 'de-de' && (language === 'de' ? 'Deutsches Hochdeutsch: verwendet "ß" korrekt' : 'German German: uses "ß" correctly')}
-          </p>
         </div>
 
         {/* Reading Level Selection */}
