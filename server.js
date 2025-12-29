@@ -5035,36 +5035,77 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     let coverImages = { frontCover: null, initialPage: null, backCover: null };
     const coverPrompts = { front: null, initialPage: null, backCover: null };
 
-    // Helper to build character reference list for cover prompts
+    // Helper to build character reference list for cover prompts (matching story image format)
     const buildCharacterReferenceList = (photos, characters = null) => {
       if (!photos || photos.length === 0) return '';
+
+      // Age-specific gender term based on apparentAge (same as story images)
+      const getGenderTerm = (gender, apparentAge) => {
+        if (!gender || gender === 'other') return '';
+        const isMale = gender === 'male';
+        switch (apparentAge) {
+          case 'infant':
+            return isMale ? 'baby boy' : 'baby girl';
+          case 'toddler':
+          case 'preschooler':
+          case 'kindergartner':
+            return isMale ? 'little boy' : 'little girl';
+          case 'young-school-age':
+          case 'school-age':
+            return isMale ? 'boy' : 'girl';
+          case 'preteen':
+          case 'young-teen':
+          case 'teenager':
+            return isMale ? 'teenage boy' : 'teenage girl';
+          case 'young-adult':
+            return isMale ? 'young man' : 'young woman';
+          case 'adult':
+          case 'middle-aged':
+            return isMale ? 'man' : 'woman';
+          case 'senior':
+          case 'elderly':
+            return isMale ? 'elderly man' : 'elderly woman';
+          default:
+            return isMale ? 'boy/man' : 'girl/woman';
+        }
+      };
+
       const charDescriptions = photos.map((photo, index) => {
         // Find the original character to get full physical description
         const char = characters?.find(c => c.name === photo.name);
-        // Build age description: "X years old, appears as [category]"
-        let ageDesc = '';
-        if (char?.age) {
-          // Use apparentAge if set, otherwise compute from age
-          const effectiveAgeCategory = char.apparentAge || char.ageCategory || getAgeCategory(char.age);
-          if (effectiveAgeCategory) {
-            ageDesc = `${char.age} years old, appears as ${getAgeCategoryLabel(effectiveAgeCategory)}`;
-          } else {
-            ageDesc = `${char.age} years old`;
-          }
-        }
-        const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-        // Include physical traits with labels (excluding height - AI doesn't understand it for images)
+
+        // Visual age first (how old they look), then actual age - matching story images format
+        const effectiveAgeCategory = char?.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
+        const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
+        const age = char?.age ? `${char.age} years old` : '';
+        const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
+
+        // Include physical traits with labels (matching story images format)
         const physical = char?.physical;
+
+        // Build hair description from separate fields or legacy field
+        let hairDesc = '';
+        if (physical?.hairColor || physical?.hairLength || physical?.hairStyle) {
+          const hairParts = [];
+          if (physical?.hairLength) hairParts.push(physical.hairLength);
+          if (physical?.hairColor) hairParts.push(physical.hairColor);
+          if (physical?.hairStyle) hairParts.push(physical.hairStyle);
+          hairDesc = `Hair: ${hairParts.join(', ')}`;
+        } else if (physical?.hair) {
+          hairDesc = `Hair: ${physical.hair}`;
+        }
+
         const physicalParts = [
           physical?.build ? `Build: ${physical.build}` : '',
           physical?.face ? `Face: ${physical.face}` : '',
-          physical?.hair ? `Hair: ${physical.hair}` : '',
-          physical?.other ? `Other: ${physical.other}` : ''
+          physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
+          hairDesc,
+          physical?.other ? `Other: ${physical.other}` : '',
+          // Include clothing description from avatar if available
+          photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
         ].filter(Boolean);
         const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-        // Include clothing description from avatar if available
-        const clothingDesc = photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : '';
-        const brief = [photo.name, ageDesc, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
+        const brief = [photo.name, visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
       let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
@@ -6240,36 +6281,77 @@ async function processStoryJob(jobId) {
       // Build visual bible prompt for covers
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
-      // Helper to build character reference list for cover prompts
+      // Helper to build character reference list for cover prompts (matching story image format)
       const buildCharacterReferenceList = (photos, characters = null) => {
         if (!photos || photos.length === 0) return '';
+
+        // Age-specific gender term based on apparentAge (same as story images)
+        const getGenderTerm = (gender, apparentAge) => {
+          if (!gender || gender === 'other') return '';
+          const isMale = gender === 'male';
+          switch (apparentAge) {
+            case 'infant':
+              return isMale ? 'baby boy' : 'baby girl';
+            case 'toddler':
+            case 'preschooler':
+            case 'kindergartner':
+              return isMale ? 'little boy' : 'little girl';
+            case 'young-school-age':
+            case 'school-age':
+              return isMale ? 'boy' : 'girl';
+            case 'preteen':
+            case 'young-teen':
+            case 'teenager':
+              return isMale ? 'teenage boy' : 'teenage girl';
+            case 'young-adult':
+              return isMale ? 'young man' : 'young woman';
+            case 'adult':
+            case 'middle-aged':
+              return isMale ? 'man' : 'woman';
+            case 'senior':
+            case 'elderly':
+              return isMale ? 'elderly man' : 'elderly woman';
+            default:
+              return isMale ? 'boy/man' : 'girl/woman';
+          }
+        };
+
         const charDescriptions = photos.map((photo, index) => {
           // Find the original character to get full physical description
           const char = characters?.find(c => c.name === photo.name);
-          // Build age description: "X years old, appears as [category]"
-          let ageDesc = '';
-          if (char?.age) {
-            // Use apparentAge if set, otherwise compute from age
-            const effectiveAgeCategory = char.apparentAge || char.ageCategory || getAgeCategory(char.age);
-            if (effectiveAgeCategory) {
-              ageDesc = `${char.age} years old, appears as ${getAgeCategoryLabel(effectiveAgeCategory)}`;
-            } else {
-              ageDesc = `${char.age} years old`;
-            }
-          }
-          const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-          // Include physical traits with labels (excluding height - AI doesn't understand it for images)
+
+          // Visual age first (how old they look), then actual age - matching story images format
+          const effectiveAgeCategory = char?.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
+          const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
+          const age = char?.age ? `${char.age} years old` : '';
+          const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
+
+          // Include physical traits with labels (matching story images format)
           const physical = char?.physical;
+
+          // Build hair description from separate fields or legacy field
+          let hairDesc = '';
+          if (physical?.hairColor || physical?.hairLength || physical?.hairStyle) {
+            const hairParts = [];
+            if (physical?.hairLength) hairParts.push(physical.hairLength);
+            if (physical?.hairColor) hairParts.push(physical.hairColor);
+            if (physical?.hairStyle) hairParts.push(physical.hairStyle);
+            hairDesc = `Hair: ${hairParts.join(', ')}`;
+          } else if (physical?.hair) {
+            hairDesc = `Hair: ${physical.hair}`;
+          }
+
           const physicalParts = [
             physical?.build ? `Build: ${physical.build}` : '',
             physical?.face ? `Face: ${physical.face}` : '',
-            physical?.hair ? `Hair: ${physical.hair}` : '',
-            physical?.other ? `Other: ${physical.other}` : ''
+            physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
+            hairDesc,
+            physical?.other ? `Other: ${physical.other}` : '',
+            // Include clothing description from avatar if available
+            photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
           ].filter(Boolean);
           const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-          // Include clothing description from avatar if available
-          const clothingDesc = photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : '';
-          const brief = [photo.name, ageDesc, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
+          const brief = [photo.name, visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
           return `${index + 1}. ${brief}`;
         });
         let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;

@@ -22,18 +22,23 @@ export function DiagnosticImage({ src, alt, className, label }: DiagnosticImageP
 
   useEffect(() => {
     // Reset timing when src changes
-    startTimeRef.current = Date.now();
+    const now = Date.now();
+    const previousStart = startTimeRef.current;
+    startTimeRef.current = now;
     setIsLoading(true);
     setLoadTime(null);
 
-    // Log image info
+    // Log image info with timing details
     const isBase64 = src?.startsWith('data:');
     const sizeKB = isBase64 ? Math.round((src.length * 3) / 4 / 1024) : 'URL';
+    const hasActualData = src && src.length > 100;
 
     log.info(`⏳ Loading ${label || alt}`, {
       isBase64,
       sizeKB: isBase64 ? `${sizeKB}KB` : 'external URL',
-      srcPreview: src?.substring(0, 50) + '...',
+      hasData: hasActualData,
+      timerReset: previousStart ? `${now - previousStart}ms since last reset` : 'first mount',
+      srcLength: src?.length || 0,
     });
   }, [src, alt, label]);
 
