@@ -68,14 +68,18 @@ Stay within the word count. Count your words. Aim for the middle of the range, n
 
 **CRITICAL: Your response MUST start with the Visual Bible section. Do NOT skip this.**
 
-**STEP 1: Check for missing Visual Bible entries**
-Scan the outline for recurring elements NOT already in the Visual Bible:
-- Animals/pets appearing on 2+ pages
-- Important objects (magical items, toys, tools) that recur
-- Secondary characters (not main characters) who appear multiple times
-- Distinctive locations appearing repeatedly
+**STEP 1: Add Visual Bible entries (MINIMUM 5 ENTRIES REQUIRED)**
 
-Your response MUST begin with `---NEW VISUAL BIBLE ENTRIES---` followed by entries or "None".
+You MUST add at least 5 entries to the Visual Bible. Scan the outline and ADD:
+- **ALL LOCATIONS** - Every distinct place in the story (rooms, outdoor areas, buildings, etc.)
+- **ALL OBJECTS** - Every important item (toys, tools, magical items, furniture, vehicles, food, etc.)
+- **ALL ANIMALS/PETS** - Any animals that appear
+- **ALL SECONDARY CHARACTERS** - Anyone who is not a main character
+
+**IMPORTANT:** Even if an element appears only once, add it to ensure visual consistency.
+Do NOT write "None" - find at least 5 elements to add.
+
+Your response MUST begin with `---NEW VISUAL BIBLE ENTRIES---` followed by your entries.
 
 **STEP 2: Write the story pages**
 After the Visual Bible section, write `---STORY TEXT---` then the pages.
@@ -87,7 +91,7 @@ Remember: Characters that feel ALIVE and UNIQUE are what make a great story. Cor
 # Output Format
 
 ---NEW VISUAL BIBLE ENTRIES---
-(List any missing recurring elements, or "None" if the Visual Bible is complete)
+(Add at least 5 entries - all locations, objects, animals, and secondary characters)
 
 ANIMAL: [Name]
 - Species: [type]
