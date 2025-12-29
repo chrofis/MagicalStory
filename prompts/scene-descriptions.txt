@@ -75,32 +75,13 @@ Include COMPLETE physical descriptions of all characters, objects, and locations
   - If two objects touch (hand holding tool, character gripping object), assign distinct materials/colors to define boundaries
   - Example: "A [wooden-brown] stick in a [pink-skin] hand" (Use hyphens to bind attributes to objects)
 
-4. **Clothing:**
+**CLOTHING CONSISTENCY (for METADATA JSON):**
+- Check the PREVIOUS 2 SCENES' clothing category
+- Use the SAME category unless the scene transitions between indoor/outdoor
+- If the outline specifies a clothing change, follow it
+- Categories: winter, summer, formal, standard
 
-   **CONSISTENCY RULE - CRITICAL:**
-   - Check the PREVIOUS SCENE's clothing category (from PREVIOUS SCENES above)
-   - Use the SAME clothing category unless there is an EXPLICIT change event:
-     ✓ Bedtime/sleepwear scene
-     ✓ Major time skip (next day, next season)
-     ✓ Story explicitly mentions changing clothes
-     ✓ Drastic environment change (indoor winter → outdoor summer)
-   - Moving through similar outdoor areas = SAME clothing (meadow → forest → clearing)
-
-   If previous scene: [winter] → This scene: [winter] (unless change event)
-   If previous scene: [summer] → This scene: [summer] (unless change event)
-
-   Select ONE category:
-   - **winter** - Cold weather scenes (coats, scarves, boots)
-   - **summer** - Warm weather scenes (t-shirts, shorts, light clothes)
-   - **formal** - Special occasions (suits, dresses, fancy attire)
-   - **standard** - Everyday casual scenes (casual clothes)
-
-   If clothing changes from previous scene, state: "CHANGE from [previous] to [new] because [reason]"
-
-5. **Characters:** List EACH main character present in this scene (name only, physical traits handled by image system):
-   * **[Character Name]:**
-
-6. **Objects & Animals:** If any RECURRING ELEMENTS appear:
+4. **Objects & Animals:** If any RECURRING ELEMENTS appear:
    - Copy their description VERBATIM from above
    - Describe their position in the scene
 
@@ -126,14 +107,7 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
      - EXPRESSION: Mouth open, eyes wide, head tilted slightly upward.
      - POSITION: Left half of the image, perched on a mound about 40 cm high, at eye level with the kneeling Sophie.
 
-4. **Clothing:** standard
-
-5. **Characters:**
-
-   * **Sophie:**
-   * **Prairie Dog:** (from recurring elements)
-
-6. **Objects & Animals:**
+4. **Objects & Animals:**
 
    * **Lasso:**
      - Braided brown leather, about 3 meters long, with metal ring at the end, shows signs of use
@@ -151,13 +125,13 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
      - Stuffed elephant toy, gray with pink inner ears, small enough to fit under an arm (about 25 cm), worn spot on right ear, friendly embroidered face
      - POSITION: Peeking partially out of the open side pocket of Sophie's backpack, one ear and head visible
 
-7. **METADATA (JSON):**
+5. **METADATA (JSON):**
 ```json
 {"characters": ["Sophie"], "clothing": "standard", "objects": ["Lasso", "Cowboy Hat", "Backpack", "Eli"]}
 ```
 ```
 
-**IMPORTANT: Always include section 7 METADATA with valid JSON at the end of your output.**
+**IMPORTANT: Always include section 5 METADATA with valid JSON at the end of your output.**
 
 **ANATOMICAL CONSISTENCY:**
 - Humans have exactly 2 arms. If you describe a character's pose and include an arm, account for BOTH arms explicitly and ensure no arm is mentioned twice.
