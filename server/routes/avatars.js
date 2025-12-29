@@ -316,6 +316,11 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.age && !analyzerData.attributes.age) {
           analyzerData.attributes.age = String(traits.age);
         }
+        // Store apparent age category from visual analysis
+        if (traits.apparentAge) {
+          analyzerData.attributes.apparent_age = traits.apparentAge;
+          log.debug(`📸 [GEMINI] Apparent age from analysis: ${traits.apparentAge}`);
+        }
         if (traits.gender && !analyzerData.attributes.gender) {
           analyzerData.attributes.gender = traits.gender.toLowerCase();
         }

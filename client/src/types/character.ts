@@ -89,6 +89,7 @@ export interface Character {
   gender: 'male' | 'female' | 'other';
   age: string;
   ageCategory?: AgeCategory; // Auto-filled from age, used for image generation
+  apparentAge?: AgeCategory; // How old they look in photo (from analysis or user override)
 
   // Physical traits (from photo analysis)
   physical?: PhysicalTraits;

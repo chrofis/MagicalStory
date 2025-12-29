@@ -20,6 +20,7 @@ export interface PhotoAnalysisResult {
   bodyCrop?: string;
   bodyNoBg?: string;
   age?: string;
+  apparentAge?: string; // Age category from visual analysis (e.g., "preteen", "young-teen")
   gender?: string;
   height?: string;
   build?: string;
@@ -72,6 +73,7 @@ export const photoService = {
         bodyCrop: data.bodyCrop,
         bodyNoBg: data.bodyNoBg,
         age: attrs.age || data.age,
+        apparentAge: attrs.apparent_age || attrs.apparentAge || data.apparentAge,
         gender: attrs.gender || data.gender,
         height: attrs.height || data.height,
         build: attrs.build || data.build,

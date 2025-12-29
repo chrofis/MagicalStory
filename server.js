@@ -5044,12 +5044,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       const charDescriptions = photos.map((photo, index) => {
         // Find the original character to get full physical description
         const char = characters?.find(c => c.name === photo.name);
-        // Build age description with category for consistency
+        // Build age description: "X years old, appears as [category]"
         let ageDesc = '';
         if (char?.age) {
-          const ageCategory = char.ageCategory || getAgeCategory(char.age);
-          if (ageCategory) {
-            ageDesc = getAgeCategoryLabel(ageCategory);
+          // Use apparentAge if set, otherwise compute from age
+          const effectiveAgeCategory = char.apparentAge || char.ageCategory || getAgeCategory(char.age);
+          if (effectiveAgeCategory) {
+            ageDesc = `${char.age} years old, appears as ${getAgeCategoryLabel(effectiveAgeCategory)}`;
           } else {
             ageDesc = `${char.age} years old`;
           }
@@ -6250,12 +6251,13 @@ async function processStoryJob(jobId) {
         const charDescriptions = photos.map((photo, index) => {
           // Find the original character to get full physical description
           const char = characters?.find(c => c.name === photo.name);
-          // Build age description with category for consistency
+          // Build age description: "X years old, appears as [category]"
           let ageDesc = '';
           if (char?.age) {
-            const ageCategory = char.ageCategory || getAgeCategory(char.age);
-            if (ageCategory) {
-              ageDesc = getAgeCategoryLabel(ageCategory);
+            // Use apparentAge if set, otherwise compute from age
+            const effectiveAgeCategory = char.apparentAge || char.ageCategory || getAgeCategory(char.age);
+            if (effectiveAgeCategory) {
+              ageDesc = `${char.age} years old, appears as ${getAgeCategoryLabel(effectiveAgeCategory)}`;
             } else {
               ageDesc = `${char.age} years old`;
             }

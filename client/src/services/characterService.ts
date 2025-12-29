@@ -40,6 +40,8 @@ interface CharacterApiResponse {
   age: string;
   age_category?: string;
   ageCategory?: string;
+  apparent_age?: string;
+  apparentAge?: string;
   // Physical traits (snake_case + camelCase legacy)
   height?: string;
   build?: string;
@@ -97,6 +99,8 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
 
   // Compute ageCategory from API or derive from age
   const ageCategory = (api.age_category || api.ageCategory || getAgeCategory(api.age)) as AgeCategory | undefined;
+  // Get apparent age from API (from photo analysis or user override)
+  const apparentAge = (api.apparent_age || api.apparentAge) as AgeCategory | undefined;
 
   return {
     id: api.id,
@@ -104,6 +108,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     gender: api.gender as 'male' | 'female' | 'other',
     age: api.age,
     ageCategory,
+    apparentAge,
 
     physical: (physical.height || physical.build || physical.face || physical.hair || physical.other) ? physical : undefined,
 
@@ -144,6 +149,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     gender: char.gender,
     age: char.age,
     age_category: ageCategory,
+    apparent_age: char.apparentAge,
     // Physical traits
     height: char.physical?.height,
     build: char.physical?.build,
@@ -375,6 +381,7 @@ export const characterService = {
     };
     // Basic info extracted from photo
     age?: string;
+    apparentAge?: AgeCategory;  // How old they look (from photo analysis)
     gender?: string;
     physical?: {
       height?: string;
@@ -398,6 +405,7 @@ export const characterService = {
         bodyBox?: { x: number; y: number; width: number; height: number };
         attributes?: {
           age?: string;
+          apparent_age?: string;  // Age category from visual analysis
           gender?: string;
           height?: string;
           build?: string;
@@ -440,6 +448,7 @@ export const characterService = {
         },
         // Basic info from analysis
         age: response.attributes?.age,
+        apparentAge: response.attributes?.apparent_age as AgeCategory | undefined,
         gender: response.attributes?.gender,
         physical: (physical.height || physical.build || physical.face || physical.hair || physical.other) ? physical : undefined,
         clothing: response.attributes?.clothing || response.attributes?.clothingStyle || response.attributes?.clothingColors

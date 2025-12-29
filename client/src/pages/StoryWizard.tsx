@@ -126,6 +126,18 @@ export default function StoryWizard() {
       return 'standard';
     }
   });
+  // Story language (de-ch is default, de-de only selectable here)
+  const [storyLanguage, setStoryLanguage] = useState<'de-ch' | 'de-de' | 'fr' | 'en'>(() => {
+    try {
+      const saved = localStorage.getItem('story_language');
+      if (saved && ['de-ch', 'de-de', 'fr', 'en'].includes(saved)) {
+        return saved as 'de-ch' | 'de-de' | 'fr' | 'en';
+      }
+      return 'de-ch'; // Default to Swiss German
+    } catch {
+      return 'de-ch';
+    }
+  });
   const [pages, setPages] = useState(() => {
     try {
       const saved = localStorage.getItem('story_pages');
@@ -558,6 +570,10 @@ export default function StoryWizard() {
   }, [languageLevel]);
 
   useEffect(() => {
+    localStorage.setItem('story_language', storyLanguage);
+  }, [storyLanguage]);
+
+  useEffect(() => {
     localStorage.setItem('story_pages', pages.toString());
   }, [pages]);
 
@@ -799,6 +815,8 @@ export default function StoryWizard() {
               gender: prev.gender || (analysis.gender as 'male' | 'female' | 'other'),
               // Age: only fill if blank (preserve user value)
               age: prev.age || analysis.age || '',
+              // Apparent age: always set from analysis if available (visual appearance)
+              apparentAge: analysis.apparentAge || prev.apparentAge,
               // Photos
               photos: {
                 original: analysis.photos?.face || originalPhotoUrl,
@@ -1165,7 +1183,7 @@ export default function StoryWizard() {
         storyTopic: storyTopic || undefined,
         storyTheme: storyTheme || undefined,
         customThemeText: storyTheme === 'custom' ? customThemeText : undefined,
-        language: language as 'en' | 'de' | 'fr',
+        language: storyLanguage,
         languageLevel,
         characters: charactersInStory.map(c => ({
           name: c.name,
@@ -1323,7 +1341,7 @@ export default function StoryWizard() {
         storyTheme: storyTheme || undefined,
         customThemeText: storyTheme === 'custom' ? customThemeText : undefined,
         artStyle,
-        language: language as Language,
+        language: storyLanguage,
         languageLevel,
         pages,
         dedication,
@@ -1643,6 +1661,8 @@ export default function StoryWizard() {
             mainCharacters={mainCharacters}
             excludedCharacters={excludedCharacters}
             onCharacterRoleChange={handleCharacterRoleChange}
+            storyLanguage={storyLanguage}
+            onStoryLanguageChange={setStoryLanguage}
             languageLevel={languageLevel}
             onLanguageLevelChange={setLanguageLevel}
             pages={pages}

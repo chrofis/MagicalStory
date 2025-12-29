@@ -15,6 +15,7 @@ Return a JSON object with this EXACT structure:
 {
   "traits": {
     "age": "<estimated age as a number (e.g. 8, 25, 45)>",
+    "apparentAge": "<age category based on visual appearance - MUST be one of: infant | toddler | preschooler | kindergartner | young-school-age | school-age | preteen | young-teen | teenager | young-adult | adult | middle-aged | senior | elderly>",
     "gender": "<male, female, or other>",
     "height": "<height in cm as a number (e.g. 120 for child, 170 for adult)>",
     "build": "<slim, average, athletic, stocky>",
@@ -23,3 +24,9 @@ Return a JSON object with this EXACT structure:
     "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>"
   }
 }
+
+Age category guide:
+- infant (0-1 years), toddler (1-2), preschooler (3-4), kindergartner (5-6)
+- young-school-age (7-8), school-age (9-10), preteen (11-12), young-teen (13-14)
+- teenager (15-17), young-adult (18-25), adult (26-39), middle-aged (40-59)
+- senior (60-75), elderly (75+)

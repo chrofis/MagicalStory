@@ -1,4 +1,4 @@
-import { StorySettings, type CharacterRole } from '@/components/story';
+import { StorySettings, type CharacterRole, type StoryLanguage } from '@/components/story';
 import type { Character } from '@/types/character';
 import type { LanguageLevel } from '@/types/story';
 
@@ -7,6 +7,8 @@ interface WizardStep4Props {
   mainCharacters: number[];
   excludedCharacters: number[];
   onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
+  storyLanguage: StoryLanguage;
+  onStoryLanguageChange: (lang: StoryLanguage) => void;
   languageLevel: LanguageLevel;
   onLanguageLevelChange: (level: LanguageLevel) => void;
   pages: number;
@@ -44,6 +46,8 @@ export function WizardStep4Settings(props: WizardStep4Props) {
       mainCharacters={props.mainCharacters}
       excludedCharacters={props.excludedCharacters}
       onCharacterRoleChange={props.onCharacterRoleChange}
+      storyLanguage={props.storyLanguage}
+      onStoryLanguageChange={props.onStoryLanguageChange}
       languageLevel={props.languageLevel}
       onLanguageLevelChange={props.onLanguageLevelChange}
       pages={props.pages}

@@ -12,11 +12,23 @@ import type { LanguageLevel, Language } from '@/types/story';
 // Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
 export type CharacterRole = 'out' | 'in' | 'main';
 
+// Story language options (de-de only available here)
+export type StoryLanguage = 'de-ch' | 'de-de' | 'fr' | 'en';
+
+export const STORY_LANGUAGES: { code: StoryLanguage; name: string; flag: string }[] = [
+  { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
+  { code: 'de-de', name: 'Deutsch (Deutschland)', flag: '🇩🇪' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'en', name: 'English', flag: '🇬🇧' },
+];
+
 interface StorySettingsProps {
   characters: Character[];
   mainCharacters: number[];
   excludedCharacters: number[];
   onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
+  storyLanguage: StoryLanguage;
+  onStoryLanguageChange: (lang: StoryLanguage) => void;
   languageLevel: LanguageLevel;
   onLanguageLevelChange: (level: LanguageLevel) => void;
   pages: number;
@@ -49,6 +61,8 @@ export function StorySettings({
   mainCharacters,
   excludedCharacters,
   onCharacterRoleChange,
+  storyLanguage,
+  onStoryLanguageChange,
   languageLevel,
   onLanguageLevelChange,
   pages,
@@ -351,6 +365,33 @@ export function StorySettings({
               );
             })}
           </div>
+        </div>
+
+        {/* Story Language Selection */}
+        <div>
+          <label className="block text-xl font-semibold mb-3">
+            {language === 'de' ? 'Sprache der Geschichte' : language === 'fr' ? 'Langue de l\'histoire' : 'Story Language'}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {STORY_LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => onStoryLanguageChange(lang.code)}
+                className={`px-4 py-2 rounded-lg border-2 transition-all flex items-center gap-2 ${
+                  storyLanguage === lang.code
+                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-200'
+                    : 'border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <span className="text-lg">{lang.flag}</span>
+                <span className="font-medium">{lang.name}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-gray-500 mt-2">
+            {storyLanguage === 'de-ch' && (language === 'de' ? 'Schweizer Hochdeutsch: verwendet "ss" statt "ß"' : 'Swiss German: uses "ss" instead of "ß"')}
+            {storyLanguage === 'de-de' && (language === 'de' ? 'Deutsches Hochdeutsch: verwendet "ß" korrekt' : 'German German: uses "ß" correctly')}
+          </p>
         </div>
 
         {/* Reading Level Selection */}

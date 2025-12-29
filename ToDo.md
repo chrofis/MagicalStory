@@ -125,23 +125,22 @@ Token count seems off
 
 ---
 
-## Pending - Frontend Refactoring
+## Pending - Frontend Refactoring (Optional Further Reduction)
 
-### StoryWizard.tsx (2555 lines → target <1500)
+### StoryWizard.tsx (2555 lines - reduced from 2646)
+Done: WizardStep1-4 extracted
+Optional further extraction:
 - [ ] Extract `useWizardNavigation.ts` hook
-- [ ] Extract `useStoryConfiguration.ts` hook
-- [ ] Extract `useCharacterManagement.ts` hook
-- [ ] Extract `WizardStep5Generation.tsx` component
+- [ ] Extract `WizardStep5Generation.tsx` (complex, many callbacks)
 
-### StoryDisplay.tsx (2341 lines → target <1500)
+### StoryDisplay.tsx (2341 lines - reduced from 2512)
+Done: SceneEditModal, ImageHistoryModal, EnlargedImageModal extracted
+Optional further extraction:
 - [ ] Extract `TitleEditor.tsx`
 - [ ] Extract `PageDisplay.tsx`
-- [ ] Extract `CoverSection.tsx`
 
-### CharacterForm.tsx (750 lines → target <400)
-- [ ] Extract `CharacterNameStep.tsx`
-- [ ] Extract `CharacterTraitsStep.tsx`
-- [ ] Extract `AvatarSection.tsx`
+### CharacterForm.tsx (750 lines)
+- [ ] Extract step components (optional)
 
 ---
 

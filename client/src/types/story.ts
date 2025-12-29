@@ -1,6 +1,6 @@
 import type { Character, RelationshipMap, RelationshipTextMap, LocalizedString, VisualBible } from './character';
 
-export type Language = 'en' | 'de' | 'fr';
+export type Language = 'en' | 'de' | 'de-ch' | 'de-de' | 'fr';
 export type LanguageLevel = '1st-grade' | 'standard' | 'advanced';
 
 export type AdventureThemeGroupId = 'historical' | 'fantasy' | 'locations' | 'professions' | 'seasonal' | 'custom';
