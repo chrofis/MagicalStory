@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
+const { dbQuery, getPool, isDatabaseMode, saveStoryImage, hasStorySeparateImages } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 
@@ -381,6 +381,201 @@ router.post('/fix-metadata-migration', authenticateToken, requireAdmin, async (r
     });
   } catch (err) {
     log.error('[FIX-MIGRATION] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/migrate-story-images/:storyId
+// Migrate a single story's images to the separate story_images table
+router.post('/migrate-story-images/:storyId', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'This operation is only available in database mode' });
+    }
+
+    const { storyId } = req.params;
+    const pool = getPool();
+
+    // Check if already migrated
+    const alreadyMigrated = await hasStorySeparateImages(storyId);
+    if (alreadyMigrated) {
+      return res.json({
+        success: true,
+        message: 'Story already migrated',
+        storyId,
+        imagesMigrated: 0
+      });
+    }
+
+    // Load story data
+    const storyRows = await pool.query('SELECT data FROM stories WHERE id = $1', [storyId]);
+    if (storyRows.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = JSON.parse(storyRows.rows[0].data);
+    let imagesMigrated = 0;
+
+    // Migrate scene images
+    if (story.sceneImages) {
+      for (const img of story.sceneImages) {
+        if (img.imageData) {
+          await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
+            qualityScore: img.qualityScore,
+            generatedAt: img.generatedAt,
+            versionIndex: 0
+          });
+          imagesMigrated++;
+
+          // Migrate image versions
+          if (img.imageVersions) {
+            for (let i = 0; i < img.imageVersions.length; i++) {
+              const version = img.imageVersions[i];
+              if (version.imageData) {
+                await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
+                  qualityScore: version.qualityScore,
+                  generatedAt: version.generatedAt,
+                  versionIndex: i + 1
+                });
+                imagesMigrated++;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Migrate cover images
+    const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+    for (const coverType of coverTypes) {
+      const coverData = story.coverImages?.[coverType];
+      if (coverData) {
+        const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+        if (imageData) {
+          await saveStoryImage(storyId, coverType, null, imageData, {
+            qualityScore: coverData.qualityScore,
+            generatedAt: coverData.generatedAt,
+            versionIndex: 0
+          });
+          imagesMigrated++;
+        }
+      }
+    }
+
+    log.info(`[MIGRATE] Story ${storyId} migrated: ${imagesMigrated} images`);
+    res.json({
+      success: true,
+      message: 'Story images migrated successfully',
+      storyId,
+      imagesMigrated
+    });
+  } catch (err) {
+    log.error('[MIGRATE] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/admin/migrate-all-story-images
+// Migrate all stories' images to the separate story_images table
+router.post('/migrate-all-story-images', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'This operation is only available in database mode' });
+    }
+
+    const pool = getPool();
+    const { limit = 10 } = req.body; // Process in batches
+
+    // Get stories that haven't been migrated yet
+    const storyRows = await pool.query(`
+      SELECT s.id FROM stories s
+      WHERE NOT EXISTS (SELECT 1 FROM story_images si WHERE si.story_id = s.id)
+      LIMIT $1
+    `, [limit]);
+
+    const results = [];
+    let totalImagesMigrated = 0;
+
+    for (const row of storyRows.rows) {
+      const storyId = row.id;
+
+      try {
+        // Load story data
+        const dataRows = await pool.query('SELECT data FROM stories WHERE id = $1', [storyId]);
+        const story = JSON.parse(dataRows.rows[0].data);
+        let imagesMigrated = 0;
+
+        // Migrate scene images
+        if (story.sceneImages) {
+          for (const img of story.sceneImages) {
+            if (img.imageData) {
+              await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
+                qualityScore: img.qualityScore,
+                generatedAt: img.generatedAt,
+                versionIndex: 0
+              });
+              imagesMigrated++;
+
+              // Migrate image versions
+              if (img.imageVersions) {
+                for (let i = 0; i < img.imageVersions.length; i++) {
+                  const version = img.imageVersions[i];
+                  if (version.imageData) {
+                    await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
+                      qualityScore: version.qualityScore,
+                      generatedAt: version.generatedAt,
+                      versionIndex: i + 1
+                    });
+                    imagesMigrated++;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Migrate cover images
+        const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+        for (const coverType of coverTypes) {
+          const coverData = story.coverImages?.[coverType];
+          if (coverData) {
+            const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+            if (imageData) {
+              await saveStoryImage(storyId, coverType, null, imageData, {
+                qualityScore: coverData.qualityScore,
+                generatedAt: coverData.generatedAt,
+                versionIndex: 0
+              });
+              imagesMigrated++;
+            }
+          }
+        }
+
+        results.push({ storyId, imagesMigrated, success: true });
+        totalImagesMigrated += imagesMigrated;
+        log.info(`[MIGRATE] Story ${storyId}: ${imagesMigrated} images`);
+      } catch (err) {
+        results.push({ storyId, error: err.message, success: false });
+        log.error(`[MIGRATE] Story ${storyId} failed:`, err.message);
+      }
+    }
+
+    // Check how many stories still need migration
+    const remainingRows = await pool.query(`
+      SELECT COUNT(*) as count FROM stories s
+      WHERE NOT EXISTS (SELECT 1 FROM story_images si WHERE si.story_id = s.id)
+    `);
+    const remaining = parseInt(remainingRows.rows[0].count);
+
+    res.json({
+      success: true,
+      storiesMigrated: results.filter(r => r.success).length,
+      totalImagesMigrated,
+      remaining,
+      results
+    });
+  } catch (err) {
+    log.error('[MIGRATE] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, hasStorySeparateImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 
@@ -124,71 +124,142 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // GET /api/stories/:id/metadata - Get story WITHOUT image data (for fast initial load)
+// Optimized: If story has separate images, skip the slow blob loading
 router.get('/:id/metadata', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`📖 GET /api/stories/${id}/metadata - User: ${req.user.username}`);
 
-    let story = null;
-
-    if (isDatabaseMode()) {
-      let rows;
-      if (req.user.impersonating && req.user.originalAdminId) {
-        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-        if (rows.length === 0) {
-          rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
-        }
-      } else {
-        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-      }
-
-      if (rows.length > 0) {
-        story = JSON.parse(rows[0].data);
-      }
-    } else {
+    if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    if (!story) {
+    // First verify access (fast query)
+    let accessRows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      accessRows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (accessRows.length === 0) {
+        accessRows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      accessRows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (accessRows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    // Strip out image data but keep metadata
-    const metadata = {
-      ...story,
-      sceneImages: story.sceneImages?.map(img => ({
-        ...img,
-        imageData: undefined, // Remove actual image data
-        hasImage: !!img.imageData,
-        // Keep version info but strip image data
-        imageVersions: img.imageVersions?.map(v => ({
-          ...v,
-          imageData: undefined,
-          hasImage: !!v.imageData
-        }))
-      })),
-      coverImages: story.coverImages ? {
-        frontCover: story.coverImages.frontCover ? {
-          ...(typeof story.coverImages.frontCover === 'object' ? story.coverImages.frontCover : {}),
-          imageData: undefined,
-          hasImage: !!(typeof story.coverImages.frontCover === 'string' ? story.coverImages.frontCover : story.coverImages.frontCover?.imageData)
-        } : null,
-        initialPage: story.coverImages.initialPage ? {
-          ...(typeof story.coverImages.initialPage === 'object' ? story.coverImages.initialPage : {}),
-          imageData: undefined,
-          hasImage: !!(typeof story.coverImages.initialPage === 'string' ? story.coverImages.initialPage : story.coverImages.initialPage?.imageData)
-        } : null,
-        backCover: story.coverImages.backCover ? {
-          ...(typeof story.coverImages.backCover === 'object' ? story.coverImages.backCover : {}),
-          imageData: undefined,
-          hasImage: !!(typeof story.coverImages.backCover === 'string' ? story.coverImages.backCover : story.coverImages.backCover?.imageData)
-        } : null
-      } : null,
-      // Include image count for progress tracking
-      totalImages: (story.sceneImages?.length || 0) + (story.coverImages ? 3 : 0)
-    };
+    // Check if story has images in separate table (FAST path)
+    const hasSeparateImages = await hasStorySeparateImages(id);
 
-    console.log(`📖 Returning story metadata: ${story.title} (${metadata.totalImages} images to load)`);
+    let metadata;
+
+    if (hasSeparateImages) {
+      // FAST PATH: Load metadata without image data, get image info from story_images table
+      // Use JSONB to extract non-image fields (PostgreSQL won't load the huge imageData strings)
+      const metaQuery = `
+        SELECT
+          (data::jsonb) - 'sceneImages' - 'coverImages' as base_data,
+          COALESCE(jsonb_array_length((data::jsonb)->'sceneImages'), 0) as scene_count
+        FROM stories WHERE id = $1
+      `;
+      const metaRows = await dbQuery(metaQuery, [id]);
+      const baseData = typeof metaRows[0].base_data === 'string'
+        ? JSON.parse(metaRows[0].base_data)
+        : metaRows[0].base_data;
+      const sceneCount = parseInt(metaRows[0].scene_count) || 0;
+
+      // Get image info from story_images table (fast - no large data)
+      const imageInfoRows = await dbQuery(
+        `SELECT image_type, page_number, version_index, quality_score, generated_at
+         FROM story_images WHERE story_id = $1 ORDER BY image_type, page_number, version_index`,
+        [id]
+      );
+
+      // Build sceneImages array from image info
+      const sceneImagesMap = new Map();
+      const coverImages = { frontCover: null, initialPage: null, backCover: null };
+
+      for (const row of imageInfoRows) {
+        if (row.image_type === 'scene') {
+          if (!sceneImagesMap.has(row.page_number)) {
+            sceneImagesMap.set(row.page_number, {
+              pageNumber: row.page_number,
+              hasImage: true,
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              imageVersions: []
+            });
+          }
+          if (row.version_index > 0) {
+            sceneImagesMap.get(row.page_number).imageVersions.push({
+              hasImage: true,
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at
+            });
+          }
+        } else {
+          // Cover image
+          coverImages[row.image_type] = {
+            hasImage: true,
+            qualityScore: row.quality_score,
+            generatedAt: row.generated_at
+          };
+        }
+      }
+
+      const sceneImages = Array.from(sceneImagesMap.values()).sort((a, b) => a.pageNumber - b.pageNumber);
+      const coverCount = (coverImages.frontCover ? 1 : 0) + (coverImages.initialPage ? 1 : 0) + (coverImages.backCover ? 1 : 0);
+
+      metadata = {
+        ...baseData,
+        sceneImages,
+        coverImages: coverCount > 0 ? coverImages : null,
+        totalImages: sceneImages.length + coverCount
+      };
+
+      console.log(`📖 [FAST] Returning story metadata: ${metadata.title} (${metadata.totalImages} images to load)`);
+    } else {
+      // SLOW PATH: Load full data blob (for non-migrated stories)
+      const rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+      const story = JSON.parse(rows[0].data);
+
+      // Strip out image data but keep metadata
+      metadata = {
+        ...story,
+        sceneImages: story.sceneImages?.map(img => ({
+          ...img,
+          imageData: undefined,
+          hasImage: !!img.imageData,
+          imageVersions: img.imageVersions?.map(v => ({
+            ...v,
+            imageData: undefined,
+            hasImage: !!v.imageData
+          }))
+        })),
+        coverImages: story.coverImages ? {
+          frontCover: story.coverImages.frontCover ? {
+            ...(typeof story.coverImages.frontCover === 'object' ? story.coverImages.frontCover : {}),
+            imageData: undefined,
+            hasImage: !!(typeof story.coverImages.frontCover === 'string' ? story.coverImages.frontCover : story.coverImages.frontCover?.imageData)
+          } : null,
+          initialPage: story.coverImages.initialPage ? {
+            ...(typeof story.coverImages.initialPage === 'object' ? story.coverImages.initialPage : {}),
+            imageData: undefined,
+            hasImage: !!(typeof story.coverImages.initialPage === 'string' ? story.coverImages.initialPage : story.coverImages.initialPage?.imageData)
+          } : null,
+          backCover: story.coverImages.backCover ? {
+            ...(typeof story.coverImages.backCover === 'object' ? story.coverImages.backCover : {}),
+            imageData: undefined,
+            hasImage: !!(typeof story.coverImages.backCover === 'string' ? story.coverImages.backCover : story.coverImages.backCover?.imageData)
+          } : null
+        } : null,
+        totalImages: (story.sceneImages?.length || 0) + (story.coverImages ? 3 : 0)
+      };
+
+      console.log(`📖 [SLOW] Returning story metadata: ${story.title} (${metadata.totalImages} images to load)`);
+    }
+
     res.json(metadata);
   } catch (err) {
     console.error('❌ Error fetching story metadata:', err);
@@ -197,35 +268,58 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
 });
 
 // GET /api/stories/:id/image/:pageNumber - Get individual page image
+// Optimized: First tries separate story_images table, falls back to data blob
 router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
   try {
     const { id, pageNumber } = req.params;
     const pageNum = parseInt(pageNumber, 10);
 
-    let story = null;
-
-    if (isDatabaseMode()) {
-      let rows;
-      if (req.user.impersonating && req.user.originalAdminId) {
-        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-        if (rows.length === 0) {
-          rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
-        }
-      } else {
-        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-      }
-
-      if (rows.length > 0) {
-        story = JSON.parse(rows[0].data);
-      }
-    } else {
+    if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    if (!story) {
+    // First, verify user has access to this story (fast query, no data loading)
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
 
+    // Try to get image from separate table first (FAST path)
+    const separateImage = await getStoryImage(id, 'scene', pageNum, 0);
+    if (separateImage) {
+      // Also get image versions from separate table
+      const versions = [];
+      for (let i = 1; i <= 10; i++) {
+        const version = await getStoryImage(id, 'scene', pageNum, i);
+        if (!version) break;
+        versions.push(version);
+      }
+
+      return res.json({
+        pageNumber: pageNum,
+        imageData: separateImage.imageData,
+        qualityScore: separateImage.qualityScore,
+        generatedAt: separateImage.generatedAt,
+        imageVersions: versions.length > 0 ? versions : undefined
+      });
+    }
+
+    // Fallback: Load from data blob (SLOW path for non-migrated stories)
+    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (dataRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = JSON.parse(dataRows[0].data);
     const sceneImage = story.sceneImages?.find(img => img.pageNumber === pageNum);
     if (!sceneImage || !sceneImage.imageData) {
       return res.status(404).json({ error: 'Image not found' });
@@ -243,34 +337,48 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
 });
 
 // GET /api/stories/:id/cover-image/:coverType - Get individual cover image
+// Optimized: First tries separate story_images table, falls back to data blob
 router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) => {
   try {
     const { id, coverType } = req.params;
 
-    let story = null;
-
-    if (isDatabaseMode()) {
-      let rows;
-      if (req.user.impersonating && req.user.originalAdminId) {
-        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-        if (rows.length === 0) {
-          rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
-        }
-      } else {
-        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
-      }
-
-      if (rows.length > 0) {
-        story = JSON.parse(rows[0].data);
-      }
-    } else {
+    if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    if (!story) {
+    // First, verify user has access to this story (fast query, no data loading)
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
 
+    // Try to get cover from separate table first (FAST path)
+    const separateImage = await getStoryImage(id, coverType, null, 0);
+    if (separateImage) {
+      return res.json({
+        coverType,
+        imageData: separateImage.imageData,
+        qualityScore: separateImage.qualityScore,
+        generatedAt: separateImage.generatedAt
+      });
+    }
+
+    // Fallback: Load from data blob (SLOW path for non-migrated stories)
+    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (dataRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = JSON.parse(dataRows[0].data);
     const coverData = story.coverImages?.[coverType];
     if (!coverData) {
       return res.status(404).json({ error: 'Cover not found' });

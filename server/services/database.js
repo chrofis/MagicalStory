@@ -466,6 +466,107 @@ async function upsertStory(storyId, userId, storyData) {
   );
 }
 
+/**
+ * Save a story image to the story_images table.
+ * @param {string} storyId - Story ID
+ * @param {string} imageType - 'scene', 'frontCover', 'initialPage', 'backCover'
+ * @param {number|null} pageNumber - Page number for scene images, null for covers
+ * @param {string} imageData - Base64 encoded image data
+ * @param {object} options - Additional options (qualityScore, generatedAt, versionIndex)
+ */
+async function saveStoryImage(storyId, imageType, pageNumber, imageData, options = {}) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  const { qualityScore = null, generatedAt = null, versionIndex = 0 } = options;
+
+  await dbQuery(
+    `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, quality_score, generated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (story_id, image_type, page_number, version_index)
+     DO UPDATE SET image_data = EXCLUDED.image_data, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
+    [storyId, imageType, pageNumber, versionIndex, imageData, qualityScore, generatedAt]
+  );
+}
+
+/**
+ * Get a story image from the story_images table.
+ * @param {string} storyId - Story ID
+ * @param {string} imageType - 'scene', 'frontCover', 'initialPage', 'backCover'
+ * @param {number|null} pageNumber - Page number for scene images, null for covers
+ * @param {number} versionIndex - Version index (default 0)
+ * @returns {object|null} Image data with metadata or null if not found
+ */
+async function getStoryImage(storyId, imageType, pageNumber, versionIndex = 0) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  const rows = await dbQuery(
+    `SELECT image_data, quality_score, generated_at FROM story_images
+     WHERE story_id = $1 AND image_type = $2 AND page_number IS NOT DISTINCT FROM $3 AND version_index = $4`,
+    [storyId, imageType, pageNumber, versionIndex]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return {
+    imageData: rows[0].image_data,
+    qualityScore: rows[0].quality_score,
+    generatedAt: rows[0].generated_at
+  };
+}
+
+/**
+ * Get all images for a story (for migration/export purposes).
+ * @param {string} storyId - Story ID
+ * @returns {array} Array of image records
+ */
+async function getAllStoryImages(storyId) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  return await dbQuery(
+    `SELECT image_type, page_number, version_index, image_data, quality_score, generated_at
+     FROM story_images WHERE story_id = $1 ORDER BY image_type, page_number, version_index`,
+    [storyId]
+  );
+}
+
+/**
+ * Check if a story has images in the new table.
+ * @param {string} storyId - Story ID
+ * @returns {boolean} True if images exist in new table
+ */
+async function hasStorySeparateImages(storyId) {
+  if (!isDatabaseMode()) {
+    return false;
+  }
+
+  const rows = await dbQuery(
+    'SELECT 1 FROM story_images WHERE story_id = $1 LIMIT 1',
+    [storyId]
+  );
+
+  return rows.length > 0;
+}
+
+/**
+ * Delete all images for a story.
+ * @param {string} storyId - Story ID
+ */
+async function deleteStoryImages(storyId) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  await dbQuery('DELETE FROM story_images WHERE story_id = $1', [storyId]);
+}
+
 module.exports = {
   initializePool,
   initializeDatabase,
@@ -476,5 +577,11 @@ module.exports = {
   logActivity,
   buildStoryMetadata,
   saveStoryData,
-  upsertStory
+  upsertStory,
+  // New image functions
+  saveStoryImage,
+  getStoryImage,
+  getAllStoryImages,
+  hasStorySeparateImages,
+  deleteStoryImages
 };
