@@ -1180,6 +1180,7 @@ export default function StoryWizard() {
         storyCategory: storyCategory || undefined,
         storyTopic: storyTopic || undefined,
         storyTheme: storyTheme || undefined,
+        customThemeText: storyTheme === 'custom' ? customThemeText : undefined,
         language: language as 'en' | 'de' | 'fr',
         languageLevel,
         characters: charactersInStory.map(c => ({
@@ -1332,6 +1333,7 @@ export default function StoryWizard() {
         storyCategory: storyCategory || undefined,
         storyTopic: storyTopic || undefined,
         storyTheme: storyTheme || undefined,
+        customThemeText: storyTheme === 'custom' ? customThemeText : undefined,
         artStyle,
         language: language as Language,
         languageLevel,

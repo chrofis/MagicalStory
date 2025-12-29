@@ -650,6 +650,7 @@ export const storyService = {
     storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
     storyTopic?: string;
     storyTheme?: string;
+    customThemeText?: string;
     language: 'en' | 'de' | 'fr';
     languageLevel: LanguageLevel;
     characters: Array<{
@@ -678,6 +679,7 @@ export const storyService = {
     storyCategory?: 'adventure' | 'life-challenge' | 'educational';
     storyTopic?: string;
     storyTheme?: string;
+    customThemeText?: string;
     artStyle: string;
     language: Language;
     languageLevel: LanguageLevel;
