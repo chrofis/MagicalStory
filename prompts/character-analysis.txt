@@ -21,9 +21,9 @@ Return a JSON object with this EXACT structure:
     "build": "<slim, average, athletic, stocky>",
     "face": "<PERMANENT facial structure: bone structure, face shape, skin tone - NO expressions>",
     "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
-    "hairColor": "<natural hair color (e.g. blonde, brown, black, red, gray, white)>",
+    "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
     "hairLength": "<MUST be one of: bald | balding | thinning | buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
-    "hairStyle": "<MUST be one of: straight | wavy | curly | coily | ponytail | braids | bun | pigtails | loose | slicked back>",
+    "hairStyle": "<MUST be one of: straight | wavy | curly | coily | messy | spiky | layered | slicked back | loose | ponytail | braids | bun | pigtails | bob | afro | mohawk | mullet | undercut | bangs | side bangs>",
     "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>"
   }
 }

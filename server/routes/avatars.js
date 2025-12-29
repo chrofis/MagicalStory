@@ -251,17 +251,17 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
     let languageInstruction = '';
     if (language === 'de') {
       languageInstruction = `WICHTIG: Beschreibe alle Merkmale auf Deutsch.
-- hairColor: z.B. "blond", "braun", "schwarz", "rot", "grau"
+- hairColor: z.B. "schwarz", "dunkelbraun", "braun", "hellbraun", "kastanienbraun", "rotbraun", "rot", "erdbeerblond", "dunkelblond", "blond", "hellblond", "platinblond", "grau", "silber", "weiss", "graumeliert"
 - hairLength: z.B. "sehr kurz", "kurz", "ohrlang", "kinnlang", "nackenlang", "schulterlang", "achsellang", "rückenmitte", "hüftlang"
-- hairStyle: z.B. "glatt", "wellig", "lockig", "Pferdeschwanz", "Zöpfe", "Dutt", "offen"
+- hairStyle: z.B. "glatt", "wellig", "lockig", "zerzaust", "stachelig", "gestuft", "Pferdeschwanz", "Zöpfe", "Dutt", "offen", "Bob", "Afro", "Irokese", "Vokuhila", "Undercut", "Pony", "Seitenpony"
 - face: z.B. "rundes Gesicht, helle Haut"
 - build: z.B. "schlank", "durchschnittlich", "athletisch", "kräftig"
 - distinctive markings: z.B. "Brille", "Sommersprossen", "keine"`;
     } else if (language === 'fr') {
       languageInstruction = `IMPORTANT: Décrivez tous les traits en français.
-- hairColor: ex. "blond", "brun", "noir", "roux", "gris"
+- hairColor: ex. "noir", "brun foncé", "brun", "châtain clair", "châtain", "auburn", "roux", "blond vénitien", "blond foncé", "blond", "blond clair", "blond platine", "gris", "argenté", "blanc", "poivre et sel"
 - hairLength: ex. "très court", "court", "aux oreilles", "au menton", "au cou", "aux épaules", "aux aisselles", "mi-dos", "aux hanches"
-- hairStyle: ex. "lisse", "ondulé", "bouclé", "queue de cheval", "tresses", "chignon", "lâche"
+- hairStyle: ex. "lisse", "ondulé", "bouclé", "ébouriffé", "en pointes", "dégradé", "queue de cheval", "tresses", "chignon", "lâche", "carré", "afro", "crête", "mulet", "undercut", "frange", "frange de côté"
 - face: ex. "visage rond, teint clair"
 - build: ex. "mince", "moyen", "athlétique", "costaud"
 - distinctive markings: ex. "lunettes", "taches de rousseur", "aucun"`;

@@ -54,18 +54,57 @@ const HAIR_LENGTH_OPTIONS: { value: string; label: string; labelDe: string; labe
   { value: 'waist-length', label: 'Waist-Length', labelDe: 'Hüftlang', labelFr: 'Aux hanches' },
 ];
 
+// Hair color options (natural colors)
+const HAIR_COLOR_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  // Dark tones
+  { value: 'black', label: 'Black', labelDe: 'Schwarz', labelFr: 'Noir' },
+  { value: 'dark brown', label: 'Dark Brown', labelDe: 'Dunkelbraun', labelFr: 'Brun foncé' },
+  { value: 'brown', label: 'Brown', labelDe: 'Braun', labelFr: 'Brun' },
+  { value: 'light brown', label: 'Light Brown', labelDe: 'Hellbraun', labelFr: 'Châtain clair' },
+  { value: 'chestnut', label: 'Chestnut', labelDe: 'Kastanienbraun', labelFr: 'Châtain' },
+  // Red tones
+  { value: 'auburn', label: 'Auburn', labelDe: 'Rotbraun', labelFr: 'Auburn' },
+  { value: 'red', label: 'Red', labelDe: 'Rot', labelFr: 'Roux' },
+  { value: 'strawberry blonde', label: 'Strawberry Blonde', labelDe: 'Erdbeerblond', labelFr: 'Blond vénitien' },
+  // Blonde tones
+  { value: 'dark blonde', label: 'Dark Blonde', labelDe: 'Dunkelblond', labelFr: 'Blond foncé' },
+  { value: 'blonde', label: 'Blonde', labelDe: 'Blond', labelFr: 'Blond' },
+  { value: 'light blonde', label: 'Light Blonde', labelDe: 'Hellblond', labelFr: 'Blond clair' },
+  { value: 'platinum blonde', label: 'Platinum Blonde', labelDe: 'Platinblond', labelFr: 'Blond platine' },
+  // Gray/White tones
+  { value: 'gray', label: 'Gray', labelDe: 'Grau', labelFr: 'Gris' },
+  { value: 'silver', label: 'Silver', labelDe: 'Silber', labelFr: 'Argenté' },
+  { value: 'white', label: 'White', labelDe: 'Weiss', labelFr: 'Blanc' },
+  { value: 'salt and pepper', label: 'Salt and Pepper', labelDe: 'Graumeliert', labelFr: 'Poivre et sel' },
+];
+
 // Hair style options (texture and styling)
 const HAIR_STYLE_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  // Textures
   { value: 'straight', label: 'Straight', labelDe: 'Glatt', labelFr: 'Lisse' },
   { value: 'wavy', label: 'Wavy', labelDe: 'Wellig', labelFr: 'Ondulé' },
   { value: 'curly', label: 'Curly', labelDe: 'Lockig', labelFr: 'Bouclé' },
   { value: 'coily', label: 'Coily', labelDe: 'Kraus', labelFr: 'Crépu' },
+  // Styling
+  { value: 'messy', label: 'Messy', labelDe: 'Zerzaust', labelFr: 'Ébouriffé' },
+  { value: 'spiky', label: 'Spiky', labelDe: 'Stachelig', labelFr: 'En pointes' },
+  { value: 'layered', label: 'Layered', labelDe: 'Gestuft', labelFr: 'Dégradé' },
+  { value: 'slicked back', label: 'Slicked Back', labelDe: 'Zurückgekämmt', labelFr: 'Plaqué' },
+  { value: 'loose', label: 'Loose', labelDe: 'Offen', labelFr: 'Lâche' },
+  // Updos
   { value: 'ponytail', label: 'Ponytail', labelDe: 'Pferdeschwanz', labelFr: 'Queue de cheval' },
   { value: 'braids', label: 'Braids', labelDe: 'Zöpfe', labelFr: 'Tresses' },
   { value: 'bun', label: 'Bun', labelDe: 'Dutt', labelFr: 'Chignon' },
   { value: 'pigtails', label: 'Pigtails', labelDe: 'Zöpfchen', labelFr: 'Couettes' },
-  { value: 'loose', label: 'Loose', labelDe: 'Offen', labelFr: 'Lâche' },
-  { value: 'slicked back', label: 'Slicked Back', labelDe: 'Zurückgekämmt', labelFr: 'Plaqué' },
+  // Haircuts
+  { value: 'bob', label: 'Bob', labelDe: 'Bob', labelFr: 'Carré' },
+  { value: 'afro', label: 'Afro', labelDe: 'Afro', labelFr: 'Afro' },
+  { value: 'mohawk', label: 'Mohawk', labelDe: 'Irokese', labelFr: 'Crête' },
+  { value: 'mullet', label: 'Mullet', labelDe: 'Vokuhila', labelFr: 'Mulet' },
+  { value: 'undercut', label: 'Undercut', labelDe: 'Undercut', labelFr: 'Undercut' },
+  // Bangs
+  { value: 'bangs', label: 'Bangs', labelDe: 'Pony', labelFr: 'Frange' },
+  { value: 'side bangs', label: 'Side Bangs', labelDe: 'Seitenpony', labelFr: 'Frange de côté' },
 ];
 
 // Simple inline editable field - click to edit, blur/enter to save
@@ -155,14 +194,24 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
       </div>
 
       {/* Row 2: Hair Color | Hair Length */}
-      <InlineEditField
-        label={language === 'de' ? 'Haarfarbe' : language === 'fr' ? 'Couleur des cheveux' : 'Hair Color'}
-        value={character.physical?.hairColor || ''}
-        placeholder={language === 'de' ? 'z.B. blond' : 'e.g. blonde'}
-        onChange={(v) => updatePhysical('hairColor', v)}
-        isAiExtracted={isAiExtracted}
-        isChanged={changedTraits?.hairColor}
-      />
+      <div className="flex items-center gap-2">
+        <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
+          {language === 'de' ? 'Haarfarbe' : language === 'fr' ? 'Couleur' : 'Hair Color'}:
+        </span>
+        <select
+          value={character.physical?.hairColor || ''}
+          onChange={(e) => updatePhysical('hairColor', e.target.value)}
+          className={selectClass(changedTraits?.hairColor)}
+        >
+          <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
+          {HAIR_COLOR_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+            </option>
+          ))}
+        </select>
+        {changedTraits?.hairColor && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+      </div>
       <div className="flex items-center gap-2">
         <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
           {language === 'de' ? 'Haarlänge' : language === 'fr' ? 'Longueur' : 'Hair Length'}:
