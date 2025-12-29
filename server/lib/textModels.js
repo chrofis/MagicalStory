@@ -5,68 +5,7 @@
  */
 
 const { log } = require('../utils/logger');
-
-// Available text models configuration
-const TEXT_MODELS = {
-  'claude-sonnet': {
-    provider: 'anthropic',
-    modelId: 'claude-sonnet-4-5-20250929',
-    maxOutputTokens: 64000,
-    description: 'Claude Sonnet 4.5 - Best narrative quality'
-  },
-  'claude-haiku': {
-    provider: 'anthropic',
-    modelId: 'claude-3-5-haiku-20241022',
-    maxOutputTokens: 8192,
-    description: 'Claude Haiku 3.5 - Fast and cheap'
-  },
-  'gemini-2.5-pro': {
-    provider: 'google',
-    modelId: 'gemini-2.5-pro',
-    maxOutputTokens: 65536,
-    description: 'Gemini 2.5 Pro - High quality, large output'
-  },
-  'gemini-2.5-flash': {
-    provider: 'google',
-    modelId: 'gemini-2.5-flash',
-    maxOutputTokens: 65536,
-    description: 'Gemini 2.5 Flash - Fast with large output'
-  },
-  'gemini-2.0-flash': {
-    provider: 'google',
-    modelId: 'gemini-2.0-flash',
-    maxOutputTokens: 8192,
-    description: 'Gemini 2.0 Flash - Very fast'
-  },
-  'gemini-pro-latest': {
-    provider: 'google',
-    modelId: 'gemini-pro-latest',
-    maxOutputTokens: 65536,
-    description: 'Gemini Pro Latest (2.5 Pro) - High quality'
-  }
-};
-
-// ============================================
-// CENTRALIZED MODEL DEFAULTS
-// Change these to update models across the entire pipeline
-// ============================================
-const MODEL_DEFAULTS = {
-  // Text generation models
-  idea: 'gemini-2.0-flash',            // Story idea generation (fast)
-  outline: 'gemini-2.5-pro',           // Story outline generation
-  storyText: 'claude-sonnet',          // Story narrative text
-  sceneDescription: 'claude-haiku',    // Scene description for images
-
-  // Image models
-  pageImage: 'gemini-2.5-flash-image',       // Regular page images
-  coverImage: 'gemini-3-pro-image-preview',  // Cover images (higher quality)
-
-  // Quality evaluation models
-  qualityEval: 'gemini-2.5-flash',     // Image quality evaluation
-
-  // Utility models (inspection, visual bible, etc.)
-  utility: 'gemini-2.0-flash'          // Fast utility tasks
-};
+const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
 
 // Get active model from environment (legacy - prefer MODEL_DEFAULTS)
 const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
