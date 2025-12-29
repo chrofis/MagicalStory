@@ -10,6 +10,9 @@ IMPORTANT: Only describe PERMANENT physical features, NOT temporary states:
 
 {LANGUAGE_INSTRUCTION}
 
+IMPORTANT: For fields marked "MUST be one of:", use the EXACT English values listed (these are system identifiers).
+Only use local language for free-text fields: "face" and "distinctive markings".
+
 Return a JSON object with this EXACT structure:
 
 {

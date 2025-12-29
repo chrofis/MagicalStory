@@ -871,6 +871,14 @@ export default function StoryWizard() {
             gender: analysis.gender,
           });
 
+          // Log raw API response in dev mode for debugging
+          if (analysis._debug?.rawResponse && import.meta.env.DEV) {
+            console.log('📸 [DEBUG] Raw Gemini response:', analysis._debug.rawResponse);
+          }
+          if (analysis._debug?.error) {
+            console.warn('📸 [DEBUG] Gemini error:', analysis._debug.error);
+          }
+
           setCurrentCharacter(prev => {
             if (!prev) return null;
 
@@ -883,6 +891,7 @@ export default function StoryWizard() {
               face: analysis.physical.face || prev.physical?.face,
               eyeColor: analysis.physical.eyeColor || prev.physical?.eyeColor,
               hairColor: analysis.physical.hairColor || prev.physical?.hairColor,
+              hairLength: analysis.physical.hairLength || prev.physical?.hairLength,
               hairStyle: analysis.physical.hairStyle || prev.physical?.hairStyle,
               hair: analysis.physical.hair || prev.physical?.hair,  // Legacy
               other: analysis.physical.other || prev.physical?.other,
@@ -895,6 +904,7 @@ export default function StoryWizard() {
               // Only mark as changed if there WAS a previous value AND it's different
               if (prevTraits.physical?.eyeColor && newPhysical?.eyeColor !== prevTraits.physical.eyeColor) changes.eyeColor = true;
               if (prevTraits.physical?.hairColor && newPhysical?.hairColor !== prevTraits.physical.hairColor) changes.hairColor = true;
+              if (prevTraits.physical?.hairLength && newPhysical?.hairLength !== prevTraits.physical.hairLength) changes.hairLength = true;
               if (prevTraits.physical?.hairStyle && newPhysical?.hairStyle !== prevTraits.physical.hairStyle) changes.hairStyle = true;
               if (prevTraits.physical?.hair && newPhysical?.hair !== prevTraits.physical.hair) changes.hair = true;
               if (prevTraits.physical?.face && newPhysical?.face !== prevTraits.physical.face) changes.face = true;

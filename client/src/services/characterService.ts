@@ -402,6 +402,7 @@ export const characterService = {
       face?: string;
       eyeColor?: string;
       hairColor?: string;
+      hairLength?: string;
       hairStyle?: string;
       hair?: string;   // Legacy: combined hair description
       other?: string;  // Glasses, birthmarks, always-present accessories
@@ -409,6 +410,11 @@ export const characterService = {
     clothing?: {
       current?: string;
       style?: string;
+    };
+    // Debug info for dev mode
+    _debug?: {
+      rawResponse?: string;
+      error?: string;
     };
   }> {
     try {
@@ -430,6 +436,8 @@ export const characterService = {
           eyeColor?: string;
           hair_color?: string;
           hairColor?: string;
+          hair_length?: string;
+          hairLength?: string;
           hair_style?: string;
           hairStyle?: string;
           clothing?: string;
@@ -439,6 +447,7 @@ export const characterService = {
         };
         error?: string;
         fallback?: boolean;
+        _debug?: { rawResponse?: string; error?: string };
       }>('/api/analyze-photo', { imageData, language });
 
       // Extract physical traits from attributes
@@ -448,6 +457,7 @@ export const characterService = {
         face: response.attributes?.face,  // Face description
         eyeColor: response.attributes?.eye_color || response.attributes?.eyeColor,
         hairColor: response.attributes?.hair_color || response.attributes?.hairColor,
+        hairLength: response.attributes?.hair_length || response.attributes?.hairLength,
         hairStyle: response.attributes?.hair_style || response.attributes?.hairStyle,
         hair: response.attributes?.hair_color || response.attributes?.hairColor,  // Legacy compatibility
         other: response.attributes?.other_features,  // Distinctive markings
@@ -474,10 +484,11 @@ export const characterService = {
         age: response.attributes?.age,
         apparentAge: response.attributes?.apparent_age as AgeCategory | undefined,
         gender: response.attributes?.gender,
-        physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairStyle || physical.hair || physical.other) ? physical : undefined,
+        physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairLength || physical.hairStyle || physical.hair || physical.other) ? physical : undefined,
         clothing: response.attributes?.clothing || response.attributes?.clothingStyle || response.attributes?.clothingColors
           ? { current: response.attributes.clothing, style: response.attributes.clothingStyle || response.attributes.clothingColors }
           : undefined,
+        _debug: response._debug,
       };
     } catch (error) {
       log.error('Photo analysis failed:', error);

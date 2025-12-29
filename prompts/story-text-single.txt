@@ -8,6 +8,8 @@ You are an expert children's book writer with deep understanding of age-appropri
 
 Your task is to create a complete, compelling, well-structured story.
 
+{LANGUAGE_INSTRUCTION}
+
 {BASE_PROMPT}
 
 Here is the story outline:

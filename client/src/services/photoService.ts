@@ -25,10 +25,17 @@ export interface PhotoAnalysisResult {
   height?: string;
   build?: string;
   hairColor?: string;
+  hairLength?: string;
+  hairStyle?: string;
   skinTone?: string;
   eyeColor?: string;
   distinctiveFeatures?: string;
   source?: string;
+  // Debug info for dev mode
+  _debug?: {
+    rawResponse?: string;
+    error?: string;
+  };
 }
 
 export const photoService = {
@@ -78,10 +85,13 @@ export const photoService = {
         height: attrs.height || data.height,
         build: attrs.build || data.build,
         hairColor: attrs.hair_color || attrs.hairColor || data.hairColor,
+        hairLength: attrs.hair_length || attrs.hairLength || data.hairLength,
+        hairStyle: attrs.hair_style || attrs.hairStyle || data.hairStyle,
         skinTone: attrs.skin_tone || attrs.skinTone || data.skinTone,
         eyeColor: attrs.eye_color || attrs.eyeColor || data.eyeColor,
         distinctiveFeatures: attrs.other_features || attrs.distinctiveFeatures || data.distinctiveFeatures,
         source: 'python-mediapipe',
+        _debug: data._debug,
       };
     } catch (error) {
       log.error('Error with Python API:', error);

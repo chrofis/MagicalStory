@@ -6412,6 +6412,11 @@ async function processStoryJob(jobId) {
       // Format Visual Bible for story text prompt
       const visualBibleForPrompt = formatVisualBibleForStoryText(visualBible);
 
+      // Get language instruction for story text
+      const { getLanguageInstruction } = require('./server/lib/languages');
+      const storyLanguage = inputData.language || 'en';
+      const languageInstruction = getLanguageInstruction(storyLanguage);
+
       const batchPrompt = PROMPT_TEMPLATES.storyTextBatch
         ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
             BASE_PROMPT: basePrompt,
@@ -6420,6 +6425,7 @@ async function processStoryJob(jobId) {
             START_PAGE: startScene,
             END_PAGE: endScene,
             READING_LEVEL: readingLevel,
+            LANGUAGE_INSTRUCTION: languageInstruction,
             VISUAL_BIBLE: visualBibleForPrompt,
             INCLUDE_TITLE: batchNum === 0 ? 'Include the title and dedication before Page 1.' : 'Start directly with Page {START_PAGE} (no title/dedication).'
           })

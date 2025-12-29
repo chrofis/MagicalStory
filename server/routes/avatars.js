@@ -82,18 +82,22 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
+        // Always include raw response for debugging
+        const rawResponse = text;
         if (result.traits) {
           log.debug('📸 [GEMINI] Extracted traits:', result.traits);
-          return result;
+          return { ...result, _rawResponse: rawResponse };
         } else {
           log.debug('📸 [GEMINI] Extracted traits (flat format):', result);
-          return { traits: result };
+          return { traits: result, _rawResponse: rawResponse };
         }
       } else {
         log.error('📸 [GEMINI] No JSON found in response:', text.substring(0, 200));
+        return { _rawResponse: text, _error: 'No JSON found in response' };
       }
     } else {
       log.error('📸 [GEMINI] Unexpected response structure:', JSON.stringify(data).substring(0, 200));
+      return { _rawResponse: JSON.stringify(data), _error: 'Unexpected response structure' };
     }
     return null;
   } catch (err) {
@@ -248,23 +252,17 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
     }
 
     // Build language instruction for trait extraction
+    // NOTE: Only free-text fields (face, distinctive markings) use local language
+    // Dropdown fields (hairColor, hairLength, hairStyle, build, eyeColor) use English values from "MUST be one of:" list
     let languageInstruction = '';
     if (language === 'de') {
-      languageInstruction = `WICHTIG: Beschreibe alle Merkmale auf Deutsch.
-- hairColor: z.B. "schwarz", "dunkelbraun", "braun", "hellbraun", "kastanienbraun", "rotbraun", "rot", "erdbeerblond", "dunkelblond", "blond", "hellblond", "platinblond", "grau", "silber", "weiss", "graumeliert"
-- hairLength: z.B. "sehr kurz", "kurz", "ohrlang", "kinnlang", "nackenlang", "schulterlang", "achsellang", "rückenmitte", "hüftlang"
-- hairStyle: z.B. "glatt", "wellig", "lockig", "zerzaust", "stachelig", "gestuft", "Pferdeschwanz", "Zöpfe", "Dutt", "offen", "Bob", "Afro", "Irokese", "Vokuhila", "Undercut", "Pony", "Seitenpony"
-- face: z.B. "rundes Gesicht, helle Haut"
-- build: z.B. "schlank", "durchschnittlich", "athletisch", "kräftig"
-- distinctive markings: z.B. "Brille", "Sommersprossen", "keine"`;
+      languageInstruction = `Beschreibe die folgenden Felder auf Deutsch:
+- face: z.B. "rundes Gesicht, helle Haut, hohe Wangenknochen"
+- distinctive markings: z.B. "Brille", "Sommersprossen", "Muttermal auf der Wange", "keine"`;
     } else if (language === 'fr') {
-      languageInstruction = `IMPORTANT: Décrivez tous les traits en français.
-- hairColor: ex. "noir", "brun foncé", "brun", "châtain clair", "châtain", "auburn", "roux", "blond vénitien", "blond foncé", "blond", "blond clair", "blond platine", "gris", "argenté", "blanc", "poivre et sel"
-- hairLength: ex. "très court", "court", "aux oreilles", "au menton", "au cou", "aux épaules", "aux aisselles", "mi-dos", "aux hanches"
-- hairStyle: ex. "lisse", "ondulé", "bouclé", "ébouriffé", "en pointes", "dégradé", "queue de cheval", "tresses", "chignon", "lâche", "carré", "afro", "crête", "mulet", "undercut", "frange", "frange de côté"
-- face: ex. "visage rond, teint clair"
-- build: ex. "mince", "moyen", "athlétique", "costaud"
-- distinctive markings: ex. "lunettes", "taches de rousseur", "aucun"`;
+      languageInstruction = `Décrivez les champs suivants en français:
+- face: ex. "visage rond, teint clair, pommettes hautes"
+- distinctive markings: ex. "lunettes", "taches de rousseur", "grain de beauté sur la joue", "aucun"`;
     }
 
     const imageSize = imageData.length;
@@ -391,7 +389,12 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         bodyNoBg: analyzerData.body_no_bg || analyzerData.bodyNoBg,
         faceBox: analyzerData.face_box || analyzerData.faceBox,
         bodyBox: analyzerData.body_box || analyzerData.bodyBox,
-        attributes: analyzerData.attributes
+        attributes: analyzerData.attributes,
+        // Include raw Gemini response for debugging (dev mode)
+        _debug: geminiTraits ? {
+          rawResponse: geminiTraits._rawResponse,
+          error: geminiTraits._error
+        } : null
       };
 
       log.debug('📸 [PHOTO] Sending response:', {

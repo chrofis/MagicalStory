@@ -41,7 +41,11 @@ The output MUST follow this EXACT format or the system will fail:
 - Write EXACTLY pages {START_PAGE} through {END_PAGE} - no more, no less
 - STOP IMMEDIATELY after page {END_PAGE}
 
-# PRIORITY 3: TEXT LENGTH
+# PRIORITY 3: LANGUAGE
+
+{LANGUAGE_INSTRUCTION}
+
+# PRIORITY 4: TEXT LENGTH
 
 **{READING_LEVEL}**
 
