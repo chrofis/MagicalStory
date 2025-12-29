@@ -1485,8 +1485,8 @@ export function StoryDisplay({
                                 <button
                                   onClick={() => setIsEditMode(true)}
                                   disabled={isGenerating}
-                                  className={`flex-1 bg-amber-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'
+                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                 >
                                   <Edit3 size={14} />
@@ -1808,8 +1808,8 @@ export function StoryDisplay({
                                 <button
                                   onClick={() => setIsEditMode(true)}
                                   disabled={isGenerating}
-                                  className={`flex-1 bg-amber-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'
+                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                 >
                                   <Edit3 size={14} />
@@ -2078,12 +2078,12 @@ export function StoryDisplay({
                     )}
 
                     {/* Text on the right */}
-                    <div className="flex items-start w-full">
+                    <div className="flex flex-col w-full h-full">
                       {isEditMode ? (
                         <textarea
                           value={pageText.trim()}
                           onChange={(e) => handlePageTextChange(index, e.target.value)}
-                          className="w-full min-h-[400px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
+                          className="w-full h-full min-h-[300px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
                           placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
                         />
                       ) : (

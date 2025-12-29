@@ -314,6 +314,7 @@ export default function StoryWizard() {
                           originalReasoning: devData.originalReasoning ?? img.originalReasoning,
                           totalAttempts: devData.totalAttempts ?? img.totalAttempts,
                           faceEvaluation: devData.faceEvaluation ?? img.faceEvaluation,
+                          referencePhotos: devData.referencePhotos ?? img.referencePhotos,
                         };
                       }
                       return img;
@@ -333,6 +334,7 @@ export default function StoryWizard() {
                             prompt: devCover.prompt ?? currentCover.prompt,
                             qualityReasoning: devCover.qualityReasoning ?? currentCover.qualityReasoning,
                             retryHistory: devCover.retryHistory ?? currentCover.retryHistory,
+                            referencePhotos: devCover.referencePhotos ?? currentCover.referencePhotos,
                           };
                         }
                       }

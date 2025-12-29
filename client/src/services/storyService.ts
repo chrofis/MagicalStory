@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto } from '@/types/story';
 
 interface StoryDraft {
   storyType: string;
@@ -330,11 +330,12 @@ export const storyService = {
       originalReasoning: string | null;
       totalAttempts: number | null;
       faceEvaluation: unknown | null;
+      referencePhotos: ReferencePhoto[] | null;
     }>;
     coverImages: {
-      frontCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null } | null;
-      initialPage: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null } | null;
-      backCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null } | null;
+      frontCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
+      initialPage: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
+      backCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
     } | null;
   } | null> {
     try {
