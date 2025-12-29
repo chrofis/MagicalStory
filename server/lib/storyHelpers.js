@@ -1212,10 +1212,23 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       if (avatarClothing) {
         log.debug(`[IMAGE PROMPT] ${char.name} avatar clothing: "${avatarClothing}"`);
       }
+      // Build hair description from separate fields or legacy field
+      let hairDesc = '';
+      if (physical?.hairColor || physical?.hairLength || physical?.hairStyle) {
+        const hairParts = [];
+        if (physical?.hairLength) hairParts.push(physical.hairLength);
+        if (physical?.hairColor) hairParts.push(physical.hairColor);
+        if (physical?.hairStyle) hairParts.push(physical.hairStyle);
+        hairDesc = `Hair: ${hairParts.join(', ')}`;
+      } else if (physical?.hair) {
+        hairDesc = `Hair: ${physical.hair}`;
+      }
+
       const physicalParts = [
         physical?.build ? `Build: ${physical.build}` : '',
         physical?.face ? `Face: ${physical.face}` : '',
-        physical?.hair ? `Hair: ${physical.hair}` : '',
+        physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
+        hairDesc,
         physical?.other ? `Other: ${physical.other}` : '',
         // Prefer avatar clothing description if available, otherwise use clothing style
         avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `CLOTHING STYLE (MUST MATCH - colors and patterns): ${clothingStyle}` : '')
@@ -1293,7 +1306,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   return `Create a cinematic scene in ${styleDescription}.
 
 ${characterReferenceList}
-Scene Description: ${sceneDescription}
+Scene Description: ${cleanSceneDescription}
 ${visualBibleSection}
 Important:
 - Match characters to the reference photos provided
@@ -1432,6 +1445,7 @@ module.exports = {
   extractCoverScenes,
   extractPageClothing,
   extractSceneMetadata,
+  stripSceneMetadata,
 
   // Prompt builders
   buildBasePrompt,
