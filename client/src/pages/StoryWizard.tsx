@@ -10,7 +10,6 @@ import { Button, LoadingSpinner, Navigation } from '@/components/common';
 import { StoryCategorySelector, ArtStyleSelector, RelationshipEditor, StorySettings } from '@/components/story';
 import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
 import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
-import type { ModelSelections } from '@/components/generation';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 
 // Types
@@ -22,6 +21,7 @@ import { characterService, storyService, authService } from '@/services';
 import { storyTypes } from '@/constants/storyTypes';
 import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship } from '@/constants/relationships';
 import { createLogger } from '@/services/logger';
+import { useDeveloperMode } from '@/hooks/useDeveloperMode';
 
 // Create namespaced logger
 const log = createLogger('StoryWizard');
@@ -46,38 +46,17 @@ export default function StoryWizard() {
     return !!params.get('storyId');
   });
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total: number | null } | null>(null);
-  const [developerMode, setDeveloperMode] = useState(() => {
-    // Persist dev mode in localStorage for admins
-    return localStorage.getItem('developer_mode') === 'true';
-  });
-  const [imageGenMode, setImageGenMode] = useState<'parallel' | 'sequential' | null>(null); // null = server default
-
-  // Persist developer mode changes
-  useEffect(() => {
-    if (developerMode) {
-      localStorage.setItem('developer_mode', 'true');
-    } else {
-      localStorage.removeItem('developer_mode');
-    }
-  }, [developerMode]);
-
-  // Developer skip options for faster testing
-  const [devSkipOutline, setDevSkipOutline] = useState(false);
-  const [devSkipText, setDevSkipText] = useState(false);
-  const [devSkipSceneDescriptions, setDevSkipSceneDescriptions] = useState(false);
-  const [devSkipImages, setDevSkipImages] = useState(false);
-  const [devSkipCovers, setDevSkipCovers] = useState(false);
-
-  // Developer model selection (admin only)
-  const [modelSelections, setModelSelections] = useState<ModelSelections>({
-    ideaModel: null,
-    outlineModel: null,
-    textModel: null,
-    sceneDescriptionModel: null,
-    imageModel: null,
-    coverImageModel: null,
-    qualityModel: null,
-  });
+  // Developer mode settings (extracted to hook)
+  const {
+    developerMode, setDeveloperMode,
+    imageGenMode, setImageGenMode,
+    devSkipOutline, setDevSkipOutline,
+    devSkipText, setDevSkipText,
+    devSkipSceneDescriptions, setDevSkipSceneDescriptions,
+    devSkipImages, setDevSkipImages,
+    devSkipCovers, setDevSkipCovers,
+    modelSelections, setModelSelections,
+  } = useDeveloperMode();
 
   // Step 1: Story Type & Art Style - load from localStorage
   const [storyType, setStoryType] = useState(() => {

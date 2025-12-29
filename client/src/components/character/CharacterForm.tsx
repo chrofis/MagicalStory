@@ -1,67 +1,11 @@
-import { ChangeEvent, useState, useEffect } from 'react';
+import { ChangeEvent, useState } from 'react';
 import { Upload, Save, ArrowRight, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
+import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import type { Character, PhysicalTraits } from '@/types/character';
-
-// Cooldown logic for avatar regeneration
-// First 2: no delay, next 2: 30s, next 2: 1min, next 2: 2min, etc.
-function getAvatarCooldown(characterId: number): { canRegenerate: boolean; waitSeconds: number; attempts: number } {
-  const key = `avatar_regen_${characterId}`;
-  const data = localStorage.getItem(key);
-  const now = Date.now();
-
-  if (!data) {
-    return { canRegenerate: true, waitSeconds: 0, attempts: 0 };
-  }
-
-  try {
-    const { attempts, lastAttempt } = JSON.parse(data);
-
-    // Calculate required delay based on attempts
-    let requiredDelay = 0;
-    if (attempts >= 2 && attempts < 4) {
-      requiredDelay = 30 * 1000; // 30 seconds
-    } else if (attempts >= 4 && attempts < 6) {
-      requiredDelay = 60 * 1000; // 1 minute
-    } else if (attempts >= 6 && attempts < 8) {
-      requiredDelay = 2 * 60 * 1000; // 2 minutes
-    } else if (attempts >= 8 && attempts < 10) {
-      requiredDelay = 5 * 60 * 1000; // 5 minutes
-    } else if (attempts >= 10) {
-      requiredDelay = 10 * 60 * 1000; // 10 minutes
-    }
-
-    const elapsed = now - lastAttempt;
-    if (elapsed >= requiredDelay) {
-      return { canRegenerate: true, waitSeconds: 0, attempts };
-    }
-
-    return { canRegenerate: false, waitSeconds: Math.ceil((requiredDelay - elapsed) / 1000), attempts };
-  } catch {
-    return { canRegenerate: true, waitSeconds: 0, attempts: 0 };
-  }
-}
-
-function recordAvatarRegeneration(characterId: number) {
-  const key = `avatar_regen_${characterId}`;
-  const data = localStorage.getItem(key);
-  const now = Date.now();
-
-  let attempts = 1;
-  if (data) {
-    try {
-      const parsed = JSON.parse(data);
-      attempts = (parsed.attempts || 0) + 1;
-    } catch {
-      // ignore
-    }
-  }
-
-  localStorage.setItem(key, JSON.stringify({ attempts, lastAttempt: now }));
-}
 
 // Simple inline editable field - click to edit, blur/enter to save
 interface InlineEditFieldProps {
@@ -156,24 +100,13 @@ export function CharacterForm({
     });
   };
 
-  // Avatar cooldown state
-  const [cooldownInfo, setCooldownInfo] = useState(() => getAvatarCooldown(character.id));
-
-  // Update cooldown timer every second when waiting
-  useEffect(() => {
-    if (cooldownInfo.waitSeconds > 0) {
-      const timer = setInterval(() => {
-        setCooldownInfo(getAvatarCooldown(character.id));
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [cooldownInfo.waitSeconds, character.id]);
+  // Avatar cooldown (uses extracted hook)
+  const { canRegenerate, waitSeconds, recordRegeneration } = useAvatarCooldown(character.id);
 
   // Handle avatar regeneration with cooldown
   const handleUserRegenerate = () => {
-    if (!cooldownInfo.canRegenerate) return;
-    recordAvatarRegeneration(character.id);
-    setCooldownInfo(getAvatarCooldown(character.id));
+    if (!canRegenerate) return;
+    recordRegeneration();
     onRegenerateAvatarsWithTraits?.();
   };
 
@@ -438,13 +371,13 @@ export function CharacterForm({
             {/* Regenerate button for all users */}
             <button
               onClick={handleUserRegenerate}
-              disabled={!cooldownInfo.canRegenerate || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+              disabled={!canRegenerate || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
               className="mt-2 w-full px-2 py-1 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-              title={!cooldownInfo.canRegenerate ? `Wait ${cooldownInfo.waitSeconds}s` : undefined}
+              title={!canRegenerate ? `Wait ${waitSeconds}s` : undefined}
             >
               <RefreshCw size={10} />
-              {!cooldownInfo.canRegenerate ? (
-                `${cooldownInfo.waitSeconds}s`
+              {!canRegenerate ? (
+                `${waitSeconds}s`
               ) : (isRegeneratingAvatars || isRegeneratingAvatarsWithTraits) ? (
                 language === 'de' ? 'Generiere...' : 'Generating...'
               ) : (
