@@ -15,6 +15,48 @@ const { OutlineParser, extractCharacterNamesFromScene } = require('./outlinePars
 const { getLanguageNote } = require('./languages');
 
 // ============================================================================
+// JSON METADATA EXTRACTION - Parse structured data from scene descriptions
+// ============================================================================
+
+/**
+ * Extract JSON metadata block from scene description
+ * Looks for ```json ... ``` block containing characters, clothing, objects
+ * @param {string} sceneDescription - The scene description text
+ * @returns {Object|null} Parsed metadata or null if not found/invalid
+ */
+function extractSceneMetadata(sceneDescription) {
+  if (!sceneDescription) return null;
+
+  // Look for ```json block
+  const jsonBlockMatch = sceneDescription.match(/```json\s*([\s\S]*?)```/i);
+  if (!jsonBlockMatch || !jsonBlockMatch[1]) {
+    log.debug('[METADATA] No JSON block found in scene description');
+    return null;
+  }
+
+  try {
+    const jsonStr = jsonBlockMatch[1].trim();
+    const metadata = JSON.parse(jsonStr);
+
+    // Validate expected fields
+    if (!metadata.characters || !Array.isArray(metadata.characters)) {
+      log.debug('[METADATA] JSON block missing or invalid "characters" array');
+      return null;
+    }
+
+    log.debug(`[METADATA] Extracted: ${metadata.characters.length} characters, clothing="${metadata.clothing}", ${(metadata.objects || []).length} objects`);
+    return {
+      characters: metadata.characters || [],
+      clothing: metadata.clothing || null,
+      objects: metadata.objects || []
+    };
+  } catch (e) {
+    log.debug(`[METADATA] Failed to parse JSON block: ${e.message}`);
+    return null;
+  }
+}
+
+// ============================================================================
 // AGE CATEGORY MAPPING - Maps numeric age to category for image generation
 // ============================================================================
 
@@ -244,7 +286,7 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
 
 /**
  * Detect which characters are mentioned in a scene description
- * Uses robust parsing from outlineParser module for multilingual support
+ * Priority: 1) JSON metadata block, 2) Markdown parsing, 3) Text search fallback
  * @param {string} sceneDescription - The scene text
  * @param {Array} characters - Array of character objects (main characters with reference photos)
  * @returns {Array} Characters that appear in this scene
@@ -257,11 +299,42 @@ function getCharactersInScene(sceneDescription, characters) {
   // DEBUG: Log available characters for matching
   log.debug(`[CHAR DETECT] Available characters for matching: ${characters.map(c => c.name).join(', ')} (${characters.length} total)`);
 
-  // Step 1: Use robust parser to extract character names from scene description
+  // Step 0: Try JSON metadata block first (most reliable)
+  const metadata = extractSceneMetadata(sceneDescription);
+  if (metadata && metadata.characters && metadata.characters.length > 0) {
+    log.debug(`[CHAR DETECT] Using JSON metadata: ${metadata.characters.join(', ')}`);
+
+    // Match JSON character names to available characters
+    const matchedCharacters = characters.filter(char => {
+      if (!char.name) return false;
+      const nameLower = char.name.toLowerCase().trim();
+      const firstName = nameLower.split(' ')[0];
+
+      const matched = metadata.characters.some(jsonName => {
+        const jsonLower = jsonName.toLowerCase().trim();
+        return jsonLower === nameLower ||
+               jsonLower === firstName ||
+               jsonLower.includes(nameLower) ||
+               nameLower.includes(jsonLower) ||
+               jsonLower.includes(firstName) ||
+               firstName.includes(jsonLower);
+      });
+
+      log.debug(`[CHAR DETECT]   - "${char.name}" -> ${matched ? 'MATCHED' : 'NO MATCH'} (JSON)`);
+      return matched;
+    });
+
+    if (matchedCharacters.length > 0) {
+      log.debug(`[CHAR DETECT] Matched ${matchedCharacters.length} characters from JSON: ${matchedCharacters.map(c => c.name).join(', ')}`);
+      return matchedCharacters;
+    }
+  }
+
+  // Step 1: Use robust markdown parser to extract character names
   const parsedNames = extractCharacterNamesFromScene(sceneDescription);
 
   if (parsedNames.length > 0) {
-    log.debug(`[CHAR DETECT] Parsed ${parsedNames.length} character names: ${parsedNames.join(', ')}`);
+    log.debug(`[CHAR DETECT] Parsed ${parsedNames.length} character names (markdown): ${parsedNames.join(', ')}`);
 
     // Match main characters whose names appear in the parsed list
     const matchedCharacters = characters.filter(char => {
@@ -334,7 +407,18 @@ function getCharacterPhotos(characters, clothingCategory = null) {
 function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   if (!sceneDescription) return null;
 
-  // Generic approach: find "Clothing" keyword (in any language) and look for value nearby
+  // Step 0: Try JSON metadata block first (most reliable)
+  const metadata = extractSceneMetadata(sceneDescription);
+  if (metadata && metadata.clothing) {
+    const validValues = ['winter', 'summer', 'formal', 'standard'];
+    const clothingLower = metadata.clothing.toLowerCase();
+    if (validValues.includes(clothingLower)) {
+      log.debug(`[CLOTHING] Using JSON metadata: "${clothingLower}"`);
+      return clothingLower;
+    }
+  }
+
+  // Fallback: Generic approach - find "Clothing" keyword (in any language) and look for value nearby
   // Handles any markdown: **, *, --, __, ##, etc.
 
   // Markdown chars that might wrap keywords or values
@@ -1287,6 +1371,7 @@ module.exports = {
   extractShortSceneDescriptions,
   extractCoverScenes,
   extractPageClothing,
+  extractSceneMetadata,
 
   // Prompt builders
   buildBasePrompt,

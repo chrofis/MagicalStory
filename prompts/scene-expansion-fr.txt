@@ -58,6 +58,14 @@ N'inventez PAS de nouveaux personnages ou objets.
      - Caractéristiques: Copiez la description depuis ÉLÉMENTS RÉCURRENTS ci-dessus
      - POSITION: Où il apparaît dans la scène
 
+7. **METADATA (JSON):** - OBLIGATOIRE, doit être un JSON valide
+```json
+{"characters": ["Nom1", "Nom2"], "clothing": "standard", "objects": ["Objet1", "Objet2"]}
+```
+   - characters: Tableau des NOMS EXACTS des personnages dans cette scène (uniquement de la liste PERSONNAGES)
+   - clothing: Un parmi "winter", "summer", "formal", "standard"
+   - objects: Tableau des noms d'objets/animaux des ÉLÉMENTS RÉCURRENTS dans cette scène
+
 **PHYSIQUE & LOGIQUE DE CAMÉRA:**
 - **Orientation de la Caméra:**
   - Personnages s'éloignant: "Vue de dos, vu de derrière"

@@ -150,7 +150,14 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
    * **Eli:**
      - Stuffed elephant toy, gray with pink inner ears, small enough to fit under an arm (about 25 cm), worn spot on right ear, friendly embroidered face
      - POSITION: Peeking partially out of the open side pocket of Sophie's backpack, one ear and head visible
+
+7. **METADATA (JSON):**
+```json
+{"characters": ["Sophie"], "clothing": "standard", "objects": ["Lasso", "Cowboy Hat", "Backpack", "Eli"]}
 ```
+```
+
+**IMPORTANT: Always include section 7 METADATA with valid JSON at the end of your output.**
 
 **ANATOMICAL CONSISTENCY:**
 - Humans have exactly 2 arms. If you describe a character's pose and include an arm, account for BOTH arms explicitly and ensure no arm is mentioned twice.

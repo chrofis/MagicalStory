@@ -58,6 +58,14 @@ Erfinde KEINE neuen Charaktere oder Objekte.
      - Merkmale: Kopiere Beschreibung aus WIEDERKEHRENDE ELEMENTE oben
      - POSITION: Wo es in der Szene erscheint
 
+7. **METADATA (JSON):** - ERFORDERLICH, muss gültiges JSON sein
+```json
+{"characters": ["Name1", "Name2"], "clothing": "standard", "objects": ["Objekt1", "Objekt2"]}
+```
+   - characters: Array der EXAKTEN Charakternamen in dieser Szene (nur aus CHARAKTERE-Liste)
+   - clothing: Eines von "winter", "summer", "formal", "standard"
+   - objects: Array der Objekt-/Tiernamen aus WIEDERKEHRENDE ELEMENTE in dieser Szene
+
 **PHYSIK & KAMERA-LOGIK:**
 - **Kamera-Orientierung:**
   - Charaktere bewegen sich weg: "Rückenansicht, von hinten gesehen"

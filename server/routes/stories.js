@@ -31,28 +31,28 @@ router.get('/', authenticateToken, async (req, res) => {
 
       // Get paginated data using JSON operators to extract only metadata (not full image data)
       // This is MUCH faster than loading the entire data blob which contains base64 images
-      // Note: data column is TEXT, so we cast to jsonb for JSON operators
+      // Note: data column is TEXT, so we cast to jsonb inline
       const rows = await dbQuery(
         `SELECT
-          d->>'id' as id,
-          d->>'title' as title,
-          d->>'createdAt' as "createdAt",
-          d->>'updatedAt' as "updatedAt",
-          (d->>'pages')::int as pages,
-          d->>'language' as language,
-          d->>'languageLevel' as "languageLevel",
-          d->'characters' as characters_json,
-          COALESCE(jsonb_array_length(d->'sceneImages'), 0) as scene_count,
-          (d->>'isPartial')::boolean as "isPartial",
-          (d->>'generatedPages')::int as "generatedPages",
-          (d->>'totalPages')::int as "totalPages",
+          (data::jsonb)->>'id' as id,
+          (data::jsonb)->>'title' as title,
+          (data::jsonb)->>'createdAt' as "createdAt",
+          (data::jsonb)->>'updatedAt' as "updatedAt",
+          ((data::jsonb)->>'pages')::int as pages,
+          (data::jsonb)->>'language' as language,
+          (data::jsonb)->>'languageLevel' as "languageLevel",
+          (data::jsonb)->'characters' as characters_json,
+          COALESCE(jsonb_array_length((data::jsonb)->'sceneImages'), 0) as scene_count,
+          ((data::jsonb)->>'isPartial')::boolean as "isPartial",
+          ((data::jsonb)->>'generatedPages')::int as "generatedPages",
+          ((data::jsonb)->>'totalPages')::int as "totalPages",
           CASE
-            WHEN d->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
-            WHEN d->'coverImages'->'frontCover' IS NOT NULL AND jsonb_typeof(d->'coverImages'->'frontCover') = 'string' THEN true
-            WHEN d->>'thumbnail' IS NOT NULL THEN true
+            WHEN (data::jsonb)->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
+            WHEN (data::jsonb)->'coverImages'->'frontCover' IS NOT NULL AND jsonb_typeof((data::jsonb)->'coverImages'->'frontCover') = 'string' THEN true
+            WHEN (data::jsonb)->>'thumbnail' IS NOT NULL THEN true
             ELSE false
           END as "hasThumbnail"
-        FROM stories, LATERAL (SELECT data::jsonb AS d) AS parsed
+        FROM stories
         WHERE user_id = $1
         ORDER BY created_at DESC
         LIMIT $2 OFFSET $3`,
