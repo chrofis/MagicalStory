@@ -370,40 +370,107 @@ class OutlineParser {
   }
 
   /**
-   * Extract cover scenes from story mode format (Title Page Scene:)
+   * Extract cover scenes from story mode format
+   * Handles multiple formats:
+   * - "Title Page Scene: content" (inline)
+   * - "**Title Page Scene**\nClothing: standard\nScene content..." (block)
    */
   _extractStoryModeCoverScenes(coverScenes) {
     const titleWords = KEYWORDS.titlePage.join('|');
     const backWords = KEYWORDS.backCover.join('|');
     const initialWords = KEYWORDS.initialPage.join('|');
 
+    // Helper to extract scene from a cover block
+    const extractFromBlock = (blockText) => {
+      const lines = blockText.split('\n');
+      const sceneLines = [];
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Skip clothing line
+        const clothingPattern = keywordPattern(KEYWORDS.clothing);
+        if (clothingPattern.test(trimmed)) {
+          // Extract clothing value
+          const clothingMatch = trimmed.match(CLOTHING_CATEGORY_PATTERN);
+          if (clothingMatch) {
+            // Return clothing separately - caller can use it
+          }
+          continue;
+        }
+
+        // Skip if it's another section header
+        if (trimmed.match(/^\*\*(?:Title|Initial|Back|Titel|Einführung|Rückseite)/i)) {
+          break;
+        }
+
+        sceneLines.push(trimmed);
+      }
+
+      return sceneLines.join(' ').trim();
+    };
+
+    // Pattern for block format: **Title Page Scene**\n followed by content until next section
+    // Matches: "**Title Page Scene**" with optional "Scene" word
+    const blockPatternTemplate = (words) => new RegExp(
+      `\\*\\*(?:${words})\\s*(?:Scene|Szene|Scène)?\\*\\*\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*(?:Title|Initial|Back|Titel|Einführung|Rückseite)|\\n##|$)`,
+      'i'
+    );
+
     // Title Page Scene
     if (!coverScenes.titlePage.scene) {
-      const match = this.outline.match(
-        new RegExp(`(?:${titleWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
-      );
-      if (match) {
-        coverScenes.titlePage.scene = this.cleanMarkdown(match[1]);
-      }
-    }
-
-    // Back Cover Scene
-    if (!coverScenes.backCover.scene) {
-      const match = this.outline.match(
-        new RegExp(`(?:${backWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
-      );
-      if (match) {
-        coverScenes.backCover.scene = this.cleanMarkdown(match[1]);
+      // Try block format first
+      const blockMatch = this.outline.match(blockPatternTemplate(titleWords));
+      if (blockMatch) {
+        const block = blockMatch[1];
+        coverScenes.titlePage.scene = extractFromBlock(block);
+        coverScenes.titlePage.clothing = this._extractClothingFromBlock(block);
+        log.debug(`[OUTLINE-PARSER] Title Page (block format): ${coverScenes.titlePage.scene.substring(0, 60)}...`);
+      } else {
+        // Try inline format
+        const inlineMatch = this.outline.match(
+          new RegExp(`(?:${titleWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
+        );
+        if (inlineMatch) {
+          coverScenes.titlePage.scene = this.cleanMarkdown(inlineMatch[1]);
+        }
       }
     }
 
     // Initial Page Scene
     if (!coverScenes.initialPage.scene) {
-      const match = this.outline.match(
-        new RegExp(`(?:${initialWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
-      );
-      if (match) {
-        coverScenes.initialPage.scene = this.cleanMarkdown(match[1]);
+      const blockMatch = this.outline.match(blockPatternTemplate(initialWords));
+      if (blockMatch) {
+        const block = blockMatch[1];
+        coverScenes.initialPage.scene = extractFromBlock(block);
+        coverScenes.initialPage.clothing = this._extractClothingFromBlock(block);
+        log.debug(`[OUTLINE-PARSER] Initial Page (block format): ${coverScenes.initialPage.scene.substring(0, 60)}...`);
+      } else {
+        const inlineMatch = this.outline.match(
+          new RegExp(`(?:${initialWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
+        );
+        if (inlineMatch) {
+          coverScenes.initialPage.scene = this.cleanMarkdown(inlineMatch[1]);
+        }
+      }
+    }
+
+    // Back Cover Scene
+    if (!coverScenes.backCover.scene) {
+      const blockMatch = this.outline.match(blockPatternTemplate(backWords));
+      if (blockMatch) {
+        const block = blockMatch[1];
+        coverScenes.backCover.scene = extractFromBlock(block);
+        coverScenes.backCover.clothing = this._extractClothingFromBlock(block);
+        log.debug(`[OUTLINE-PARSER] Back Cover (block format): ${coverScenes.backCover.scene.substring(0, 60)}...`);
+      } else {
+        const inlineMatch = this.outline.match(
+          new RegExp(`(?:${backWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
+        );
+        if (inlineMatch) {
+          coverScenes.backCover.scene = this.cleanMarkdown(inlineMatch[1]);
+        }
       }
     }
   }
