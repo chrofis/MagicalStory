@@ -227,32 +227,7 @@ export const characterService = {
 
   async getCharacterData(): Promise<CharacterData> {
     const response = await api.get<CharacterDataResponse>('/api/characters');
-    // DEBUG: Log what's being loaded from API with full details
-    console.log('[LOAD CLIENT] Raw API response:', (response.characters || []).map(c => ({
-      name: c.name,
-      // Physical traits
-      eye_color: c.eye_color || c.eyeColor,
-      hair_color: c.hair_color || c.hairColor,
-      hair_style: c.hair_style || c.hairStyle,
-      build: c.build,
-      // Avatars
-      hasClothingAvatars: !!(c.clothing_avatars || c.clothingAvatars),
-      hasClothing: !!((c.clothing_avatars as CharacterAvatars | undefined)?.clothing || (c.clothingAvatars as CharacterAvatars | undefined)?.clothing),
-      clothingKeys: ((c.clothing_avatars as CharacterAvatars | undefined)?.clothing || (c.clothingAvatars as CharacterAvatars | undefined)?.clothing) ? Object.keys(((c.clothing_avatars as CharacterAvatars | undefined)?.clothing || (c.clothingAvatars as CharacterAvatars | undefined)?.clothing)!) : [],
-    })));
     const mapped = (response.characters || []).map(mapCharacterFromApi);
-    console.log('[LOAD CLIENT] Mapped characters:', mapped.map(c => ({
-      name: c.name,
-      // Physical traits
-      eyeColor: c.physical?.eyeColor,
-      hairColor: c.physical?.hairColor,
-      hairStyle: c.physical?.hairStyle,
-      build: c.physical?.build,
-      // Avatars
-      hasAvatars: !!c.avatars,
-      hasClothing: !!c.avatars?.clothing,
-      clothingKeys: c.avatars?.clothing ? Object.keys(c.avatars.clothing) : [],
-    })));
     return {
       characters: mapped,
       relationships: response.relationships || {},
@@ -280,30 +255,7 @@ export const characterService = {
       customWeaknesses: data.customWeaknesses,
       customFears: data.customFears,
     };
-    // DEBUG: Log full character data being saved
-    console.log('[SAVE CLIENT] Full character data:', data.characters.map(c => ({
-      name: c.name,
-      // Physical traits
-      eyeColor: c.physical?.eyeColor,
-      hairColor: c.physical?.hairColor,
-      hairStyle: c.physical?.hairStyle,
-      build: c.physical?.build,
-      // Avatars
-      hasAvatars: !!c.avatars,
-      hasClothing: !!c.avatars?.clothing,
-      clothingKeys: c.avatars?.clothing ? Object.keys(c.avatars.clothing) : [],
-      avatarStatus: c.avatars?.status,
-    })));
-    console.log('[SAVE CLIENT] Mapped API data:', apiData.characters.map((c: Record<string, unknown>) => ({
-      name: c.name,
-      eye_color: c.eye_color,
-      hair_color: c.hair_color,
-      hair_style: c.hair_style,
-      build: c.build,
-      hasClothingAvatars: !!c.clothing_avatars,
-    })));
-    const result = await api.post('/api/characters', apiData);
-    console.log('[SAVE CLIENT] Server response:', result);
+    await api.post('/api/characters', apiData);
   },
 
   async generateClothingAvatars(character: Character): Promise<{

@@ -157,9 +157,10 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
     if (hasSeparateImages) {
       // FAST PATH: Load metadata without image data, get image info from story_images table
       // Use JSONB to extract non-image fields (PostgreSQL won't load the huge imageData strings)
+      // Also exclude 'characters' (7MB+) since they're loaded separately via /api/characters
       const metaQuery = `
         SELECT
-          (data::jsonb) - 'sceneImages' - 'coverImages' as base_data,
+          (data::jsonb) - 'sceneImages' - 'coverImages' - 'characters' as base_data,
           COALESCE(jsonb_array_length((data::jsonb)->'sceneImages'), 0) as scene_count
         FROM stories WHERE id = $1
       `;
@@ -224,9 +225,10 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       const rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
       const story = JSON.parse(rows[0].data);
 
-      // Strip out image data but keep metadata
+      // Strip out image data and characters (loaded separately) but keep metadata
+      const { characters: _, ...storyWithoutCharacters } = story;
       metadata = {
-        ...story,
+        ...storyWithoutCharacters,
         sceneImages: story.sceneImages?.map(img => ({
           ...img,
           imageData: undefined,
@@ -443,35 +445,41 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/stories/:id/cover - Get story cover image only (for lazy loading)
+// GET /api/stories/:id/cover - Get story cover image only (for lazy loading in story list)
 router.get('/:id/cover', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    let coverImage = null;
 
-    log.debug(`🖼️ GET /api/stories/${id}/cover - User: ${req.user.username} (ID: ${req.user.id})`);
-
-    if (isDatabaseMode()) {
-      const result = await dbQuery(
-        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
-        [id, req.user.id]
-      );
-      log.debug(`🖼️ Cover query returned ${result.length} rows for story ${id}`);
-      if (result.length > 0) {
-        const story = JSON.parse(result[0].data);
-        coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
-        log.debug(`🖼️ Cover image found: ${coverImage ? 'yes' : 'no'}`);
-      }
-    } else {
+    if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    if (!coverImage) {
-      log.debug(`🖼️ No cover image for story ${id}`);
-      return res.status(404).json({ error: 'Cover image not found' });
+    // Verify user has access (fast query, no data loading)
+    const accessCheck = await dbQuery(
+      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (accessCheck.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
     }
 
-    res.json({ coverImage });
+    // FAST PATH: Try to get cover from separate images table first
+    const separateImage = await getStoryImage(id, 'frontCover', null, 0);
+    if (separateImage) {
+      return res.json({ coverImage: separateImage.imageData });
+    }
+
+    // SLOW PATH: Fall back to loading from data blob
+    const result = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (result.length > 0) {
+      const story = JSON.parse(result[0].data);
+      const coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
+      if (coverImage) {
+        return res.json({ coverImage });
+      }
+    }
+
+    return res.status(404).json({ error: 'Cover image not found' });
   } catch (err) {
     console.error('❌ Error fetching cover image:', err);
     res.status(500).json({ error: 'Failed to fetch cover image' });

@@ -372,6 +372,15 @@ export const storyService = {
 
     let loadedCount = 0;
 
+    // Load cover images first (title pages appear first in the UI)
+    for (const coverType of coverTypes) {
+      const result = await this.getCoverImage(id, coverType);
+      if (result) {
+        loadedCount++;
+        onImageLoaded(coverType, result.imageData, undefined, loadedCount);
+      }
+    }
+
     // Load page images in parallel batches (3 at a time for balance)
     const BATCH_SIZE = 3;
     for (let i = 0; i < pageNumbers.length; i += BATCH_SIZE) {
@@ -386,15 +395,6 @@ export const storyService = {
           onImageLoaded(batch[idx], result.imageData, result.imageVersions, loadedCount);
         }
       });
-    }
-
-    // Load cover images
-    for (const coverType of coverTypes) {
-      const result = await this.getCoverImage(id, coverType);
-      if (result) {
-        loadedCount++;
-        onImageLoaded(coverType, result.imageData, undefined, loadedCount);
-      }
     }
 
     onComplete();

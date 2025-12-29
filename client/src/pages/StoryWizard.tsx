@@ -794,10 +794,8 @@ export default function StoryWizard() {
 
       // Start analyzing - don't show photo yet
       setIsAnalyzingPhoto(true);
-      // Only go to name step if not already in traits step (editing existing character)
-      if (characterStep !== 'traits') {
-        setCharacterStep('name');
-      }
+      // Always go to name step when new photo is uploaded (forces Save & Generate Avatar before traits)
+      setCharacterStep('name');
 
       // Run photo analysis
       try {
@@ -877,8 +875,8 @@ export default function StoryWizard() {
               physical: newPhysical,
               // Clothing from analysis
               clothing: analysis.clothing || prev.clothing,
-              // Keep avatars but mark as stale when photo changes (from previous photo)
-              avatars: prev.avatars ? { ...prev.avatars, stale: true } : undefined,
+              // Clear avatars when new photo is uploaded - must regenerate with new face
+              avatars: undefined,
             };
           });
         } else {
@@ -889,21 +887,21 @@ export default function StoryWizard() {
             // Don't set the photo - user needs to upload a different one
           } else {
             log.warn('Photo analysis returned no data, using original photo');
-            // Fallback to original photo - mark avatars as stale
+            // Fallback to original photo - clear avatars (new photo means new face)
             setCurrentCharacter(prev => prev ? {
               ...prev,
               photos: { original: originalPhotoUrl },
-              avatars: prev.avatars ? { ...prev.avatars, stale: true } : undefined,
+              avatars: undefined,
             } : null);
           }
         }
       } catch (error) {
         log.error('Photo analysis error:', error);
-        // Fallback to original photo on error - mark avatars as stale
+        // Fallback to original photo on error - clear avatars (new photo means new face)
         setCurrentCharacter(prev => prev ? {
           ...prev,
           photos: { original: originalPhotoUrl },
-          avatars: prev.avatars ? { ...prev.avatars, stale: true } : undefined,
+          avatars: undefined,
         } : null);
       } finally {
         setIsAnalyzingPhoto(false);
@@ -1029,9 +1027,10 @@ export default function StoryWizard() {
         // Update local state with new avatars
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
+        // Only update currentCharacter if it's still the same character (user might have switched)
+        setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: freshAvatars } : prev);
         setCharacters(prev => prev.map(c =>
-          c.id === latestChar.id ? { ...c, avatars: freshAvatars } : c
+          c.id === charId ? { ...c, avatars: freshAvatars } : c
         ));
 
         log.success(`✅ Avatars regenerated for ${latestChar.name}`);
@@ -1045,7 +1044,7 @@ export default function StoryWizard() {
           });
         });
         const finalCharacters = latestCharacters.map(c =>
-          c.id === updatedChar.id ? updatedChar : c
+          c.id === charId ? updatedChar : c
         );
 
         await characterService.saveCharacterData({

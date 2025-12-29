@@ -22,7 +22,7 @@ Return a JSON object with this EXACT structure:
     "face": "<PERMANENT facial structure: bone structure, face shape, skin tone - NO expressions>",
     "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
     "hairColor": "<natural hair color (e.g. blonde, brown, black, red, gray, white)>",
-    "hairLength": "<MUST be one of: buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
+    "hairLength": "<MUST be one of: bald | buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
     "hairStyle": "<MUST be one of: straight | wavy | curly | coily | ponytail | braids | bun | pigtails | loose | slicked back>",
     "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>"
   }
