@@ -1,7 +1,8 @@
 /**
  * Admin Routes Index
  *
- * Aggregates all admin route modules
+ * Aggregates all admin route modules into a single router.
+ * Each submodule handles a specific domain of admin functionality.
  */
 
 const express = require('express');
@@ -9,11 +10,16 @@ const router = express.Router();
 
 // Import modular admin routes
 const usersRouter = require('./users');
+const printProductsRouter = require('./print-products');
+const ordersRouter = require('./orders');
+const analyticsRouter = require('./analytics');
+const databaseRouter = require('./database');
 
-// Mount user management routes
+// Mount submodule routers
 router.use('/users', usersRouter);
+router.use('/print-products', printProductsRouter);
+router.use('/orders', ordersRouter);
+router.use('/', analyticsRouter);  // stats, database-size, user-storage, config, token-usage
+router.use('/', databaseRouter);   // cleanup endpoints
 
-// Export for use in main admin.js
-module.exports = {
-  usersRouter
-};
+module.exports = router;
