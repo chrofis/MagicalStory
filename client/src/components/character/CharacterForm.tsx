@@ -269,7 +269,7 @@ export function CharacterForm({
           </div>
 
           {/* Basic Info - Compact grid */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="grid grid-cols-4 gap-2 mb-3">
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.gender}</label>
               <select
