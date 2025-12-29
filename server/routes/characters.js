@@ -29,6 +29,13 @@ router.get('/', authenticateToken, async (req, res) => {
 
       if (rows.length > 0) {
         const data = JSON.parse(rows[0].data);
+        // DEBUG: Log what's in the database
+        console.log('[LOAD DB] Characters clothing_avatars:', (data.characters || []).map(c => ({
+          name: c.name,
+          hasClothingAvatars: !!c.clothing_avatars,
+          hasClothing: !!c.clothing_avatars?.clothing,
+          clothingKeys: c.clothing_avatars?.clothing ? Object.keys(c.clothing_avatars.clothing) : [],
+        })));
         // Handle both old format (array) and new format (object)
         if (Array.isArray(data)) {
           characterData.characters = data;
