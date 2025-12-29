@@ -127,18 +127,25 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
         ]
       }],
       generationConfig: {
-        temperature: 0,
-        maxOutputTokens: 2000,
+        temperature: 0.3,
+        maxOutputTokens: 4000,
         responseMimeType: 'application/json'
-      }
+      },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      ]
     };
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(20000)
       }
     );
 
@@ -153,7 +160,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     if (inputTokens > 0) {
-      console.log(`📊 [AVATAR EVAL] model: gemini-2.0-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
     }
 
     log.debug(`🔍 [AVATAR EVAL] Raw response: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
