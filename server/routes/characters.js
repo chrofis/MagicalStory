@@ -24,8 +24,10 @@ router.get('/', authenticateToken, async (req, res) => {
     };
 
     if (isDatabaseMode()) {
-      const selectQuery = 'SELECT data FROM characters WHERE user_id = $1 ORDER BY id DESC LIMIT 1';
-      const rows = await dbQuery(selectQuery, [req.user.id]);
+      // Use the same ID format as the UPSERT to ensure we get the correct record
+      const characterId = `characters_${req.user.id}`;
+      const selectQuery = 'SELECT data FROM characters WHERE id = $1';
+      const rows = await dbQuery(selectQuery, [characterId]);
 
       if (rows.length > 0) {
         const data = JSON.parse(rows[0].data);
