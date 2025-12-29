@@ -31,6 +31,7 @@ interface StorySettingsProps {
   // Generate Ideas
   onGenerateIdeas?: () => Promise<void>;
   isGeneratingIdeas?: boolean;
+  ideaPrompt?: { prompt: string; model: string } | null;
   // Story type settings (from step 1)
   storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
   storyTopic?: string;
@@ -61,6 +62,7 @@ export function StorySettings({
   onImageGenModeChange,
   onGenerateIdeas,
   isGeneratingIdeas = false,
+  ideaPrompt,
   // Story type settings (from step 1)
   storyCategory = '',
   storyTopic = '',
@@ -433,6 +435,17 @@ export function StorySettings({
               </button>
             )}
           </div>
+          {/* Developer mode: Show idea generator prompt */}
+          {developerMode && ideaPrompt && (
+            <details className="mt-2 text-left">
+              <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+                Show idea generator prompt ({ideaPrompt.model})
+              </summary>
+              <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-64 border bg-gray-100 border-gray-200">
+                {ideaPrompt.prompt}
+              </pre>
+            </details>
+          )}
           <textarea
             value={storyDetails}
             onChange={(e) => onStoryDetailsChange(e.target.value)}

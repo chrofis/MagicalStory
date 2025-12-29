@@ -667,8 +667,8 @@ export const storyService = {
     }>;
     // Developer model override (admin only)
     ideaModel?: string | null;
-  }): Promise<{ storyIdea: string }> {
-    const response = await api.post<{ storyIdea: string }>('/api/generate-story-ideas', data);
+  }): Promise<{ storyIdea: string; prompt?: string; model?: string }> {
+    const response = await api.post<{ storyIdea: string; prompt?: string; model?: string }>('/api/generate-story-ideas', data);
     return response;
   },
 

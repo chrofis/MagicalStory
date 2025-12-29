@@ -1623,7 +1623,8 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
     const result = await callTextModel(prompt, 500, modelToUse);
 
-    res.json({ storyIdea: result.text.trim() });
+    // Return prompt and model for dev mode display
+    res.json({ storyIdea: result.text.trim(), prompt, model: modelToUse });
 
   } catch (err) {
     log.error('Generate story ideas error:', err);

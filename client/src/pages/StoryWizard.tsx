@@ -158,6 +158,7 @@ export default function StoryWizard() {
     return localStorage.getItem('story_details') || '';
   });
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
+  const [lastIdeaPrompt, setLastIdeaPrompt] = useState<{ prompt: string; model: string } | null>(null);
 
   // Step 5: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
@@ -1209,6 +1210,10 @@ export default function StoryWizard() {
         // Save to localStorage
         localStorage.setItem('story_details', result.storyIdea);
       }
+      // Store prompt and model for dev mode display
+      if (result.prompt && result.model) {
+        setLastIdeaPrompt({ prompt: result.prompt, model: result.model });
+      }
     } catch (error) {
       log.error('Failed to generate story ideas:', error);
       alert(language === 'de'
@@ -1762,6 +1767,7 @@ export default function StoryWizard() {
             onImageGenModeChange={setImageGenMode}
             onGenerateIdeas={generateIdeas}
             isGeneratingIdeas={isGeneratingIdeas}
+            ideaPrompt={lastIdeaPrompt}
             // Story type settings (from step 1)
             storyCategory={storyCategory}
             storyTopic={storyTopic}
