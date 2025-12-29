@@ -378,19 +378,43 @@ function getCharactersInScene(sceneDescription, characters) {
 
 /**
  * Get photo URLs for specific characters based on clothing category
- * Prefers clothing avatar for the category > body with no background > body crop > face photo
+ * Prefers clothing avatar for the category > fallback categories > body with no background > body crop > face photo
  * @param {Array} characters - Array of character objects (filtered to scene)
  * @param {string} clothingCategory - Optional clothing category (winter, summer, formal, standard)
  * @returns {Array} Array of photo URLs for image generation
  */
 function getCharacterPhotos(characters, clothingCategory = null) {
   if (!characters || characters.length === 0) return [];
+
+  // Fallback priority for clothing avatars (same as getCharacterPhotoDetails)
+  const clothingFallbackOrder = {
+    winter: ['standard', 'formal', 'summer'],
+    summer: ['standard', 'formal', 'winter'],
+    formal: ['standard', 'winter', 'summer'],
+    standard: ['formal', 'summer', 'winter']
+  };
+
   return characters
     .map(char => {
+      // Support both avatar structures (char.avatars and char.clothingAvatars)
+      const avatars = char.avatars || char.clothingAvatars;
+
       // If clothing category specified and character has clothing avatar for it, use it
-      if (clothingCategory && char.clothingAvatars && char.clothingAvatars[clothingCategory]) {
-        return char.clothingAvatars[clothingCategory];
+      if (clothingCategory && avatars && avatars[clothingCategory]) {
+        return avatars[clothingCategory];
       }
+
+      // Try fallback clothing categories before falling back to body photos
+      if (clothingCategory && avatars) {
+        const fallbacks = clothingFallbackOrder[clothingCategory] || ['standard', 'formal', 'summer', 'winter'];
+        for (const fallbackCategory of fallbacks) {
+          if (avatars[fallbackCategory]) {
+            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${clothingCategory}, using ${fallbackCategory}`);
+            return avatars[fallbackCategory];
+          }
+        }
+      }
+
       // Fall back to body without background > body crop > face photo
       return char.bodyNoBgUrl || char.bodyPhotoUrl || char.photoUrl;
     })

@@ -155,10 +155,14 @@ async function initializeDatabase() {
         id VARCHAR(255) PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
         data TEXT NOT NULL,
+        metadata JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
+    // Add metadata column if missing (for existing databases)
+    await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS metadata JSONB`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_metadata ON stories USING GIN (metadata)`);
 
     // Story drafts table
     await dbPool.query(`
@@ -457,7 +461,7 @@ async function upsertStory(storyId, userId, storyData) {
 
   const metadata = buildStoryMetadata(storyData);
   await dbQuery(
-    'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET data = $3, metadata = $4',
+    'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, metadata = EXCLUDED.metadata',
     [storyId, userId, JSON.stringify(storyData), JSON.stringify(metadata)]
   );
 }
