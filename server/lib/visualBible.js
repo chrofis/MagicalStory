@@ -722,7 +722,7 @@ function parseNewVisualBibleEntries(text) {
   if (!match) return newEntries;
 
   const section = match[1].trim();
-  log.debug(`[VISUAL BIBLE] Found new entries section: ${section.substring(0, 200)}...`);
+  log.debug(`[VISUAL BIBLE] Found new entries section: ${section.substring(0, 300)}...`);
 
   // Check for "None" or empty
   if (!section || section.toLowerCase() === 'none') {
@@ -730,91 +730,196 @@ function parseNewVisualBibleEntries(text) {
     return newEntries;
   }
 
-  // Parse each type of entry
-  // ANIMAL: Name
-  // - Species: ...
-  // - Coloring: ...
-  // - Pages: 3, 5, 7
-  const animalMatches = section.matchAll(/ANIMAL:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
-  for (const m of animalMatches) {
-    const name = m[1].trim();
-    const details = m[2];
-    const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
-    const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+  // Helper to parse pages from "(pages X, Y, Z)" or "(page X)" or German "(Seite X)" format
+  const parsePages = (text) => {
+    // Support English (page/pages) and German (Seite/Seiten)
+    const pagesMatch = text.match(/\((?:pages?|Seiten?)\s+([\d,\s]+)\)/i);
+    if (pagesMatch) {
+      return pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
+    }
+    return [];
+  };
 
-    // Build description from other fields
-    const species = details.match(/Species:\s*(.+)/i)?.[1]?.trim() || '';
-    const coloring = details.match(/Coloring:\s*(.+)/i)?.[1]?.trim() || '';
-    const size = details.match(/Size:\s*(.+)/i)?.[1]?.trim() || '';
-    const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+  // Helper to parse markdown entry: **Name** (pages X, Y, Z)\n- Field: value\n- Field: value
+  // Supports English and German page markers
+  const parseMarkdownEntry = (entryText) => {
+    const nameMatch = entryText.match(/\*\*(.+?)\*\*\s*\((?:pages?|Seiten?)\s+[\d,\s]+\)/i);
+    if (!nameMatch) return null;
 
-    const descParts = [species, coloring, size, features].filter(Boolean);
-    const description = descParts.join('. ');
+    const name = nameMatch[0];
+    const cleanName = nameMatch[1].trim();
+    const pages = parsePages(name);
 
-    if (name && description) {
-      newEntries.animals.push({ name, description, pages, source: 'story_text' });
-      log.debug(`[VISUAL BIBLE] Parsed animal: ${name} (pages ${pages.join(',')})`);
+    // Get all the details after the name line
+    const detailsStart = entryText.indexOf(nameMatch[0]) + nameMatch[0].length;
+    const details = entryText.substring(detailsStart);
+
+    return { name: cleanName, pages, details };
+  };
+
+  // NEW FORMAT: ### Secondary Characters section with **Name** (pages X, Y, Z)
+  // Also support German "Sekundäre Charaktere" or "Nebencharaktere"
+  const secCharSection = section.match(/###\s*(?:Secondary Characters|Sekundäre Charaktere|Nebencharaktere)\s*([\s\S]*?)(?=###|$)/i);
+  if (secCharSection) {
+    // Split by ** to find each entry (support English pages/German Seiten)
+    const entries = secCharSection[1].split(/(?=\*\*[^*]+\*\*\s*\((?:pages?|Seiten?))/i);
+    for (const entry of entries) {
+      if (!entry.trim() || entry.includes('already exists')) continue;
+      const parsed = parseMarkdownEntry(entry);
+      if (!parsed) continue;
+
+      const visual = parsed.details.match(/Visual:\s*(.+)/i)?.[1]?.trim() || '';
+      const signatureLook = parsed.details.match(/Signature Look:\s*(.+)/i)?.[1]?.trim() || '';
+      const clothing = parsed.details.match(/Clothing:\s*(.+)/i)?.[1]?.trim() || '';
+
+      const descParts = [visual];
+      if (signatureLook) descParts.push(`Signature Look: ${signatureLook}`);
+      if (clothing) descParts.push(`Clothing: ${clothing}`);
+      const description = descParts.join('. ');
+
+      if (parsed.name && description) {
+        newEntries.secondaryCharacters.push({ name: parsed.name, description, pages: parsed.pages, source: 'story_text' });
+        log.debug(`[VISUAL BIBLE] Parsed secondary character: ${parsed.name} (pages ${parsed.pages.join(',')})`);
+      }
     }
   }
 
-  // ARTIFACT: Name
-  const artifactMatches = section.matchAll(/ARTIFACT:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
-  for (const m of artifactMatches) {
-    const name = m[1].trim();
-    const details = m[2];
-    const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
-    const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+  // NEW FORMAT: ### Animals & Creatures section (also German "Tiere")
+  const animalsSection = section.match(/###\s*(?:Animals?\s*(?:&|and)?\s*Creatures?|Tiere\s*(?:&|und)?\s*Kreaturen?)\s*([\s\S]*?)(?=###|$)/i);
+  if (animalsSection) {
+    const entries = animalsSection[1].split(/(?=\*\*[^*]+\*\*\s*\((?:pages?|Seiten?))/i);
+    for (const entry of entries) {
+      if (!entry.trim() || entry.includes('already exists')) continue;
+      const parsed = parseMarkdownEntry(entry);
+      if (!parsed) continue;
 
-    const type = details.match(/Type:\s*(.+)/i)?.[1]?.trim() || '';
-    const appearance = details.match(/Appearance:\s*(.+)/i)?.[1]?.trim() || '';
-    const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+      const species = parsed.details.match(/Species:\s*(.+)/i)?.[1]?.trim() || '';
+      const coloring = parsed.details.match(/Coloring:\s*(.+)/i)?.[1]?.trim() || '';
+      const size = parsed.details.match(/Size:\s*(.+)/i)?.[1]?.trim() || '';
+      const features = parsed.details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
 
-    const descParts = [type, appearance, features].filter(Boolean);
-    const description = descParts.join('. ');
+      const descParts = [species, coloring, size, features].filter(Boolean);
+      const description = descParts.join('. ');
 
-    if (name && description) {
-      newEntries.artifacts.push({ name, description, pages, source: 'story_text' });
-      log.debug(`[VISUAL BIBLE] Parsed artifact: ${name} (pages ${pages.join(',')})`);
+      if (parsed.name && description) {
+        newEntries.animals.push({ name: parsed.name, description, pages: parsed.pages, source: 'story_text' });
+        log.debug(`[VISUAL BIBLE] Parsed animal: ${parsed.name} (pages ${parsed.pages.join(',')})`);
+      }
     }
   }
 
-  // LOCATION: Name
-  const locationMatches = section.matchAll(/LOCATION:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
-  for (const m of locationMatches) {
-    const name = m[1].trim();
-    const details = m[2];
-    const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
-    const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+  // NEW FORMAT: ### Artifacts (Objects) section (also German "Artefakte/Gegenstände/Objekte")
+  const artifactsSection = section.match(/###\s*(?:Artifacts?\s*(?:\(Objects?\))?|Artefakte?\s*(?:\(Objekte?\))?|Gegenstände?|Objekte?)\s*([\s\S]*?)(?=###|$)/i);
+  if (artifactsSection) {
+    const entries = artifactsSection[1].split(/(?=\*\*[^*]+\*\*\s*\((?:pages?|Seiten?))/i);
+    for (const entry of entries) {
+      if (!entry.trim() || entry.includes('already exists')) continue;
+      const parsed = parseMarkdownEntry(entry);
+      if (!parsed) continue;
 
-    const setting = details.match(/Setting:\s*(.+)/i)?.[1]?.trim() || '';
-    const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+      const type = parsed.details.match(/Type:\s*(.+)/i)?.[1]?.trim() || '';
+      const description = parsed.details.match(/Description:\s*(.+)/i)?.[1]?.trim() || '';
 
-    const descParts = [setting, features].filter(Boolean);
-    const description = descParts.join('. ');
+      const fullDesc = [type, description].filter(Boolean).join('. ');
 
-    if (name && description) {
-      newEntries.locations.push({ name, description, pages, source: 'story_text' });
-      log.debug(`[VISUAL BIBLE] Parsed location: ${name} (pages ${pages.join(',')})`);
+      if (parsed.name && fullDesc) {
+        newEntries.artifacts.push({ name: parsed.name, description: fullDesc, pages: parsed.pages, source: 'story_text' });
+        log.debug(`[VISUAL BIBLE] Parsed artifact: ${parsed.name} (pages ${parsed.pages.join(',')})`);
+      }
     }
   }
 
-  // SECONDARY CHARACTER: Name
-  const charMatches = section.matchAll(/SECONDARY CHARACTER:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
-  for (const m of charMatches) {
-    const name = m[1].trim();
-    const details = m[2];
-    const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
-    const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+  // NEW FORMAT: ### Locations section (also German "Orte/Schauplätze")
+  const locationsSection = section.match(/###\s*(?:Locations?|Orte?|Schauplätze?)\s*([\s\S]*?)(?=###|$)/i);
+  if (locationsSection) {
+    const entries = locationsSection[1].split(/(?=\*\*[^*]+\*\*\s*\((?:pages?|Seiten?))/i);
+    for (const entry of entries) {
+      if (!entry.trim() || entry.includes('already exists')) continue;
+      const parsed = parseMarkdownEntry(entry);
+      if (!parsed) continue;
 
-    const physical = details.match(/Physical:\s*(.+)/i)?.[1]?.trim() || '';
-    const clothing = details.match(/Clothing:\s*(.+)/i)?.[1]?.trim() || '';
+      const setting = parsed.details.match(/Setting:\s*(.+)/i)?.[1]?.trim() || '';
+      const features = parsed.details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
 
-    const descParts = [physical, clothing].filter(Boolean);
-    const description = descParts.join('. Typically wears: ');
+      const descParts = [setting, features].filter(Boolean);
+      const description = descParts.join('. ');
 
-    if (name && description) {
-      newEntries.secondaryCharacters.push({ name, description, pages, source: 'story_text' });
-      log.debug(`[VISUAL BIBLE] Parsed secondary character: ${name} (pages ${pages.join(',')})`);
+      if (parsed.name && description) {
+        newEntries.locations.push({ name: parsed.name, description, pages: parsed.pages, source: 'story_text' });
+        log.debug(`[VISUAL BIBLE] Parsed location: ${parsed.name} (pages ${parsed.pages.join(',')})`);
+      }
+    }
+  }
+
+  // LEGACY FORMAT: ANIMAL: Name, ARTIFACT: Name, etc. (keep for backwards compatibility)
+  if (newEntries.animals.length === 0) {
+    const animalMatches = section.matchAll(/ANIMAL:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
+    for (const m of animalMatches) {
+      const name = m[1].trim();
+      const details = m[2];
+      const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
+      const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+      const species = details.match(/Species:\s*(.+)/i)?.[1]?.trim() || '';
+      const coloring = details.match(/Coloring:\s*(.+)/i)?.[1]?.trim() || '';
+      const size = details.match(/Size:\s*(.+)/i)?.[1]?.trim() || '';
+      const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+      const descParts = [species, coloring, size, features].filter(Boolean);
+      const description = descParts.join('. ');
+      if (name && description) {
+        newEntries.animals.push({ name, description, pages, source: 'story_text' });
+      }
+    }
+  }
+
+  if (newEntries.artifacts.length === 0) {
+    const artifactMatches = section.matchAll(/ARTIFACT:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
+    for (const m of artifactMatches) {
+      const name = m[1].trim();
+      const details = m[2];
+      const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
+      const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+      const type = details.match(/Type:\s*(.+)/i)?.[1]?.trim() || '';
+      const appearance = details.match(/Appearance:\s*(.+)/i)?.[1]?.trim() || '';
+      const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+      const descParts = [type, appearance, features].filter(Boolean);
+      const description = descParts.join('. ');
+      if (name && description) {
+        newEntries.artifacts.push({ name, description, pages, source: 'story_text' });
+      }
+    }
+  }
+
+  if (newEntries.locations.length === 0) {
+    const locationMatches = section.matchAll(/LOCATION:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
+    for (const m of locationMatches) {
+      const name = m[1].trim();
+      const details = m[2];
+      const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
+      const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+      const setting = details.match(/Setting:\s*(.+)/i)?.[1]?.trim() || '';
+      const features = details.match(/Features:\s*(.+)/i)?.[1]?.trim() || '';
+      const descParts = [setting, features].filter(Boolean);
+      const description = descParts.join('. ');
+      if (name && description) {
+        newEntries.locations.push({ name, description, pages, source: 'story_text' });
+      }
+    }
+  }
+
+  if (newEntries.secondaryCharacters.length === 0) {
+    const charMatches = section.matchAll(/SECONDARY CHARACTER:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
+    for (const m of charMatches) {
+      const name = m[1].trim();
+      const details = m[2];
+      const pagesMatch = details.match(/Pages?:\s*([\d,\s]+)/i);
+      const pages = pagesMatch ? pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p)) : [];
+      const physical = details.match(/Physical:\s*(.+)/i)?.[1]?.trim() || '';
+      const clothing = details.match(/Clothing:\s*(.+)/i)?.[1]?.trim() || '';
+      const descParts = [physical, clothing].filter(Boolean);
+      const description = descParts.join('. Typically wears: ');
+      if (name && description) {
+        newEntries.secondaryCharacters.push({ name, description, pages, source: 'story_text' });
+      }
     }
   }
 

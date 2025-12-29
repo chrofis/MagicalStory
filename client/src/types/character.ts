@@ -145,6 +145,7 @@ export interface VisualBibleEntry {
   description: string;
   extractedDescription: string | null;
   firstAppearanceAnalyzed: boolean;
+  source?: 'outline' | 'story_text';  // Where this entry was added from
 }
 
 export interface VisualBibleChangeLogEntry {
