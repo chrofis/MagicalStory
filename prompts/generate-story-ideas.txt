@@ -14,7 +14,7 @@ READING LEVEL: {READING_LEVEL_DESCRIPTION}
 
 {CATEGORY_INSTRUCTIONS}
 
-{LANGUAGE_INSTRUCTION}
+{TOPIC_GUIDE}
 
 Generate a story idea in 3-5 sentences that includes:
 1. LOCATION and TIME: Where and when does the story take place?
@@ -35,3 +35,7 @@ Example 2: "In a castle during winter in medieval times, the kitchen runs out of
 Example 3: "In a forest where animals can talk, a rabbit loses her way home. She asks an owl for directions, but the owl speaks in riddles. A fox offers to guide her, but leads her in circles. The rabbit must figure out the owl's riddle to find the path."
 
 Write ONLY the story idea description, nothing else. Be specific about what happens!
+
+---
+**CRITICAL - OUTPUT LANGUAGE:**
+{LANGUAGE_INSTRUCTION}
