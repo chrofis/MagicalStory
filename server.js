@@ -1274,6 +1274,16 @@ async function initializeDatabase() {
       // Don't fail initialization if migrations fail
     }
 
+    // Auto-migrate story images to separate table (runs in background)
+    try {
+      const { autoMigrateStoryImages } = require('./server/services/database');
+      autoMigrateStoryImages().catch(err => {
+        log.warn('⚠️  Auto-migration warning:', err.message);
+      });
+    } catch (err) {
+      log.warn('⚠️  Could not start auto-migration:', err.message);
+    }
+
   } catch (err) {
     log.error('❌ Database initialization error:', err.message);
     log.error('Error code:', err.code);

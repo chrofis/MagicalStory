@@ -56,6 +56,14 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const { characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears } = req.body;
 
+    // DEBUG: Log what's being saved, especially clothing data
+    console.log('[SAVE] Characters clothing_avatars:', (characters || []).map(c => ({
+      name: c.name,
+      hasClothingAvatars: !!c.clothing_avatars,
+      hasClothing: !!c.clothing_avatars?.clothing,
+      clothingKeys: c.clothing_avatars?.clothing ? Object.keys(c.clothing_avatars.clothing) : [],
+    })));
+
     // Store character data as an object with all related information
     const characterData = {
       characters: characters || [],

@@ -372,13 +372,6 @@ async function initializeDatabase() {
       }
     }
 
-    // Auto-migrate story images to separate table (runs in background)
-    console.log('[AUTO-MIGRATE] Calling autoMigrateStoryImages()...');
-    autoMigrateStoryImages().catch(err => {
-      console.warn('⚠️  Auto-migration warning:', err.message);
-    });
-    console.log('[AUTO-MIGRATE] autoMigrateStoryImages() called (running in background)');
-
   } catch (err) {
     console.error('❌ Database initialization error:', err.message);
     throw err;
@@ -714,5 +707,6 @@ module.exports = {
   getStoryImage,
   getAllStoryImages,
   hasStorySeparateImages,
-  deleteStoryImages
+  deleteStoryImages,
+  autoMigrateStoryImages
 };

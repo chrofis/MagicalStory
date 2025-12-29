@@ -227,8 +227,22 @@ export const characterService = {
 
   async getCharacterData(): Promise<CharacterData> {
     const response = await api.get<CharacterDataResponse>('/api/characters');
+    // DEBUG: Log what's being loaded from API, especially clothing data
+    console.log('[LOAD] Raw API response clothing_avatars:', (response.characters || []).map(c => ({
+      name: c.name,
+      hasClothingAvatars: !!(c.clothing_avatars || c.clothingAvatars),
+      hasClothing: !!((c.clothing_avatars as CharacterAvatars | undefined)?.clothing || (c.clothingAvatars as CharacterAvatars | undefined)?.clothing),
+      clothingKeys: ((c.clothing_avatars as CharacterAvatars | undefined)?.clothing || (c.clothingAvatars as CharacterAvatars | undefined)?.clothing) ? Object.keys(((c.clothing_avatars as CharacterAvatars | undefined)?.clothing || (c.clothingAvatars as CharacterAvatars | undefined)?.clothing)!) : [],
+    })));
+    const mapped = (response.characters || []).map(mapCharacterFromApi);
+    console.log('[LOAD] Mapped characters clothing:', mapped.map(c => ({
+      name: c.name,
+      hasAvatars: !!c.avatars,
+      hasClothing: !!c.avatars?.clothing,
+      clothingKeys: c.avatars?.clothing ? Object.keys(c.avatars.clothing) : [],
+    })));
     return {
-      characters: (response.characters || []).map(mapCharacterFromApi),
+      characters: mapped,
       relationships: response.relationships || {},
       relationshipTexts: response.relationshipTexts || {},
       customRelationships: response.customRelationships || [],
@@ -245,7 +259,7 @@ export const characterService = {
   },
 
   async saveCharacterData(data: CharacterData): Promise<void> {
-    await api.post('/api/characters', {
+    const apiData = {
       characters: data.characters.map(mapCharacterToApi),
       relationships: data.relationships,
       relationshipTexts: data.relationshipTexts,
@@ -253,7 +267,15 @@ export const characterService = {
       customStrengths: data.customStrengths,
       customWeaknesses: data.customWeaknesses,
       customFears: data.customFears,
-    });
+    };
+    // DEBUG: Log what's being saved, especially clothing data
+    console.log('[SAVE] Character avatars clothing:', data.characters.map(c => ({
+      name: c.name,
+      hasAvatars: !!c.avatars,
+      hasClothing: !!c.avatars?.clothing,
+      clothingKeys: c.avatars?.clothing ? Object.keys(c.avatars.clothing) : [],
+    })));
+    await api.post('/api/characters', apiData);
   },
 
   async generateClothingAvatars(character: Character): Promise<{
