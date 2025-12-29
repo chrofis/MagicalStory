@@ -250,9 +250,21 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
     // Build language instruction for trait extraction
     let languageInstruction = '';
     if (language === 'de') {
-      languageInstruction = 'WICHTIG: Beschreibe alle Merkmale (face, hair, build, distinctive markings) auf Deutsch. Beispiel: "rundes Gesicht mit weichen Wangen", "lange, braune Haare im Pferdeschwanz", "schlank", "Brille".';
+      languageInstruction = `WICHTIG: Beschreibe alle Merkmale auf Deutsch.
+- hairColor: z.B. "blond", "braun", "schwarz", "rot", "grau"
+- hairLength: z.B. "sehr kurz", "kurz", "ohrlang", "kinnlang", "nackenlang", "schulterlang", "achsellang", "rückenmitte", "hüftlang"
+- hairStyle: z.B. "glatt", "wellig", "lockig", "Pferdeschwanz", "Zöpfe", "Dutt", "offen"
+- face: z.B. "rundes Gesicht, helle Haut"
+- build: z.B. "schlank", "durchschnittlich", "athletisch", "kräftig"
+- distinctive markings: z.B. "Brille", "Sommersprossen", "keine"`;
     } else if (language === 'fr') {
-      languageInstruction = 'IMPORTANT: Décrivez tous les traits (face, hair, build, distinctive markings) en français. Exemple: "visage rond avec joues douces", "longs cheveux bruns en queue de cheval", "mince", "lunettes".';
+      languageInstruction = `IMPORTANT: Décrivez tous les traits en français.
+- hairColor: ex. "blond", "brun", "noir", "roux", "gris"
+- hairLength: ex. "très court", "court", "aux oreilles", "au menton", "au cou", "aux épaules", "aux aisselles", "mi-dos", "aux hanches"
+- hairStyle: ex. "lisse", "ondulé", "bouclé", "queue de cheval", "tresses", "chignon", "lâche"
+- face: ex. "visage rond, teint clair"
+- build: ex. "mince", "moyen", "athlétique", "costaud"
+- distinctive markings: ex. "lunettes", "taches de rousseur", "aucun"`;
     }
 
     const imageSize = imageData.length;
