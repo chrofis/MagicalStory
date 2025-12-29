@@ -3,13 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { ArrowLeft, ArrowRight, Loader2, Sparkles, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 // Components
 import { Button, LoadingSpinner, Navigation } from '@/components/common';
-import { StoryCategorySelector, ArtStyleSelector, RelationshipEditor, StorySettings } from '@/components/story';
-import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
 import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
+import {
+  WizardStep1Configuration,
+  WizardStep2Characters,
+  WizardStep3Relationships,
+  WizardStep4Settings,
+} from './wizard';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 
 // Types
@@ -1577,158 +1581,64 @@ export default function StoryWizard() {
   // Render current step content
   const renderStep = () => {
     switch (step) {
-      case 1: {
-        // Determine if story selection is complete (ready to show art style)
-        const isStorySelectionComplete =
-          (storyCategory === 'adventure' && storyTheme) ||
-          ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic);
-
+      case 1:
         return (
-          <div className="space-y-6">
-            <StoryCategorySelector
-              storyCategory={storyCategory}
-              storyTopic={storyTopic}
-              storyTheme={storyTheme}
-              customThemeText={customThemeText}
-              onCategoryChange={(cat) => setStoryCategory(cat)}
-              onTopicChange={setStoryTopic}
-              onThemeChange={setStoryTheme}
-              onCustomThemeTextChange={setCustomThemeText}
-              onLegacyStoryTypeChange={setStoryType}
-            />
-            {isStorySelectionComplete && (
-              <div id="art-style-section">
-                <ArtStyleSelector
-                  selectedStyle={artStyle}
-                  onSelect={setArtStyle}
-                />
-              </div>
-            )}
-          </div>
+          <WizardStep1Configuration
+            storyCategory={storyCategory}
+            storyTopic={storyTopic}
+            storyTheme={storyTheme}
+            customThemeText={customThemeText}
+            artStyle={artStyle}
+            onCategoryChange={setStoryCategory}
+            onTopicChange={setStoryTopic}
+            onThemeChange={setStoryTheme}
+            onCustomThemeTextChange={setCustomThemeText}
+            onArtStyleChange={setArtStyle}
+            onLegacyStoryTypeChange={setStoryType}
+          />
         );
-      }
 
       case 2:
-        if (currentCharacter) {
-          // Step 2a: Photo upload
-          if (characterStep === 'photo') {
-            return (
-              <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                  <Users size={24} /> {t.createCharacters}
-                </h2>
-                <PhotoUpload onPhotoSelect={handlePhotoSelect} />
-                <button
-                  onClick={() => setCurrentCharacter(null)}
-                  className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-                >
-                  {t.cancel}
-                </button>
-              </div>
-            );
-          }
-
-          // Step 2b: Name entry only
-          if (characterStep === 'name') {
-            return (
-              <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                  <Users size={24} /> {t.createCharacters}
-                </h2>
-                <CharacterForm
-                  character={currentCharacter}
-                  onChange={setCurrentCharacter}
-                  onSave={saveCharacter}
-                  onCancel={() => setCurrentCharacter(null)}
-                  onPhotoChange={handlePhotoSelect}
-                  onContinueToTraits={() => setCharacterStep('traits')}
-                  onRegenerateAvatars={handleRegenerateAvatars}
-                  onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
-                  isLoading={isLoading}
-                  isAnalyzingPhoto={isAnalyzingPhoto}
-                  isRegeneratingAvatars={isRegeneratingAvatars}
-                  isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
-                  step="name"
-                  developerMode={developerMode}
-                />
-              </div>
-            );
-          }
-
-          // Step 2c: Traits and characteristics
-          return (
-            <div className="space-y-6">
-              <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                <Users size={24} /> {t.createCharacters}
-              </h2>
-              <CharacterForm
-                character={currentCharacter}
-                onChange={setCurrentCharacter}
-                onSave={saveCharacter}
-                onCancel={() => setCurrentCharacter(null)}
-                onPhotoChange={handlePhotoSelect}
-                onRegenerateAvatars={handleRegenerateAvatars}
-                onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
-                isLoading={isLoading}
-                isAnalyzingPhoto={isAnalyzingPhoto}
-                isRegeneratingAvatars={isRegeneratingAvatars}
-                isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
-                step="traits"
-                developerMode={developerMode}
-              />
-            </div>
-          );
-        }
-
-        if (characters.length > 0) {
-          return (
-            <div className="space-y-6">
-              <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                <Users size={24} /> {t.createCharacters}
-              </h2>
-              <CharacterList
-                characters={characters}
-                showSuccessMessage={showCharacterCreated}
-                onEdit={editCharacter}
-                onDelete={deleteCharacter}
-                onCreateAnother={startNewCharacter}
-                onContinue={goNext}
-              />
-            </div>
-          );
-        }
-
         return (
-          <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-              <Users size={24} /> {t.createCharacters}
-            </h2>
-            <div className="text-center py-12">
-              <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 mb-6">{t.startCreating}</p>
-              <Button onClick={startNewCharacter} icon={Sparkles}>
-                {language === 'de' ? 'Ersten Charakter erstellen' : language === 'fr' ? 'Creer le premier personnage' : 'Create First Character'}
-              </Button>
-            </div>
-          </div>
+          <WizardStep2Characters
+            characters={characters}
+            currentCharacter={currentCharacter}
+            characterStep={characterStep}
+            showCharacterCreated={showCharacterCreated}
+            isLoading={isLoading}
+            isAnalyzingPhoto={isAnalyzingPhoto}
+            isRegeneratingAvatars={isRegeneratingAvatars}
+            isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
+            developerMode={developerMode}
+            onCharacterChange={setCurrentCharacter}
+            onCharacterStepChange={setCharacterStep}
+            onPhotoSelect={handlePhotoSelect}
+            onSaveCharacter={saveCharacter}
+            onEditCharacter={editCharacter}
+            onDeleteCharacter={deleteCharacter}
+            onStartNewCharacter={startNewCharacter}
+            onRegenerateAvatars={handleRegenerateAvatars}
+            onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
+            onContinue={goNext}
+          />
         );
 
       case 3:
         return (
-          <RelationshipEditor
+          <WizardStep3Relationships
             characters={characters}
             relationships={relationships}
             relationshipTexts={relationshipTexts}
+            customRelationships={customRelationships}
             onRelationshipChange={updateRelationship}
             onRelationshipTextChange={(key, text) => { relationshipsDirty.current = true; setRelationshipTexts(prev => ({ ...prev, [key]: text })); }}
-            customRelationships={customRelationships}
             onAddCustomRelationship={addCustomRelationship}
           />
         );
 
       case 4:
         return (
-          <StorySettings
+          <WizardStep4Settings
             characters={characters}
             mainCharacters={mainCharacters}
             excludedCharacters={excludedCharacters}
@@ -1747,7 +1657,6 @@ export default function StoryWizard() {
             onGenerateIdeas={generateIdeas}
             isGeneratingIdeas={isGeneratingIdeas}
             ideaPrompt={lastIdeaPrompt}
-            // Story type settings (from step 1)
             storyCategory={storyCategory}
             storyTopic={storyTopic}
             storyTheme={storyTheme}
