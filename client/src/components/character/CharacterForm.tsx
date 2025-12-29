@@ -269,7 +269,7 @@ export function CharacterForm({
           </div>
 
           {/* Basic Info - Compact grid */}
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-3 gap-2 mb-3">
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.gender}</label>
               <select
@@ -292,25 +292,6 @@ export function CharacterForm({
                 min="1"
                 max="120"
               />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
-                {language === 'de' ? 'Sieht aus wie' : language === 'fr' ? 'Apparence' : 'Appears as'}
-              </label>
-              <select
-                value={character.apparentAge || getAgeCategory(character.age) || ''}
-                onChange={(e) => updateField('apparentAge', e.target.value as AgeCategory)}
-                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs bg-white focus:border-indigo-500 focus:outline-none"
-              >
-                <option value="">
-                  {language === 'de' ? '— Automatisch —' : language === 'fr' ? '— Automatique —' : '— Auto —'}
-                </option>
-                {AGE_CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                  </option>
-                ))}
-              </select>
             </div>
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
@@ -358,6 +339,26 @@ export function CharacterForm({
                 placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
                 onChange={(v) => updatePhysical('other', v)}
               />
+              {/* Apparent Age - how old they look */}
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-600 text-xs whitespace-nowrap">
+                  {language === 'de' ? 'Sieht aus wie:' : language === 'fr' ? 'Apparence:' : 'Appears as:'}
+                </span>
+                <select
+                  value={character.apparentAge || getAgeCategory(character.age) || ''}
+                  onChange={(e) => updateField('apparentAge', e.target.value as AgeCategory)}
+                  className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:border-indigo-400 bg-white hover:border-gray-300"
+                >
+                  <option value="">
+                    {language === 'de' ? '— Automatisch —' : language === 'fr' ? '— Automatique —' : '— Auto —'}
+                  </option>
+                  {AGE_CATEGORY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </details>
         </div>
