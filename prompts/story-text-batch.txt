@@ -93,28 +93,34 @@ Remember: Characters that feel ALIVE and UNIQUE are what make a great story. Cor
 ---NEW VISUAL BIBLE ENTRIES---
 (Add at least 5 entries - all locations, objects, animals, and secondary characters)
 
-ANIMAL: [Name]
-- Species: [type]
-- Coloring: [colors and patterns]
-- Size: [relative size]
-- Features: [distinctive details]
-- Pages: [page numbers where it appears]
+### Secondary Characters
+For each person NOT a main character:
+**[Name/Role]** (pages X, Y, Z)
+- Visual: [age category: child/teen/young adult/middle-aged/elderly], [build: short/average/tall, slim/stocky/muscular], [hair: color, style, length], [face: eye color, skin tone, 1-2 distinctive features]
+- Signature Look: [ONE memorable visual element for instant recognition, e.g., "bright red bandana", "gold tooth", "curved wooden cane"]
+- Clothing: [specific colors and details - be consistent]
 
-ARTIFACT: [Name]
-- Type: [what it is]
-- Appearance: [color, material, size]
-- Features: [distinctive details]
-- Pages: [page numbers]
+**RULES for Secondary Characters:**
+- Use standalone terms for build/size - NO comparisons to other characters
+- Use age categories, not specific ages
+- Signature Look must be visually striking and easy to reproduce
 
-LOCATION: [Name]
-- Setting: [indoor/outdoor, type]
-- Features: [key visual elements]
-- Pages: [page numbers]
+### Animals & Creatures
+**[Name]** (pages X, Y, Z)
+- Species: [type of animal/creature]
+- Coloring: [exact colors and patterns, e.g., "white fur with orange patches on both ears"]
+- Size: [relative size description]
+- Features: [collar, markings, accessories, distinguishing details]
 
-SECONDARY CHARACTER: [Name/Role]
-- Physical: [age, build, hair, distinctive features]
-- Clothing: [typical outfit]
-- Pages: [page numbers]
+### Artifacts (Objects)
+**[Name]** (pages X, Y, Z)
+- Type: [what kind of object]
+- Description: [size, color, material, condition, distinctive markings]
+
+### Locations
+**[Name]** (pages X, Y, Z)
+- Setting: [indoor/outdoor, type of place]
+- Features: [colors, shapes, distinctive visual elements that make it recognizable]
 
 ---STORY TEXT---
 
