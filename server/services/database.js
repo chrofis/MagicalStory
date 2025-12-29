@@ -373,9 +373,11 @@ async function initializeDatabase() {
     }
 
     // Auto-migrate story images to separate table (runs in background)
+    console.log('[AUTO-MIGRATE] Calling autoMigrateStoryImages()...');
     autoMigrateStoryImages().catch(err => {
       console.warn('⚠️  Auto-migration warning:', err.message);
     });
+    console.log('[AUTO-MIGRATE] autoMigrateStoryImages() called (running in background)');
 
   } catch (err) {
     console.error('❌ Database initialization error:', err.message);
@@ -388,16 +390,20 @@ async function initializeDatabase() {
  * Runs in the background after server startup, processing stories in batches.
  */
 async function autoMigrateStoryImages() {
+  console.log('[AUTO-MIGRATE] Starting auto-migration check...');
+
   if (!isDatabaseMode() || !dbPool) {
+    console.log('[AUTO-MIGRATE] Skipping - not in database mode');
     return;
   }
 
   // Check if story_images table exists
   try {
     await dbPool.query('SELECT 1 FROM story_images LIMIT 1');
+    console.log('[AUTO-MIGRATE] story_images table exists');
   } catch (err) {
     // Table doesn't exist yet, skip migration
-    console.log('[AUTO-MIGRATE] story_images table not ready, skipping');
+    console.log('[AUTO-MIGRATE] story_images table not ready, skipping:', err.message);
     return;
   }
 

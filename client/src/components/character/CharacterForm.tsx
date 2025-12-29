@@ -73,6 +73,117 @@ function InlineEditField({ label, value, placeholder, onChange, isChanged, isAiE
   );
 }
 
+// Shared physical traits grid component - used in both step 1 and step 2
+interface PhysicalTraitsGridProps {
+  character: Character;
+  language: string;
+  updatePhysical: (field: keyof PhysicalTraits, value: string) => void;
+  updateApparentAge: (value: AgeCategory) => void;
+  changedTraits?: ChangedTraits;
+  isAiExtracted?: boolean;
+}
+
+function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparentAge, changedTraits, isAiExtracted }: PhysicalTraitsGridProps) {
+  const labelClass = isAiExtracted ? 'text-gray-400' : 'text-gray-600';
+  const selectClass = (isChanged?: boolean) => `flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
+    isChanged
+      ? 'border-amber-400 bg-amber-50'
+      : isAiExtracted
+        ? 'border-gray-200 bg-gray-50 text-gray-500'
+        : 'border-gray-200 bg-white'
+  }`;
+
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+      {/* Row 1: Eye Color | Visual Age */}
+      <InlineEditField
+        label={language === 'de' ? 'Augenfarbe' : language === 'fr' ? 'Couleur des yeux' : 'Eye Color'}
+        value={character.physical?.eyeColor || ''}
+        placeholder={language === 'de' ? 'z.B. blau' : 'e.g. blue'}
+        onChange={(v) => updatePhysical('eyeColor', v)}
+        isAiExtracted={isAiExtracted}
+        isChanged={changedTraits?.eyeColor}
+      />
+      <div className="flex items-center gap-2">
+        <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
+          {language === 'de' ? 'Visuelles Alter' : language === 'fr' ? 'Âge visuel' : 'Visual Age'}:
+        </span>
+        <select
+          value={character.apparentAge || getAgeCategory(character.age) || ''}
+          onChange={(e) => updateApparentAge(e.target.value as AgeCategory)}
+          className={selectClass(changedTraits?.apparentAge)}
+        >
+          <option value="">{language === 'de' ? '— Auto —' : language === 'fr' ? '— Auto —' : '— Auto —'}</option>
+          {AGE_CATEGORY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+            </option>
+          ))}
+        </select>
+        {changedTraits?.apparentAge && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+      </div>
+
+      {/* Row 2: Hair Color | Build */}
+      <InlineEditField
+        label={language === 'de' ? 'Haarfarbe' : language === 'fr' ? 'Couleur des cheveux' : 'Hair Color'}
+        value={character.physical?.hairColor || ''}
+        placeholder={language === 'de' ? 'z.B. blond' : 'e.g. blonde'}
+        onChange={(v) => updatePhysical('hairColor', v)}
+        isAiExtracted={isAiExtracted}
+        isChanged={changedTraits?.hairColor}
+      />
+      <div className="flex items-center gap-2">
+        <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
+          {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}:
+        </span>
+        <select
+          value={character.physical?.build || ''}
+          onChange={(e) => updatePhysical('build', e.target.value)}
+          className={selectClass(changedTraits?.build)}
+        >
+          <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
+          {BUILD_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+            </option>
+          ))}
+        </select>
+        {changedTraits?.build && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+      </div>
+
+      {/* Row 3: Hair Style | Face */}
+      <InlineEditField
+        label={language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}
+        value={character.physical?.hairStyle || ''}
+        placeholder={language === 'de' ? 'z.B. lockig' : 'e.g. curly'}
+        onChange={(v) => updatePhysical('hairStyle', v)}
+        isAiExtracted={isAiExtracted}
+        isChanged={changedTraits?.hairStyle}
+      />
+      <InlineEditField
+        label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
+        value={character.physical?.face || ''}
+        placeholder={language === 'de' ? 'z.B. rund' : 'e.g. round'}
+        onChange={(v) => updatePhysical('face', v)}
+        isAiExtracted={isAiExtracted}
+        isChanged={changedTraits?.face}
+      />
+
+      {/* Row 4: Other (full width) */}
+      <div className="col-span-2">
+        <InlineEditField
+          label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
+          value={character.physical?.other || ''}
+          placeholder={language === 'de' ? 'z.B. Brille, Sommersprossen' : 'e.g. glasses, freckles'}
+          onChange={(v) => updatePhysical('other', v)}
+          isAiExtracted={isAiExtracted}
+          isChanged={changedTraits?.other}
+        />
+      </div>
+    </div>
+  );
+}
+
 interface CharacterFormProps {
   character: Character;
   onChange: (character: Character) => void;
@@ -297,101 +408,14 @@ export function CharacterForm({
                   </span>
                 )}
               </div>
-              {/* 2-column layout for physical traits */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                {/* Left column: Eye Color, Hair Color, Hair Style */}
-                <InlineEditField
-                  label={language === 'de' ? 'Augenfarbe' : language === 'fr' ? 'Couleur des yeux' : 'Eye Color'}
-                  value={character.physical?.eyeColor || ''}
-                  placeholder={language === 'de' ? 'z.B. blau' : 'e.g. blue'}
-                  onChange={(v) => updatePhysical('eyeColor', v)}
-                  isAiExtracted={true}
-                  isChanged={changedTraits?.eyeColor}
-                />
-                {/* Right column: Visual Age */}
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-xs whitespace-nowrap text-gray-400">
-                    {language === 'de' ? 'Visuelles Alter' : language === 'fr' ? 'Âge visuel' : 'Visual Age'}:
-                  </span>
-                  <select
-                    value={character.apparentAge || getAgeCategory(character.age) || ''}
-                    onChange={(e) => updateField('apparentAge', e.target.value as AgeCategory)}
-                    className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
-                      changedTraits?.apparentAge ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 text-gray-500'
-                    }`}
-                  >
-                    <option value="">{language === 'de' ? '— Auto —' : language === 'fr' ? '— Auto —' : '— Auto —'}</option>
-                    {AGE_CATEGORY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {changedTraits?.apparentAge && <span className="text-amber-500 text-xs" title="Changed">●</span>}
-                </div>
-
-                {/* Left: Hair Color */}
-                <InlineEditField
-                  label={language === 'de' ? 'Haarfarbe' : language === 'fr' ? 'Couleur des cheveux' : 'Hair Color'}
-                  value={character.physical?.hairColor || ''}
-                  placeholder={language === 'de' ? 'z.B. blond' : 'e.g. blonde'}
-                  onChange={(v) => updatePhysical('hairColor', v)}
-                  isAiExtracted={true}
-                  isChanged={changedTraits?.hairColor}
-                />
-                {/* Right: Build */}
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-xs whitespace-nowrap text-gray-400">
-                    {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}:
-                  </span>
-                  <select
-                    value={character.physical?.build || ''}
-                    onChange={(e) => updatePhysical('build', e.target.value)}
-                    className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
-                      changedTraits?.build ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 text-gray-500'
-                    }`}
-                  >
-                    <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
-                    {BUILD_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {changedTraits?.build && <span className="text-amber-500 text-xs" title="Changed">●</span>}
-                </div>
-
-                {/* Left: Hair Style */}
-                <InlineEditField
-                  label={language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}
-                  value={character.physical?.hairStyle || ''}
-                  placeholder={language === 'de' ? 'z.B. lockig' : 'e.g. curly'}
-                  onChange={(v) => updatePhysical('hairStyle', v)}
-                  isAiExtracted={true}
-                  isChanged={changedTraits?.hairStyle}
-                />
-                {/* Right: Face */}
-                <InlineEditField
-                  label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
-                  value={character.physical?.face || ''}
-                  placeholder={language === 'de' ? 'z.B. rund' : 'e.g. round'}
-                  onChange={(v) => updatePhysical('face', v)}
-                  isAiExtracted={true}
-                  isChanged={changedTraits?.face}
-                />
-
-                {/* Bottom: Other (spans both columns) */}
-                <div className="col-span-2">
-                  <InlineEditField
-                    label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
-                    value={character.physical?.other || ''}
-                    placeholder={language === 'de' ? 'z.B. Brille, Sommersprossen' : 'e.g. glasses, freckles'}
-                    onChange={(v) => updatePhysical('other', v)}
-                    isAiExtracted={true}
-                    isChanged={changedTraits?.other}
-                  />
-                </div>
-              </div>
+              <PhysicalTraitsGrid
+                character={character}
+                language={language}
+                updatePhysical={updatePhysical}
+                updateApparentAge={(v) => updateField('apparentAge', v)}
+                changedTraits={changedTraits}
+                isAiExtracted={true}
+              />
               <p className="mt-2 text-[10px] text-gray-400 italic">
                 {language === 'de' ? 'Diese Merkmale wurden aus dem Foto erkannt. Sie können sie bearbeiten.' :
                  language === 'fr' ? 'Ces caractéristiques ont été détectées à partir de la photo. Vous pouvez les modifier.' :
@@ -543,74 +567,13 @@ export function CharacterForm({
             <summary className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
               {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
             </summary>
-            <div className="px-3 pb-3 space-y-1.5 text-xs">
-              <InlineEditField
-                label={language === 'de' ? 'Augenfarbe' : language === 'fr' ? 'Couleur des yeux' : 'Eye Color'}
-                value={character.physical?.eyeColor || ''}
-                placeholder={language === 'de' ? 'z.B. blau, braun' : 'e.g. blue, brown'}
-                onChange={(v) => updatePhysical('eyeColor', v)}
+            <div className="px-3 pb-3">
+              <PhysicalTraitsGrid
+                character={character}
+                language={language}
+                updatePhysical={updatePhysical}
+                updateApparentAge={(v) => updateField('apparentAge', v)}
               />
-              <InlineEditField
-                label={language === 'de' ? 'Haarfarbe' : language === 'fr' ? 'Couleur des cheveux' : 'Hair Color'}
-                value={character.physical?.hairColor || ''}
-                placeholder={language === 'de' ? 'z.B. blond, braun' : 'e.g. blonde, brown'}
-                onChange={(v) => updatePhysical('hairColor', v)}
-              />
-              <InlineEditField
-                label={language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}
-                value={character.physical?.hairStyle || ''}
-                placeholder={language === 'de' ? 'z.B. lockig, kurz' : 'e.g. curly, short'}
-                onChange={(v) => updatePhysical('hairStyle', v)}
-              />
-              <InlineEditField
-                label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
-                value={character.physical?.face || ''}
-                placeholder={language === 'de' ? 'z.B. rund, oval' : 'e.g. round, oval'}
-                onChange={(v) => updatePhysical('face', v)}
-              />
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-600 text-xs whitespace-nowrap">
-                  {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}:
-                </span>
-                <select
-                  value={character.physical?.build || ''}
-                  onChange={(e) => updatePhysical('build', e.target.value)}
-                  className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:border-indigo-400 bg-white hover:border-gray-300"
-                >
-                  <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
-                  {BUILD_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <InlineEditField
-                label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
-                value={character.physical?.other || ''}
-                placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
-                onChange={(v) => updatePhysical('other', v)}
-              />
-              {/* Visual Age - how old they look */}
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-600 text-xs whitespace-nowrap">
-                  {language === 'de' ? 'Visuelles Alter:' : language === 'fr' ? 'Âge visuel:' : 'Visual Age:'}
-                </span>
-                <select
-                  value={character.apparentAge || getAgeCategory(character.age) || ''}
-                  onChange={(e) => updateField('apparentAge', e.target.value as AgeCategory)}
-                  className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:border-indigo-400 bg-white hover:border-gray-300"
-                >
-                  <option value="">
-                    {language === 'de' ? '— Automatisch —' : language === 'fr' ? '— Automatique —' : '— Auto —'}
-                  </option>
-                  {AGE_CATEGORY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
           </details>
         </div>
