@@ -2209,7 +2209,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
 });
 
 // Edit scene image with a user prompt
-app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, res) => {
+app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const { editPrompt } = req.body;
@@ -2315,7 +2315,7 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, async (req, 
 });
 
 // Auto-repair image (detect and fix physics errors) - DEV ONLY
-app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, async (req, res) => {
+app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
