@@ -1997,31 +1997,6 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     const visualBible = storyData.visualBible || null;
     const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
-    // Helper to build character reference list for cover prompts
-    const buildCharRefList = (photos, characters) => {
-      if (!photos || photos.length === 0) return '';
-      const charDescriptions = photos.map((photo, index) => {
-        // Look up character info by name to get full physical description
-        const char = characters?.find(c => c.name === photo.name);
-        const age = char?.age ? `${char.age} years old` : '';
-        const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
-        // Include physical traits with labels (excluding height - AI doesn't understand it for images)
-        const physical = char?.physical;
-        const physicalParts = [
-          physical?.build ? `Build: ${physical.build}` : '',
-          physical?.face ? `Face: ${physical.face}` : '',
-          physical?.hair ? `Hair: ${physical.hair}` : '',
-          physical?.other ? `Other: ${physical.other}` : ''
-        ].filter(Boolean);
-        const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-        // Include clothing description from avatar if available
-        const clothingDesc = photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : '';
-        const brief = [photo.name, age, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
-        return `${index + 1}. ${brief}`;
-      });
-      return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
-    };
-
     // Extract cover scenes with clothing info
     const coverScenes = extractCoverScenes(storyData.outline || '');
     const storyTitle = storyData.title || 'My Story';
@@ -2063,7 +2038,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
           TITLE_PAGE_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
           STORY_TITLE: storyTitle,
-          CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos, storyData.characters),
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
           VISUAL_BIBLE: visualBiblePrompt
         });
       } else if (normalizedCoverType === 'initialPage') {
@@ -2072,21 +2047,21 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
               INITIAL_PAGE_SCENE: sceneDescription,
               STYLE_DESCRIPTION: styleDescription,
               DEDICATION: storyData.dedication,
-              CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos, storyData.characters),
+              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
               VISUAL_BIBLE: visualBiblePrompt
             })
           : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
               INITIAL_PAGE_SCENE: sceneDescription,
               STYLE_DESCRIPTION: styleDescription,
               STORY_TITLE: storyTitle,
-              CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos, storyData.characters),
+              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
               VISUAL_BIBLE: visualBiblePrompt
             });
       } else {
         coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
           BACK_COVER_SCENE: sceneDescription,
           STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_REFERENCE_LIST: buildCharRefList(coverCharacterPhotos, storyData.characters),
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
           VISUAL_BIBLE: visualBiblePrompt
         });
       }
@@ -5036,95 +5011,6 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     let coverImages = { frontCover: null, initialPage: null, backCover: null };
     const coverPrompts = { front: null, initialPage: null, backCover: null };
 
-    // Helper to build character reference list for cover prompts (matching story image format)
-    const buildCharacterReferenceList = (photos, characters = null) => {
-      if (!photos || photos.length === 0) return '';
-
-      // Age-specific gender term based on apparentAge (same as story images)
-      const getGenderTerm = (gender, apparentAge) => {
-        if (!gender || gender === 'other') return '';
-        const isMale = gender === 'male';
-        switch (apparentAge) {
-          case 'infant':
-            return isMale ? 'baby boy' : 'baby girl';
-          case 'toddler':
-          case 'preschooler':
-          case 'kindergartner':
-            return isMale ? 'little boy' : 'little girl';
-          case 'young-school-age':
-          case 'school-age':
-            return isMale ? 'boy' : 'girl';
-          case 'preteen':
-          case 'young-teen':
-          case 'teenager':
-            return isMale ? 'teenage boy' : 'teenage girl';
-          case 'young-adult':
-            return isMale ? 'young man' : 'young woman';
-          case 'adult':
-          case 'middle-aged':
-            return isMale ? 'man' : 'woman';
-          case 'senior':
-          case 'elderly':
-            return isMale ? 'elderly man' : 'elderly woman';
-          default:
-            return isMale ? 'boy/man' : 'girl/woman';
-        }
-      };
-
-      const charDescriptions = photos.map((photo, index) => {
-        // Find the original character to get full physical description
-        const char = characters?.find(c => c.name === photo.name);
-
-        // Visual age first (how old they look), then actual age - matching story images format
-        const effectiveAgeCategory = char?.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
-        const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
-        const age = char?.age ? `${char.age} years old` : '';
-        const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
-
-        // Include physical traits with labels (matching story images format)
-        const physical = char?.physical;
-
-        // Build hair description from separate fields or legacy field
-        let hairDesc = '';
-        if (physical?.hairColor || physical?.hairLength || physical?.hairStyle) {
-          const hairParts = [];
-          if (physical?.hairLength) hairParts.push(physical.hairLength);
-          if (physical?.hairColor) hairParts.push(physical.hairColor);
-          if (physical?.hairStyle) hairParts.push(physical.hairStyle);
-          hairDesc = `Hair: ${hairParts.join(', ')}`;
-        } else if (physical?.hair) {
-          hairDesc = `Hair: ${physical.hair}`;
-        }
-
-        const physicalParts = [
-          physical?.build ? `Build: ${physical.build}` : '',
-          physical?.face ? `Face: ${physical.face}` : '',
-          physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
-          hairDesc,
-          physical?.other ? `Other: ${physical.other}` : '',
-          // Include clothing description from avatar if available
-          photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
-        ].filter(Boolean);
-        const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-        const brief = [photo.name, visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
-        return `${index + 1}. ${brief}`;
-      });
-      let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
-
-      // Add relative height description if characters data is available
-      if (characters && characters.length >= 2) {
-        // Filter to only characters in this scene (matching photo names)
-        const sceneCharacters = characters.filter(c => photos.some(p => p.name === c.name));
-        const heightDescription = buildRelativeHeightDescription(sceneCharacters);
-        if (heightDescription) {
-          result += `\n${heightDescription}\n`;
-          log.debug(`📏 [COVER] Added relative heights: ${heightDescription}`);
-        }
-      }
-
-      return result;
-    };
-
     // Helper function to generate cover image during streaming
     const generateCoverImageDuringStream = async (coverType, sceneDescription, rawBlock = null, extractedTitle = null) => {
       if (skipImages) return null;
@@ -6281,95 +6167,6 @@ async function processStoryJob(jobId) {
 
       // Build visual bible prompt for covers
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
-
-      // Helper to build character reference list for cover prompts (matching story image format)
-      const buildCharacterReferenceList = (photos, characters = null) => {
-        if (!photos || photos.length === 0) return '';
-
-        // Age-specific gender term based on apparentAge (same as story images)
-        const getGenderTerm = (gender, apparentAge) => {
-          if (!gender || gender === 'other') return '';
-          const isMale = gender === 'male';
-          switch (apparentAge) {
-            case 'infant':
-              return isMale ? 'baby boy' : 'baby girl';
-            case 'toddler':
-            case 'preschooler':
-            case 'kindergartner':
-              return isMale ? 'little boy' : 'little girl';
-            case 'young-school-age':
-            case 'school-age':
-              return isMale ? 'boy' : 'girl';
-            case 'preteen':
-            case 'young-teen':
-            case 'teenager':
-              return isMale ? 'teenage boy' : 'teenage girl';
-            case 'young-adult':
-              return isMale ? 'young man' : 'young woman';
-            case 'adult':
-            case 'middle-aged':
-              return isMale ? 'man' : 'woman';
-            case 'senior':
-            case 'elderly':
-              return isMale ? 'elderly man' : 'elderly woman';
-            default:
-              return isMale ? 'boy/man' : 'girl/woman';
-          }
-        };
-
-        const charDescriptions = photos.map((photo, index) => {
-          // Find the original character to get full physical description
-          const char = characters?.find(c => c.name === photo.name);
-
-          // Visual age first (how old they look), then actual age - matching story images format
-          const effectiveAgeCategory = char?.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
-          const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
-          const age = char?.age ? `${char.age} years old` : '';
-          const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
-
-          // Include physical traits with labels (matching story images format)
-          const physical = char?.physical;
-
-          // Build hair description from separate fields or legacy field
-          let hairDesc = '';
-          if (physical?.hairColor || physical?.hairLength || physical?.hairStyle) {
-            const hairParts = [];
-            if (physical?.hairLength) hairParts.push(physical.hairLength);
-            if (physical?.hairColor) hairParts.push(physical.hairColor);
-            if (physical?.hairStyle) hairParts.push(physical.hairStyle);
-            hairDesc = `Hair: ${hairParts.join(', ')}`;
-          } else if (physical?.hair) {
-            hairDesc = `Hair: ${physical.hair}`;
-          }
-
-          const physicalParts = [
-            physical?.build ? `Build: ${physical.build}` : '',
-            physical?.face ? `Face: ${physical.face}` : '',
-            physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
-            hairDesc,
-            physical?.other ? `Other: ${physical.other}` : '',
-            // Include clothing description from avatar if available
-            photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
-          ].filter(Boolean);
-          const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-          const brief = [photo.name, visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
-          return `${index + 1}. ${brief}`;
-        });
-        let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
-
-        // Add relative height description if characters data is available
-        if (characters && characters.length >= 2) {
-          // Filter to only characters in this scene (matching photo names)
-          const sceneCharacters = characters.filter(c => photos.some(p => p.name === c.name));
-          const heightDescription = buildRelativeHeightDescription(sceneCharacters);
-          if (heightDescription) {
-            result += `\n${heightDescription}\n`;
-            log.debug(`📏 [COVER] Added relative heights: ${heightDescription}`);
-          }
-        }
-
-        return result;
-      };
 
       // Prepare all cover generation promises
       // Front cover

@@ -413,6 +413,11 @@ export function StoryDisplay({
   const maxViewablePage = getMaxViewablePage();
   const totalProgressivePages = progressiveData?.totalPages || storyPages.length;
 
+  // Debug: Log progressive state
+  if (progressiveMode && maxViewablePage !== totalProgressivePages) {
+    console.log(`[PROGRESSIVE] maxViewable=${maxViewablePage}, total=${totalProgressivePages}, completedImages=${Object.keys(completedPageImages).length}, isGenerating=${isGenerating}`);
+  }
+
   // Helper to get cover image data (handles both string and object formats)
   const getCoverImageData = (img: string | CoverImageData | null | undefined): string | null => {
     if (!img) return null;
@@ -2101,7 +2106,8 @@ export function StoryDisplay({
           })}
 
           {/* Progressive mode: Show loading indicator for remaining pages */}
-          {progressiveMode && maxViewablePage < totalProgressivePages && (
+          {/* Hide when all expected images are received, even if job isn't complete yet */}
+          {progressiveMode && maxViewablePage < totalProgressivePages && Object.keys(completedPageImages).length < totalProgressivePages && (
             <div className="p-6 text-center">
               <div className="inline-flex flex-col items-center bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 shadow-sm">
                 <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
