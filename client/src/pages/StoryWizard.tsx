@@ -961,27 +961,13 @@ export default function StoryWizard() {
       if (result.success && result.avatars) {
         // Update local state with new avatars (explicitly clear stale flag)
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
+
+        // Update state only - DO NOT save here
+        // The user will click Save which triggers saveCharacter() with the updated state
         setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
         setCharacters(prev => prev.map(c =>
           c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
         ));
-
-        // Save the updated avatars to storage
-        // IMPORTANT: Use local state (currentCharacter has user's edits), not API data which may be stale
-        const updatedCharactersForSave = characters.map(c =>
-          c.id === currentCharacter.id
-            ? { ...currentCharacter, avatars: freshAvatars }  // Use currentCharacter to preserve unsaved edits
-            : c
-        );
-        await characterService.saveCharacterData({
-          characters: updatedCharactersForSave,
-          relationships,
-          relationshipTexts,
-          customRelationships,
-          customStrengths: [],
-          customWeaknesses: [],
-          customFears: [],
-        });
 
         log.success(`✅ Avatars WITH TRAITS regenerated for ${currentCharacter.name}`);
       } else {
@@ -1047,11 +1033,32 @@ export default function StoryWizard() {
 
     setIsLoading(true);
     try {
+      // Get the LATEST currentCharacter from state to avoid stale closure issues
+      const latestCurrentChar = await new Promise<Character | null>(resolve => {
+        setCurrentCharacter(prev => {
+          resolve(prev);
+          return prev; // Don't modify, just read
+        });
+      });
+
+      if (!latestCurrentChar) {
+        log.warn('No current character to save');
+        return;
+      }
+
+      // Get the LATEST characters array from state
+      const latestCharacters = await new Promise<Character[]>(resolve => {
+        setCharacters(prev => {
+          resolve(prev);
+          return prev; // Don't modify, just read
+        });
+      });
+
       // Check if this is an edit (existing character) or new character
-      const isEdit = currentCharacter.id && characters.find(c => c.id === currentCharacter.id);
+      const isEdit = latestCurrentChar.id && latestCharacters.find(c => c.id === latestCurrentChar.id);
       const updatedCharacters = isEdit
-        ? characters.map(c => c.id === currentCharacter.id ? currentCharacter : c)
-        : [...characters, currentCharacter];
+        ? latestCharacters.map(c => c.id === latestCurrentChar.id ? latestCurrentChar : c)
+        : [...latestCharacters, latestCurrentChar];
 
       log.info('Saving characters with relationships:', updatedCharacters.length);
       // Save characters along with relationships
