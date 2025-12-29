@@ -1,0 +1,113 @@
+import { useState, useEffect, useRef } from 'react';
+import { createLogger } from '@/services/logger';
+
+const log = createLogger('ImageLoad');
+
+interface DiagnosticImageProps {
+  src: string;
+  alt: string;
+  className?: string;
+  label?: string; // For identifying which image in logs
+}
+
+/**
+ * Image component with diagnostic logging for load times
+ * Helps debug slow image loading on mobile devices
+ */
+export function DiagnosticImage({ src, alt, className, label }: DiagnosticImageProps) {
+  const [_isLoading, setIsLoading] = useState(true);
+  const [_loadTime, setLoadTime] = useState<number | null>(null);
+  const startTimeRef = useRef<number>(Date.now());
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    // Reset timing when src changes
+    startTimeRef.current = Date.now();
+    setIsLoading(true);
+    setLoadTime(null);
+
+    // Log image info
+    const isBase64 = src?.startsWith('data:');
+    const sizeKB = isBase64 ? Math.round((src.length * 3) / 4 / 1024) : 'URL';
+
+    log.info(`⏳ Loading ${label || alt}`, {
+      isBase64,
+      sizeKB: isBase64 ? `${sizeKB}KB` : 'external URL',
+      srcPreview: src?.substring(0, 50) + '...',
+    });
+  }, [src, alt, label]);
+
+  const handleLoad = () => {
+    const elapsed = Date.now() - startTimeRef.current;
+    setIsLoading(false);
+    setLoadTime(elapsed);
+
+    const isBase64 = src?.startsWith('data:');
+    const sizeKB = isBase64 ? Math.round((src.length * 3) / 4 / 1024) : null;
+    const naturalSize = imgRef.current
+      ? `${imgRef.current.naturalWidth}x${imgRef.current.naturalHeight}`
+      : 'unknown';
+
+    // Log with color based on load time
+    if (elapsed < 100) {
+      log.success(`✅ Loaded ${label || alt} in ${elapsed}ms`, { sizeKB, naturalSize });
+    } else if (elapsed < 500) {
+      log.info(`✅ Loaded ${label || alt} in ${elapsed}ms`, { sizeKB, naturalSize });
+    } else if (elapsed < 2000) {
+      log.warn(`⚠️ Slow load: ${label || alt} took ${elapsed}ms`, { sizeKB, naturalSize });
+    } else {
+      log.error(`🐢 Very slow: ${label || alt} took ${elapsed}ms`, { sizeKB, naturalSize });
+    }
+
+    // Log to server for remote debugging (only for slow loads > 1s)
+    if (elapsed > 1000) {
+      logToServer({
+        type: 'slow_image_load',
+        label: label || alt,
+        loadTimeMs: elapsed,
+        sizeKB,
+        naturalSize,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  };
+
+  const handleError = () => {
+    const elapsed = Date.now() - startTimeRef.current;
+    setIsLoading(false);
+    log.error(`❌ Failed to load ${label || alt} after ${elapsed}ms`);
+  };
+
+  return (
+    <img
+      ref={imgRef}
+      src={src}
+      alt={alt}
+      className={className}
+      onLoad={handleLoad}
+      onError={handleError}
+    />
+  );
+}
+
+// Log slow loads to server for remote debugging
+async function logToServer(data: Record<string, unknown>) {
+  try {
+    await fetch('/api/log-error', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        errorType: 'Performance',
+        message: `Slow image load: ${data.label} took ${data.loadTimeMs}ms`,
+        userAgent: data.userAgent,
+        timestamp: data.timestamp,
+        url: window.location.href,
+      }),
+    });
+  } catch {
+    // Ignore logging errors
+  }
+}
+
+export default DiagnosticImage;

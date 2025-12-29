@@ -18,7 +18,7 @@ import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible } from '@/types/character';
-import type { LanguageLevel, SceneDescription, SceneImage, Language, CoverImages } from '@/types/story';
+import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
@@ -127,11 +127,11 @@ export default function StoryWizard() {
     }
   });
   // Story language (de-ch is default, de-de only selectable here)
-  const [storyLanguage, setStoryLanguage] = useState<'de-ch' | 'de-de' | 'fr' | 'en'>(() => {
+  const [storyLanguage, setStoryLanguage] = useState<StoryLanguageCode>(() => {
     try {
       const saved = localStorage.getItem('story_language');
       if (saved && ['de-ch', 'de-de', 'fr', 'en'].includes(saved)) {
-        return saved as 'de-ch' | 'de-de' | 'fr' | 'en';
+        return saved as StoryLanguageCode;
       }
       return 'de-ch'; // Default to Swiss German
     } catch {
@@ -671,7 +671,7 @@ export default function StoryWizard() {
       const charKey = characters.map(c => c.id).sort().join('-');
 
       if (!relationshipsInitialized.current || relationshipsInitialized.current !== charKey) {
-        const lang = language as Language;
+        const lang = language as UILanguage;
         const notKnown = getNotKnownRelationship(lang);
         log.debug('Initializing relationships for step 3', { charKey, existingCount: Object.keys(relationships).length });
 
@@ -1052,7 +1052,7 @@ export default function StoryWizard() {
 
   // Relationship handlers - set both forward and inverse relationships
   const updateRelationship = (char1Id: number, char2Id: number, value: string) => {
-    const lang = language as Language;
+    const lang = language as UILanguage;
     const inverse = findInverseRelationship(value, lang);
     const forwardKey = `${char1Id}-${char2Id}`;
     const inverseKey = `${char2Id}-${char1Id}`;

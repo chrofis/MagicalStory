@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, Language, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, ImageVersion } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, ImageVersion } from '@/types/story';
 
 interface StoryDraft {
   storyType: string;
@@ -18,7 +18,7 @@ interface StoryDraft {
   languageLevel: LanguageLevel;
   mainCharacters: number[];
   dedication: string;
-  language: Language;
+  language: StoryLanguageCode;
 }
 
 interface StoryListItemServer {
@@ -27,7 +27,7 @@ interface StoryListItemServer {
   createdAt: string;
   updatedAt?: string;
   pages: number;
-  language: Language;
+  language: StoryLanguageCode;
   characters?: { name: string; id: number }[];
   pageCount?: number;
   hasThumbnail?: boolean; // Changed from thumbnail to hasThumbnail
@@ -51,7 +51,7 @@ export interface StoryListItem {
   title: string;
   story_type: string;
   art_style: string;
-  language: Language;
+  language: StoryLanguageCode;
   pages: number;
   created_at: string;
   hasThumbnail?: boolean; // Changed from thumbnail
@@ -66,7 +66,7 @@ interface StoryDetailsServer {
   title: string;
   storyType: string;
   artStyle: string;
-  language: Language;
+  language: StoryLanguageCode;
   languageLevel: LanguageLevel;
   pages: number;
   dedication?: string;
@@ -404,7 +404,7 @@ export const storyService = {
     title: string;
     storyType: string;
     artStyle: string;
-    language: Language;
+    language: StoryLanguageCode;
     languageLevel: LanguageLevel;
     pages: number;
     dedication?: string;
@@ -651,7 +651,7 @@ export const storyService = {
     storyTopic?: string;
     storyTheme?: string;
     customThemeText?: string;
-    language: 'en' | 'de' | 'fr';
+    language: StoryLanguageCode;
     languageLevel: LanguageLevel;
     characters: Array<{
       name: string;
@@ -681,7 +681,7 @@ export const storyService = {
     storyTheme?: string;
     customThemeText?: string;
     artStyle: string;
-    language: Language;
+    language: StoryLanguageCode;
     languageLevel: LanguageLevel;
     pages: number;
     dedication?: string;

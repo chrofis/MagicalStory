@@ -1,6 +1,12 @@
 import type { Character, RelationshipMap, RelationshipTextMap, LocalizedString, VisualBible } from './character';
 
-export type Language = 'en' | 'de' | 'de-ch' | 'de-de' | 'fr';
+// UI Language - matches LocalizedString keys (used for UI translations)
+export type UILanguage = 'en' | 'de' | 'fr';
+// Legacy alias for backwards compatibility
+export type Language = UILanguage;
+
+// Story Language - used for AI story generation (supports regional variants)
+export type StoryLanguageCode = 'en' | 'de' | 'de-ch' | 'de-de' | 'fr';
 export type LanguageLevel = '1st-grade' | 'standard' | 'advanced';
 
 export type AdventureThemeGroupId = 'historical' | 'fantasy' | 'locations' | 'professions' | 'seasonal' | 'custom';
@@ -202,7 +208,7 @@ export interface SavedStory {
   storyTopic?: string;  // Life challenge or educational topic ID
   storyTheme?: string;  // Adventure theme wrapper (or 'realistic' for no wrapper)
   artStyle: string;
-  language: Language;
+  language: StoryLanguageCode;
   languageLevel: LanguageLevel;
   pages: number;
   dedication?: string;

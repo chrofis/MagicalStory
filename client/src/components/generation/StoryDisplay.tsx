@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
@@ -1103,10 +1104,11 @@ export function StoryDisplay({
             <p className="text-sm text-gray-500 text-center mb-2">
               {language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover'}
             </p>
-            <img
+            <DiagnosticImage
               src={getCoverImageData(coverImages.frontCover)!}
               alt="Front Cover"
               className="w-full rounded-lg shadow-lg"
+              label="Front Cover"
             />
             {/* Regenerate Cover - visible to all users */}
             {_onRegenerateCover && (
@@ -1226,10 +1228,11 @@ export function StoryDisplay({
             <p className="text-sm text-gray-500 text-center mb-2">
               {language === 'de' ? 'Widmungsseite' : language === 'fr' ? 'Page de dédicace' : 'Dedication Page'}
             </p>
-            <img
+            <DiagnosticImage
               src={getCoverImageData(coverImages.initialPage)!}
               alt="Dedication Page"
               className="w-full rounded-lg shadow-lg"
+              label="Dedication Page"
             />
             {/* Regenerate Cover - visible to all users */}
             {_onRegenerateCover && (
@@ -1401,10 +1404,11 @@ export function StoryDisplay({
                       </div>
                     ) : (image?.imageData || progressiveImageData) ? (
                       <div className="w-full mb-4">
-                        <img
-                          src={image?.imageData || progressiveImageData}
+                        <DiagnosticImage
+                          src={(image?.imageData || progressiveImageData) ?? ''}
                           alt={`Scene for page ${pageNumber}`}
                           className="w-full rounded-lg shadow-md object-cover"
+                          label={`Page ${pageNumber}`}
                         />
                         {/* Image action buttons - shown to all users */}
                         {onRegenerateImage && (
@@ -2073,10 +2077,11 @@ export function StoryDisplay({
             <p className="text-sm text-gray-500 text-center mb-2">
               {language === 'de' ? 'Rückseite' : language === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
             </p>
-            <img
+            <DiagnosticImage
               src={getCoverImageData(coverImages.backCover)!}
               alt="Back Cover"
               className="w-full rounded-lg shadow-lg"
+              label="Back Cover"
             />
             {/* Regenerate Cover - visible to all users */}
             {_onRegenerateCover && (

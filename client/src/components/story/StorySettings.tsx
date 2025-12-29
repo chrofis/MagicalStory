@@ -7,15 +7,15 @@ import { ArtStyleSelector } from './ArtStyleSelector';
 import { storyCategories, storyTypes, lifeChallenges, educationalTopics } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
-import type { LanguageLevel, Language } from '@/types/story';
+import type { LanguageLevel, StoryLanguageCode, UILanguage } from '@/types/story';
 
 // Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
 export type CharacterRole = 'out' | 'in' | 'main';
 
-// Story language options (de-de only available here)
-export type StoryLanguage = 'de-ch' | 'de-de' | 'fr' | 'en';
+// Re-export for backwards compatibility
+export type StoryLanguage = StoryLanguageCode;
 
-export const STORY_LANGUAGES: { code: StoryLanguage; name: string; flag: string }[] = [
+export const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
   { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
   { code: 'de-de', name: 'Deutsch (Deutschland)', flag: '🇩🇪' },
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
@@ -27,8 +27,8 @@ interface StorySettingsProps {
   mainCharacters: number[];
   excludedCharacters: number[];
   onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
-  storyLanguage: StoryLanguage;
-  onStoryLanguageChange: (lang: StoryLanguage) => void;
+  storyLanguage: StoryLanguageCode;
+  onStoryLanguageChange: (lang: StoryLanguageCode) => void;
   languageLevel: LanguageLevel;
   onLanguageLevelChange: (level: LanguageLevel) => void;
   pages: number;
@@ -89,7 +89,7 @@ export function StorySettings({
   onLegacyStoryTypeChange,
 }: StorySettingsProps) {
   const { t, language } = useLanguage();
-  const lang = language as Language;
+  const lang = language as UILanguage;
 
   // Modal state for editing story type settings
   const [isEditSettingsOpen, setIsEditSettingsOpen] = useState(false);
