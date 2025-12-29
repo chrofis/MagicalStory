@@ -2083,7 +2083,7 @@ export function StoryDisplay({
                         <textarea
                           value={pageText.trim()}
                           onChange={(e) => handlePageTextChange(index, e.target.value)}
-                          className="w-full min-h-[200px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
+                          className="w-full min-h-[400px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
                           placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
                         />
                       ) : (
