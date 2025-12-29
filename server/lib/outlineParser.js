@@ -632,9 +632,10 @@ function extractCharacterNamesFromScene(sceneDescription) {
     // - "**Name:**" (bold + colon, no bullet)
     // - "1. **Name:**" (numbered)
     const namePatterns = [
-      // Bullet or number + bold name with optional colon
-      /^[\s\-\*\u2022]*(?:\d+\.\s*)?\*\*([^*:]+?)\*\*\s*:?/gm,
-      // Bold name at start of line
+      // Bullet (single *, -, •) + space + bold name with optional colon
+      // Note: Use [\s]* for whitespace only, then optional single bullet, to avoid consuming **
+      /^[\t ]*(?:[\-\*\u2022]\s*)?(?:\d+\.\s*)?\*\*([^*:]+?)\*\*\s*:?/gm,
+      // Bold name at start of line (no bullet)
       /^\s*\*\*([^*:]+?)\*\*\s*:?/gm,
     ];
 
@@ -658,7 +659,39 @@ function extractCharacterNamesFromScene(sceneDescription) {
     }
   }
 
-  // Step 3: Fallback - look for character headers anywhere in the scene
+  // Step 3: Fallback - look for "Main characters:" in Image Summary
+  // Format: "Main characters: Name1, Name2, Name3."
+  const mainCharsMatch = sceneDescription.match(/Main characters?:\s*([^.]+)/i);
+  if (mainCharsMatch && mainCharsMatch[1]) {
+    const names = mainCharsMatch[1].split(/[,&]/).map(n => n.trim().toLowerCase()).filter(n => n.length >= 2);
+    for (const name of names) {
+      if (!characterNames.includes(name)) {
+        characterNames.push(name);
+      }
+    }
+    if (characterNames.length > 0) {
+      log.debug(`[SCENE-PARSER] Found ${characterNames.length} characters from "Main characters:": ${characterNames.join(', ')}`);
+      return characterNames;
+    }
+  }
+
+  // Step 4: Fallback - look for character headers in Composition section
+  // Format: "* Name:" followed by ACTION/POSITION/EXPRESSION (not bold)
+  const compositionPattern = /[\s\-\*\u2022]+([A-Z][a-zäöü]+)\s*:\s*\n[\s\-]+(?:ACTION|POSITION|EXPRESSION)/gi;
+  let compMatch;
+  while ((compMatch = compositionPattern.exec(sceneDescription)) !== null) {
+    const name = compMatch[1].trim().toLowerCase();
+    // Skip common non-character words
+    if (name.length >= 2 && !characterNames.includes(name) && !['action', 'position', 'expression', 'orientation', 'pose'].includes(name)) {
+      characterNames.push(name);
+    }
+  }
+  if (characterNames.length > 0) {
+    log.debug(`[SCENE-PARSER] Found ${characterNames.length} characters from Composition section: ${characterNames.join(', ')}`);
+    return characterNames;
+  }
+
+  // Step 5: Fallback - look for character headers anywhere in the scene (bold format)
   // This handles scenes without a dedicated Characters section
   log.debug(`[SCENE-PARSER] No Characters section found, using fallback pattern matching`);
 

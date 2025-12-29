@@ -1019,7 +1019,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 /**
  * Build image generation prompt
  */
-function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null, isStorybook = false) {
+function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null, isStorybook = false, referencePhotos = null) {
   // Build image generation prompt (matches step-by-step format)
   // For storybook mode: visualBible entries are added here since there's no separate scene description step
   // For parallel/sequential modes: Visual Bible is also in scene description, but adding here ensures consistency
@@ -1032,6 +1032,17 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   if (sceneCharacters && sceneCharacters.length > 0) {
     log.debug(`[IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
 
+    // Build a map of character names to their clothing descriptions from referencePhotos
+    const clothingMap = {};
+    if (referencePhotos && referencePhotos.length > 0) {
+      referencePhotos.forEach(photo => {
+        if (photo.name && photo.clothingDescription) {
+          clothingMap[photo.name.toLowerCase()] = photo.clothingDescription;
+          log.debug(`[IMAGE PROMPT] ${photo.name} wearing: "${photo.clothingDescription}" (${photo.clothingCategory})`);
+        }
+      });
+    }
+
     // Build a numbered list of characters with full physical descriptions INCLUDING CLOTHING
     const charDescriptions = sceneCharacters.map((char, index) => {
       const age = char.age ? `${char.age} years old` : '';
@@ -1041,17 +1052,21 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       // Get clothing STYLE from character analysis - colors AND patterns
       // Avatar determines the garment type (coat, hoodie, t-shirt), we need colors + patterns to match
       const clothingStyle = char.clothingStyle || char.clothing_style || char.clothing?.style || char.clothingColors || char.clothing_colors || char.clothing?.colors;
+      // Get clothing DESCRIPTION from avatar eval (what they're actually wearing in the selected avatar)
+      const avatarClothing = clothingMap[char.name?.toLowerCase()] || null;
       if (clothingStyle) {
         log.debug(`[IMAGE PROMPT] ${char.name} clothing style: "${clothingStyle}"`);
-      } else {
-        log.debug(`[IMAGE PROMPT] ${char.name} has no clothing style info`);
+      }
+      if (avatarClothing) {
+        log.debug(`[IMAGE PROMPT] ${char.name} avatar clothing: "${avatarClothing}"`);
       }
       const physicalParts = [
         physical?.build ? `Build: ${physical.build}` : '',
         physical?.face ? `Face: ${physical.face}` : '',
         physical?.hair ? `Hair: ${physical.hair}` : '',
         physical?.other ? `Other: ${physical.other}` : '',
-        clothingStyle ? `CLOTHING STYLE (MUST MATCH - colors and patterns): ${clothingStyle}` : ''
+        // Prefer avatar clothing description if available, otherwise use clothing style
+        avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `CLOTHING STYLE (MUST MATCH - colors and patterns): ${clothingStyle}` : '')
       ].filter(Boolean);
       const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
       const brief = [char.name, age, gender, physicalDesc].filter(Boolean).join(', ');

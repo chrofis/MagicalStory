@@ -1722,7 +1722,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     // Build image prompt with scene-specific characters and visual bible
     // Use isStorybook=true to include Visual Bible section in prompt
     // Note: We don't build originalPrompt separately to avoid duplicate logging - originalDescription is stored for comparison
-    const imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true);
+    const imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
 
     // Log prompt changes for debugging
     if (sceneWasEdited) {
@@ -4941,7 +4941,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           log.debug(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} characters)...`);
         }
 
-        const imagePrompt = buildImagePrompt(sceneDesc, inputData, sceneCharacters, false, vBible, pageNum, true); // isStorybook = true
+        const imagePrompt = buildImagePrompt(sceneDesc, inputData, sceneCharacters, false, vBible, pageNum, true, referencePhotos); // isStorybook = true
         imagePrompts[pageNum] = imagePrompt;
 
         let imageResult = null;
@@ -5474,7 +5474,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           }
 
           // Build image prompt with only scene-specific characters and visual bible
-          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters, isSequential, vBible, pageNum, true); // isStorybook = true
+          const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters, isSequential, vBible, pageNum, true, referencePhotos); // isStorybook = true
           imagePrompts[pageNum] = imagePrompt;
 
           // Usage tracker for page images
@@ -6547,7 +6547,7 @@ Output Format:
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingCategory})...`);
 
             // Generate image
-            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum);
+            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum, false, referencePhotos);
             imagePrompts[pageNum] = imagePrompt;
 
             let imageResult = null;
@@ -6983,7 +6983,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
 
             // Generate image from scene description with scene-specific characters and visual bible
-            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, true, visualBible, pageNum);
+            const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, true, visualBible, pageNum, false, referencePhotos);
             imagePrompts[pageNum] = imagePrompt;
 
             let imageResult = null;
