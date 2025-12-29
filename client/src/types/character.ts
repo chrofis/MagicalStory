@@ -51,6 +51,7 @@ export interface CharacterAvatars {
   status?: 'pending' | 'generating' | 'complete' | 'failed';
   stale?: boolean; // True when avatars were generated from a previous photo
   faceMatch?: Record<ClothingCategory, FaceMatchResult>; // Face match evaluation results (dev mode only)
+  prompts?: Record<ClothingCategory, string>; // Actual prompts used for generation (dev mode only)
 }
 
 // Clothing information

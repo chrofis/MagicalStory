@@ -5,7 +5,6 @@ import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import type { Character, PhysicalTraits } from '@/types/character';
-import { api } from '@/services/api';
 
 // Cooldown logic for avatar regeneration
 // First 2: no delay, next 2: 30s, next 2: 1min, next 2: 2min, etc.
@@ -62,64 +61,6 @@ function recordAvatarRegeneration(characterId: number) {
   }
 
   localStorage.setItem(key, JSON.stringify({ attempts, lastAttempt: now }));
-}
-
-// Component to fetch and display avatar prompt from server (always shows with traits)
-function AvatarPromptDisplay({ category, gender, physical, clothingStyle }: {
-  category: string;
-  gender: string | undefined;
-  physical?: PhysicalTraits;
-  clothingStyle?: string;
-}) {
-  const [prompt, setPrompt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Debounce API calls to avoid flooding server while typing
-    const timeoutId = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Always fetch with traits (that's the default generation mode now)
-        let url = `/api/avatar-prompt?category=${category}&gender=${gender || 'male'}&withTraits=true`;
-        if (physical) {
-          if (physical.build) url += `&build=${encodeURIComponent(physical.build)}`;
-          if (physical.hair) url += `&hair=${encodeURIComponent(physical.hair)}`;
-          if (physical.face) url += `&face=${encodeURIComponent(physical.face)}`;
-          if (physical.other) url += `&other=${encodeURIComponent(physical.other)}`;
-          if (physical.height) url += `&height=${encodeURIComponent(physical.height)}`;
-        }
-        if (clothingStyle) url += `&clothingStyle=${encodeURIComponent(clothingStyle)}`;
-        const response = await api.get<{ success: boolean; prompt: string }>(url);
-        if (response.success) {
-          setPrompt(response.prompt);
-        } else {
-          setError('Failed to load prompt');
-        }
-      } catch (err) {
-        setError(String(err));
-      } finally {
-        setLoading(false);
-      }
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [category, gender, physical, clothingStyle]);
-
-  return (
-    <div>
-      {loading ? (
-        <div className="text-[9px] text-gray-400">Loading...</div>
-      ) : error ? (
-        <div className="text-[9px] text-red-400">{error}</div>
-      ) : (
-        <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
-          {prompt}
-        </pre>
-      )}
-    </div>
-  );
 }
 
 // Simple inline editable field - click to edit, blur/enter to save
@@ -621,10 +562,14 @@ export function CharacterForm({
                 )}
                 {developerMode && (
                   <>
-                    <details className="mt-1 text-left">
-                      <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
-                      <AvatarPromptDisplay category={category} gender={character.gender} physical={character.physical} clothingStyle={character.clothing?.style} />
-                    </details>
+                    {character.avatars?.prompts?.[category] && (
+                      <details className="mt-1 text-left">
+                        <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
+                        <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
+                          {character.avatars.prompts[category]}
+                        </pre>
+                      </details>
+                    )}
                     {character.avatars?.faceMatch?.[category] && (
                       <details className="mt-1 text-left">
                         <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">

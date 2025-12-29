@@ -93,6 +93,9 @@ export default function StoryWizard() {
   const [storyTheme, setStoryTheme] = useState(() => {
     return localStorage.getItem('story_theme') || '';
   });
+  const [customThemeText, setCustomThemeText] = useState(() => {
+    return localStorage.getItem('story_custom_theme_text') || '';
+  });
   const [artStyle, setArtStyle] = useState(() => {
     return localStorage.getItem('story_art_style') || 'pixar';
   });
@@ -610,6 +613,14 @@ export default function StoryWizard() {
       localStorage.removeItem('story_theme');
     }
   }, [storyTheme]);
+
+  useEffect(() => {
+    if (customThemeText) {
+      localStorage.setItem('story_custom_theme_text', customThemeText);
+    } else {
+      localStorage.removeItem('story_custom_theme_text');
+    }
+  }, [customThemeText]);
 
   // Clear story details (plot) when story category, topic, or theme changes
   // This prevents stale plot from being used with a new category/topic selection
@@ -1592,9 +1603,11 @@ export default function StoryWizard() {
               storyCategory={storyCategory}
               storyTopic={storyTopic}
               storyTheme={storyTheme}
+              customThemeText={customThemeText}
               onCategoryChange={(cat) => setStoryCategory(cat)}
               onTopicChange={setStoryTopic}
               onThemeChange={setStoryTheme}
+              onCustomThemeTextChange={setCustomThemeText}
               onLegacyStoryTypeChange={setStoryType}
             />
             {isStorySelectionComplete && (

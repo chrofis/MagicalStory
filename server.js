@@ -3889,7 +3889,8 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
     const results = {
       status: 'generating',
       generatedAt: null,
-      faceMatch: {}
+      faceMatch: {},
+      prompts: {}
     };
 
     // Generate avatars sequentially to avoid rate limits
@@ -3909,6 +3910,9 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
           avatarPrompt += physicalTraitsSection;
         }
         log.debug(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStyle.substring(0, 50)}..."`);
+
+        // Store the prompt for this category (so client can display it)
+        results.prompts[category] = avatarPrompt;
 
         // Prepare the request with reference photo
         const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');

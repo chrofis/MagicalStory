@@ -21,10 +21,12 @@ interface StoryCategorySelectorProps {
   storyCategory: 'adventure' | 'life-challenge' | 'educational' | '';
   storyTopic: string;  // Life challenge or educational topic ID
   storyTheme: string;  // Adventure theme (or 'realistic')
+  customThemeText?: string;  // Custom theme description when theme is 'custom'
   // Callbacks
   onCategoryChange: (category: 'adventure' | 'life-challenge' | 'educational') => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
+  onCustomThemeTextChange?: (text: string) => void;
   // For backwards compatibility - sets the legacy storyType
   onLegacyStoryTypeChange: (storyType: string) => void;
 }
@@ -33,9 +35,11 @@ export function StoryCategorySelector({
   storyCategory,
   storyTopic,
   storyTheme,
+  customThemeText = '',
   onCategoryChange,
   onTopicChange,
   onThemeChange,
+  onCustomThemeTextChange,
   onLegacyStoryTypeChange,
 }: StoryCategorySelectorProps) {
   const { language } = useLanguage();
@@ -59,6 +63,8 @@ export function StoryCategorySelector({
       selectedTopic: 'Topic',
       selectedTheme: 'Theme',
       change: 'Change',
+      customThemePlaceholder: 'Describe your adventure theme...',
+      customThemeLabel: 'Your custom theme:',
     },
     de: {
       chooseStoryType: 'Welche Art von Geschichte?',
@@ -71,6 +77,8 @@ export function StoryCategorySelector({
       selectedTopic: 'Thema',
       selectedTheme: 'Setting',
       change: 'Ändern',
+      customThemePlaceholder: 'Beschreibe dein Abenteuer-Thema...',
+      customThemeLabel: 'Dein eigenes Thema:',
     },
     fr: {
       chooseStoryType: 'Quel type d\'histoire?',
@@ -83,6 +91,8 @@ export function StoryCategorySelector({
       selectedTopic: 'Sujet',
       selectedTheme: 'Thème',
       change: 'Changer',
+      customThemePlaceholder: 'Décrivez votre thème d\'aventure...',
+      customThemeLabel: 'Votre thème personnalisé:',
     },
   };
   const t = translations[lang] || translations.en;
@@ -521,6 +531,20 @@ export function StoryCategorySelector({
             {t.change}
           </button>
         </div>
+
+        {/* Custom theme input - shown when 'custom' is selected */}
+        {storyTheme === 'custom' && (
+          <div className="border-t border-indigo-100 pt-3">
+            <label className="block text-xs text-gray-500 mb-1">{t.customThemeLabel}</label>
+            <input
+              type="text"
+              value={customThemeText}
+              onChange={(e) => onCustomThemeTextChange?.(e.target.value)}
+              placeholder={t.customThemePlaceholder}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
