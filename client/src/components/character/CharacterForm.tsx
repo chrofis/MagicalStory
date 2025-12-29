@@ -37,6 +37,34 @@ const BUILD_OPTIONS: { value: string; label: string; labelDe: string; labelFr: s
   { value: 'heavy', label: 'Heavy', labelDe: 'Kräftig', labelFr: 'Corpulent' },
 ];
 
+// Hair length options (body reference points)
+const HAIR_LENGTH_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  { value: 'buzz cut', label: 'Buzz Cut', labelDe: 'Sehr kurz', labelFr: 'Très court' },
+  { value: 'cropped', label: 'Cropped', labelDe: 'Kurz', labelFr: 'Court' },
+  { value: 'pixie', label: 'Pixie', labelDe: 'Pixie', labelFr: 'Pixie' },
+  { value: 'ear-length', label: 'Ear-Length', labelDe: 'Ohrlang', labelFr: 'Aux oreilles' },
+  { value: 'chin-length', label: 'Chin-Length', labelDe: 'Kinnlang', labelFr: 'Au menton' },
+  { value: 'neck-length', label: 'Neck-Length', labelDe: 'Nackenlang', labelFr: 'Au cou' },
+  { value: 'shoulder-length', label: 'Shoulder-Length', labelDe: 'Schulterlang', labelFr: 'Aux épaules' },
+  { value: 'armpit-length', label: 'Armpit-Length', labelDe: 'Achsellang', labelFr: 'Aux aisselles' },
+  { value: 'mid-back', label: 'Mid-Back', labelDe: 'Rückenmitte', labelFr: 'Mi-dos' },
+  { value: 'waist-length', label: 'Waist-Length', labelDe: 'Hüftlang', labelFr: 'Aux hanches' },
+];
+
+// Hair style options (texture and styling)
+const HAIR_STYLE_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  { value: 'straight', label: 'Straight', labelDe: 'Glatt', labelFr: 'Lisse' },
+  { value: 'wavy', label: 'Wavy', labelDe: 'Wellig', labelFr: 'Ondulé' },
+  { value: 'curly', label: 'Curly', labelDe: 'Lockig', labelFr: 'Bouclé' },
+  { value: 'coily', label: 'Coily', labelDe: 'Kraus', labelFr: 'Crépu' },
+  { value: 'ponytail', label: 'Ponytail', labelDe: 'Pferdeschwanz', labelFr: 'Queue de cheval' },
+  { value: 'braids', label: 'Braids', labelDe: 'Zöpfe', labelFr: 'Tresses' },
+  { value: 'bun', label: 'Bun', labelDe: 'Dutt', labelFr: 'Chignon' },
+  { value: 'pigtails', label: 'Pigtails', labelDe: 'Zöpfchen', labelFr: 'Couettes' },
+  { value: 'loose', label: 'Loose', labelDe: 'Offen', labelFr: 'Lâche' },
+  { value: 'slicked back', label: 'Slicked Back', labelDe: 'Zurückgekämmt', labelFr: 'Plaqué' },
+];
+
 // Simple inline editable field - click to edit, blur/enter to save
 interface InlineEditFieldProps {
   label: string;
@@ -132,24 +160,44 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         isAiExtracted={isAiExtracted}
         isChanged={changedTraits?.hairColor}
       />
-      <InlineEditField
-        label={language === 'de' ? 'Haarlänge' : language === 'fr' ? 'Longueur' : 'Hair Length'}
-        value={character.physical?.hairLength || ''}
-        placeholder={language === 'de' ? 'z.B. schulterlang' : 'e.g. shoulder-length'}
-        onChange={(v) => updatePhysical('hairLength', v)}
-        isAiExtracted={isAiExtracted}
-        isChanged={changedTraits?.hairLength}
-      />
+      <div className="flex items-center gap-2">
+        <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
+          {language === 'de' ? 'Haarlänge' : language === 'fr' ? 'Longueur' : 'Hair Length'}:
+        </span>
+        <select
+          value={character.physical?.hairLength || ''}
+          onChange={(e) => updatePhysical('hairLength', e.target.value)}
+          className={selectClass(changedTraits?.hairLength)}
+        >
+          <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
+          {HAIR_LENGTH_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+            </option>
+          ))}
+        </select>
+        {changedTraits?.hairLength && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+      </div>
 
       {/* Row 3: Hair Style | Build */}
-      <InlineEditField
-        label={language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}
-        value={character.physical?.hairStyle || ''}
-        placeholder={language === 'de' ? 'z.B. lockig' : 'e.g. curly'}
-        onChange={(v) => updatePhysical('hairStyle', v)}
-        isAiExtracted={isAiExtracted}
-        isChanged={changedTraits?.hairStyle}
-      />
+      <div className="flex items-center gap-2">
+        <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
+          {language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}:
+        </span>
+        <select
+          value={character.physical?.hairStyle || ''}
+          onChange={(e) => updatePhysical('hairStyle', e.target.value)}
+          className={selectClass(changedTraits?.hairStyle)}
+        >
+          <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
+          {HAIR_STYLE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+            </option>
+          ))}
+        </select>
+        {changedTraits?.hairStyle && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+      </div>
       <div className="flex items-center gap-2">
         <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
           {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}:
@@ -896,28 +944,23 @@ export function CharacterForm({
           </button>
         )}
         <Button
-          onClick={onSave}
+          onClick={() => {
+            // If no avatars yet and we can generate them, save + generate
+            // Otherwise just save
+            const hasAvatars = !!(character.avatars?.winter || character.avatars?.standard || character.avatars?.summer || character.avatars?.formal);
+            if (!hasAvatars && onSaveAndRegenerateWithTraits) {
+              onSaveAndRegenerateWithTraits();
+            } else {
+              onSave();
+            }
+          }}
           disabled={!canSaveCharacter || isLoading || isRegeneratingAvatarsWithTraits}
-          loading={isLoading && !isRegeneratingAvatarsWithTraits}
+          loading={isLoading || isRegeneratingAvatarsWithTraits}
           icon={Save}
-          className={onCancel ? "flex-1" : (onSaveAndRegenerateWithTraits ? "flex-1" : "w-full")}
+          className={onCancel ? "flex-1" : "w-full"}
         >
           {t.saveCharacter}
         </Button>
-        {onSaveAndRegenerateWithTraits && (
-          <Button
-            onClick={onSaveAndRegenerateWithTraits}
-            disabled={!canSaveCharacter || isLoading || isRegeneratingAvatarsWithTraits}
-            loading={isRegeneratingAvatarsWithTraits}
-            icon={Wand2}
-            variant="primary"
-            className="flex-1"
-          >
-            {language === 'de' ? 'Speichern & Avatar' :
-             language === 'fr' ? 'Enreg. & avatar' :
-             'Save & Avatar'}
-          </Button>
-        )}
       </div>
 
       {!canSaveCharacter && (
