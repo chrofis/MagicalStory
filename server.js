@@ -4848,7 +4848,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const storyTypeName = inputData.storyType || 'adventure';
     const middlePage = Math.ceil(sceneCount / 2);
     const lang = inputData.language || 'en';
-    const langText = lang === 'de' ? 'German (use ä, ö, ü normally. Do not use ß, use ss instead)' : lang === 'fr' ? 'French' : 'English';
+
+    // Get language name, note, and instruction from centralized config
+    const { getLanguageNameEnglish, getLanguageNote, getLanguageInstruction } = require('./server/lib/languages');
+    const languageName = getLanguageNameEnglish(lang);
+    const languageNote = getLanguageNote(lang);
+    const languageInstruction = getLanguageInstruction(lang);
 
     // Build list of main character names for Visual Bible exclusion
     const mainCharacterNames = (inputData.characters || []).map(c => c.name).join(', ');
@@ -4859,7 +4864,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8,
       PAGES: sceneCount,
-      LANGUAGE: langText,
+      LANGUAGE: languageName,
+      LANGUAGE_NOTE: languageNote,
+      LANGUAGE_INSTRUCTION: languageInstruction,
       STORY_TYPE: storyTypeName,
       STORY_DETAILS: inputData.storyDetails || '',
       DEDICATION: inputData.dedication || '',

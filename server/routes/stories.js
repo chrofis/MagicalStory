@@ -49,6 +49,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
     log.debug(`📚 GET /api/stories - User: ${req.user.username}, limit: ${limit}, offset: ${offset}`);
+    console.log(`📚 [STORIES] Fetching stories for user: ${req.user.username} (id: ${req.user.id})`);
     log.debug(`📚 [DEBUG] Stories query user ID: "${req.user.id}" (type: ${typeof req.user.id})`);
     let userStories = [];
     let totalCount = 0;
@@ -120,6 +121,36 @@ router.get('/', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('❌ Error fetching stories:', err);
     res.status(500).json({ error: 'Failed to fetch stories', details: err.message });
+  }
+});
+
+// GET /api/stories/debug/:id - Debug endpoint to check story existence (admin only)
+router.get('/debug/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { id } = req.params;
+    const rows = await dbQuery(
+      'SELECT id, user_id, created_at, (metadata::jsonb->>\'title\') as title FROM stories WHERE id = $1',
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.json({ found: false, id });
+    }
+    const story = rows[0];
+    // Also get the user email for this story
+    const userRows = await dbQuery('SELECT email FROM users WHERE id = $1', [story.user_id]);
+    res.json({
+      found: true,
+      id: story.id,
+      user_id: story.user_id,
+      user_email: userRows[0]?.email || 'unknown',
+      created_at: story.created_at,
+      title: story.title
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

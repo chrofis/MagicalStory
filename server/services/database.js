@@ -584,10 +584,18 @@ async function upsertStory(storyId, userId, storyData) {
   }
 
   const metadata = buildStoryMetadata(storyData);
-  await dbQuery(
-    'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, metadata = EXCLUDED.metadata',
+  console.log(`💾 [UPSERT] Saving story ${storyId} for user ${userId}, title: "${metadata.title}"`);
+
+  const result = await dbQuery(
+    'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, metadata = EXCLUDED.metadata RETURNING id, user_id',
     [storyId, userId, JSON.stringify(storyData), JSON.stringify(metadata)]
   );
+
+  if (result && result.length > 0) {
+    console.log(`✅ [UPSERT] Story saved successfully: id=${result[0].id}, user_id=${result[0].user_id}`);
+  } else {
+    console.error(`❌ [UPSERT] Story save returned no result for ${storyId}`);
+  }
 }
 
 /**

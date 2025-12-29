@@ -1772,7 +1772,7 @@ export function StoryDisplay({
                   </div>
                 ) : (
                   /* Standard Layout: Image on left, text on right (side-by-side) */
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid md:grid-cols-2 gap-6 items-stretch">
                     {/* Image on the left */}
                     {image && image.imageData ? (
                       <div className="flex flex-col">
@@ -2083,7 +2083,7 @@ export function StoryDisplay({
                         <textarea
                           value={pageText.trim()}
                           onChange={(e) => handlePageTextChange(index, e.target.value)}
-                          className="w-full h-full min-h-[300px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
+                          className="w-full flex-1 min-h-[300px] p-4 text-gray-800 leading-snug font-serif text-xl bg-white border-2 border-amber-300 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-y"
                           placeholder={language === 'de' ? 'Text eingeben...' : language === 'fr' ? 'Entrez le texte...' : 'Enter text...'}
                         />
                       ) : (
