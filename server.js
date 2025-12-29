@@ -1568,11 +1568,11 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
       `- ${r.character1} and ${r.character2}: ${r.relationship}`
     ).join('\n');
 
-    // Determine language for response
+    // Determine language for response (matching other prompts for consistency)
     const langInstructions = {
-      'de': 'Antworte auf Deutsch.',
-      'fr': 'Réponds en français.',
-      'en': 'Respond in English.'
+      'de': 'You MUST write your response in German. Use Swiss Standard German spelling (Schweizer Hochdeutsch): use ä, ö, ü normally, but use "ss" instead of "ß". Use standard German vocabulary, not Swiss dialect words.',
+      'fr': 'You MUST write your response in French.',
+      'en': 'You MUST write your response in English.'
     };
 
     // Determine reading level description
@@ -1601,6 +1601,14 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
       categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
     }
 
+    // Get teaching guide for the topic if available
+    const { getTeachingGuide } = require('./server/lib/storyHelpers');
+    const teachingGuide = getTeachingGuide(effectiveCategory, storyTopic);
+    const topicGuideText = teachingGuide
+      ? `**TOPIC GUIDE for "${storyTopic}":**
+${teachingGuide}`
+      : '';
+
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
@@ -1611,6 +1619,7 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
       .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
       .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
       .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
+      .replace('{TOPIC_GUIDE}', topicGuideText)
       .replace('{LANGUAGE_INSTRUCTION}', langInstructions[language] || langInstructions['en']);
 
     // Call the text model (using the imported function)
@@ -3733,7 +3742,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       }],
       generationConfig: {
         temperature: 0,
-        maxOutputTokens: 500,
+        maxOutputTokens: 2000,
         responseMimeType: 'application/json'
       }
     };
