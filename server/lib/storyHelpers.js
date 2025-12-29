@@ -1200,7 +1200,38 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       // Visual age first (how old they look), then actual age
       const visualAge = char.apparentAge ? `Looks: ${char.apparentAge.replace(/-/g, ' ')}` : '';
       const age = char.age ? `${char.age} years old` : '';
-      const gender = char.gender === 'male' ? 'boy/man' : char.gender === 'female' ? 'girl/woman' : '';
+
+      // Age-specific gender term based on apparentAge
+      const getGenderTerm = (gender, apparentAge) => {
+        if (!gender || gender === 'other') return '';
+        const isMale = gender === 'male';
+        switch (apparentAge) {
+          case 'infant':
+            return isMale ? 'baby boy' : 'baby girl';
+          case 'toddler':
+          case 'preschooler':
+          case 'kindergartner':
+            return isMale ? 'little boy' : 'little girl';
+          case 'young-school-age':
+          case 'school-age':
+            return isMale ? 'boy' : 'girl';
+          case 'preteen':
+          case 'young-teen':
+          case 'teenager':
+            return isMale ? 'teenage boy' : 'teenage girl';
+          case 'young-adult':
+            return isMale ? 'young man' : 'young woman';
+          case 'adult':
+          case 'middle-aged':
+            return isMale ? 'man' : 'woman';
+          case 'senior':
+          case 'elderly':
+            return isMale ? 'elderly man' : 'elderly woman';
+          default:
+            return isMale ? 'boy/man' : 'girl/woman';
+        }
+      };
+      const gender = getGenderTerm(char.gender, char.apparentAge);
       // Include physical traits with labels (excluding height - AI doesn't understand it for images)
       const physical = char.physical;
       // Get clothing STYLE from character analysis - colors AND patterns
