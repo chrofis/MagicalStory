@@ -286,4 +286,103 @@ router.delete('/orphaned-files', authenticateToken, requireAdmin, async (req, re
   }
 });
 
+// POST /api/admin/fix-metadata-migration
+// Fixes the metadata column migration if it was recorded but not executed
+router.post('/fix-metadata-migration', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'This operation is only available in database mode' });
+    }
+
+    const pool = getPool();
+    const results = [];
+
+    // Check if metadata column exists
+    log.info('[FIX-MIGRATION] Checking if metadata column exists...');
+    const columnCheck = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'stories' AND column_name = 'metadata'
+    `);
+
+    if (columnCheck.rows.length > 0) {
+      return res.json({
+        success: true,
+        message: 'Metadata column already exists, no fix needed',
+        results: [{ step: 'check', status: 'Column exists' }]
+      });
+    }
+
+    // Column doesn't exist - remove migration record and re-run
+    log.info('[FIX-MIGRATION] Metadata column missing, fixing...');
+
+    // Remove migration record
+    results.push({ step: 'remove_record', status: 'starting' });
+    await pool.query("DELETE FROM schema_migrations WHERE migration_name = '015_add_story_metadata_column.sql'");
+    results[results.length - 1].status = 'done';
+
+    // Add column
+    results.push({ step: 'add_column', status: 'starting' });
+    await pool.query('ALTER TABLE stories ADD COLUMN IF NOT EXISTS metadata JSONB');
+    results[results.length - 1].status = 'done';
+
+    // Create index
+    results.push({ step: 'create_index', status: 'starting' });
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_stories_metadata ON stories USING GIN (metadata)');
+    results[results.length - 1].status = 'done';
+
+    // Backfill
+    results.push({ step: 'backfill', status: 'starting' });
+    const countBefore = await pool.query('SELECT COUNT(*) as count FROM stories WHERE metadata IS NULL');
+    const storiesToBackfill = parseInt(countBefore.rows[0].count);
+    results[results.length - 1].storiesToBackfill = storiesToBackfill;
+
+    await pool.query(`
+      UPDATE stories
+      SET metadata = jsonb_build_object(
+        'id', (data::jsonb)->>'id',
+        'title', (data::jsonb)->>'title',
+        'createdAt', (data::jsonb)->>'createdAt',
+        'updatedAt', (data::jsonb)->>'updatedAt',
+        'pages', (data::jsonb)->>'pages',
+        'language', (data::jsonb)->>'language',
+        'languageLevel', (data::jsonb)->>'languageLevel',
+        'isPartial', COALESCE(((data::jsonb)->>'isPartial')::boolean, false),
+        'generatedPages', (data::jsonb)->>'generatedPages',
+        'totalPages', (data::jsonb)->>'totalPages',
+        'sceneCount', COALESCE(jsonb_array_length((data::jsonb)->'sceneImages'), 0),
+        'hasThumbnail', CASE
+          WHEN (data::jsonb)->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
+          WHEN (data::jsonb)->'coverImages'->'frontCover' IS NOT NULL THEN true
+          WHEN (data::jsonb)->>'thumbnail' IS NOT NULL THEN true
+          ELSE false
+        END,
+        'characters', (
+          SELECT COALESCE(jsonb_agg(jsonb_build_object('id', c->>'id', 'name', c->>'name')), '[]'::jsonb)
+          FROM jsonb_array_elements((data::jsonb)->'characters') AS c
+        )
+      )
+      WHERE metadata IS NULL
+    `);
+
+    const countAfter = await pool.query('SELECT COUNT(*) as count FROM stories WHERE metadata IS NOT NULL');
+    results[results.length - 1].storiesBackfilled = parseInt(countAfter.rows[0].count);
+    results[results.length - 1].status = 'done';
+
+    // Record migration
+    results.push({ step: 'record_migration', status: 'starting' });
+    await pool.query("INSERT INTO schema_migrations (migration_name) VALUES ('015_add_story_metadata_column.sql')");
+    results[results.length - 1].status = 'done';
+
+    log.info('[FIX-MIGRATION] Migration fixed successfully!');
+    res.json({
+      success: true,
+      message: 'Migration fixed successfully',
+      results
+    });
+  } catch (err) {
+    log.error('[FIX-MIGRATION] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
