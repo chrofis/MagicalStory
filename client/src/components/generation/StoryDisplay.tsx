@@ -616,16 +616,43 @@ export function StoryDisplay({
       {/* Developer Mode: Story Overview and Full Text */}
       {developerMode && (
         <div className="space-y-4 mt-6">
-          {/* Story Outline/Overview */}
+          {/* Full Outline Generation Output */}
           {outline && (
             <details className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-purple-800 hover:text-purple-900 flex items-center gap-2">
                 <FileText size={20} />
-                {language === 'de' ? 'Story-Übersicht (Outline)' : language === 'fr' ? 'Aperçu de l\'histoire' : 'Story Overview (Outline)'}
+                {language === 'de' ? 'Vollständige API-Ausgabe (Outline)' : language === 'fr' ? 'Sortie API complète (Plan)' : 'Full API Output (Outline)'}
+                {outlineModelId && (
+                  <span className="ml-2 text-sm font-normal text-purple-600">({outlineModelId})</span>
+                )}
+                {outlineUsage && (
+                  <span className="ml-2 text-xs font-normal text-purple-500">
+                    [{outlineUsage.input_tokens.toLocaleString()} in / {outlineUsage.output_tokens.toLocaleString()} out]
+                  </span>
+                )}
               </summary>
-              <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-purple-200 overflow-x-auto max-h-96 overflow-y-auto">
-                {outline}
-              </pre>
+              <div className="mt-4 space-y-4">
+                {/* Input: The prompt sent to the API */}
+                {outlinePrompt && (
+                  <div>
+                    <h4 className="text-sm font-bold text-purple-700 mb-2">
+                      {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (Entrée)' : '📤 Prompt (Input)'}
+                    </h4>
+                    <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-purple-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                      {outlinePrompt}
+                    </pre>
+                  </div>
+                )}
+                {/* Output: The outline response */}
+                <div>
+                  <h4 className="text-sm font-bold text-purple-700 mb-2">
+                    {language === 'de' ? '📥 API-Antwort (Outline)' : language === 'fr' ? '📥 Réponse API (Plan)' : '📥 API Response (Outline)'}
+                  </h4>
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-purple-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                    {outline}
+                  </pre>
+                </div>
+              </div>
             </details>
           )}
 
@@ -664,25 +691,6 @@ export function StoryDisplay({
                   </pre>
                 </div>
               </div>
-            </details>
-          )}
-
-          {/* Outline API Prompt */}
-          {outlinePrompt && (
-            <details className="bg-cyan-50 border-2 border-cyan-200 rounded-xl p-4">
-              <summary className="cursor-pointer text-lg font-bold text-cyan-800 hover:text-cyan-900 flex items-center gap-2">
-                <FileText size={20} />
-                {language === 'de' ? 'API-Prompt: Outline' : language === 'fr' ? 'Prompt API: Plan' : 'API Prompt: Outline'}
-                {outlineModelId && <span className="ml-2 text-sm font-normal text-cyan-600">({outlineModelId})</span>}
-                {outlineUsage && (
-                  <span className="ml-2 text-xs font-normal text-cyan-500">
-                    [{outlineUsage.input_tokens.toLocaleString()} in / {outlineUsage.output_tokens.toLocaleString()} out]
-                  </span>
-                )}
-              </summary>
-              <pre className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-cyan-200 overflow-x-auto max-h-96 overflow-y-auto">
-                {outlinePrompt}
-              </pre>
             </details>
           )}
 
