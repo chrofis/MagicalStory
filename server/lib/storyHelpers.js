@@ -353,10 +353,18 @@ function getCharacterPhotoDetails(characters, clothingCategory = null) {
       const avatars = char.avatars || char.clothingAvatars;
       const photos = char.photos || {};
 
+      let clothingDescription = null;
+      let usedClothingCategory = null;
+
       // Check for exact clothing avatar first
       if (clothingCategory && avatars && avatars[clothingCategory]) {
         photoType = `clothing-${clothingCategory}`;
         photoUrl = avatars[clothingCategory];
+        usedClothingCategory = clothingCategory;
+        // Get extracted clothing description for this avatar
+        if (avatars.clothing && avatars.clothing[clothingCategory]) {
+          clothingDescription = avatars.clothing[clothingCategory];
+        }
       }
       // Try fallback clothing avatars before falling back to body photo
       else if (clothingCategory && avatars) {
@@ -365,6 +373,11 @@ function getCharacterPhotoDetails(characters, clothingCategory = null) {
           if (avatars[fallbackCategory]) {
             photoType = `clothing-${fallbackCategory}`;
             photoUrl = avatars[fallbackCategory];
+            usedClothingCategory = fallbackCategory;
+            // Get extracted clothing description for fallback avatar
+            if (avatars.clothing && avatars.clothing[fallbackCategory]) {
+              clothingDescription = avatars.clothing[fallbackCategory];
+            }
             log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${clothingCategory}, using ${fallbackCategory}`);
             break;
           }
@@ -391,7 +404,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null) {
         photoType,
         photoUrl,
         photoHash: hashImageData(photoUrl),  // For dev mode verification
-        clothingCategory: clothingCategory || null,
+        clothingCategory: usedClothingCategory || clothingCategory || null,
+        clothingDescription,  // Exact clothing from avatar eval (e.g., "red winter parka, blue jeans")
         hasPhoto: photoType !== 'none'
       };
     })
@@ -1241,5 +1255,8 @@ module.exports = {
   buildStoryPrompt,
   buildSceneDescriptionPrompt,
   buildImagePrompt,
-  buildSceneExpansionPrompt
+  buildSceneExpansionPrompt,
+
+  // Teaching guides
+  getTeachingGuide
 };

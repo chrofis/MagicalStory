@@ -350,6 +350,7 @@ interface StoryTextPrompt {
   startPage: number;
   endPage: number;
   prompt: string;
+  rawResponse?: string;  // Unfiltered API response for dev mode
   modelId?: string;
   usage?: { input_tokens: number; output_tokens: number };
 }
@@ -991,13 +992,13 @@ export function StoryDisplay({
                     {storyTextPrompts[0]?.prompt || 'No prompt available'}
                   </pre>
                 </div>
-                {/* Output: The generated story */}
+                {/* Output: The raw unfiltered API response */}
                 <div>
                   <h4 className="text-sm font-bold text-amber-700 mb-2">
-                    {language === 'de' ? '📥 Antwort (Ausgabe)' : language === 'fr' ? '📥 Réponse (Sortie)' : '📥 Response (Output)'}
+                    {language === 'de' ? '📥 Rohe API-Antwort (ungefiltert)' : language === 'fr' ? '📥 Réponse API brute (non filtrée)' : '📥 Raw API Response (unfiltered)'}
                   </h4>
                   <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-amber-200 overflow-x-auto max-h-[400px] overflow-y-auto">
-                    {story}
+                    {storyTextPrompts[0]?.rawResponse || story}
                   </pre>
                 </div>
               </div>

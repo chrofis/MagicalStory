@@ -177,14 +177,6 @@ export function CharacterForm({
     onRegenerateAvatarsWithTraits?.();
   };
 
-  // Update clothing style
-  const updateClothingStyle = (value: string) => {
-    onChange({
-      ...character,
-      clothing: { ...character.clothing, style: value },
-    });
-  };
-
   const canSaveName = character.name && character.name.trim().length >= 2;
 
   const canSaveCharacter =
@@ -389,12 +381,6 @@ export function CharacterForm({
                 value={character.physical?.other || ''}
                 placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
                 onChange={(v) => updatePhysical('other', v)}
-              />
-              <InlineEditField
-                label={language === 'de' ? 'Kleidungsstil' : language === 'fr' ? 'Style vestimentaire' : 'Clothing Style'}
-                value={character.clothing?.style || ''}
-                placeholder={language === 'de' ? 'z.B. schwarz mit Dino-Muster' : 'e.g. black with dinosaur print'}
-                onChange={updateClothingStyle}
               />
             </div>
           </details>

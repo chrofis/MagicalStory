@@ -2142,7 +2142,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
           physical?.other ? `Other: ${physical.other}` : ''
         ].filter(Boolean);
         const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-        const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
+        // Include clothing description from avatar if available
+        const clothingDesc = photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : '';
+        const brief = [photo.name, age, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
       return `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
@@ -3401,9 +3403,9 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
     // Build language instruction for trait extraction
     let languageInstruction = '';
     if (language === 'de') {
-      languageInstruction = 'WICHTIG: Beschreibe alle Merkmale (face, hair, build, distinctive markings, clothing, clothingStyle) auf Deutsch. Beispiel: "rundes Gesicht mit weichen Wangen", "lange, braune Haare im Pferdeschwanz", "schlank", "Brille".';
+      languageInstruction = 'WICHTIG: Beschreibe alle Merkmale (face, hair, build, distinctive markings) auf Deutsch. Beispiel: "rundes Gesicht mit weichen Wangen", "lange, braune Haare im Pferdeschwanz", "schlank", "Brille".';
     } else if (language === 'fr') {
-      languageInstruction = 'IMPORTANT: Décrivez tous les traits (face, hair, build, distinctive markings, clothing, clothingStyle) en français. Exemple: "visage rond avec joues douces", "longs cheveux bruns en queue de cheval", "mince", "lunettes".';
+      languageInstruction = 'IMPORTANT: Décrivez tous les traits (face, hair, build, distinctive markings) en français. Exemple: "visage rond avec joues douces", "longs cheveux bruns en queue de cheval", "mince", "lunettes".';
     }
 
     // Log image info
@@ -3591,17 +3593,6 @@ app.post('/api/analyze-photo', authenticateToken, async (req, res) => {
         if (distinctiveMarkings && distinctiveMarkings !== 'none') {
           analyzerData.attributes.other_features = distinctiveMarkings;
         }
-        // Clothing description
-        if (traits.clothing) {
-          analyzerData.attributes.clothing = traits.clothing;
-        }
-        // Clothing style (colors + patterns - used for avatar style matching)
-        if (traits.clothingStyle) {
-          analyzerData.attributes.clothingStyle = traits.clothingStyle;
-        } else if (traits.clothingColors) {
-          // Backward compatibility
-          analyzerData.attributes.clothingStyle = traits.clothingColors;
-        }
       }
 
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
@@ -3704,7 +3695,6 @@ app.get('/api/avatar-prompt', authenticateToken, async (req, res) => {
       if (req.query.hair) traitParts.push(`Hair: ${req.query.hair}`);
       if (req.query.face) traitParts.push(`Face: ${req.query.face}`);
       if (req.query.other) traitParts.push(`Distinctive features: ${req.query.other}`);
-      if (req.query.clothingStyle) traitParts.push(`Clothing style/colors: ${req.query.clothingStyle}`);
       // Height removed - doesn't help avatar generation
       if (traitParts.length > 0) {
         avatarPrompt += `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
@@ -3779,6 +3769,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     try {
       const evalResult = JSON.parse(responseText);
       const score = evalResult.finalScore;
+      const clothing = evalResult.clothing || null;
       if (typeof score === 'number' && score >= 1 && score <= 10) {
         // Format details as readable text for display
         const details = [
@@ -3789,8 +3780,8 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
           `Overall: ${evalResult.overallStructure?.score}/10 - ${evalResult.overallStructure?.reason}`,
           `Final Score: ${score}/10`
         ].join('\n');
-        log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10`);
-        return { score, details, raw: evalResult };
+        log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10${clothing ? `, Clothing: ${clothing}` : ''}`);
+        return { score, details, clothing, raw: evalResult };
       }
     } catch (parseErr) {
       log.warn(`[AVATAR EVAL] JSON parse failed, trying text fallback: ${parseErr.message}`);
@@ -3798,7 +3789,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       const scoreMatch = responseText.match(/finalScore["']?\s*:\s*(\d+)/i);
       if (scoreMatch) {
         const score = parseInt(scoreMatch[1], 10);
-        return { score, details: responseText };
+        return { score, details: responseText, clothing: null };
       }
     }
 
@@ -3815,7 +3806,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
 // Prompts based on reference implementation - see prompts/clothing-avatars.txt
 app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    const { characterId, facePhoto, physicalDescription, name, age, gender, build, physicalTraits, clothingStyle } = req.body;
+    const { characterId, facePhoto, physicalDescription, name, age, gender, build, physicalTraits } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
@@ -3828,7 +3819,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
     // Build physical traits section if provided (for "Generate with Traits" mode)
     let physicalTraitsSection = '';
-    if (physicalTraits || build || clothingStyle) {
+    if (physicalTraits || build) {
       const traitParts = [];
       // Build first (body type)
       if (build) traitParts.push(`Build: ${build}`);
@@ -3838,8 +3829,6 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
       if (physicalTraits?.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
       // Height removed - doesn't help avatar generation
-      // Clothing style (colors and patterns to use)
-      if (clothingStyle) traitParts.push(`Clothing style/colors: ${clothingStyle}`);
       if (traitParts.length > 0) {
         physicalTraitsSection = `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
       }
@@ -3894,6 +3883,7 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
       status: 'generating',
       generatedAt: null,
       faceMatch: {},
+      clothing: {},
       prompts: {}
     };
 
@@ -3904,16 +3894,16 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
 
         // Build the prompt from template (use only the prompt part, not the CLOTHING_STYLES section)
         const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
-        const clothingStyle = getClothingStylePrompt(category);
-        log.debug(`   [CLOTHING] Style for ${category}: "${clothingStyle}"`);
+        const clothingStylePrompt = getClothingStylePrompt(category);
+        log.debug(`   [CLOTHING] Style for ${category}: "${clothingStylePrompt}"`);
         let avatarPrompt = fillTemplate(promptPart, {
-          'CLOTHING_STYLE': clothingStyle
+          'CLOTHING_STYLE': clothingStylePrompt
         });
         // Append physical traits section if provided
         if (physicalTraitsSection) {
           avatarPrompt += physicalTraitsSection;
         }
-        log.debug(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStyle.substring(0, 50)}..."`);
+        log.debug(`   [CLOTHING] Prompt includes: "Outfit: ${clothingStylePrompt.substring(0, 50)}..."`);
 
         // Store the prompt for this category (so client can display it)
         results.prompts[category] = avatarPrompt;
@@ -4056,10 +4046,14 @@ app.post('/api/generate-clothing-avatars', authenticateToken, async (req, res) =
             results[category] = imageData;
           }
 
-          // Evaluate face match (for developer mode display)
+          // Evaluate face match and extract clothing (for developer mode display and image generation)
           const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, results[category], geminiApiKey);
           if (faceMatchResult) {
-            results.faceMatch[category] = faceMatchResult;
+            results.faceMatch[category] = { score: faceMatchResult.score, details: faceMatchResult.details };
+            if (faceMatchResult.clothing) {
+              results.clothing[category] = faceMatchResult.clothing;
+              log.debug(`👕 [AVATAR EVAL] ${category} clothing: ${faceMatchResult.clothing}`);
+            }
             log.debug(`🔍 [AVATAR EVAL] ${category} score: ${faceMatchResult.score}/10`);
           }
         } else {
@@ -5889,7 +5883,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           physical?.other ? `Other: ${physical.other}` : ''
         ].filter(Boolean);
         const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-        const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
+        // Include clothing description from avatar if available
+        const clothingDesc = photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : '';
+        const brief = [photo.name, age, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
       let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
@@ -7084,7 +7080,9 @@ async function processStoryJob(jobId) {
             physical?.other ? `Other: ${physical.other}` : ''
           ].filter(Boolean);
           const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-          const brief = [photo.name, age, gender, physicalDesc].filter(Boolean).join(', ');
+          // Include clothing description from avatar if available
+          const clothingDesc = photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : '';
+          const brief = [photo.name, age, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
           return `${index + 1}. ${brief}`;
         });
         let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
@@ -7522,6 +7520,10 @@ Output Format:
 
       fullStoryText += batchText + '\n\n';
       console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
+
+      // Add raw response to storyTextPrompts for dev mode (unfiltered API response)
+      storyTextPrompts[batchNum].rawResponse = batchText;
+      storyTextPrompts[batchNum].modelId = textModelConfig?.modelId || getActiveTextModel().modelId;
 
       // Save checkpoint: story batch (include prompt for debugging)
       await saveCheckpoint(jobId, 'story_batch', { batchNum, batchText, startScene, endScene, batchPrompt }, batchNum);

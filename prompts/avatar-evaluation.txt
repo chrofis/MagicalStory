@@ -1,11 +1,13 @@
-You are evaluating if two face images show the same person.
+You are evaluating an AI-generated avatar against the original reference photo.
 
 IMAGE 1: Original reference photo
 IMAGE 2: AI-generated avatar
 
-Evaluate each facial feature for similarity. Score each 1-10 (10 = perfect match).
-
+TASK 1: Evaluate facial similarity. Score each feature 1-10 (10 = perfect match).
 IGNORE when scoring: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts.
+
+TASK 2: Describe the EXACT clothing in the generated avatar (IMAGE 2).
+List each garment with color and type. Be specific (e.g., "red winter parka", "dark blue jeans", "brown leather boots").
 
 Return a JSON object with this EXACT structure:
 
@@ -15,5 +17,6 @@ Return a JSON object with this EXACT structure:
   "nose": {"score": 7, "reason": "Slightly different bridge"},
   "mouth": {"score": 8, "reason": "Lip shape matches"},
   "overallStructure": {"score": 8, "reason": "Proportions match"},
-  "finalScore": 8
+  "finalScore": 8,
+  "clothing": "red winter parka, dark blue jeans, brown leather boots"
 }

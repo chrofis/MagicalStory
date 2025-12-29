@@ -91,8 +91,8 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
 
     avatars: api.clothing_avatars || api.clothingAvatars,
 
-    clothing: (api.clothing || api.clothing_style || api.clothingStyle || api.clothing_colors || api.clothingColors)
-      ? { current: api.clothing, style: api.clothing_style || api.clothingStyle || api.clothing_colors || api.clothingColors }
+    clothing: api.clothing
+      ? { current: api.clothing }
       : undefined,
 
     generatedOutfits: (api.generated_outfits || api.generatedOutfits) as Record<number, GeneratedOutfit> | undefined,
@@ -129,7 +129,6 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     fears: char.traits?.challenges,
     // Clothing
     clothing: char.clothing?.current,
-    clothing_style: char.clothing?.style,
     clothing_avatars: char.avatars,
     // Generated outfits per page
     generated_outfits: char.generatedOutfits,
@@ -311,8 +310,6 @@ export const characterService = {
         build: character.physical?.build || 'average',
         // Pass all physical traits to include in the avatar generation prompt
         physicalTraits: character.physical,
-        // Pass clothing style for consistent outfit patterns/colors
-        clothingStyle: character.clothing?.style,
       });
 
       if (response.success && response.clothingAvatars) {

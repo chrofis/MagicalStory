@@ -51,13 +51,13 @@ export interface CharacterAvatars {
   status?: 'pending' | 'generating' | 'complete' | 'failed';
   stale?: boolean; // True when avatars were generated from a previous photo
   faceMatch?: Record<ClothingCategory, FaceMatchResult>; // Face match evaluation results (dev mode only)
+  clothing?: Record<ClothingCategory, string>; // Extracted clothing descriptions per avatar (e.g., "red winter parka, blue jeans")
   prompts?: Record<ClothingCategory, string>; // Actual prompts used for generation (dev mode only)
 }
 
 // Clothing information
 export interface CharacterClothing {
   current?: string;  // What they're wearing in the reference photo
-  style?: string;    // Colors AND patterns (e.g. "black with dinosaur print", "navy blue with white stripes")
 }
 
 // Generated outfit for a specific page
