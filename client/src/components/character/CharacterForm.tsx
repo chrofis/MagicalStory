@@ -8,22 +8,33 @@ import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory } from '@/services/characterService';
 import type { Character, PhysicalTraits, AgeCategory, ChangedTraits } from '@/types/character';
 
-// Age category options for the dropdown
+// Age category options for the dropdown (no age numbers - we already have real age field)
 const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string; labelFr: string }[] = [
-  { value: 'infant', label: 'Infant (0-1)', labelDe: 'Säugling (0-1)', labelFr: 'Nourrisson (0-1)' },
-  { value: 'toddler', label: 'Toddler (1-2)', labelDe: 'Kleinkind (1-2)', labelFr: 'Bambin (1-2)' },
-  { value: 'preschooler', label: 'Preschooler (3-4)', labelDe: 'Vorschulkind (3-4)', labelFr: 'Préscolaire (3-4)' },
-  { value: 'kindergartner', label: 'Kindergartner (5-6)', labelDe: 'Kindergartenkind (5-6)', labelFr: 'Maternelle (5-6)' },
-  { value: 'young-school-age', label: 'Young School-Age (7-8)', labelDe: 'Junges Schulkind (7-8)', labelFr: 'Jeune écolier (7-8)' },
-  { value: 'school-age', label: 'School-Age (9-10)', labelDe: 'Schulkind (9-10)', labelFr: 'Écolier (9-10)' },
-  { value: 'preteen', label: 'Preteen (11-12)', labelDe: 'Vorpubertär (11-12)', labelFr: 'Préadolescent (11-12)' },
-  { value: 'young-teen', label: 'Young Teen (13-14)', labelDe: 'Junger Teen (13-14)', labelFr: 'Jeune ado (13-14)' },
-  { value: 'teenager', label: 'Teenager (15-17)', labelDe: 'Teenager (15-17)', labelFr: 'Adolescent (15-17)' },
-  { value: 'young-adult', label: 'Young Adult (18-25)', labelDe: 'Junger Erwachsener (18-25)', labelFr: 'Jeune adulte (18-25)' },
-  { value: 'adult', label: 'Adult (26-39)', labelDe: 'Erwachsener (26-39)', labelFr: 'Adulte (26-39)' },
-  { value: 'middle-aged', label: 'Middle-Aged (40-59)', labelDe: 'Mittleres Alter (40-59)', labelFr: 'Âge moyen (40-59)' },
-  { value: 'senior', label: 'Senior (60-75)', labelDe: 'Senior (60-75)', labelFr: 'Senior (60-75)' },
-  { value: 'elderly', label: 'Elderly (75+)', labelDe: 'Hochbetagt (75+)', labelFr: 'Âgé (75+)' },
+  { value: 'infant', label: 'Infant', labelDe: 'Säugling', labelFr: 'Nourrisson' },
+  { value: 'toddler', label: 'Toddler', labelDe: 'Kleinkind', labelFr: 'Bambin' },
+  { value: 'preschooler', label: 'Preschooler', labelDe: 'Vorschulkind', labelFr: 'Préscolaire' },
+  { value: 'kindergartner', label: 'Kindergartner', labelDe: 'Kindergartenkind', labelFr: 'Maternelle' },
+  { value: 'young-school-age', label: 'Young School-Age', labelDe: 'Junges Schulkind', labelFr: 'Jeune écolier' },
+  { value: 'school-age', label: 'School-Age', labelDe: 'Schulkind', labelFr: 'Écolier' },
+  { value: 'preteen', label: 'Preteen', labelDe: 'Vorpubertär', labelFr: 'Préadolescent' },
+  { value: 'young-teen', label: 'Young Teen', labelDe: 'Junger Teen', labelFr: 'Jeune ado' },
+  { value: 'teenager', label: 'Teenager', labelDe: 'Teenager', labelFr: 'Adolescent' },
+  { value: 'young-adult', label: 'Young Adult', labelDe: 'Junger Erwachsener', labelFr: 'Jeune adulte' },
+  { value: 'adult', label: 'Adult', labelDe: 'Erwachsener', labelFr: 'Adulte' },
+  { value: 'middle-aged', label: 'Middle-Aged', labelDe: 'Mittleres Alter', labelFr: 'Âge moyen' },
+  { value: 'senior', label: 'Senior', labelDe: 'Senior', labelFr: 'Senior' },
+  { value: 'elderly', label: 'Elderly', labelDe: 'Hochbetagt', labelFr: 'Âgé' },
+];
+
+// Build options for the dropdown (translated)
+const BUILD_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  { value: 'slim', label: 'Slim', labelDe: 'Schlank', labelFr: 'Mince' },
+  { value: 'average', label: 'Average', labelDe: 'Durchschnitt', labelFr: 'Moyen' },
+  { value: 'athletic', label: 'Athletic', labelDe: 'Athletisch', labelFr: 'Athlétique' },
+  { value: 'stocky', label: 'Stocky', labelDe: 'Stämmig', labelFr: 'Trapu' },
+  { value: 'petite', label: 'Petite', labelDe: 'Zierlich', labelFr: 'Petit' },
+  { value: 'tall', label: 'Tall', labelDe: 'Gross', labelFr: 'Grand' },
+  { value: 'heavy', label: 'Heavy', labelDe: 'Kräftig', labelFr: 'Corpulent' },
 ];
 
 // Simple inline editable field - click to edit, blur/enter to save
@@ -319,14 +330,26 @@ export function CharacterForm({
                   isAiExtracted={true}
                   isChanged={changedTraits?.face}
                 />
-                <InlineEditField
-                  label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
-                  value={character.physical?.build || ''}
-                  placeholder={language === 'de' ? 'z.B. schlank' : 'e.g. slim'}
-                  onChange={(v) => updatePhysical('build', v)}
-                  isAiExtracted={true}
-                  isChanged={changedTraits?.build}
-                />
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-xs whitespace-nowrap text-gray-400">
+                    {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}:
+                  </span>
+                  <select
+                    value={character.physical?.build || ''}
+                    onChange={(e) => updatePhysical('build', e.target.value)}
+                    className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
+                      changedTraits?.build ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 text-gray-500'
+                    }`}
+                  >
+                    <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
+                    {BUILD_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  {changedTraits?.build && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+                </div>
                 <InlineEditField
                   label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
                   value={character.physical?.other || ''}
@@ -512,12 +535,23 @@ export function CharacterForm({
                 placeholder={language === 'de' ? 'z.B. rund, oval' : 'e.g. round, oval'}
                 onChange={(v) => updatePhysical('face', v)}
               />
-              <InlineEditField
-                label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
-                value={character.physical?.build || ''}
-                placeholder={language === 'de' ? 'z.B. schlank' : 'e.g. slim'}
-                onChange={(v) => updatePhysical('build', v)}
-              />
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-600 text-xs whitespace-nowrap">
+                  {language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}:
+                </span>
+                <select
+                  value={character.physical?.build || ''}
+                  onChange={(e) => updatePhysical('build', e.target.value)}
+                  className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:border-indigo-400 bg-white hover:border-gray-300"
+                >
+                  <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
+                  {BUILD_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <InlineEditField
                 label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
                 value={character.physical?.other || ''}
