@@ -1,4 +1,4 @@
-CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
+Safe, family-friendly content only.
 
 **STYLE: {STYLE_DESCRIPTION}**
 
@@ -23,4 +23,4 @@ CLOTHING RULE: Characters wear the SAME clothes as the previous scene unless the
 ---
 
 Show appropriate emotions. Clean, clear composition.
-This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.
+All content must be innocent and age-appropriate.

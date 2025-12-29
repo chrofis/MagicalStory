@@ -1,4 +1,4 @@
-KINDERBUCH-ILLUSTRATION - Sichere, familienfreundliche Inhalte.
+Nur sichere, familienfreundliche Inhalte.
 
 **STIL: {STYLE_DESCRIPTION}**
 
@@ -18,4 +18,4 @@ KINDERBUCH-ILLUSTRATION - Sichere, familienfreundliche Inhalte.
 ---
 
 Zeige angemessene Emotionen. Klare, aufgeräumte Komposition. Kein Text oder Wasserzeichen.
-Dies ist eine kindgerechte Bilderbuch-Illustration. Alle Inhalte sind unschuldig und altersgerecht.
+Alle Inhalte müssen unschuldig und altersgerecht sein.

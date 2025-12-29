@@ -1,4 +1,4 @@
-KINDERBUCH-ILLUSTRATION - Sichere, familienfreundliche Inhalte.
+Nur sichere, familienfreundliche Inhalte.
 
 **STIL: {STYLE_DESCRIPTION}**
 
@@ -23,4 +23,4 @@ KLEIDUNGSREGEL: Charaktere tragen DIESELBE Kleidung wie in der vorherigen Szene,
 ---
 
 Zeige angemessene Emotionen. Klare, aufgeräumte Komposition.
-Dies ist eine kindgerechte Bilderbuch-Illustration. Alle Inhalte sind unschuldig und altersgerecht.
+Alle Inhalte müssen unschuldig und altersgerecht sein.
