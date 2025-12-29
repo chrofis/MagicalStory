@@ -295,7 +295,6 @@ export function StorySettings({
                 }}
                 className="w-full inline-flex items-center justify-center gap-1 bg-white border border-blue-200 rounded-lg px-2 py-2 hover:border-blue-400 transition-colors"
               >
-                <span className="text-base">{getStoryLanguageInfo().flag}</span>
                 <span className="font-medium text-gray-700 truncate">{getStoryLanguageInfo().name}</span>
               </button>
               {isLanguageDropdownOpen && (
@@ -311,7 +310,6 @@ export function StorySettings({
                         storyLanguage === langOption.code ? 'bg-blue-50' : ''
                       }`}
                     >
-                      <span className="text-base">{langOption.flag}</span>
                       <span className="font-medium text-gray-700">{langOption.name}</span>
                     </button>
                   ))}

@@ -555,6 +555,7 @@ export function CharacterForm({
                         </summary>
                         <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
                           {character.avatars.faceMatch[category].details}
+                          {character.avatars.clothing?.[category] && `\n\nClothing: ${character.avatars.clothing[category]}`}
                         </pre>
                       </details>
                     )}
