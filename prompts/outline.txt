@@ -17,7 +17,7 @@ Your task is to create a compelling, well-structured story outline that will gui
 # Story Parameters
 
 - **Length**: {PAGES} pages
-- **Language**: {LANGUAGE} (NOTE: If German, use Swiss Standard German spelling (Schweizer Hochdeutsch): use ä, ö, ü normally, but use "ss" instead of "ß". Use standard German vocabulary, not Swiss dialect words.)
+- **Language**: {LANGUAGE} {LANGUAGE_NOTE}
 - **Reading Level**: {READING_LEVEL}
 - **Story Category**: {STORY_CATEGORY}
 - **Story Theme/Setting**: {STORY_TYPE}
@@ -173,7 +173,7 @@ For each person who is NOT listed in the "Characters" section above but appears 
 - **Name/Role**: How they are referred to (e.g., "Fireman Fred" or "the friendly firefighter")
 - **Appears in pages**: List all page numbers
 - **Visual Appearance** (describe what the eye SEES, not backstory):
-  - Apparent age category: child (small, round face) | teen (lanky, youthful) | young adult | middle-aged | elderly (grey hair, wrinkles)
+  - Apparent age: infant/baby (0-1) | toddler (1-2) | preschooler (3-4) | kindergartner (5-6) | young school-age child (7-8) | school-age child (9-10) | preteen (11-12) | young teen (13-14) | teenager (15-17) | young adult (18-25) | adult (26-39) | middle-aged (40-59) | senior (60-75) | elderly (75+)
   - Build/size: use standalone terms (short, average, tall, slim, stocky, muscular) - NO comparisons to other characters
   - Hair: color, style, length, facial hair (ONLY for adults - teens/children cannot have beards)
   - Face: eye color, skin tone, 1-2 distinctive features (scar, glasses, freckles)
@@ -182,7 +182,7 @@ For each person who is NOT listed in the "Characters" section above but appears 
 
 **IMPORTANT for Secondary Characters**:
 - NEVER reference or compare to main characters (e.g., don't write "taller than Max" or "similar to Emma")
-- Do NOT use specific ages like "16 years old" - use apparent age categories instead
+- Use the apparent age categories above (e.g., "teenager", "young adult", "middle-aged") - you may add specific ages for clarity (e.g., "teenager, around 16")
 - Ensure features match the age category (no beards on children/teens, no wrinkles on young adults)
 - The Signature Look should be visually striking and easy for AI to reproduce consistently
 - Each description must be SELF-CONTAINED - readable without knowing who the main characters are

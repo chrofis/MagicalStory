@@ -75,6 +75,12 @@ export interface GeneratedOutfit {
   };
 }
 
+// Age categories for image generation consistency
+export type AgeCategory =
+  | 'infant' | 'toddler' | 'preschooler' | 'kindergartner'
+  | 'young-school-age' | 'school-age' | 'preteen' | 'young-teen'
+  | 'teenager' | 'young-adult' | 'adult' | 'middle-aged' | 'senior' | 'elderly';
+
 // Main Character interface - clean structure
 export interface Character {
   // Identity
@@ -82,6 +88,7 @@ export interface Character {
   name: string;
   gender: 'male' | 'female' | 'other';
   age: string;
+  ageCategory?: AgeCategory; // Auto-filled from age, used for image generation
 
   // Physical traits (from photo analysis)
   physical?: PhysicalTraits;

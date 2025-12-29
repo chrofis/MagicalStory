@@ -5,6 +5,7 @@ import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
+import { getAgeCategory } from '@/services/characterService';
 import type { Character, PhysicalTraits } from '@/types/character';
 
 // Simple inline editable field - click to edit, blur/enter to save
@@ -75,7 +76,12 @@ export function CharacterForm({
 
   // Update top-level character fields
   const updateField = <K extends keyof Character>(field: K, value: Character[K]) => {
-    onChange({ ...character, [field]: value });
+    // Auto-compute ageCategory when age changes
+    if (field === 'age' && typeof value === 'string') {
+      onChange({ ...character, [field]: value, ageCategory: getAgeCategory(value) });
+    } else {
+      onChange({ ...character, [field]: value });
+    }
   };
 
   // Update physical traits

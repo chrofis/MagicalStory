@@ -1,8 +1,36 @@
 import api from './api';
-import type { Character, CharacterAvatars, GeneratedOutfit } from '@/types/character';
+import type { Character, CharacterAvatars, GeneratedOutfit, AgeCategory } from '@/types/character';
 import { createLogger } from './logger';
 
 const log = createLogger('CharacterService');
+
+/**
+ * Get age category from numeric age string
+ * Categories: infant (0-1), toddler (1-2), preschooler (3-4), kindergartner (5-6),
+ * young-school-age (7-8), school-age (9-10), preteen (11-12), young-teen (13-14),
+ * teenager (15-17), young-adult (18-25), adult (26-39), middle-aged (40-59),
+ * senior (60-75), elderly (75+)
+ */
+export function getAgeCategory(age: string | undefined): AgeCategory | undefined {
+  if (!age) return undefined;
+  const numAge = parseInt(age, 10);
+  if (isNaN(numAge) || numAge < 0) return undefined;
+
+  if (numAge <= 1) return 'infant';
+  if (numAge <= 2) return 'toddler';
+  if (numAge <= 4) return 'preschooler';
+  if (numAge <= 6) return 'kindergartner';
+  if (numAge <= 8) return 'young-school-age';
+  if (numAge <= 10) return 'school-age';
+  if (numAge <= 12) return 'preteen';
+  if (numAge <= 14) return 'young-teen';
+  if (numAge <= 17) return 'teenager';
+  if (numAge <= 25) return 'young-adult';
+  if (numAge <= 39) return 'adult';
+  if (numAge <= 59) return 'middle-aged';
+  if (numAge <= 75) return 'senior';
+  return 'elderly';
+}
 
 // API response format - supports both snake_case (new) and camelCase (legacy) field names
 interface CharacterApiResponse {
@@ -10,6 +38,8 @@ interface CharacterApiResponse {
   name: string;
   gender: string;
   age: string;
+  age_category?: string;
+  ageCategory?: string;
   // Physical traits (snake_case + camelCase legacy)
   height?: string;
   build?: string;
@@ -65,11 +95,15 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     other: api.other,  // Glasses, birthmarks, always-present accessories
   };
 
+  // Compute ageCategory from API or derive from age
+  const ageCategory = (api.age_category || api.ageCategory || getAgeCategory(api.age)) as AgeCategory | undefined;
+
   return {
     id: api.id,
     name: api.name,
     gender: api.gender as 'male' | 'female' | 'other',
     age: api.age,
+    ageCategory,
 
     physical: (physical.height || physical.build || physical.face || physical.hair || physical.other) ? physical : undefined,
 
@@ -101,11 +135,15 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
 
 // Convert frontend Character to API format
 function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
+  // Auto-compute ageCategory if not set but age is available
+  const ageCategory = char.ageCategory || getAgeCategory(char.age);
+
   return {
     id: char.id,
     name: char.name,
     gender: char.gender,
     age: char.age,
+    age_category: ageCategory,
     // Physical traits
     height: char.physical?.height,
     build: char.physical?.build,

@@ -157,6 +157,8 @@ const {
   getReadingLevel,
   getTokensPerPage,
   calculateStoryPageCount,
+  getAgeCategory,
+  getAgeCategoryLabel,
   getCharactersInScene,
   getCharacterPhotos,
   parseClothingCategory,
@@ -1427,12 +1429,8 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
       `- ${r.character1} and ${r.character2}: ${r.relationship}`
     ).join('\n');
 
-    // Determine language for response (matching other prompts for consistency)
-    const langInstructions = {
-      'de': 'You MUST write your response in German. Use Swiss Standard German spelling (Schweizer Hochdeutsch). CRITICAL SPELLING RULES: Use ä, ö, ü (NEVER use ae, oe, ue). Use "ss" instead of "ß". Examples: CORRECT: "schön", "größer", "für", "Mädchen" | WRONG: "schoen", "groesser", "fuer", "Maedchen". Use standard German vocabulary, not Swiss dialect.',
-      'fr': 'You MUST write your response in French.',
-      'en': 'You MUST write your response in English.'
-    };
+    // Get language instruction from centralized config
+    const { getLanguageInstruction } = require('./server/lib/languages');
 
     // Determine reading level description
     const readingLevelDescriptions = {
@@ -1479,7 +1477,7 @@ ${teachingGuide}`
       .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
       .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
       .replace('{TOPIC_GUIDE}', topicGuideText)
-      .replace('{LANGUAGE_INSTRUCTION}', langInstructions[language] || langInstructions['en']);
+      .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Call the text model (using the imported function)
     const { callTextModel, getModelDefaults } = require('./server/lib/textModels');
@@ -5046,7 +5044,16 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       const charDescriptions = photos.map((photo, index) => {
         // Find the original character to get full physical description
         const char = characters?.find(c => c.name === photo.name);
-        const age = char?.age ? `${char.age} years old` : '';
+        // Build age description with category for consistency
+        let ageDesc = '';
+        if (char?.age) {
+          const ageCategory = char.ageCategory || getAgeCategory(char.age);
+          if (ageCategory) {
+            ageDesc = getAgeCategoryLabel(ageCategory);
+          } else {
+            ageDesc = `${char.age} years old`;
+          }
+        }
         const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
         // Include physical traits with labels (excluding height - AI doesn't understand it for images)
         const physical = char?.physical;
@@ -5059,7 +5066,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
         // Include clothing description from avatar if available
         const clothingDesc = photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : '';
-        const brief = [photo.name, age, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
+        const brief = [photo.name, ageDesc, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
         return `${index + 1}. ${brief}`;
       });
       let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
@@ -6243,7 +6250,16 @@ async function processStoryJob(jobId) {
         const charDescriptions = photos.map((photo, index) => {
           // Find the original character to get full physical description
           const char = characters?.find(c => c.name === photo.name);
-          const age = char?.age ? `${char.age} years old` : '';
+          // Build age description with category for consistency
+          let ageDesc = '';
+          if (char?.age) {
+            const ageCategory = char.ageCategory || getAgeCategory(char.age);
+            if (ageCategory) {
+              ageDesc = getAgeCategoryLabel(ageCategory);
+            } else {
+              ageDesc = `${char.age} years old`;
+            }
+          }
           const gender = char?.gender === 'male' ? 'boy/man' : char?.gender === 'female' ? 'girl/woman' : '';
           // Include physical traits with labels (excluding height - AI doesn't understand it for images)
           const physical = char?.physical;
@@ -6256,7 +6272,7 @@ async function processStoryJob(jobId) {
           const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
           // Include clothing description from avatar if available
           const clothingDesc = photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : '';
-          const brief = [photo.name, age, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
+          const brief = [photo.name, ageDesc, gender, physicalDesc, clothingDesc].filter(Boolean).join(', ');
           return `${index + 1}. ${brief}`;
         });
         let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;

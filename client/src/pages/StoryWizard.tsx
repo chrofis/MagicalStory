@@ -35,7 +35,7 @@ export default function StoryWizard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();
   const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading, isImpersonating } = useAuth();
-  const { showSuccess, showInfo } = useToast();
+  const { showSuccess, showInfo, showError } = useToast();
 
   // Wizard state - start at step 5 with loading if we have a storyId in URL
   // Otherwise restore from localStorage to preserve step when navigating away and back
@@ -820,7 +820,7 @@ export default function StoryWizard() {
           // Check for specific errors
           if (analysis.error === 'no_face_detected') {
             log.warn('No face detected in photo');
-            alert(t.noFaceDetected);
+            showError(t.noFaceDetected);
             // Don't set the photo - user needs to upload a different one
           } else {
             log.warn('Photo analysis returned no data, using original photo');
@@ -875,11 +875,11 @@ export default function StoryWizard() {
         log.success(`✅ Avatars regenerated for ${currentCharacter.name}`);
       } else {
         log.error(`❌ Failed to regenerate avatars: ${result.error}`);
-        alert(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
+        showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       log.error(`❌ Failed to regenerate avatars for ${currentCharacter.name}:`, error);
-      alert(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRegeneratingAvatars(false);
     }
@@ -922,11 +922,11 @@ export default function StoryWizard() {
         log.success(`✅ Avatars WITH TRAITS regenerated for ${currentCharacter.name}`);
       } else {
         log.error(`❌ Failed to regenerate avatars with traits: ${result.error}`);
-        alert(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
+        showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       log.error(`❌ Failed to regenerate avatars with traits for ${currentCharacter.name}:`, error);
-      alert(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRegeneratingAvatarsWithTraits(false);
     }
@@ -984,7 +984,7 @@ export default function StoryWizard() {
       setShowCharacterCreated(true);
     } catch (error) {
       log.error('Failed to save character:', error);
-      alert(language === 'de'
+      showError(language === 'de'
         ? 'Charakter konnte nicht gespeichert werden. Bitte versuche es erneut.'
         : language === 'fr'
         ? 'Échec de l\'enregistrement du personnage. Veuillez réessayer.'
@@ -1199,7 +1199,7 @@ export default function StoryWizard() {
       }
     } catch (error) {
       log.error('Failed to generate story ideas:', error);
-      alert(language === 'de'
+      showError(language === 'de'
         ? 'Fehler beim Generieren von Ideen. Bitte versuchen Sie es erneut.'
         : language === 'fr'
         ? 'Erreur lors de la génération d\'idées. Veuillez réessayer.'
@@ -1521,7 +1521,7 @@ export default function StoryWizard() {
             return;
           } catch (cancelError) {
             log.error('Failed to cancel existing job:', cancelError);
-            alert(language === 'de'
+            showError(language === 'de'
               ? 'Abbrechen fehlgeschlagen. Bitte versuche es später erneut.'
               : language === 'fr'
               ? 'Échec de l\'annulation. Veuillez réessayer plus tard.'
@@ -1532,7 +1532,7 @@ export default function StoryWizard() {
         setIsGenerating(false);
         return;
       } else {
-        alert(language === 'de'
+        showError(language === 'de'
           ? `Generierung fehlgeschlagen: ${errorMessage}`
           : language === 'fr'
           ? `Échec de la génération: ${errorMessage}`
@@ -1738,7 +1738,7 @@ export default function StoryWizard() {
                   log.success('Visual Bible updated successfully');
                 } catch (error) {
                   log.error('Failed to update Visual Bible:', error);
-                  alert(language === 'de'
+                  showError(language === 'de'
                     ? 'Visual Bible konnte nicht aktualisiert werden'
                     : language === 'fr'
                     ? 'Échec de la mise à jour de la Bible Visuelle'
@@ -1781,7 +1781,7 @@ export default function StoryWizard() {
                 } catch (error) {
                   log.error('Image regeneration failed:', error);
                   const errorMsg = error instanceof Error ? error.message : String(error);
-                  alert(language === 'de'
+                  showError(language === 'de'
                     ? `Bildgenerierung fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
                     ? `Échec de la régénération: ${errorMsg}`
@@ -1810,7 +1810,7 @@ export default function StoryWizard() {
                   URL.revokeObjectURL(url);
                 } catch (error) {
                   log.error('PDF download failed:', error);
-                  alert(language === 'de'
+                  showError(language === 'de'
                     ? 'PDF-Download fehlgeschlagen'
                     : language === 'fr'
                     ? 'Échec du téléchargement PDF'
@@ -1859,7 +1859,7 @@ export default function StoryWizard() {
 
                   const parts = address.split(',').map(p => p.trim());
                   if (parts.length < 7) {
-                    alert(language === 'de'
+                    showError(language === 'de'
                       ? 'Ungültiges Adressformat'
                       : language === 'fr'
                       ? 'Format d\'adresse invalide'
@@ -1909,20 +1909,20 @@ export default function StoryWizard() {
                   if (result.dashboardUrl && confirm(successMsg)) {
                     window.open(result.dashboardUrl, '_blank');
                   } else if (!result.dashboardUrl) {
-                    alert(language === 'de'
-                      ? `✅ Druckauftrag erstellt!\n\nOrder ID: ${result.orderId}`
+                    showSuccess(language === 'de'
+                      ? `Druckauftrag erstellt! Order ID: ${result.orderId}`
                       : language === 'fr'
-                      ? `✅ Commande créée!\n\nID: ${result.orderId}`
-                      : `✅ Print order created!\n\nOrder ID: ${result.orderId}`);
+                      ? `Commande créée! ID: ${result.orderId}`
+                      : `Print order created! Order ID: ${result.orderId}`);
                   }
                 } catch (error) {
                   log.error('Print order failed:', error);
                   const errorMsg = error instanceof Error ? error.message : String(error);
-                  alert(language === 'de'
-                    ? `Druckauftrag fehlgeschlagen:\n${errorMsg}`
+                  showError(language === 'de'
+                    ? `Druckauftrag fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
-                    ? `Échec de la commande d'impression:\n${errorMsg}`
-                    : `Print order failed:\n${errorMsg}`);
+                    ? `Échec de la commande d'impression: ${errorMsg}`
+                    : `Print order failed: ${errorMsg}`);
                 }
               } : undefined}
               onCreateAnother={() => {
@@ -2006,7 +2006,7 @@ export default function StoryWizard() {
                 } catch (error) {
                   log.error('Cover regeneration failed:', error);
                   const errorMsg = error instanceof Error ? error.message : String(error);
-                  alert(language === 'de'
+                  showError(language === 'de'
                     ? `Cover-Generierung fehlgeschlagen: ${errorMsg}`
                     : language === 'fr'
                     ? `Échec de la régénération: ${errorMsg}`

@@ -12,6 +12,61 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { hashImageData } = require('./images');
 const { buildVisualBiblePrompt } = require('./visualBible');
 const { OutlineParser, extractCharacterNamesFromScene } = require('./outlineParser');
+const { getLanguageNote } = require('./languages');
+
+// ============================================================================
+// AGE CATEGORY MAPPING - Maps numeric age to category for image generation
+// ============================================================================
+
+/**
+ * Get age category from numeric age
+ * Categories: infant (0-1), toddler (1-2), preschooler (3-4), kindergartner (5-6),
+ * young-school-age (7-8), school-age (9-10), preteen (11-12), young-teen (13-14),
+ * teenager (15-17), young-adult (18-25), adult (26-39), middle-aged (40-59),
+ * senior (60-75), elderly (75+)
+ */
+function getAgeCategory(age) {
+  const numAge = parseInt(age, 10);
+  if (isNaN(numAge) || numAge < 0) return null;
+
+  if (numAge <= 1) return 'infant';
+  if (numAge <= 2) return 'toddler';
+  if (numAge <= 4) return 'preschooler';
+  if (numAge <= 6) return 'kindergartner';
+  if (numAge <= 8) return 'young-school-age';
+  if (numAge <= 10) return 'school-age';
+  if (numAge <= 12) return 'preteen';
+  if (numAge <= 14) return 'young-teen';
+  if (numAge <= 17) return 'teenager';
+  if (numAge <= 25) return 'young-adult';
+  if (numAge <= 39) return 'adult';
+  if (numAge <= 59) return 'middle-aged';
+  if (numAge <= 75) return 'senior';
+  return 'elderly';
+}
+
+/**
+ * Get human-readable age category label for prompts
+ */
+function getAgeCategoryLabel(ageCategory) {
+  const labels = {
+    'infant': 'infant/baby (0-1 years)',
+    'toddler': 'toddler (1-2 years)',
+    'preschooler': 'preschooler (3-4 years)',
+    'kindergartner': 'kindergartner (5-6 years)',
+    'young-school-age': 'young school-age child (7-8 years)',
+    'school-age': 'school-age child (9-10 years)',
+    'preteen': 'preteen (11-12 years)',
+    'young-teen': 'young teen (13-14 years)',
+    'teenager': 'teenager (15-17 years)',
+    'young-adult': 'young adult (18-25 years)',
+    'adult': 'adult (26-39 years)',
+    'middle-aged': 'middle-aged (40-59 years)',
+    'senior': 'senior (60-75 years)',
+    'elderly': 'elderly (75+ years)'
+  };
+  return labels[ageCategory] || ageCategory;
+}
 
 // ============================================================================
 // TEACHING GUIDES - Loaded from text files for easy editing
@@ -686,11 +741,9 @@ function buildBasePrompt(inputData, textPageCount = null) {
 
   const readingLevel = getReadingLevel(inputData.languageLevel);
 
-  // Add German language note if applicable
+  // Add language-specific note from centralized config
   const language = inputData.language || 'en';
-  const languageNote = language === 'de' || language === 'German'
-    ? ' (use ae, oe, ue normally. Do not use ss, use ss instead)'
-    : '';
+  const languageNote = getLanguageNote(language);
 
   return `# Story Parameters
 
@@ -794,6 +847,7 @@ ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
       AGE_TO: inputData.ageTo || 8,
       PAGES: pageCount,  // Use calculated page count, not raw input
       LANGUAGE: inputData.language || 'en',
+      LANGUAGE_NOTE: getLanguageNote(inputData.language || 'en'),
       READING_LEVEL: readingLevel,
       CHARACTERS: JSON.stringify(characterSummary),
       CHARACTER_NAMES: characterNames,  // For Visual Bible exclusion warning
@@ -926,7 +980,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       PAGE_CONTENT: pageContent,
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
-      LANGUAGE: language
+      LANGUAGE: language,
+      LANGUAGE_NOTE: getLanguageNote(language)
     });
   }
 
@@ -1152,7 +1207,8 @@ function buildSceneExpansionPrompt(sceneSummary, inputData, sceneCharacters, vis
       SCENE_SUMMARY: sceneSummary,
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
-      LANGUAGE: langCode === 'de' ? 'Deutsch' : langCode === 'fr' ? 'Français' : 'English'
+      LANGUAGE: langCode === 'de' ? 'Deutsch' : langCode === 'fr' ? 'Français' : 'English',
+      LANGUAGE_NOTE: getLanguageNote(langCode)
     });
   }
 
@@ -1189,6 +1245,10 @@ module.exports = {
 
   // Page calculations
   calculateStoryPageCount,
+
+  // Age category
+  getAgeCategory,
+  getAgeCategoryLabel,
 
   // Character helpers
   getCharactersInScene,
