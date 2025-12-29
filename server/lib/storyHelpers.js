@@ -604,10 +604,15 @@ function buildCharacterPhysicalDescription(char) {
   // Support both legacy fields and new physical object structure
   const height = char.physical?.height || char.height;
   const build = char.physical?.build || char.build;
-  const hair = char.physical?.hair || char.hairColor;
   const face = char.physical?.face || char.otherFeatures;
   const other = char.physical?.other;
   const clothing = char.clothing?.current || char.clothing;
+
+  // Hair: prefer new separate fields, fall back to legacy combined field
+  const hairColor = char.physical?.hairColor;
+  const hairLength = char.physical?.hairLength;
+  const hairStyle = char.physical?.hairStyle;
+  const legacyHair = char.physical?.hair || char.hairColor;
 
   if (height) {
     description += `, ${height} cm tall`;
@@ -615,8 +620,16 @@ function buildCharacterPhysicalDescription(char) {
   if (build) {
     description += `, ${build} build`;
   }
-  if (hair) {
-    description += `, with ${hair} hair`;
+
+  // Build hair description from separate fields or use legacy
+  if (hairColor || hairLength || hairStyle) {
+    const hairParts = [];
+    if (hairLength) hairParts.push(hairLength);
+    if (hairColor) hairParts.push(hairColor);
+    if (hairStyle) hairParts.push(hairStyle);
+    description += `. Hair: ${hairParts.join(', ')}`;
+  } else if (legacyHair) {
+    description += `, with ${legacyHair} hair`;
   }
   if (face) {
     description += `, ${face}`;

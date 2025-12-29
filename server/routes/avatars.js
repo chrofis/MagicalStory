@@ -347,6 +347,9 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.hairColor) {
           analyzerData.attributes.hair_color = traits.hairColor;
         }
+        if (traits.hairLength) {
+          analyzerData.attributes.hair_length = traits.hairLength;
+        }
         if (traits.hairStyle) {
           analyzerData.attributes.hair_style = traits.hairStyle;
         }
@@ -475,8 +478,9 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       else if (physicalTraits?.build) traitParts.push(`Build: ${physicalTraits.build}`);
       // Use new separated hair fields if available, otherwise fall back to combined 'hair' field
       if (physicalTraits?.hairColor) traitParts.push(`Hair color: ${physicalTraits.hairColor}`);
+      if (physicalTraits?.hairLength) traitParts.push(`Hair length: ${physicalTraits.hairLength}`);
       if (physicalTraits?.hairStyle) traitParts.push(`Hair style: ${physicalTraits.hairStyle}`);
-      if (!physicalTraits?.hairColor && !physicalTraits?.hairStyle && physicalTraits?.hair) {
+      if (!physicalTraits?.hairColor && !physicalTraits?.hairLength && !physicalTraits?.hairStyle && physicalTraits?.hair) {
         traitParts.push(`Hair: ${physicalTraits.hair}`);
       }
       if (physicalTraits?.eyeColor) traitParts.push(`Eye color: ${physicalTraits.eyeColor}`);

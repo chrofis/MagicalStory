@@ -12,8 +12,9 @@ export interface PhysicalTraits {
   face?: string;
   eyeColor?: string;     // Eye color (e.g., "blue", "brown", "green")
   hairColor?: string;    // Hair color (e.g., "blonde", "brown", "black")
-  hairStyle?: string;    // Hair style (e.g., "curly", "straight", "short ponytail")
-  hair?: string;         // Legacy: combined hair description (deprecated, use hairColor + hairStyle)
+  hairLength?: string;   // Hair length (e.g., "shoulder-length", "chin-length", "mid-back")
+  hairStyle?: string;    // Hair texture/style (e.g., "straight", "wavy", "curly ponytail")
+  hair?: string;         // Legacy: combined hair description (deprecated, use hairColor + hairLength + hairStyle)
   other?: string;        // Glasses, birthmarks, always-present accessories
 }
 
@@ -23,6 +24,7 @@ export interface ChangedTraits {
   face?: boolean;
   eyeColor?: boolean;
   hairColor?: boolean;
+  hairLength?: boolean;
   hairStyle?: boolean;
   hair?: boolean;        // Legacy
   other?: boolean;

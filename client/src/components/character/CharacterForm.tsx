@@ -123,7 +123,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         {changedTraits?.apparentAge && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
 
-      {/* Row 2: Hair Color | Build */}
+      {/* Row 2: Hair Color | Hair Length */}
       <InlineEditField
         label={language === 'de' ? 'Haarfarbe' : language === 'fr' ? 'Couleur des cheveux' : 'Hair Color'}
         value={character.physical?.hairColor || ''}
@@ -131,6 +131,24 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         onChange={(v) => updatePhysical('hairColor', v)}
         isAiExtracted={isAiExtracted}
         isChanged={changedTraits?.hairColor}
+      />
+      <InlineEditField
+        label={language === 'de' ? 'Haarlänge' : language === 'fr' ? 'Longueur' : 'Hair Length'}
+        value={character.physical?.hairLength || ''}
+        placeholder={language === 'de' ? 'z.B. schulterlang' : 'e.g. shoulder-length'}
+        onChange={(v) => updatePhysical('hairLength', v)}
+        isAiExtracted={isAiExtracted}
+        isChanged={changedTraits?.hairLength}
+      />
+
+      {/* Row 3: Hair Style | Build */}
+      <InlineEditField
+        label={language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}
+        value={character.physical?.hairStyle || ''}
+        placeholder={language === 'de' ? 'z.B. lockig' : 'e.g. curly'}
+        onChange={(v) => updatePhysical('hairStyle', v)}
+        isAiExtracted={isAiExtracted}
+        isChanged={changedTraits?.hairStyle}
       />
       <div className="flex items-center gap-2">
         <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
@@ -151,15 +169,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         {changedTraits?.build && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
 
-      {/* Row 3: Hair Style | Face */}
-      <InlineEditField
-        label={language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}
-        value={character.physical?.hairStyle || ''}
-        placeholder={language === 'de' ? 'z.B. lockig' : 'e.g. curly'}
-        onChange={(v) => updatePhysical('hairStyle', v)}
-        isAiExtracted={isAiExtracted}
-        isChanged={changedTraits?.hairStyle}
-      />
+      {/* Row 4: Face | Other */}
       <InlineEditField
         label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
         value={character.physical?.face || ''}
@@ -168,18 +178,14 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         isAiExtracted={isAiExtracted}
         isChanged={changedTraits?.face}
       />
-
-      {/* Row 4: Other (full width) */}
-      <div className="col-span-2">
-        <InlineEditField
-          label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
-          value={character.physical?.other || ''}
-          placeholder={language === 'de' ? 'z.B. Brille, Sommersprossen' : 'e.g. glasses, freckles'}
-          onChange={(v) => updatePhysical('other', v)}
-          isAiExtracted={isAiExtracted}
-          isChanged={changedTraits?.other}
-        />
-      </div>
+      <InlineEditField
+        label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
+        value={character.physical?.other || ''}
+        placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
+        onChange={(v) => updatePhysical('other', v)}
+        isAiExtracted={isAiExtracted}
+        isChanged={changedTraits?.other}
+      />
     </div>
   );
 }
