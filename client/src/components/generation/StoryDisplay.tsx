@@ -533,9 +533,9 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Action Buttons Grid - Order: Add to Book, PDF, Edit, Create Another */}
+      {/* Action Buttons Grid - Order: Create Book, PDF, Edit, Create Another */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        {/* Add to Book */}
+        {/* Create Book */}
         {hasImages && storyId && onAddToBook && (
           <button
             onClick={onAddToBook}
@@ -544,7 +544,7 @@ export function StoryDisplay({
               isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
             }`}
           >
-            <ShoppingCart size={16} /> {language === 'de' ? 'Zum Buch hinzufügen' : language === 'fr' ? 'Ajouter au livre' : 'Add to Book'}
+            <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : 'Create Book'}
           </button>
         )}
 
@@ -2240,7 +2240,7 @@ export function StoryDisplay({
             {language === 'de' ? 'Was möchten Sie als Nächstes tun?' : language === 'fr' ? 'Que souhaitez-vous faire ensuite ?' : 'What would you like to do next?'}
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            {/* Add to Book */}
+            {/* Create Book */}
             {storyId && onAddToBook && (
               <button
                 onClick={onAddToBook}
@@ -2249,7 +2249,7 @@ export function StoryDisplay({
                   isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                 }`}
               >
-                <ShoppingCart size={16} /> {language === 'de' ? 'Zum Buch hinzufügen' : language === 'fr' ? 'Ajouter au livre' : 'Add to Book'}
+                <ShoppingCart size={16} /> {language === 'de' ? 'Buch erstellen' : language === 'fr' ? 'Créer le livre' : 'Create Book'}
               </button>
             )}
 
