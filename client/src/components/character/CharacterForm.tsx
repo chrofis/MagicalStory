@@ -40,6 +40,8 @@ const BUILD_OPTIONS: { value: string; label: string; labelDe: string; labelFr: s
 // Hair length options (body reference points)
 const HAIR_LENGTH_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
   { value: 'bald', label: 'Bald', labelDe: 'Glatze', labelFr: 'Chauve' },
+  { value: 'balding', label: 'Balding', labelDe: 'Halbglatze', labelFr: 'Dégarni' },
+  { value: 'thinning', label: 'Thinning', labelDe: 'Dünnes Haar', labelFr: 'Clairsemé' },
   { value: 'buzz cut', label: 'Buzz Cut', labelDe: 'Sehr kurz', labelFr: 'Très court' },
   { value: 'cropped', label: 'Cropped', labelDe: 'Kurz', labelFr: 'Court' },
   { value: 'pixie', label: 'Pixie', labelDe: 'Pixie', labelFr: 'Pixie' },
