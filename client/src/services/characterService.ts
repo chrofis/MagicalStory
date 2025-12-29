@@ -287,6 +287,7 @@ export const characterService = {
         physicalDescription,
         name: character.name,
         age: character.age,
+        apparentAge: character.apparentAge,
         gender: character.gender,
         build: character.physical?.build || 'average',
       });
@@ -350,6 +351,7 @@ export const characterService = {
         physicalDescription,
         name: character.name,
         age: character.age,
+        apparentAge: character.apparentAge,
         gender: character.gender,
         build: character.physical?.build || 'average',
         // Pass all physical traits to include in the avatar generation prompt

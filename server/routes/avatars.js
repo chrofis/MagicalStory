@@ -432,7 +432,7 @@ router.get('/avatar-prompt', authenticateToken, async (req, res) => {
  */
 router.post('/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    const { characterId, facePhoto, physicalDescription, name, age, gender, build, physicalTraits } = req.body;
+    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
@@ -445,8 +445,14 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
 
     // Build physical traits section if provided
     let physicalTraitsSection = '';
-    if (physicalTraits || build) {
+    if (physicalTraits || build || apparentAge || age) {
       const traitParts = [];
+      // Add apparent age first (most important for body generation)
+      if (apparentAge) {
+        traitParts.push(`Apparent age: ${apparentAge}`);
+      } else if (age) {
+        traitParts.push(`Age: ${age} years old`);
+      }
       if (build) traitParts.push(`Build: ${build}`);
       else if (physicalTraits?.build) traitParts.push(`Build: ${physicalTraits.build}`);
       if (physicalTraits?.hair) traitParts.push(`Hair: ${physicalTraits.hair}`);
