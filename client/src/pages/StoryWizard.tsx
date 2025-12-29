@@ -2365,14 +2365,14 @@ export default function StoryWizard() {
               setJobId(null);
               setIsProgressStalled(false);
               setGenerationProgress({ current: 0, total: 0, message: '' });
-              alert(language === 'de'
+              showInfo(language === 'de'
                 ? 'Generierung abgebrochen'
                 : language === 'fr'
                 ? 'Génération annulée'
                 : 'Generation cancelled');
             } catch (error) {
               log.error('Failed to cancel job:', error);
-              alert(language === 'de'
+              showError(language === 'de'
                 ? 'Abbruch fehlgeschlagen'
                 : language === 'fr'
                 ? 'Échec de l\'annulation'
@@ -2489,7 +2489,7 @@ export default function StoryWizard() {
                     }
                   } catch (error) {
                     log.error('Edit failed:', error);
-                    alert(language === 'de'
+                    showError(language === 'de'
                       ? 'Bearbeitung fehlgeschlagen. Bitte versuche es erneut.'
                       : language === 'fr'
                       ? 'Échec de la modification. Veuillez réessayer.'

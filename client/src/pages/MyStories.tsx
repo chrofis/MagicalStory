@@ -195,7 +195,7 @@ export default function MyStories() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
-  const { showSuccess, showInfo } = useToast();
+  const { showSuccess, showInfo, showError } = useToast();
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -504,7 +504,7 @@ export default function MyStories() {
       });
     } catch (error) {
       log.error('Failed to delete story:', error);
-      alert(language === 'de'
+      showError(language === 'de'
         ? 'Geschichte konnte nicht gelöscht werden. Bitte versuche es erneut.'
         : language === 'fr'
         ? 'Impossible de supprimer l\'histoire. Veuillez réessayer.'

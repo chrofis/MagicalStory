@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CreditCard, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useToast } from '@/context/ToastContext';
 import { storyService } from '@/services';
 
 interface CreditsModalProps {
@@ -10,6 +11,7 @@ interface CreditsModalProps {
 
 export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
   const { language } = useLanguage();
+  const { showError } = useToast();
   const [isBuyingCredits, setIsBuyingCredits] = useState(false);
 
   if (!isOpen) return null;
@@ -23,10 +25,10 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
       }
     } catch (error) {
       console.error('Failed to create checkout:', error);
-      alert(language === 'de'
+      showError(language === 'de'
         ? 'Fehler beim Erstellen der Zahlung. Bitte versuchen Sie es erneut.'
         : language === 'fr'
-        ? 'Erreur lors de la creation du paiement. Veuillez reessayer.'
+        ? 'Erreur lors de la création du paiement. Veuillez réessayer.'
         : 'Failed to create payment. Please try again.');
       setIsBuyingCredits(false);
     }
