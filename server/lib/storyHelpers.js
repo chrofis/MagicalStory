@@ -721,6 +721,102 @@ function buildRelativeHeightDescription(characters) {
   return `**HEIGHT ORDER (shortest to tallest):** ${descriptions.join(' -> ')}`;
 }
 
+/**
+ * Build character reference list for image prompts (covers and story pages)
+ * Creates a numbered list with consistent formatting across all image types
+ * @param {Array} photos - Reference photos with name, clothingDescription
+ * @param {Array} characters - Original character data with physical descriptions
+ * @returns {string} Formatted character reference list
+ */
+function buildCharacterReferenceList(photos, characters = null) {
+  if (!photos || photos.length === 0) return '';
+
+  // Age-specific gender term based on apparentAge
+  const getGenderTerm = (gender, apparentAge) => {
+    if (!gender || gender === 'other') return '';
+    const isMale = gender === 'male';
+    switch (apparentAge) {
+      case 'infant':
+        return isMale ? 'baby boy' : 'baby girl';
+      case 'toddler':
+      case 'preschooler':
+      case 'kindergartner':
+        return isMale ? 'little boy' : 'little girl';
+      case 'young-school-age':
+      case 'school-age':
+        return isMale ? 'boy' : 'girl';
+      case 'preteen':
+      case 'young-teen':
+      case 'teenager':
+        return isMale ? 'teenage boy' : 'teenage girl';
+      case 'young-adult':
+        return isMale ? 'young man' : 'young woman';
+      case 'adult':
+      case 'middle-aged':
+        return isMale ? 'man' : 'woman';
+      case 'senior':
+      case 'elderly':
+        return isMale ? 'elderly man' : 'elderly woman';
+      default:
+        return isMale ? 'boy/man' : 'girl/woman';
+    }
+  };
+
+  const charDescriptions = photos.map((photo, index) => {
+    // Find the original character to get full physical description
+    const char = characters?.find(c => c.name === photo.name);
+
+    // Visual age first (how old they look), then actual age
+    const effectiveAgeCategory = char?.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
+    const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
+    const age = char?.age ? `${char.age} years old` : '';
+    const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
+
+    // Include physical traits with labels
+    const physical = char?.physical;
+
+    // Build hair description from separate fields or legacy field
+    let hairDesc = '';
+    if (physical?.hairColor || physical?.hairLength || physical?.hairStyle) {
+      const hairParts = [];
+      if (physical?.hairLength) hairParts.push(physical.hairLength);
+      if (physical?.hairColor) hairParts.push(physical.hairColor);
+      if (physical?.hairStyle) hairParts.push(physical.hairStyle);
+      hairDesc = `Hair: ${hairParts.join(', ')}`;
+    } else if (physical?.hair) {
+      hairDesc = `Hair: ${physical.hair}`;
+    }
+
+    const physicalParts = [
+      physical?.build ? `Build: ${physical.build}` : '',
+      physical?.face ? `Face: ${physical.face}` : '',
+      physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
+      hairDesc,
+      physical?.other ? `Other: ${physical.other}` : '',
+      // Include clothing description from avatar if available
+      photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
+    ].filter(Boolean);
+    const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
+    const brief = [photo.name, visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
+    return `${index + 1}. ${brief}`;
+  });
+
+  let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+
+  // Add relative height description if characters data is available
+  if (characters && characters.length >= 2) {
+    // Filter to only characters in this scene (matching photo names)
+    const sceneCharacters = characters.filter(c => photos.some(p => p.name === c.name));
+    const heightDescription = buildRelativeHeightDescription(sceneCharacters);
+    if (heightDescription) {
+      result += `\n${heightDescription}\n`;
+      log.debug(`📏 Added relative heights: ${heightDescription}`);
+    }
+  }
+
+  return result;
+}
+
 // ============================================================================
 // PARSERS
 // ============================================================================
@@ -1475,6 +1571,7 @@ module.exports = {
   getCharacterPhotoDetails,
   buildCharacterPhysicalDescription,
   buildRelativeHeightDescription,
+  buildCharacterReferenceList,
 
   // Parsers
   parseStoryPages,

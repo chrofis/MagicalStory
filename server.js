@@ -165,6 +165,7 @@ const {
   getCharacterPhotoDetails,
   buildCharacterPhysicalDescription,
   buildRelativeHeightDescription,
+  buildCharacterReferenceList,
   parseStoryPages,
   parseSceneDescriptions,
   extractShortSceneDescriptions,

@@ -28,6 +28,18 @@ Return a JSON object with this EXACT structure:
     "hairLength": "<MUST be one of: bald | balding | thinning | buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
     "hairStyle": "<MUST be one of: straight | wavy | curly | coily | messy | spiky | layered | slicked back | loose | ponytail | braids | bun | pigtails | bob | afro | mohawk | mullet | undercut | bangs | side bangs>",
     "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>"
+  },
+  "detailedHairAnalysis": {
+    "texture": "<fine | medium | thick | coarse>",
+    "type": "<straight | wavy | curly | coily>",
+    "lengthTop": "<length of hair on top in cm, e.g. '5cm', '15cm', '30cm'>",
+    "lengthSides": "<length of hair on sides in cm, e.g. '2cm', '10cm', '25cm'>",
+    "bangsEndAt": "<where fringe/bangs end - 'above eyebrows' | 'at eyebrows' | 'below eyebrows' | 'no bangs'>",
+    "styling": "<messy | slicked | natural | styled | tousled>",
+    "direction": "<which way hair sweeps - 'left' | 'right' | 'back' | 'forward' | 'center part' | 'side part left' | 'side part right'>",
+    "baseColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
+    "highlightsHex": "<highlight color as HEX code if visible, e.g. '#C4A77D', or 'none'>",
+    "salonLevel": "<hair darkness level 1-10, where 1=black, 10=lightest blonde>"
   }
 }
 
