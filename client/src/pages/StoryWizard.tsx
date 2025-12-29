@@ -928,13 +928,20 @@ export default function StoryWizard() {
         ));
 
         // Save the updated avatars to storage
-        const currentData = await characterService.getCharacterData();
-        const updatedCharacters = currentData.characters.map(c =>
-          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
+        // IMPORTANT: Use local state (currentCharacter has user's edits), not API data which may be stale
+        const updatedCharactersForSave = characters.map(c =>
+          c.id === currentCharacter.id
+            ? { ...currentCharacter, avatars: freshAvatars }  // Use currentCharacter to preserve unsaved edits
+            : c
         );
         await characterService.saveCharacterData({
-          ...currentData,
-          characters: updatedCharacters,
+          characters: updatedCharactersForSave,
+          relationships,
+          relationshipTexts,
+          customRelationships,
+          customStrengths: [],
+          customWeaknesses: [],
+          customFears: [],
         });
 
         log.success(`✅ Avatars WITH TRAITS regenerated for ${currentCharacter.name}`);
@@ -1306,12 +1313,24 @@ export default function StoryWizard() {
             ));
             // Also update currentCharacter if it matches
             setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars } : prev);
-            // Save to storage
-            const currentData = await characterService.getCharacterData();
-            const updatedCharacters = currentData.characters.map(c =>
-              c.id === char.id ? { ...c, avatars: freshAvatars } : c
-            );
-            await characterService.saveCharacterData({ ...currentData, characters: updatedCharacters });
+            // Save to storage using local state to preserve any unsaved changes
+            // Use functional update to get latest characters state
+            setCharacters(prevChars => {
+              const updatedCharsForSave = prevChars.map(c =>
+                c.id === char.id ? { ...c, avatars: freshAvatars } : c
+              );
+              // Fire save in background (don't await to avoid blocking)
+              characterService.saveCharacterData({
+                characters: updatedCharsForSave,
+                relationships,
+                relationshipTexts,
+                customRelationships,
+                customStrengths: [],
+                customWeaknesses: [],
+                customFears: [],
+              }).catch(err => console.error('Failed to save avatar update:', err));
+              return updatedCharsForSave;
+            });
             console.log(`[generateStory] ✅ Avatars regenerated for ${char.name}`);
           } else {
             console.warn(`[generateStory] ⚠️ Failed to regenerate avatars for ${char.name}: ${result.error}`);

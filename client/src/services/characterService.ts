@@ -523,13 +523,14 @@ export const characterService = {
       // Now save back to storage
       onProgress?.('saving', `Saving avatars for ${character.name}...`);
 
-      // Fetch current data to ensure we have latest
+      // Fetch current data to get relationships and other characters
       const currentData = await characterService.getCharacterData();
 
       // Update the character with new avatars
+      // IMPORTANT: Use the input `character` object (which has the user's edits), not `c` from API
       const updatedCharacters = currentData.characters.map(c =>
         c.id === character.id
-          ? { ...c, avatars: genResult.avatars }
+          ? { ...character, avatars: genResult.avatars }  // Preserve all fields from input character
           : c
       );
 
