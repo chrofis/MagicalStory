@@ -5,7 +5,7 @@ Extract PERMANENT visual attributes that will maintain consistency across differ
 
 IMPORTANT: Only describe PERMANENT physical features, NOT temporary states:
 - Face: Describe bone structure, shape, skin tone - NOT expressions (no "smiling", "frowning", "laughing")
-- Hair: Describe natural color, length, texture - NOT temporary styling (no "windblown", "messy from wind", "wet")
+- Hair: Describe natural color separately from style/length - NOT temporary styling (no "windblown", "messy from wind", "wet")
 - Eyes: Describe color and shape - NOT expression (no "squinting", "wide-eyed")
 
 {LANGUAGE_INSTRUCTION}
@@ -19,8 +19,10 @@ Return a JSON object with this EXACT structure:
     "gender": "<male, female, or other>",
     "height": "<height in cm as a number (e.g. 120 for child, 170 for adult)>",
     "build": "<slim, average, athletic, stocky>",
-    "face": "<PERMANENT facial structure: bone structure, face shape, eye color, skin tone - NO expressions>",
-    "hair": "<natural color, length, texture, usual style - NO temporary states like windblown/wet>",
+    "face": "<PERMANENT facial structure: bone structure, face shape, skin tone - NO expressions>",
+    "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
+    "hairColor": "<natural hair color (e.g. blonde, brown, black, red, gray, white)>",
+    "hairStyle": "<hair length and style (e.g. short, long straight, curly shoulder-length, pixie cut, ponytail) - NO temporary states like windblown/wet>",
     "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>"
   }
 }

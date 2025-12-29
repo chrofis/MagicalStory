@@ -2,7 +2,7 @@ import { Users, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common';
 import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
-import type { Character } from '@/types/character';
+import type { Character, ChangedTraits } from '@/types/character';
 
 interface WizardStep2Props {
   characters: Character[];
@@ -11,12 +11,15 @@ interface WizardStep2Props {
   showCharacterCreated: boolean;
   isLoading: boolean;
   isAnalyzingPhoto: boolean;
+  isGeneratingAvatar: boolean;  // Background avatar generation
   isRegeneratingAvatars: boolean;
   isRegeneratingAvatarsWithTraits: boolean;
   developerMode: boolean;
+  changedTraits?: ChangedTraits;  // Which traits changed from previous photo
   onCharacterChange: (character: Character | null) => void;
   onCharacterStepChange: (step: 'photo' | 'name' | 'traits') => void;
   onPhotoSelect: (file: File) => void;
+  onSaveAndGenerateAvatar: () => void;  // Save traits and trigger avatar generation
   onSaveCharacter: () => void;
   onEditCharacter: (character: Character) => void;
   onDeleteCharacter: (id: number) => void;
@@ -37,12 +40,15 @@ export function WizardStep2Characters({
   showCharacterCreated,
   isLoading,
   isAnalyzingPhoto,
+  isGeneratingAvatar,
   isRegeneratingAvatars,
   isRegeneratingAvatarsWithTraits,
   developerMode,
+  changedTraits,
   onCharacterChange,
   onCharacterStepChange,
   onPhotoSelect,
+  onSaveAndGenerateAvatar,
   onSaveCharacter,
   onEditCharacter,
   onDeleteCharacter,
@@ -87,14 +93,17 @@ export function WizardStep2Characters({
             onCancel={() => onCharacterChange(null)}
             onPhotoChange={onPhotoSelect}
             onContinueToTraits={() => onCharacterStepChange('traits')}
+            onSaveAndGenerateAvatar={onSaveAndGenerateAvatar}
             onRegenerateAvatars={onRegenerateAvatars}
             onRegenerateAvatarsWithTraits={onRegenerateAvatarsWithTraits}
             isLoading={isLoading}
             isAnalyzingPhoto={isAnalyzingPhoto}
+            isGeneratingAvatar={isGeneratingAvatar}
             isRegeneratingAvatars={isRegeneratingAvatars}
             isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
             step="name"
             developerMode={developerMode}
+            changedTraits={changedTraits}
           />
         </div>
       );
@@ -116,10 +125,12 @@ export function WizardStep2Characters({
           onRegenerateAvatarsWithTraits={onRegenerateAvatarsWithTraits}
           isLoading={isLoading}
           isAnalyzingPhoto={isAnalyzingPhoto}
+          isGeneratingAvatar={isGeneratingAvatar}
           isRegeneratingAvatars={isRegeneratingAvatars}
           isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
           step="traits"
           developerMode={developerMode}
+          changedTraits={changedTraits}
         />
       </div>
     );

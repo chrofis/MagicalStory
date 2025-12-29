@@ -340,7 +340,18 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         if (traits.face) {
           analyzerData.attributes.face = traits.face;
         }
-        if (traits.hair) {
+        // New separated eye and hair fields
+        if (traits.eyeColor) {
+          analyzerData.attributes.eye_color = traits.eyeColor;
+        }
+        if (traits.hairColor) {
+          analyzerData.attributes.hair_color = traits.hairColor;
+        }
+        if (traits.hairStyle) {
+          analyzerData.attributes.hair_style = traits.hairStyle;
+        }
+        // Legacy: combined hair field (fallback for old code)
+        if (traits.hair && !traits.hairColor) {
           analyzerData.attributes.hair_color = traits.hair;
         }
         const distinctiveMarkings = traits["distinctive markings"] || traits.distinctiveMarkings || traits.other;
@@ -462,7 +473,13 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       }
       if (build) traitParts.push(`Build: ${build}`);
       else if (physicalTraits?.build) traitParts.push(`Build: ${physicalTraits.build}`);
-      if (physicalTraits?.hair) traitParts.push(`Hair: ${physicalTraits.hair}`);
+      // Use new separated hair fields if available, otherwise fall back to combined 'hair' field
+      if (physicalTraits?.hairColor) traitParts.push(`Hair color: ${physicalTraits.hairColor}`);
+      if (physicalTraits?.hairStyle) traitParts.push(`Hair style: ${physicalTraits.hairStyle}`);
+      if (!physicalTraits?.hairColor && !physicalTraits?.hairStyle && physicalTraits?.hair) {
+        traitParts.push(`Hair: ${physicalTraits.hair}`);
+      }
+      if (physicalTraits?.eyeColor) traitParts.push(`Eye color: ${physicalTraits.eyeColor}`);
       if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
       if (physicalTraits?.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
       if (traitParts.length > 0) {

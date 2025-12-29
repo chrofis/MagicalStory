@@ -45,11 +45,15 @@ interface CharacterApiResponse {
   // Physical traits (snake_case + camelCase legacy)
   height?: string;
   build?: string;
+  eye_color?: string;
+  eyeColor?: string;
   hair_color?: string;
   hairColor?: string;
+  hair_style?: string;
+  hairStyle?: string;
   other_features?: string;
   otherFeatures?: string;
-  other?: string;  // New: glasses, birthmarks, always-present accessories
+  other?: string;  // Glasses, birthmarks, always-present accessories
   // Photos (snake_case + camelCase legacy)
   photo_url?: string;
   photoUrl?: string;
@@ -93,7 +97,10 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     height: api.height,
     build: api.build,
     face: api.other_features || api.otherFeatures,
-    hair: api.hair_color || api.hairColor,
+    eyeColor: api.eye_color || api.eyeColor,
+    hairColor: api.hair_color || api.hairColor,
+    hairStyle: api.hair_style || api.hairStyle,
+    hair: api.hair_color || api.hairColor,  // Legacy: combined hair field
     other: api.other,  // Glasses, birthmarks, always-present accessories
   };
 
@@ -153,7 +160,9 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     // Physical traits
     height: char.physical?.height,
     build: char.physical?.build,
-    hair_color: char.physical?.hair,
+    eye_color: char.physical?.eyeColor,
+    hair_color: char.physical?.hairColor,
+    hair_style: char.physical?.hairStyle,
     other_features: char.physical?.face,
     other: char.physical?.other,  // Glasses, birthmarks, always-present accessories
     // Photos
@@ -389,7 +398,10 @@ export const characterService = {
       height?: string;
       build?: string;
       face?: string;
-      hair?: string;
+      eyeColor?: string;
+      hairColor?: string;
+      hairStyle?: string;
+      hair?: string;   // Legacy: combined hair description
       other?: string;  // Glasses, birthmarks, always-present accessories
     };
     clothing?: {
@@ -412,7 +424,12 @@ export const characterService = {
           height?: string;
           build?: string;
           face?: string;  // Face description
+          eye_color?: string;
+          eyeColor?: string;
           hair_color?: string;
+          hairColor?: string;
+          hair_style?: string;
+          hairStyle?: string;
           clothing?: string;
           clothingStyle?: string;  // Colors and patterns of clothing
           clothingColors?: string;  // Legacy: main colors of clothing
@@ -427,7 +444,10 @@ export const characterService = {
         height: response.attributes?.height,
         build: response.attributes?.build,
         face: response.attributes?.face,  // Face description
-        hair: response.attributes?.hair_color,
+        eyeColor: response.attributes?.eye_color || response.attributes?.eyeColor,
+        hairColor: response.attributes?.hair_color || response.attributes?.hairColor,
+        hairStyle: response.attributes?.hair_style || response.attributes?.hairStyle,
+        hair: response.attributes?.hair_color || response.attributes?.hairColor,  // Legacy compatibility
         other: response.attributes?.other_features,  // Distinctive markings
       };
 

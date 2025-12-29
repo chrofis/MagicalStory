@@ -10,8 +10,25 @@ export interface PhysicalTraits {
   height?: string;
   build?: string;
   face?: string;
-  hair?: string;
-  other?: string;  // Glasses, birthmarks, always-present accessories
+  eyeColor?: string;     // Eye color (e.g., "blue", "brown", "green")
+  hairColor?: string;    // Hair color (e.g., "blonde", "brown", "black")
+  hairStyle?: string;    // Hair style (e.g., "curly", "straight", "short ponytail")
+  hair?: string;         // Legacy: combined hair description (deprecated, use hairColor + hairStyle)
+  other?: string;        // Glasses, birthmarks, always-present accessories
+}
+
+// Tracks which physical traits changed from previous photo analysis
+export interface ChangedTraits {
+  build?: boolean;
+  face?: boolean;
+  eyeColor?: boolean;
+  hairColor?: boolean;
+  hairStyle?: boolean;
+  hair?: boolean;        // Legacy
+  other?: boolean;
+  gender?: boolean;
+  age?: boolean;
+  apparentAge?: boolean;
 }
 
 // Psychological traits

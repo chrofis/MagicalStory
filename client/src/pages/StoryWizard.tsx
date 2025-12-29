@@ -17,7 +17,7 @@ import {
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 
 // Types
-import type { Character, RelationshipMap, RelationshipTextMap, VisualBible } from '@/types/character';
+import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits } from '@/types/character';
 import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages } from '@/types/story';
 
 // Services & Helpers
@@ -89,8 +89,11 @@ export default function StoryWizard() {
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
   const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits'>('photo');
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);  // Background avatar generation
   const [isRegeneratingAvatars, setIsRegeneratingAvatars] = useState(false);
   const [isRegeneratingAvatarsWithTraits, setIsRegeneratingAvatarsWithTraits] = useState(false);
+  const [changedTraits, setChangedTraits] = useState<ChangedTraits | undefined>(undefined);
+  const previousTraitsRef = useRef<{ physical?: Character['physical']; gender?: string; age?: string } | null>(null);
 
   // Step 3: Relationships - loaded from API with characters
   const [relationships, setRelationships] = useState<RelationshipMap>({});
@@ -770,6 +773,17 @@ export default function StoryWizard() {
     reader.onload = async (e) => {
       const originalPhotoUrl = e.target?.result as string;
 
+      // Store previous traits for comparison (before analysis overwrites them)
+      if (currentCharacter) {
+        previousTraitsRef.current = {
+          physical: currentCharacter.physical,
+          gender: currentCharacter.gender,
+          age: currentCharacter.age,
+        };
+      }
+      // Clear changed traits indicator when starting new analysis
+      setChangedTraits(undefined);
+
       // Start analyzing - don't show photo yet
       setIsAnalyzingPhoto(true);
       // Only go to name step if not already in traits step (editing existing character)
@@ -805,9 +819,34 @@ export default function StoryWizard() {
               // Always overwrite other physical traits from photo analysis
               build: analysis.physical.build || prev.physical?.build,
               face: analysis.physical.face || prev.physical?.face,
-              hair: analysis.physical.hair || prev.physical?.hair,
+              eyeColor: analysis.physical.eyeColor || prev.physical?.eyeColor,
+              hairColor: analysis.physical.hairColor || prev.physical?.hairColor,
+              hairStyle: analysis.physical.hairStyle || prev.physical?.hairStyle,
+              hair: analysis.physical.hair || prev.physical?.hair,  // Legacy
               other: analysis.physical.other || prev.physical?.other,
             } : prev.physical;
+
+            // Compare previous vs new traits to highlight changes
+            const prevTraits = previousTraitsRef.current;
+            if (prevTraits && (prevTraits.physical || prevTraits.gender || prevTraits.age)) {
+              const changes: ChangedTraits = {};
+              // Only mark as changed if there WAS a previous value AND it's different
+              if (prevTraits.physical?.eyeColor && newPhysical?.eyeColor !== prevTraits.physical.eyeColor) changes.eyeColor = true;
+              if (prevTraits.physical?.hairColor && newPhysical?.hairColor !== prevTraits.physical.hairColor) changes.hairColor = true;
+              if (prevTraits.physical?.hairStyle && newPhysical?.hairStyle !== prevTraits.physical.hairStyle) changes.hairStyle = true;
+              if (prevTraits.physical?.hair && newPhysical?.hair !== prevTraits.physical.hair) changes.hair = true;
+              if (prevTraits.physical?.face && newPhysical?.face !== prevTraits.physical.face) changes.face = true;
+              if (prevTraits.physical?.build && newPhysical?.build !== prevTraits.physical.build) changes.build = true;
+              if (prevTraits.physical?.other && newPhysical?.other !== prevTraits.physical.other) changes.other = true;
+              if (prevTraits.gender && analysis.gender && analysis.gender !== prevTraits.gender) changes.gender = true;
+              if (prevTraits.age && analysis.age && analysis.age !== prevTraits.age) changes.age = true;
+
+              // Only set if there are actual changes
+              if (Object.keys(changes).length > 0) {
+                log.info('Traits changed from previous photo:', changes);
+                setChangedTraits(changes);
+              }
+            }
 
             return {
               ...prev,
@@ -954,6 +993,52 @@ export default function StoryWizard() {
       showError(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRegeneratingAvatarsWithTraits(false);
+    }
+  };
+
+  // Handler for "Save & Generate Avatar" button
+  // Moves to traits step and triggers avatar generation in background
+  const handleSaveAndGenerateAvatar = async () => {
+    if (!currentCharacter) return;
+
+    // Clear changed traits indicator after saving
+    setChangedTraits(undefined);
+
+    // Move to traits step immediately so user can continue editing
+    setCharacterStep('traits');
+
+    // Start background avatar generation
+    setIsGeneratingAvatar(true);
+    setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'generating' } } : prev);
+
+    log.info(`🎨 Starting avatar generation for ${currentCharacter.name}...`);
+
+    try {
+      // Generate avatars with physical traits
+      const result = await characterService.generateClothingAvatarsWithTraits(currentCharacter);
+
+      if (result.success && result.avatars) {
+        const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
+
+        // Update local state with new avatars
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
+        setCharacters(prev => prev.map(c =>
+          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
+        ));
+
+        log.success(`✅ Avatar generated for ${currentCharacter.name}`);
+      } else {
+        log.error(`❌ Failed to generate avatar: ${result.error}`);
+        showError(`Failed to generate avatar: ${result.error || 'Unknown error'}`);
+        // Mark as failed
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+      }
+    } catch (error) {
+      log.error(`❌ Avatar generation failed:`, error);
+      showError(`Avatar generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+    } finally {
+      setIsGeneratingAvatar(false);
     }
   };
 
@@ -1644,12 +1729,15 @@ export default function StoryWizard() {
             showCharacterCreated={showCharacterCreated}
             isLoading={isLoading}
             isAnalyzingPhoto={isAnalyzingPhoto}
+            isGeneratingAvatar={isGeneratingAvatar}
             isRegeneratingAvatars={isRegeneratingAvatars}
             isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
             developerMode={developerMode}
+            changedTraits={changedTraits}
             onCharacterChange={setCurrentCharacter}
             onCharacterStepChange={setCharacterStep}
             onPhotoSelect={handlePhotoSelect}
+            onSaveAndGenerateAvatar={handleSaveAndGenerateAvatar}
             onSaveCharacter={saveCharacter}
             onEditCharacter={editCharacter}
             onDeleteCharacter={deleteCharacter}

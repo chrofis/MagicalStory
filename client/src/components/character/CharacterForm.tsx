@@ -1,12 +1,12 @@
 import { ChangeEvent, useState } from 'react';
-import { Upload, Save, ArrowRight, RefreshCw } from 'lucide-react';
+import { Upload, Save, RefreshCw, Sparkles, Wand2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory } from '@/services/characterService';
-import type { Character, PhysicalTraits, AgeCategory } from '@/types/character';
+import type { Character, PhysicalTraits, AgeCategory, ChangedTraits } from '@/types/character';
 
 // Age category options for the dropdown
 const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string; labelFr: string }[] = [
@@ -32,19 +32,32 @@ interface InlineEditFieldProps {
   value: string;
   placeholder?: string;
   onChange: (value: string) => void;
+  isChanged?: boolean;  // Highlight if trait changed from previous photo
+  isAiExtracted?: boolean;  // Style as AI-extracted (grayed)
 }
 
-function InlineEditField({ label, value, placeholder, onChange }: InlineEditFieldProps) {
+function InlineEditField({ label, value, placeholder, onChange, isChanged, isAiExtracted }: InlineEditFieldProps) {
   return (
     <div className="flex items-center gap-2">
-      <span className="font-medium text-gray-600 text-xs whitespace-nowrap">{label}:</span>
+      <span className={`font-medium text-xs whitespace-nowrap ${isAiExtracted ? 'text-gray-400' : 'text-gray-600'}`}>
+        {label}:
+      </span>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:border-indigo-400 bg-white hover:border-gray-300"
+        className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
+          isChanged
+            ? 'border-amber-400 bg-amber-50 text-amber-800'
+            : isAiExtracted
+              ? 'border-gray-200 bg-gray-50 text-gray-500'
+              : 'border-gray-200 bg-white'
+        }`}
         placeholder={placeholder}
       />
+      {isChanged && (
+        <span className="text-amber-500 text-xs" title="Changed from previous photo">●</span>
+      )}
     </div>
   );
 }
@@ -56,14 +69,17 @@ interface CharacterFormProps {
   onCancel?: () => void;
   onPhotoChange: (file: File) => void;
   onContinueToTraits?: () => void;
+  onSaveAndGenerateAvatar?: () => void;  // New: triggers avatar generation
   onRegenerateAvatars?: () => void;
   onRegenerateAvatarsWithTraits?: () => void;
   isLoading?: boolean;
   isAnalyzingPhoto?: boolean;
+  isGeneratingAvatar?: boolean;  // New: background avatar generation in progress
   isRegeneratingAvatars?: boolean;
   isRegeneratingAvatarsWithTraits?: boolean;
   step: 'name' | 'traits';
   developerMode?: boolean;
+  changedTraits?: ChangedTraits;  // New: which traits changed from previous photo
 }
 
 export function CharacterForm({
@@ -73,14 +89,17 @@ export function CharacterForm({
   onCancel,
   onPhotoChange,
   onContinueToTraits,
+  onSaveAndGenerateAvatar,
   onRegenerateAvatars,
   onRegenerateAvatarsWithTraits,
   isLoading,
   isAnalyzingPhoto,
+  isGeneratingAvatar,
   isRegeneratingAvatars,
   isRegeneratingAvatarsWithTraits,
   step,
   developerMode,
+  changedTraits,
 }: CharacterFormProps) {
   const { t, language } = useLanguage();
   const [enlargedAvatar, setEnlargedAvatar] = useState(false);
@@ -151,58 +170,210 @@ export function CharacterForm({
   // Get display photo URL
   const displayPhoto = character.photos?.face || character.photos?.original;
 
-  // Step 1: Name entry only
+  // Check if any traits changed (for showing indicator)
+  const hasChangedTraits = changedTraits && Object.values(changedTraits).some(v => v);
+
+  // Step 1: Name entry + Physical traits (AI-extracted) + Avatar placeholder
   if (step === 'name') {
     return (
       <div className="space-y-6">
-        {/* Photo display - show spinner while analyzing */}
-        <div className="flex flex-col items-center gap-4">
-          {isAnalyzingPhoto ? (
-            <div className="w-32 h-32 rounded-full bg-indigo-100 border-4 border-indigo-400 shadow-lg flex items-center justify-center">
+        {/* Main content: Photo/Info on left, Avatar placeholder on right */}
+        <div className="flex gap-4">
+          {/* Left side: Photo, name, basic info, physical traits */}
+          <div className="flex-1 min-w-0 space-y-4">
+            {/* Photo display - show spinner while analyzing */}
+            <div className="flex items-start gap-4">
               <div className="flex flex-col items-center gap-2">
-                <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-indigo-600 font-medium">
-                  {language === 'de' ? 'Analysiere...' : language === 'fr' ? 'Analyse...' : 'Analyzing...'}
-                </span>
+                {isAnalyzingPhoto ? (
+                  <div className="w-24 h-24 rounded-full bg-indigo-100 border-4 border-indigo-400 shadow-lg flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] text-indigo-600 font-medium">
+                        {language === 'de' ? 'Analysiere...' : language === 'fr' ? 'Analyse...' : 'Analyzing...'}
+                      </span>
+                    </div>
+                  </div>
+                ) : displayPhoto ? (
+                  <img
+                    src={displayPhoto}
+                    alt="Character"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-indigo-400 shadow-lg"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-gray-300 flex items-center justify-center">
+                    <Upload size={24} className="text-gray-400" />
+                  </div>
+                )}
+
+                <label className="cursor-pointer bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs hover:bg-gray-300 flex items-center gap-1.5 font-semibold transition-colors">
+                  <Upload size={12} />
+                  {language === 'de' ? 'Ändern' : language === 'fr' ? 'Changer' : 'Change'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {/* Name input */}
+              <div className="flex-1">
+                <label className="block text-sm font-semibold mb-1 text-gray-700">
+                  {language === 'de' ? 'Name' : language === 'fr' ? 'Nom' : 'Name'}
+                </label>
+                <input
+                  type="text"
+                  value={character.name}
+                  onChange={(e) => updateField('name', e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-lg focus:border-indigo-500 focus:outline-none"
+                  placeholder={t.characterName}
+                  autoFocus
+                />
               </div>
             </div>
-          ) : displayPhoto ? (
-            <img
-              src={displayPhoto}
-              alt="Character"
-              className="w-32 h-32 rounded-full object-cover border-4 border-indigo-400 shadow-lg"
-            />
-          ) : (
-            <div className="w-32 h-32 rounded-full bg-gray-200 border-4 border-gray-300 flex items-center justify-center">
-              <Upload size={32} className="text-gray-400" />
+
+            {/* Basic Info - Gender, Age */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 mb-0.5 flex items-center gap-1">
+                  <Sparkles size={10} className="text-gray-300" />
+                  {t.gender}
+                  {changedTraits?.gender && <span className="text-amber-500">●</span>}
+                </label>
+                <select
+                  value={character.gender}
+                  onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
+                  className={`w-full px-2 py-1.5 border rounded text-sm focus:border-indigo-500 focus:outline-none ${
+                    changedTraits?.gender ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <option value="male">{t.male}</option>
+                  <option value="female">{t.female}</option>
+                  <option value="other">{t.other}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 mb-0.5 flex items-center gap-1">
+                  <Sparkles size={10} className="text-gray-300" />
+                  {t.age}
+                  {changedTraits?.age && <span className="text-amber-500">●</span>}
+                </label>
+                <input
+                  type="number"
+                  value={character.age}
+                  onChange={(e) => updateField('age', e.target.value)}
+                  className={`w-full px-2 py-1.5 border rounded text-sm focus:border-indigo-500 focus:outline-none ${
+                    changedTraits?.age ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 text-gray-600'
+                  }`}
+                  min="1"
+                  max="120"
+                />
+              </div>
             </div>
-          )}
 
-          <label className="cursor-pointer bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-300 flex items-center gap-2 font-semibold transition-colors">
-            <Upload size={16} />
-            {language === 'de' ? 'Anderes Foto' : language === 'fr' ? 'Autre photo' : 'Change Photo'}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </label>
-        </div>
+            {/* Physical Features - AI-extracted (grayed, editable) */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles size={14} className="text-gray-400" />
+                <span className="text-xs font-medium text-gray-500">
+                  {language === 'de' ? 'KI-erkannte Merkmale' : language === 'fr' ? 'Caractéristiques détectées par l\'IA' : 'AI-detected features'}
+                </span>
+                {hasChangedTraits && (
+                  <span className="text-xs text-amber-600 flex items-center gap-1">
+                    <span className="text-amber-500">●</span>
+                    {language === 'de' ? 'Geändert' : language === 'fr' ? 'Modifié' : 'Changed'}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1.5 text-xs">
+                <InlineEditField
+                  label={language === 'de' ? 'Augenfarbe' : language === 'fr' ? 'Couleur des yeux' : 'Eye Color'}
+                  value={character.physical?.eyeColor || ''}
+                  placeholder={language === 'de' ? 'z.B. blau, braun' : 'e.g. blue, brown'}
+                  onChange={(v) => updatePhysical('eyeColor', v)}
+                  isAiExtracted={true}
+                  isChanged={changedTraits?.eyeColor}
+                />
+                <InlineEditField
+                  label={language === 'de' ? 'Haarfarbe' : language === 'fr' ? 'Couleur des cheveux' : 'Hair Color'}
+                  value={character.physical?.hairColor || ''}
+                  placeholder={language === 'de' ? 'z.B. blond, braun' : 'e.g. blonde, brown'}
+                  onChange={(v) => updatePhysical('hairColor', v)}
+                  isAiExtracted={true}
+                  isChanged={changedTraits?.hairColor}
+                />
+                <InlineEditField
+                  label={language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}
+                  value={character.physical?.hairStyle || ''}
+                  placeholder={language === 'de' ? 'z.B. lockig, kurz' : 'e.g. curly, short'}
+                  onChange={(v) => updatePhysical('hairStyle', v)}
+                  isAiExtracted={true}
+                  isChanged={changedTraits?.hairStyle}
+                />
+                <InlineEditField
+                  label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
+                  value={character.physical?.face || ''}
+                  placeholder={language === 'de' ? 'z.B. rund, oval' : 'e.g. round, oval'}
+                  onChange={(v) => updatePhysical('face', v)}
+                  isAiExtracted={true}
+                  isChanged={changedTraits?.face}
+                />
+                <InlineEditField
+                  label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
+                  value={character.physical?.build || ''}
+                  placeholder={language === 'de' ? 'z.B. schlank' : 'e.g. slim'}
+                  onChange={(v) => updatePhysical('build', v)}
+                  isAiExtracted={true}
+                  isChanged={changedTraits?.build}
+                />
+                <InlineEditField
+                  label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
+                  value={character.physical?.other || ''}
+                  placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
+                  onChange={(v) => updatePhysical('other', v)}
+                  isAiExtracted={true}
+                  isChanged={changedTraits?.other}
+                />
+              </div>
+              <p className="mt-2 text-[10px] text-gray-400 italic">
+                {language === 'de' ? 'Diese Merkmale wurden aus dem Foto erkannt. Sie können sie bearbeiten.' :
+                 language === 'fr' ? 'Ces caractéristiques ont été détectées à partir de la photo. Vous pouvez les modifier.' :
+                 'These features were detected from the photo. You can edit them.'}
+              </p>
+            </div>
+          </div>
 
-        {/* Name input */}
-        <div>
-          <label className="block text-lg font-semibold mb-2 text-center">
-            {language === 'de' ? 'Wie heisst diese Person?' : language === 'fr' ? 'Comment s\'appelle cette personne?' : 'What is this person\'s name?'}
-          </label>
-          <input
-            type="text"
-            value={character.name}
-            onChange={(e) => updateField('name', e.target.value)}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg text-center focus:border-indigo-500 focus:outline-none"
-            placeholder={t.characterName}
-            autoFocus
-          />
+          {/* Right side: Avatar placeholder */}
+          <div className="flex-shrink-0 w-36">
+            <div className="text-center">
+              <div className="w-36 h-48 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
+                {(isGeneratingAvatar || character.avatars?.status === 'generating') ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs text-indigo-600 font-medium px-2 text-center">
+                      {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création de l\'avatar...' : 'Creating avatar...'}
+                    </span>
+                  </div>
+                ) : character.avatars?.standard ? (
+                  <img
+                    src={character.avatars.standard}
+                    alt={`${character.name} avatar`}
+                    className="w-full h-full object-contain rounded-lg"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 px-2">
+                    <Wand2 size={24} className="text-gray-300" />
+                    <span className="text-[10px] text-gray-400 text-center">
+                      {language === 'de' ? 'Avatar wird nach dem Speichern erstellt' :
+                       language === 'fr' ? 'L\'avatar sera créé après la sauvegarde' :
+                       'Avatar will be created after saving'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Buttons */}
@@ -216,13 +387,15 @@ export function CharacterForm({
             </button>
           )}
           <Button
-            onClick={onContinueToTraits}
-            disabled={!canSaveName || isLoading}
+            onClick={onSaveAndGenerateAvatar || onContinueToTraits}
+            disabled={!canSaveName || isLoading || isAnalyzingPhoto}
             loading={isLoading}
-            icon={ArrowRight}
+            icon={Wand2}
             className={onCancel ? "flex-1" : "w-full"}
           >
-            {language === 'de' ? 'Weiter' : language === 'fr' ? 'Continuer' : 'Continue'}
+            {language === 'de' ? 'Speichern & Avatar erstellen' :
+             language === 'fr' ? 'Enregistrer et créer l\'avatar' :
+             'Save & Generate Avatar'}
           </Button>
         </div>
       </div>
@@ -316,16 +489,28 @@ export function CharacterForm({
             </summary>
             <div className="px-3 pb-3 space-y-1.5 text-xs">
               <InlineEditField
+                label={language === 'de' ? 'Augenfarbe' : language === 'fr' ? 'Couleur des yeux' : 'Eye Color'}
+                value={character.physical?.eyeColor || ''}
+                placeholder={language === 'de' ? 'z.B. blau, braun' : 'e.g. blue, brown'}
+                onChange={(v) => updatePhysical('eyeColor', v)}
+              />
+              <InlineEditField
+                label={language === 'de' ? 'Haarfarbe' : language === 'fr' ? 'Couleur des cheveux' : 'Hair Color'}
+                value={character.physical?.hairColor || ''}
+                placeholder={language === 'de' ? 'z.B. blond, braun' : 'e.g. blonde, brown'}
+                onChange={(v) => updatePhysical('hairColor', v)}
+              />
+              <InlineEditField
+                label={language === 'de' ? 'Frisur' : language === 'fr' ? 'Coiffure' : 'Hair Style'}
+                value={character.physical?.hairStyle || ''}
+                placeholder={language === 'de' ? 'z.B. lockig, kurz' : 'e.g. curly, short'}
+                onChange={(v) => updatePhysical('hairStyle', v)}
+              />
+              <InlineEditField
                 label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
                 value={character.physical?.face || ''}
                 placeholder={language === 'de' ? 'z.B. rund, oval' : 'e.g. round, oval'}
                 onChange={(v) => updatePhysical('face', v)}
-              />
-              <InlineEditField
-                label={language === 'de' ? 'Haare' : language === 'fr' ? 'Cheveux' : 'Hair'}
-                value={character.physical?.hair || ''}
-                placeholder={language === 'de' ? 'z.B. braun, kurz' : 'e.g. brown, short'}
-                onChange={(v) => updatePhysical('hair', v)}
               />
               <InlineEditField
                 label={language === 'de' ? 'Körperbau' : language === 'fr' ? 'Corpulence' : 'Build'}
@@ -375,16 +560,21 @@ export function CharacterForm({
                   onClick={() => setEnlargedAvatar(true)}
                   title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                 />
-                {(isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') && (
+                {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
                     <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
               </div>
             ) : (
-              <div className="w-40 h-56 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
-                {(isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
-                  <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-40 h-56 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
+                {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs text-indigo-600 font-medium px-2 text-center">
+                      {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création...' : 'Creating...'}
+                    </span>
+                  </div>
                 ) : (
                   <span className="text-[10px] text-gray-400 text-center px-2">
                     {language === 'de' ? 'Kein Avatar' : 'No avatar'}
