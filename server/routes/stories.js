@@ -29,38 +29,71 @@ router.get('/', authenticateToken, async (req, res) => {
       const countResult = await dbQuery('SELECT COUNT(*) as count FROM stories WHERE user_id = $1', [req.user.id]);
       totalCount = parseInt(countResult[0]?.count || 0);
 
-      // Get paginated data
+      // Get paginated data using JSON operators to extract only metadata (not full image data)
+      // This is MUCH faster than loading the entire data blob which contains base64 images
       const rows = await dbQuery(
-        'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+        `SELECT
+          data->>'id' as id,
+          data->>'title' as title,
+          data->>'createdAt' as "createdAt",
+          data->>'updatedAt' as "updatedAt",
+          (data->>'pages')::int as pages,
+          data->>'language' as language,
+          data->>'languageLevel' as "languageLevel",
+          data->'characters' as characters_json,
+          COALESCE(jsonb_array_length(data->'sceneImages'), 0) as scene_count,
+          (data->>'isPartial')::boolean as "isPartial",
+          (data->>'generatedPages')::int as "generatedPages",
+          (data->>'totalPages')::int as "totalPages",
+          CASE
+            WHEN data->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
+            WHEN data->'coverImages'->'frontCover' IS NOT NULL AND jsonb_typeof(data->'coverImages'->'frontCover') = 'string' THEN true
+            WHEN data->>'thumbnail' IS NOT NULL THEN true
+            ELSE false
+          END as "hasThumbnail"
+        FROM stories
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3`,
         [req.user.id, limit, offset]
       );
 
-      // Parse and return metadata only (no images for performance)
+      // Map database results to response format (no JSON parsing needed!)
       userStories = rows.map(row => {
-        const story = JSON.parse(row.data);
-        const hasThumbnail = !!(story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail);
         // Calculate page count:
         // - Picture book (1st-grade): 1 scene = 1 page (image with text below)
         // - Standard/Advanced: 1 scene = 2 pages (text page + image page)
         // - Plus 3 cover pages (front, back, initial/dedication)
-        const sceneCount = story.sceneImages?.length || 0;
-        const isPictureBook = story.languageLevel === '1st-grade';
+        const sceneCount = parseInt(row.scene_count) || 0;
+        const isPictureBook = row.languageLevel === '1st-grade';
         const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
         const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
+
+        // Parse characters from JSON (small data)
+        let characters = [];
+        try {
+          const charsData = typeof row.characters_json === 'string'
+            ? JSON.parse(row.characters_json)
+            : row.characters_json;
+          characters = (charsData || []).map(c => ({ name: c.name, id: c.id }));
+        } catch (e) {
+          // Ignore parse errors
+        }
+
         return {
-          id: story.id,
-          title: story.title,
-          createdAt: story.createdAt,
-          updatedAt: story.updatedAt,
-          pages: story.pages,
-          language: story.language,
-          languageLevel: story.languageLevel,
-          characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+          id: row.id,
+          title: row.title,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          pages: row.pages,
+          language: row.language,
+          languageLevel: row.languageLevel,
+          characters,
           pageCount,
-          hasThumbnail,
-          isPartial: story.isPartial || false,
-          generatedPages: story.generatedPages,
-          totalPages: story.totalPages
+          hasThumbnail: row.hasThumbnail || false,
+          isPartial: row.isPartial || false,
+          generatedPages: row.generatedPages,
+          totalPages: row.totalPages
         };
       });
     } else {

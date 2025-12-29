@@ -491,26 +491,56 @@ router.get('/:userId/stories', authenticateToken, requireAdmin, async (req, res)
     }
     const targetUsername = userResult[0].username;
 
-    const selectQuery = 'SELECT data FROM stories WHERE user_id = $1 ORDER BY created_at DESC';
+    // Use JSON operators to extract only metadata (not full image data) for performance
+    const selectQuery = `SELECT
+      data->>'id' as id,
+      data->>'title' as title,
+      data->>'createdAt' as "createdAt",
+      data->>'updatedAt' as "updatedAt",
+      (data->>'pages')::int as pages,
+      data->>'language' as language,
+      data->>'languageLevel' as "languageLevel",
+      data->'characters' as characters_json,
+      COALESCE(jsonb_array_length(data->'sceneImages'), 0) as scene_count,
+      CASE
+        WHEN data->'coverImages'->'frontCover'->'imageData' IS NOT NULL THEN true
+        WHEN data->'coverImages'->'frontCover' IS NOT NULL AND jsonb_typeof(data->'coverImages'->'frontCover') = 'string' THEN true
+        WHEN data->>'thumbnail' IS NOT NULL THEN true
+        ELSE false
+      END as "hasThumbnail"
+    FROM stories
+    WHERE user_id = $1
+    ORDER BY created_at DESC`;
     const rows = await dbQuery(selectQuery, [targetUserId]);
 
     const userStories = rows.map(row => {
-      const story = JSON.parse(row.data);
-      const sceneCount = story.sceneImages?.length || 0;
-      const isPictureBook = story.languageLevel === '1st-grade';
+      const sceneCount = parseInt(row.scene_count) || 0;
+      const isPictureBook = row.languageLevel === '1st-grade';
       const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
       const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
+
+      // Parse characters from JSON (small data)
+      let characters = [];
+      try {
+        const charsData = typeof row.characters_json === 'string'
+          ? JSON.parse(row.characters_json)
+          : row.characters_json;
+        characters = (charsData || []).map(c => ({ name: c.name, id: c.id }));
+      } catch (e) {
+        // Ignore parse errors
+      }
+
       return {
-        id: story.id,
-        title: story.title,
-        createdAt: story.createdAt,
-        updatedAt: story.updatedAt,
-        pages: story.pages,
-        language: story.language,
-        languageLevel: story.languageLevel,
-        characters: story.characters?.map(c => ({ name: c.name, id: c.id })) || [],
+        id: row.id,
+        title: row.title,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        pages: row.pages,
+        language: row.language,
+        languageLevel: row.languageLevel,
+        characters,
         pageCount,
-        thumbnail: (story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null)
+        hasThumbnail: row.hasThumbnail || false
       };
     });
 
