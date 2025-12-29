@@ -621,9 +621,15 @@ function extractCharacterNamesFromScene(sceneDescription) {
     'i'
   );
   const sectionMatch = sceneDescription.match(sectionPattern);
+  log.debug(`[SCENE-PARSER] Looking for Characters section in scene (${sceneDescription.length} chars)`);
+  log.debug(`[SCENE-PARSER] Section pattern match: ${sectionMatch ? 'FOUND' : 'NOT FOUND'}`);
 
   if (sectionMatch && sectionMatch[1]) {
     const charactersSection = sectionMatch[1];
+
+    // DEBUG: Log the captured section
+    log.debug(`[SCENE-PARSER] Characters section captured (${charactersSection.length} chars):`);
+    log.debug(`[SCENE-PARSER] Section content: "${charactersSection.substring(0, 500)}"`);
 
     // Step 2: Extract names from the section
     // Pattern handles multiple formats:
@@ -641,14 +647,21 @@ function extractCharacterNamesFromScene(sceneDescription) {
 
     for (const pattern of namePatterns) {
       let match;
+      log.debug(`[SCENE-PARSER] Trying pattern: ${pattern.toString().substring(0, 80)}...`);
       while ((match = pattern.exec(charactersSection)) !== null) {
         const name = match[1].trim();
+        log.debug(`[SCENE-PARSER]   Raw match: "${name}" at index ${match.index}`);
         // Skip if it looks like a section header or is too short
         if (name.length >= 2 && !name.match(/^(?:Characters|Charaktere|Personnages|Physical|Description)$/i)) {
           const nameLower = name.toLowerCase();
           if (!characterNames.includes(nameLower)) {
             characterNames.push(nameLower);
+            log.debug(`[SCENE-PARSER]   -> Added: "${nameLower}"`);
+          } else {
+            log.debug(`[SCENE-PARSER]   -> Duplicate, skipped`);
           }
+        } else {
+          log.debug(`[SCENE-PARSER]   -> Filtered out (header or too short)`);
         }
       }
     }

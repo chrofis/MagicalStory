@@ -254,6 +254,9 @@ function getCharactersInScene(sceneDescription, characters) {
     return [];
   }
 
+  // DEBUG: Log available characters for matching
+  log.debug(`[CHAR DETECT] Available characters for matching: ${characters.map(c => c.name).join(', ')} (${characters.length} total)`);
+
   // Step 1: Use robust parser to extract character names from scene description
   const parsedNames = extractCharacterNamesFromScene(sceneDescription);
 
@@ -266,7 +269,7 @@ function getCharactersInScene(sceneDescription, characters) {
       const nameLower = char.name.toLowerCase().trim();
       const firstName = nameLower.split(' ')[0];
 
-      return parsedNames.some(parsed =>
+      const matched = parsedNames.some(parsed =>
         parsed === nameLower ||
         parsed === firstName ||
         parsed.includes(nameLower) ||
@@ -275,6 +278,11 @@ function getCharactersInScene(sceneDescription, characters) {
         parsed.includes(firstName) ||
         firstName.includes(parsed)
       );
+
+      // DEBUG: Log each character match attempt
+      log.debug(`[CHAR DETECT]   - "${char.name}" (nameLower="${nameLower}", firstName="${firstName}") -> ${matched ? 'MATCHED' : 'NO MATCH'}`);
+
+      return matched;
     });
 
     if (matchedCharacters.length > 0) {
