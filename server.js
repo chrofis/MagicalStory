@@ -5206,8 +5206,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       log.debug(`✅ [STORYBOOK] ${coverResults.filter(r => r).length} cover images complete from streaming`);
     }
 
-    // Save checkpoint
-    await saveCheckpoint(jobId, 'storybook_combined', { response, rawResponse: response });
+    // Save checkpoint (include prompt, model, and usage for dev mode)
+    await saveCheckpoint(jobId, 'storybook_combined', {
+      response,
+      rawResponse: response,
+      outlinePrompt: storybookPrompt,
+      outlineModelId: streamingTextModelId,
+      outlineUsage: streamingTextUsage
+    });
 
     // Extract title
     let storyTitle = inputData.title || 'My Picture Book';
@@ -5727,7 +5733,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       mainCharacters: inputData.mainCharacters || [],
       relationships: inputData.relationships || {},
       relationshipTexts: inputData.relationshipTexts || {},
-      outline: '',
+      outline: response, // Full combined response for dev mode
+      outlinePrompt: storybookPrompt, // Prompt sent to API (dev mode)
+      outlineModelId: streamingTextModelId, // Model used (dev mode)
+      outlineUsage: streamingTextUsage, // Token usage (dev mode)
       visualBible: visualBible, // Recurring visual elements for consistency
       storyText: fullStoryText,
       originalStory: fullStoryText, // Store original for restore functionality

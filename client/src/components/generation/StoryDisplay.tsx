@@ -629,12 +629,14 @@ export function StoryDisplay({
       {/* Developer Mode: Story Overview and Full Text */}
       {developerMode && (
         <div className="space-y-4 mt-6">
-          {/* Full Outline Generation Output */}
+          {/* Full Outline/Combined Generation Output */}
           {outline && (
             <details className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-purple-800 hover:text-purple-900 flex items-center gap-2">
                 <FileText size={20} />
-                {language === 'de' ? 'Vollständige API-Ausgabe (Outline)' : language === 'fr' ? 'Sortie API complète (Plan)' : 'Full API Output (Outline)'}
+                {isPictureBook
+                  ? (language === 'de' ? 'Vollständige API-Ausgabe (Kombiniert)' : language === 'fr' ? 'Sortie API complète (Combinée)' : 'Full API Output (Combined)')
+                  : (language === 'de' ? 'Vollständige API-Ausgabe (Outline)' : language === 'fr' ? 'Sortie API complète (Plan)' : 'Full API Output (Outline)')}
                 {outlineModelId && (
                   <span className="ml-2 text-sm font-normal text-purple-600">({outlineModelId})</span>
                 )}
@@ -656,10 +658,12 @@ export function StoryDisplay({
                     </pre>
                   </div>
                 )}
-                {/* Output: The outline response */}
+                {/* Output: The outline/combined response */}
                 <div>
                   <h4 className="text-sm font-bold text-purple-700 mb-2">
-                    {language === 'de' ? '📥 API-Antwort (Outline)' : language === 'fr' ? '📥 Réponse API (Plan)' : '📥 API Response (Outline)'}
+                    {isPictureBook
+                      ? (language === 'de' ? '📥 API-Antwort (Kombiniert)' : language === 'fr' ? '📥 Réponse API (Combinée)' : '📥 API Response (Combined)')
+                      : (language === 'de' ? '📥 API-Antwort (Outline)' : language === 'fr' ? '📥 Réponse API (Plan)' : '📥 API Response (Outline)')}
                   </h4>
                   <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-purple-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                     {outline}
