@@ -40,6 +40,40 @@ Return a JSON object with this EXACT structure:
     "baseColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
     "highlightsHex": "<highlight color as HEX code if visible, e.g. '#C4A77D', or 'none'>",
     "salonLevel": "<hair darkness level 1-10, where 1=black, 10=lightest blonde>"
+  },
+  "detailedFaceAnalysis": {
+    "faceShape": "<oval | heart | square | diamond | oblong | round | rectangle>",
+    "eyes": {
+      "shape": "<almond | hooded | round | monolid | downturned | upturned>",
+      "canthalTilt": "<upturned | neutral | downturned>",
+      "irisColorHex": "<exact iris color as HEX code, e.g. '#6B4423'>"
+    },
+    "nose": {
+      "bridge": "<straight | aquiline | concave | curved>",
+      "tip": "<bulbous | pointed | upturned | rounded>",
+      "nostrilWidth": "<narrow | medium | wide>"
+    },
+    "jawlineAndChin": {
+      "jawline": "<sharp | angular | soft | rounded | square>",
+      "chin": "<prominent | recessed | neutral | dimpled | pointed>"
+    },
+    "cheeksAndForehead": {
+      "cheekboneHeight": "<high | medium | low>",
+      "cheekFullness": "<hollow | flat | full | round>",
+      "foreheadHeight": "<short | medium | tall>",
+      "foreheadWidth": "<narrow | medium | wide>"
+    },
+    "lipsAndMouth": {
+      "upperLipFullness": "<thin | medium | full>",
+      "lowerLipFullness": "<thin | medium | full>",
+      "cupidsBow": "<defined | soft | flat>"
+    },
+    "distinguishingMarks": {
+      "freckles": "<none | light | moderate | heavy>",
+      "moles": "<description of visible moles and locations, or 'none'>",
+      "skinTexture": "<smooth | textured | weathered>",
+      "nasolabialFolds": "<none | subtle | moderate | pronounced>"
+    }
   }
 }
 
