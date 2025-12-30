@@ -4865,6 +4865,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
     let fullStoryText = '';
     let streamingTextModelId = null;  // Track which model was used for streaming text generation
+    let streamingTextUsage = null;    // Track token usage for dev mode
     const allSceneDescriptions = [];  // Only story pages (1, 2, 3...), NOT cover pages
     const allImages = [];
     const imagePrompts = {};
@@ -5183,6 +5184,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       }, textModelOverride);
       response = streamResult.text;
       streamingTextModelId = streamResult.modelId || (textModelOverride ? textModelOverride : getActiveTextModel().modelId);
+      streamingTextUsage = streamResult.usage || { input_tokens: 0, output_tokens: 0 };  // Save usage for dev mode
       addUsage('anthropic', streamResult.usage, 'story_text', streamingTextModelId);
       log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars (model: ${streamingTextModelId})`);
       log.debug(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
@@ -5688,7 +5690,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const resultData = {
       title: storyTitle,
       storyText: fullStoryText,
-      outline: '', // No outline for picture book mode
+      outline: response, // Full combined response for dev mode
+      outlinePrompt: storybookPrompt, // Prompt sent to API (dev mode)
+      outlineModelId: streamingTextModelId, // Model used (dev mode)
+      outlineUsage: streamingTextUsage, // Token usage (dev mode)
       visualBible: visualBible, // Recurring visual elements for consistency
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,

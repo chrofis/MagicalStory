@@ -17,34 +17,38 @@ interface DiagnosticImageProps {
 export function DiagnosticImage({ src, alt, className, label }: DiagnosticImageProps) {
   const [_isLoading, setIsLoading] = useState(true);
   const [_loadTime, setLoadTime] = useState<number | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
+  // Don't start timer until we have actual image data
+  const startTimeRef = useRef<number>(0);
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    // Reset timing when src changes
-    const now = Date.now();
-    const previousStart = startTimeRef.current;
-    startTimeRef.current = now;
+    // Only start/reset timer when we have actual image data (> 100 chars for base64)
+    const hasActualData = src && src.length > 100;
+    if (hasActualData) {
+      // Always reset timer when new data arrives
+      startTimeRef.current = Date.now();
+      log.info(`⏳ Loading ${label || alt}`, {
+        isBase64: src?.startsWith('data:'),
+        sizeKB: Math.round((src.length * 3) / 4 / 1024),
+      });
+    } else {
+      // No real data yet, keep timer at 0
+      startTimeRef.current = 0;
+    }
     setIsLoading(true);
     setLoadTime(null);
-
-    // Log image info with timing details
-    const isBase64 = src?.startsWith('data:');
-    const sizeKB = isBase64 ? Math.round((src.length * 3) / 4 / 1024) : 'URL';
-    const hasActualData = src && src.length > 100;
-
-    log.info(`⏳ Loading ${label || alt}`, {
-      isBase64,
-      sizeKB: isBase64 ? `${sizeKB}KB` : 'external URL',
-      hasData: hasActualData,
-      timerReset: previousStart ? `${now - previousStart}ms since last reset` : 'first mount',
-      srcLength: src?.length || 0,
-    });
   }, [src, alt, label]);
 
   const handleLoad = () => {
-    const elapsed = Date.now() - startTimeRef.current;
     setIsLoading(false);
+
+    // Don't report timing if timer was never started (no real data yet)
+    if (startTimeRef.current === 0) {
+      log.info(`✅ Loaded ${label || alt} (placeholder/empty)`);
+      return;
+    }
+
+    const elapsed = Date.now() - startTimeRef.current;
     setLoadTime(elapsed);
 
     const isBase64 = src?.startsWith('data:');
@@ -79,8 +83,12 @@ export function DiagnosticImage({ src, alt, className, label }: DiagnosticImageP
   };
 
   const handleError = () => {
-    const elapsed = Date.now() - startTimeRef.current;
     setIsLoading(false);
+    if (startTimeRef.current === 0) {
+      log.error(`❌ Failed to load ${label || alt} (no data received)`);
+      return;
+    }
+    const elapsed = Date.now() - startTimeRef.current;
     log.error(`❌ Failed to load ${label || alt} after ${elapsed}ms`);
   };
 
