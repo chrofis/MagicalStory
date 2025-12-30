@@ -150,7 +150,7 @@ const schemas = {
     password: { required: true, type: 'string', minLength: 1, maxLength: 128 }
   },
   createStory: {
-    pages: { required: true, type: 'integer', min: 10, max: 100 },
+    pages: { required: true, type: 'integer', min: 4, max: 100 },  // Allow 4+ pages for short picture books
     language: { type: 'string', maxLength: 50 },
     languageLevel: { type: 'string', maxLength: 50 },
     storyType: { type: 'string', maxLength: 100 },
