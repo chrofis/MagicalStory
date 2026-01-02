@@ -1151,34 +1151,45 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   }).join('\n');
 
   // Build Visual Bible recurring elements section - include ALL entries (not filtered by page)
+  // Each entry includes its unique ID for robust matching (e.g., CHR001, LOC001)
   let recurringElements = '';
   if (visualBible) {
+    // Helper to format ID label
+    const idLabel = (entry) => entry.id ? ` [${entry.id}]` : '';
+
     // Add ALL secondary characters
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
       for (const sc of visualBible.secondaryCharacters) {
         const description = sc.extractedDescription || sc.description;
-        recurringElements += `* **${sc.name}** (secondary character): ${description}\n`;
+        recurringElements += `* **${sc.name}**${idLabel(sc)} (secondary character): ${description}\n`;
       }
     }
     // Add ALL locations
     if (visualBible.locations && visualBible.locations.length > 0) {
       for (const loc of visualBible.locations) {
         const description = loc.extractedDescription || loc.description;
-        recurringElements += `* **${loc.name}** (location): ${description}\n`;
+        recurringElements += `* **${loc.name}**${idLabel(loc)} (location): ${description}\n`;
+      }
+    }
+    // Add ALL vehicles
+    if (visualBible.vehicles && visualBible.vehicles.length > 0) {
+      for (const veh of visualBible.vehicles) {
+        const description = veh.extractedDescription || veh.description;
+        recurringElements += `* **${veh.name}**${idLabel(veh)} (vehicle): ${description}\n`;
       }
     }
     // Add ALL animals
     if (visualBible.animals && visualBible.animals.length > 0) {
       for (const animal of visualBible.animals) {
         const description = animal.extractedDescription || animal.description;
-        recurringElements += `* **${animal.name}** (animal): ${description}\n`;
+        recurringElements += `* **${animal.name}**${idLabel(animal)} (animal): ${description}\n`;
       }
     }
     // Add ALL artifacts
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
       for (const artifact of visualBible.artifacts) {
         const description = artifact.extractedDescription || artifact.description;
-        recurringElements += `* **${artifact.name}** (object): ${description}\n`;
+        recurringElements += `* **${artifact.name}**${idLabel(artifact)} (object): ${description}\n`;
       }
     }
     // Add ALL clothing/costumes
@@ -1186,7 +1197,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const item of visualBible.clothing) {
         const description = item.extractedDescription || item.description;
         const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
-        recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
+        recurringElements += `* **${item.name}**${idLabel(item)}${wornBy} (clothing): ${description}\n`;
       }
     }
   }
@@ -1194,6 +1205,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   // Consolidated logging for scene prompt
   const vbEntryCount = (visualBible?.secondaryCharacters?.length || 0) +
                        (visualBible?.locations?.length || 0) +
+                       (visualBible?.vehicles?.length || 0) +
                        (visualBible?.animals?.length || 0) +
                        (visualBible?.artifacts?.length || 0) +
                        (visualBible?.clothing?.length || 0);
@@ -1561,36 +1573,52 @@ function buildSceneExpansionPrompt(sceneSummary, inputData, sceneCharacters, vis
     characterDetails = '(No main characters with reference photos in this scene)';
   }
 
-  // Build recurring elements from Visual Bible
+  // Build recurring elements from Visual Bible (with IDs for robust matching)
   let recurringElements = '';
   if (visualBible) {
     const elements = [];
+    const idLabel = (entry) => entry.id ? ` [${entry.id}]` : '';
 
-    // Add animals
-    if (visualBible.animals && visualBible.animals.length > 0) {
-      visualBible.animals.forEach(animal => {
-        elements.push(`* **${animal.name}:** ${animal.description}`);
-      });
-    }
-
-    // Add artifacts
-    if (visualBible.artifacts && visualBible.artifacts.length > 0) {
-      visualBible.artifacts.forEach(artifact => {
-        elements.push(`* **${artifact.name}:** ${artifact.description}`);
+    // Add secondary characters
+    if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
+      visualBible.secondaryCharacters.forEach(char => {
+        elements.push(`* **${char.name}**${idLabel(char)} (secondary character): ${char.description}`);
       });
     }
 
     // Add locations
     if (visualBible.locations && visualBible.locations.length > 0) {
       visualBible.locations.forEach(location => {
-        elements.push(`* **${location.name}:** ${location.description}`);
+        elements.push(`* **${location.name}**${idLabel(location)} (location): ${location.description}`);
       });
     }
 
-    // Add secondary characters
-    if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
-      visualBible.secondaryCharacters.forEach(char => {
-        elements.push(`* **${char.name}:** ${char.description}`);
+    // Add vehicles
+    if (visualBible.vehicles && visualBible.vehicles.length > 0) {
+      visualBible.vehicles.forEach(vehicle => {
+        elements.push(`* **${vehicle.name}**${idLabel(vehicle)} (vehicle): ${vehicle.description}`);
+      });
+    }
+
+    // Add animals
+    if (visualBible.animals && visualBible.animals.length > 0) {
+      visualBible.animals.forEach(animal => {
+        elements.push(`* **${animal.name}**${idLabel(animal)} (animal): ${animal.description}`);
+      });
+    }
+
+    // Add artifacts
+    if (visualBible.artifacts && visualBible.artifacts.length > 0) {
+      visualBible.artifacts.forEach(artifact => {
+        elements.push(`* **${artifact.name}**${idLabel(artifact)} (object): ${artifact.description}`);
+      });
+    }
+
+    // Add clothing/costumes
+    if (visualBible.clothing && visualBible.clothing.length > 0) {
+      visualBible.clothing.forEach(item => {
+        const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
+        elements.push(`* **${item.name}**${idLabel(item)}${wornBy} (clothing): ${item.description}`);
       });
     }
 
