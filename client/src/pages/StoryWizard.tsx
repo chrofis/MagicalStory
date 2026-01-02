@@ -1359,6 +1359,10 @@ export default function StoryWizard() {
       if (step === 2 && newStep !== 2) {
         await saveAllCharacterData();
       }
+      // Clear currentCharacter when entering step 1 to show character list
+      if (newStep === 1 && step !== 1) {
+        setCurrentCharacter(null);
+      }
       setStep(newStep);
       // Scroll to top when changing steps
       window.scrollTo(0, 0);
