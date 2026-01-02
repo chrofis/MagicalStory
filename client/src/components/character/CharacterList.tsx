@@ -84,9 +84,7 @@ export function CharacterList({
       )}
 
       {/* Existing characters */}
-      <div className="bg-white border-2 border-indigo-200 rounded-lg p-3">
-        <h3 className="text-base font-bold text-gray-800 mb-2">{t.yourCharacters}</h3>
-        <div className="grid md:grid-cols-2 gap-2">
+      <div className="grid md:grid-cols-2 gap-2">
           {characters.map((char) => {
             const role = getCharacterRole(char.id);
             const isOut = role === 'out';
@@ -207,7 +205,6 @@ export function CharacterList({
                 : 'Create Another Character'}
             </span>
           </button>
-        </div>
       </div>
 
       {/* Delete confirmation modal */}
