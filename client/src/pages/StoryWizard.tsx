@@ -2093,6 +2093,7 @@ export default function StoryWizard() {
             onGenerateIdeas={generateIdeas}
             isGeneratingIdeas={isGeneratingIdeas}
             ideaPrompt={lastIdeaPrompt}
+            onEditStep={safeSetStep}
             developerMode={developerMode}
             imageGenMode={imageGenMode}
             onImageGenModeChange={setImageGenMode}

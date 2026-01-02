@@ -1,4 +1,4 @@
-import { Wand2, Sparkles, Loader2, Palette } from 'lucide-react';
+import { Wand2, Sparkles, Loader2, Palette, Pencil } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { storyTypes, lifeChallenges, educationalTopics, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
@@ -34,6 +34,8 @@ interface WizardStep6Props {
   onGenerateIdeas: () => Promise<void>;
   isGeneratingIdeas: boolean;
   ideaPrompt: { prompt: string; model: string } | null;
+  // Navigation
+  onEditStep: (step: number) => void;
   // Developer options
   developerMode: boolean;
   imageGenMode: 'parallel' | 'sequential' | null;
@@ -62,6 +64,7 @@ export function WizardStep6Summary({
   onGenerateIdeas,
   isGeneratingIdeas,
   ideaPrompt,
+  onEditStep,
   developerMode,
   imageGenMode,
   onImageGenModeChange,
@@ -152,11 +155,74 @@ export function WizardStep6Summary({
         <Wand2 size={24} /> {t.title}
       </h2>
 
-      {/* Summary of all selections */}
+      {/* Summary of all selections - ordered by wizard flow */}
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          {/* Story Type */}
-          <div className="bg-white rounded-lg p-2 border border-green-200">
+          {/* 1. Main Characters → Step 1 */}
+          {getMainCharacterNames() && (
+            <div className="bg-white rounded-lg p-2 border border-indigo-200 relative group">
+              <button
+                onClick={() => onEditStep(1)}
+                className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+              >
+                <Pencil size={12} />
+              </button>
+              <span className="text-gray-500 text-xs block">{t.mainChars}</span>
+              <span className="font-medium text-indigo-700">{getMainCharacterNames()}</span>
+            </div>
+          )}
+
+          {/* 2. Supporting Characters → Step 1 */}
+          {getSupportingCharacterNames() && (
+            <div className="bg-white rounded-lg p-2 border border-gray-200 relative group">
+              <button
+                onClick={() => onEditStep(1)}
+                className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+              >
+                <Pencil size={12} />
+              </button>
+              <span className="text-gray-500 text-xs block">{t.supportingChars}</span>
+              <span className="font-medium text-gray-700">{getSupportingCharacterNames()}</span>
+            </div>
+          )}
+
+          {/* 3. Language → Step 2 */}
+          <div className="bg-white rounded-lg p-2 border border-blue-200 relative group">
+            <button
+              onClick={() => onEditStep(2)}
+              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
+              title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+            >
+              <Pencil size={12} />
+            </button>
+            <span className="text-gray-500 text-xs block">{t.languageLabel}</span>
+            <span className="font-medium text-gray-800">{getStoryLanguageName()}</span>
+          </div>
+
+          {/* 4. Reading Level & Pages → Step 2 */}
+          <div className="bg-white rounded-lg p-2 border border-gray-200 relative group">
+            <button
+              onClick={() => onEditStep(2)}
+              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
+              title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+            >
+              <Pencil size={12} />
+            </button>
+            <span className="text-gray-500 text-xs block">{t.level} / {t.pagesLabel}</span>
+            <span className="font-medium text-gray-700">{getReadingLevelLabel()} / {pages} {t.pagesLabel.toLowerCase()}</span>
+          </div>
+
+          {/* 5. Story Type → Step 3 */}
+          <div className="bg-white rounded-lg p-2 border border-green-200 relative group">
+            <button
+              onClick={() => onEditStep(3)}
+              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
+              title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+            >
+              <Pencil size={12} />
+            </button>
             <span className="text-gray-500 text-xs block">{t.storyType}</span>
             <span className="font-medium text-gray-800">
               {storyCategory === 'adventure' ? getThemeName() : (
@@ -168,41 +234,20 @@ export function WizardStep6Summary({
             </span>
           </div>
 
-          {/* Art Style */}
-          <div className="bg-white rounded-lg p-2 border border-purple-200">
+          {/* 6. Art Style → Step 4 */}
+          <div className="bg-white rounded-lg p-2 border border-purple-200 relative group">
+            <button
+              onClick={() => onEditStep(4)}
+              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
+              title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+            >
+              <Pencil size={12} />
+            </button>
             <span className="text-gray-500 text-xs block">{t.artStyleLabel}</span>
             <span className="font-medium text-gray-800 flex items-center gap-1">
               <Palette size={14} className="text-purple-600" />
               {getArtStyleName()}
             </span>
-          </div>
-
-          {/* Language */}
-          <div className="bg-white rounded-lg p-2 border border-blue-200">
-            <span className="text-gray-500 text-xs block">{t.languageLabel}</span>
-            <span className="font-medium text-gray-800">{getStoryLanguageName()}</span>
-          </div>
-
-          {/* Main Characters */}
-          {getMainCharacterNames() && (
-            <div className="bg-white rounded-lg p-2 border border-indigo-200">
-              <span className="text-gray-500 text-xs block">{t.mainChars}</span>
-              <span className="font-medium text-indigo-700">{getMainCharacterNames()}</span>
-            </div>
-          )}
-
-          {/* Supporting Characters */}
-          {getSupportingCharacterNames() && (
-            <div className="bg-white rounded-lg p-2 border border-gray-200">
-              <span className="text-gray-500 text-xs block">{t.supportingChars}</span>
-              <span className="font-medium text-gray-700">{getSupportingCharacterNames()}</span>
-            </div>
-          )}
-
-          {/* Reading Level & Pages */}
-          <div className="bg-white rounded-lg p-2 border border-gray-200">
-            <span className="text-gray-500 text-xs block">{t.level} / {t.pagesLabel}</span>
-            <span className="font-medium text-gray-700">{getReadingLevelLabel()} / {pages} {t.pagesLabel.toLowerCase()}</span>
           </div>
         </div>
       </div>
