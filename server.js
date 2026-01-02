@@ -6227,6 +6227,8 @@ async function processStoryJob(jobId) {
     let storyTitle = extractedTitle || inputData.title || 'My Story';
     if (extractedTitle) {
       log.debug(`📖 [PIPELINE] Extracted title from outline: "${storyTitle}"`);
+      // Update inputData so buildBasePrompt uses the extracted title
+      inputData.title = storyTitle;
     }
 
     // START COVER GENERATION IN PARALLEL (optimization: don't wait for page images)
