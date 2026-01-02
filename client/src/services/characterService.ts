@@ -84,6 +84,7 @@ interface CharacterApiResponse {
   clothingColors?: string;
   clothing_avatars?: CharacterAvatars;
   clothingAvatars?: CharacterAvatars;
+  avatars?: CharacterAvatars;  // Direct avatars field (includes styledAvatars from story generation)
   // Generated outfits per page
   generated_outfits?: Record<number, unknown>;
   generatedOutfits?: Record<number, unknown>;
@@ -135,7 +136,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
       bodyBox: api.body_box || api.bodyBox,
     },
 
-    avatars: api.clothing_avatars || api.clothingAvatars,
+    avatars: api.avatars || api.clothing_avatars || api.clothingAvatars,
 
     clothing: api.clothing
       ? { current: api.clothing }
@@ -183,6 +184,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     // Clothing
     clothing: char.clothing?.current,
     clothing_avatars: char.avatars,
+    avatars: char.avatars,  // Also send as avatars for backend compatibility
     // Generated outfits per page
     generated_outfits: char.generatedOutfits,
   };
