@@ -1182,13 +1182,22 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         recurringElements += `* **${artifact.name}** (object): ${description}\n`;
       }
     }
+    // Add ALL clothing/costumes
+    if (visualBible.clothing && visualBible.clothing.length > 0) {
+      for (const item of visualBible.clothing) {
+        const description = item.extractedDescription || item.description;
+        const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
+        recurringElements += `* **${item.name}**${wornBy} (clothing): ${description}\n`;
+      }
+    }
   }
 
   // Consolidated logging for scene prompt
   const vbEntryCount = (visualBible?.secondaryCharacters?.length || 0) +
                        (visualBible?.locations?.length || 0) +
                        (visualBible?.animals?.length || 0) +
-                       (visualBible?.artifacts?.length || 0);
+                       (visualBible?.artifacts?.length || 0) +
+                       (visualBible?.clothing?.length || 0);
   const matchInfo = vbMatches.length > 0 ? vbMatches.join(', ') : 'none';
   const missInfo = vbMisses.length > 0 ? `, missing: ${vbMisses.join(', ')}` : '';
   log.debug(`[SCENE PROMPT P${pageNumber}] ${characters.length} chars (VB: ${matchInfo}${missInfo}), ${vbEntryCount} recurring elements`);
@@ -1433,6 +1442,19 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       if (location) {
         const description = location.extractedDescription || location.description;
         requiredObjects.push({ name: location.name, type: 'location', description });
+        continue;
+      }
+
+      // Look up in clothing/costumes
+      const clothing = (visualBible.clothing || []).find(c =>
+        c.name.toLowerCase().trim() === objNameLower ||
+        c.name.toLowerCase().includes(objNameLower) ||
+        objNameLower.includes(c.name.toLowerCase())
+      );
+      if (clothing) {
+        const description = clothing.extractedDescription || clothing.description;
+        const wornBy = clothing.wornBy ? ` (worn by ${clothing.wornBy})` : '';
+        requiredObjects.push({ name: clothing.name, type: 'clothing', description: description + wornBy });
       }
     }
 

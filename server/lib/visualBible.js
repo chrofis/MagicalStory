@@ -27,6 +27,7 @@ function parseVisualBible(outline) {
     animals: [],             // Parsed from outline
     artifacts: [],           // Parsed from outline
     locations: [],           // Parsed from outline
+    clothing: [],            // Parsed from outline - costumes, special outfits
     changeLog: []            // Track all updates during story generation
   };
 
@@ -124,16 +125,42 @@ function parseVisualBible(outline) {
     log.debug(`[VISUAL BIBLE] No Locations section found`);
   }
 
+  // Parse Clothing & Costumes (supports ## or ### headers, also German "Kleidung" / "Verkleidung")
+  const clothingMatch = visualBibleSection.match(/#{2,3}\s*(?:Clothing|Kleidung|Verkleidung)(?:\s*(?:&|and|und)\s*(?:Costumes?|Kostüme?))?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
+  if (clothingMatch) {
+    log.debug(`[VISUAL BIBLE] Clothing section found, length: ${clothingMatch[1].length}`);
+    if (!clothingMatch[1].toLowerCase().includes('none')) {
+      const entries = parseVisualBibleEntries(clothingMatch[1]);
+      // Mark entries as clothing type and try to extract "worn by" field
+      entries.forEach(entry => {
+        entry.type = 'clothing';
+        // Try to extract "Worn by" from description
+        const wornByMatch = entry.description.match(/Worn by:\s*([^.]+)/i);
+        if (wornByMatch) {
+          entry.wornBy = wornByMatch[1].trim();
+        }
+      });
+      visualBible.clothing = entries;
+      log.debug(`[VISUAL BIBLE] Parsed ${entries.length} clothing items`);
+    } else {
+      log.debug(`[VISUAL BIBLE] Clothing section contains "None"`);
+    }
+  } else {
+    log.debug(`[VISUAL BIBLE] No Clothing section found`);
+  }
+
   const totalEntries = visualBible.secondaryCharacters.length +
                        visualBible.animals.length +
                        visualBible.artifacts.length +
-                       visualBible.locations.length;
+                       visualBible.locations.length +
+                       visualBible.clothing.length;
 
   log.debug(`[VISUAL BIBLE] Parsed ${totalEntries} entries: ` +
     `${visualBible.secondaryCharacters.length} characters, ` +
     `${visualBible.animals.length} animals, ` +
     `${visualBible.artifacts.length} artifacts, ` +
-    `${visualBible.locations.length} locations`);
+    `${visualBible.locations.length} locations, ` +
+    `${visualBible.clothing.length} clothing`);
 
   return visualBible;
 }
@@ -364,6 +391,7 @@ function getVisualBibleEntriesForPage(visualBible, pageNumber) {
   checkEntries(visualBible.animals || [], 'animal');
   checkEntries(visualBible.artifacts || [], 'artifact');
   checkEntries(visualBible.locations || [], 'location');
+  checkEntries(visualBible.clothing || [], 'clothing');
 
   return relevant;
 }
@@ -390,6 +418,7 @@ function getElementsNeedingAnalysis(visualBible, pageNumber) {
   checkEntries(visualBible.animals || [], 'animal');
   checkEntries(visualBible.artifacts || [], 'artifact');
   checkEntries(visualBible.locations || [], 'location');
+  checkEntries(visualBible.clothing || [], 'clothing');
 
   return needsAnalysis;
 }
@@ -420,6 +449,9 @@ function buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames = n
   }
   for (const entry of visualBible.locations || []) {
     allEntries.push({ ...entry, type: 'location' });
+  }
+  for (const entry of visualBible.clothing || []) {
+    allEntries.push({ ...entry, type: 'clothing' });
   }
 
   log.debug(`[VISUAL BIBLE PROMPT] Total entries: ${allEntries.length} (${allEntries.map(e => e.name).join(', ') || 'none'})`);
@@ -641,6 +673,7 @@ function updateVisualBibleWithExtracted(visualBible, pageNumber, extractedDescri
   updateEntries(visualBible.animals || []);
   updateEntries(visualBible.artifacts || []);
   updateEntries(visualBible.locations || []);
+  updateEntries(visualBible.clothing || []);
 
   return visualBible;
 }
@@ -696,6 +729,15 @@ function formatVisualBibleForStoryText(visualBible) {
     }
   }
 
+  // Clothing & Costumes
+  if (visualBible.clothing?.length > 0) {
+    sections.push('Clothing & Costumes:');
+    for (const item of visualBible.clothing) {
+      const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
+      sections.push(`- ${item.name}${wornBy} (pages ${item.pages?.join(', ') || 'multiple'}): ${item.description}`);
+    }
+  }
+
   if (sections.length === 0) {
     return 'None defined yet.';
   }
@@ -712,7 +754,8 @@ function parseNewVisualBibleEntries(text) {
     secondaryCharacters: [],
     animals: [],
     artifacts: [],
-    locations: []
+    locations: [],
+    clothing: []
   };
 
   if (!text) return newEntries;
@@ -851,6 +894,35 @@ function parseNewVisualBibleEntries(text) {
     }
   }
 
+  // NEW FORMAT: ### Clothing & Costumes section (also German "Kleidung/Verkleidung/Kostüme")
+  const clothingSection = section.match(/###\s*(?:Clothing|Kleidung|Verkleidung)(?:\s*(?:&|and|und)\s*(?:Costumes?|Kostüme?))?\s*([\s\S]*?)(?=###|$)/i);
+  if (clothingSection) {
+    const entries = clothingSection[1].split(/(?=\*\*[^*]+\*\*\s*\((?:pages?|Seiten?))/i);
+    for (const entry of entries) {
+      if (!entry.trim() || entry.includes('already exists')) continue;
+      const parsed = parseMarkdownEntry(entry);
+      if (!parsed) continue;
+
+      const wornBy = parsed.details.match(/Worn by:\s*(.+)/i)?.[1]?.trim() || '';
+      const description = parsed.details.match(/Description:\s*(.+)/i)?.[1]?.trim() || '';
+      const howWorn = parsed.details.match(/How worn:\s*(.+)/i)?.[1]?.trim() || '';
+
+      const descParts = [description, howWorn].filter(Boolean);
+      const fullDesc = descParts.join('. ');
+
+      if (parsed.name && fullDesc) {
+        newEntries.clothing.push({
+          name: parsed.name,
+          description: fullDesc,
+          wornBy: wornBy,
+          pages: parsed.pages,
+          source: 'story_text'
+        });
+        log.debug(`[VISUAL BIBLE] Parsed clothing: ${parsed.name} worn by ${wornBy} (pages ${parsed.pages.join(',')})`);
+      }
+    }
+  }
+
   // LEGACY FORMAT: ANIMAL: Name, ARTIFACT: Name, etc. (keep for backwards compatibility)
   if (newEntries.animals.length === 0) {
     const animalMatches = section.matchAll(/ANIMAL:\s*(.+?)(?=\n-)([\s\S]*?)(?=\n(?:ANIMAL|ARTIFACT|LOCATION|SECONDARY CHARACTER):|$)/gi);
@@ -924,7 +996,8 @@ function parseNewVisualBibleEntries(text) {
   }
 
   const totalNew = newEntries.animals.length + newEntries.artifacts.length +
-                   newEntries.locations.length + newEntries.secondaryCharacters.length;
+                   newEntries.locations.length + newEntries.secondaryCharacters.length +
+                   newEntries.clothing.length;
   log.debug(`[VISUAL BIBLE] Parsed ${totalNew} new entries from story text`);
 
   return newEntries;
@@ -940,7 +1013,7 @@ function mergeNewVisualBibleEntries(visualBible, newEntries) {
   const existingNames = new Set();
 
   // Collect all existing names (case-insensitive)
-  for (const arr of [visualBible.secondaryCharacters, visualBible.animals, visualBible.artifacts, visualBible.locations]) {
+  for (const arr of [visualBible.secondaryCharacters, visualBible.animals, visualBible.artifacts, visualBible.locations, visualBible.clothing]) {
     for (const entry of arr || []) {
       existingNames.add(entry.name.toLowerCase());
     }
@@ -981,6 +1054,14 @@ function mergeNewVisualBibleEntries(visualBible, newEntries) {
     if (!existingNames.has(loc.name.toLowerCase())) {
       visualBible.locations.push(loc);
       addVisualBibleChangeLog(visualBible, `Added location from story text: ${loc.name}`);
+      addedCount++;
+    }
+  }
+
+  for (const item of newEntries.clothing || []) {
+    if (!existingNames.has(item.name.toLowerCase())) {
+      visualBible.clothing.push(item);
+      addVisualBibleChangeLog(visualBible, `Added clothing from story text: ${item.name} (worn by ${item.wornBy || 'unknown'})`);
       addedCount++;
     }
   }

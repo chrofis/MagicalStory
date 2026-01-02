@@ -98,6 +98,7 @@ Add at least 5 entries. Scan the outline and ADD:
 - **ALL OBJECTS** - Every important item (toys, tools, magical items, furniture, vehicles, food, etc.)
 - **ALL ANIMALS/PETS** - Any animals that appear
 - **ALL SECONDARY CHARACTERS** - Anyone who is not a main character
+- **ALL SPECIAL CLOTHING/COSTUMES** - Costumes, uniforms, capes, hats, etc. that characters wear (include character name!)
 
 Even if an element appears only once, add it to ensure visual consistency.
 Do NOT write "None" - find at least 5 elements to add.
@@ -132,6 +133,14 @@ For each person NOT a main character:
 **[Name]** (pages X, Y, Z)
 - Setting: [indoor/outdoor, type of place]
 - Features: [colors, shapes, distinctive visual elements that make it recognizable]
+
+### Clothing & Costumes
+**[Item Name + Character Name]** (pages X, Y, Z)
+- Worn by: [character name - REQUIRED to avoid mix-ups]
+- Description: [colors, materials, distinctive features]
+- How worn: [how the character wears it, e.g., "tied around shoulders", "on head"]
+
+**IMPORTANT:** Always include the character's name in the item name (e.g., "Max's superhero cape", "Emma's princess crown") to ensure the right character wears the right item.
 
 ## Section 2: Story Text
 
