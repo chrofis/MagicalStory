@@ -272,10 +272,11 @@ router.post('/firebase', authLimiter, async (req, res) => {
 
       const randomPassword = crypto.randomBytes(32).toString('hex');
       const hashedPassword = await bcrypt.hash(randomPassword, 10);
+      const userId = Date.now().toString();
 
       const result = await dbQuery(
-        'INSERT INTO users (username, email, password, role, story_quota, stories_generated, credits, email_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE) RETURNING *',
-        [username, firebaseEmail, hashedPassword, role, storyQuota, 0, initialCredits]
+        'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE) RETURNING *',
+        [userId, username, firebaseEmail, hashedPassword, role, storyQuota, 0, initialCredits]
       );
       user = result[0];
 
