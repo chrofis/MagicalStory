@@ -15,8 +15,7 @@ async function loadPromptTemplates() {
     const promptsDir = path.join(__dirname, '../../prompts');
 
     PROMPT_TEMPLATES.outline = await fs.readFile(path.join(promptsDir, 'outline.txt'), 'utf-8');
-    PROMPT_TEMPLATES.storyTextBatch = await fs.readFile(path.join(promptsDir, 'story-text-batch.txt'), 'utf-8');
-    PROMPT_TEMPLATES.storyTextSingle = await fs.readFile(path.join(promptsDir, 'story-text-single.txt'), 'utf-8');
+    PROMPT_TEMPLATES.storyText = await fs.readFile(path.join(promptsDir, 'story-text.txt'), 'utf-8');
     PROMPT_TEMPLATES.sceneDescriptions = await fs.readFile(path.join(promptsDir, 'scene-descriptions.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGenerationDe = await fs.readFile(path.join(promptsDir, 'image-generation-de.txt'), 'utf-8');

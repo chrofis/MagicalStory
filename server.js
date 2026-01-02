@@ -6364,13 +6364,13 @@ async function processStoryJob(jobId) {
       const storyLanguage = inputData.language || 'en';
       const languageInstruction = getLanguageInstruction(storyLanguage);
 
-      const batchPrompt = PROMPT_TEMPLATES.storyTextBatch
-        ? fillTemplate(PROMPT_TEMPLATES.storyTextBatch, {
+      const batchPrompt = PROMPT_TEMPLATES.storyText
+        ? fillTemplate(PROMPT_TEMPLATES.storyText, {
             BASE_PROMPT: basePrompt,
             OUTLINE: outline,
-            PAGES: sceneCount,
             START_PAGE: startScene,
             END_PAGE: endScene,
+            START_PAGE_PLUS_1: startScene + 1,
             READING_LEVEL: readingLevel,
             LANGUAGE_INSTRUCTION: languageInstruction,
             VISUAL_BIBLE: visualBibleForPrompt,

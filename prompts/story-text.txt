@@ -133,7 +133,7 @@ For each person NOT a main character:
 --- Page {START_PAGE} ---
 [Story text with vivid, unique characters]
 
---- Page {START_PAGE + 1} ---
+--- Page {START_PAGE_PLUS_1} ---
 [Continue the story...]
 
 ...continue until page {END_PAGE}...
