@@ -125,28 +125,56 @@ function parseVisualBible(outline) {
     log.debug(`[VISUAL BIBLE] No Locations section found`);
   }
 
-  // Parse Clothing & Costumes (supports ## or ### headers, also German "Kleidung" / "Verkleidung")
-  const clothingMatch = visualBibleSection.match(/#{2,3}\s*(?:Clothing|Kleidung|Verkleidung)(?:\s*(?:&|and|und)\s*(?:Costumes?|Kostüme?))?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
+  // Parse Clothing & Costumes (supports ## or ### headers, also German "Kleidung" / "Verkleidung" / "Kostüme")
+  // More flexible regex to handle various formats
+  log.debug(`[VISUAL BIBLE] Looking for Clothing section...`);
+
+  // Check if clothing-related text exists at all
+  const hasClothingText = /clothing|kleidung|verkleidung|kostüm|costume/i.test(visualBibleSection);
+  log.debug(`[VISUAL BIBLE] Contains clothing-related text: ${hasClothingText}`);
+
+  // Try multiple patterns
+  let clothingMatch = visualBibleSection.match(/#{2,3}\s*(?:Clothing|Kleidung|Verkleidung|Kostüme?)(?:\s*(?:&|and|und|,)\s*(?:Costumes?|Kostüme?|Verkleidung(?:en)?))?\s*([\s\S]*?)(?=\n#{2,3}\s|\n\(Include|$)/i);
+
+  if (!clothingMatch) {
+    // Try alternate pattern without & connector
+    clothingMatch = visualBibleSection.match(/#{2,3}\s*(?:Clothing|Kleidung|Verkleidung|Kostüme?)\s*([\s\S]*?)(?=\n#{2,3}\s|\n\(Include|$)/i);
+  }
+
   if (clothingMatch) {
     log.debug(`[VISUAL BIBLE] Clothing section found, length: ${clothingMatch[1].length}`);
-    if (!clothingMatch[1].toLowerCase().includes('none')) {
+    log.debug(`[VISUAL BIBLE] Clothing section preview: "${clothingMatch[1].substring(0, 300)}..."`);
+    if (!clothingMatch[1].toLowerCase().includes('none') || clothingMatch[1].length > 50) {
       const entries = parseVisualBibleEntries(clothingMatch[1]);
+      log.debug(`[VISUAL BIBLE] parseVisualBibleEntries returned ${entries.length} entries`);
       // Mark entries as clothing type and try to extract "worn by" field
       entries.forEach(entry => {
         entry.type = 'clothing';
-        // Try to extract "Worn by" from description
-        const wornByMatch = entry.description.match(/Worn by:\s*([^.]+)/i);
+        // Try to extract "Worn by" from description (multiple patterns)
+        const wornByMatch = entry.description.match(/Worn by:\s*([^.\n-]+)/i) ||
+                           entry.description.match(/Getragen von:\s*([^.\n-]+)/i);
         if (wornByMatch) {
           entry.wornBy = wornByMatch[1].trim();
         }
+        // Also try to extract from name if it has (Character) format
+        const nameCharMatch = entry.name.match(/\(([^)]+)\)\s*$/);
+        if (nameCharMatch && !entry.wornBy) {
+          entry.wornBy = nameCharMatch[1].trim();
+        }
+        log.debug(`[VISUAL BIBLE] Clothing entry: "${entry.name}" worn by "${entry.wornBy || 'unknown'}"`);
       });
       visualBible.clothing = entries;
       log.debug(`[VISUAL BIBLE] Parsed ${entries.length} clothing items`);
     } else {
-      log.debug(`[VISUAL BIBLE] Clothing section contains "None"`);
+      log.debug(`[VISUAL BIBLE] Clothing section contains "None" or is too short`);
     }
   } else {
-    log.debug(`[VISUAL BIBLE] No Clothing section found`);
+    log.debug(`[VISUAL BIBLE] No Clothing section found with regex`);
+    // Log a snippet around potential clothing text for debugging
+    const clothingIndex = visualBibleSection.toLowerCase().indexOf('clothing');
+    if (clothingIndex > -1) {
+      log.debug(`[VISUAL BIBLE] Found "clothing" at index ${clothingIndex}: "${visualBibleSection.substring(Math.max(0, clothingIndex - 20), clothingIndex + 100)}"`);
+    }
   }
 
   const totalEntries = visualBible.secondaryCharacters.length +

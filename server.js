@@ -1274,25 +1274,6 @@ async function initializeDatabase() {
 
     console.log('✓ Database tables initialized');
 
-    // Run database migrations
-    try {
-      const { runMigrations } = require('./run-migrations');
-      await runMigrations(dbPool, 'postgresql');
-    } catch (err) {
-      log.error('⚠️  Migration warning:', err.message);
-      // Don't fail initialization if migrations fail
-    }
-
-    // Auto-migrate story images to separate table (runs in background)
-    try {
-      const { autoMigrateStoryImages } = require('./server/services/database');
-      autoMigrateStoryImages().catch(err => {
-        log.warn('⚠️  Auto-migration warning:', err.message);
-      });
-    } catch (err) {
-      log.warn('⚠️  Could not start auto-migration:', err.message);
-    }
-
   } catch (err) {
     log.error('❌ Database initialization error:', err.message);
     log.error('Error code:', err.code);
@@ -6265,6 +6246,37 @@ async function processStoryJob(jobId) {
     let coverGenerationPromise = null;
     const coverPrompts = {};  // Store cover prompts for dev mode
 
+    // Get art style for styled avatars
+    const artStyle = inputData.artStyle || 'pixar';
+
+    // Prepare styled avatars for non-realistic art styles (parallel with outline parsing)
+    if (artStyle !== 'realistic' && inputData.characters && !skipImages) {
+      log.debug(`🎨 [PIPELINE] Preparing styled avatars for ${artStyle} style...`);
+      try {
+        // Build requirements for all possible clothing categories (covers + pages)
+        const avatarRequirements = [
+          { pageNumber: 'cover', clothingCategory: 'standard', characterNames: inputData.characters.map(c => c.name) },
+          { pageNumber: 'cover', clothingCategory: 'winter', characterNames: inputData.characters.map(c => c.name) },
+          { pageNumber: 'cover', clothingCategory: 'summer', characterNames: inputData.characters.map(c => c.name) },
+          { pageNumber: 'cover', clothingCategory: 'formal', characterNames: inputData.characters.map(c => c.name) }
+        ];
+        // Add requirements for each scene based on clothing
+        for (let i = 1; i <= sceneCount; i++) {
+          const clothing = pageClothingData.pageClothing[i] || pageClothingData.primaryClothing || 'standard';
+          avatarRequirements.push({
+            pageNumber: i,
+            clothingCategory: clothing,
+            characterNames: inputData.characters.map(c => c.name)
+          });
+        }
+        // Convert avatars in parallel
+        await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements);
+        log.debug(`✅ [PIPELINE] Styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
+      } catch (error) {
+        log.error(`⚠️ [PIPELINE] Failed to prepare styled avatars, using original photos:`, error.message);
+      }
+    }
+
     if (!skipImages && !skipCovers) {
       console.log(`📕 [PIPELINE] Starting PARALLEL cover generation for job ${jobId}`);
 
@@ -6285,7 +6297,8 @@ async function processStoryJob(jobId) {
       // Front cover
       const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
       const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
-      const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
+      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
+      frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
       const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
         TITLE_PAGE_SCENE: titlePageScene,
         STYLE_DESCRIPTION: styleDescription,
@@ -6297,7 +6310,8 @@ async function processStoryJob(jobId) {
 
       // Initial page
       const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
-      const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
+      let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
+      initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
       const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
         ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
             INITIAL_PAGE_SCENE: initialPageScene,
@@ -6317,7 +6331,8 @@ async function processStoryJob(jobId) {
 
       // Back cover
       const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
-      const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
+      let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
+      backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
       const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
         BACK_COVER_SCENE: backCoverScene,
         STYLE_DESCRIPTION: styleDescription,
@@ -6537,7 +6552,8 @@ Output Format:
             const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
             // Store clothing for future pages' context (clothing consistency)
             pageClothingForContext[pageNum] = clothingCategory;
-            const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+            referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingCategory})...`);
 
             // Generate image
@@ -6973,7 +6989,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Store clothing for future pages' context (clothing consistency)
             pageClothingForContext[pageNum] = clothingCategory;
             // Use detailed photo info (with names) for labeled reference images
-            const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+            referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
 
             // Generate image from scene description with scene-specific characters and visual bible
@@ -7214,6 +7231,54 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     log.debug('📖 [SERVER] storyText length:', resultData.storyText?.length || 0);
     log.verbose('📖 [SERVER] storyText preview:', resultData.storyText?.substring(0, 200));
 
+    // Persist styled avatars to character data before saving story
+    if (artStyle !== 'realistic' && inputData.characters) {
+      try {
+        const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
+        if (styledAvatarsMap.size > 0) {
+          log.debug(`💾 [PIPELINE] Persisting ${styledAvatarsMap.size} styled avatar sets to character data...`);
+          for (const char of inputData.characters) {
+            const styledAvatars = styledAvatarsMap.get(char.name);
+            if (styledAvatars) {
+              if (!char.avatars) char.avatars = {};
+              if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+              char.avatars.styledAvatars[artStyle] = styledAvatars;
+              log.debug(`  - ${char.name}: ${Object.keys(styledAvatars).length} ${artStyle} avatars saved`);
+            }
+          }
+
+          // Also persist styled avatars to the characters table
+          try {
+            const characterId = `characters_${job.user_id}`;
+            const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+            if (charResult.rows.length > 0) {
+              const charData = JSON.parse(charResult.rows[0].data);
+              const chars = charData.characters || [];
+              let updatedCount = 0;
+              for (const dbChar of chars) {
+                const styledAvatars = styledAvatarsMap.get(dbChar.name);
+                if (styledAvatars) {
+                  if (!dbChar.avatars) dbChar.avatars = {};
+                  if (!dbChar.avatars.styledAvatars) dbChar.avatars.styledAvatars = {};
+                  dbChar.avatars.styledAvatars[artStyle] = styledAvatars;
+                  updatedCount++;
+                }
+              }
+              if (updatedCount > 0) {
+                charData.characters = chars;
+                await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
+                log.debug(`💾 [PIPELINE] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
+              }
+            }
+          } catch (dbError) {
+            log.error(`⚠️ [PIPELINE] Failed to persist styled avatars to characters table:`, dbError.message);
+          }
+        }
+      } catch (error) {
+        log.error(`⚠️ [PIPELINE] Failed to persist styled avatars:`, error.message);
+      }
+    }
+
     // Save story to stories table so it appears in My Stories
     const storyId = jobId; // Use jobId as storyId for consistency
     const storyData = {
@@ -7343,6 +7408,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       ['completed', 100, 'Story generation complete!', JSON.stringify(resultData), jobId]
     );
 
+    // Clear styled avatar cache to free memory
+    clearStyledAvatarCache();
+
     console.log(`✅ Job ${jobId} completed successfully`);
 
     // Send story completion email to customer
@@ -7365,6 +7433,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     }
 
   } catch (error) {
+    // Clear styled avatar cache on error too
+    clearStyledAvatarCache();
+
     log.error(`❌ Job ${jobId} failed:`, error);
 
     // Log all partial data for debugging

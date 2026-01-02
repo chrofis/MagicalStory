@@ -361,145 +361,10 @@ async function initializeDatabase() {
 
     console.log('✓ Database tables initialized');
 
-    // Run migrations if available
-    try {
-      const { runMigrations } = require('../run-migrations');
-      await runMigrations(dbPool, 'postgresql');
-    } catch (err) {
-      // Migrations file might not exist or fail - that's okay
-      if (err.code !== 'MODULE_NOT_FOUND') {
-        console.warn('⚠️  Migration warning:', err.message);
-      }
-    }
-
   } catch (err) {
     console.error('❌ Database initialization error:', err.message);
     throw err;
   }
-}
-
-/**
- * Auto-migrate story images to the separate story_images table.
- * Runs in the background after server startup, processing stories in batches.
- */
-async function autoMigrateStoryImages() {
-  console.log('[AUTO-MIGRATE] Starting auto-migration check...');
-
-  if (!isDatabaseMode() || !dbPool) {
-    console.log('[AUTO-MIGRATE] Skipping - not in database mode');
-    return;
-  }
-
-  // Check if story_images table exists
-  try {
-    await dbPool.query('SELECT 1 FROM story_images LIMIT 1');
-    console.log('[AUTO-MIGRATE] story_images table exists');
-  } catch (err) {
-    // Table doesn't exist yet, skip migration
-    console.log('[AUTO-MIGRATE] story_images table not ready, skipping:', err.message);
-    return;
-  }
-
-  // Count stories needing migration
-  const countResult = await dbPool.query(`
-    SELECT COUNT(*) as count FROM stories s
-    WHERE NOT EXISTS (SELECT 1 FROM story_images si WHERE si.story_id = s.id)
-  `);
-  const totalToMigrate = parseInt(countResult.rows[0].count);
-
-  if (totalToMigrate === 0) {
-    console.log('[AUTO-MIGRATE] All stories already migrated to separate images');
-    return;
-  }
-
-  console.log(`[AUTO-MIGRATE] Starting background migration of ${totalToMigrate} stories...`);
-
-  const BATCH_SIZE = 5;
-  let migratedCount = 0;
-  let totalImages = 0;
-
-  while (true) {
-    // Get next batch of stories to migrate
-    const storyRows = await dbPool.query(`
-      SELECT s.id FROM stories s
-      WHERE NOT EXISTS (SELECT 1 FROM story_images si WHERE si.story_id = s.id)
-      LIMIT $1
-    `, [BATCH_SIZE]);
-
-    if (storyRows.rows.length === 0) {
-      break; // All done
-    }
-
-    for (const row of storyRows.rows) {
-      const storyId = row.id;
-
-      try {
-        // Load story data
-        const dataRows = await dbPool.query('SELECT data FROM stories WHERE id = $1', [storyId]);
-        if (dataRows.rows.length === 0) continue;
-
-        const story = JSON.parse(dataRows.rows[0].data);
-        let imagesMigrated = 0;
-
-        // Migrate scene images
-        if (story.sceneImages) {
-          for (const img of story.sceneImages) {
-            if (img.imageData) {
-              await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
-                qualityScore: img.qualityScore,
-                generatedAt: img.generatedAt,
-                versionIndex: 0
-              });
-              imagesMigrated++;
-
-              // Migrate image versions
-              if (img.imageVersions) {
-                for (let i = 0; i < img.imageVersions.length; i++) {
-                  const version = img.imageVersions[i];
-                  if (version.imageData) {
-                    await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
-                      qualityScore: version.qualityScore,
-                      generatedAt: version.generatedAt,
-                      versionIndex: i + 1
-                    });
-                    imagesMigrated++;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Migrate cover images
-        const coverTypes = ['frontCover', 'initialPage', 'backCover'];
-        for (const coverType of coverTypes) {
-          const coverData = story.coverImages?.[coverType];
-          if (coverData) {
-            const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
-            if (imageData) {
-              await saveStoryImage(storyId, coverType, null, imageData, {
-                qualityScore: coverData.qualityScore,
-                generatedAt: coverData.generatedAt,
-                versionIndex: 0
-              });
-              imagesMigrated++;
-            }
-          }
-        }
-
-        migratedCount++;
-        totalImages += imagesMigrated;
-        console.log(`[AUTO-MIGRATE] Story ${migratedCount}/${totalToMigrate}: ${storyId} (${imagesMigrated} images)`);
-      } catch (err) {
-        console.error(`[AUTO-MIGRATE] Failed to migrate story ${storyId}:`, err.message);
-      }
-    }
-
-    // Small delay between batches to not overload the database
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-
-  console.log(`[AUTO-MIGRATE] ✅ Complete! Migrated ${migratedCount} stories with ${totalImages} images`);
 }
 
 // Close the pool
@@ -710,11 +575,10 @@ module.exports = {
   buildStoryMetadata,
   saveStoryData,
   upsertStory,
-  // New image functions
+  // Image functions
   saveStoryImage,
   getStoryImage,
   getAllStoryImages,
   hasStorySeparateImages,
-  deleteStoryImages,
-  autoMigrateStoryImages
+  deleteStoryImages
 };
