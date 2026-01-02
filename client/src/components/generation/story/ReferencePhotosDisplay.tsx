@@ -81,11 +81,18 @@ export function ReferencePhotosDisplay({
             </div>
             {photo.photoUrl && (
               <>
-                <img
-                  src={photo.photoUrl}
-                  alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
-                  className="w-full max-h-32 object-contain rounded border border-gray-200 bg-gray-50"
-                />
+                <div className="relative">
+                  <img
+                    src={photo.photoUrl}
+                    alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
+                    className={`w-full max-h-32 object-contain rounded border bg-gray-50 ${photo.isStyled ? 'border-purple-400 ring-2 ring-purple-200' : 'border-gray-200'}`}
+                  />
+                  {photo.isStyled && (
+                    <span className="absolute top-1 right-1 px-1 py-0.5 text-[9px] font-bold bg-purple-500 text-white rounded">
+                      🎨 STYLED
+                    </span>
+                  )}
+                </div>
                 {photo.photoHash && (
                   <div className="mt-1 text-[9px] font-mono text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-center">
                     🔐 {photo.photoHash}

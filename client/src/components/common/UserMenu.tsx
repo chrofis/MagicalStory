@@ -90,7 +90,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
         <>
           {/* Create New Story */}
           <button
-            onClick={() => handleNavigate('/create')}
+            onClick={() => handleNavigate('/create?new=true')}
             className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
           >
             <Sparkles size={16} />

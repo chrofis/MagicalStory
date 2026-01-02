@@ -126,6 +126,8 @@ export interface ReferencePhoto {
   photoHash?: string | null;  // SHA256 hash (first 8 chars) for verification
   hasPhoto: boolean;
   clothingCategory?: 'winter' | 'summer' | 'formal' | 'standard' | null;
+  isStyled?: boolean;  // True if this is a pre-converted styled avatar
+  originalPhotoUrl?: string | null;  // Original photo URL before styling
 }
 
 // Individual image version (for user-initiated regenerations)

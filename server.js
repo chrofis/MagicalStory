@@ -5775,6 +5775,35 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               log.debug(`  - ${char.name}: ${Object.keys(styledAvatars).length} ${artStyle} avatars saved`);
             }
           }
+
+          // Also persist styled avatars to the characters table (for viewing on Characters page)
+          try {
+            const characterId = `characters_${userId}`;
+            const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+            if (charResult.rows.length > 0) {
+              const charData = JSON.parse(charResult.rows[0].data);
+              const chars = charData.characters || [];
+              let updatedCount = 0;
+
+              for (const dbChar of chars) {
+                const styledAvatars = styledAvatarsMap.get(dbChar.name);
+                if (styledAvatars) {
+                  if (!dbChar.avatars) dbChar.avatars = {};
+                  if (!dbChar.avatars.styledAvatars) dbChar.avatars.styledAvatars = {};
+                  dbChar.avatars.styledAvatars[artStyle] = styledAvatars;
+                  updatedCount++;
+                }
+              }
+
+              if (updatedCount > 0) {
+                charData.characters = chars;
+                await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
+                log.debug(`💾 [STORYBOOK] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
+              }
+            }
+          } catch (dbError) {
+            log.error(`⚠️ [STORYBOOK] Failed to persist styled avatars to characters table:`, dbError.message);
+          }
         }
       } catch (error) {
         log.error(`⚠️ [STORYBOOK] Failed to persist styled avatars:`, error.message);
@@ -7167,6 +7196,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     const resultData = {
       outline,
       outlinePrompt,  // API prompt for outline (dev mode)
+      outlineModelId: outlineModelUsed,  // Model used for outline (dev mode)
       storyTextPrompts, // API prompts for story text batches (dev mode)
       visualBible, // Visual Bible for recurring element consistency (dev mode)
       storyText: fullStoryText,
@@ -7201,6 +7231,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       relationshipTexts: inputData.relationshipTexts || {},
       outline: outline,
       outlinePrompt: outlinePrompt, // API prompt for outline (dev mode)
+      outlineModelId: outlineModelUsed, // Model used for outline (dev mode)
       storyTextPrompts: storyTextPrompts, // API prompts for story text (dev mode)
       storyText: fullStoryText,
       originalStory: fullStoryText, // Store original for restore functionality

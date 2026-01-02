@@ -220,6 +220,51 @@ export default function StoryWizard() {
     }
   }, [isAuthenticated, isAuthLoading, navigate]);
 
+  // Reset story settings when ?new=true is present (from "Create New Story" button)
+  useEffect(() => {
+    const isNewStory = searchParams.get('new') === 'true';
+    if (isNewStory) {
+      log.info('New story requested - resetting all story settings');
+
+      // Reset story settings state
+      setStoryType('');
+      setStoryCategory('' as 'adventure' | 'life-challenge' | 'educational' | '');
+      setStoryTopic('');
+      setStoryTheme('');
+      setCustomThemeText('');
+      setArtStyle('watercolor');
+      setLanguageLevel('standard');
+      setPages(30);
+      setDedication('');
+      setStoryDetails('');
+      setMainCharacters([]);
+      setExcludedCharacters([]);
+
+      // Clear localStorage for story settings
+      localStorage.removeItem('story_type');
+      localStorage.removeItem('story_category');
+      localStorage.removeItem('story_topic');
+      localStorage.removeItem('story_theme');
+      localStorage.removeItem('story_custom_theme_text');
+      localStorage.removeItem('story_art_style');
+      localStorage.removeItem('story_language_level');
+      localStorage.removeItem('story_pages');
+      localStorage.removeItem('story_dedication');
+      localStorage.removeItem('story_details');
+      localStorage.removeItem('story_main_characters');
+      localStorage.removeItem('story_excluded_characters');
+      localStorage.removeItem('wizard_step');
+
+      // Remove the 'new' param from URL to avoid resetting on refresh
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('new');
+      setSearchParams(newParams, { replace: true });
+
+      // Ensure we're on step 1
+      setStep(1);
+    }
+  }, [searchParams, setSearchParams]);
+
   // Load saved story from URL parameter - uses progressive loading for better UX
   useEffect(() => {
     const loadSavedStory = async () => {
