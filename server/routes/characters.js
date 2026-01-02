@@ -26,8 +26,10 @@ router.get('/', authenticateToken, async (req, res) => {
     if (isDatabaseMode()) {
       // Use the same ID format as the UPSERT to ensure we get the correct record
       const characterId = `characters_${req.user.id}`;
+      console.log(`[Characters] GET - Looking for characterId: ${characterId}, user.id: ${req.user.id}`);
       const selectQuery = 'SELECT data FROM characters WHERE id = $1';
       const rows = await dbQuery(selectQuery, [characterId]);
+      console.log(`[Characters] GET - Found ${rows.length} rows`);
 
       if (rows.length > 0) {
         const data = JSON.parse(rows[0].data);
@@ -69,10 +71,13 @@ router.post('/', authenticateToken, async (req, res) => {
       customFears: customFears || []
     };
 
+    console.log(`[Characters] POST - Saving ${characters?.length || 0} characters for user.id: ${req.user.id}`);
+
     if (isDatabaseMode()) {
       // Use UPSERT to atomically update or insert character data
       // We use a stable ID per user to ensure only one record exists
       const characterId = `characters_${req.user.id}`;
+      console.log(`[Characters] POST - Using characterId: ${characterId}`);
       const jsonData = JSON.stringify(characterData);
 
       const upsertQuery = `

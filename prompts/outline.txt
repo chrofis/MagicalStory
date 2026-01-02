@@ -324,8 +324,7 @@ Clothing: [same]
 
 ---
 
-Be specific and creative. Each scene description should paint a clear picture for the illustrator. Ensure character development is woven throughout the plot and that each page advances both the story and the characters' growth arcs.
 
-**FINAL REMINDER: Your response is INCOMPLETE unless it includes Page-by-Page Breakdown entries for EVERY page from Page 1 through Page {PAGES}. Do not stop until you have written all {PAGES} pages.**
 
-**Remember: Cover scene descriptions should be SIMPLE and SHORT - let the image generator handle the details.**
+** Reminder Do not stop until you have written all {PAGES} pages.**
+
