@@ -711,36 +711,6 @@ export function StoryDisplay({
             </details>
           )}
 
-          {/* Story Text API Prompts */}
-          {storyTextPrompts.length > 0 && (
-            <details className="bg-teal-50 border-2 border-teal-200 rounded-xl p-4">
-              <summary className="cursor-pointer text-lg font-bold text-teal-800 hover:text-teal-900 flex items-center gap-2">
-                <FileText size={20} />
-                {language === 'de' ? `API-Prompts: Story-Text (${storyTextPrompts.length} Batches)` : language === 'fr' ? `Prompts API: Texte (${storyTextPrompts.length} lots)` : `API Prompts: Story Text (${storyTextPrompts.length} batches)`}
-              </summary>
-              <div className="mt-4 space-y-4">
-                {storyTextPrompts.map((batch) => (
-                  <details key={batch.batch} className="bg-white border border-teal-200 rounded-lg p-3">
-                    <summary className="cursor-pointer text-sm font-semibold text-teal-700 flex items-center gap-2 flex-wrap">
-                      <span>
-                        {language === 'de' ? `Batch ${batch.batch}: Seiten ${batch.startPage}-${batch.endPage}` : language === 'fr' ? `Lot ${batch.batch}: Pages ${batch.startPage}-${batch.endPage}` : `Batch ${batch.batch}: Pages ${batch.startPage}-${batch.endPage}`}
-                      </span>
-                      {batch.modelId && <span className="text-xs font-normal text-teal-500">({batch.modelId})</span>}
-                      {batch.usage && (
-                        <span className="text-xs font-normal text-teal-400">
-                          [{batch.usage.input_tokens.toLocaleString()} in / {batch.usage.output_tokens.toLocaleString()} out]
-                        </span>
-                      )}
-                    </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border overflow-x-auto max-h-64 overflow-y-auto">
-                      {batch.prompt}
-                    </pre>
-                  </details>
-                ))}
-              </div>
-            </details>
-          )}
-
           {/* Visual Bible - Recurring Elements for Consistency */}
           {visualBible && (
             <details className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4">
