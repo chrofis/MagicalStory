@@ -78,7 +78,7 @@ export function WizardStep2Characters({
       return (
         <div className="space-y-6">
           <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-            <Users size={24} /> {t.createCharacters}
+            <Users size={24} /> {t.charactersStepTitle}
           </h2>
           <PhotoUpload onPhotoSelect={onPhotoSelect} />
           <button
@@ -96,7 +96,7 @@ export function WizardStep2Characters({
       return (
         <div className="space-y-6">
           <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-            <Users size={24} /> {t.createCharacters}
+            <Users size={24} /> {t.charactersStepTitle}
           </h2>
           <CharacterForm
             character={currentCharacter}
@@ -126,7 +126,7 @@ export function WizardStep2Characters({
     return (
       <div className="space-y-6">
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <Users size={24} /> {t.createCharacters}
+          <Users size={24} /> {t.charactersStepTitle}
         </h2>
         <CharacterForm
           character={currentCharacter}
@@ -156,7 +156,7 @@ export function WizardStep2Characters({
     return (
       <div className="space-y-6">
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-          <Users size={24} /> {t.createCharacters}
+          <Users size={24} /> {t.charactersStepTitle}
         </h2>
         <CharacterList
           characters={characters}
@@ -176,7 +176,7 @@ export function WizardStep2Characters({
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-        <Users size={24} /> {t.createCharacters}
+        <Users size={24} /> {t.charactersStepTitle}
       </h2>
       <div className="text-center py-12">
         <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />

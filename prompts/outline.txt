@@ -122,6 +122,20 @@ For any vehicles appearing in multiple scenes:
 - **Color & Details**: Exact colors and distinctive features (e.g., "rusty red pickup truck with dented fender", "shiny blue bicycle with white basket", "yellow school bus with number 42")
 - **Signature Element**: ONE memorable detail for recognition (e.g., "fuzzy dice hanging from mirror", "flower stickers on the basket")
 
+## Clothing & Costumes
+For special outfits, costumes, or distinctive clothing items that characters wear (NOT their everyday clothes from reference photos):
+- **Item Name + Character**: Always include the character's name (e.g., "Emma's princess dress", "Max's superhero cape", "Dad's chef hat")
+- **Appears in pages**: List all page numbers where worn
+- **Worn by**: Which character wears this item
+- **Description**: Colors, materials, distinctive features (e.g., "sparkly pink tutu with silver stars", "red cape made from a bedsheet with yellow lightning bolt")
+- **How worn**: How the character wears it (e.g., "tied around shoulders", "on head slightly crooked", "over regular clothes")
+
+**IMPORTANT for Clothing:**
+- ALWAYS include the character's name in the item name to avoid mix-ups
+- Only list SPECIAL clothing (costumes, uniforms, accessories) - not everyday outfits
+- Be specific about colors and distinctive details
+- If multiple characters have similar items, clearly distinguish them (e.g., "Emma's blue wizard hat" vs "Max's purple wizard hat")
+
 ## IMPORTANT: Visual Consistency Rules
 
 **Every recurring element MUST have:**
@@ -291,6 +305,12 @@ Title: [Story title]
 **[Name/Type]** (pages X, Y, Z)
 - Color & Details: [exact colors, condition, distinctive features]
 - Signature Element: [ONE memorable detail]
+
+### Clothing & Costumes
+**[Item Name + Character Name]** (pages X, Y, Z)
+- Worn by: [character name]
+- Description: [colors, materials, distinctive features]
+- How worn: [how the character wears it]
 
 (Include only elements appearing in 2+ scenes. Write "None" for any category with no recurring elements.)
 

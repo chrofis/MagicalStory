@@ -37,6 +37,7 @@ export interface TranslationStrings {
   storyTypeEmoji: string;
   addStoryType: string;
   createCharacters: string;
+  charactersStepTitle: string;
   characterCreated: string;
   createAnother: string;
   continueToRelationships: string;
@@ -215,6 +216,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     storyTypeEmoji: 'Emoji',
     addStoryType: 'Add',
     createCharacters: 'Create Your Characters',
+    charactersStepTitle: 'Characters & Story Roles',
     characterCreated: 'Character Created!',
     createAnother: 'Create Another Character',
     continueToRelationships: 'Continue to Relationships',
@@ -391,6 +393,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     storyTypeEmoji: 'Emoji',
     addStoryType: 'Hinzufügen',
     createCharacters: 'Erstelle deine Charaktere',
+    charactersStepTitle: 'Charaktere & Rollen',
     characterCreated: 'Charakter erstellt!',
     createAnother: 'Weiteren Charakter erstellen',
     continueToRelationships: 'Weiter zu Beziehungen',
@@ -567,6 +570,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     storyTypeEmoji: 'Emoji',
     addStoryType: 'Ajouter',
     createCharacters: 'Créez vos personnages',
+    charactersStepTitle: 'Personnages & Rôles',
     characterCreated: 'Personnage créé !',
     createAnother: 'Créer un autre personnage',
     continueToRelationships: 'Continuer vers les Relations',
