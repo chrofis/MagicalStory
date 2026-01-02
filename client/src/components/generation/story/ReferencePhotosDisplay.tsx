@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { ReferencePhoto } from '@/types/story';
+import { ImageLightbox } from '@/components/common/ImageLightbox';
 
 interface ReferencePhotosDisplayProps {
   referencePhotos: ReferencePhoto[];
@@ -12,6 +14,8 @@ export function ReferencePhotosDisplay({
   referencePhotos,
   language
 }: ReferencePhotosDisplayProps) {
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
   if (!referencePhotos || referencePhotos.length === 0) return null;
 
   const getPhotoTypeLabel = (photoType: string) => {
@@ -85,7 +89,9 @@ export function ReferencePhotosDisplay({
                   <img
                     src={photo.photoUrl}
                     alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
-                    className={`w-full max-h-32 object-contain rounded border bg-gray-50 ${photo.isStyled ? 'border-purple-400 ring-2 ring-purple-200' : 'border-gray-200'}`}
+                    className={`w-full max-h-32 object-contain rounded border bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity ${photo.isStyled ? 'border-purple-400 ring-2 ring-purple-200' : 'border-gray-200'}`}
+                    onClick={() => setLightboxImage(photo.photoUrl)}
+                    title="Click to enlarge"
                   />
                   {photo.isStyled && (
                     <span className="absolute top-1 right-1 px-1 py-0.5 text-[9px] font-bold bg-purple-500 text-white rounded">
@@ -103,6 +109,12 @@ export function ReferencePhotosDisplay({
           </div>
         ))}
       </div>
+
+      {/* Lightbox for enlarged view */}
+      <ImageLightbox
+        src={lightboxImage}
+        onClose={() => setLightboxImage(null)}
+      />
     </details>
   );
 }

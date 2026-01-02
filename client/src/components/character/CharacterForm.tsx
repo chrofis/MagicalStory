@@ -3,10 +3,11 @@ import { Upload, Save, RefreshCw, Sparkles, Wand2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import TraitSelector from './TraitSelector';
+import CharacterRelationships from './CharacterRelationships';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory } from '@/services/characterService';
-import type { Character, PhysicalTraits, AgeCategory, ChangedTraits } from '@/types/character';
+import type { Character, PhysicalTraits, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
 const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string; labelFr: string }[] = [
@@ -292,6 +293,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
 
 interface CharacterFormProps {
   character: Character;
+  allCharacters?: Character[];  // All characters for relationship editing
   onChange: (character: Character) => void;
   onSave: () => void;
   onCancel?: () => void;
@@ -310,10 +312,18 @@ interface CharacterFormProps {
   developerMode?: boolean;
   changedTraits?: ChangedTraits;  // New: which traits changed from previous photo
   photoAnalysisDebug?: { rawResponse?: string; error?: string };  // Debug info for dev mode
+  // Relationship props
+  relationships?: RelationshipMap;
+  relationshipTexts?: RelationshipTextMap;
+  onRelationshipChange?: (char1Id: number, char2Id: number, value: string) => void;
+  onRelationshipTextChange?: (key: string, text: string) => void;
+  customRelationships?: string[];
+  onAddCustomRelationship?: (relationship: string) => void;
 }
 
 export function CharacterForm({
   character,
+  allCharacters = [],
   onChange,
   onSave,
   onCancel,
@@ -332,6 +342,12 @@ export function CharacterForm({
   developerMode,
   changedTraits,
   photoAnalysisDebug,
+  relationships = {},
+  relationshipTexts = {},
+  onRelationshipChange,
+  onRelationshipTextChange,
+  customRelationships = [],
+  onAddCustomRelationship,
 }: CharacterFormProps) {
   const { t, language } = useLanguage();
   const [enlargedAvatar, setEnlargedAvatar] = useState(false);
@@ -1063,6 +1079,20 @@ export function CharacterForm({
           rows={3}
         />
       </div>
+
+      {/* Relationships with other characters */}
+      {allCharacters.length > 1 && onRelationshipChange && onRelationshipTextChange && (
+        <CharacterRelationships
+          character={character}
+          allCharacters={allCharacters}
+          relationships={relationships}
+          relationshipTexts={relationshipTexts}
+          onRelationshipChange={onRelationshipChange}
+          onRelationshipTextChange={onRelationshipTextChange}
+          customRelationships={customRelationships}
+          onAddCustomRelationship={onAddCustomRelationship}
+        />
+      )}
 
       {/* Save/Cancel Buttons */}
       <div className="flex gap-3">

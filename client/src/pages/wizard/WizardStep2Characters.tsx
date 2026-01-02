@@ -2,7 +2,7 @@ import { Users, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common';
 import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
-import type { Character, ChangedTraits } from '@/types/character';
+import type { Character, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
 
 // Character role in story
 type CharacterRole = 'out' | 'in' | 'main';
@@ -35,6 +35,13 @@ interface WizardStep2Props {
   onRegenerateAvatars: () => void;
   onRegenerateAvatarsWithTraits: () => void;
   onSaveAndRegenerateWithTraits: () => void;  // Combined save + regenerate with traits
+  // Relationship props
+  relationships: RelationshipMap;
+  relationshipTexts: RelationshipTextMap;
+  onRelationshipChange: (char1Id: number, char2Id: number, value: string) => void;
+  onRelationshipTextChange: (key: string, text: string) => void;
+  customRelationships: string[];
+  onAddCustomRelationship: (relationship: string) => void;
 }
 
 /**
@@ -68,6 +75,12 @@ export function WizardStep2Characters({
   onRegenerateAvatars,
   onRegenerateAvatarsWithTraits,
   onSaveAndRegenerateWithTraits,
+  relationships,
+  relationshipTexts,
+  onRelationshipChange,
+  onRelationshipTextChange,
+  customRelationships,
+  onAddCustomRelationship,
 }: WizardStep2Props) {
   const { t, language } = useLanguage();
 
@@ -130,6 +143,7 @@ export function WizardStep2Characters({
         </h2>
         <CharacterForm
           character={currentCharacter}
+          allCharacters={characters}
           onChange={onCharacterChange}
           onSave={onSaveCharacter}
           onCancel={() => onCharacterChange(null)}
@@ -146,6 +160,12 @@ export function WizardStep2Characters({
           developerMode={developerMode}
           changedTraits={changedTraits}
           photoAnalysisDebug={photoAnalysisDebug}
+          relationships={relationships}
+          relationshipTexts={relationshipTexts}
+          onRelationshipChange={onRelationshipChange}
+          onRelationshipTextChange={onRelationshipTextChange}
+          customRelationships={customRelationships}
+          onAddCustomRelationship={onAddCustomRelationship}
         />
       </div>
     );

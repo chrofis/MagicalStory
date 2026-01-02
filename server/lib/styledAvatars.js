@@ -400,15 +400,20 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
     });
   }
 
-  // Add cover requirements (all characters in various clothing)
+  // Add cover requirements ONLY for clothing categories actually used in the story
+  // This avoids generating unused styled avatars (e.g., winter avatars for a summer story)
+  const usedClothingCategories = new Set(requirements.map(r => r.clothingCategory));
+  // Always include 'standard' as fallback for covers
+  usedClothingCategories.add('standard');
+
   const allCharacterNames = characters.map(c => c.name);
-  ['standard', 'winter', 'summer', 'formal'].forEach(clothing => {
+  for (const clothing of usedClothingCategories) {
     requirements.push({
       pageNumber: 'cover',
       clothingCategory: clothing,
       characterNames: allCharacterNames
     });
-  });
+  }
 
   return requirements;
 }
