@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, Trash2, Check, AlertTriangle, Star } from 'lucide-react';
+import { Edit2, Trash2, Check, AlertTriangle, Star, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
 
@@ -15,7 +15,6 @@ interface CharacterListProps {
   onEdit: (character: Character) => void;
   onDelete: (id: number) => void;
   onCreateAnother: () => void;
-  onContinue: () => void;
 }
 
 export function CharacterList({
@@ -27,7 +26,6 @@ export function CharacterList({
   onEdit,
   onDelete,
   onCreateAnother,
-  onContinue,
 }: CharacterListProps) {
   const { t, language } = useLanguage();
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
@@ -192,38 +190,22 @@ export function CharacterList({
               </div>
             );
           })}
-        </div>
-      </div>
 
-      {/* Action buttons */}
-      <div className="md:bg-indigo-50 md:border-2 md:border-indigo-200 md:rounded-lg p-4">
-        <p className="text-gray-800 mb-4 text-center font-semibold">
-          {language === 'de'
-            ? 'Was mochten Sie als Nachstes tun?'
-            : language === 'fr'
-            ? 'Que voulez-vous faire ensuite?'
-            : 'What would you like to do next?'}
-        </p>
-        <div className="grid md:grid-cols-2 gap-3">
+          {/* Add Character Card */}
           <button
             onClick={onCreateAnother}
-            className="bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 font-semibold flex items-center justify-center gap-2 transition-colors"
+            className="border-2 border-dashed border-indigo-300 rounded p-4 flex flex-col items-center justify-center gap-2 hover:border-indigo-500 hover:bg-indigo-50 transition-colors min-h-[100px]"
           >
-            {language === 'de'
-              ? 'Weiteren Charakter erstellen'
-              : language === 'fr'
-              ? 'Creer un autre personnage'
-              : 'Create Another Character'}
-          </button>
-          <button
-            onClick={onContinue}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold flex items-center justify-center gap-2 transition-colors"
-          >
-            {language === 'de'
-              ? 'Weiter zu Beziehungen'
-              : language === 'fr'
-              ? 'Continuer vers les relations'
-              : 'Continue to Relationships'}
+            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+              <Plus size={24} className="text-indigo-600" />
+            </div>
+            <span className="text-sm font-medium text-indigo-600">
+              {language === 'de'
+                ? 'Weiteren Charakter erstellen'
+                : language === 'fr'
+                ? 'Créer un autre personnage'
+                : 'Create Another Character'}
+            </span>
           </button>
         </div>
       </div>

@@ -1969,7 +1969,6 @@ export default function StoryWizard() {
             onRegenerateAvatars={handleRegenerateAvatars}
             onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
             onSaveAndRegenerateWithTraits={handleSaveAndRegenerateWithTraits}
-            onContinue={goNext}
           />
         );
 
