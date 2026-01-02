@@ -105,11 +105,38 @@ For objects that appear in multiple scenes and must look consistent:
 - **Type**: What kind of object
 - **Description**: Size, color, material, condition, distinctive markings
 
-## Recurring Locations (if visually distinctive)
-For specific places that appear multiple times with unique visual features:
-- **Name**: What it's called
+## Recurring Locations
+For specific places that appear multiple times:
+- **Name**: What it's called (e.g., "Emma's house", "the town square", "the old bridge")
 - **Appears in pages**: List all page numbers
-- **Key visual features**: Colors, shapes, distinctive elements
+- **Key visual features**: Be SPECIFIC about colors and distinctive details:
+  - Building colors (e.g., "bright yellow house with red shutters", "grey stone church with green copper roof")
+  - Architectural style (e.g., "Victorian with ornate balcony", "modern glass facade")
+  - Memorable landmark element (e.g., "crooked chimney", "round window like a porthole", "wooden door with heart-shaped knocker")
+- **Signature Element**: ONE unique visual detail that makes this location instantly recognizable (e.g., "the bright purple mailbox out front", "the weathervane shaped like a rooster")
+
+## Vehicles & Transportation
+For any vehicles appearing in multiple scenes:
+- **Name/Type**: What it is (e.g., "Dad's car", "the school bus", "grandpa's bicycle")
+- **Appears in pages**: List all page numbers
+- **Color & Details**: Exact colors and distinctive features (e.g., "rusty red pickup truck with dented fender", "shiny blue bicycle with white basket", "yellow school bus with number 42")
+- **Signature Element**: ONE memorable detail for recognition (e.g., "fuzzy dice hanging from mirror", "flower stickers on the basket")
+
+## IMPORTANT: Visual Consistency Rules
+
+**Every recurring element MUST have:**
+1. **Specific colors** - Never say "a car" or "a house". Always specify: "a bright red car", "a pale blue house with white trim"
+2. **One memorable signature element** - Something unique and easy to recognize that AI can reproduce consistently
+3. **Enough detail for independent illustration** - Each description must work standalone without seeing other scenes
+
+**Examples of GOOD descriptions:**
+- "A cozy cottage with moss-green walls, a thatched roof, and a bright orange door with a brass cat-shaped knocker"
+- "An old-fashioned red bicycle with a wicker basket and a silver bell on the handlebar"
+
+**Examples of BAD descriptions (too vague):**
+- "A house" ❌
+- "A nice car" ❌
+- "The school" ❌
 
 **NOTE:** Only include elements that appear in 2+ scenes. Never include {CHARACTER_NAMES} here - they are main characters with reference photos.
 
@@ -256,7 +283,14 @@ Title: [Story title]
 
 ### Locations
 **[Name]** (pages X, Y, Z)
-- Features: [distinctive visual elements]
+- Colors: [specific building/place colors]
+- Features: [architectural details, distinctive elements]
+- Signature Element: [ONE memorable detail for instant recognition]
+
+### Vehicles
+**[Name/Type]** (pages X, Y, Z)
+- Color & Details: [exact colors, condition, distinctive features]
+- Signature Element: [ONE memorable detail]
 
 (Include only elements appearing in 2+ scenes. Write "None" for any category with no recurring elements.)
 

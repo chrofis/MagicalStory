@@ -24,6 +24,11 @@ router.get('/', authenticateToken, async (req, res) => {
     };
 
     if (isDatabaseMode()) {
+      // First, check ALL rows for this user_id to debug
+      const allRowsQuery = 'SELECT id, user_id, LENGTH(data) as data_len FROM characters WHERE user_id = $1';
+      const allRows = await dbQuery(allRowsQuery, [req.user.id]);
+      console.log(`[Characters] GET - All rows for user_id ${req.user.id}: ${JSON.stringify(allRows)}`);
+
       // Use the same ID format as the UPSERT to ensure we get the correct record
       const characterId = `characters_${req.user.id}`;
       console.log(`[Characters] GET - Looking for characterId: ${characterId}, user.id: ${req.user.id}`);
