@@ -30,10 +30,29 @@ export function getLocalizedRelationship(rel: LocalizedString, lang: Language): 
   return rel[lang];
 }
 
-export function findInverseRelationship(value: string, lang: Language): string {
+export interface CustomRelationshipPair {
+  forward: string;
+  inverse: string;
+}
+
+export function findInverseRelationship(
+  value: string,
+  lang: Language,
+  customRelationships: CustomRelationshipPair[] = []
+): string {
+  // First check built-in relationships
   for (const rel of relationshipTypes) {
     if (rel.value[lang] === value) {
       return rel.inverse[lang];
+    }
+  }
+  // Then check custom relationships (both directions)
+  for (const custom of customRelationships) {
+    if (custom.forward === value) {
+      return custom.inverse;
+    }
+    if (custom.inverse === value) {
+      return custom.forward;
     }
   }
   return value;

@@ -190,11 +190,31 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
   };
 }
 
+// Custom relationship with forward and inverse
+export interface CustomRelationshipPair {
+  forward: string;
+  inverse: string;
+}
+
+// Helper to migrate old string[] format to new CustomRelationshipPair[] format
+function migrateCustomRelationships(
+  data: string[] | CustomRelationshipPair[] | undefined
+): CustomRelationshipPair[] {
+  if (!data || data.length === 0) return [];
+  // Check if it's old format (array of strings)
+  if (typeof data[0] === 'string') {
+    // Convert old format: each string becomes both forward and inverse
+    return (data as string[]).map(rel => ({ forward: rel, inverse: rel }));
+  }
+  // Already new format
+  return data as CustomRelationshipPair[];
+}
+
 interface CharacterDataResponse {
   characters: CharacterApiResponse[];
   relationships: Record<string, string>;
   relationshipTexts: Record<string, string>;
-  customRelationships: string[];
+  customRelationships: string[] | CustomRelationshipPair[];
   customStrengths: string[];
   customWeaknesses: string[];
   customFears: string[];
@@ -204,7 +224,7 @@ export interface CharacterData {
   characters: Character[];
   relationships: Record<string, string>;
   relationshipTexts: Record<string, string>;
-  customRelationships: string[];
+  customRelationships: CustomRelationshipPair[];
   customStrengths: string[];
   customWeaknesses: string[];
   customFears: string[];
@@ -234,7 +254,7 @@ export const characterService = {
       characters: mapped,
       relationships: response.relationships || {},
       relationshipTexts: response.relationshipTexts || {},
-      customRelationships: response.customRelationships || [],
+      customRelationships: migrateCustomRelationships(response.customRelationships),
       customStrengths: response.customStrengths || [],
       customWeaknesses: response.customWeaknesses || [],
       customFears: response.customFears || [],

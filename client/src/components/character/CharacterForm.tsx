@@ -9,6 +9,7 @@ import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as def
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory } from '@/services/characterService';
 import type { Character, PhysicalTraits, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
+import type { CustomRelationshipPair } from '@/constants/relationships';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
 const AGE_CATEGORY_OPTIONS: { value: AgeCategory; label: string; labelDe: string; labelFr: string }[] = [
@@ -318,8 +319,8 @@ interface CharacterFormProps {
   relationshipTexts?: RelationshipTextMap;
   onRelationshipChange?: (char1Id: number, char2Id: number, value: string) => void;
   onRelationshipTextChange?: (key: string, text: string) => void;
-  customRelationships?: string[];
-  onAddCustomRelationship?: (relationship: string) => void;
+  customRelationships?: CustomRelationshipPair[];
+  onAddCustomRelationship?: (forward: string, inverse: string) => void;
 }
 
 export function CharacterForm({

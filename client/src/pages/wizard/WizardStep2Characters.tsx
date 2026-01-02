@@ -3,6 +3,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common';
 import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
 import type { Character, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
+import type { CustomRelationshipPair } from '@/constants/relationships';
 
 // Character role in story
 type CharacterRole = 'out' | 'in' | 'main';
@@ -40,8 +41,8 @@ interface WizardStep2Props {
   relationshipTexts: RelationshipTextMap;
   onRelationshipChange: (char1Id: number, char2Id: number, value: string) => void;
   onRelationshipTextChange: (key: string, text: string) => void;
-  customRelationships: string[];
-  onAddCustomRelationship: (relationship: string) => void;
+  customRelationships: CustomRelationshipPair[];
+  onAddCustomRelationship: (forward: string, inverse: string) => void;
 }
 
 /**

@@ -24,7 +24,7 @@ import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UI
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
 import { storyTypes } from '@/constants/storyTypes';
-import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship } from '@/constants/relationships';
+import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
 import { createLogger } from '@/services/logger';
 import { useDeveloperMode } from '@/hooks/useDeveloperMode';
 
@@ -100,7 +100,7 @@ export default function StoryWizard() {
   // Relationships state (step 2) - loaded from API with characters
   const [relationships, setRelationships] = useState<RelationshipMap>({});
   const [relationshipTexts, setRelationshipTexts] = useState<RelationshipTextMap>({});
-  const [customRelationships, setCustomRelationships] = useState<string[]>([]);
+  const [customRelationships, setCustomRelationships] = useState<CustomRelationshipPair[]>([]);
   const relationshipsInitialized = useRef<string | null>(null);
   const dataLoadedFromApi = useRef(false);
   const relationshipsDirty = useRef(false); // Track if relationships were modified
@@ -1416,9 +1416,9 @@ export default function StoryWizard() {
     }));
   };
 
-  const addCustomRelationship = (relationship: string) => {
+  const addCustomRelationship = (forward: string, inverse: string) => {
     relationshipsDirty.current = true; // Mark as modified
-    setCustomRelationships(prev => [...prev, relationship]);
+    setCustomRelationships(prev => [...prev, { forward, inverse }]);
   };
 
   // Character role change handler (out/in/main)
