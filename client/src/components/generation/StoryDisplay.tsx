@@ -790,6 +790,7 @@ export function StoryDisplay({
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
                           <div className="font-semibold text-rose-800 flex items-center gap-2">
                             {entry.name}
+                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
                             {entry.source && (
                               <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                                 {entry.source === 'outline' ? 'Outline' : 'Story'}
@@ -850,6 +851,7 @@ export function StoryDisplay({
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
                           <div className="font-semibold text-rose-800 flex items-center gap-2">
                             {entry.name}
+                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
                             {entry.source && (
                               <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                                 {entry.source === 'outline' ? 'Outline' : 'Story'}
@@ -910,6 +912,7 @@ export function StoryDisplay({
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
                           <div className="font-semibold text-rose-800 flex items-center gap-2">
                             {entry.name}
+                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
                             {entry.source && (
                               <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                                 {entry.source === 'outline' ? 'Outline' : 'Story'}
@@ -970,6 +973,7 @@ export function StoryDisplay({
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
                           <div className="font-semibold text-rose-800 flex items-center gap-2">
                             {entry.name}
+                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
                             {entry.source && (
                               <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                                 {entry.source === 'outline' ? 'Outline' : 'Story'}
@@ -1008,6 +1012,69 @@ export function StoryDisplay({
                               )}
                             </div>
                           )}
+                          {entry.extractedDescription && (
+                            <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
+                              <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Vehicles */}
+                {visualBible.vehicles && visualBible.vehicles.length > 0 && (
+                  <div className="bg-white border border-rose-200 rounded-lg p-3">
+                    <h4 className="text-sm font-bold text-rose-700 mb-2">
+                      {language === 'de' ? 'Fahrzeuge' : language === 'fr' ? 'Véhicules' : 'Vehicles'}
+                    </h4>
+                    <div className="space-y-2">
+                      {visualBible.vehicles.map((entry) => (
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
+                          <div className="font-semibold text-rose-800 flex items-center gap-2">
+                            {entry.name}
+                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
+                            {entry.source && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                {entry.source === 'outline' ? 'Outline' : 'Story'}
+                              </span>
+                            )}
+                            {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
+                          </div>
+                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                          {entry.extractedDescription && (
+                            <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
+                              <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Clothing & Costumes */}
+                {visualBible.clothing && visualBible.clothing.length > 0 && (
+                  <div className="bg-white border border-rose-200 rounded-lg p-3">
+                    <h4 className="text-sm font-bold text-rose-700 mb-2">
+                      {language === 'de' ? 'Kleidung & Kostüme' : language === 'fr' ? 'Vêtements & Costumes' : 'Clothing & Costumes'}
+                    </h4>
+                    <div className="space-y-2">
+                      {visualBible.clothing.map((entry) => (
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
+                          <div className="font-semibold text-rose-800 flex items-center gap-2">
+                            {entry.name}
+                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
+                            {entry.wornBy && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">worn by {entry.wornBy}</span>}
+                            {entry.source && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                {entry.source === 'outline' ? 'Outline' : 'Story'}
+                              </span>
+                            )}
+                            {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
+                          </div>
+                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
                           {entry.extractedDescription && (
                             <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
@@ -1071,7 +1138,9 @@ export function StoryDisplay({
                  (!visualBible.secondaryCharacters || visualBible.secondaryCharacters.length === 0) &&
                  (!visualBible.animals || visualBible.animals.length === 0) &&
                  (!visualBible.artifacts || visualBible.artifacts.length === 0) &&
-                 (!visualBible.locations || visualBible.locations.length === 0) && (
+                 (!visualBible.locations || visualBible.locations.length === 0) &&
+                 (!visualBible.vehicles || visualBible.vehicles.length === 0) &&
+                 (!visualBible.clothing || visualBible.clothing.length === 0) && (
                   <div className="text-gray-500 text-sm italic">
                     {language === 'de' ? 'Keine wiederkehrenden Elemente gefunden' : language === 'fr' ? 'Aucun élément récurrent trouvé' : 'No recurring elements found in this story'}
                   </div>

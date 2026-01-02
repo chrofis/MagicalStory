@@ -170,11 +170,16 @@ export interface VisualBibleEntry {
   source?: 'outline' | 'story_text';  // Where this entry was added from
 }
 
+export interface VisualBibleClothingEntry extends VisualBibleEntry {
+  wornBy?: string;  // Character who wears this item
+  howWorn?: string; // How it's worn
+}
+
 export interface VisualBibleChangeLogEntry {
   timestamp: string;
   page: number;
   element: string;
-  type: 'mainCharacter' | 'secondaryCharacter' | 'animal' | 'artifact' | 'location' | 'generatedOutfit';
+  type: 'mainCharacter' | 'secondaryCharacter' | 'animal' | 'artifact' | 'location' | 'vehicle' | 'clothing' | 'generatedOutfit';
   change: string;
   before: string | null;
   after: string;
@@ -186,6 +191,8 @@ export interface VisualBible {
   animals: VisualBibleEntry[];
   artifacts: VisualBibleEntry[];
   locations: VisualBibleEntry[];
+  vehicles: VisualBibleEntry[];
+  clothing: VisualBibleClothingEntry[];
   changeLog: VisualBibleChangeLogEntry[];
 }
 
