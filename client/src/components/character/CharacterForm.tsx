@@ -964,6 +964,70 @@ export function CharacterForm({
         </div>
       )}
 
+      {/* Styled Avatars (developer only - pre-converted to art styles) */}
+      {developerMode && character.avatars?.styledAvatars && Object.keys(character.avatars.styledAvatars).length > 0 && (
+        <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
+            🎨 {language === 'de' ? 'Stilisierte Avatare' : language === 'fr' ? 'Avatars stylisés' : 'Styled Avatars'}
+            <span className="text-xs font-normal text-purple-500">
+              ({Object.keys(character.avatars.styledAvatars).length} {language === 'de' ? 'Stile' : 'styles'})
+            </span>
+          </h4>
+          <div className="space-y-4">
+            {Object.entries(character.avatars.styledAvatars).map(([artStyle, avatars]) => {
+              const styleLabels: Record<string, { en: string; de: string; emoji: string }> = {
+                'pixar': { en: 'Pixar 3D', de: 'Pixar 3D', emoji: '🎬' },
+                'watercolor': { en: 'Watercolor', de: 'Aquarell', emoji: '🎨' },
+                'comic-book': { en: 'Comic Book', de: 'Comic', emoji: '💥' },
+                'anime': { en: 'Anime', de: 'Anime', emoji: '🌸' },
+                'oil-painting': { en: 'Oil Painting', de: 'Ölmalerei', emoji: '🖼️' },
+                'colored-pencil': { en: 'Colored Pencil', de: 'Buntstift', emoji: '✏️' },
+                'storybook': { en: 'Storybook', de: 'Bilderbuch', emoji: '📖' },
+              };
+              const styleInfo = styleLabels[artStyle] || { en: artStyle, de: artStyle, emoji: '🎭' };
+              const clothingOrder = ['standard', 'winter', 'summer', 'formal'] as const;
+              const clothingEmojis: Record<string, string> = {
+                'standard': '👕',
+                'winter': '❄️',
+                'summer': '☀️',
+                'formal': '👔'
+              };
+
+              return (
+                <div key={artStyle} className="border border-purple-200 rounded-lg p-3 bg-white">
+                  <h5 className="text-xs font-semibold text-purple-600 mb-2">
+                    {styleInfo.emoji} {language === 'de' ? styleInfo.de : styleInfo.en}
+                  </h5>
+                  <div className="grid grid-cols-4 gap-2">
+                    {clothingOrder.map((category) => {
+                      const avatar = avatars[category];
+                      return (
+                        <div key={category} className="text-center">
+                          <div className="text-[10px] text-gray-500 mb-1">
+                            {clothingEmojis[category]} {category}
+                          </div>
+                          {avatar ? (
+                            <img
+                              src={avatar}
+                              alt={`${character.name} - ${artStyle} - ${category}`}
+                              className="w-full h-32 object-contain rounded border border-purple-200 bg-gray-50"
+                            />
+                          ) : (
+                            <div className="w-full h-32 rounded border border-dashed border-purple-200 bg-purple-50/50 flex items-center justify-center text-purple-300 text-[10px]">
+                              —
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Trait Selectors */}
       <TraitSelector
         label={t.strengths}

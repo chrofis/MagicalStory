@@ -125,7 +125,8 @@ const {
   applyStyledAvatars,
   collectAvatarRequirements,
   clearStyledAvatarCache,
-  getStyledAvatarCacheStats
+  getStyledAvatarCacheStats,
+  exportStyledAvatarsForPersistence
 } = require('./server/lib/styledAvatars');
 const {
   TEXT_MODELS,
@@ -5756,6 +5757,29 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       // Developer mode: raw AI response for debugging
       rawAIResponse: response
     };
+
+    // Persist styled avatars to character data before saving story
+    if (artStyle !== 'realistic' && inputData.characters) {
+      try {
+        const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
+        if (styledAvatarsMap.size > 0) {
+          log.debug(`💾 [STORYBOOK] Persisting ${styledAvatarsMap.size} styled avatar sets to character data...`);
+          for (const char of inputData.characters) {
+            const styledAvatars = styledAvatarsMap.get(char.name);
+            if (styledAvatars) {
+              // Initialize styledAvatars object if not exists
+              if (!char.avatars) char.avatars = {};
+              if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+              // Store under artStyle key
+              char.avatars.styledAvatars[artStyle] = styledAvatars;
+              log.debug(`  - ${char.name}: ${Object.keys(styledAvatars).length} ${artStyle} avatars saved`);
+            }
+          }
+        }
+      } catch (error) {
+        log.error(`⚠️ [STORYBOOK] Failed to persist styled avatars:`, error.message);
+      }
+    }
 
     // Save story to stories table so it appears in My Stories
     const storyId = jobId; // Use jobId as storyId for consistency

@@ -345,6 +345,52 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
   return requirements;
 }
 
+/**
+ * Export styled avatars for a character from the cache
+ * Used to persist styled avatars to character data after story generation
+ *
+ * @param {string} characterName
+ * @param {string} artStyle
+ * @returns {Record<string, string>|null} Map of clothingCategory -> styledAvatar, or null if none found
+ */
+function getStyledAvatarsForCharacter(characterName, artStyle) {
+  const clothingCategories = ['winter', 'standard', 'summer', 'formal'];
+  const result = {};
+  let foundAny = false;
+
+  for (const category of clothingCategories) {
+    const cacheKey = getAvatarCacheKey(characterName, category, artStyle);
+    const styledAvatar = styledAvatarCache.get(cacheKey);
+    if (styledAvatar) {
+      result[category] = styledAvatar;
+      foundAny = true;
+    }
+  }
+
+  return foundAny ? result : null;
+}
+
+/**
+ * Export all styled avatars from cache organized by character and art style
+ * Used to persist styled avatars to character data after story generation
+ *
+ * @param {Array} characters - Array of character objects
+ * @param {string} artStyle - Target art style
+ * @returns {Map<string, Record<string, string>>} Map of characterName -> {clothingCategory: styledAvatar}
+ */
+function exportStyledAvatarsForPersistence(characters, artStyle) {
+  const result = new Map();
+
+  for (const char of characters) {
+    const avatars = getStyledAvatarsForCharacter(char.name, artStyle);
+    if (avatars) {
+      result.set(char.name, avatars);
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   // Core functions
   getOrCreateStyledAvatar,
@@ -360,6 +406,10 @@ module.exports = {
   hasStyledAvatar,
   clearStyledAvatarCache,
   getStyledAvatarCacheStats,
+
+  // Persistence
+  getStyledAvatarsForCharacter,
+  exportStyledAvatarsForPersistence,
 
   // Utility
   getAvatarCacheKey,
