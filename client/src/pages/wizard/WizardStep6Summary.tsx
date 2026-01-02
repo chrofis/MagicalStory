@@ -112,9 +112,10 @@ export function WizardStep6Summary({
   };
 
   const getReadingLevelLabel = () => {
-    if (languageLevel === 'simple') return language === 'de' ? 'Einfach' : language === 'fr' ? 'Simple' : 'Simple';
-    if (languageLevel === 'standard') return language === 'de' ? 'Standard' : language === 'fr' ? 'Standard' : 'Standard';
-    if (languageLevel === 'advanced') return language === 'de' ? 'Anspruchsvoll' : language === 'fr' ? 'Avancé' : 'Advanced';
+    // Use same labels as WizardStep3BookSettings
+    if (languageLevel === '1st-grade') return language === 'de' ? 'Bilderbuch' : language === 'fr' ? 'Album Illustré' : 'Picture Book';
+    if (languageLevel === 'standard') return language === 'de' ? 'Kinderbuch' : language === 'fr' ? 'Livre Enfant' : 'Chapter Book';
+    if (languageLevel === 'advanced') return language === 'de' ? 'Jugendbuch' : language === 'fr' ? 'Roman Jeunesse' : 'Young Adult';
     return '';
   };
 

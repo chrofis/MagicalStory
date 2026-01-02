@@ -1,4 +1,3 @@
-import { Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { artStyles } from '@/constants/artStyles';
 
@@ -8,16 +7,10 @@ interface ArtStyleSelectorProps {
 }
 
 export function ArtStyleSelector({ selectedStyle, onSelect }: ArtStyleSelectorProps) {
-  const { t, language } = useLanguage();
+  const { language } = useLanguage();
 
   return (
-    <div id="art-style-section" className="md:bg-indigo-50 md:border-2 md:border-indigo-200 md:rounded-lg md:p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Palette size={18} className="text-indigo-600" />
-        <h2 className="text-lg md:text-xl font-bold text-gray-800">{t.chooseArtStyle}</h2>
-      </div>
-      <p className="text-sm text-gray-500 mb-2 md:mb-3">{t.artStyleDescription}</p>
-
+    <div id="art-style-section">
       <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
         {artStyles.map((style) => (
           <button
