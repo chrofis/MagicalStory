@@ -787,22 +787,25 @@ export default function StoryWizard() {
     // Don't auto-advance - user needs to select theme/topic next
   };
 
-  // Handler for story theme change (for adventure category) - auto-advances when clicked
+  // Handler for story theme change - auto-advances only at final step
   const handleThemeChange = (theme: string) => {
     setStoryTheme(theme);
-    // Auto-advance to art style step when user clicks a theme
+    // Adventure: advance when theme is selected (this IS the final step)
     if (storyCategory === 'adventure' && theme !== '') {
+      safeSetStep(4);
+    }
+    // Life-challenge/Educational: advance when setting is selected
+    // Only advance if topic is already set (meaning user is at the final setting step)
+    // This prevents auto-advance when 'realistic' is set as default during category selection
+    else if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic !== '' && theme !== '') {
       safeSetStep(4);
     }
   };
 
-  // Handler for story topic change (for life-challenge/educational) - auto-advances when clicked
+  // Handler for story topic change - doesn't auto-advance, user still needs to select setting
   const handleTopicChange = (topic: string) => {
     setStoryTopic(topic);
-    // Auto-advance to art style step when user clicks a topic
-    if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && topic !== '') {
-      safeSetStep(4);
-    }
+    // Don't auto-advance - user still needs to select a setting next
   };
 
   // Handler for art style selection - sets style and auto-advances
