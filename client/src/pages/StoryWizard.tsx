@@ -2572,7 +2572,7 @@ export default function StoryWizard() {
             </p>
 
             <Button onClick={() => generateStory()} size="lg" icon={Sparkles}>
-              {t.generateStory}
+              {t.generateStory} ({pages * 10} Credits)
             </Button>
           </div>
         );
@@ -2751,7 +2751,7 @@ export default function StoryWizard() {
                         : 'bg-indigo-600 text-white hover:bg-indigo-700'
                     }`}
                   >
-                    <Sparkles size={20} /> {t.generateStory}
+                    <Sparkles size={20} /> {t.generateStory} ({pages * 10} Credits)
                   </button>
 
                   {/* Developer Mode: Generate Text Only (no images) */}
