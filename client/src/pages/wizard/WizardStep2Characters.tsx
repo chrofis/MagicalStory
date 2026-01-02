@@ -4,6 +4,9 @@ import { Button } from '@/components/common';
 import { CharacterList, CharacterForm, PhotoUpload } from '@/components/character';
 import type { Character, ChangedTraits } from '@/types/character';
 
+// Character role in story
+type CharacterRole = 'out' | 'in' | 'main';
+
 interface WizardStep2Props {
   characters: Character[];
   currentCharacter: Character | null;
@@ -17,6 +20,10 @@ interface WizardStep2Props {
   developerMode: boolean;
   changedTraits?: ChangedTraits;  // Which traits changed from previous photo
   photoAnalysisDebug?: { rawResponse?: string; error?: string };  // Debug info for dev mode
+  // Character role selection
+  mainCharacters: number[];
+  excludedCharacters: number[];
+  onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   onCharacterChange: (character: Character | null) => void;
   onCharacterStepChange: (step: 'photo' | 'name' | 'traits') => void;
   onPhotoSelect: (file: File) => void;
@@ -48,6 +55,9 @@ export function WizardStep2Characters({
   developerMode,
   changedTraits,
   photoAnalysisDebug,
+  mainCharacters,
+  excludedCharacters,
+  onCharacterRoleChange,
   onCharacterChange,
   onCharacterStepChange,
   onPhotoSelect,
@@ -153,6 +163,9 @@ export function WizardStep2Characters({
         <CharacterList
           characters={characters}
           showSuccessMessage={showCharacterCreated}
+          mainCharacters={mainCharacters}
+          excludedCharacters={excludedCharacters}
+          onCharacterRoleChange={onCharacterRoleChange}
           onEdit={onEditCharacter}
           onDelete={onDeleteCharacter}
           onCreateAnother={onStartNewCharacter}

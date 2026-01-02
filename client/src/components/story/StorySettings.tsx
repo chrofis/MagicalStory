@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wand2, Star, Sparkles, Loader2, Pencil, Palette } from 'lucide-react';
+import { Wand2, Sparkles, Loader2, Pencil, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Modal } from '@/components/common/Modal';
 import { StoryCategorySelector } from './StoryCategorySelector';
@@ -26,7 +26,6 @@ interface StorySettingsProps {
   characters: Character[];
   mainCharacters: number[];
   excludedCharacters: number[];
-  onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   storyLanguage: StoryLanguageCode;
   onStoryLanguageChange: (lang: StoryLanguageCode) => void;
   dedication: string;
@@ -52,13 +51,15 @@ interface StorySettingsProps {
   onCustomThemeTextChange?: (text: string) => void;
   onArtStyleChange?: (style: string) => void;
   onLegacyStoryTypeChange?: (storyType: string) => void;
+  // Book settings for summary
+  languageLevel?: string;
+  pages?: number;
 }
 
 export function StorySettings({
   characters,
   mainCharacters,
   excludedCharacters,
-  onCharacterRoleChange,
   storyLanguage,
   onStoryLanguageChange,
   dedication,
@@ -83,6 +84,9 @@ export function StorySettings({
   onCustomThemeTextChange,
   onArtStyleChange,
   onLegacyStoryTypeChange,
+  // Book settings for summary
+  languageLevel = '',
+  pages = 0,
 }: StorySettingsProps) {
   const { t, language } = useLanguage();
   const lang = language as UILanguage;
@@ -92,20 +96,6 @@ export function StorySettings({
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const [isStoryDropdownOpen, setIsStoryDropdownOpen] = useState(false);
   const [isArtStyleDropdownOpen, setIsArtStyleDropdownOpen] = useState(false);
-
-  // Helper to determine character's current role
-  const getCharacterRole = (charId: number): CharacterRole => {
-    if (excludedCharacters.includes(charId)) return 'out';
-    if (mainCharacters.includes(charId)) return 'main';
-    return 'in';
-  };
-
-  // Role labels for 3-state buttons
-  const roleLabels = {
-    out: language === 'de' ? 'Nicht dabei' : language === 'fr' ? 'Absent' : 'Out',
-    in: language === 'de' ? 'Dabei' : language === 'fr' ? 'Présent' : 'In',
-    main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : 'Main',
-  };
 
   // Helper functions for display names
   const getThemeName = () => {
@@ -144,6 +134,30 @@ export function StorySettings({
 
   const getStoryLanguageInfo = () => {
     return STORY_LANGUAGES.find(l => l.code === storyLanguage) || STORY_LANGUAGES[0];
+  };
+
+  // Get main character names
+  const getMainCharacterNames = () => {
+    return characters
+      .filter(c => mainCharacters.includes(c.id))
+      .map(c => c.name)
+      .join(', ');
+  };
+
+  // Get supporting character names (in story but not main)
+  const getSupportingCharacterNames = () => {
+    return characters
+      .filter(c => !excludedCharacters.includes(c.id) && !mainCharacters.includes(c.id))
+      .map(c => c.name)
+      .join(', ');
+  };
+
+  // Get reading level label
+  const getReadingLevelLabel = () => {
+    if (languageLevel === '1st-grade') return t.firstGrade;
+    if (languageLevel === 'standard') return t.standard;
+    if (languageLevel === 'advanced') return t.advanced;
+    return '';
   };
 
   // Check if story type selection is complete
@@ -297,96 +311,49 @@ export function StorySettings({
       </h2>
 
       <div className="space-y-6">
-        {/* Character Role Selection */}
-        <div>
-          <label className="block text-xl font-semibold mb-3">
-            {language === 'de' ? 'Charaktere in der Geschichte' : language === 'fr' ? 'Personnages dans l\'histoire' : 'Characters in the Story'}
-          </label>
-          <div className="grid md:grid-cols-2 gap-3">
-            {characters.map((char) => {
-              const role = getCharacterRole(char.id);
-              const isOut = role === 'out';
-              const isIn = role === 'in';
-              const isMain = role === 'main';
-              // Count characters currently in story (not excluded)
-              const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
-              // Prevent removing the last character from the story
-              const isLastInStory = !isOut && charactersInStory.length === 1;
-
-              return (
-                <div
-                  key={char.id}
-                  className={`p-4 rounded-lg transition-all flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${
-                    isOut
-                      ? 'border-2 border-dashed border-gray-300 bg-gray-50 opacity-60'
-                      : isMain
-                      ? 'border-4 border-indigo-600 bg-indigo-50'
-                      : 'bg-indigo-50'
-                  }`}
-                >
-                  {/* Character info - top on mobile, left on desktop */}
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {(char.photos?.face || char.photos?.original) && (
-                      <img
-                        src={char.photos?.face || char.photos?.original}
-                        alt={char.name}
-                        className={`w-12 h-12 rounded-full object-cover flex-shrink-0 ${isOut ? 'grayscale' : ''}`}
-                      />
-                    )}
-                    <div className="min-w-0">
-                      <div className="font-bold text-base flex items-center gap-2">
-                        <span className="truncate">{char.name}</span>
-                        {isMain && <Star size={18} className="text-indigo-600 fill-indigo-600 flex-shrink-0" />}
-                      </div>
-                      <div className="text-sm text-gray-500 truncate">
-                        {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other}, {char.age}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Role selector - full width on mobile, right side on desktop */}
-                  <div className="flex rounded-lg overflow-hidden border border-gray-300 w-full md:w-auto">
-                    <button
-                      onClick={() => onCharacterRoleChange(char.id, 'out')}
-                      disabled={isLastInStory}
-                      title={isLastInStory ? (language === 'de' ? 'Mindestens ein Charakter muss in der Geschichte sein' : language === 'fr' ? 'Au moins un personnage doit être dans l\'histoire' : 'At least one character must be in the story') : undefined}
-                      className={`flex-1 md:flex-initial px-3 py-2 text-sm font-medium transition-colors ${
-                        isOut
-                          ? 'bg-gray-500 text-white'
-                          : isLastInStory
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      {roleLabels.out}
-                    </button>
-                    <button
-                      onClick={() => onCharacterRoleChange(char.id, 'in')}
-                      className={`flex-1 md:flex-initial px-3 py-2 text-sm font-medium transition-colors border-l border-r border-gray-300 ${
-                        isIn
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-white text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      {roleLabels.in}
-                    </button>
-                    <button
-                      onClick={() => onCharacterRoleChange(char.id, 'main')}
-                      className={`flex-1 md:flex-initial px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
-                        isMain
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-white text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      <Star size={14} className={isMain ? 'fill-white' : ''} />
-                      {roleLabels.main}
-                    </button>
-                  </div>
+        {/* Compact Summary - Characters and Book Settings */}
+        {isStoryTypeComplete && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {/* Main Characters */}
+              {getMainCharacterNames() && (
+                <div>
+                  <span className="text-gray-500">
+                    {language === 'de' ? 'Hauptfiguren' : language === 'fr' ? 'Personnages principaux' : 'Main characters'}:
+                  </span>{' '}
+                  <span className="font-medium text-indigo-700">{getMainCharacterNames()}</span>
                 </div>
-              );
-            })}
+              )}
+              {/* Supporting Characters */}
+              {getSupportingCharacterNames() && (
+                <div>
+                  <span className="text-gray-500">
+                    {language === 'de' ? 'Nebenfiguren' : language === 'fr' ? 'Personnages secondaires' : 'Also in story'}:
+                  </span>{' '}
+                  <span className="font-medium">{getSupportingCharacterNames()}</span>
+                </div>
+              )}
+              {/* Reading Level */}
+              {languageLevel && (
+                <div>
+                  <span className="text-gray-500">
+                    {language === 'de' ? 'Lesestufe' : language === 'fr' ? 'Niveau' : 'Level'}:
+                  </span>{' '}
+                  <span className="font-medium">{getReadingLevelLabel()}</span>
+                </div>
+              )}
+              {/* Pages */}
+              {pages > 0 && (
+                <div>
+                  <span className="text-gray-500">
+                    {language === 'de' ? 'Seiten' : language === 'fr' ? 'Pages' : 'Pages'}:
+                  </span>{' '}
+                  <span className="font-medium">{pages}</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Story Plot / Story Details - Required */}
         <div>

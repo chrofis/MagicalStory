@@ -1906,6 +1906,9 @@ export default function StoryWizard() {
             developerMode={developerMode}
             changedTraits={changedTraits}
             photoAnalysisDebug={photoAnalysisDebug}
+            mainCharacters={mainCharacters}
+            excludedCharacters={excludedCharacters}
+            onCharacterRoleChange={handleCharacterRoleChange}
             onCharacterChange={setCurrentCharacter}
             onCharacterStepChange={setCharacterStep}
             onPhotoSelect={handlePhotoSelect}
@@ -1943,6 +1946,8 @@ export default function StoryWizard() {
             onLanguageLevelChange={setLanguageLevel}
             pages={pages}
             onPagesChange={setPages}
+            storyLanguage={storyLanguage}
+            onStoryLanguageChange={setStoryLanguage}
             developerMode={developerMode}
           />
         );
@@ -1954,9 +1959,10 @@ export default function StoryWizard() {
             characters={characters}
             mainCharacters={mainCharacters}
             excludedCharacters={excludedCharacters}
-            onCharacterRoleChange={handleCharacterRoleChange}
             storyLanguage={storyLanguage}
             onStoryLanguageChange={setStoryLanguage}
+            languageLevel={languageLevel}
+            pages={pages}
             dedication={dedication}
             onDedicationChange={setDedication}
             storyDetails={storyDetails}

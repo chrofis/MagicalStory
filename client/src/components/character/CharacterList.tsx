@@ -1,11 +1,17 @@
 import { useState } from 'react';
-import { Edit2, Trash2, Check, AlertTriangle } from 'lucide-react';
+import { Edit2, Trash2, Check, AlertTriangle, Star } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Character } from '@/types/character';
+
+// Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
+type CharacterRole = 'out' | 'in' | 'main';
 
 interface CharacterListProps {
   characters: Character[];
   showSuccessMessage?: boolean;
+  mainCharacters?: number[];
+  excludedCharacters?: number[];
+  onCharacterRoleChange?: (charId: number, role: CharacterRole) => void;
   onEdit: (character: Character) => void;
   onDelete: (id: number) => void;
   onCreateAnother: () => void;
@@ -15,6 +21,9 @@ interface CharacterListProps {
 export function CharacterList({
   characters,
   showSuccessMessage,
+  mainCharacters = [],
+  excludedCharacters = [],
+  onCharacterRoleChange,
   onEdit,
   onDelete,
   onCreateAnother,
@@ -22,6 +31,20 @@ export function CharacterList({
 }: CharacterListProps) {
   const { t, language } = useLanguage();
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
+
+  // Helper to determine character's current role
+  const getCharacterRole = (charId: number): CharacterRole => {
+    if (excludedCharacters.includes(charId)) return 'out';
+    if (mainCharacters.includes(charId)) return 'main';
+    return 'in';
+  };
+
+  // Role labels for 3-state buttons
+  const roleLabels = {
+    out: language === 'de' ? 'Nicht dabei' : language === 'fr' ? 'Absent' : 'Out',
+    in: language === 'de' ? 'Dabei' : language === 'fr' ? 'Présent' : 'In',
+    main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : 'Main',
+  };
 
   const handleDeleteClick = (char: Character) => {
     setDeleteConfirm({ id: char.id, name: char.name });
@@ -66,62 +89,109 @@ export function CharacterList({
       <div className="bg-white border-2 border-indigo-200 rounded-lg p-3">
         <h3 className="text-base font-bold text-gray-800 mb-2">{t.yourCharacters}</h3>
         <div className="grid md:grid-cols-2 gap-2">
-          {characters.map((char) => (
-            <div key={char.id} className="border border-gray-200 rounded p-2">
-              {/* Top row: Photo/Name on left, Buttons on right */}
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {(char.photos?.face || char.photos?.original) && (
-                    <img
-                      src={char.photos?.face || char.photos?.original}
-                      alt={char.name}
-                      className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-sm md:text-base truncate">{char.name}</h4>
-                    <p className="text-xs md:text-sm text-gray-500">
-                      {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other},{' '}
-                      {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
-                    </p>
+          {characters.map((char) => {
+            const role = getCharacterRole(char.id);
+            const isOut = role === 'out';
+            const isIn = role === 'in';
+            const isMain = role === 'main';
+            // Count characters currently in story (not excluded)
+            const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
+            // Prevent removing the last character from the story
+            const isLastInStory = !isOut && charactersInStory.length === 1;
+
+            return (
+              <div
+                key={char.id}
+                className={`border rounded p-2 transition-all ${
+                  isOut
+                    ? 'border-dashed border-gray-300 bg-gray-50 opacity-60'
+                    : isMain
+                    ? 'border-2 border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 bg-white'
+                }`}
+              >
+                {/* Top row: Photo/Name on left, Edit/Delete on right */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {(char.photos?.face || char.photos?.original) && (
+                      <img
+                        src={char.photos?.face || char.photos?.original}
+                        alt={char.name}
+                        className={`w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0 ${isOut ? 'grayscale' : ''}`}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-sm md:text-base truncate flex items-center gap-1">
+                        {char.name}
+                        {isMain && <Star size={14} className="text-indigo-600 fill-indigo-600 flex-shrink-0" />}
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other},{' '}
+                        {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => onEdit(char)}
+                      className="bg-indigo-600 text-white p-1.5 rounded text-xs hover:bg-indigo-700"
+                      title={t.editCharacter}
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(char)}
+                      className="bg-red-500 text-white p-1.5 rounded text-xs hover:bg-red-600"
+                      title={t.deleteCharacter}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => onEdit(char)}
-                    className="bg-indigo-600 text-white px-2 md:px-3 py-1 rounded text-xs hover:bg-indigo-700 flex items-center gap-1"
-                  >
-                    <Edit2 size={12} />
-                    {t.editCharacter}
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClick(char)}
-                    className="bg-red-500 text-white px-2 md:px-3 py-1 rounded text-xs hover:bg-red-600 flex items-center gap-1"
-                  >
-                    <Trash2 size={12} />
-                    {t.deleteCharacter}
-                  </button>
-                </div>
-              </div>
 
-              {/* Character traits */}
-              {char.traits?.strengths && char.traits.strengths.length > 0 && (
-                <p className="text-xs text-gray-800 mb-1">
-                  <strong className="text-green-600">{t.strengths}:</strong> {char.traits.strengths.join(', ')}
-                </p>
-              )}
-              {char.traits?.flaws && char.traits.flaws.length > 0 && (
-                <p className="text-xs text-gray-800 mb-1">
-                  <strong className="text-orange-600">{language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : 'Flaws'}:</strong> {char.traits.flaws.join(', ')}
-                </p>
-              )}
-              {char.traits?.challenges && char.traits.challenges.length > 0 && (
-                <p className="text-xs text-gray-800 mb-1">
-                  <strong className="text-purple-600">{language === 'de' ? 'Herausforderungen' : language === 'fr' ? 'Défis' : 'Challenges'}:</strong> {char.traits.challenges.join(', ')}
-                </p>
-              )}
-            </div>
-          ))}
+                {/* Role selector */}
+                {onCharacterRoleChange && (
+                  <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                    <button
+                      onClick={() => onCharacterRoleChange(char.id, 'out')}
+                      disabled={isLastInStory}
+                      title={isLastInStory ? (language === 'de' ? 'Mindestens ein Charakter muss in der Geschichte sein' : language === 'fr' ? 'Au moins un personnage doit être dans l\'histoire' : 'At least one character must be in the story') : undefined}
+                      className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
+                        isOut
+                          ? 'bg-gray-500 text-white'
+                          : isLastInStory
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {roleLabels.out}
+                    </button>
+                    <button
+                      onClick={() => onCharacterRoleChange(char.id, 'in')}
+                      className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-l border-r border-gray-300 ${
+                        isIn
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {roleLabels.in}
+                    </button>
+                    <button
+                      onClick={() => onCharacterRoleChange(char.id, 'main')}
+                      className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                        isMain
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Star size={12} className={isMain ? 'fill-white' : ''} />
+                      {roleLabels.main}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

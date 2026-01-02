@@ -1,13 +1,23 @@
 import { useEffect } from 'react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Globe } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import type { LanguageLevel } from '@/types/story';
+import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
+
+// Story language options
+const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
+  { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
+  { code: 'de-de', name: 'Deutsch (Deutschland)', flag: '🇩🇪' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'en', name: 'English', flag: '🇬🇧' },
+];
 
 interface WizardStep3Props {
   languageLevel: LanguageLevel;
   onLanguageLevelChange: (level: LanguageLevel) => void;
   pages: number;
   onPagesChange: (pages: number) => void;
+  storyLanguage: StoryLanguageCode;
+  onStoryLanguageChange: (lang: StoryLanguageCode) => void;
   developerMode: boolean;
 }
 
@@ -20,6 +30,8 @@ export function WizardStep3BookSettings({
   onLanguageLevelChange,
   pages,
   onPagesChange,
+  storyLanguage,
+  onStoryLanguageChange,
   developerMode,
 }: WizardStep3Props) {
   const { t, language } = useLanguage();
@@ -86,6 +98,30 @@ export function WizardStep3BookSettings({
         <BookOpen size={24} />
         {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : 'Book Format'}
       </h2>
+
+      {/* Story Language Selection */}
+      <div>
+        <label className="block text-xl font-semibold mb-3 flex items-center gap-2">
+          <Globe size={20} />
+          {language === 'de' ? 'Sprache der Geschichte' : language === 'fr' ? 'Langue de l\'histoire' : 'Story Language'}
+        </label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {STORY_LANGUAGES.map((lang) => (
+            <button
+              key={lang.code}
+              onClick={() => onStoryLanguageChange(lang.code)}
+              className={`px-4 py-3 rounded-lg border-2 font-medium transition-all flex items-center justify-center gap-2 ${
+                storyLanguage === lang.code
+                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200'
+                  : 'border-gray-200 hover:border-indigo-300'
+              }`}
+            >
+              <span className="text-lg">{lang.flag}</span>
+              <span className="text-sm">{lang.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Reading Level Selection */}
       <div>

@@ -1,13 +1,15 @@
-import { StorySettings, type CharacterRole, type StoryLanguage } from '@/components/story';
+import { StorySettings, type StoryLanguage } from '@/components/story';
 import type { Character } from '@/types/character';
 
 interface WizardStep4Props {
   characters: Character[];
   mainCharacters: number[];
   excludedCharacters: number[];
-  onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   storyLanguage: StoryLanguage;
   onStoryLanguageChange: (lang: StoryLanguage) => void;
+  // Book settings for summary
+  languageLevel: string;
+  pages: number;
   dedication: string;
   onDedicationChange: (dedication: string) => void;
   storyDetails: string;
@@ -42,7 +44,6 @@ export function WizardStep4Settings(props: WizardStep4Props) {
       characters={props.characters}
       mainCharacters={props.mainCharacters}
       excludedCharacters={props.excludedCharacters}
-      onCharacterRoleChange={props.onCharacterRoleChange}
       storyLanguage={props.storyLanguage}
       onStoryLanguageChange={props.onStoryLanguageChange}
       dedication={props.dedication}
@@ -66,6 +67,8 @@ export function WizardStep4Settings(props: WizardStep4Props) {
       onCustomThemeTextChange={props.onCustomThemeTextChange}
       onArtStyleChange={props.onArtStyleChange}
       onLegacyStoryTypeChange={props.onLegacyStoryTypeChange}
+      languageLevel={props.languageLevel}
+      pages={props.pages}
     />
   );
 }
