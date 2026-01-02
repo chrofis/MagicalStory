@@ -1,5 +1,3 @@
-import { Sparkles } from 'lucide-react';
-import { useLanguage } from '@/context/LanguageContext';
 import { StoryCategorySelector } from '@/components/story/StoryCategorySelector';
 
 interface WizardStep4Props {
@@ -29,19 +27,8 @@ export function WizardStep4StoryType({
   onCustomThemeTextChange,
   onLegacyStoryTypeChange,
 }: WizardStep4Props) {
-  const { language } = useLanguage();
-
-  const title = language === 'de'
-    ? 'Welche Art von Geschichte?'
-    : language === 'fr'
-    ? 'Quel type d\'histoire?'
-    : 'What kind of story?';
-
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-        <Sparkles size={24} /> {title}
-      </h2>
       <StoryCategorySelector
         storyCategory={storyCategory}
         storyTopic={storyTopic}

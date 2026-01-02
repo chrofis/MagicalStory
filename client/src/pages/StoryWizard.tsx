@@ -782,6 +782,27 @@ export default function StoryWizard() {
     }
   }, [step]);
 
+  // Auto-advance from step 4 (Story Type) when selection is complete
+  useEffect(() => {
+    if (step === 4) {
+      // Check if story type selection is complete
+      const isComplete = storyCategory !== '' && (
+        (storyCategory === 'adventure' && storyTheme !== '') ||
+        ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic !== '')
+      );
+      if (isComplete) {
+        safeSetStep(5);
+      }
+    }
+  }, [step, storyCategory, storyTheme, storyTopic]);
+
+  // Handler for art style selection - sets style and auto-advances
+  const handleArtStyleSelect = (style: string) => {
+    setArtStyle(style);
+    // Always advance to step 6 when user clicks any art style
+    safeSetStep(6);
+  };
+
   // Initialize relationships when moving to step 2 (only once per character set)
   // Wait until not loading to ensure API data is loaded first
   useEffect(() => {
@@ -2035,7 +2056,7 @@ export default function StoryWizard() {
         return (
           <WizardStep5ArtStyle
             artStyle={artStyle}
-            onArtStyleChange={setArtStyle}
+            onArtStyleChange={handleArtStyleSelect}
           />
         );
 

@@ -11,6 +11,8 @@
  * - Downsized storage for efficiency
  */
 
+const fs = require('fs');
+const path = require('path');
 const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 
@@ -24,17 +26,50 @@ const styledAvatarCache = new Map();
 // Value: Promise that resolves to the styled avatar
 const conversionInProgress = new Map();
 
-// Art style prompts for avatar conversion
-const ART_STYLE_CONVERSION_PROMPTS = {
-  pixar: 'Convert this person into a Pixar 3D animated character style. Keep the same pose, clothing, and all physical features (face shape, hair color, hair style, eye color, skin tone, build). The result should look like a Pixar movie character but be clearly recognizable as the same person. High quality 3D render.',
-  watercolor: 'Convert this person into a soft watercolor illustration style. Keep the same pose, clothing, and all physical features (face shape, hair color, hair style, eye color, skin tone, build). The result should look like a beautiful watercolor painting but be clearly recognizable as the same person.',
-  'comic-book': 'Convert this person into a comic book illustration style with bold lines and vibrant colors. Keep the same pose, clothing, and all physical features (face shape, hair color, hair style, eye color, skin tone, build). The result should look like a comic book character but be clearly recognizable as the same person.',
-  anime: 'Convert this person into an anime/manga illustration style. Keep the same pose, clothing, and all physical features (face shape, hair color, hair style, eye color, skin tone, build). The result should look like an anime character but be clearly recognizable as the same person.',
-  'oil-painting': 'Convert this person into a classical oil painting style with rich textures and warm colors. Keep the same pose, clothing, and all physical features (face shape, hair color, hair style, eye color, skin tone, build). The result should look like a classical portrait but be clearly recognizable as the same person.',
-  'colored-pencil': 'Convert this person into a colored pencil sketch illustration style. Keep the same pose, clothing, and all physical features (face shape, hair color, hair style, eye color, skin tone, build). The result should look like a detailed colored pencil drawing but be clearly recognizable as the same person.',
-  storybook: 'Convert this person into a classic children\'s storybook illustration style with soft, warm colors. Keep the same pose, clothing, and all physical features (face shape, hair color, hair style, eye color, skin tone, build). The result should look like a storybook character but be clearly recognizable as the same person.',
-  realistic: 'Enhance this photo to look like a high-quality professional portrait. Keep the same pose, clothing, and all physical features exactly as shown. Minor enhancement only.',
-};
+// Load art style prompts from prompts/art-styles.txt
+function loadArtStylePrompts() {
+  const promptsPath = path.join(__dirname, '../../prompts/art-styles.txt');
+  const prompts = {};
+  try {
+    const content = fs.readFileSync(promptsPath, 'utf8');
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const colonIndex = trimmed.indexOf(':');
+        if (colonIndex > 0) {
+          const styleId = trimmed.substring(0, colonIndex).trim();
+          const prompt = trimmed.substring(colonIndex + 1).trim();
+          prompts[styleId] = prompt;
+        }
+      }
+    }
+    log.debug(`[STYLED AVATARS] Loaded ${Object.keys(prompts).length} art style prompts`);
+  } catch (err) {
+    log.error(`[STYLED AVATARS] Failed to load art-styles.txt:`, err.message);
+  }
+  return prompts;
+}
+
+// Load styled avatar prompt template from prompts/styled-avatar.txt
+function loadStyledAvatarTemplate() {
+  const templatePath = path.join(__dirname, '../../prompts/styled-avatar.txt');
+  try {
+    const content = fs.readFileSync(templatePath, 'utf8');
+    // Remove comment lines
+    const lines = content.split('\n').filter(line => !line.trim().startsWith('#'));
+    const template = lines.join('\n').trim();
+    log.debug(`[STYLED AVATARS] Loaded styled avatar template (${template.length} chars)`);
+    return template;
+  } catch (err) {
+    log.error(`[STYLED AVATARS] Failed to load styled-avatar.txt:`, err.message);
+    return null;
+  }
+}
+
+// Load prompts at module initialization
+const ART_STYLE_PROMPTS = loadArtStylePrompts();
+const STYLED_AVATAR_TEMPLATE = loadStyledAvatarTemplate();
 
 /**
  * Generate cache key for styled avatar
@@ -58,12 +93,24 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName) {
   const startTime = Date.now();
   log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style...`);
 
-  // Get conversion prompt for this art style
-  const conversionPrompt = ART_STYLE_CONVERSION_PROMPTS[artStyle] || ART_STYLE_CONVERSION_PROMPTS.pixar;
+  // Get art style prompt from loaded prompts
+  const artStylePrompt = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS.pixar;
+  if (!artStylePrompt) {
+    log.error(`[STYLED AVATAR] No art style prompt found for "${artStyle}"`);
+    return originalAvatar;
+  }
 
   try {
-    // Build prompt with character name for better results
-    const fullPrompt = `${conversionPrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features.`;
+    // Build full prompt using template
+    let fullPrompt;
+    if (STYLED_AVATAR_TEMPLATE) {
+      fullPrompt = STYLED_AVATAR_TEMPLATE
+        .replace('{ART_STYLE_PROMPT}', artStylePrompt)
+        .replace('{CHARACTER_NAME}', characterName);
+    } else {
+      // Fallback if template not loaded
+      fullPrompt = `Convert this person into the following art style: ${artStylePrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features.`;
+    }
 
     // Call image API to convert the avatar
     // We pass the original avatar as a reference photo
@@ -435,6 +482,7 @@ module.exports = {
   // Utility
   getAvatarCacheKey,
 
-  // Constants (for external use)
-  ART_STYLE_CONVERSION_PROMPTS
+  // Loaded prompts (for external use)
+  ART_STYLE_PROMPTS,
+  STYLED_AVATAR_TEMPLATE
 };

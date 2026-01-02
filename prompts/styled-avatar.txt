@@ -1,0 +1,13 @@
+# Styled Avatar Conversion Prompt
+# This prompt is used to convert character reference photos into target art styles.
+# The art style prompt from art-styles.txt is inserted at {ART_STYLE_PROMPT}.
+# The character name is inserted at {CHARACTER_NAME}.
+
+Convert this person into the following art style: {ART_STYLE_PROMPT}
+
+CRITICAL REQUIREMENTS:
+- Keep the EXACT same pose and body position
+- Preserve ALL physical features: face shape, hair color, hair style, eye color, skin tone, body build
+- Keep the EXACT same clothing and accessories
+- The result must be clearly recognizable as the same person
+- This is {CHARACTER_NAME} - preserve their unique identity and all distinguishing features
