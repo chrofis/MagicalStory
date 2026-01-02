@@ -24,17 +24,17 @@ router.get('/', authenticateToken, async (req, res) => {
     };
 
     if (isDatabaseMode()) {
-      // First, check ALL rows for this user_id to debug
-      const allRowsQuery = 'SELECT id, user_id, LENGTH(data) as data_len FROM characters WHERE user_id = $1';
-      const allRows = await dbQuery(allRowsQuery, [req.user.id]);
-      console.log(`[Characters] GET - All rows for user_id ${req.user.id}: ${JSON.stringify(allRows)}`);
-
-      // Use the same ID format as the UPSERT to ensure we get the correct record
-      const characterId = `characters_${req.user.id}`;
-      console.log(`[Characters] GET - Looking for characterId: ${characterId}, user.id: ${req.user.id}`);
-      const selectQuery = 'SELECT data FROM characters WHERE id = $1';
-      const rows = await dbQuery(selectQuery, [characterId]);
-      console.log(`[Characters] GET - Found ${rows.length} rows`);
+      // Query by user_id and get the row with the most data (handles legacy ID formats)
+      // Legacy format: characters_{user_id}_{timestamp}
+      // Current format: characters_{user_id}
+      const selectQuery = `
+        SELECT data FROM characters
+        WHERE user_id = $1
+        ORDER BY LENGTH(data) DESC
+        LIMIT 1
+      `;
+      const rows = await dbQuery(selectQuery, [req.user.id]);
+      console.log(`[Characters] GET - Found ${rows.length} rows for user_id: ${req.user.id}`);
 
       if (rows.length > 0) {
         const data = JSON.parse(rows[0].data);
@@ -96,6 +96,16 @@ router.post('/', authenticateToken, async (req, res) => {
           created_at = CURRENT_TIMESTAMP
       `;
       await dbQuery(upsertQuery, [characterId, req.user.id, jsonData]);
+
+      // Clean up legacy rows with old ID format (characters_{user_id}_{timestamp})
+      const cleanupQuery = `
+        DELETE FROM characters
+        WHERE user_id = $1 AND id != $2
+      `;
+      const cleanupResult = await dbQuery(cleanupQuery, [req.user.id, characterId]);
+      if (cleanupResult.rowCount > 0) {
+        console.log(`[Characters] POST - Cleaned up ${cleanupResult.rowCount} legacy rows for user ${req.user.id}`);
+      }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
