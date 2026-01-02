@@ -99,27 +99,30 @@ export function WizardStep3BookSettings({
         {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : 'Book Format'}
       </h2>
 
-      {/* Story Language Selection */}
+      {/* Story Language Selection - Dropdown */}
       <div>
         <label className="block text-xl font-semibold mb-3 flex items-center gap-2">
           <Globe size={20} />
           {language === 'de' ? 'Sprache der Geschichte' : language === 'fr' ? 'Langue de l\'histoire' : 'Story Language'}
         </label>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {STORY_LANGUAGES.map((lang) => (
-            <button
-              key={lang.code}
-              onClick={() => onStoryLanguageChange(lang.code)}
-              className={`px-4 py-3 rounded-lg border-2 font-medium transition-all flex items-center justify-center gap-2 ${
-                storyLanguage === lang.code
-                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200'
-                  : 'border-gray-200 hover:border-indigo-300'
-              }`}
-            >
-              <span className="text-lg">{lang.flag}</span>
-              <span className="text-sm">{lang.name}</span>
-            </button>
-          ))}
+        <div className="relative inline-block w-full max-w-xs">
+          <select
+            value={storyLanguage}
+            onChange={(e) => onStoryLanguageChange(e.target.value as StoryLanguageCode)}
+            className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base font-medium appearance-none bg-white cursor-pointer pr-10"
+          >
+            {STORY_LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.flag} {lang.name}
+              </option>
+            ))}
+          </select>
+          {/* Custom dropdown arrow */}
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </div>
       </div>
 
