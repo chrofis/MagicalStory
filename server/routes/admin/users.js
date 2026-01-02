@@ -335,9 +335,10 @@ router.get('/:userId/details', authenticateToken, requireAdmin, async (req, res)
     const user = userResult[0];
 
     // Run remaining queries in parallel
+    // Use metadata for stories to avoid loading huge base64 images
     const [storiesResult, characterCountResult, ordersResult, creditsResult] = await Promise.all([
       dbQuery(
-        `SELECT id, data, created_at FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        `SELECT id, metadata, created_at FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
         [targetUserId]
       ),
       dbQuery(`
@@ -375,21 +376,32 @@ router.get('/:userId/details', authenticateToken, requireAdmin, async (req, res)
 
     const stories = storiesResult.map(s => {
       try {
-        const storyData = typeof s.data === 'string' ? JSON.parse(s.data) : s.data;
-        const sceneCount = storyData?.sceneImages?.length || storyData?.scenes?.length || 0;
-        const isPictureBook = storyData?.languageLevel === '1st-grade';
+        // Use metadata (lightweight) instead of full data (contains base64 images)
+        const meta = s.metadata ?
+          (typeof s.metadata === 'string' ? JSON.parse(s.metadata) : s.metadata) :
+          null;
+
+        if (!meta) {
+          return {
+            id: s.id,
+            title: 'Untitled',
+            createdAt: s.created_at,
+            pageCount: 0,
+            imageCount: 0
+          };
+        }
+
+        const sceneCount = meta.sceneCount || 0;
+        const isPictureBook = meta.languageLevel === '1st-grade';
         const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
         const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
-        const sceneImageCount = storyData?.sceneImages?.length || 0;
-        const coverImageCount = storyData?.coverImages ?
-          (storyData.coverImages.frontCover ? 1 : 0) +
-          (storyData.coverImages.backCover ? 1 : 0) +
-          (storyData.coverImages.spine ? 1 : 0) : 0;
-        const imageCount = sceneImageCount + coverImageCount;
+        // Estimate image count: scenes + up to 3 cover images
+        const imageCount = sceneCount + (meta.hasThumbnail ? 3 : 0);
         totalImages += imageCount;
 
-        if (storyData?.tokenUsage) {
-          const tu = storyData.tokenUsage;
+        // Token usage from metadata if available
+        if (meta.tokenUsage) {
+          const tu = meta.tokenUsage;
           for (const provider of ['anthropic', 'gemini_text', 'gemini_image', 'gemini_quality']) {
             if (tu[provider]) {
               totalTokens[provider].input_tokens += tu[provider].input_tokens || 0;
@@ -400,8 +412,8 @@ router.get('/:userId/details', authenticateToken, requireAdmin, async (req, res)
         }
 
         return {
-          id: s.id,
-          title: storyData?.title || storyData?.storyTitle || 'Untitled',
+          id: meta.id || s.id,
+          title: meta.title || 'Untitled',
           createdAt: s.created_at,
           pageCount,
           imageCount
