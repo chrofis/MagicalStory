@@ -2666,15 +2666,37 @@ export default function StoryWizard() {
                 </div>
               )}
 
-              {/* Step 5: Back button and Generate buttons stacked */}
+              {/* Step 5: Generate button first, then back button */}
               {step === 5 && (
                 <div className="space-y-4">
+                  {/* Generate Story button - primary action at top */}
                   <button
-                    onClick={goBack}
-                    className="bg-transparent text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
+                    onClick={() => generateStory()}
+                    disabled={!canGoNext()}
+                    className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
+                      !canGoNext()
+                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
                   >
-                    <ArrowLeft size={20} /> {t.back}
+                    <Sparkles size={20} /> {t.generateStory} ({pages * 10} Credits)
                   </button>
+
+                  {/* Developer Mode: Generate Text Only (no images) */}
+                  {developerMode && (
+                    <button
+                      onClick={() => generateStory({ skipImages: true })}
+                      disabled={!canGoNext()}
+                      className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
+                        !canGoNext()
+                          ? 'bg-gray-400 text-white cursor-not-allowed'
+                          : 'bg-yellow-500 text-white hover:bg-yellow-600'
+                      }`}
+                    >
+                      <Sparkles size={20} />
+                      {language === 'de' ? 'Nur Text generieren (ohne Bilder)' : language === 'fr' ? 'Générer le texte uniquement (sans images)' : 'Generate Text Only (no images)'}
+                    </button>
+                  )}
 
                   {/* Developer Skip Options */}
                   {developerMode && (
@@ -2743,33 +2765,13 @@ export default function StoryWizard() {
                     />
                   )}
 
+                  {/* Back button at the bottom */}
                   <button
-                    onClick={() => generateStory()}
-                    disabled={!canGoNext()}
-                    className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
-                      !canGoNext()
-                        ? 'bg-gray-400 text-white cursor-not-allowed'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                    }`}
+                    onClick={goBack}
+                    className="bg-transparent text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold flex items-center gap-2"
                   >
-                    <Sparkles size={20} /> {t.generateStory} ({pages * 10} Credits)
+                    <ArrowLeft size={20} /> {t.back}
                   </button>
-
-                  {/* Developer Mode: Generate Text Only (no images) */}
-                  {developerMode && (
-                    <button
-                      onClick={() => generateStory({ skipImages: true })}
-                      disabled={!canGoNext()}
-                      className={`w-full py-3 rounded-lg font-bold text-base flex items-center justify-center gap-2 ${
-                        !canGoNext()
-                          ? 'bg-gray-400 text-white cursor-not-allowed'
-                          : 'bg-yellow-500 text-white hover:bg-yellow-600'
-                      }`}
-                    >
-                      <Sparkles size={20} />
-                      {language === 'de' ? 'Nur Text generieren (ohne Bilder)' : language === 'fr' ? 'Générer le texte uniquement (sans images)' : 'Generate Text Only (no images)'}
-                    </button>
-                  )}
                 </div>
               )}
             </div>

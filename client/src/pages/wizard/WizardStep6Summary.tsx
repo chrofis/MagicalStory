@@ -123,9 +123,9 @@ export function WizardStep6Summary({
     title: language === 'de' ? 'Geschichte erstellen' : language === 'fr' ? 'Créer l\'histoire' : 'Create Your Story',
     storyDetails: language === 'de' ? 'Geschichte / Handlung' : language === 'fr' ? 'Histoire / Intrigue' : 'Story / Plot',
     storyDetailsPlaceholder: language === 'de'
-      ? 'Beschreiben Sie die Handlung Ihrer Geschichte...'
+      ? 'Beschreibe die Handlung deiner Geschichte...'
       : language === 'fr'
-      ? 'Décrivez l\'intrigue de votre histoire...'
+      ? 'Décris l\'intrigue de ton histoire...'
       : 'Describe the plot of your story...',
     optional: language === 'de' ? '(optional)' : language === 'fr' ? '(optionnel)' : '(optional)',
     dedication: language === 'de' ? 'Widmung' : language === 'fr' ? 'Dédicace' : 'Dedication',
@@ -135,9 +135,9 @@ export function WizardStep6Summary({
       ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
       : 'e.g. "For my dear daughter Emma on her 5th birthday"',
     dedicationHelp: language === 'de'
-      ? 'Dieser Text wird auf der Einführungsseite Ihres Buches gedruckt.'
+      ? 'Dieser Text wird auf der Einführungsseite deines Buches gedruckt.'
       : language === 'fr'
-      ? 'Ce texte sera imprimé sur la page d\'introduction de votre livre.'
+      ? 'Ce texte sera imprimé sur la page d\'introduction de ton livre.'
       : 'This text will be printed on the initial page of your book.',
     generateIdeas: language === 'de' ? 'Vorschlag generieren' : language === 'fr' ? 'Générer une suggestion' : 'Generate Suggestion',
     generating: language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Generating...',
@@ -156,100 +156,51 @@ export function WizardStep6Summary({
         <Wand2 size={24} /> {t.title}
       </h2>
 
-      {/* Summary of all selections - ordered by wizard flow */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          {/* 1. Main Characters → Step 1 */}
-          {getMainCharacterNames() && (
-            <div className="bg-white rounded-lg p-2 border border-indigo-200 relative group">
-              <button
-                onClick={() => onEditStep(1)}
-                className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
-              >
-                <Pencil size={12} />
-              </button>
-              <span className="text-gray-500 text-xs block">{t.mainChars}</span>
-              <span className="font-medium text-indigo-700">{getMainCharacterNames()}</span>
-            </div>
-          )}
-
-          {/* 2. Supporting Characters → Step 1 */}
-          {getSupportingCharacterNames() && (
-            <div className="bg-white rounded-lg p-2 border border-gray-200 relative group">
-              <button
-                onClick={() => onEditStep(1)}
-                className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
-              >
-                <Pencil size={12} />
-              </button>
-              <span className="text-gray-500 text-xs block">{t.supportingChars}</span>
-              <span className="font-medium text-gray-700">{getSupportingCharacterNames()}</span>
-            </div>
-          )}
-
-          {/* 3. Language → Step 2 */}
-          <div className="bg-white rounded-lg p-2 border border-blue-200 relative group">
-            <button
-              onClick={() => onEditStep(2)}
-              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
-              title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
-            >
-              <Pencil size={12} />
-            </button>
-            <span className="text-gray-500 text-xs block">{t.languageLabel}</span>
-            <span className="font-medium text-gray-800">{getStoryLanguageName()}</span>
+      {/* Summary of all selections - compact inline format */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        {/* Main Characters */}
+        {getMainCharacterNames() && (
+          <div className="flex items-center gap-1 group">
+            <span className="text-gray-500">{t.mainChars}:</span>
+            <span className="font-medium text-indigo-700">{getMainCharacterNames()}</span>
+            <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
           </div>
-
-          {/* 4. Reading Level & Pages → Step 2 */}
-          <div className="bg-white rounded-lg p-2 border border-gray-200 relative group">
-            <button
-              onClick={() => onEditStep(2)}
-              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
-              title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
-            >
-              <Pencil size={12} />
-            </button>
-            <span className="text-gray-500 text-xs block">{t.level} / {t.pagesLabel}</span>
-            <span className="font-medium text-gray-700">{getReadingLevelLabel()} / {pages} {t.pagesLabel.toLowerCase()}</span>
+        )}
+        {/* Supporting Characters */}
+        {getSupportingCharacterNames() && (
+          <div className="flex items-center gap-1 group">
+            <span className="text-gray-500">{t.supportingChars}:</span>
+            <span className="font-medium text-gray-700">{getSupportingCharacterNames()}</span>
+            <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
           </div>
-
-          {/* 5. Story Type → Step 3 */}
-          <div className="bg-white rounded-lg p-2 border border-green-200 relative group">
-            <button
-              onClick={() => onEditStep(3)}
-              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
-              title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
-            >
-              <Pencil size={12} />
-            </button>
-            <span className="text-gray-500 text-xs block">{t.storyType}</span>
-            <span className="font-medium text-gray-800">
-              {storyCategory === 'adventure' ? getThemeName() : (
-                <>
-                  {getTopicName()}
-                  {storyTheme && storyTheme !== 'realistic' && ` + ${getThemeName()}`}
-                </>
-              )}
-            </span>
-          </div>
-
-          {/* 6. Art Style → Step 4 */}
-          <div className="bg-white rounded-lg p-2 border border-purple-200 relative group">
-            <button
-              onClick={() => onEditStep(4)}
-              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
-              title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
-            >
-              <Pencil size={12} />
-            </button>
-            <span className="text-gray-500 text-xs block">{t.artStyleLabel}</span>
-            <span className="font-medium text-gray-800 flex items-center gap-1">
-              <Palette size={14} className="text-purple-600" />
-              {getArtStyleName()}
-            </span>
-          </div>
+        )}
+        {/* Language */}
+        <div className="flex items-center gap-1 group">
+          <span className="text-gray-500">{t.languageLabel}:</span>
+          <span className="font-medium">{getStoryLanguageName()}</span>
+          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+        </div>
+        {/* Reading Level & Pages */}
+        <div className="flex items-center gap-1 group">
+          <span className="text-gray-500">{t.level}:</span>
+          <span className="font-medium">{getReadingLevelLabel()} / {pages} {t.pagesLabel.toLowerCase()}</span>
+          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+        </div>
+        {/* Story Type */}
+        <div className="flex items-center gap-1 group">
+          <span className="text-gray-500">{t.storyType}:</span>
+          <span className="font-medium">
+            {storyCategory === 'adventure' ? getThemeName() : (
+              <>{getTopicName()}{storyTheme && storyTheme !== 'realistic' && ` + ${getThemeName()}`}</>
+            )}
+          </span>
+          <button onClick={() => onEditStep(3)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+        </div>
+        {/* Art Style */}
+        <div className="flex items-center gap-1 group">
+          <span className="text-gray-500">{t.artStyleLabel}:</span>
+          <span className="font-medium flex items-center gap-1"><Palette size={12} className="text-purple-600" />{getArtStyleName()}</span>
+          <button onClick={() => onEditStep(4)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
       </div>
 
