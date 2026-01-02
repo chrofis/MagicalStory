@@ -9,9 +9,9 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { Button, LoadingSpinner, Navigation } from '@/components/common';
 import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
 import {
-  WizardStep1Configuration,
   WizardStep2Characters,
   WizardStep3Relationships,
+  WizardStep3BookSettings,
   WizardStep4Settings,
 } from './wizard';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
@@ -62,7 +62,7 @@ export default function StoryWizard() {
     modelSelections, setModelSelections,
   } = useDeveloperMode();
 
-  // Step 1: Story Type & Art Style - load from localStorage
+  // Story Type & Art Style settings - load from localStorage (used in step 4)
   const [storyType, setStoryType] = useState(() => {
     return localStorage.getItem('story_type') || '';
   });
@@ -83,7 +83,7 @@ export default function StoryWizard() {
     return localStorage.getItem('story_art_style') || 'watercolor';
   });
 
-  // Step 2: Characters
+  // Characters state (step 1)
   const [characters, setCharacters] = useState<Character[]>([]);
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
@@ -96,7 +96,7 @@ export default function StoryWizard() {
   const [photoAnalysisDebug, setPhotoAnalysisDebug] = useState<{ rawResponse?: string; error?: string } | undefined>(undefined);
   const previousTraitsRef = useRef<{ physical?: Character['physical']; gender?: string; age?: string } | null>(null);
 
-  // Step 3: Relationships - loaded from API with characters
+  // Relationships state (step 2) - loaded from API with characters
   const [relationships, setRelationships] = useState<RelationshipMap>({});
   const [relationshipTexts, setRelationshipTexts] = useState<RelationshipTextMap>({});
   const [customRelationships, setCustomRelationships] = useState<string[]>([]);
@@ -105,7 +105,7 @@ export default function StoryWizard() {
   const relationshipsDirty = useRef(false); // Track if relationships were modified
   const [initialCharacterLoadDone, setInitialCharacterLoadDone] = useState(false); // Track if initial API load completed
 
-  // Step 4: Story Settings - load from localStorage
+  // Story Settings state (step 4) - load from localStorage
   const [mainCharacters, setMainCharacters] = useState<number[]>(() => {
     try {
       const saved = localStorage.getItem('story_main_characters');
@@ -526,7 +526,7 @@ export default function StoryWizard() {
         localStorage.removeItem('pending_art_style');
       }
 
-      // Navigate to step 4 (will trigger auto-generate once characters are loaded)
+      // Navigate to step 4 (story type + settings) to continue after email verification
       setStep(4);
 
       // Clear the URL param
@@ -616,17 +616,17 @@ export default function StoryWizard() {
     }
   }, [isAuthenticated, isAuthLoading, searchParams]);
 
-  // Auto-start character creation when entering step 2 with no characters
+  // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh
   useEffect(() => {
-    if (step === 2 && characters.length === 0 && !currentCharacter && !isLoading && initialCharacterLoadDone) {
+    if (step === 1 && characters.length === 0 && !currentCharacter && !isLoading && initialCharacterLoadDone) {
       startNewCharacter();
     }
   }, [step, characters.length, currentCharacter, isLoading, initialCharacterLoadDone]);
 
   // Note: Relationships are now saved with characters to the API, not localStorage
 
-  // Persist Step 4 settings to localStorage
+  // Persist Story Settings (step 4) to localStorage
   useEffect(() => {
     localStorage.setItem('story_main_characters', JSON.stringify(mainCharacters));
   }, [mainCharacters]);
@@ -655,7 +655,7 @@ export default function StoryWizard() {
     localStorage.setItem('story_details', storyDetails);
   }, [storyDetails]);
 
-  // Persist Step 1 settings to localStorage
+  // Persist Story Type settings (step 4) to localStorage
   useEffect(() => {
     localStorage.setItem('story_type', storyType);
   }, [storyType]);
@@ -733,17 +733,17 @@ export default function StoryWizard() {
     }
   }, [step]);
 
-  // Initialize relationships when moving to step 3 (only once per character set)
+  // Initialize relationships when moving to step 2 (only once per character set)
   // Wait until not loading to ensure API data is loaded first
   useEffect(() => {
-    if (step === 3 && characters.length >= 2 && !isLoading) {
+    if (step === 2 && characters.length >= 2 && !isLoading) {
       // Create a key based on character IDs to detect if characters changed
       const charKey = characters.map(c => c.id).sort().join('-');
 
       if (!relationshipsInitialized.current || relationshipsInitialized.current !== charKey) {
         const lang = language as UILanguage;
         const notKnown = getNotKnownRelationship(lang);
-        log.debug('Initializing relationships for step 3', { charKey, existingCount: Object.keys(relationships).length });
+        log.debug('Initializing relationships for step 2', { charKey, existingCount: Object.keys(relationships).length });
 
         setRelationships(prev => {
           const updated = { ...prev };
@@ -1348,14 +1348,15 @@ export default function StoryWizard() {
   };
 
   // Navigation
+  // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType+Settings
   const safeSetStep = async (newStep: number) => {
     if (newStep >= 0 && newStep <= 5) {
-      // Auto-save character if leaving step 2 while editing
-      if (step === 2 && currentCharacter && newStep !== 2) {
+      // Auto-save character if leaving step 1 while editing
+      if (step === 1 && currentCharacter && newStep !== 1) {
         await saveCharacter();
       }
-      // Save relationships when leaving step 3
-      if (step === 3 && newStep !== 3) {
+      // Save relationships when leaving step 2
+      if (step === 2 && newStep !== 2) {
         await saveAllCharacterData();
       }
       setStep(newStep);
@@ -1365,28 +1366,36 @@ export default function StoryWizard() {
   };
 
   const canAccessStep = (s: number): boolean => {
+    // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType+Settings
     if (s === 1) return true;
-    if (s === 2) return storyType !== '';
-    if (s === 3) return storyType !== '' && characters.length > 0;
-    if (s === 4) return storyType !== '' && characters.length > 0 && areAllRelationshipsDefined();
+    if (s === 2) return characters.length > 0;
+    if (s === 3) return characters.length > 0 && areAllRelationshipsDefined();
+    if (s === 4) return characters.length > 0 && areAllRelationshipsDefined();
     if (s === 5) return generatedStory !== '';
     return false;
   };
 
   const canGoNext = (): boolean => {
+    // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType+Settings
     if (step === 1) {
-      // Must have category, and for adventure need theme, for others need topic
+      // Step 1: Characters - must have at least one character
+      return characters.length > 0;
+    }
+    if (step === 2) {
+      // Step 2: Relationships - all relationships must be defined
+      return areAllRelationshipsDefined();
+    }
+    if (step === 3) {
+      // Step 3: Book Settings - always can proceed (languageLevel has default)
+      return true;
+    }
+    if (step === 4) {
+      // Step 4: Story Type + Settings
+      // Must have: story type complete, main character selected, story details
       if (!storyCategory) return false;
       if (storyCategory === 'adventure' && !storyTheme) return false;
       if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && !storyTopic) return false;
-      // Also need art style
       if (!artStyle) return false;
-      return true;
-    }
-    if (step === 2) return characters.length > 0;
-    if (step === 3) return areAllRelationshipsDefined();
-    // Step 4: At least one character, at least one main character, and story details required
-    if (step === 4) {
       const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
       return charactersInStory.length > 0 && mainCharacters.length > 0 && storyDetails.trim().length > 0;
     }
@@ -1878,26 +1887,11 @@ export default function StoryWizard() {
   }, [isAuthenticated, characters, step, isGenerating, refreshUser]);
 
   // Render current step content
+  // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType+Settings
   const renderStep = () => {
     switch (step) {
       case 1:
-        return (
-          <WizardStep1Configuration
-            storyCategory={storyCategory}
-            storyTopic={storyTopic}
-            storyTheme={storyTheme}
-            customThemeText={customThemeText}
-            artStyle={artStyle}
-            onCategoryChange={setStoryCategory}
-            onTopicChange={setStoryTopic}
-            onThemeChange={setStoryTheme}
-            onCustomThemeTextChange={setCustomThemeText}
-            onArtStyleChange={setArtStyle}
-            onLegacyStoryTypeChange={setStoryType}
-          />
-        );
-
-      case 2:
+        // Step 1: Characters (was step 2)
         return (
           <WizardStep2Characters
             characters={characters}
@@ -1927,7 +1921,8 @@ export default function StoryWizard() {
           />
         );
 
-      case 3:
+      case 2:
+        // Step 2: Relationships (was step 3)
         return (
           <WizardStep3Relationships
             characters={characters}
@@ -1940,7 +1935,20 @@ export default function StoryWizard() {
           />
         );
 
+      case 3:
+        // Step 3: Book Settings (new - reading level + pages)
+        return (
+          <WizardStep3BookSettings
+            languageLevel={languageLevel}
+            onLanguageLevelChange={setLanguageLevel}
+            pages={pages}
+            onPagesChange={setPages}
+            developerMode={developerMode}
+          />
+        );
+
       case 4:
+        // Step 4: Story Type + Settings
         return (
           <WizardStep4Settings
             characters={characters}
@@ -1949,10 +1957,6 @@ export default function StoryWizard() {
             onCharacterRoleChange={handleCharacterRoleChange}
             storyLanguage={storyLanguage}
             onStoryLanguageChange={setStoryLanguage}
-            languageLevel={languageLevel}
-            onLanguageLevelChange={setLanguageLevel}
-            pages={pages}
-            onPagesChange={setPages}
             dedication={dedication}
             onDedicationChange={setDedication}
             storyDetails={storyDetails}
@@ -1966,10 +1970,12 @@ export default function StoryWizard() {
             storyCategory={storyCategory}
             storyTopic={storyTopic}
             storyTheme={storyTheme}
+            customThemeText={customThemeText}
             artStyle={artStyle}
             onCategoryChange={setStoryCategory}
             onTopicChange={setStoryTopic}
             onThemeChange={setStoryTheme}
+            onCustomThemeTextChange={setCustomThemeText}
             onArtStyleChange={setArtStyle}
             onLegacyStoryTypeChange={setStoryType}
           />

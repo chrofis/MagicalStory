@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Wand2, Star, Sparkles, Loader2, Pencil, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Modal } from '@/components/common/Modal';
@@ -7,7 +7,7 @@ import { ArtStyleSelector } from './ArtStyleSelector';
 import { storyTypes, lifeChallenges, educationalTopics } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
-import type { LanguageLevel, StoryLanguageCode, UILanguage } from '@/types/story';
+import type { StoryLanguageCode, UILanguage } from '@/types/story';
 
 // Character role in story: 'out' = not in story, 'in' = side character, 'main' = main character
 export type CharacterRole = 'out' | 'in' | 'main';
@@ -29,10 +29,6 @@ interface StorySettingsProps {
   onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   storyLanguage: StoryLanguageCode;
   onStoryLanguageChange: (lang: StoryLanguageCode) => void;
-  languageLevel: LanguageLevel;
-  onLanguageLevelChange: (level: LanguageLevel) => void;
-  pages: number;
-  onPagesChange: (pages: number) => void;
   dedication: string;
   onDedicationChange: (dedication: string) => void;
   storyDetails: string;
@@ -44,14 +40,16 @@ interface StorySettingsProps {
   onGenerateIdeas?: () => Promise<void>;
   isGeneratingIdeas?: boolean;
   ideaPrompt?: { prompt: string; model: string } | null;
-  // Story type settings (from step 1)
+  // Story type settings (from step 4)
   storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
   storyTopic?: string;
   storyTheme?: string;
+  customThemeText?: string;
   artStyle?: string;
   onCategoryChange?: (category: 'adventure' | 'life-challenge' | 'educational') => void;
   onTopicChange?: (topic: string) => void;
   onThemeChange?: (theme: string) => void;
+  onCustomThemeTextChange?: (text: string) => void;
   onArtStyleChange?: (style: string) => void;
   onLegacyStoryTypeChange?: (storyType: string) => void;
 }
@@ -63,10 +61,6 @@ export function StorySettings({
   onCharacterRoleChange,
   storyLanguage,
   onStoryLanguageChange,
-  languageLevel,
-  onLanguageLevelChange,
-  pages,
-  onPagesChange,
   dedication,
   onDedicationChange,
   storyDetails,
@@ -77,14 +71,16 @@ export function StorySettings({
   onGenerateIdeas,
   isGeneratingIdeas = false,
   ideaPrompt,
-  // Story type settings (from step 1)
+  // Story type settings (from step 4)
   storyCategory = '',
   storyTopic = '',
   storyTheme = '',
+  customThemeText = '',
   artStyle = '',
   onCategoryChange,
   onTopicChange,
   onThemeChange,
+  onCustomThemeTextChange,
   onArtStyleChange,
   onLegacyStoryTypeChange,
 }: StorySettingsProps) {
@@ -102,58 +98,6 @@ export function StorySettings({
     if (excludedCharacters.includes(charId)) return 'out';
     if (mainCharacters.includes(charId)) return 'main';
     return 'in';
-  };
-
-  // Available page options based on developer mode
-  // Only even numbers so text/image split works (pageCount / 2 must be whole number)
-  const availablePageOptions = developerMode ? [4, 10, 14, 20, 24, 30, 34, 40, 44, 50] : [10, 14, 20, 24, 30, 34, 40, 44, 50];
-
-  // If current pages value is not in available options, reset to default (10)
-  useEffect(() => {
-    const validOptions = developerMode ? [4, 10, 14, 20, 24, 30, 34, 40, 44, 50] : [10, 14, 20, 24, 30, 34, 40, 44, 50];
-    if (!validOptions.includes(pages)) {
-      onPagesChange(10);
-    }
-  }, [pages, developerMode, onPagesChange]);
-
-  const readingLevels = [
-    {
-      value: '1st-grade' as LanguageLevel,
-      label: t.firstGrade,
-      desc: t.firstGradeDesc,
-      image: '/images/text and image on each page.jpg',
-    },
-    {
-      value: 'standard' as LanguageLevel,
-      label: t.standard,
-      desc: t.standardDesc,
-      image: '/images/left page text, right page image.jpg',
-    },
-    {
-      value: 'advanced' as LanguageLevel,
-      label: t.advanced,
-      desc: t.advancedDesc,
-      image: '/images/dense text left.jpg',
-    },
-  ];
-
-  // Generate page option label based on language level
-  const getPageLabel = (pageCount: number, isTest = false) => {
-    const testSuffix = isTest ? ' (Test)' : '';
-    const creditsCost = pageCount * 10;
-    const creditsLabel = language === 'de' ? 'Credits' : language === 'fr' ? 'crédits' : 'credits';
-
-    if (languageLevel === '1st-grade') {
-      return `${pageCount} ${language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'} = ${creditsCost} ${creditsLabel}${testSuffix}`;
-    }
-    const textPages = Math.floor(pageCount / 2);
-    const imagePages = Math.floor(pageCount / 2);
-    if (language === 'de') {
-      return `${pageCount} Seiten (${textPages} Text + ${imagePages} Bilder) = ${creditsCost} ${creditsLabel}${testSuffix}`;
-    } else if (language === 'fr') {
-      return `${pageCount} pages (${textPages} texte + ${imagePages} images) = ${creditsCost} ${creditsLabel}${testSuffix}`;
-    }
-    return `${pageCount} pages (${textPages} text + ${imagePages} images) = ${creditsCost} ${creditsLabel}${testSuffix}`;
   };
 
   // Role labels for 3-state buttons
@@ -202,15 +146,42 @@ export function StorySettings({
     return STORY_LANGUAGES.find(l => l.code === storyLanguage) || STORY_LANGUAGES[0];
   };
 
-  // Check if we should show the settings summary bar
-  const showSettingsSummary = storyCategory && artStyle && (
+  // Check if story type selection is complete
+  const isStoryTypeComplete = storyCategory && artStyle && (
     storyCategory === 'adventure' ? storyTheme : storyTopic
   );
 
   return (
     <div className="space-y-6">
-      {/* Story Settings Bar - 3 columns: Story, Art Style, Language */}
-      {showSettingsSummary && (
+      {/* Story Type Selection - Show inline when not complete */}
+      {!isStoryTypeComplete && onCategoryChange && onTopicChange && onThemeChange && onArtStyleChange && onLegacyStoryTypeChange && (
+        <div className="space-y-6">
+          <StoryCategorySelector
+            storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | ''}
+            storyTopic={storyTopic}
+            storyTheme={storyTheme}
+            customThemeText={customThemeText}
+            onCategoryChange={onCategoryChange}
+            onTopicChange={onTopicChange}
+            onThemeChange={onThemeChange}
+            onCustomThemeTextChange={onCustomThemeTextChange}
+            onLegacyStoryTypeChange={onLegacyStoryTypeChange}
+          />
+
+          {/* Art Style Selector - only show when story type is partially selected */}
+          {storyCategory && (storyCategory === 'adventure' ? storyTheme : storyTopic) && (
+            <div className="border-t border-gray-200 pt-6">
+              <ArtStyleSelector
+                selectedStyle={artStyle}
+                onSelect={onArtStyleChange}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Story Settings Bar - 3 columns: Story, Art Style, Language (shown when story type is complete) */}
+      {isStoryTypeComplete && (
         <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-3">
           <div className="grid grid-cols-3 gap-2 text-sm">
             {/* LEFT: Story Topic/Theme - clickable */}
@@ -416,62 +387,6 @@ export function StorySettings({
             })}
           </div>
         </div>
-
-        {/* Reading Level Selection */}
-        <div>
-          <label className="block text-xl font-semibold mb-3">{t.readingLevel}</label>
-          <div className="flex overflow-x-auto gap-3 pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
-            {readingLevels.map((level) => (
-              <button
-                key={level.value}
-                onClick={() => onLanguageLevelChange(level.value)}
-                className={`flex-shrink-0 w-40 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
-                  languageLevel === level.value
-                    ? 'border-indigo-600 ring-2 ring-indigo-200'
-                    : 'border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                <div className="w-full bg-gray-100 p-2 h-28 md:h-auto">
-                  <img
-                    src={level.image}
-                    alt={level.label}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <div className="p-2 md:p-3">
-                  <div className="font-semibold text-sm md:text-base mb-1">{level.label}</div>
-                  <div className="text-xs md:text-sm text-gray-500 whitespace-pre-line">{level.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Number of Pages - shown after reading level is selected */}
-        {languageLevel && (
-          <div>
-            <label className="block text-xl font-semibold mb-3">
-              {t.numberOfPages}
-            </label>
-            <select
-              value={pages}
-              onChange={(e) => onPagesChange(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base md:text-lg font-semibold"
-            >
-              {availablePageOptions.map((pageOption) => (
-                <option key={pageOption} value={pageOption}>
-                  {getPageLabel(pageOption, pageOption === 4)}
-                </option>
-              ))}
-            </select>
-            <p className="text-sm text-gray-500 mt-2">
-              {languageLevel === '1st-grade'
-                ? (language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below')
-                : (language === 'de' ? 'Abwechselnd Textseite und Bildseite' : language === 'fr' ? 'Alternance de pages de texte et d\'images' : 'Alternating text page and image page')
-              }
-            </p>
-          </div>
-        )}
 
         {/* Story Plot / Story Details - Required */}
         <div>

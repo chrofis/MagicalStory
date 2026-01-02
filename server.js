@@ -121,6 +121,13 @@ const {
   IMAGE_QUALITY_THRESHOLD
 } = require('./server/lib/images');
 const {
+  prepareStyledAvatars,
+  applyStyledAvatars,
+  collectAvatarRequirements,
+  clearStyledAvatarCache,
+  getStyledAvatarCacheStats
+} = require('./server/lib/styledAvatars');
+const {
   TEXT_MODELS,
   MODEL_DEFAULTS,
   getActiveTextModel,
@@ -5366,10 +5373,33 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       [30, `Story text complete. ${streamingImagePromises.length} images already generating...`, jobId]
     );
 
+    // Get art style for styled avatar preparation
+    const artStyle = inputData.artStyle || 'pixar';
+
     // Generate images if not skipped
     if (!skipImages) {
       // Note: imageGenMode and MAX_RETRIES already defined above for streaming
       log.debug(`🖼️  [STORYBOOK] Image generation mode: ${imageGenMode.toUpperCase()}`);
+
+      // Prepare styled avatars (convert reference photos to target art style)
+      // This is done once at the start to avoid repeated style conversion in each image
+      if (artStyle !== 'realistic') {
+        log.debug(`🎨 [STORYBOOK] Preparing styled avatars for ${artStyle} style...`);
+        try {
+          // Collect avatar requirements from all scenes
+          const avatarRequirements = collectAvatarRequirements(
+            allSceneDescriptions,
+            inputData.characters || [],
+            {}, // pageClothing - will parse from scene descriptions
+            'standard'
+          );
+          // Convert avatars in parallel
+          await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements);
+          log.debug(`✅ [STORYBOOK] Styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
+        } catch (error) {
+          log.error(`⚠️ [STORYBOOK] Failed to prepare styled avatars, using original photos:`, error.message);
+        }
+      }
 
       // Helper function to generate a single image (used for sequential mode)
       const generateImage = async (scene, idx, previousImage = null, isSequential = false, vBible = null) => {
@@ -5395,8 +5425,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
 
           // Use detailed photo info (with names) for labeled reference images
-          const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Reference photos: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
+
+          // Apply styled avatars (pre-converted to target art style)
+          referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
 
           // Log visual bible usage
           if (vBible) {
@@ -5571,7 +5604,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           // Use extracted clothing or parse from scene description
           const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
           // Use detailed photo info (with names) for labeled reference images
-          const frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
+          let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
+          // Apply styled avatars (pre-converted to target art style)
+          frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
           log.debug(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}), clothing: ${frontCoverClothing}`);
 
           const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
@@ -5609,7 +5644,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (!coverImages.initialPage) {
           // Use extracted clothing or parse from scene description
           const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
-          const initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
+          let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
+          // Apply styled avatars (pre-converted to target art style)
+          initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
           log.debug(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
 
           const initialPrompt = inputData.dedication && inputData.dedication.trim()
@@ -5655,7 +5692,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (!coverImages.backCover) {
           // Use extracted clothing or parse from scene description
           const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
-          const backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
+          let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
+          // Apply styled avatars (pre-converted to target art style)
+          backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
           log.debug(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
 
           const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
@@ -5851,10 +5890,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       [JSON.stringify(resultData), jobId]
     );
 
+    // Clear styled avatar cache to free memory
+    clearStyledAvatarCache();
+
     log.debug(`✅ [STORYBOOK] Job ${jobId} completed successfully`);
     return resultData;
 
   } catch (error) {
+    // Clear styled avatar cache on error too
+    clearStyledAvatarCache();
     log.error(`❌ [STORYBOOK] Job ${jobId} failed:`, error);
 
     // Refund reserved credits on failure - PROPORTIONAL based on work completed

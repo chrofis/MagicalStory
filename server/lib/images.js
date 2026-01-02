@@ -927,6 +927,20 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           }
         }
 
+        // Skip quality evaluation for avatar conversions (just style transfer, no scene composition)
+        if (evaluationType === 'avatar') {
+          log.debug(`⏭️ [QUALITY] Skipping quality evaluation for avatar conversion`);
+          const result = {
+            imageData: compressedImageData,
+            score: null,
+            reasoning: null,
+            modelId,
+            imageUsage: imageUsage
+          };
+          imageCache.set(cacheKey, result);
+          return result;
+        }
+
         // Evaluate image quality with prompt and reference images
         log.debug(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
         const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext);
