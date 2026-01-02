@@ -2,6 +2,7 @@ import { ChangeEvent, useState } from 'react';
 import { Upload, Save, RefreshCw, Sparkles, Wand2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
+import { ImageLightbox } from '@/components/common/ImageLightbox';
 import TraitSelector from './TraitSelector';
 import CharacterRelationships from './CharacterRelationships';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
@@ -351,6 +352,7 @@ export function CharacterForm({
 }: CharacterFormProps) {
   const { t, language } = useLanguage();
   const [enlargedAvatar, setEnlargedAvatar] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1026,7 +1028,9 @@ export function CharacterForm({
                             <img
                               src={avatar}
                               alt={`${character.name} - ${artStyle} - ${category}`}
-                              className="w-full h-32 object-contain rounded border border-purple-200 bg-gray-50"
+                              className="w-full h-32 object-contain rounded border border-purple-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => setLightboxImage(avatar)}
+                              title="Click to enlarge"
                             />
                           ) : (
                             <div className="w-full h-32 rounded border border-dashed border-purple-200 bg-purple-50/50 flex items-center justify-center text-purple-300 text-[10px]">
@@ -1129,6 +1133,12 @@ export function CharacterForm({
           {t.selectStrengthsFlaws}
         </p>
       )}
+
+      {/* Lightbox for enlarged styled avatars */}
+      <ImageLightbox
+        src={lightboxImage}
+        onClose={() => setLightboxImage(null)}
+      />
     </div>
   );
 }
