@@ -50,6 +50,13 @@ router.get('/', authenticateToken, async (req, res) => {
           };
         }
         console.log(`[Characters] GET - Final characters count: ${characterData.characters.length}`);
+        // Debug: Check for styled avatars
+        for (const char of characterData.characters) {
+          if (char.avatars?.styledAvatars) {
+            const styles = Object.keys(char.avatars.styledAvatars);
+            console.log(`[Characters] GET - ${char.name} has styledAvatars for: ${styles.join(', ')}`);
+          }
+        }
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -68,17 +75,6 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const { characters, relationships, relationshipTexts, customRelationships, customStrengths, customWeaknesses, customFears } = req.body;
 
-    // Store character data as an object with all related information
-    const characterData = {
-      characters: characters || [],
-      relationships: relationships || {},
-      relationshipTexts: relationshipTexts || {},
-      customRelationships: customRelationships || [],
-      customStrengths: customStrengths || [],
-      customWeaknesses: customWeaknesses || [],
-      customFears: customFears || []
-    };
-
     console.log(`[Characters] POST - Saving ${characters?.length || 0} characters for user.id: ${req.user.id}`);
 
     if (isDatabaseMode()) {
@@ -86,6 +82,49 @@ router.post('/', authenticateToken, async (req, res) => {
       // We use a stable ID per user to ensure only one record exists
       const characterId = `characters_${req.user.id}`;
       console.log(`[Characters] POST - Using characterId: ${characterId}`);
+
+      // First, fetch existing data to preserve server-side additions (like styledAvatars)
+      const existingRows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+      let existingCharacters = [];
+      if (existingRows.length > 0) {
+        const existingData = JSON.parse(existingRows[0].data);
+        existingCharacters = existingData.characters || [];
+      }
+
+      // Merge styledAvatars from existing characters into new characters
+      let preservedCount = 0;
+      const mergedCharacters = (characters || []).map(newChar => {
+        const existingChar = existingCharacters.find(c => c.id === newChar.id || c.name === newChar.name);
+        if (existingChar?.avatars?.styledAvatars) {
+          // Preserve styledAvatars from database
+          preservedCount++;
+          const styles = Object.keys(existingChar.avatars.styledAvatars);
+          console.log(`[Characters] POST - Preserving styledAvatars for ${newChar.name}: ${styles.join(', ')}`);
+          return {
+            ...newChar,
+            avatars: {
+              ...newChar.avatars,
+              styledAvatars: existingChar.avatars.styledAvatars
+            }
+          };
+        }
+        return newChar;
+      });
+      if (preservedCount > 0) {
+        console.log(`[Characters] POST - Preserved styledAvatars for ${preservedCount} characters`);
+      }
+
+      // Store character data as an object with all related information
+      const characterData = {
+        characters: mergedCharacters,
+        relationships: relationships || {},
+        relationshipTexts: relationshipTexts || {},
+        customRelationships: customRelationships || [],
+        customStrengths: customStrengths || [],
+        customWeaknesses: customWeaknesses || [],
+        customFears: customFears || []
+      };
+
       const jsonData = JSON.stringify(characterData);
 
       const upsertQuery = `
