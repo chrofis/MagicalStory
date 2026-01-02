@@ -20,6 +20,8 @@ RÈGLE VESTIMENTAIRE: Les personnages portent les MÊMES vêtements que dans la 
 
 **SCÈNE:** {SCENE_DESCRIPTION}
 
+{REQUIRED_OBJECTS}
+
 ---
 
 Montrer des émotions appropriées. Composition claire et épurée.

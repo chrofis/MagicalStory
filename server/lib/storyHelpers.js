@@ -1268,6 +1268,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   // For storybook mode: visualBible entries are added here since there's no separate scene description step
   // For parallel/sequential modes: Visual Bible is also in scene description, but adding here ensures consistency
 
+  // Extract metadata BEFORE stripping (needed for objects lookup)
+  const metadata = extractSceneMetadata(sceneDescription);
+
   // Strip JSON metadata block from scene description (not needed in image prompt)
   const cleanSceneDescription = stripSceneMetadata(sceneDescription);
 
@@ -1388,6 +1391,71 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     }
   }
 
+  // Build required objects section from metadata.objects by looking up in Visual Bible
+  // This ensures objects listed in scene metadata are included with their full descriptions
+  let requiredObjectsSection = '';
+  if (metadata && metadata.objects && metadata.objects.length > 0 && visualBible) {
+    const requiredObjects = [];
+
+    for (const objName of metadata.objects) {
+      const objNameLower = objName.toLowerCase().trim();
+
+      // Look up in artifacts
+      const artifact = (visualBible.artifacts || []).find(a =>
+        a.name.toLowerCase().trim() === objNameLower ||
+        a.name.toLowerCase().includes(objNameLower) ||
+        objNameLower.includes(a.name.toLowerCase())
+      );
+      if (artifact) {
+        const description = artifact.extractedDescription || artifact.description;
+        requiredObjects.push({ name: artifact.name, type: 'object', description });
+        continue;
+      }
+
+      // Look up in animals
+      const animal = (visualBible.animals || []).find(a =>
+        a.name.toLowerCase().trim() === objNameLower ||
+        a.name.toLowerCase().includes(objNameLower) ||
+        objNameLower.includes(a.name.toLowerCase())
+      );
+      if (animal) {
+        const description = animal.extractedDescription || animal.description;
+        requiredObjects.push({ name: animal.name, type: 'animal', description });
+        continue;
+      }
+
+      // Look up in locations (in case location is listed as object)
+      const location = (visualBible.locations || []).find(l =>
+        l.name.toLowerCase().trim() === objNameLower ||
+        l.name.toLowerCase().includes(objNameLower) ||
+        objNameLower.includes(l.name.toLowerCase())
+      );
+      if (location) {
+        const description = location.extractedDescription || location.description;
+        requiredObjects.push({ name: location.name, type: 'location', description });
+      }
+    }
+
+    if (requiredObjects.length > 0) {
+      // Build the required objects section with language-appropriate header
+      let header;
+      if (language === 'de') {
+        header = '**ERFORDERLICHE OBJEKTE IN DIESER SZENE (MÜSSEN im Bild erscheinen):**';
+      } else if (language === 'fr') {
+        header = '**OBJETS REQUIS DANS CETTE SCÈNE (DOIVENT apparaître dans l\'image):**';
+      } else {
+        header = '**REQUIRED OBJECTS IN THIS SCENE (MUST appear in the image):**';
+      }
+
+      requiredObjectsSection = `\n${header}\n`;
+      for (const obj of requiredObjects) {
+        requiredObjectsSection += `* **${obj.name}** (${obj.type}): ${obj.description}\n`;
+      }
+
+      log.debug(`[IMAGE PROMPT] Added ${requiredObjects.length} required objects from metadata: ${requiredObjects.map(o => o.name).join(', ')}`);
+    }
+  }
+
   // Select the correct template based on mode and language
   let template = null;
   let templateName = '';
@@ -1426,6 +1494,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       SCENE_DESCRIPTION: cleanSceneDescription,
       CHARACTER_REFERENCE_LIST: characterReferenceList,
       VISUAL_BIBLE: visualBibleSection,
+      REQUIRED_OBJECTS: requiredObjectsSection,
       AGE_FROM: inputData.ageFrom || 3,
       AGE_TO: inputData.ageTo || 8
     });
@@ -1436,6 +1505,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
 ${characterReferenceList}
 Scene Description: ${cleanSceneDescription}
+${requiredObjectsSection}
 ${visualBibleSection}
 Important:
 - Match characters to the reference photos provided

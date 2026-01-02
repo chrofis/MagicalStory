@@ -20,6 +20,8 @@ CLOTHING RULE: Characters wear the SAME clothes as the previous scene unless the
 
 **SCENE:** {SCENE_DESCRIPTION}
 
+{REQUIRED_OBJECTS}
+
 ---
 
 Show appropriate emotions. Clean, clear composition.

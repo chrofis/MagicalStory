@@ -20,6 +20,8 @@ KLEIDUNGSREGEL: Charaktere tragen DIESELBE Kleidung wie in der vorherigen Szene,
 
 **SZENE:** {SCENE_DESCRIPTION}
 
+{REQUIRED_OBJECTS}
+
 ---
 
 Zeige angemessene Emotionen. Klare, aufgeräumte Komposition.

@@ -15,6 +15,8 @@ ILLUSTRATION DE LIVRE POUR ENFANTS - Contenu sûr et familial.
 
 **SCÈNE:** {SCENE_DESCRIPTION}
 
+{REQUIRED_OBJECTS}
+
 ---
 
 Montrer des émotions appropriées. Composition claire et épurée. Pas de texte ni de filigranes.
