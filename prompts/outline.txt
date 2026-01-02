@@ -105,8 +105,8 @@ For objects that appear in multiple scenes and must look consistent:
 - **Type**: What kind of object
 - **Description**: Size, color, material, condition, distinctive markings
 
-## Recurring Locations
-For specific places that appear multiple times:
+## Locations
+Every scene must have a location. List all locations:
 - **Name**: What it's called (e.g., "Emma's house", "the town square", "the old bridge")
 - **Appears in pages**: List all page numbers
 - **Key visual features**: Be SPECIFIC about colors and distinctive details:
