@@ -53,9 +53,10 @@ export function StoryCategorySelector({
   // Translations
   const translations = {
     en: {
-      chooseStoryType: 'What kind of story?',
-      chooseTheme: 'Choose a theme',
-      chooseTopic: 'What should the story be about?',
+      storyType: 'Story Type',
+      theme: 'Theme',
+      topic: 'Topic',
+      setting: 'Setting',
       optionalTheme: 'Optional: Add an adventure theme',
       optionalThemeDesc: 'Make it a pirate, wizard, or other adventure story',
       noTheme: 'No theme (realistic)',
@@ -67,9 +68,10 @@ export function StoryCategorySelector({
       customThemeLabel: 'Your custom theme:',
     },
     de: {
-      chooseStoryType: 'Welche Art von Geschichte?',
-      chooseTheme: 'Wähle ein Thema',
-      chooseTopic: 'Worum soll es in der Geschichte gehen?',
+      storyType: 'Geschichte',
+      theme: 'Thema',
+      topic: 'Thema',
+      setting: 'Setting',
       optionalTheme: 'Optional: Abenteuer-Thema hinzufügen',
       optionalThemeDesc: 'Als Piraten-, Zauberer- oder andere Abenteuergeschichte',
       noTheme: 'Kein Thema (realistisch)',
@@ -81,9 +83,10 @@ export function StoryCategorySelector({
       customThemeLabel: 'Dein eigenes Thema:',
     },
     fr: {
-      chooseStoryType: 'Quel type d\'histoire?',
-      chooseTheme: 'Choisir un thème',
-      chooseTopic: 'De quoi doit parler l\'histoire?',
+      storyType: 'Histoire',
+      theme: 'Thème',
+      topic: 'Sujet',
+      setting: 'Cadre',
       optionalTheme: 'Optionnel: Ajouter un thème d\'aventure',
       optionalThemeDesc: 'En faire une histoire de pirate, sorcier, etc.',
       noTheme: 'Pas de thème (réaliste)',
@@ -91,8 +94,8 @@ export function StoryCategorySelector({
       selectedTopic: 'Sujet',
       selectedTheme: 'Thème',
       change: 'Changer',
-      customThemePlaceholder: 'Décrivez votre thème d\'aventure...',
-      customThemeLabel: 'Votre thème personnalisé:',
+      customThemePlaceholder: 'Décris ton thème d\'aventure...',
+      customThemeLabel: 'Ton thème personnalisé:',
     },
   };
   const t = translations[lang] || translations.en;
@@ -191,9 +194,9 @@ export function StoryCategorySelector({
   if (!storyCategory) {
     return (
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           <Sparkles className="text-indigo-600" size={24} />
-          {t.chooseStoryType}
+          {t.storyType}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -234,7 +237,10 @@ export function StoryCategorySelector({
           </button>
         </div>
 
-        <h2 className="text-2xl font-bold text-gray-800">{t.chooseTheme}</h2>
+        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+          <Sparkles className="text-indigo-600" size={24} />
+          {t.theme}
+        </h2>
 
         <div className="space-y-3">
           {adventureThemeGroups.map((group) => {
@@ -292,7 +298,10 @@ export function StoryCategorySelector({
           </button>
         </div>
 
-        <h2 className="text-2xl font-bold text-gray-800">{t.chooseTopic}</h2>
+        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+          <Sparkles className="text-indigo-600" size={24} />
+          {t.topic}
+        </h2>
 
         <div className="space-y-3">
           {lifeChallengeGroups.map((group) => {
@@ -352,7 +361,10 @@ export function StoryCategorySelector({
           </button>
         </div>
 
-        <h2 className="text-2xl font-bold text-gray-800">{t.chooseTopic}</h2>
+        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+          <Sparkles className="text-indigo-600" size={24} />
+          {t.topic}
+        </h2>
 
         <div className="space-y-3">
           {educationalGroups.map((group) => {
@@ -459,9 +471,9 @@ export function StoryCategorySelector({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+      <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
         <Sparkles className="text-indigo-600" size={24} />
-        {t.chooseStoryType}
+        {t.storyType}
       </h2>
 
       {/* Selection summary */}

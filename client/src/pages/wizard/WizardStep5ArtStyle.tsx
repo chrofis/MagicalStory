@@ -18,10 +18,10 @@ export function WizardStep5ArtStyle({
   const { language } = useLanguage();
 
   const title = language === 'de'
-    ? 'Wähle den Kunststil'
+    ? 'Kunststil'
     : language === 'fr'
-    ? 'Choisissez le style artistique'
-    : 'Choose Art Style';
+    ? 'Style artistique'
+    : 'Art Style';
 
   return (
     <div className="space-y-6">
