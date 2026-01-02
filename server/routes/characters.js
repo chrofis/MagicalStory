@@ -33,6 +33,8 @@ router.get('/', authenticateToken, async (req, res) => {
 
       if (rows.length > 0) {
         const data = JSON.parse(rows[0].data);
+        console.log(`[Characters] GET - Parsed data keys: ${Object.keys(data).join(', ')}`);
+        console.log(`[Characters] GET - Characters count in data: ${Array.isArray(data) ? data.length : (data.characters?.length || 0)}`);
         // Handle both old format (array) and new format (object)
         if (Array.isArray(data)) {
           characterData.characters = data;
@@ -42,6 +44,7 @@ router.get('/', authenticateToken, async (req, res) => {
             ...data
           };
         }
+        console.log(`[Characters] GET - Final characters count: ${characterData.characters.length}`);
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
