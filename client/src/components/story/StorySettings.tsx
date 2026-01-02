@@ -362,7 +362,7 @@ export function StorySettings({
                 ) : (
                   <>
                     <Sparkles size={18} />
-                    {language === 'de' ? 'Ideen generieren' : language === 'fr' ? 'Générer des idées' : 'Generate Ideas'}
+                    {language === 'de' ? 'Vorschlag generieren' : language === 'fr' ? 'Générer une suggestion' : 'Generate Suggestion'}
                   </>
                 )}
               </button>
@@ -391,10 +391,10 @@ export function StorySettings({
           />
           <p className="text-sm text-gray-500 mt-2">
             {language === 'de'
-              ? 'Beschreiben Sie die Handlung oder klicken Sie auf "Ideen generieren"'
+              ? 'Beschreiben Sie die Handlung oder klicken Sie auf "Vorschlag generieren"'
               : language === 'fr'
-              ? 'Décrivez l\'intrigue ou cliquez sur "Générer des idées"'
-              : 'Describe the plot or click "Generate Ideas"'}
+              ? 'Décrivez l\'intrigue ou cliquez sur "Générer une suggestion"'
+              : 'Describe the plot or click "Generate Suggestion"'}
           </p>
         </div>
 

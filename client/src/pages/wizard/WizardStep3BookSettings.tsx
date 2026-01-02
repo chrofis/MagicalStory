@@ -93,35 +93,34 @@ export function WizardStep3BookSettings({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-        <BookOpen size={24} />
-        {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : 'Book Format'}
-      </h2>
+      {/* Header with Story Language Selection on the right */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+          <BookOpen size={24} />
+          {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : 'Book Format'}
+        </h2>
 
-      {/* Story Language Selection - Dropdown */}
-      <div>
-        <label className="block text-xl font-semibold mb-3 flex items-center gap-2">
-          <Globe size={20} />
-          {language === 'de' ? 'Sprache der Geschichte' : language === 'fr' ? 'Langue de l\'histoire' : 'Story Language'}
-        </label>
-        <div className="relative inline-block w-full max-w-xs">
-          <select
-            value={storyLanguage}
-            onChange={(e) => onStoryLanguageChange(e.target.value as StoryLanguageCode)}
-            className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base font-medium appearance-none bg-white cursor-pointer pr-10"
-          >
-            {STORY_LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.flag} {lang.name}
-              </option>
-            ))}
-          </select>
-          {/* Custom dropdown arrow */}
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+        {/* Story Language Selection - Dropdown on the right */}
+        <div className="flex items-center gap-2">
+          <Globe size={20} className="text-gray-600" />
+          <div className="relative">
+            <select
+              value={storyLanguage}
+              onChange={(e) => onStoryLanguageChange(e.target.value as StoryLanguageCode)}
+              className="px-4 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base font-medium appearance-none bg-white cursor-pointer pr-10"
+            >
+              {STORY_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.name}
+                </option>
+              ))}
+            </select>
+            {/* Custom dropdown arrow */}
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
           </div>
         </div>
       </div>

@@ -135,7 +135,7 @@ export function WizardStep6Summary({
       : language === 'fr'
       ? 'Ce texte sera imprimé sur la page d\'introduction de votre livre.'
       : 'This text will be printed on the initial page of your book.',
-    generateIdeas: language === 'de' ? 'Ideen generieren' : language === 'fr' ? 'Générer des idées' : 'Generate Ideas',
+    generateIdeas: language === 'de' ? 'Vorschlag generieren' : language === 'fr' ? 'Générer une suggestion' : 'Generate Suggestion',
     generating: language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Generating...',
     storyType: language === 'de' ? 'Geschichte' : language === 'fr' ? 'Histoire' : 'Story',
     artStyleLabel: language === 'de' ? 'Kunststil' : language === 'fr' ? 'Style' : 'Art Style',
