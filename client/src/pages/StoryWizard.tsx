@@ -781,19 +781,29 @@ export default function StoryWizard() {
     }
   }, [step]);
 
-  // Auto-advance from step 3 (Story Type) when selection is complete
-  useEffect(() => {
-    if (step === 3) {
-      // Check if story type selection is complete
-      const isComplete = storyCategory !== '' && (
-        (storyCategory === 'adventure' && storyTheme !== '') ||
-        ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic !== '')
-      );
-      if (isComplete) {
-        safeSetStep(4);
-      }
+  // Handler for story category change - doesn't auto-advance, user must select theme/topic
+  const handleCategoryChange = (category: 'adventure' | 'life-challenge' | 'educational' | '') => {
+    setStoryCategory(category);
+    // Don't auto-advance - user needs to select theme/topic next
+  };
+
+  // Handler for story theme change (for adventure category) - auto-advances when clicked
+  const handleThemeChange = (theme: string) => {
+    setStoryTheme(theme);
+    // Auto-advance to art style step when user clicks a theme
+    if (storyCategory === 'adventure' && theme !== '') {
+      safeSetStep(4);
     }
-  }, [step, storyCategory, storyTheme, storyTopic]);
+  };
+
+  // Handler for story topic change (for life-challenge/educational) - auto-advances when clicked
+  const handleTopicChange = (topic: string) => {
+    setStoryTopic(topic);
+    // Auto-advance to art style step when user clicks a topic
+    if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && topic !== '') {
+      safeSetStep(4);
+    }
+  };
 
   // Handler for art style selection - sets style and auto-advances
   const handleArtStyleSelect = (style: string) => {
@@ -2042,9 +2052,9 @@ export default function StoryWizard() {
             storyTopic={storyTopic}
             storyTheme={storyTheme}
             customThemeText={customThemeText}
-            onCategoryChange={setStoryCategory}
-            onTopicChange={setStoryTopic}
-            onThemeChange={setStoryTheme}
+            onCategoryChange={handleCategoryChange}
+            onTopicChange={handleTopicChange}
+            onThemeChange={handleThemeChange}
             onCustomThemeTextChange={setCustomThemeText}
             onLegacyStoryTypeChange={setStoryType}
           />
