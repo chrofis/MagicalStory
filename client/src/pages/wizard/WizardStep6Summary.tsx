@@ -143,7 +143,7 @@ export function WizardStep6Summary({
     generating: language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Generating...',
     storyType: language === 'de' ? 'Geschichte' : language === 'fr' ? 'Histoire' : 'Story',
     artStyleLabel: language === 'de' ? 'Kunststil' : language === 'fr' ? 'Style' : 'Art Style',
-    languageLabel: language === 'de' ? 'Sprache' : language === 'fr' ? 'Langue' : 'Language',
+    languageLabel: language === 'de' ? 'Sprachvariante' : language === 'fr' ? 'Variante de langue' : 'Language Variant',
     mainChars: language === 'de' ? 'Hauptfiguren' : language === 'fr' ? 'Personnages principaux' : 'Main characters',
     supportingChars: language === 'de' ? 'Nebenfiguren' : language === 'fr' ? 'Personnages secondaires' : 'Also in story',
     level: language === 'de' ? 'Lesestufe' : language === 'fr' ? 'Niveau' : 'Level',
