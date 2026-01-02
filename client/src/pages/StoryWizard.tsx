@@ -304,6 +304,8 @@ export default function StoryWizard() {
                 animals: story.visualBible.animals || [],
                 artifacts: story.visualBible.artifacts || [],
                 locations: story.visualBible.locations || [],
+                vehicles: story.visualBible.vehicles || [],
+                clothing: story.visualBible.clothing || [],
                 changeLog: story.visualBible.changeLog || []
               });
             } else {
@@ -1832,6 +1834,8 @@ export default function StoryWizard() {
               animals: status.result.visualBible.animals || [],
               artifacts: status.result.visualBible.artifacts || [],
               locations: status.result.visualBible.locations || [],
+              vehicles: status.result.visualBible.vehicles || [],
+              clothing: status.result.visualBible.clothing || [],
               changeLog: status.result.visualBible.changeLog || []
             });
           } else {
