@@ -152,6 +152,27 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
     return new Map();
   }
 
+  // Pre-populate cache with any existing styled avatars from character data
+  // This avoids regenerating avatars that were created in previous story generations
+  let preloadedCount = 0;
+  for (const char of characters) {
+    const existingStyled = char.avatars?.styledAvatars?.[artStyle];
+    if (existingStyled) {
+      for (const [clothingCategory, styledAvatar] of Object.entries(existingStyled)) {
+        if (styledAvatar && styledAvatar.startsWith('data:image')) {
+          const cacheKey = getAvatarCacheKey(char.name, clothingCategory, artStyle);
+          if (!styledAvatarCache.has(cacheKey)) {
+            styledAvatarCache.set(cacheKey, styledAvatar);
+            preloadedCount++;
+          }
+        }
+      }
+    }
+  }
+  if (preloadedCount > 0) {
+    log.debug(`♻️ [STYLED AVATARS] Preloaded ${preloadedCount} existing ${artStyle} avatars from character data`);
+  }
+
   // Collect all unique character + clothing combinations needed
   const neededAvatars = new Map(); // key -> { characterName, clothingCategory, originalAvatar }
 
