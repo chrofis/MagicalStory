@@ -587,6 +587,7 @@ function getVisualBibleEntriesForPage(visualBible, pageNumber) {
   checkEntries(visualBible.animals || [], 'animal');
   checkEntries(visualBible.artifacts || [], 'artifact');
   checkEntries(visualBible.locations || [], 'location');
+  checkEntries(visualBible.vehicles || [], 'vehicle');
   checkEntries(visualBible.clothing || [], 'clothing');
 
   return relevant;
@@ -614,6 +615,7 @@ function getElementsNeedingAnalysis(visualBible, pageNumber) {
   checkEntries(visualBible.animals || [], 'animal');
   checkEntries(visualBible.artifacts || [], 'artifact');
   checkEntries(visualBible.locations || [], 'location');
+  checkEntries(visualBible.vehicles || [], 'vehicle');
   checkEntries(visualBible.clothing || [], 'clothing');
 
   return needsAnalysis;
@@ -646,11 +648,14 @@ function buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames = n
   for (const entry of visualBible.locations || []) {
     allEntries.push({ ...entry, type: 'location' });
   }
+  for (const entry of visualBible.vehicles || []) {
+    allEntries.push({ ...entry, type: 'vehicle' });
+  }
   for (const entry of visualBible.clothing || []) {
     allEntries.push({ ...entry, type: 'clothing' });
   }
 
-  log.debug(`[VISUAL BIBLE PROMPT] Total entries: ${allEntries.length} (${allEntries.map(e => e.name).join(', ') || 'none'})`);
+  log.debug(`[VISUAL BIBLE PROMPT] Total entries: ${allEntries.length} (${allEntries.map(e => `${e.name}${e.id ? ` [${e.id}]` : ''}`).join(', ') || 'none'})`);
 
   // If no entries, return empty
   if (allEntries.length === 0) {
@@ -675,10 +680,11 @@ These elements are NOT required - only include them if they naturally fit the im
 
   let prompt = `\n${introText}\n\n`;
 
-  // Add all recurring elements
+  // Add all recurring elements with IDs for robust matching
   for (const entry of allEntries) {
     const description = entry.extractedDescription || entry.description;
-    prompt += `**${entry.name}** (${entry.type}): ${description}\n`;
+    const idLabel = entry.id ? ` [${entry.id}]` : '';
+    prompt += `**${entry.name}**${idLabel} (${entry.type}): ${description}\n`;
   }
 
   return prompt;
@@ -887,6 +893,13 @@ function formatVisualBibleForStoryText(visualBible) {
 
   const sections = [];
 
+  // Helper to format entry with ID
+  const formatEntry = (entry, extraInfo = '') => {
+    const idLabel = entry.id ? ` [${entry.id}]` : '';
+    const pages = entry.pages?.join(', ') || entry.appearsInPages?.join(', ') || 'multiple';
+    return `- ${entry.name}${idLabel}${extraInfo} (pages ${pages}): ${entry.description}`;
+  };
+
   // Main characters (just names, full details in base prompt)
   if (visualBible.mainCharacters?.length > 0) {
     const names = visualBible.mainCharacters.map(c => c.name).join(', ');
@@ -897,7 +910,7 @@ function formatVisualBibleForStoryText(visualBible) {
   if (visualBible.secondaryCharacters?.length > 0) {
     sections.push('Secondary Characters:');
     for (const char of visualBible.secondaryCharacters) {
-      sections.push(`- ${char.name} (pages ${char.pages?.join(', ') || 'multiple'}): ${char.description}`);
+      sections.push(formatEntry(char));
     }
   }
 
@@ -905,7 +918,7 @@ function formatVisualBibleForStoryText(visualBible) {
   if (visualBible.animals?.length > 0) {
     sections.push('Animals:');
     for (const animal of visualBible.animals) {
-      sections.push(`- ${animal.name} (pages ${animal.pages?.join(', ') || 'multiple'}): ${animal.description}`);
+      sections.push(formatEntry(animal));
     }
   }
 
@@ -913,7 +926,7 @@ function formatVisualBibleForStoryText(visualBible) {
   if (visualBible.artifacts?.length > 0) {
     sections.push('Artifacts:');
     for (const artifact of visualBible.artifacts) {
-      sections.push(`- ${artifact.name} (pages ${artifact.pages?.join(', ') || 'multiple'}): ${artifact.description}`);
+      sections.push(formatEntry(artifact));
     }
   }
 
@@ -921,7 +934,15 @@ function formatVisualBibleForStoryText(visualBible) {
   if (visualBible.locations?.length > 0) {
     sections.push('Locations:');
     for (const loc of visualBible.locations) {
-      sections.push(`- ${loc.name} (pages ${loc.pages?.join(', ') || 'multiple'}): ${loc.description}`);
+      sections.push(formatEntry(loc));
+    }
+  }
+
+  // Vehicles
+  if (visualBible.vehicles?.length > 0) {
+    sections.push('Vehicles:');
+    for (const veh of visualBible.vehicles) {
+      sections.push(formatEntry(veh));
     }
   }
 
@@ -930,7 +951,7 @@ function formatVisualBibleForStoryText(visualBible) {
     sections.push('Clothing & Costumes:');
     for (const item of visualBible.clothing) {
       const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
-      sections.push(`- ${item.name}${wornBy} (pages ${item.pages?.join(', ') || 'multiple'}): ${item.description}`);
+      sections.push(formatEntry(item, wornBy));
     }
   }
 
@@ -943,7 +964,8 @@ function formatVisualBibleForStoryText(visualBible) {
 
 /**
  * Parse new Visual Bible entries from story text output.
- * Looks for ---NEW VISUAL BIBLE ENTRIES--- section at the beginning.
+ * Looks for ---NEW VISUAL BIBLE ENTRIES--- section.
+ * Supports JSON format (preferred) and legacy markdown format.
  */
 function parseNewVisualBibleEntries(text) {
   const newEntries = {
@@ -951,6 +973,7 @@ function parseNewVisualBibleEntries(text) {
     animals: [],
     artifacts: [],
     locations: [],
+    vehicles: [],
     clothing: []
   };
 
@@ -969,9 +992,138 @@ function parseNewVisualBibleEntries(text) {
     return newEntries;
   }
 
+  // Try JSON format first (preferred)
+  const jsonResult = tryParseNewEntriesJSON(section);
+  if (jsonResult) {
+    log.debug('[VISUAL BIBLE] Parsed new entries from JSON format');
+    return jsonResult;
+  }
+
+  // Fall back to legacy markdown parsing
+  log.debug('[VISUAL BIBLE] JSON not found, falling back to markdown parsing');
+  return parseNewEntriesMarkdown(section);
+}
+
+/**
+ * Try to parse new Visual Bible entries from JSON code block
+ */
+function tryParseNewEntriesJSON(section) {
+  const jsonMatch = section.match(/```json\s*([\s\S]*?)\s*```/);
+  if (!jsonMatch) return null;
+
+  try {
+    const jsonData = JSON.parse(jsonMatch[1]);
+    log.debug('[VISUAL BIBLE] Parsed new entries JSON successfully');
+
+    const newEntries = {
+      secondaryCharacters: [],
+      animals: [],
+      artifacts: [],
+      locations: [],
+      vehicles: [],
+      clothing: []
+    };
+
+    let idCounter = { CHR: 0, ANI: 0, ART: 0, LOC: 0, VEH: 0, CLO: 0 };
+
+    // Parse each category from JSON
+    if (jsonData.secondaryCharacters && Array.isArray(jsonData.secondaryCharacters)) {
+      newEntries.secondaryCharacters = jsonData.secondaryCharacters.map(char => ({
+        id: char.id || generateId('CHR', idCounter.CHR++),
+        name: char.name,
+        description: buildCharacterDescription(char),
+        pages: char.pages || [],
+        source: 'story_text'
+      }));
+    }
+
+    if (jsonData.animals && Array.isArray(jsonData.animals)) {
+      newEntries.animals = jsonData.animals.map(animal => ({
+        id: animal.id || generateId('ANI', idCounter.ANI++),
+        name: animal.name,
+        description: buildAnimalDescription(animal),
+        pages: animal.pages || [],
+        source: 'story_text'
+      }));
+    }
+
+    if (jsonData.artifacts && Array.isArray(jsonData.artifacts)) {
+      newEntries.artifacts = jsonData.artifacts.map(artifact => ({
+        id: artifact.id || generateId('ART', idCounter.ART++),
+        name: artifact.name,
+        description: artifact.description || `${artifact.type}: ${artifact.description}`,
+        type: artifact.type,
+        pages: artifact.pages || [],
+        source: 'story_text'
+      }));
+    }
+
+    if (jsonData.locations && Array.isArray(jsonData.locations)) {
+      newEntries.locations = jsonData.locations.map(loc => ({
+        id: loc.id || generateId('LOC', idCounter.LOC++),
+        name: loc.name,
+        description: buildLocationDescription(loc),
+        setting: loc.setting,
+        signatureElement: loc.signatureElement,
+        pages: loc.pages || [],
+        source: 'story_text'
+      }));
+    }
+
+    if (jsonData.vehicles && Array.isArray(jsonData.vehicles)) {
+      newEntries.vehicles = jsonData.vehicles.map(veh => ({
+        id: veh.id || generateId('VEH', idCounter.VEH++),
+        name: veh.name,
+        description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
+        signatureElement: veh.signatureElement,
+        pages: veh.pages || [],
+        source: 'story_text'
+      }));
+    }
+
+    if (jsonData.clothing && Array.isArray(jsonData.clothing)) {
+      newEntries.clothing = jsonData.clothing.map(item => ({
+        id: item.id || generateId('CLO', idCounter.CLO++),
+        name: item.name,
+        description: `${item.description}. ${item.howWorn || ''}`.trim(),
+        wornBy: item.wornBy,
+        howWorn: item.howWorn,
+        type: 'clothing',
+        pages: item.pages || [],
+        source: 'story_text'
+      }));
+    }
+
+    const totalNew = newEntries.secondaryCharacters.length + newEntries.animals.length +
+                     newEntries.artifacts.length + newEntries.locations.length +
+                     newEntries.vehicles.length + newEntries.clothing.length;
+    log.debug(`[VISUAL BIBLE] Parsed ${totalNew} new entries from JSON`);
+
+    return newEntries;
+
+  } catch (err) {
+    log.warn(`[VISUAL BIBLE] Failed to parse new entries JSON: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Legacy markdown parsing for new Visual Bible entries
+ */
+function parseNewEntriesMarkdown(section) {
+  const newEntries = {
+    secondaryCharacters: [],
+    animals: [],
+    artifacts: [],
+    locations: [],
+    vehicles: [],
+    clothing: []
+  };
+
+  let idCounter = { CHR: 0, ANI: 0, ART: 0, LOC: 0, VEH: 0, CLO: 0 };
+
   // Helper to parse pages from "(pages X, Y, Z)" or "(page X)" or German "(Seite X)" format
   const parsePages = (text) => {
-    // Support English (page/pages) and German (Seite/Seiten)
     const pagesMatch = text.match(/\((?:pages?|Seiten?)\s+([\d,\s]+)\)/i);
     if (pagesMatch) {
       return pagesMatch[1].split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
@@ -979,8 +1131,7 @@ function parseNewVisualBibleEntries(text) {
     return [];
   };
 
-  // Helper to parse markdown entry: **Name** (pages X, Y, Z)\n- Field: value\n- Field: value
-  // Supports English and German page markers
+  // Helper to parse markdown entry
   const parseMarkdownEntry = (entryText) => {
     const nameMatch = entryText.match(/\*\*(.+?)\*\*\s*\((?:pages?|Seiten?)\s+[\d,\s]+\)/i);
     if (!nameMatch) return null;
@@ -988,8 +1139,6 @@ function parseNewVisualBibleEntries(text) {
     const name = nameMatch[0];
     const cleanName = nameMatch[1].trim();
     const pages = parsePages(name);
-
-    // Get all the details after the name line
     const detailsStart = entryText.indexOf(nameMatch[0]) + nameMatch[0].length;
     const details = entryText.substring(detailsStart);
 
@@ -1201,63 +1350,82 @@ function parseNewVisualBibleEntries(text) {
 
 /**
  * Merge new Visual Bible entries into existing Visual Bible.
- * Avoids duplicates by name (case-insensitive).
+ * Avoids duplicates by name or ID (case-insensitive).
  */
 function mergeNewVisualBibleEntries(visualBible, newEntries) {
   if (!visualBible || !newEntries) return visualBible;
 
-  const existingNames = new Set();
+  // Ensure vehicles array exists
+  if (!visualBible.vehicles) visualBible.vehicles = [];
 
-  // Collect all existing names (case-insensitive)
-  for (const arr of [visualBible.secondaryCharacters, visualBible.animals, visualBible.artifacts, visualBible.locations, visualBible.clothing]) {
+  const existingNamesAndIds = new Set();
+
+  // Collect all existing names and IDs (case-insensitive)
+  for (const arr of [visualBible.secondaryCharacters, visualBible.animals, visualBible.artifacts, visualBible.locations, visualBible.vehicles, visualBible.clothing]) {
     for (const entry of arr || []) {
-      existingNames.add(entry.name.toLowerCase());
+      if (entry.name) existingNamesAndIds.add(entry.name.toLowerCase());
+      if (entry.id) existingNamesAndIds.add(entry.id.toLowerCase());
     }
   }
   // Also exclude main character names
   for (const char of visualBible.mainCharacters || []) {
-    existingNames.add(char.name.toLowerCase());
+    if (char.name) existingNamesAndIds.add(char.name.toLowerCase());
   }
 
   let addedCount = 0;
 
+  // Helper to check if entry already exists
+  const alreadyExists = (entry) => {
+    if (entry.name && existingNamesAndIds.has(entry.name.toLowerCase())) return true;
+    if (entry.id && existingNamesAndIds.has(entry.id.toLowerCase())) return true;
+    return false;
+  };
+
   // Merge each category
   for (const char of newEntries.secondaryCharacters || []) {
-    if (!existingNames.has(char.name.toLowerCase())) {
+    if (!alreadyExists(char)) {
       visualBible.secondaryCharacters.push(char);
-      addVisualBibleChangeLog(visualBible, `Added secondary character from story text: ${char.name}`);
+      addVisualBibleChangeLog(visualBible, `Added secondary character: ${char.name} [${char.id || 'no-id'}]`);
       addedCount++;
     }
   }
 
   for (const animal of newEntries.animals || []) {
-    if (!existingNames.has(animal.name.toLowerCase())) {
+    if (!alreadyExists(animal)) {
       visualBible.animals.push(animal);
-      addVisualBibleChangeLog(visualBible, `Added animal from story text: ${animal.name}`);
+      addVisualBibleChangeLog(visualBible, `Added animal: ${animal.name} [${animal.id || 'no-id'}]`);
       addedCount++;
     }
   }
 
   for (const artifact of newEntries.artifacts || []) {
-    if (!existingNames.has(artifact.name.toLowerCase())) {
+    if (!alreadyExists(artifact)) {
       visualBible.artifacts.push(artifact);
-      addVisualBibleChangeLog(visualBible, `Added artifact from story text: ${artifact.name}`);
+      addVisualBibleChangeLog(visualBible, `Added artifact: ${artifact.name} [${artifact.id || 'no-id'}]`);
       addedCount++;
     }
   }
 
   for (const loc of newEntries.locations || []) {
-    if (!existingNames.has(loc.name.toLowerCase())) {
+    if (!alreadyExists(loc)) {
       visualBible.locations.push(loc);
-      addVisualBibleChangeLog(visualBible, `Added location from story text: ${loc.name}`);
+      addVisualBibleChangeLog(visualBible, `Added location: ${loc.name} [${loc.id || 'no-id'}]`);
+      addedCount++;
+    }
+  }
+
+  for (const veh of newEntries.vehicles || []) {
+    if (!alreadyExists(veh)) {
+      visualBible.vehicles.push(veh);
+      addVisualBibleChangeLog(visualBible, `Added vehicle: ${veh.name} [${veh.id || 'no-id'}]`);
       addedCount++;
     }
   }
 
   for (const item of newEntries.clothing || []) {
-    if (!existingNames.has(item.name.toLowerCase())) {
+    if (!alreadyExists(item)) {
       visualBible.clothing.push(item);
-      addVisualBibleChangeLog(visualBible, `Added clothing from story text: ${item.name} (worn by ${item.wornBy || 'unknown'})`);
+      addVisualBibleChangeLog(visualBible, `Added clothing: ${item.name} [${item.id || 'no-id'}] (worn by ${item.wornBy || 'unknown'})`);
       addedCount++;
     }
   }

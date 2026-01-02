@@ -1401,59 +1401,67 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
   // Build required objects section from metadata.objects by looking up in Visual Bible
   // This ensures objects listed in scene metadata are included with their full descriptions
+  // Supports lookup by name OR identifier (e.g., "CLO001", "ART002", etc.)
   let requiredObjectsSection = '';
   if (metadata && metadata.objects && metadata.objects.length > 0 && visualBible) {
     const requiredObjects = [];
 
-    for (const objName of metadata.objects) {
-      const objNameLower = objName.toLowerCase().trim();
+    // Helper function to match by name OR ID
+    const matchesEntry = (entry, searchTerm) => {
+      const searchLower = searchTerm.toLowerCase().trim();
+      const nameLower = (entry.name || '').toLowerCase().trim();
+      const idLower = (entry.id || '').toLowerCase().trim();
 
+      // Match by ID (exact match, e.g., "CLO001")
+      if (idLower && idLower === searchLower) return true;
+
+      // Match by name (exact, contains, or contained)
+      if (nameLower === searchLower) return true;
+      if (nameLower.includes(searchLower)) return true;
+      if (searchLower.includes(nameLower) && nameLower.length > 3) return true;
+
+      return false;
+    };
+
+    for (const objName of metadata.objects) {
       // Look up in artifacts
-      const artifact = (visualBible.artifacts || []).find(a =>
-        a.name.toLowerCase().trim() === objNameLower ||
-        a.name.toLowerCase().includes(objNameLower) ||
-        objNameLower.includes(a.name.toLowerCase())
-      );
+      const artifact = (visualBible.artifacts || []).find(a => matchesEntry(a, objName));
       if (artifact) {
         const description = artifact.extractedDescription || artifact.description;
-        requiredObjects.push({ name: artifact.name, type: 'object', description });
+        requiredObjects.push({ name: artifact.name, id: artifact.id, type: 'object', description });
         continue;
       }
 
       // Look up in animals
-      const animal = (visualBible.animals || []).find(a =>
-        a.name.toLowerCase().trim() === objNameLower ||
-        a.name.toLowerCase().includes(objNameLower) ||
-        objNameLower.includes(a.name.toLowerCase())
-      );
+      const animal = (visualBible.animals || []).find(a => matchesEntry(a, objName));
       if (animal) {
         const description = animal.extractedDescription || animal.description;
-        requiredObjects.push({ name: animal.name, type: 'animal', description });
+        requiredObjects.push({ name: animal.name, id: animal.id, type: 'animal', description });
         continue;
       }
 
-      // Look up in locations (in case location is listed as object)
-      const location = (visualBible.locations || []).find(l =>
-        l.name.toLowerCase().trim() === objNameLower ||
-        l.name.toLowerCase().includes(objNameLower) ||
-        objNameLower.includes(l.name.toLowerCase())
-      );
+      // Look up in locations
+      const location = (visualBible.locations || []).find(l => matchesEntry(l, objName));
       if (location) {
         const description = location.extractedDescription || location.description;
-        requiredObjects.push({ name: location.name, type: 'location', description });
+        requiredObjects.push({ name: location.name, id: location.id, type: 'location', description });
+        continue;
+      }
+
+      // Look up in vehicles
+      const vehicle = (visualBible.vehicles || []).find(v => matchesEntry(v, objName));
+      if (vehicle) {
+        const description = vehicle.extractedDescription || vehicle.description;
+        requiredObjects.push({ name: vehicle.name, id: vehicle.id, type: 'vehicle', description });
         continue;
       }
 
       // Look up in clothing/costumes
-      const clothing = (visualBible.clothing || []).find(c =>
-        c.name.toLowerCase().trim() === objNameLower ||
-        c.name.toLowerCase().includes(objNameLower) ||
-        objNameLower.includes(c.name.toLowerCase())
-      );
+      const clothing = (visualBible.clothing || []).find(c => matchesEntry(c, objName));
       if (clothing) {
         const description = clothing.extractedDescription || clothing.description;
         const wornBy = clothing.wornBy ? ` (worn by ${clothing.wornBy})` : '';
-        requiredObjects.push({ name: clothing.name, type: 'clothing', description: description + wornBy });
+        requiredObjects.push({ name: clothing.name, id: clothing.id, type: 'clothing', description: description + wornBy });
       }
     }
 
@@ -1470,10 +1478,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
       requiredObjectsSection = `\n${header}\n`;
       for (const obj of requiredObjects) {
-        requiredObjectsSection += `* **${obj.name}** (${obj.type}): ${obj.description}\n`;
+        const idLabel = obj.id ? ` [${obj.id}]` : '';
+        requiredObjectsSection += `* **${obj.name}**${idLabel} (${obj.type}): ${obj.description}\n`;
       }
 
-      log.debug(`[IMAGE PROMPT] Added ${requiredObjects.length} required objects from metadata: ${requiredObjects.map(o => o.name).join(', ')}`);
+      log.debug(`[IMAGE PROMPT] Added ${requiredObjects.length} required objects from metadata: ${requiredObjects.map(o => `${o.name}${o.id ? ` [${o.id}]` : ''}`).join(', ')}`);
     }
   }
 
