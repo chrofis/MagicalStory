@@ -87,68 +87,102 @@ The output MUST follow this EXACT format or the system will fail:
 
 Your response MUST have two sections in this exact order:
 
-## Section 1: Visual Bible Entries
+## Section 1: Visual Bible Entries (JSON Format)
 
 **CRITICAL: Your response MUST start with this section. Do NOT skip it.**
 
-Start with `---NEW VISUAL BIBLE ENTRIES---`
+Start with `---NEW VISUAL BIBLE ENTRIES---` then output a JSON code block.
 
-Add at least 5 entries. Scan the outline and ADD:
-- **ALL LOCATIONS** - Every distinct place in the story (rooms, outdoor areas, buildings, etc.)
-- **ALL OBJECTS** - Every important item (toys, tools, magical items, furniture, vehicles, food, etc.) - NOT clothing!
+Scan these pages and ADD all new visual elements. Use unique identifiers:
+- Secondary Characters: CHR001, CHR002...
+- Animals & Creatures: ANI001, ANI002...
+- Artifacts (Objects): ART001, ART002...
+- Locations: LOC001, LOC002...
+- Vehicles: VEH001, VEH002...
+- Clothing & Costumes: CLO001, CLO002...
+
+**What to include:**
+- **ALL LOCATIONS** - Every distinct place (rooms, outdoor areas, buildings)
+- **ALL OBJECTS** - Important items (toys, tools, magical items, furniture, food)
+- **ALL VEHICLES** - Cars, bicycles, boats, etc.
 - **ALL ANIMALS/PETS** - Any animals that appear
 - **ALL SECONDARY CHARACTERS** - Anyone who is not a main character
-- **ALL SPECIAL CLOTHING/COSTUMES** - ⚠️ SEPARATE SECTION! Capes, costumes, hats, uniforms, masks that characters wear. MUST include character name (e.g., "Lukas' Superhelden-Umhang")
+- **ALL CLOTHING/COSTUMES** - Capes, costumes, hats, uniforms, masks (MUST include character name!)
 
-Even if an element appears only once, add it to ensure visual consistency.
-Do NOT write "None" - find at least 5 elements to add.
+Add at least 5 entries. Even if an element appears only once, add it for visual consistency.
 
-### Secondary Characters
-For each person NOT a main character:
-**[Name/Role]** (pages X, Y, Z)
-- Visual: [apparent age], [build: short/average/tall, slim/stocky/muscular], [hair: color, style, length], [face: eye color, skin tone, 1-2 distinctive features]
-- Signature Look: [ONE memorable visual element for instant recognition, e.g., "bright red bandana", "gold tooth", "curved wooden cane"]
-- Clothing: [specific colors and details - be consistent]
+**Output format:**
 
-**Apparent age categories:** infant/baby (0-1) | toddler (1-2) | preschooler (3-4) | kindergartner (5-6) | young school-age child (7-8) | school-age child (9-10) | preteen (11-12) | young teen (13-14) | teenager (15-17) | young adult (18-25) | adult (26-39) | middle-aged (40-59) | senior (60-75) | elderly (75+)
+---NEW VISUAL BIBLE ENTRIES---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Fireman Fred",
+      "pages": [2, 5],
+      "age": "adult",
+      "build": "tall, muscular",
+      "hair": "short black hair",
+      "face": "brown eyes, warm smile",
+      "signatureLook": "bright red helmet",
+      "clothing": "yellow jacket with reflective stripes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Whiskers",
+      "pages": [1, 3, 6],
+      "species": "cat",
+      "coloring": "white with orange patches on ears",
+      "size": "small house cat",
+      "features": "blue collar with bell"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "name": "the magic map",
+      "pages": [2, 4],
+      "type": "ancient parchment",
+      "description": "yellowed paper with gold edges, glowing blue lines"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Emma's bedroom",
+      "pages": [1, 10],
+      "setting": "indoor, child's bedroom",
+      "colors": "pale pink walls, white furniture",
+      "features": "canopy bed with fairy lights",
+      "signatureElement": "large teddy bear on bed"
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "VEH001",
+      "name": "Dad's car",
+      "pages": [1, 5],
+      "colorAndDetails": "forest green station wagon, slightly rusty",
+      "signatureElement": "surfboard on roof rack"
+    }
+  ],
+  "clothing": [
+    {
+      "id": "CLO001",
+      "name": "Max's superhero cape",
+      "pages": [3, 4, 5],
+      "wornBy": "Max",
+      "description": "red blanket with yellow star sewn on",
+      "howWorn": "tied around shoulders over regular clothes"
+    }
+  ]
+}
+```
 
-**RULES for Secondary Characters:**
-- Use standalone terms for build/size - NO comparisons to other characters
-- Use apparent age categories above - you may add specific ages for clarity (e.g., "teenager, around 16")
-- Signature Look must be visually striking and easy to reproduce
-
-### Animals & Creatures
-**[Name]** (pages X, Y, Z)
-- Species: [type of animal/creature]
-- Coloring: [exact colors and patterns, e.g., "white fur with orange patches on both ears"]
-- Size: [relative size description]
-- Features: [collar, markings, accessories, distinguishing details]
-
-### Artifacts (Objects)
-**[Name]** (pages X, Y, Z)
-- Type: [what kind of object]
-- Description: [size, color, material, condition, distinctive markings]
-
-**NOTE:** Do NOT put clothing/costumes here - use the Clothing & Costumes section below!
-
-### Locations
-**[Name]** (pages X, Y, Z)
-- Setting: [indoor/outdoor, type of place]
-- Features: [colors, shapes, distinctive visual elements that make it recognizable]
-
-### Clothing & Costumes
-For ANY special clothing, costumes, capes, hats, uniforms worn by characters:
-**[Item Name + Character Name]** (pages X, Y, Z)
-- Worn by: [character name - REQUIRED to avoid mix-ups]
-- Description: [colors, materials, distinctive features]
-- How worn: [how the character wears it, e.g., "tied around shoulders", "on head"]
-
-**Examples:**
-- "Max's superhero cape" - Worn by: Max - Description: red blanket with yellow star
-- "Emma's princess crown" - Worn by: Emma - Description: golden plastic crown with pink gems
-- "Dad's chef hat" - Worn by: Dad - Description: tall white chef's toque
-
-**IMPORTANT:** ALWAYS create this section if ANY character wears special clothing (capes, costumes, hats, uniforms, masks, etc.). Include the character's name in the item name to prevent mix-ups between characters.
+**IMPORTANT:** Use empty arrays `[]` for categories with no new elements. Always include `wornBy` for clothing items to avoid mix-ups between characters.
 
 ## Section 2: Story Text
 

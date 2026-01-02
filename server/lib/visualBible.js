@@ -17,8 +17,11 @@ const { MODEL_DEFAULTS } = require('./textModels');
 
 /**
  * Parse Visual Bible from story outline
- * Extracts: secondaryCharacters, animals, artifacts, locations
- * Also initializes empty mainCharacters array and changeLog
+ * Supports two formats:
+ * 1. JSON format (preferred) - enclosed in ```json code block
+ * 2. Legacy markdown format - uses regex parsing
+ *
+ * Each item has a unique identifier (CHR001, ANI001, ART001, LOC001, VEH001, CLO001)
  */
 function parseVisualBible(outline) {
   const visualBible = {
@@ -27,169 +30,334 @@ function parseVisualBible(outline) {
     animals: [],             // Parsed from outline
     artifacts: [],           // Parsed from outline
     locations: [],           // Parsed from outline
+    vehicles: [],            // Parsed from outline
     clothing: [],            // Parsed from outline - costumes, special outfits
     changeLog: []            // Track all updates during story generation
   };
 
   if (!outline) return visualBible;
 
-  // Log outline length for debugging
   log.debug(`[VISUAL BIBLE] Parsing outline, length: ${outline.length} chars`);
 
-  // Check if outline contains Visual Bible mention at all (case-insensitive)
+  // Check if outline contains Visual Bible mention at all
   if (!outline.toLowerCase().includes('visual bible')) {
     log.debug('[VISUAL BIBLE] Outline does not contain "Visual Bible" text');
     return visualBible;
   }
 
-  // Find the Visual Bible section - simplified regex
-  // Matches: "# VISUAL BIBLE", "## Visual Bible", "# Part 5: Visual Bible", etc.
+  // Try JSON format first (preferred)
+  const jsonParsed = tryParseVisualBibleJSON(outline);
+  if (jsonParsed) {
+    log.info(`[VISUAL BIBLE] Successfully parsed JSON format`);
+    return jsonParsed;
+  }
+
+  // Fall back to legacy markdown parsing
+  log.debug('[VISUAL BIBLE] JSON not found, falling back to markdown parsing');
+  return parseVisualBibleMarkdown(outline);
+}
+
+/**
+ * Try to parse Visual Bible from JSON code block
+ * Returns null if JSON not found or invalid
+ */
+function tryParseVisualBibleJSON(outline) {
+  // Look for JSON code block in the Visual Bible section
+  // Match ```json ... ``` after "Visual Bible" header
+  const visualBibleStart = outline.toLowerCase().indexOf('visual bible');
+  if (visualBibleStart === -1) return null;
+
+  // Find JSON code block after Visual Bible header
+  const afterVisualBible = outline.substring(visualBibleStart);
+  const jsonMatch = afterVisualBible.match(/```json\s*([\s\S]*?)\s*```/);
+
+  if (!jsonMatch) {
+    log.debug('[VISUAL BIBLE] No JSON code block found in Visual Bible section');
+    return null;
+  }
+
+  try {
+    const jsonData = JSON.parse(jsonMatch[1]);
+    log.debug(`[VISUAL BIBLE] Parsed JSON successfully`);
+
+    const visualBible = {
+      mainCharacters: [],
+      secondaryCharacters: [],
+      animals: [],
+      artifacts: [],
+      locations: [],
+      vehicles: [],
+      clothing: [],
+      changeLog: []
+    };
+
+    // Convert JSON format to internal format
+    // Secondary Characters
+    if (jsonData.secondaryCharacters && Array.isArray(jsonData.secondaryCharacters)) {
+      visualBible.secondaryCharacters = jsonData.secondaryCharacters.map(char => ({
+        id: char.id || generateId('CHR', visualBible.secondaryCharacters.length),
+        name: char.name,
+        appearsInPages: char.pages || [],
+        description: buildCharacterDescription(char),
+        extractedDescription: null,
+        firstAppearanceAnalyzed: false,
+        source: 'outline'
+      }));
+      log.debug(`[VISUAL BIBLE] Parsed ${visualBible.secondaryCharacters.length} secondary characters from JSON`);
+    }
+
+    // Animals
+    if (jsonData.animals && Array.isArray(jsonData.animals)) {
+      visualBible.animals = jsonData.animals.map(animal => ({
+        id: animal.id || generateId('ANI', visualBible.animals.length),
+        name: animal.name,
+        appearsInPages: animal.pages || [],
+        description: buildAnimalDescription(animal),
+        extractedDescription: null,
+        firstAppearanceAnalyzed: false,
+        source: 'outline'
+      }));
+      log.debug(`[VISUAL BIBLE] Parsed ${visualBible.animals.length} animals from JSON`);
+    }
+
+    // Artifacts
+    if (jsonData.artifacts && Array.isArray(jsonData.artifacts)) {
+      visualBible.artifacts = jsonData.artifacts.map(artifact => ({
+        id: artifact.id || generateId('ART', visualBible.artifacts.length),
+        name: artifact.name,
+        appearsInPages: artifact.pages || [],
+        description: artifact.description || `${artifact.type}: ${artifact.description}`,
+        type: artifact.type,
+        extractedDescription: null,
+        firstAppearanceAnalyzed: false,
+        source: 'outline'
+      }));
+      log.debug(`[VISUAL BIBLE] Parsed ${visualBible.artifacts.length} artifacts from JSON`);
+    }
+
+    // Locations
+    if (jsonData.locations && Array.isArray(jsonData.locations)) {
+      visualBible.locations = jsonData.locations.map(loc => ({
+        id: loc.id || generateId('LOC', visualBible.locations.length),
+        name: loc.name,
+        appearsInPages: loc.pages || [],
+        description: buildLocationDescription(loc),
+        setting: loc.setting,
+        signatureElement: loc.signatureElement,
+        extractedDescription: null,
+        firstAppearanceAnalyzed: false,
+        source: 'outline'
+      }));
+      log.debug(`[VISUAL BIBLE] Parsed ${visualBible.locations.length} locations from JSON`);
+    }
+
+    // Vehicles
+    if (jsonData.vehicles && Array.isArray(jsonData.vehicles)) {
+      visualBible.vehicles = jsonData.vehicles.map(veh => ({
+        id: veh.id || generateId('VEH', visualBible.vehicles.length),
+        name: veh.name,
+        appearsInPages: veh.pages || [],
+        description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
+        signatureElement: veh.signatureElement,
+        extractedDescription: null,
+        firstAppearanceAnalyzed: false,
+        source: 'outline'
+      }));
+      log.debug(`[VISUAL BIBLE] Parsed ${visualBible.vehicles.length} vehicles from JSON`);
+    }
+
+    // Clothing
+    if (jsonData.clothing && Array.isArray(jsonData.clothing)) {
+      visualBible.clothing = jsonData.clothing.map(item => ({
+        id: item.id || generateId('CLO', visualBible.clothing.length),
+        name: item.name,
+        appearsInPages: item.pages || [],
+        description: `${item.description}. ${item.howWorn}`,
+        wornBy: item.wornBy,
+        howWorn: item.howWorn,
+        type: 'clothing',
+        extractedDescription: null,
+        firstAppearanceAnalyzed: false,
+        source: 'outline'
+      }));
+      log.debug(`[VISUAL BIBLE] Parsed ${visualBible.clothing.length} clothing items from JSON`);
+    }
+
+    const totalEntries = visualBible.secondaryCharacters.length +
+                         visualBible.animals.length +
+                         visualBible.artifacts.length +
+                         visualBible.locations.length +
+                         visualBible.vehicles.length +
+                         visualBible.clothing.length;
+
+    log.info(`[VISUAL BIBLE] JSON parsing complete: ${totalEntries} total entries`);
+    return visualBible;
+
+  } catch (err) {
+    log.warn(`[VISUAL BIBLE] Failed to parse JSON: ${err.message}`);
+    log.debug(`[VISUAL BIBLE] JSON content preview: ${jsonMatch[1].substring(0, 200)}...`);
+    return null;
+  }
+}
+
+/**
+ * Generate a unique identifier for visual bible items
+ */
+function generateId(prefix, index) {
+  return `${prefix}${String(index + 1).padStart(3, '0')}`;
+}
+
+/**
+ * Build description string from character JSON
+ */
+function buildCharacterDescription(char) {
+  const parts = [];
+  if (char.age) parts.push(char.age);
+  if (char.build) parts.push(char.build);
+  if (char.hair) parts.push(char.hair);
+  if (char.face) parts.push(char.face);
+  if (char.signatureLook) parts.push(`Signature: ${char.signatureLook}`);
+  if (char.clothing) parts.push(`Clothing: ${char.clothing}`);
+  return parts.join('. ');
+}
+
+/**
+ * Build description string from animal JSON
+ */
+function buildAnimalDescription(animal) {
+  const parts = [];
+  if (animal.species) parts.push(animal.species);
+  if (animal.coloring) parts.push(animal.coloring);
+  if (animal.size) parts.push(animal.size);
+  if (animal.features) parts.push(animal.features);
+  return parts.join('. ');
+}
+
+/**
+ * Build description string from location JSON
+ */
+function buildLocationDescription(loc) {
+  const parts = [];
+  if (loc.setting) parts.push(loc.setting);
+  if (loc.colors) parts.push(loc.colors);
+  if (loc.features) parts.push(loc.features);
+  if (loc.signatureElement) parts.push(`Signature: ${loc.signatureElement}`);
+  return parts.join('. ');
+}
+
+/**
+ * Legacy markdown parsing for Visual Bible
+ * Used as fallback when JSON format is not present
+ */
+function parseVisualBibleMarkdown(outline) {
+  const visualBible = {
+    mainCharacters: [],
+    secondaryCharacters: [],
+    animals: [],
+    artifacts: [],
+    locations: [],
+    vehicles: [],
+    clothing: [],
+    changeLog: []
+  };
+
+  // Find the Visual Bible section
   const visualBibleMatch = outline.match(/#+\s*(?:Part\s*\d+[:\s]*)?Visual\s*Bible\b([\s\S]*?)(?=\n#[^#]|\n---|$)/i);
   if (!visualBibleMatch) {
-    log.debug('[VISUAL BIBLE] Regex did not match Visual Bible section');
-    // Try alternate regex patterns
-    const altMatch = outline.match(/Visual\s*Bible[\s\S]{0,50}/i);
-    if (altMatch) {
-      log.debug(`[VISUAL BIBLE] Found text near "Visual Bible": "${altMatch[0].substring(0, 100)}..."`);
-    }
+    log.debug('[VISUAL BIBLE MARKDOWN] Could not find Visual Bible section');
     return visualBible;
   }
 
   const visualBibleSection = visualBibleMatch[1];
-  log.debug(`[VISUAL BIBLE] Found section, length: ${visualBibleSection.length} chars`);
-  log.debug(`[VISUAL BIBLE] Section preview: "${visualBibleSection.substring(0, 200)}..."`);
+  log.debug(`[VISUAL BIBLE MARKDOWN] Found section, length: ${visualBibleSection.length} chars`);
 
-  // Log what subsections we find
-  log.debug(`[VISUAL BIBLE] Looking for ### Secondary Characters...`);
-  log.debug(`[VISUAL BIBLE] Looking for ### Animals...`);
-  log.debug(`[VISUAL BIBLE] Looking for ### Artifacts...`);
-  log.debug(`[VISUAL BIBLE] Looking for ### Locations...`);
+  // Parse each category with regex
+  let idCounter = { CHR: 0, ANI: 0, ART: 0, LOC: 0, VEH: 0, CLO: 0 };
 
-  // Parse Secondary Characters (supports ## or ### headers)
+  // Secondary Characters
   const secondaryCharsMatch = visualBibleSection.match(/#{2,3}\s*Secondary\s*Characters?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
-  if (secondaryCharsMatch) {
-    log.debug(`[VISUAL BIBLE] Secondary Characters section found, length: ${secondaryCharsMatch[1].length}`);
-    if (!secondaryCharsMatch[1].toLowerCase().includes('none')) {
-      const entries = parseVisualBibleEntries(secondaryCharsMatch[1]);
-      visualBible.secondaryCharacters = entries;
-      log.debug(`[VISUAL BIBLE] Parsed ${entries.length} secondary characters`);
-    } else {
-      log.debug(`[VISUAL BIBLE] Secondary Characters section contains "None"`);
-    }
-  } else {
-    log.debug(`[VISUAL BIBLE] No Secondary Characters section found`);
+  if (secondaryCharsMatch && !secondaryCharsMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(secondaryCharsMatch[1]);
+    visualBible.secondaryCharacters = entries.map(e => ({
+      ...e,
+      id: e.id || generateId('CHR', idCounter.CHR++)
+    }));
+    log.debug(`[VISUAL BIBLE MARKDOWN] Parsed ${entries.length} secondary characters`);
   }
 
-  // Parse Animals & Creatures (supports ## or ### headers)
+  // Animals
   const animalsMatch = visualBibleSection.match(/#{2,3}\s*Animals?\s*(?:&|and)?\s*Creatures?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
-  if (animalsMatch) {
-    log.debug(`[VISUAL BIBLE] Animals section found, length: ${animalsMatch[1].length}`);
-    if (!animalsMatch[1].toLowerCase().includes('none')) {
-      const entries = parseVisualBibleEntries(animalsMatch[1]);
-      visualBible.animals = entries;
-      log.debug(`[VISUAL BIBLE] Parsed ${entries.length} animals`);
-    } else {
-      log.debug(`[VISUAL BIBLE] Animals section contains "None"`);
-    }
-  } else {
-    log.debug(`[VISUAL BIBLE] No Animals section found`);
+  if (animalsMatch && !animalsMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(animalsMatch[1]);
+    visualBible.animals = entries.map(e => ({
+      ...e,
+      id: e.id || generateId('ANI', idCounter.ANI++)
+    }));
+    log.debug(`[VISUAL BIBLE MARKDOWN] Parsed ${entries.length} animals`);
   }
 
-  // Parse Artifacts (supports ## or ### headers, also "Important Artifacts")
+  // Artifacts
   const artifactsMatch = visualBibleSection.match(/#{2,3}\s*(?:Important\s*)?Artifacts?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
-  if (artifactsMatch) {
-    log.debug(`[VISUAL BIBLE] Artifacts section found, length: ${artifactsMatch[1].length}`);
-    if (!artifactsMatch[1].toLowerCase().includes('none')) {
-      const entries = parseVisualBibleEntries(artifactsMatch[1]);
-      visualBible.artifacts = entries;
-      log.debug(`[VISUAL BIBLE] Parsed ${entries.length} artifacts`);
-    } else {
-      log.debug(`[VISUAL BIBLE] Artifacts section contains "None"`);
-    }
-  } else {
-    log.debug(`[VISUAL BIBLE] No Artifacts section found`);
+  if (artifactsMatch && !artifactsMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(artifactsMatch[1]);
+    visualBible.artifacts = entries.map(e => ({
+      ...e,
+      id: e.id || generateId('ART', idCounter.ART++)
+    }));
+    log.debug(`[VISUAL BIBLE MARKDOWN] Parsed ${entries.length} artifacts`);
   }
 
-  // Parse Locations (supports ## or ### headers, also "Recurring Locations")
+  // Locations
   const locationsMatch = visualBibleSection.match(/#{2,3}\s*(?:Recurring\s*)?Locations?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
-  if (locationsMatch) {
-    log.debug(`[VISUAL BIBLE] Locations section found, length: ${locationsMatch[1].length}`);
-    if (!locationsMatch[1].toLowerCase().includes('none')) {
-      const entries = parseVisualBibleEntries(locationsMatch[1]);
-      visualBible.locations = entries;
-      log.debug(`[VISUAL BIBLE] Parsed ${entries.length} locations`);
-    } else {
-      log.debug(`[VISUAL BIBLE] Locations section contains "None"`);
-    }
-  } else {
-    log.debug(`[VISUAL BIBLE] No Locations section found`);
+  if (locationsMatch && !locationsMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(locationsMatch[1]);
+    visualBible.locations = entries.map(e => ({
+      ...e,
+      id: e.id || generateId('LOC', idCounter.LOC++)
+    }));
+    log.debug(`[VISUAL BIBLE MARKDOWN] Parsed ${entries.length} locations`);
   }
 
-  // Parse Clothing & Costumes (supports ## or ### headers, also German "Kleidung" / "Verkleidung" / "Kostüme")
-  // More flexible regex to handle various formats
-  log.debug(`[VISUAL BIBLE] Looking for Clothing section...`);
+  // Vehicles
+  const vehiclesMatch = visualBibleSection.match(/#{2,3}\s*Vehicles?\s*(?:&|and)?\s*Transportation?([\s\S]*?)(?=\n#{2,3}\s|$)/i);
+  if (vehiclesMatch && !vehiclesMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(vehiclesMatch[1]);
+    visualBible.vehicles = entries.map(e => ({
+      ...e,
+      id: e.id || generateId('VEH', idCounter.VEH++)
+    }));
+    log.debug(`[VISUAL BIBLE MARKDOWN] Parsed ${entries.length} vehicles`);
+  }
 
-  // Check if clothing-related text exists at all
-  const hasClothingText = /clothing|kleidung|verkleidung|kostüm|costume/i.test(visualBibleSection);
-  log.debug(`[VISUAL BIBLE] Contains clothing-related text: ${hasClothingText}`);
-
-  // Try multiple patterns
+  // Clothing
   let clothingMatch = visualBibleSection.match(/#{2,3}\s*(?:Clothing|Kleidung|Verkleidung|Kostüme?)(?:\s*(?:&|and|und|,)\s*(?:Costumes?|Kostüme?|Verkleidung(?:en)?))?\s*([\s\S]*?)(?=\n#{2,3}\s|\n\(Include|$)/i);
-
   if (!clothingMatch) {
-    // Try alternate pattern without & connector
     clothingMatch = visualBibleSection.match(/#{2,3}\s*(?:Clothing|Kleidung|Verkleidung|Kostüme?)\s*([\s\S]*?)(?=\n#{2,3}\s|\n\(Include|$)/i);
   }
-
-  if (clothingMatch) {
-    log.debug(`[VISUAL BIBLE] Clothing section found, length: ${clothingMatch[1].length}`);
-    log.debug(`[VISUAL BIBLE] Clothing section preview: "${clothingMatch[1].substring(0, 300)}..."`);
-    if (!clothingMatch[1].toLowerCase().includes('none') || clothingMatch[1].length > 50) {
-      const entries = parseVisualBibleEntries(clothingMatch[1]);
-      log.debug(`[VISUAL BIBLE] parseVisualBibleEntries returned ${entries.length} entries`);
-      // Mark entries as clothing type and try to extract "worn by" field
-      entries.forEach(entry => {
-        entry.type = 'clothing';
-        // Try to extract "Worn by" from description (multiple patterns)
-        const wornByMatch = entry.description.match(/Worn by:\s*([^.\n-]+)/i) ||
-                           entry.description.match(/Getragen von:\s*([^.\n-]+)/i);
-        if (wornByMatch) {
-          entry.wornBy = wornByMatch[1].trim();
-        }
-        // Also try to extract from name if it has (Character) format
-        const nameCharMatch = entry.name.match(/\(([^)]+)\)\s*$/);
-        if (nameCharMatch && !entry.wornBy) {
-          entry.wornBy = nameCharMatch[1].trim();
-        }
-        log.debug(`[VISUAL BIBLE] Clothing entry: "${entry.name}" worn by "${entry.wornBy || 'unknown'}"`);
-      });
-      visualBible.clothing = entries;
-      log.debug(`[VISUAL BIBLE] Parsed ${entries.length} clothing items`);
-    } else {
-      log.debug(`[VISUAL BIBLE] Clothing section contains "None" or is too short`);
-    }
-  } else {
-    log.debug(`[VISUAL BIBLE] No Clothing section found with regex`);
-    // Log a snippet around potential clothing text for debugging
-    const clothingIndex = visualBibleSection.toLowerCase().indexOf('clothing');
-    if (clothingIndex > -1) {
-      log.debug(`[VISUAL BIBLE] Found "clothing" at index ${clothingIndex}: "${visualBibleSection.substring(Math.max(0, clothingIndex - 20), clothingIndex + 100)}"`);
-    }
+  if (clothingMatch && !clothingMatch[1].toLowerCase().includes('none')) {
+    const entries = parseVisualBibleEntries(clothingMatch[1]);
+    entries.forEach(entry => {
+      entry.type = 'clothing';
+      entry.id = entry.id || generateId('CLO', idCounter.CLO++);
+      // Extract wornBy
+      const wornByMatch = entry.description.match(/Worn by:\s*([^.\n-]+)/i) ||
+                         entry.description.match(/Getragen von:\s*([^.\n-]+)/i);
+      if (wornByMatch) entry.wornBy = wornByMatch[1].trim();
+      const nameCharMatch = entry.name.match(/\(([^)]+)\)\s*$/);
+      if (nameCharMatch && !entry.wornBy) entry.wornBy = nameCharMatch[1].trim();
+    });
+    visualBible.clothing = entries;
+    log.debug(`[VISUAL BIBLE MARKDOWN] Parsed ${entries.length} clothing items`);
   }
 
   const totalEntries = visualBible.secondaryCharacters.length +
                        visualBible.animals.length +
                        visualBible.artifacts.length +
                        visualBible.locations.length +
+                       visualBible.vehicles.length +
                        visualBible.clothing.length;
 
-  log.debug(`[VISUAL BIBLE] Parsed ${totalEntries} entries: ` +
-    `${visualBible.secondaryCharacters.length} characters, ` +
-    `${visualBible.animals.length} animals, ` +
-    `${visualBible.artifacts.length} artifacts, ` +
-    `${visualBible.locations.length} locations, ` +
-    `${visualBible.clothing.length} clothing`);
-
+  log.debug(`[VISUAL BIBLE MARKDOWN] Total: ${totalEntries} entries`);
   return visualBible;
 }
 

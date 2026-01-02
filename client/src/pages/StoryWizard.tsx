@@ -13,6 +13,7 @@ import {
   WizardStep3Relationships,
   WizardStep3BookSettings,
   WizardStep4Settings,
+  WizardStep5ArtStyle,
 } from './wizard';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 
@@ -37,11 +38,11 @@ export default function StoryWizard() {
   const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
 
-  // Wizard state - start at step 5 with loading if we have a storyId in URL
+  // Wizard state - start at step 6 with loading if we have a storyId in URL
   // Otherwise restore from localStorage to preserve step when navigating away and back
   const [step, setStep] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('storyId')) return 5;
+    if (params.get('storyId')) return 6;
     const savedStep = localStorage.getItem('wizard_step');
     return savedStep ? parseInt(savedStep, 10) : 1;
   });
@@ -159,7 +160,7 @@ export default function StoryWizard() {
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [lastIdeaPrompt, setLastIdeaPrompt] = useState<{ prompt: string; model: string } | null>(null);
 
-  // Step 5: Generation & Display
+  // Step 6: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
   const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
   const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
@@ -330,7 +331,7 @@ export default function StoryWizard() {
             setOriginalStory(story.originalStory || story.story || '');
 
             // Show the story view immediately - images will load progressively
-            setStep(5);
+            setStep(6);
             setIsLoading(false);
             setLoadingProgress(null);
 
@@ -571,8 +572,8 @@ export default function StoryWizard() {
         localStorage.removeItem('pending_art_style');
       }
 
-      // Navigate to step 4 (story type + settings) to continue after email verification
-      setStep(4);
+      // Navigate to step 5 (art style) to continue after email verification
+      setStep(5);
 
       // Clear the URL param
       const newParams = new URLSearchParams(searchParams);
@@ -772,8 +773,8 @@ export default function StoryWizard() {
 
   // Persist wizard step to localStorage (so navigating away and back preserves position)
   useEffect(() => {
-    // Only persist steps 1-4, not step 5 (which is story viewing/generation)
-    if (step >= 1 && step <= 4) {
+    // Only persist steps 1-5, not step 6 (which is story viewing/generation)
+    if (step >= 1 && step <= 5) {
       localStorage.setItem('wizard_step', step.toString());
     }
   }, [step]);
@@ -1393,9 +1394,9 @@ export default function StoryWizard() {
   };
 
   // Navigation
-  // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType+Settings
+  // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType, 5=ArtStyle, 6=StoryDisplay
   const safeSetStep = async (newStep: number) => {
-    if (newStep >= 0 && newStep <= 5) {
+    if (newStep >= 0 && newStep <= 6) {
       // Auto-save character if leaving step 1 while editing
       if (step === 1 && currentCharacter && newStep !== 1) {
         await saveCharacter();
@@ -1415,17 +1416,18 @@ export default function StoryWizard() {
   };
 
   const canAccessStep = (s: number): boolean => {
-    // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType+Settings
+    // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType, 5=ArtStyle, 6=StoryDisplay
     if (s === 1) return true;
     if (s === 2) return characters.length > 0;
     if (s === 3) return characters.length > 0 && areAllRelationshipsDefined();
     if (s === 4) return characters.length > 0 && areAllRelationshipsDefined();
-    if (s === 5) return generatedStory !== '';
+    if (s === 5) return characters.length > 0 && areAllRelationshipsDefined() && storyCategory !== '';
+    if (s === 6) return generatedStory !== '';
     return false;
   };
 
   const canGoNext = (): boolean => {
-    // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType+Settings
+    // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType, 5=ArtStyle
     if (step === 1) {
       // Step 1: Characters - must have at least one character
       return characters.length > 0;
@@ -1439,11 +1441,14 @@ export default function StoryWizard() {
       return true;
     }
     if (step === 4) {
-      // Step 4: Story Type + Settings
-      // Must have: story type complete, main character selected, story details
+      // Step 4: Story Type - must have story category and topic/theme selected
       if (!storyCategory) return false;
       if (storyCategory === 'adventure' && !storyTheme) return false;
       if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && !storyTopic) return false;
+      return true;
+    }
+    if (step === 5) {
+      // Step 5: Art Style - must have art style, main character, and story details
       if (!artStyle) return false;
       const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
       return charactersInStory.length > 0 && mainCharacters.length > 0 && storyDetails.trim().length > 0;
@@ -1485,7 +1490,7 @@ export default function StoryWizard() {
   };
 
   const goNext = async () => {
-    if (step < 4 && canGoNext()) {
+    if (step < 5 && canGoNext()) {
       await safeSetStep(step + 1);
     }
   };
@@ -1579,9 +1584,9 @@ export default function StoryWizard() {
       return;
     }
 
-    console.log('[generateStory] Starting generation, setting step to 5');
+    console.log('[generateStory] Starting generation, setting step to 6');
     setIsGenerating(true);
-    setStep(5);
+    setStep(6);
     // Reset ALL story state for new generation - must clear old story to show popup
     setGeneratedStory('');
     setStoryTitle('');
@@ -1773,10 +1778,10 @@ export default function StoryWizard() {
             }
             return updated;
           });
-          // Transition to step 5 (StoryDisplay) when front cover is ready
+          // Transition to step 6 (StoryDisplay) when front cover is ready
           if (shouldTransitionToDisplay) {
             log.debug('Transitioning to StoryDisplay - front cover ready');
-            setStep(5);
+            setStep(6);
           }
         }
 
@@ -1903,7 +1908,7 @@ export default function StoryWizard() {
 
   // Trigger auto-generate if pending (from email verification redirect)
   useEffect(() => {
-    if (pendingAutoGenerate.current && isAuthenticated && characters.length > 0 && step === 4 && !isGenerating) {
+    if (pendingAutoGenerate.current && isAuthenticated && characters.length > 0 && step === 5 && !isGenerating) {
       pendingAutoGenerate.current = false;
 
       // Check if another window already started generation (within last 2 minutes)
@@ -2036,6 +2041,15 @@ export default function StoryWizard() {
         );
 
       case 5:
+        // Step 5: Art Style Selection
+        return (
+          <WizardStep5ArtStyle
+            artStyle={artStyle}
+            onArtStyleChange={setArtStyle}
+          />
+        );
+
+      case 6:
         // Show StoryDisplay if we have final story OR progressive data OR front cover during generation
         // This allows transitioning to StoryDisplay as soon as front cover is ready
         if (generatedStory || progressiveStoryData || (isGenerating && coverImages.frontCover)) {
@@ -2573,10 +2587,10 @@ export default function StoryWizard() {
           )}
 
           {/* Navigation buttons - inside the container */}
-          {step < 5 && !currentCharacter && (
+          {step < 6 && !currentCharacter && (
             <div className="mt-6 pt-6 border-t border-gray-200">
-              {/* Steps 1-3: Back and Next buttons side by side */}
-              {step !== 4 && (
+              {/* Steps 1-4: Back and Next buttons side by side */}
+              {step !== 5 && (
                 <div className={`flex ${step === 1 ? 'justify-end' : 'justify-between'}`}>
                   {/* Hide back button on step 1 */}
                   {step > 1 && (
@@ -2601,8 +2615,8 @@ export default function StoryWizard() {
                 </div>
               )}
 
-              {/* Step 4: Back button and Generate buttons stacked */}
-              {step === 4 && (
+              {/* Step 5: Back button and Generate buttons stacked */}
+              {step === 5 && (
                 <div className="space-y-4">
                   <button
                     onClick={goBack}

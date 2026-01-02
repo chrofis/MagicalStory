@@ -70,89 +70,65 @@ List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensu
 
 **DO NOT include main characters here.** The characters listed in the "Characters" section above ({CHARACTER_NAMES}) are already tracked separately with their reference photos. The Visual Bible is ONLY for NEW elements not already provided.
 
-## Secondary Characters
-For each person who is NOT listed in the "Characters" section above but appears in multiple scenes (e.g., a shopkeeper, a teacher, a neighbor):
-- **Name/Role**: How they are referred to (e.g., "Fireman Fred" or "the friendly firefighter")
-- **Appears in pages**: List all page numbers
-- **Visual Appearance** (describe what the eye SEES, not backstory):
-  - Apparent age: infant/baby (0-1) | toddler (1-2) | preschooler (3-4) | kindergartner (5-6) | young school-age child (7-8) | school-age child (9-10) | preteen (11-12) | young teen (13-14) | teenager (15-17) | young adult (18-25) | adult (26-39) | middle-aged (40-59) | senior (60-75) | elderly (75+)
-  - Build/size: use standalone terms (short, average, tall, slim, stocky, muscular) - NO comparisons to other characters
-  - Hair: color, style, length, facial hair (ONLY for adults - teens/children cannot have beards)
-  - Face: eye color, skin tone, 1-2 distinctive features (scar, glasses, freckles)
-- **Signature Look** (ONE memorable visual element for instant recognition, e.g., "bright red bandana", "gold tooth", "curved wooden cane")
-- **Clothing**: Specific colors and details (be consistent across all scenes)
+## Visual Bible Output Format
 
-**IMPORTANT for Secondary Characters**:
-- NEVER reference or compare to main characters (e.g., don't write "taller than Max" or "similar to Emma")
-- Use the apparent age categories above (e.g., "teenager", "young adult", "middle-aged") - you may add specific ages for clarity (e.g., "teenager, around 16")
-- Ensure features match the age category (no beards on children/teens, no wrinkles on young adults)
-- The Signature Look should be visually striking and easy for AI to reproduce consistently
-- Each description must be SELF-CONTAINED - readable without knowing who the main characters are
+**CRITICAL: Output the Visual Bible as a JSON code block.** Each item gets a unique identifier:
+- Secondary Characters: CHR001, CHR002, CHR003...
+- Animals & Creatures: ANI001, ANI002, ANI003...
+- Artifacts (Objects): ART001, ART002, ART003...
+- Locations: LOC001, LOC002, LOC003...
+- Vehicles: VEH001, VEH002, VEH003...
+- Clothing & Costumes: CLO001, CLO002, CLO003...
 
-## Animals & Creatures
-For any animal or creature appearing in multiple scenes:
-- **Name**: What it's called (e.g., "Whiskers" or "the family cat")
-- **Appears in pages**: List all page numbers
-- **Species**: Type of animal/creature
-- **Coloring**: Exact colors and patterns (e.g., "white fur with orange patches on both ears")
-- **Size**: Relative size description
-- **Distinguishing features**: Collar, markings, accessories
+### What to Include in Each Category
 
-## Important Artifacts
-For objects that appear in multiple scenes and must look consistent:
-- **Name**: What it's called (e.g., "the magic map" or "grandma's locket")
-- **Appears in pages**: List all page numbers
-- **Type**: What kind of object
-- **Description**: Size, color, material, condition, distinctive markings
+**Secondary Characters** - People NOT in the main character list who appear in 2+ scenes:
+- name: How they are referred to (e.g., "Fireman Fred")
+- age: Use categories: infant/baby (0-1) | toddler (1-2) | preschooler (3-4) | kindergartner (5-6) | young school-age child (7-8) | school-age child (9-10) | preteen (11-12) | young teen (13-14) | teenager (15-17) | young adult (18-25) | adult (26-39) | middle-aged (40-59) | senior (60-75) | elderly (75+)
+- build: standalone terms (short, average, tall, slim, stocky, muscular) - NO comparisons
+- hair: color, style, length
+- face: eye color, skin tone, 1-2 distinctive features
+- signatureLook: ONE memorable visual element for instant recognition
+- clothing: specific colors and details
 
-## Locations
-Every scene must have a location. List all locations:
-- **Name**: What it's called (e.g., "Emma's house", "the town square", "the old bridge")
-- **Appears in pages**: List all page numbers
-- **Key visual features**: Be SPECIFIC about colors and distinctive details:
-  - Building colors (e.g., "bright yellow house with red shutters", "grey stone church with green copper roof")
-  - Architectural style (e.g., "Victorian with ornate balcony", "modern glass facade")
-  - Memorable landmark element (e.g., "crooked chimney", "round window like a porthole", "wooden door with heart-shaped knocker")
-- **Signature Element**: ONE unique visual detail that makes this location instantly recognizable (e.g., "the bright purple mailbox out front", "the weathervane shaped like a rooster")
+**Animals & Creatures** - Any animal appearing in 2+ scenes:
+- name: What it's called (e.g., "Whiskers")
+- species: Type of animal
+- coloring: Exact colors and patterns
+- size: Relative size description
+- features: Collar, markings, accessories
 
-## Vehicles & Transportation
-For any vehicles appearing in multiple scenes:
-- **Name/Type**: What it is (e.g., "Dad's car", "the school bus", "grandpa's bicycle")
-- **Appears in pages**: List all page numbers
-- **Color & Details**: Exact colors and distinctive features (e.g., "rusty red pickup truck with dented fender", "shiny blue bicycle with white basket", "yellow school bus with number 42")
-- **Signature Element**: ONE memorable detail for recognition (e.g., "fuzzy dice hanging from mirror", "flower stickers on the basket")
+**Artifacts** - Important objects appearing in 2+ scenes:
+- name: What it's called (e.g., "the magic map")
+- type: What kind of object
+- description: Size, color, material, distinctive markings
 
-## Clothing & Costumes
-For special outfits, costumes, or distinctive clothing items that characters wear (NOT their everyday clothes from reference photos):
-- **Item Name + Character**: Always include the character's name (e.g., "Emma's princess dress", "Max's superhero cape", "Dad's chef hat")
-- **Appears in pages**: List all page numbers where worn
-- **Worn by**: Which character wears this item
-- **Description**: Colors, materials, distinctive features (e.g., "sparkly pink tutu with silver stars", "red cape made from a bedsheet with yellow lightning bolt")
-- **How worn**: How the character wears it (e.g., "tied around shoulders", "on head slightly crooked", "over regular clothes")
+**Locations** - Every distinct place in the story:
+- name: What it's called (e.g., "Emma's house")
+- setting: Indoor/outdoor, type of place
+- colors: Specific building/place colors
+- features: Architectural details, distinctive elements
+- signatureElement: ONE unique visual detail for instant recognition
 
-**IMPORTANT for Clothing:**
-- ALWAYS include the character's name in the item name to avoid mix-ups
-- Only list SPECIAL clothing (costumes, uniforms, accessories) - not everyday outfits
-- Be specific about colors and distinctive details
-- If multiple characters have similar items, clearly distinguish them (e.g., "Emma's blue wizard hat" vs "Max's purple wizard hat")
+**Vehicles** - Any vehicle appearing in 2+ scenes:
+- name: What it is (e.g., "Dad's car")
+- colorAndDetails: Exact colors, condition, distinctive features
+- signatureElement: ONE memorable detail
 
-## IMPORTANT: Visual Consistency Rules
+**Clothing & Costumes** - Special outfits/costumes (NOT everyday clothes):
+- name: Item name WITH character name (e.g., "Max's superhero cape")
+- wornBy: Which character wears this (REQUIRED)
+- description: Colors, materials, distinctive features
+- howWorn: How the character wears it
 
-**Every recurring element MUST have:**
-1. **Specific colors** - Never say "a car" or "a house". Always specify: "a bright red car", "a pale blue house with white trim"
-2. **One memorable signature element** - Something unique and easy to recognize that AI can reproduce consistently
-3. **Enough detail for independent illustration** - Each description must work standalone without seeing other scenes
+## Visual Consistency Rules
 
-**Examples of GOOD descriptions:**
-- "A cozy cottage with moss-green walls, a thatched roof, and a bright orange door with a brass cat-shaped knocker"
-- "An old-fashioned red bicycle with a wicker basket and a silver bell on the handlebar"
+**Every element MUST have:**
+1. **Specific colors** - Never "a car" → Always "a bright red car"
+2. **One signature element** - Unique and easy to recognize
+3. **Self-contained description** - Works without seeing other scenes
 
-**Examples of BAD descriptions (too vague):**
-- "A house" ❌
-- "A nice car" ❌
-- "The school" ❌
-
-**NOTE:** Only include elements that appear in 2+ scenes. Never include {CHARACTER_NAMES} here - they are main characters with reference photos.
+**NOTE:** Only include elements appearing in 2+ scenes. Never include {CHARACTER_NAMES} - they are main characters with reference photos.
 
 ---
 
@@ -277,42 +253,75 @@ Title: [Story title]
 
 ## Visual Bible
 
-### Secondary Characters
-**[Name/Role]** (pages X, Y, Z)
-- Visual: [age category], [build/size], [hair], [face features]
-- Signature Look: [ONE memorable visual element]
-- Clothing: [specific colors and details]
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Fireman Fred",
+      "pages": [2, 5, 8],
+      "age": "adult",
+      "build": "tall, muscular",
+      "hair": "short black hair",
+      "face": "brown eyes, warm smile, small scar on chin",
+      "signatureLook": "bright red firefighter helmet",
+      "clothing": "yellow firefighter jacket with reflective stripes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Whiskers",
+      "pages": [1, 3, 6, 10],
+      "species": "cat",
+      "coloring": "white fur with orange patches on both ears",
+      "size": "small house cat",
+      "features": "blue collar with silver bell"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "name": "the magic map",
+      "pages": [2, 4, 7],
+      "type": "ancient parchment map",
+      "description": "yellowed paper with gold edges, glowing blue lines that move"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Emma's house",
+      "pages": [1, 10],
+      "setting": "suburban home, outdoor/indoor",
+      "colors": "pale blue walls with white trim",
+      "features": "two-story Victorian style, wraparound porch",
+      "signatureElement": "bright red front door with brass knocker"
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "VEH001",
+      "name": "Dad's car",
+      "pages": [1, 5],
+      "colorAndDetails": "forest green station wagon, slightly rusty",
+      "signatureElement": "surfboard strapped to roof rack"
+    }
+  ],
+  "clothing": [
+    {
+      "id": "CLO001",
+      "name": "Max's superhero cape",
+      "pages": [3, 4, 5, 6],
+      "wornBy": "Max",
+      "description": "red blanket with yellow star sewn on back",
+      "howWorn": "tied around shoulders over regular clothes"
+    }
+  ]
+}
+```
 
-### Animals & Creatures
-**[Name]** (pages X, Y, Z)
-- Species: [type]
-- Coloring: [exact colors and patterns]
-- Size: [relative size]
-- Features: [collar, markings, etc.]
-
-### Artifacts
-**[Name]** (pages X, Y, Z)
-- Type: [what it is]
-- Description: [size, color, material, distinctive details]
-
-### Locations
-**[Name]** (pages X, Y, Z)
-- Colors: [specific building/place colors]
-- Features: [architectural details, distinctive elements]
-- Signature Element: [ONE memorable detail for instant recognition]
-
-### Vehicles
-**[Name/Type]** (pages X, Y, Z)
-- Color & Details: [exact colors, condition, distinctive features]
-- Signature Element: [ONE memorable detail]
-
-### Clothing & Costumes
-**[Item Name + Character Name]** (pages X, Y, Z)
-- Worn by: [character name]
-- Description: [colors, materials, distinctive features]
-- How worn: [how the character wears it]
-
-(Include only elements appearing in 2+ scenes. Write "None" for any category with no recurring elements.)
+(Use empty arrays `[]` for categories with no elements. Include ONLY elements appearing in 2+ scenes.)
 
 ## Cover Scenes
 

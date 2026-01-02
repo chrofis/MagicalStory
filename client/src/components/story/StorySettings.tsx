@@ -3,7 +3,6 @@ import { Wand2, Sparkles, Loader2, Pencil, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Modal } from '@/components/common/Modal';
 import { StoryCategorySelector } from './StoryCategorySelector';
-import { ArtStyleSelector } from './ArtStyleSelector';
 import { storyTypes, lifeChallenges, educationalTopics } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
@@ -160,38 +159,26 @@ export function StorySettings({
     return '';
   };
 
-  // Check if story type selection is complete
-  const isStoryTypeComplete = storyCategory && artStyle && (
+  // Check if story type selection is complete (artStyle is now a separate step)
+  const isStoryTypeComplete = storyCategory && (
     storyCategory === 'adventure' ? storyTheme : storyTopic
   );
 
   return (
     <div className="space-y-6">
       {/* Story Type Selection - Show inline when not complete */}
-      {!isStoryTypeComplete && onCategoryChange && onTopicChange && onThemeChange && onArtStyleChange && onLegacyStoryTypeChange && (
-        <div className="space-y-6">
-          <StoryCategorySelector
-            storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | ''}
-            storyTopic={storyTopic}
-            storyTheme={storyTheme}
-            customThemeText={customThemeText}
-            onCategoryChange={onCategoryChange}
-            onTopicChange={onTopicChange}
-            onThemeChange={onThemeChange}
-            onCustomThemeTextChange={onCustomThemeTextChange}
-            onLegacyStoryTypeChange={onLegacyStoryTypeChange}
-          />
-
-          {/* Art Style Selector - only show when story type is partially selected */}
-          {storyCategory && (storyCategory === 'adventure' ? storyTheme : storyTopic) && (
-            <div className="border-t border-gray-200 pt-6">
-              <ArtStyleSelector
-                selectedStyle={artStyle}
-                onSelect={onArtStyleChange}
-              />
-            </div>
-          )}
-        </div>
+      {!isStoryTypeComplete && onCategoryChange && onTopicChange && onThemeChange && onLegacyStoryTypeChange && (
+        <StoryCategorySelector
+          storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | ''}
+          storyTopic={storyTopic}
+          storyTheme={storyTheme}
+          customThemeText={customThemeText}
+          onCategoryChange={onCategoryChange}
+          onTopicChange={onTopicChange}
+          onThemeChange={onThemeChange}
+          onCustomThemeTextChange={onCustomThemeTextChange}
+          onLegacyStoryTypeChange={onLegacyStoryTypeChange}
+        />
       )}
 
       {/* Story Settings Bar - 3 columns: Story, Art Style, Language (shown when story type is complete) */}
@@ -494,7 +481,7 @@ export function StorySettings({
       </div>
 
       {/* Edit Settings Modal */}
-      {isEditSettingsOpen && onCategoryChange && onTopicChange && onThemeChange && onArtStyleChange && onLegacyStoryTypeChange && (
+      {isEditSettingsOpen && onCategoryChange && onTopicChange && onThemeChange && onLegacyStoryTypeChange && (
         <Modal
           isOpen={isEditSettingsOpen}
           onClose={() => setIsEditSettingsOpen(false)}
@@ -512,16 +499,6 @@ export function StorySettings({
               onThemeChange={onThemeChange}
               onLegacyStoryTypeChange={onLegacyStoryTypeChange}
             />
-
-            {/* Art Style Selector - only show when story type is fully selected */}
-            {storyCategory && (storyCategory === 'adventure' ? storyTheme : storyTopic) && (
-              <div className="border-t border-gray-200 pt-6">
-                <ArtStyleSelector
-                  selectedStyle={artStyle}
-                  onSelect={onArtStyleChange}
-                />
-              </div>
-            )}
 
             {/* Done Button */}
             <div className="flex justify-end pt-4 border-t border-gray-200">
