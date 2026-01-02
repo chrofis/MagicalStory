@@ -48,71 +48,7 @@ When writing about characters' strengths and weaknesses:
 
 ---
 
-# Part 1: Plot Structure
-
-## Plot Structure
-Create a detailed {PAGES}-page story outline with a compelling plot. The focus of the plot must be on the main character(s)
-Clearly define:
-
-**Inciting Incident**: The event that disrupts the ordinary world and sets the story in motion.
-
-**Rising Action**: The series of events that build tension and develop conflict. Include obstacles, challenges, and complications the characters must face.
-
-**Climax**: The turning point - the moment of highest tension where the main conflict reaches its peak.
-
-**Falling Action**: Events following the climax that begin to resolve the conflict.
-
-For longer stories with more than 15 scenes, include repeated rising actions, climax and falling actions. Ideally for multiple characters, especially if there is more than one main character
-
-**Resolution**: How the story concludes - the new normal after the adventure, showing character growth and lessons learned.
-
-## Themes
-Identify 2-3 major themes the story will explore that are appropriate for the target age group (e.g., friendship, courage, kindness, family, perseverance, overcoming fears, honesty).
-
-## Tone and Genre
-Describe the overall tone (e.g., adventurous, heartwarming, playful, magical) and genre elements that will shape the storytelling.
-
-## Clothing Continuity
-
-Determine the PRIMARY clothing context for the story based on the overall setting and adventure type:
-
-**Primary Clothing:** [winter | summer | formal | standard]
-- This is the DEFAULT clothing for all scenes unless a change is explicitly needed
-
-**Clothing Change Events:** List any pages where clothing CHANGES and why:
-- Only mark changes for: going to bed/waking up, major time skip (next day/season), explicit costume change in story, moving between drastically different environments (beach → snowy mountain)
-- Moving between similar environments does NOT require a change (meadow → forest → river = same clothing)
-
-Example:
-- Primary Clothing: summer (outdoor summer adventure)
-- Changes: Page 8 (bedtime scene → standard), Page 9 (next morning, back outside → summer)
-
----
-
-# Part 2: Character Development Arcs
-
-For EACH main character provided, detail their development arc by describing:
-
-**Starting Point**: How they are at the beginning of the story (based on their traits - strengths, weaknesses, fears).
-
-**Key Challenges**: Specific conflicts or obstacles they face that drive their development. Reference which pages/events in the outline these occur.
-
-**Turning Points**: Realizations or moments of growth they experience. Link these directly to plot points and page numbers.
-
-**End State**: How they have changed or evolved by the end of the story. What have they learned? How have they grown?
-
-**Key Moments**: List 2-3 specific pages where this character's development is most evident.
-
-
-For all other characters:
-**Starting Point**: In which scene do they enter the story. Do not have all characters start on scene 1.
-**Repeated behaviors**: Things they do repeatedly in the story that are characteristic for them
-**Challenge**: One challenge / scene where the character shines
-
-
----
-
-# Part 3: Title and Page-by-Page Breakdown
+# Part 1: Title
 
 ## Story Title
 Create an engaging, age-appropriate title for this story. The title should:
@@ -124,43 +60,9 @@ Create an engaging, age-appropriate title for this story. The title should:
 Format:
 Title: [Your creative title here]
 
-## Page-by-Page Breakdown
-For EACH of the {PAGES} story pages, provide:
-
-**Key Action/Plot Point**: A sentence or two describing the main event or plot progression for that page.
-
-**Character Focus**: Which character(s) are featured, their detailed actions, and how their traits/development are shown (remember: SHOW don't TELL)
-
-**Scene**: One sentence describing the key visual moment for the illustrator
-
-**Clothing**: Use the PRIMARY clothing from "Clothing Continuity" section above, unless this page has a clothing change event.
-- Write **[same]** if clothing matches the previous page
-- Write **[change to: winter|summer|formal|standard]** if clothing changes, with brief reason
-
-
 ---
 
-# Part 4: Cover Scene Descriptions
-
-In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for these 3 cover elements.
-
-**IMPORTANT RULES FOR COVER SCENES:**
-- Keep descriptions SHORT (2-3 sentences max)
-- Focus on MOOD and SETTING, not precise character positions
-- Do NOT specify exact locations of each character
-- Do NOT include text instructions (title, dedication, website - these are added separately)
-- Do NOT over-specify details like weather effects, lighting, or props
-- Let the AI image generator handle composition
-
-**Title Page Scene**: A simple, striking scene featuring the MAIN CHARACTER prominently. Describe the mood, setting, and what the main character is doing. Keep supporting characters minimal or in background. (2-3 sentences)
-
-**Initial Scene**: A warm group scene showing all characters together in a welcoming setting. Focus on the overall mood and atmosphere. (2-3 sentences)
-
-**Back Cover Scene**: A satisfying conclusion scene with all characters together, feeling happy/content. Focus on emotional closure. (2-3 sentences)
-
----
-
-# Part 5: Visual Bible (for Illustration Consistency)
+# Part 2: Visual Bible (for Illustration Consistency)
 
 List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensures consistent illustrations throughout the book.
 
@@ -210,6 +112,118 @@ For specific places that appear multiple times with unique visual features:
 - **Key visual features**: Colors, shapes, distinctive elements
 
 **NOTE:** Only include elements that appear in 2+ scenes. Never include {CHARACTER_NAMES} here - they are main characters with reference photos.
+
+---
+
+# Part 3: Cover Scene Descriptions
+
+In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for these 3 cover elements.
+
+**IMPORTANT RULES FOR COVER SCENES:**
+- Keep descriptions SHORT (2-3 sentences max)
+- Focus on MOOD and SETTING, not precise character positions
+- Do NOT specify exact locations of each character
+- Do NOT include text instructions (title, dedication, website - these are added separately)
+- Do NOT over-specify details like weather effects, lighting, or props
+- Let the AI image generator handle composition
+
+**Title Page Scene**: A simple, striking scene featuring the MAIN CHARACTER prominently. Describe the mood, setting, and what the main character is doing. Keep supporting characters minimal or in background. (2-3 sentences)
+
+**Initial Scene**: A warm group scene showing all characters together in a welcoming setting. Focus on the overall mood and atmosphere. (2-3 sentences)
+
+**Back Cover Scene**: A satisfying conclusion scene with all characters together, feeling happy/content. Focus on emotional closure. (2-3 sentences)
+
+---
+
+# Part 4: Plot Structure
+
+Create a detailed {PAGES}-page story outline with a compelling plot. The focus of the plot must be on the main character(s).
+Clearly define:
+
+**Inciting Incident**: The event that disrupts the ordinary world and sets the story in motion.
+
+**Rising Action**: The series of events that build tension and develop conflict. Include obstacles, challenges, and complications the characters must face.
+
+**Climax**: The turning point - the moment of highest tension where the main conflict reaches its peak.
+
+**Falling Action**: Events following the climax that begin to resolve the conflict.
+
+For longer stories with more than 15 scenes, include repeated rising actions, climax and falling actions. Ideally for multiple characters, especially if there is more than one main character.
+
+**Resolution**: How the story concludes - the new normal after the adventure, showing character growth and lessons learned.
+
+## Themes
+Identify 2-3 major themes the story will explore that are appropriate for the target age group (e.g., friendship, courage, kindness, family, perseverance, overcoming fears, honesty).
+
+## Tone and Genre
+Describe the overall tone (e.g., adventurous, heartwarming, playful, magical) and genre elements that will shape the storytelling.
+
+## Clothing Continuity
+
+Determine the PRIMARY clothing context for the story based on the overall setting and adventure type:
+
+**Primary Clothing:** [winter | summer | formal | standard]
+- This is the DEFAULT clothing for all scenes unless a change is explicitly needed
+
+**Clothing Change Events:** List any pages where clothing CHANGES and why:
+- Only mark changes for: going to bed/waking up, major time skip (next day/season), explicit costume change in story, moving between drastically different environments (beach → snowy mountain)
+- Moving between similar environments does NOT require a change (meadow → forest → river = same clothing)
+
+Example:
+- Primary Clothing: summer (outdoor summer adventure)
+- Changes: Page 8 (bedtime scene → standard), Page 9 (next morning, back outside → summer)
+
+---
+
+# Part 5: Character Development Arcs
+
+For EACH main character provided, detail their development arc by describing:
+
+**Starting Point**: How they are at the beginning of the story (based on their traits - strengths, weaknesses, fears).
+
+**Key Challenges**: Specific conflicts or obstacles they face that drive their development. Reference which pages/events in the outline these occur.
+
+**Turning Points**: Realizations or moments of growth they experience. Link these directly to plot points and page numbers.
+
+**End State**: How they have changed or evolved by the end of the story. What have they learned? How have they grown?
+
+**Key Moments**: List 2-3 specific pages where this character's development is most evident.
+
+
+For all other characters:
+**Starting Point**: In which scene do they enter the story. Do not have all characters start on scene 1.
+**Repeated behaviors**: Things they do repeatedly in the story that are characteristic for them.
+**Challenge**: One challenge / scene where the character shines.
+
+---
+
+# Part 6: Page-by-Page Breakdown
+
+For EACH of the {PAGES} story pages, provide:
+
+**Key Action/Plot Point**: A sentence or two describing the main event or plot progression for that page.
+
+**Character Focus**: Which character(s) are featured, their detailed actions, and how their traits/development are shown (remember: SHOW don't TELL)
+
+**Scene**: One sentence describing the key visual moment for the illustrator.
+
+**Clothing**: Use the PRIMARY clothing from "Clothing Continuity" section above, unless this page has a clothing change event.
+- Write **[same]** if clothing matches the previous page
+- Write **[change to: winter|summer|formal|standard]** if clothing changes, with brief reason
+
+---
+
+# CRITICAL: You MUST generate ALL 6 sections
+
+**You MUST complete ALL sections listed above:**
+1. Title
+2. Visual Bible (with all subsections)
+3. Cover Scenes (all 3: Title Page, Initial Page, Back Cover)
+4. Plot Structure (with Themes, Tone, and Clothing Continuity)
+5. Character Development Arcs (for ALL characters)
+6. Page-by-Page Breakdown (for ALL {PAGES} pages, from Page 1 to Page {PAGES})
+
+**DO NOT STOP EARLY.** The outline is incomplete unless it contains detailed breakdowns for every single page from 1 to {PAGES}.
 
 ---
 
@@ -272,6 +286,10 @@ Resolution: [Description]
 ## Tone and Genre
 [Description]
 
+## Clothing Continuity
+Primary Clothing: [winter | summer | formal | standard]
+Clothing Changes: [List any pages with changes, or "None"]
+
 ## Character Development Arcs
 
 ### [Character 1 Name]
@@ -302,10 +320,12 @@ Character Focus: [Description]
 Scene: [One sentence - the key visual moment]
 Clothing: [same]
 
-...and so on for all {PAGES} pages. Use [same] for most pages; only use [change to: X] when there's an explicit reason.
+...continue for ALL {PAGES} pages (Page 3, Page 4, ... Page {PAGES}). Use [same] for most pages; only use [change to: X] when there's an explicit reason.
 
 ---
 
 Be specific and creative. Each scene description should paint a clear picture for the illustrator. Ensure character development is woven throughout the plot and that each page advances both the story and the characters' growth arcs.
+
+**FINAL REMINDER: Your response is INCOMPLETE unless it includes Page-by-Page Breakdown entries for EVERY page from Page 1 through Page {PAGES}. Do not stop until you have written all {PAGES} pages.**
 
 **Remember: Cover scene descriptions should be SIMPLE and SHORT - let the image generator handle the details.**
