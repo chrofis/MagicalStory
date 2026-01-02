@@ -174,7 +174,6 @@ function parseTeachingGuideFile(filePath) {
       guides.set(currentId, currentContent.join('\n').trim());
     }
 
-    log.debug(`Loaded ${guides.size} teaching guides from ${path.basename(filePath)}`);
   } catch (err) {
     log.error(`Error loading teaching guide file ${filePath}:`, err.message);
   }

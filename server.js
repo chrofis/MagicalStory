@@ -306,19 +306,11 @@ const JWT_SECRET = process.env.JWT_SECRET;
 // Database Configuration - PostgreSQL (Railway)
 const DATABASE_URL = process.env.DATABASE_URL;
 
-// Debug logging
-console.log('🔍 Environment Check:');
-log.debug(`  DATABASE_URL: ${DATABASE_URL ? 'SET (length: ' + DATABASE_URL.length + ')' : 'NOT SET'}`);
-log.debug(`  STORAGE_MODE: ${process.env.STORAGE_MODE}`);
-log.debug(`  GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'SET (length: ' + process.env.GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
-log.debug(`  ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'SET (length: ' + process.env.ANTHROPIC_API_KEY.length + ')' : 'NOT SET'}`);
-
 // Default to file mode for safety - only use database if explicitly configured
 const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' && DATABASE_URL)
                      ? 'database'
                      : 'file';
 
-log.debug(`📦 Storage mode: ${STORAGE_MODE}`);
 if (STORAGE_MODE === 'database') {
   console.log(`🗄️  Database: PostgreSQL (Railway)`);
 }
@@ -332,11 +324,10 @@ if (STORAGE_MODE === 'database') {
       rejectUnauthorized: false
     }
   });
-  log.debug(`✓ PostgreSQL pool created (Railway)`);
 
   // Initialize the modular database service pool as well
   initModularPool();
-  log.debug(`✓ Modular database pool initialized`);
+  log.debug(`✓ Database pools initialized`);
 }
 
 // Middleware
@@ -7234,7 +7225,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     // Persist styled avatars to character data before saving story
     if (artStyle !== 'realistic' && inputData.characters) {
       try {
+        const cacheStats = getStyledAvatarCacheStats();
+        log.debug(`💾 [PIPELINE] Cache before export: ${cacheStats.size} entries, ${cacheStats.inProgress} in progress`);
         const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
+        log.debug(`💾 [PIPELINE] Export returned ${styledAvatarsMap.size} character sets for ${artStyle}`);
+        for (const [name, avatars] of styledAvatarsMap) {
+          log.debug(`   - "${name}": ${Object.keys(avatars).join(', ')}`);
+        }
         if (styledAvatarsMap.size > 0) {
           log.debug(`💾 [PIPELINE] Persisting ${styledAvatarsMap.size} styled avatar sets to character data...`);
           for (const char of inputData.characters) {
@@ -7250,10 +7247,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           // Also persist styled avatars to the characters table
           try {
             const characterId = `characters_${job.user_id}`;
+            log.debug(`💾 [PIPELINE] Looking up characters table with id: ${characterId}`);
             const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
             if (charResult.rows.length > 0) {
               const charData = JSON.parse(charResult.rows[0].data);
               const chars = charData.characters || [];
+              log.debug(`💾 [PIPELINE] Found ${chars.length} characters in DB: ${chars.map(c => `"${c.name}"`).join(', ')}`);
               let updatedCount = 0;
               for (const dbChar of chars) {
                 const styledAvatars = styledAvatarsMap.get(dbChar.name);
@@ -7262,17 +7261,26 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                   if (!dbChar.avatars.styledAvatars) dbChar.avatars.styledAvatars = {};
                   dbChar.avatars.styledAvatars[artStyle] = styledAvatars;
                   updatedCount++;
+                  log.debug(`   ✓ Matched "${dbChar.name}" with ${Object.keys(styledAvatars).length} styled avatars`);
+                } else {
+                  log.debug(`   ✗ No match for "${dbChar.name}" in styledAvatarsMap`);
                 }
               }
               if (updatedCount > 0) {
                 charData.characters = chars;
                 await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
                 log.debug(`💾 [PIPELINE] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
+              } else {
+                log.debug(`💾 [PIPELINE] No characters matched for styled avatar update`);
               }
+            } else {
+              log.debug(`💾 [PIPELINE] No characters table entry found for ${characterId}`);
             }
           } catch (dbError) {
             log.error(`⚠️ [PIPELINE] Failed to persist styled avatars to characters table:`, dbError.message);
           }
+        } else {
+          log.debug(`💾 [PIPELINE] No styled avatars to persist (cache empty for ${artStyle})`);
         }
       } catch (error) {
         log.error(`⚠️ [PIPELINE] Failed to persist styled avatars:`, error.message);
@@ -8334,25 +8342,8 @@ app.get('*', (req, res, next) => {
 
 initialize().then(() => {
   app.listen(PORT, () => {
-    log.debug(`\n=================================`);
     console.log(`🚀 MagicalStory Server Running`);
-    log.debug(`=================================`);
     console.log(`📍 URL: http://localhost:${PORT}`);
-    console.log(`💾 Storage: ${STORAGE_MODE.toUpperCase()}`);
-    if (STORAGE_MODE === 'database') {
-      // Parse DATABASE_URL to show host and database name
-      try {
-        const url = new URL(DATABASE_URL);
-        const dbName = url.pathname.slice(1); // Remove leading /
-        console.log(`🗄️  Database: ${url.hostname}/${dbName} (PostgreSQL)`);
-      } catch (err) {
-        console.log(`🗄️  Database: PostgreSQL (Railway)`);
-      }
-    } else {
-      log.debug(`📝 Logs: data/logs.json`);
-      log.debug(`👥 Users: data/users.json`);
-    }
-    log.debug(`=================================\n`);
   });
 }).catch(err => {
   log.error('Failed to initialize server:', err);

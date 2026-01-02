@@ -36,7 +36,6 @@ function initializePool() {
     console.error('Unexpected database pool error:', err);
   });
 
-  console.log('📦 Database pool initialized');
   return dbPool;
 }
 
