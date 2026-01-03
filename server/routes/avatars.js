@@ -546,6 +546,7 @@ const ART_STYLE_PROMPTS = loadArtStylePrompts();
  * @returns {Promise<Object>} - { success, imageData, clothing, costumeType, artStyle, error? }
  */
 async function generateStyledCostumedAvatar(character, config, artStyle) {
+  const startTime = Date.now();
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
     log.error('[STYLED COSTUME] No Gemini API key available');
@@ -723,7 +724,37 @@ Your task is to transform a reference photo into a ${artStyle} style illustratio
       log.debug(`👕 [STYLED COSTUME] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
     }
 
-    log.debug(`✅ [STYLED COSTUME] Generated ${costumeType}@${artStyle} avatar for ${character.name}`);
+    const duration = Date.now() - startTime;
+    log.debug(`✅ [STYLED COSTUME] Generated ${costumeType}@${artStyle} avatar for ${character.name} in ${duration}ms`);
+
+    // Log generation details for developer mode auditing
+    costumedAvatarGenerationLog.push({
+      timestamp: new Date().toISOString(),
+      characterName: character.name,
+      costumeType,
+      artStyle,
+      costumeDescription: config.description || '',
+      durationMs: duration,
+      success: true,
+      inputs: {
+        facePhoto: {
+          identifier: getImageIdentifier(facePhoto),
+          sizeKB: getImageSizeKB(facePhoto),
+          imageData: facePhoto
+        },
+        standardAvatar: standardAvatar ? {
+          identifier: getImageIdentifier(standardAvatar),
+          sizeKB: getImageSizeKB(standardAvatar),
+          imageData: standardAvatar
+        } : null
+      },
+      prompt: avatarPrompt,
+      output: {
+        identifier: getImageIdentifier(finalImageData),
+        sizeKB: getImageSizeKB(finalImageData),
+        imageData: finalImageData
+      }
+    });
 
     return {
       success: true,
@@ -734,7 +765,33 @@ Your task is to transform a reference photo into a ${artStyle} style illustratio
     };
 
   } catch (err) {
+    const duration = Date.now() - startTime;
     log.error(`❌ [STYLED COSTUME] Error:`, err.message);
+
+    // Log failed generation
+    costumedAvatarGenerationLog.push({
+      timestamp: new Date().toISOString(),
+      characterName: character.name,
+      costumeType,
+      artStyle,
+      costumeDescription: config.description || '',
+      durationMs: duration,
+      success: false,
+      error: err.message,
+      inputs: {
+        facePhoto: {
+          identifier: getImageIdentifier(facePhoto),
+          sizeKB: getImageSizeKB(facePhoto),
+          imageData: facePhoto
+        },
+        standardAvatar: standardAvatar ? {
+          identifier: getImageIdentifier(standardAvatar),
+          sizeKB: getImageSizeKB(standardAvatar),
+          imageData: standardAvatar
+        } : null
+      }
+    });
+
     return { success: false, error: err.message };
   }
 }
@@ -1209,3 +1266,5 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
 module.exports = router;
 module.exports.generateDynamicAvatar = generateDynamicAvatar;
 module.exports.generateStyledCostumedAvatar = generateStyledCostumedAvatar;
+module.exports.getCostumedAvatarGenerationLog = getCostumedAvatarGenerationLog;
+module.exports.clearCostumedAvatarGenerationLog = clearCostumedAvatarGenerationLog;

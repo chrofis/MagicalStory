@@ -32,6 +32,23 @@ interface StyledAvatarGenerationEntry {
   output?: { identifier: string; sizeKB: number; imageData?: string };
 }
 
+interface CostumedAvatarGenerationEntry {
+  timestamp: string;
+  characterName: string;
+  costumeType: string;
+  artStyle: string;
+  costumeDescription: string;
+  durationMs: number;
+  success: boolean;
+  error?: string;
+  inputs: {
+    facePhoto: { identifier: string; sizeKB: number; imageData?: string };
+    standardAvatar: { identifier: string; sizeKB: number; imageData?: string } | null;
+  };
+  prompt?: string;
+  output?: { identifier: string; sizeKB: number; imageData?: string };
+}
+
 interface StoryDisplayProps {
   title: string;
   story: string;
@@ -61,6 +78,7 @@ interface StoryDisplayProps {
   storyId?: string | null;
   developerMode?: boolean;
   styledAvatarGeneration?: StyledAvatarGenerationEntry[];
+  costumedAvatarGeneration?: CostumedAvatarGenerationEntry[];
   // Partial story fields
   isPartial?: boolean;
   failureReason?: string;
@@ -117,6 +135,7 @@ export function StoryDisplay({
   storyId,
   developerMode = false,
   styledAvatarGeneration = [],
+  costumedAvatarGeneration = [],
   isPartial = false,
   failureReason,
   generatedPages,

@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from 'react';
-import { Upload, Save, RefreshCw, Pencil, X } from 'lucide-react';
+import { Upload, Save, RefreshCw, Pencil, X, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
@@ -562,7 +562,7 @@ export function CharacterForm({
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
-                  {language === 'de' ? 'Größe (cm)' : language === 'fr' ? 'Taille (cm)' : 'Height (cm)'}
+                  {language === 'de' ? 'Grösse (cm)' : language === 'fr' ? 'Taille (cm)' : 'Height (cm)'}
                 </label>
                 <input
                   type="number"
@@ -592,12 +592,12 @@ export function CharacterForm({
             onClick={onContinueToTraits}
             disabled={!canSaveName || isLoading || isAnalyzingPhoto}
             loading={isLoading}
-            icon={Save}
+            icon={ArrowRight}
             className={onCancel ? "flex-1" : "w-full"}
           >
-            {language === 'de' ? 'Speichern' :
-             language === 'fr' ? 'Enregistrer' :
-             'Save'}
+            {language === 'de' ? 'Weiter' :
+             language === 'fr' ? 'Suivant' :
+             'Next'}
           </Button>
         </div>
       </div>

@@ -131,6 +131,10 @@ const {
   clearStyledAvatarGenerationLog
 } = require('./server/lib/styledAvatars');
 const {
+  getCostumedAvatarGenerationLog,
+  clearCostumedAvatarGenerationLog
+} = require('./server/routes/avatars');
+const {
   TEXT_MODELS,
   MODEL_DEFAULTS,
   getActiveTextModel,
@@ -4718,8 +4722,9 @@ class ProgressiveStoryPageParser {
 async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}) {
   log.debug(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
-  // Clear styled avatar generation log for fresh tracking
+  // Clear avatar generation logs for fresh tracking
   clearStyledAvatarGenerationLog();
+  clearCostumedAvatarGenerationLog();
 
   // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {
@@ -5864,6 +5869,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       imagePrompts: imagePrompts,
       coverPrompts: coverPrompts,  // Cover image prompts for dev mode
       styledAvatarGeneration: getStyledAvatarGenerationLog(),  // Styled avatar generation log for dev mode
+      costumedAvatarGeneration: getCostumedAvatarGenerationLog(),  // Costumed avatar generation log for dev mode
       storyType: inputData.storyType,
       storyDetails: inputData.storyDetails,
       pages: sceneCount,
@@ -6147,8 +6153,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}) {
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
-  // Clear styled avatar generation log for fresh tracking
+  // Clear avatar generation logs for fresh tracking
   clearStyledAvatarGenerationLog();
+  clearCostumedAvatarGenerationLog();
 
   // Token usage tracker - same structure as other modes
   const tokenUsage = {
@@ -6684,6 +6691,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       storyTextPrompts: [], // Not used in unified mode (single prompt generates all)
       visualBible: visualBible, // Recurring visual elements for consistency
       styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
+      costumedAvatarGeneration: getCostumedAvatarGenerationLog(), // Costumed avatar generation log (dev mode)
       storyText: fullStoryText,
       originalStory: fullStoryText, // Store original for restore functionality
       sceneDescriptions: allSceneDescriptions,
@@ -6733,6 +6741,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       storyText: fullStoryText,
       visualBible,
       styledAvatarGeneration: getStyledAvatarGenerationLog(),
+      costumedAvatarGeneration: getCostumedAvatarGenerationLog(),
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages,
@@ -8221,6 +8230,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       imagePrompts,
       coverPrompts,  // Cover image prompts for dev mode
       styledAvatarGeneration: getStyledAvatarGenerationLog(),  // Styled avatar generation log for dev mode
+      costumedAvatarGeneration: getCostumedAvatarGenerationLog(),  // Costumed avatar generation log for dev mode
       title: storyTitle,
       textOnly: skipImages // Mark if this was text-only generation
     };
