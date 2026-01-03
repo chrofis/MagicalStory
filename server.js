@@ -6265,8 +6265,110 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [20, 'Preparing character avatars...', jobId]
     );
 
-    // Collect avatar requirements from story pages
-    // Convert storyPages to format expected by collectAvatarRequirements
+    const artStyle = inputData.artStyle || 'pixar';
+
+    // Generate missing avatars based on clothing requirements from story
+    if (clothingRequirements && Object.keys(clothingRequirements).length > 0 && !skipImages) {
+      log.debug(`👔 [UNIFIED] Clothing requirements found for ${Object.keys(clothingRequirements).length} characters`);
+
+      const { generateDynamicAvatar, generateStyledCostumedAvatar } = require('./server/routes/avatars');
+
+      const avatarsGenerated = [];
+      const avatarsFailed = [];
+
+      for (const [charName, requirements] of Object.entries(clothingRequirements)) {
+        const char = inputData.characters?.find(c =>
+          c.name.toLowerCase() === charName.toLowerCase()
+        );
+        if (!char) {
+          log.debug(`[UNIFIED AVATAR] Character "${charName}" not found, skipping`);
+          continue;
+        }
+
+        // Initialize avatars structure
+        if (!char.avatars) char.avatars = {};
+        if (!char.avatars.clothing) char.avatars.clothing = {};
+        if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+
+        for (const [category, config] of Object.entries(requirements)) {
+          if (!config || !config.used) continue;
+
+          // Check if avatar already exists
+          let avatarExists = false;
+          if (category === 'costumed' && config.costume) {
+            const costumeKey = config.costume.toLowerCase();
+            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+            if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+            avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
+          } else {
+            avatarExists = !!char.avatars[category];
+          }
+
+          if (avatarExists) {
+            log.debug(`[UNIFIED AVATAR] ${char.name} already has ${category}${config.costume ? ':' + config.costume : ''} avatar`);
+            continue;
+          }
+
+          const logCategory = config.costume ? `costumed:${config.costume}` : category;
+          log.debug(`🎭 [UNIFIED AVATAR] Generating ${logCategory} avatar for ${char.name}...`);
+
+          await dbPool.query(
+            'UPDATE story_jobs SET progress_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [`Generating ${logCategory} avatar for ${char.name}...`, jobId]
+          );
+
+          try {
+            let result;
+
+            if (category === 'costumed' && config.costume) {
+              // Generate styled costumed avatar (costume + art style in one call)
+              result = await generateStyledCostumedAvatar(char, config, artStyle);
+
+              if (result.success && result.imageData) {
+                const costumeKey = result.costumeType;
+                char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
+                if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+                if (result.clothing) {
+                  char.avatars.clothing.costumed[costumeKey] = result.clothing;
+                }
+                avatarsGenerated.push(`${char.name}:${logCategory}@${artStyle}`);
+                log.debug(`✅ [UNIFIED AVATAR] Generated styled ${logCategory}@${artStyle} for ${char.name}`);
+              } else {
+                avatarsFailed.push(`${char.name}:${logCategory}`);
+                log.warn(`⚠️ [UNIFIED AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
+              }
+            } else {
+              // For standard/winter/summer: use dynamic avatar generation
+              result = await generateDynamicAvatar(char, category, config);
+
+              if (result.success && result.imageData) {
+                char.avatars[category] = result.imageData;
+                if (result.clothing) {
+                  char.avatars.clothing[category] = result.clothing;
+                }
+                avatarsGenerated.push(`${char.name}:${logCategory}`);
+                log.debug(`✅ [UNIFIED AVATAR] Generated ${logCategory} for ${char.name}`);
+              } else {
+                avatarsFailed.push(`${char.name}:${logCategory}`);
+                log.warn(`⚠️ [UNIFIED AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
+              }
+            }
+          } catch (e) {
+            avatarsFailed.push(`${char.name}:${logCategory}`);
+            log.error(`❌ [UNIFIED AVATAR] Error generating ${logCategory} for ${char.name}: ${e.message}`);
+          }
+        }
+      }
+
+      if (avatarsGenerated.length > 0) {
+        log.debug(`✅ [UNIFIED] Generated ${avatarsGenerated.length} avatars: ${avatarsGenerated.join(', ')}`);
+      }
+      if (avatarsFailed.length > 0) {
+        log.warn(`⚠️ [UNIFIED] Failed to generate ${avatarsFailed.length} avatars: ${avatarsFailed.join(', ')}`);
+      }
+    }
+
+    // Collect avatar requirements from story pages for styled avatar preparation
     const sceneDescriptions = storyPages.map(page => ({
       pageNumber: page.pageNumber || storyPages.indexOf(page) + 1,
       description: page.sceneHint || page.text || ''
@@ -6285,10 +6387,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       'standard'
     );
 
-    if (avatarRequirements.length > 0) {
-      log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars`);
-      await prepareStyledAvatars(avatarRequirements, inputData.characters, inputData.artStyle);
-      applyStyledAvatars(inputData.characters);
+    // Now prepare styled avatars (convert existing avatars to target art style)
+    if (avatarRequirements.length > 0 && artStyle !== 'realistic') {
+      log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle}`);
+      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements);
     }
 
     // PHASE 3: Expand scene hints with Art Director (parallel)

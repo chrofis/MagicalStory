@@ -862,7 +862,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   };
 
-  log.debug('🖼️  [IMAGE GEN] Calling Gemini API with prompt:', prompt.substring(0, 100) + '...');
+  log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt: ${prompt.substring(0, 100).replace(/\n/g, ' ')}...`);
   log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8`);
 
   const response = await fetch(
