@@ -62,7 +62,8 @@ N'inventez PAS de nouveaux personnages ou objets.
 ```json
 {"characters": ["Nom1", "Nom2"], "clothing": "standard", "objects": ["Objet1", "Objet2"]}
 ```
-   - characters: Tableau des NOMS EXACTS des personnages dans cette scène (uniquement de la liste PERSONNAGES)
+   - characters: TOUS les personnages/animaux décrits dans la section 3 (Composition) DOIVENT être listés ici
+   - Ceci est utilisé pour attacher des images de référence - personnages manquants = références manquantes
    - clothing: Un parmi "winter", "summer", "formal", "standard"
    - objects: Tableau des noms d'objets/animaux des ÉLÉMENTS RÉCURRENTS dans cette scène
 

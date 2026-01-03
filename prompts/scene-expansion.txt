@@ -62,7 +62,8 @@ Do NOT invent new characters or objects.
 ```json
 {"characters": ["Name1", "Name2"], "clothing": "standard", "objects": ["Object1", "Object2"]}
 ```
-   - characters: Array of EXACT character names appearing in this scene (from CHARACTERS list only)
+   - characters: ALL characters/animals described in section 3 (Composition) MUST be listed here
+   - This is used to attach reference images - missing characters = missing references
    - clothing: One of "winter", "summer", "formal", "standard"
    - objects: Array of object/animal names from RECURRING ELEMENTS appearing in this scene
 

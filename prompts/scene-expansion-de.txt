@@ -62,7 +62,8 @@ Erfinde KEINE neuen Charaktere oder Objekte.
 ```json
 {"characters": ["Name1", "Name2"], "clothing": "standard", "objects": ["Objekt1", "Objekt2"]}
 ```
-   - characters: Array der EXAKTEN Charakternamen in dieser Szene (nur aus CHARAKTERE-Liste)
+   - characters: ALLE Charaktere/Tiere aus Abschnitt 3 (Komposition) MÜSSEN hier aufgelistet sein
+   - Dies wird verwendet um Referenzbilder anzuhängen - fehlende Charaktere = fehlende Referenzen
    - clothing: Eines von "winter", "summer", "formal", "standard"
    - objects: Array der Objekt-/Tiernamen aus WIEDERKEHRENDE ELEMENTE in dieser Szene
 

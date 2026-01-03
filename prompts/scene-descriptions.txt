@@ -127,9 +127,15 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
 
 5. **METADATA (JSON):**
 ```json
-{"characters": ["Sophie"], "clothing": "standard", "objects": ["Lasso", "Cowboy Hat", "Backpack", "Eli"]}
+{"characters": ["Sophie", "Prairie Dog"], "clothing": "standard", "objects": ["Lasso", "Cowboy Hat", "Backpack", "Eli"]}
 ```
 ```
+
+**CRITICAL: The "characters" array in METADATA must include ALL characters/animals from section 3 (Composition).**
+- If you described a character or animal in Composition, they MUST be in the JSON characters array
+- This is used to attach reference images - missing characters = missing references
+- Main characters use their name (e.g., "Sophie")
+- Animals/creatures use their name (e.g., "Prairie Dog", "Whiskers")
 
 **IMPORTANT: Always include section 5 METADATA with valid JSON at the end of your output.**
 
