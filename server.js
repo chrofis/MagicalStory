@@ -6399,20 +6399,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
 
         // Generate cover image with quality retry
+        const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
+        const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
         const coverResult = await generateImageWithQualityRetry(
           coverPrompt,
-          coverPhotos.map(p => p.photoUrl).filter(Boolean),
           coverPhotos,
-          { maxRetries: 2, qualityThreshold: IMAGE_QUALITY_THRESHOLD },
-          modelOverrides
+          null,
+          'cover',
+          null,
+          null,
+          null,
+          coverModelOverrides,
+          coverLabel
         );
 
-        if (coverResult?.image) {
-          coverImages[coverType] = coverResult.image;
-          addUsage('gemini_image', coverResult.usage, 'cover_images', coverResult.modelId);
-          if (coverResult.qualityUsage) {
-            addUsage('gemini_quality', coverResult.qualityUsage, 'cover_quality');
-          }
+        if (coverResult?.imageData) {
+          coverImages[coverType] = coverResult.imageData;
+          addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'cover_images', coverResult.modelId);
         }
       })));
     }
@@ -6459,26 +6462,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pagePhotos
         );
 
+        const pageModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
         const imageResult = await generateImageWithQualityRetry(
           imagePrompt,
-          pagePhotos.map(p => p.photoUrl).filter(Boolean),
           pagePhotos,
-          { maxRetries: 2, qualityThreshold: IMAGE_QUALITY_THRESHOLD },
-          modelOverrides
+          null,
+          'scene',
+          null,
+          null,
+          null,
+          pageModelOverrides,
+          `PAGE ${pageNum}`
         );
 
-        if (imageResult?.image) {
-          addUsage('gemini_image', imageResult.usage, 'page_images', imageResult.modelId);
-          if (imageResult.qualityUsage) {
-            addUsage('gemini_quality', imageResult.qualityUsage, 'page_quality');
-          }
+        if (imageResult?.imageData) {
+          addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'page_images', imageResult.modelId);
         }
 
         return {
           pageNumber: pageNum,
           text: scene.text,
           sceneDescription: scene.sceneDescription,
-          image: imageResult?.image || null,
+          image: imageResult?.imageData || null,
           imagePrompt
         };
       }))
