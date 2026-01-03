@@ -6241,6 +6241,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const coverHints = parser.extractCoverHints();
     const storyPages = parser.extractPages();
 
+    // Construct fullStoryText from parsed pages (for storage compatibility)
+    const fullStoryText = storyPages.map(page =>
+      `--- Page ${page.pageNumber} ---\n${page.text}`
+    ).join('\n\n');
+
     log.debug(`📖 [UNIFIED] Parsed: title="${title}", ${storyPages.length} pages, ${Object.keys(clothingRequirements).length} clothing reqs`);
     log.debug(`📖 [UNIFIED] Visual Bible: ${visualBible.secondaryCharacters?.length || 0} chars, ${visualBible.locations?.length || 0} locs, ${visualBible.animals?.length || 0} animals, ${visualBible.artifacts?.length || 0} artifacts`);
 
@@ -6433,6 +6438,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     );
 
     log.debug(`📖 [UNIFIED] Expanded ${expandedScenes.length} scene descriptions`);
+
+    // Create allSceneDescriptions array for storage compatibility
+    const allSceneDescriptions = expandedScenes.map(scene => ({
+      pageNumber: scene.pageNumber,
+      description: scene.sceneDescription,
+      clothing: scene.clothing || 'standard'
+    }));
+
+    // Create pageClothingData for storage compatibility
+    const pageClothing = {};
+    storyPages.forEach((page, index) => {
+      pageClothing[index + 1] = page.clothing || 'standard';
+    });
+    const pageClothingData = {
+      primaryClothing: storyPages[0]?.clothing || 'standard',
+      pageClothing
+    };
 
     // Skip image generation if requested
     if (skipImages) {
