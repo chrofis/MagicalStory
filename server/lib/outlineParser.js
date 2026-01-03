@@ -428,12 +428,21 @@ class OutlineParser {
         coverScenes.titlePage.clothing = this._extractClothingFromBlock(block);
         log.debug(`[OUTLINE-PARSER] Title Page (block format): ${coverScenes.titlePage.scene.substring(0, 60)}...`);
       } else {
-        // Try inline format
+        // Try inline format: **Title Page Scene**: description\nClothing: category
+        // Stop at next section header (Title Page|Initial Page|Back Cover) or markdown header, NOT at "Clothing:"
+        const sectionStopPattern = `(?:Title Page|Initial Page|Back Cover|Titelseite|Einführungsseite|Rückseite|Page de titre|Page initiale|Quatrième)`;
+        // Handle both formats: "**Title Page Scene**:" and "Title Page Scene:"
         const inlineMatch = this.outline.match(
-          new RegExp(`(?:${titleWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
+          new RegExp(`\\*{0,2}(?:${titleWords})\\s*(?:Scene|Szene|Scène)?\\*{0,2}[:\\s]+([^\\n]+(?:\\n(?!\\*\\*${sectionStopPattern}|##)[^\\n]+)*)`, 'i')
         );
         if (inlineMatch) {
-          coverScenes.titlePage.scene = this.cleanMarkdown(inlineMatch[1]);
+          const fullBlock = inlineMatch[0];
+          // Extract just the scene description (first line), not the clothing
+          const sceneText = inlineMatch[1].split('\n')[0];
+          coverScenes.titlePage.scene = this.cleanMarkdown(sceneText);
+          // Extract clothing from the full block (includes Clothing: line)
+          coverScenes.titlePage.clothing = this._extractClothingFromBlock(fullBlock);
+          log.debug(`[OUTLINE-PARSER] Title Page (inline format): ${coverScenes.titlePage.scene.substring(0, 60)}..., clothing: ${coverScenes.titlePage.clothing || 'none'}`);
         }
       }
     }
@@ -447,11 +456,19 @@ class OutlineParser {
         coverScenes.initialPage.clothing = this._extractClothingFromBlock(block);
         log.debug(`[OUTLINE-PARSER] Initial Page (block format): ${coverScenes.initialPage.scene.substring(0, 60)}...`);
       } else {
+        // Try inline format: **Initial Page Scene**: description\nClothing: category
+        // Stop at next section header, NOT at "Clothing:"
+        const sectionStopPattern = `(?:Title Page|Initial Page|Back Cover|Titelseite|Einführungsseite|Rückseite|Page de titre|Page initiale|Quatrième)`;
+        // Handle both formats: "**Initial Page Scene**:" and "Initial Page Scene:"
         const inlineMatch = this.outline.match(
-          new RegExp(`(?:${initialWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
+          new RegExp(`\\*{0,2}(?:${initialWords})\\s*(?:Scene|Szene|Scène)?\\*{0,2}[:\\s]+([^\\n]+(?:\\n(?!\\*\\*${sectionStopPattern}|##)[^\\n]+)*)`, 'i')
         );
         if (inlineMatch) {
-          coverScenes.initialPage.scene = this.cleanMarkdown(inlineMatch[1]);
+          const fullBlock = inlineMatch[0];
+          const sceneText = inlineMatch[1].split('\n')[0];
+          coverScenes.initialPage.scene = this.cleanMarkdown(sceneText);
+          coverScenes.initialPage.clothing = this._extractClothingFromBlock(fullBlock);
+          log.debug(`[OUTLINE-PARSER] Initial Page (inline format): ${coverScenes.initialPage.scene.substring(0, 60)}..., clothing: ${coverScenes.initialPage.clothing || 'none'}`);
         }
       }
     }
@@ -465,11 +482,19 @@ class OutlineParser {
         coverScenes.backCover.clothing = this._extractClothingFromBlock(block);
         log.debug(`[OUTLINE-PARSER] Back Cover (block format): ${coverScenes.backCover.scene.substring(0, 60)}...`);
       } else {
+        // Try inline format: **Back Cover Scene**: description\nClothing: category
+        // Stop at next section header, NOT at "Clothing:"
+        const sectionStopPattern = `(?:Title Page|Initial Page|Back Cover|Titelseite|Einführungsseite|Rückseite|Page de titre|Page initiale|Quatrième)`;
+        // Handle both formats: "**Back Cover Scene**:" and "Back Cover Scene:"
         const inlineMatch = this.outline.match(
-          new RegExp(`(?:${backWords})\\s*(?:Scene)?[:\\s]+([^\\n]+(?:\\n(?![A-Z][a-z]+\\s*(?:Scene|Page)?:)[^\\n]+)*)`, 'i')
+          new RegExp(`\\*{0,2}(?:${backWords})\\s*(?:Scene|Szene|Scène)?\\*{0,2}[:\\s]+([^\\n]+(?:\\n(?!\\*\\*${sectionStopPattern}|##)[^\\n]+)*)`, 'i')
         );
         if (inlineMatch) {
-          coverScenes.backCover.scene = this.cleanMarkdown(inlineMatch[1]);
+          const fullBlock = inlineMatch[0];
+          const sceneText = inlineMatch[1].split('\n')[0];
+          coverScenes.backCover.scene = this.cleanMarkdown(sceneText);
+          coverScenes.backCover.clothing = this._extractClothingFromBlock(fullBlock);
+          log.debug(`[OUTLINE-PARSER] Back Cover (inline format): ${coverScenes.backCover.scene.substring(0, 60)}..., clothing: ${coverScenes.backCover.clothing || 'none'}`);
         }
       }
     }
