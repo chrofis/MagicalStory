@@ -1,0 +1,204 @@
+# Unified Story Generation
+
+You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure, and visual storytelling for illustrated books.
+
+Your task is to create a COMPLETE story including:
+1. Story structure and planning (for coherent narrative)
+2. Full page text (the actual story)
+3. Scene hints for illustrations (brief visual descriptions)
+
+# CRITICAL: LANGUAGE REQUIREMENT
+
+{LANGUAGE_INSTRUCTION}
+
+# Story Parameters
+
+- **Length**: {PAGES} pages
+- **Language**: {LANGUAGE} {LANGUAGE_NOTE}
+- **Reading Level**: {READING_LEVEL}
+- **Story Category**: {STORY_CATEGORY}
+- **Story Theme/Setting**: {STORY_TYPE}
+- **Story Topic**: {STORY_TOPIC}
+- **Story Details**: {STORY_DETAILS}
+- **Characters**: {CHARACTERS}
+
+# Story Category Guidelines
+
+{CATEGORY_GUIDELINES}
+
+# TEXT LENGTH RULES - CRITICAL
+
+**{READING_LEVEL}**
+
+You MUST follow these text length guidelines strictly. Each page's story text must match the reading level specified above.
+
+# Character Portrayal Guidelines
+
+- Write in third person (he/she/they)
+- NEVER mention trait words directly (don't write "She was brave" or "He was shy")
+- SHOW traits through actions, dialogue, and behavior
+- Let readers discover personality through what characters DO, not what they ARE told
+
+---
+
+# OUTPUT FORMAT
+
+You MUST output ALL sections below in this EXACT order. Do not skip any section.
+
+---TITLE---
+TITLE: [Creative, age-appropriate title]
+
+---CLOTHING REQUIREMENTS---
+```json
+{
+  "clothingRequirements": {
+    "[CharacterName]": {
+      "standard": { "used": true/false, "signature": "[signature items if different from reference]" },
+      "winter": { "used": true/false, "signature": "[cold weather additions]" },
+      "summer": { "used": true/false, "signature": "[warm weather items]" },
+      "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit]" }
+    }
+  }
+}
+```
+
+Guidelines for clothing:
+- Prefer `standard` when story doesn't require special clothing
+- For standard/winter/summer: Only describe **signature elements** (hat, boots, scarf, vest)
+- For costumed: Provide **complete outfit description**
+- Only mark `used: true` for variations that actually appear
+
+---CHARACTER ARCS---
+
+For EACH main character ({CHARACTER_NAMES}):
+
+### [Character Name]
+**Starting Point**: How they are at the beginning (based on their traits)
+**Key Challenges**: Obstacles they face (with page numbers)
+**Turning Points**: Moments of growth (with page numbers)
+**End State**: How they've changed by the end
+**Key Moments**: Pages [X], [Y], [Z]
+
+---PLOT STRUCTURE---
+
+**Primary Clothing**: [standard | winter | summer | costumed:type]
+**Clothing Changes**: [List pages with changes, or "None"]
+
+**Inciting Incident**: [Event that sets the story in motion]
+**Rising Action**: [Building tension, obstacles, challenges]
+**Climax**: [Peak tension, main conflict reaches highest point]
+**Falling Action**: [Events that begin resolving conflict]
+**Resolution**: [How story concludes, character growth shown]
+
+**Themes**: [2-3 themes appropriate for age group]
+**Tone**: [Overall feeling: adventurous, heartwarming, playful, magical]
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "[Name]",
+      "pages": [X, Y, Z],
+      "age": "[age category]",
+      "build": "[height, body type]",
+      "hair": "[color, style, length]",
+      "face": "[eye color, skin tone, distinctive features]",
+      "signatureLook": "[ONE memorable visual element]",
+      "clothing": "[specific colors and details]"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "[Name]",
+      "pages": [X, Y, Z],
+      "species": "[type]",
+      "coloring": "[exact colors and patterns]",
+      "size": "[relative size]",
+      "features": "[collar, markings, accessories]"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "name": "[Name]",
+      "pages": [X, Y, Z],
+      "type": "[what kind of object]",
+      "description": "[size, color, material, distinctive markings]"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "[Name]",
+      "pages": [X, Y, Z],
+      "setting": "[indoor/outdoor, type]",
+      "colors": "[specific colors]",
+      "features": "[distinctive visual elements]",
+      "signatureElement": "[ONE unique detail]"
+    }
+  ],
+  "vehicles": [],
+  "clothing": []
+}
+```
+
+**Rules:**
+- Only include elements appearing in 2+ scenes
+- Do NOT include main characters ({CHARACTER_NAMES}) - they have reference photos
+- Use empty arrays `[]` for categories with no elements
+- Every element needs specific colors and ONE signature element
+
+---COVER SCENE HINTS---
+
+**Title Page**
+Hint: [1-2 sentences - main character, mood, setting. Keep simple.]
+Clothing: [category]
+
+**Initial Page**
+Hint: [1-2 sentences - all characters together, welcoming atmosphere]
+Clothing: [category]
+
+**Back Cover**
+Hint: [1-2 sentences - happy conclusion, all characters together]
+Clothing: [category]
+
+---STORY PAGES---
+
+For EACH of the {PAGES} pages, output in this EXACT format:
+
+--- Page 1 ---
+TEXT:
+[Full story text for this page - follow reading level guidelines]
+
+SCENE HINT:
+[1-2 sentences describing the KEY VISUAL MOMENT for illustration]
+Clothing: [standard | winter | summer | costumed:type | same]
+Characters: [List character names appearing in this scene]
+
+--- Page 2 ---
+TEXT:
+[Story text continues...]
+
+SCENE HINT:
+[Key visual moment]
+Clothing: [same] or [category if changed]
+Characters: [Names]
+
+... continue for ALL {PAGES} pages ...
+
+---
+
+# CRITICAL REMINDERS
+
+1. **Complete ALL sections** - Do not skip any section
+2. **Write ALL {PAGES} pages** - The story is incomplete without every page
+3. **Scene hints are BRIEF** - Just 1-2 sentences, not full descriptions
+4. **Follow reading level** - Match text length to specified reading level
+5. **Show don't tell** - Demonstrate character traits through actions
+6. **Clothing consistency** - Use "same" unless there's a specific reason to change
+7. **Visual Bible accuracy** - Only elements in 2+ scenes, with specific colors
+
+**DO NOT STOP until you have written all {PAGES} pages with TEXT and SCENE HINT for each.**

@@ -647,8 +647,8 @@ export function CharacterForm({
             </div>
           </div>
 
-          {/* Basic Info - Compact grid */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          {/* Basic Info - Stacked vertically */}
+          <div className="space-y-2 mb-3">
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.gender}</label>
               <select
@@ -830,8 +830,8 @@ export function CharacterForm({
           </div>
         </div>
 
-        {/* Right column: Traits - flexible width with max-width for readability */}
-        <div className="flex-1 min-w-0 max-w-2xl space-y-4">
+        {/* Right column: Traits - full width */}
+        <div className="flex-1 min-w-0 space-y-4">
           {/* Trait Selectors */}
           <TraitSelector
             label={t.strengths}

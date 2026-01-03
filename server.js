@@ -183,9 +183,10 @@ const {
   buildStoryPrompt,
   buildSceneDescriptionPrompt,
   buildImagePrompt,
-  buildSceneExpansionPrompt
+  buildSceneExpansionPrompt,
+  buildUnifiedStoryPrompt
 } = require('./server/lib/storyHelpers');
-const { OutlineParser } = require('./server/lib/outlineParser');
+const { OutlineParser, UnifiedStoryParser } = require('./server/lib/outlineParser');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -6132,6 +6133,405 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
   }
 }
 
+// ============================================================================
+// UNIFIED STORY GENERATION
+// Single prompt generates complete story, Art Director expands scenes, then images
+// ============================================================================
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}) {
+  log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
+
+  // Token usage tracker - same structure as other modes
+  const tokenUsage = {
+    anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    byFunction: {
+      unified_story: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      scene_expansion: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      cover_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
+      page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() }
+    }
+  };
+
+  // Pricing per million tokens
+  const MODEL_PRICING = {
+    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
+    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+    'claude-opus-4-5': { input: 5.00, output: 25.00 },
+    'gemini-2.5-flash': { input: 0.30, output: 2.50 },
+    'gemini-2.5-pro': { input: 1.25, output: 10.00 },
+    'gemini-2.0-flash': { input: 0.10, output: 0.40 },
+    'gemini-2.5-flash-image': { input: 0.30, output: 30.00 },
+    'gemini-3-pro-image-preview': { input: 2.00, output: 120.00 }
+  };
+  const PROVIDER_PRICING = {
+    anthropic: { input: 3.00, output: 15.00 },
+    gemini_image: { input: 0.30, output: 30.00 },
+    gemini_quality: { input: 0.10, output: 0.40 },
+    gemini_text: { input: 0.30, output: 2.50 }
+  };
+
+  const addUsage = (provider, usage, functionName = null, modelName = null) => {
+    if (usage && tokenUsage[provider]) {
+      tokenUsage[provider].input_tokens += usage.input_tokens || 0;
+      tokenUsage[provider].output_tokens += usage.output_tokens || 0;
+      tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
+      tokenUsage[provider].calls += 1;
+    }
+    if (functionName && tokenUsage.byFunction[functionName]) {
+      tokenUsage.byFunction[functionName].input_tokens += usage?.input_tokens || 0;
+      tokenUsage.byFunction[functionName].output_tokens += usage?.output_tokens || 0;
+      tokenUsage.byFunction[functionName].thinking_tokens += usage?.thinking_tokens || 0;
+      tokenUsage.byFunction[functionName].calls += 1;
+      tokenUsage.byFunction[functionName].provider = provider;
+      if (modelName) tokenUsage.byFunction[functionName].models.add(modelName);
+    }
+  };
+
+  const calculateCost = (modelOrProvider, inputTokens, outputTokens, thinkingTokens = 0) => {
+    const pricing = MODEL_PRICING[modelOrProvider] || PROVIDER_PRICING[modelOrProvider] || { input: 0, output: 0 };
+    const inputCost = (inputTokens / 1000000) * pricing.input;
+    const outputCost = (outputTokens / 1000000) * pricing.output;
+    const thinkingCost = (thinkingTokens / 1000000) * pricing.output;
+    return { input: inputCost, output: outputCost, thinking: thinkingCost, total: inputCost + outputCost + thinkingCost };
+  };
+
+  const sceneCount = inputData.pages;
+  const lang = inputData.language || 'en';
+  const { getLanguageNameEnglish } = require('./server/lib/languages');
+  const langText = getLanguageNameEnglish(lang);
+
+  try {
+    // PHASE 1: Generate complete story with unified prompt
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [10, 'Generating story structure and pages...', jobId]
+    );
+
+    const unifiedPrompt = buildUnifiedStoryPrompt(inputData, sceneCount);
+    log.debug(`📖 [UNIFIED] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages`);
+
+    // Use streaming for the unified story generation
+    const unifiedResult = await callTextModelStreaming(unifiedPrompt, 20000, null, modelOverrides.outlineModel);
+    const unifiedResponse = unifiedResult.text;
+    const unifiedModelId = unifiedResult.modelId;
+    const unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
+    const unifiedProvider = unifiedResult.provider === 'google' ? 'gemini_text' : 'anthropic';
+    addUsage(unifiedProvider, unifiedUsage, 'unified_story', unifiedModelId);
+
+    log.debug(`📖 [UNIFIED] Response length: ${unifiedResponse.length} chars`);
+
+    // Parse the unified response
+    const parser = new UnifiedStoryParser(unifiedResponse);
+    const title = parser.extractTitle() || inputData.storyType || 'Untitled Story';
+    const clothingRequirements = parser.extractClothingRequirements();
+    const visualBible = parser.extractVisualBible();
+    const coverHints = parser.extractCoverHints();
+    const storyPages = parser.extractPages();
+
+    log.debug(`📖 [UNIFIED] Parsed: title="${title}", ${storyPages.length} pages, ${Object.keys(clothingRequirements).length} clothing reqs`);
+    log.debug(`📖 [UNIFIED] Visual Bible: ${visualBible.secondaryCharacters?.length || 0} chars, ${visualBible.locations?.length || 0} locs, ${visualBible.animals?.length || 0} animals, ${visualBible.artifacts?.length || 0} artifacts`);
+
+    // Filter main characters from Visual Bible (safety net)
+    filterMainCharactersFromVisualBible(visualBible, inputData.characters);
+
+    // Save checkpoint
+    await saveCheckpoint(jobId, 'unified_story', {
+      title,
+      clothingRequirements,
+      visualBible,
+      coverHints,
+      storyPages,
+      unifiedPrompt,
+      unifiedModelId,
+      unifiedUsage
+    });
+
+    // PHASE 2: Generate avatars for clothing requirements (if needed)
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [20, 'Preparing character avatars...', jobId]
+    );
+
+    // Collect avatar requirements from clothing requirements
+    const avatarRequirements = collectAvatarRequirements(
+      inputData.characters,
+      inputData.artStyle,
+      clothingRequirements,
+      storyPages.map(p => p.clothing)
+    );
+
+    if (avatarRequirements.length > 0) {
+      log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars`);
+      await prepareStyledAvatars(avatarRequirements, inputData.characters);
+      applyStyledAvatars(inputData.characters);
+    }
+
+    // PHASE 3: Expand scene hints with Art Director (parallel)
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [30, 'Expanding scene descriptions...', jobId]
+    );
+
+    const sceneExpansionLimit = pLimit(5);
+    const expandedScenes = await Promise.all(
+      storyPages.map((page, index) => sceneExpansionLimit(async () => {
+        const pageNum = index + 1;
+        const sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
+
+        // Build scene expansion prompt
+        const expansionPrompt = buildSceneDescriptionPrompt(
+          pageNum,
+          page.text,
+          sceneCharacters,
+          page.sceneHint,
+          langText,
+          visualBible,
+          [], // No previous scenes needed for expansion
+          page.clothing || 'standard'
+        );
+
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 2000, null, modelOverrides.sceneDescriptionModel);
+        const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
+        addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
+
+        return {
+          pageNumber: pageNum,
+          text: page.text,
+          sceneHint: page.sceneHint,
+          sceneDescription: expansionResult.text,
+          clothing: page.clothing,
+          characters: page.characters
+        };
+      }))
+    );
+
+    log.debug(`📖 [UNIFIED] Expanded ${expandedScenes.length} scene descriptions`);
+
+    // Skip image generation if requested
+    if (skipImages) {
+      log.debug(`📖 [UNIFIED] Skipping image generation (text-only mode)`);
+
+      const result = {
+        title,
+        pages: expandedScenes.map(scene => ({
+          pageNumber: scene.pageNumber,
+          text: scene.text,
+          sceneDescription: scene.sceneDescription,
+          image: null
+        })),
+        coverImages: {},
+        visualBible,
+        tokenUsage,
+        generationMode: 'unified'
+      };
+
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [100, 'Story generation complete (text only)', jobId]
+      );
+
+      return result;
+    }
+
+    // PHASE 4: Generate cover images (parallel)
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [40, 'Generating cover images...', jobId]
+    );
+
+    const coverImages = {};
+    if (!skipCovers && coverHints) {
+      const coverLimit = pLimit(3);
+      const coverTypes = ['titlePage', 'initialPage', 'backCover'];
+
+      await Promise.all(coverTypes.map(coverType => coverLimit(async () => {
+        const hint = coverHints[coverType];
+        if (!hint) return;
+
+        const clothingCategory = hint.clothing || 'standard';
+        const coverCharacters = getCharactersInScene(hint.scene || '', inputData.characters);
+
+        // Get character photos with clothing
+        let costumeType = null;
+        let effectiveCategory = clothingCategory;
+        if (clothingCategory.startsWith('costumed:')) {
+          effectiveCategory = 'costumed';
+          costumeType = clothingCategory.split(':')[1];
+        }
+
+        const coverPhotos = getCharacterPhotoDetails(coverCharacters, effectiveCategory, costumeType, inputData.artStyle);
+
+        // Build cover prompt
+        const coverPrompt = buildImagePrompt(
+          hint.scene || `Cover scene for ${title}`,
+          inputData,
+          coverCharacters,
+          false,
+          visualBible,
+          0,
+          true,
+          coverPhotos
+        );
+
+        // Generate cover image with quality retry
+        const coverResult = await generateImageWithQualityRetry(
+          coverPrompt,
+          coverPhotos.map(p => p.photoUrl).filter(Boolean),
+          coverPhotos,
+          { maxRetries: 2, qualityThreshold: IMAGE_QUALITY_THRESHOLD },
+          modelOverrides
+        );
+
+        if (coverResult?.image) {
+          coverImages[coverType] = coverResult.image;
+          addUsage('gemini_image', coverResult.usage, 'cover_images', coverResult.modelId);
+          if (coverResult.qualityUsage) {
+            addUsage('gemini_quality', coverResult.qualityUsage, 'cover_quality');
+          }
+        }
+      })));
+    }
+
+    log.debug(`📖 [UNIFIED] Generated ${Object.keys(coverImages).length} cover images`);
+
+    // PHASE 5: Generate page images (parallel with rate limiting)
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [50, 'Generating page illustrations...', jobId]
+    );
+
+    const imageLimit = pLimit(5);
+    const allImages = await Promise.all(
+      expandedScenes.map((scene, index) => imageLimit(async () => {
+        const pageNum = scene.pageNumber;
+        const progressPercent = 50 + Math.floor((index / expandedScenes.length) * 40);
+
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [progressPercent, `Generating illustration ${pageNum}/${expandedScenes.length}...`, jobId]
+        );
+
+        const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
+        const clothingCategory = scene.clothing || 'standard';
+
+        let costumeType = null;
+        let effectiveCategory = clothingCategory;
+        if (clothingCategory.startsWith('costumed:')) {
+          effectiveCategory = 'costumed';
+          costumeType = clothingCategory.split(':')[1];
+        }
+
+        const pagePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveCategory, costumeType, inputData.artStyle);
+
+        const imagePrompt = buildImagePrompt(
+          scene.sceneDescription,
+          inputData,
+          sceneCharacters,
+          false,
+          visualBible,
+          pageNum,
+          true,
+          pagePhotos
+        );
+
+        const imageResult = await generateImageWithQualityRetry(
+          imagePrompt,
+          pagePhotos.map(p => p.photoUrl).filter(Boolean),
+          pagePhotos,
+          { maxRetries: 2, qualityThreshold: IMAGE_QUALITY_THRESHOLD },
+          modelOverrides
+        );
+
+        if (imageResult?.image) {
+          addUsage('gemini_image', imageResult.usage, 'page_images', imageResult.modelId);
+          if (imageResult.qualityUsage) {
+            addUsage('gemini_quality', imageResult.qualityUsage, 'page_quality');
+          }
+        }
+
+        return {
+          pageNumber: pageNum,
+          text: scene.text,
+          sceneDescription: scene.sceneDescription,
+          image: imageResult?.image || null,
+          imagePrompt
+        };
+      }))
+    );
+
+    log.debug(`📖 [UNIFIED] Generated ${allImages.filter(p => p.image).length}/${allImages.length} page images`);
+
+    // Calculate total cost
+    let totalCost = 0;
+    for (const [funcName, funcUsage] of Object.entries(tokenUsage.byFunction)) {
+      if (funcUsage.calls > 0) {
+        const models = Array.from(funcUsage.models);
+        const model = models[0] || funcUsage.provider;
+        const cost = calculateCost(model, funcUsage.input_tokens, funcUsage.output_tokens, funcUsage.thinking_tokens);
+        totalCost += cost.total;
+      }
+    }
+
+    log.debug(`💰 [UNIFIED] Total estimated cost: $${totalCost.toFixed(4)}`);
+
+    // Build final result
+    const result = {
+      title,
+      pages: allImages,
+      coverImages,
+      visualBible,
+      clothingRequirements,
+      tokenUsage,
+      estimatedCost: totalCost,
+      generationMode: 'unified'
+    };
+
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [95, 'Finalizing story...', jobId]
+    );
+
+    return result;
+
+  } catch (error) {
+    log.error(`❌ [UNIFIED] Error generating story:`, error.message);
+
+    // Try to refund credits on failure
+    try {
+      const jobRow = await dbPool.query('SELECT credits_reserved, user_id FROM story_jobs WHERE id = $1', [jobId]);
+      if (jobRow.rows.length > 0) {
+        const creditsToRefund = jobRow.rows[0].credits_reserved || 0;
+        const refundUserId = jobRow.rows[0].user_id;
+
+        if (creditsToRefund > 0 && refundUserId) {
+          await dbPool.query(
+            'UPDATE users SET credits = credits + $1 WHERE id = $2 RETURNING credits',
+            [creditsToRefund, refundUserId]
+          );
+          await dbPool.query(
+            'UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1',
+            [jobId]
+          );
+          log.info(`💳 [UNIFIED] Refunded ${creditsToRefund} credits for failed job ${jobId}`);
+        }
+      }
+    } catch (refundErr) {
+      log.error('❌ [UNIFIED] Failed to refund credits:', refundErr.message);
+    }
+
+    await dbPool.query(
+      `UPDATE story_jobs SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [error.message, jobId]
+    );
+
+    throw error;
+  }
+}
+
 // Background worker function to process a story generation job
 // NEW STREAMING ARCHITECTURE: Generate images as story batches complete
 async function processStoryJob(jobId) {
@@ -6251,18 +6651,24 @@ async function processStoryJob(jobId) {
       log.debug(`🔧 [PIPELINE] User overrides applied: ${JSON.stringify(filteredUserOverrides)}`);
     }
 
-    // Check if this is a picture book - use simplified combined flow
-    // Developer can override with generationMode: 'pictureBook' or 'outlineAndText'
-    let isPictureBook;
+    // Determine generation mode:
+    // - 'unified' (default): Single prompt + Art Director scene expansion (highest quality)
+    // - 'pictureBook': Combined text+scene in single prompt (faster, simpler)
+    // - 'outlineAndText': Separate outline + text prompts (legacy mode)
+    let generationMode;
     if (inputData.generationMode === 'pictureBook') {
-      isPictureBook = true;
+      generationMode = 'pictureBook';
       log.debug(`📚 [PIPELINE] Generation mode override: pictureBook (forced single prompt)`);
     } else if (inputData.generationMode === 'outlineAndText') {
-      isPictureBook = false;
+      generationMode = 'outlineAndText';
       log.debug(`📚 [PIPELINE] Generation mode override: outlineAndText (forced outline+text)`);
+    } else if (inputData.generationMode === 'unified') {
+      generationMode = 'unified';
+      log.debug(`📚 [PIPELINE] Generation mode: unified (single prompt + Art Director)`);
     } else {
-      // Auto: use reading level to determine mode (1st-grade = picture book)
-      isPictureBook = inputData.languageLevel === '1st-grade';
+      // Default: unified mode for all stories (best quality)
+      generationMode = 'unified';
+      log.debug(`📚 [PIPELINE] Generation mode: unified (default - single prompt + Art Director)`);
     }
 
     // Get language for scene descriptions (use centralized config)
@@ -6271,11 +6677,12 @@ async function processStoryJob(jobId) {
     const langText = getLanguageNameEnglish(lang);
 
     // Calculate number of story scenes to generate:
-    // - Picture Book: 1 scene per page (image + text on same page)
-    // - Standard: 1 scene per 2 print pages (text page + facing image page)
+    // - Picture Book / Unified: 1 scene per page (image + text on same page)
+    // - OutlineAndText: 1 scene per 2 print pages (text page + facing image page)
     const printPages = inputData.pages;  // Total pages when printed
-    const sceneCount = isPictureBook ? printPages : Math.floor(printPages / 2);
-    log.debug(`📚 [PIPELINE] Print pages: ${printPages}, Mode: ${isPictureBook ? 'Picture Book' : 'Standard'}, Scenes to generate: ${sceneCount}`);
+    const isPictureBookLayout = generationMode !== 'outlineAndText';
+    const sceneCount = isPictureBookLayout ? printPages : Math.floor(printPages / 2);
+    log.debug(`📚 [PIPELINE] Print pages: ${printPages}, Mode: ${generationMode}, Scenes to generate: ${sceneCount}`);
 
     if (skipImages) {
       log.debug(`📝 [PIPELINE] Text-only mode enabled - skipping image generation`);
@@ -6300,12 +6707,19 @@ async function processStoryJob(jobId) {
       ['processing', 5, 'Starting story generation...', jobId]
     );
 
-    if (isPictureBook) {
+    // Route to appropriate processing function based on generation mode
+    if (generationMode === 'unified') {
+      log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
+      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides);
+    }
+
+    if (generationMode === 'pictureBook') {
       log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
       return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides);
     }
 
-    // Standard flow for normal stories
+    // outlineAndText mode (legacy): Separate outline + text generation
+    log.debug(`📚 [PIPELINE] OutlineAndText mode - separate outline + text prompts`);
     await dbPool.query(
       'UPDATE story_jobs SET progress_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       ['Writing story...', jobId]

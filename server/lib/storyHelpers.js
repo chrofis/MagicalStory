@@ -11,8 +11,8 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { hashImageData } = require('./images');
 const { buildVisualBiblePrompt } = require('./visualBible');
-const { OutlineParser, extractCharacterNamesFromScene } = require('./outlineParser');
-const { getLanguageNote } = require('./languages');
+const { OutlineParser, UnifiedStoryParser, extractCharacterNamesFromScene } = require('./outlineParser');
+const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -1824,6 +1824,148 @@ Output a detailed scene description with:
 }
 
 // ============================================================================
+// UNIFIED STORY GENERATION
+// ============================================================================
+
+/**
+ * Build unified story generation prompt
+ * Generates complete story with character arcs, plot structure, visual bible, and all pages
+ * @param {Object} inputData - Story parameters
+ * @param {number} sceneCount - Number of story pages to generate
+ * @returns {string} Filled prompt template
+ */
+function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
+  const pageCount = sceneCount || inputData.pages || 15;
+  const readingLevel = getReadingLevel(inputData.languageLevel);
+  const mainCharacterIds = inputData.mainCharacters || [];
+  const language = inputData.language || 'en';
+
+  // Extract character info with strengths/flaws for character arcs
+  const characterSummary = (inputData.characters || []).map(char => {
+    const traits = char.traits || {};
+    return {
+      name: char.name,
+      isMainCharacter: mainCharacterIds.includes(char.id),
+      gender: char.gender,
+      age: char.age,
+      personality: char.personality,
+      strengths: traits.strengths || char.strengths || [],
+      flaws: traits.flaws || char.weaknesses || [],
+      challenges: traits.challenges || char.fears || [],
+      specialDetails: traits.specialDetails || char.specialDetails || ''
+    };
+  });
+
+  // Extract character names for Visual Bible exclusion
+  const characterNames = characterSummary.map(c => c.name).join(', ');
+
+  // Build relationship descriptions
+  let relationshipDescriptions = '';
+  if (inputData.relationships) {
+    const relationships = inputData.relationships;
+    const relationshipTexts = inputData.relationshipTexts || {};
+    const characters = inputData.characters || [];
+
+    const relationshipLines = Object.entries(relationships)
+      .filter(([key, type]) => type && type !== 'Not Known to')
+      .map(([key, type]) => {
+        const [char1Id, char2Id] = key.split('-').map(Number);
+        const char1 = characters.find(c => c.id === char1Id);
+        const char2 = characters.find(c => c.id === char2Id);
+        if (!char1 || !char2) return null;
+        const customText = relationshipTexts[key] || '';
+        const baseRelationship = `${char1.name} is ${type} ${char2.name}`;
+        return customText ? `${baseRelationship}. ${customText}` : baseRelationship;
+      })
+      .filter(Boolean);
+
+    if (relationshipLines.length > 0) {
+      relationshipDescriptions = `\n**Relationships:**\n${relationshipLines.map(r => `- ${r}`).join('\n')}`;
+    }
+  }
+
+  // Determine story category and build category-specific guidelines
+  const storyCategory = inputData.storyCategory || 'adventure';
+  const storyTopic = inputData.storyTopic || '';
+  const storyTheme = inputData.storyTheme || inputData.storyType || 'adventure';
+
+  // Get teaching guide from external file if available
+  const teachingGuide = getTeachingGuide(storyCategory, storyTopic);
+
+  let categoryGuidelines = '';
+  if (storyCategory === 'life-challenge') {
+    categoryGuidelines = `This is a LIFE SKILLS story about "${storyTopic}".
+
+**IMPORTANT GUIDELINES for Life Skills Stories:**
+- The story should help children understand and cope with the topic: ${storyTopic}
+- Show the main character(s) facing this challenge naturally within the story
+- Provide positive, age-appropriate messages about handling this situation
+- Include practical tips or coping strategies woven into the narrative
+- End with a hopeful, empowering message
+- Avoid being preachy - let the lesson emerge naturally from the story
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - integrate the life lesson into this theme creatively` : '- This is a realistic story set in everyday life situations'}
+
+${teachingGuide ? `**SPECIFIC GUIDANCE for "${storyTopic}":**
+${teachingGuide}` : ''}`;
+  } else if (storyCategory === 'educational') {
+    categoryGuidelines = `This is an EDUCATIONAL story teaching about "${storyTopic}".
+
+**IMPORTANT GUIDELINES for Educational Stories:**
+- Weave the educational content naturally into an engaging narrative
+- Include accurate, age-appropriate information about the topic
+- Use repetition and reinforcement to help children learn
+- Make the learning fun and memorable through story elements
+- Include moments where characters discover or apply what they're learning
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - make learning part of the adventure` : '- Use everyday situations to explore the educational topic'}
+
+${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
+${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
+  } else {
+    categoryGuidelines = `This is an ADVENTURE story with a ${storyTheme || 'adventure'} theme.
+
+**IMPORTANT GUIDELINES for Adventure Stories:**
+- Create an exciting, engaging adventure appropriate for the age group
+- Include elements typical of the ${storyTheme || 'adventure'} theme
+- Balance action and excitement with character development
+- Include challenges that the characters must overcome`;
+  }
+
+  // Build characters JSON with relationships
+  const charactersJson = JSON.stringify(characterSummary, null, 2) + relationshipDescriptions;
+
+  // Use template if available
+  if (PROMPT_TEMPLATES.storyUnified) {
+    const prompt = fillTemplate(PROMPT_TEMPLATES.storyUnified, {
+      LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
+      PAGES: pageCount,
+      LANGUAGE: getLanguageNameEnglish(language),
+      LANGUAGE_NOTE: getLanguageNote(language),
+      READING_LEVEL: readingLevel,
+      STORY_CATEGORY: storyCategory,
+      STORY_TYPE: storyTheme,
+      STORY_TOPIC: storyTopic || 'None',
+      STORY_DETAILS: inputData.storyDetails || 'None',
+      CHARACTERS: charactersJson,
+      CHARACTER_NAMES: characterNames,
+      CATEGORY_GUIDELINES: categoryGuidelines
+    });
+    log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars`);
+    return prompt;
+  }
+
+  // Fallback to hardcoded prompt
+  log.warn('[PROMPT] storyUnified template not loaded, using fallback');
+  return `Create a complete children's story with ${pageCount} pages.
+Language: ${getLanguageNameEnglish(language)}
+Reading Level: ${readingLevel}
+Characters: ${charactersJson}
+Story Type: ${storyTheme}
+Story Details: ${inputData.storyDetails || 'None'}
+
+Output: Title, clothing requirements, character arcs, plot structure, visual bible, cover scenes, and all ${pageCount} pages with text and scene hints.`;
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1867,6 +2009,7 @@ module.exports = {
   buildSceneDescriptionPrompt,
   buildImagePrompt,
   buildSceneExpansionPrompt,
+  buildUnifiedStoryPrompt,
 
   // Teaching guides
   getTeachingGuide

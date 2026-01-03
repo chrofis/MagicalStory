@@ -919,11 +919,319 @@ function extractCharacterNamesFromScene(sceneDescription) {
 }
 
 // ============================================================================
+// UNIFIED STORY PARSER - For parsing unified prompt output (single prompt mode)
+// ============================================================================
+
+/**
+ * Parser for unified story generation output
+ * Extracts all sections from a single combined prompt response
+ */
+class UnifiedStoryParser {
+  /**
+   * @param {string} response - The full unified story response
+   */
+  constructor(response) {
+    this.response = response || '';
+    this._cache = {};
+  }
+
+  /**
+   * Extract story title
+   * @returns {string|null}
+   */
+  extractTitle() {
+    if (this._cache.title !== undefined) return this._cache.title;
+
+    const match = this.response.match(/---TITLE---\s*(?:TITLE:\s*)?(.+?)(?:\n|$)/i);
+    if (match) {
+      this._cache.title = match[1].trim();
+      log.debug(`[UNIFIED-PARSER] Title: "${this._cache.title}"`);
+      return this._cache.title;
+    }
+
+    this._cache.title = null;
+    return null;
+  }
+
+  /**
+   * Extract clothing requirements JSON
+   * @returns {Object|null}
+   */
+  extractClothingRequirements() {
+    if (this._cache.clothingRequirements !== undefined) return this._cache.clothingRequirements;
+
+    const sectionMatch = this.response.match(/---CLOTHING REQUIREMENTS---\s*([\s\S]*?)(?=---[A-Z\s]+---|$)/i);
+    if (!sectionMatch) {
+      this._cache.clothingRequirements = null;
+      return null;
+    }
+
+    const section = sectionMatch[1];
+    const jsonMatch = section.match(/```json\s*([\s\S]*?)```/i) ||
+                      section.match(/(\{[\s\S]*?"clothingRequirements"[\s\S]*?\})/);
+
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        this._cache.clothingRequirements = parsed.clothingRequirements || parsed;
+        log.debug(`[UNIFIED-PARSER] Clothing requirements for ${Object.keys(this._cache.clothingRequirements).length} characters`);
+        return this._cache.clothingRequirements;
+      } catch (e) {
+        log.error(`[UNIFIED-PARSER] Failed to parse clothing requirements: ${e.message}`);
+      }
+    }
+
+    this._cache.clothingRequirements = null;
+    return null;
+  }
+
+  /**
+   * Extract character arcs section
+   * @returns {Object|null} - Map of character name to arc details
+   */
+  extractCharacterArcs() {
+    if (this._cache.characterArcs !== undefined) return this._cache.characterArcs;
+
+    const sectionMatch = this.response.match(/---CHARACTER ARCS---\s*([\s\S]*?)(?=---[A-Z\s]+---|$)/i);
+    if (!sectionMatch) {
+      this._cache.characterArcs = null;
+      return null;
+    }
+
+    const section = sectionMatch[1];
+    const arcs = {};
+
+    // Match character arc blocks: ### CharacterName followed by fields
+    const charPattern = /###\s*(.+?)\s*\n([\s\S]*?)(?=###\s|$)/g;
+    let match;
+    while ((match = charPattern.exec(section)) !== null) {
+      const name = match[1].trim();
+      const content = match[2];
+
+      arcs[name] = {
+        startingPoint: this._extractField(content, 'Starting Point'),
+        keyChallenges: this._extractField(content, 'Key Challenges'),
+        turningPoints: this._extractField(content, 'Turning Points'),
+        endState: this._extractField(content, 'End State'),
+        keyMoments: this._extractField(content, 'Key Moments')
+      };
+    }
+
+    this._cache.characterArcs = Object.keys(arcs).length > 0 ? arcs : null;
+    log.debug(`[UNIFIED-PARSER] Character arcs for ${Object.keys(arcs).length} characters`);
+    return this._cache.characterArcs;
+  }
+
+  /**
+   * Extract plot structure section
+   * @returns {Object|null}
+   */
+  extractPlotStructure() {
+    if (this._cache.plotStructure !== undefined) return this._cache.plotStructure;
+
+    const sectionMatch = this.response.match(/---PLOT STRUCTURE---\s*([\s\S]*?)(?=---[A-Z\s]+---|$)/i);
+    if (!sectionMatch) {
+      this._cache.plotStructure = null;
+      return null;
+    }
+
+    const section = sectionMatch[1];
+    const structure = {
+      primaryClothing: this._extractField(section, 'Primary Clothing') || 'standard',
+      clothingChanges: this._extractField(section, 'Clothing Changes'),
+      incitingIncident: this._extractField(section, 'Inciting Incident'),
+      risingAction: this._extractField(section, 'Rising Action'),
+      climax: this._extractField(section, 'Climax'),
+      fallingAction: this._extractField(section, 'Falling Action'),
+      resolution: this._extractField(section, 'Resolution'),
+      themes: this._extractField(section, 'Themes'),
+      tone: this._extractField(section, 'Tone')
+    };
+
+    this._cache.plotStructure = structure;
+    log.debug(`[UNIFIED-PARSER] Plot structure extracted (primary clothing: ${structure.primaryClothing})`);
+    return this._cache.plotStructure;
+  }
+
+  /**
+   * Extract Visual Bible JSON
+   * @returns {Object|null}
+   */
+  extractVisualBible() {
+    if (this._cache.visualBible !== undefined) return this._cache.visualBible;
+
+    const sectionMatch = this.response.match(/---VISUAL BIBLE---\s*([\s\S]*?)(?=---[A-Z\s]+---|$)/i);
+    if (!sectionMatch) {
+      this._cache.visualBible = null;
+      return null;
+    }
+
+    const section = sectionMatch[1];
+    const jsonMatch = section.match(/```json\s*([\s\S]*?)```/i) ||
+                      section.match(/(\{[\s\S]*?"(?:secondaryCharacters|animals|artifacts|locations)"[\s\S]*?\})/);
+
+    if (jsonMatch) {
+      try {
+        this._cache.visualBible = JSON.parse(jsonMatch[1]);
+        const counts = {
+          secondary: this._cache.visualBible.secondaryCharacters?.length || 0,
+          animals: this._cache.visualBible.animals?.length || 0,
+          artifacts: this._cache.visualBible.artifacts?.length || 0,
+          locations: this._cache.visualBible.locations?.length || 0
+        };
+        log.debug(`[UNIFIED-PARSER] Visual Bible: ${counts.secondary} secondary chars, ${counts.animals} animals, ${counts.artifacts} artifacts, ${counts.locations} locations`);
+        return this._cache.visualBible;
+      } catch (e) {
+        log.error(`[UNIFIED-PARSER] Failed to parse Visual Bible: ${e.message}`);
+      }
+    }
+
+    this._cache.visualBible = null;
+    return null;
+  }
+
+  /**
+   * Extract cover scene hints
+   * @returns {{titlePage: {hint: string, clothing: string}, initialPage: {hint: string, clothing: string}, backCover: {hint: string, clothing: string}}}
+   */
+  extractCoverHints() {
+    if (this._cache.coverHints !== undefined) return this._cache.coverHints;
+
+    const sectionMatch = this.response.match(/---COVER SCENE HINTS---\s*([\s\S]*?)(?=---STORY PAGES---|$)/i);
+    const defaults = {
+      titlePage: { hint: '', clothing: 'standard' },
+      initialPage: { hint: '', clothing: 'standard' },
+      backCover: { hint: '', clothing: 'standard' }
+    };
+
+    if (!sectionMatch) {
+      this._cache.coverHints = defaults;
+      return defaults;
+    }
+
+    const section = sectionMatch[1];
+
+    // Extract each cover hint
+    const extractCover = (label) => {
+      const pattern = new RegExp(`\\*\\*${label}\\*\\*\\s*(?:Hint:)?\\s*(.+?)(?:\\nClothing:\\s*(\\S+))?(?=\\n\\*\\*|$)`, 'is');
+      const match = section.match(pattern);
+      if (match) {
+        return {
+          hint: match[1].trim(),
+          clothing: (match[2] || 'standard').toLowerCase()
+        };
+      }
+      return { hint: '', clothing: 'standard' };
+    };
+
+    this._cache.coverHints = {
+      titlePage: extractCover('Title Page'),
+      initialPage: extractCover('Initial Page'),
+      backCover: extractCover('Back Cover')
+    };
+
+    log.debug(`[UNIFIED-PARSER] Cover hints extracted: title=${this._cache.coverHints.titlePage.hint.length > 0}, initial=${this._cache.coverHints.initialPage.hint.length > 0}, back=${this._cache.coverHints.backCover.hint.length > 0}`);
+    return this._cache.coverHints;
+  }
+
+  /**
+   * Extract all story pages with text, scene hint, clothing, and characters
+   * @returns {Array<{pageNumber: number, text: string, sceneHint: string, clothing: string, characters: string[]}>}
+   */
+  extractPages() {
+    if (this._cache.pages !== undefined) return this._cache.pages;
+
+    const pages = [];
+
+    // Match page blocks: --- Page X --- followed by TEXT: and SCENE HINT:
+    const pagePattern = /---\s*Page\s+(\d+)\s*---\s*([\s\S]*?)(?=---\s*Page\s+\d+\s*---|$)/gi;
+
+    let match;
+    while ((match = pagePattern.exec(this.response)) !== null) {
+      const pageNumber = parseInt(match[1], 10);
+      const content = match[2];
+
+      // Extract TEXT section
+      const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
+      const text = textMatch ? textMatch[1].trim() : '';
+
+      // Extract SCENE HINT section
+      const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Clothing:|Characters:|---\s*Page|$)/i);
+      const sceneHint = hintMatch ? hintMatch[1].trim() : '';
+
+      // Extract Clothing
+      const clothingMatch = content.match(/Clothing:\s*(\S+)/i);
+      let clothing = clothingMatch ? clothingMatch[1].toLowerCase() : 'standard';
+      if (clothing === 'same' || clothing === '[same]') {
+        // Use previous page's clothing or default to standard
+        const prevPage = pages.length > 0 ? pages[pages.length - 1] : null;
+        clothing = prevPage ? prevPage.clothing : 'standard';
+      }
+
+      // Extract Characters
+      const charactersMatch = content.match(/Characters:\s*(.+?)(?:\n|$)/i);
+      const characters = charactersMatch
+        ? charactersMatch[1].split(/[,&]/).map(c => c.trim()).filter(c => c.length > 0)
+        : [];
+
+      pages.push({
+        pageNumber,
+        text,
+        sceneHint,
+        clothing,
+        characters
+      });
+    }
+
+    // Sort by page number
+    pages.sort((a, b) => a.pageNumber - b.pageNumber);
+
+    this._cache.pages = pages;
+    log.debug(`[UNIFIED-PARSER] Extracted ${pages.length} pages`);
+    return pages;
+  }
+
+  /**
+   * Helper: Extract a field value from text
+   * @param {string} text - Text to search
+   * @param {string} fieldName - Field name to find
+   * @returns {string|null}
+   */
+  _extractField(text, fieldName) {
+    const pattern = new RegExp(`\\*\\*${fieldName}\\*\\*:\\s*(.+?)(?=\\n\\*\\*|$)`, 'is');
+    const match = text.match(pattern);
+    if (match) return match[1].trim();
+
+    // Try without bold
+    const plainPattern = new RegExp(`${fieldName}:\\s*(.+?)(?=\\n[A-Z]|$)`, 'is');
+    const plainMatch = text.match(plainPattern);
+    return plainMatch ? plainMatch[1].trim() : null;
+  }
+
+  /**
+   * Get a summary of what was parsed
+   * @returns {Object}
+   */
+  getSummary() {
+    return {
+      hasTitle: !!this.extractTitle(),
+      hasClothingRequirements: !!this.extractClothingRequirements(),
+      hasCharacterArcs: !!this.extractCharacterArcs(),
+      hasPlotStructure: !!this.extractPlotStructure(),
+      hasVisualBible: !!this.extractVisualBible(),
+      hasCoverHints: !!this.extractCoverHints().titlePage.hint,
+      pageCount: this.extractPages().length
+    };
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
 module.exports = {
   OutlineParser,
+  UnifiedStoryParser,
   KEYWORDS,
   CLOTHING_CATEGORIES,
   keywordPattern,
