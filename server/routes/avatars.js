@@ -927,3 +927,4 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
 });
 
 module.exports = router;
+module.exports.generateDynamicAvatar = generateDynamicAvatar;
