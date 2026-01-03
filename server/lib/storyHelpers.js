@@ -596,10 +596,11 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         let costumeKey = costumeType?.toLowerCase();
 
         // Look up costume type from clothingRequirements (per-character)
+        // clothingRequirements is a flat map: { "CharName": "costumed:costume-type" }
         if (!costumeKey && clothingRequirements) {
-          const charReqs = clothingRequirements[char.name];
-          if (charReqs?.costumed?.costume) {
-            costumeKey = charReqs.costumed.costume.toLowerCase();
+          const charClothing = clothingRequirements[char.name];
+          if (typeof charClothing === 'string' && charClothing.startsWith('costumed:')) {
+            costumeKey = charClothing.split(':')[1].toLowerCase();
             log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from clothingRequirements`);
           }
         }

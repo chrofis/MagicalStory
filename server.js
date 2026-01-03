@@ -6296,11 +6296,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           try {
             if (category === 'costumed' && config.costume) {
               log.debug(`⚡ [STREAM-AVATAR] Generating costumed avatar for ${char.name}: ${config.costume}`);
-              const result = await generateStyledCostumedAvatar(char, artStyle, config.costume, config.description);
-              if (result?.url) {
+              const result = await generateStyledCostumedAvatar(char, config, artStyle);
+              if (result?.success && result?.imageData) {
                 if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
                 if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-                char.avatars.styledAvatars[artStyle].costumed[config.costume.toLowerCase()] = result.url;
+                char.avatars.styledAvatars[artStyle].costumed[config.costume.toLowerCase()] = result.imageData;
                 log.debug(`✅ [STREAM-AVATAR] ${char.name} costumed:${config.costume} complete`);
               }
             } else if (['winter', 'summer', 'standard'].includes(category)) {
@@ -6494,11 +6494,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Enhance message to show parallel work
         let enhancedMessage = message;
         const avatarCount = streamingAvatarPromises.length;
-        const sceneCount = streamingSceneExpansionPromises.size;
-        if (avatarCount > 0 || sceneCount > 0) {
+        const scenesInProgress = streamingSceneExpansionPromises.size;
+        if (avatarCount > 0 || scenesInProgress > 0) {
           const parts = [];
           if (avatarCount > 0) parts.push(`${avatarCount} avatars`);
-          if (sceneCount > 0) parts.push(`${sceneCount} scenes`);
+          if (scenesInProgress > 0) parts.push(`${scenesInProgress} scenes`);
           enhancedMessage = `${message} (${parts.join(', ')} in progress)`;
         }
 
