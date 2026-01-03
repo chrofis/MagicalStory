@@ -6635,7 +6635,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       outlinePrompt: unifiedPrompt, // Prompt sent to API (dev mode)
       outlineModelId: unifiedModelId, // Model used (dev mode)
       outlineUsage: unifiedUsage, // Token usage (dev mode)
-      storyTextPrompts: storyTextPrompts, // Story text batch prompts (dev mode)
+      storyTextPrompts: [], // Not used in unified mode (single prompt generates all)
       visualBible: visualBible, // Recurring visual elements for consistency
       styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
       storyText: fullStoryText,

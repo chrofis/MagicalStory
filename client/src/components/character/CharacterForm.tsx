@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from 'react';
-import { Upload, Save, Pencil, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { Upload, Save, RefreshCw, Pencil, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
@@ -168,7 +168,7 @@ interface PhysicalTraitsGridProps {
   isAiExtracted?: boolean;
 }
 
-export function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparentAge, changedTraits, isAiExtracted }: PhysicalTraitsGridProps) {
+function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparentAge, changedTraits, isAiExtracted }: PhysicalTraitsGridProps) {
   const labelClass = isAiExtracted ? 'text-gray-400' : 'text-gray-600';
   const selectClass = (isChanged?: boolean) => `flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
     isChanged
@@ -378,19 +378,19 @@ export function CharacterForm({
   onCancel,
   onPhotoChange,
   onContinueToTraits,
-  onSaveAndGenerateAvatar: _onSaveAndGenerateAvatar,
-  onSaveAndRegenerateWithTraits: _onSaveAndRegenerateWithTraits,
-  onRegenerateAvatars: _onRegenerateAvatars,
-  onRegenerateAvatarsWithTraits: _onRegenerateAvatarsWithTraits,
+  onSaveAndGenerateAvatar: _onSaveAndGenerateAvatar,  // No longer used - avatar auto-generates on photo upload
+  onSaveAndRegenerateWithTraits,
+  onRegenerateAvatars,
+  onRegenerateAvatarsWithTraits,
   isLoading,
   isAnalyzingPhoto,
-  isGeneratingAvatar: _isGeneratingAvatar,
-  isRegeneratingAvatars: _isRegeneratingAvatars,
-  isRegeneratingAvatarsWithTraits: _isRegeneratingAvatarsWithTraits,
+  isGeneratingAvatar,
+  isRegeneratingAvatars,
+  isRegeneratingAvatarsWithTraits,
   step,
-  developerMode: _developerMode,
-  changedTraits: _changedTraits,
-  photoAnalysisDebug: _photoAnalysisDebug,
+  developerMode,
+  changedTraits: _changedTraits,  // Unused but kept for future use
+  photoAnalysisDebug,
   relationships = {},
   relationshipTexts = {},
   onRelationshipChange,
@@ -399,34 +399,9 @@ export function CharacterForm({
   onAddCustomRelationship,
 }: CharacterFormProps) {
   const { t, language } = useLanguage();
-  const [_enlargedAvatar, _setEnlargedAvatar] = useState(false);
+  const [enlargedAvatar, setEnlargedAvatar] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const [_isModifyingAvatar, _setIsModifyingAvatar] = useState(false);
-
-  // Wizard state for new character creation
-  type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
-  type EditSection = 'strengths' | 'weaknesses' | 'conflicts' | 'details' | 'relationships' | null;
-
-  // Check if step 1 info is already complete (from photo analysis)
-  const hasPhoto = !!(character.photos?.face || character.photos?.original);
-  const hasBasicInfo = !!(character.gender && character.age && String(character.age).trim() !== '');
-  const step1Complete = hasPhoto && hasBasicInfo;
-
-  // Start at step 2 if photo + basic info already filled
-  const [wizardStep, setWizardStep] = useState<WizardStep>(step1Complete ? 2 : 1);
-  const [editingSection, setEditingSection] = useState<EditSection>(null);
-
-  // Determine if character is "new" (needs wizard) or "existing" (compact edit view)
-  const isExistingCharacter = !!(
-    character.traits?.strengths?.length >= 3 &&
-    character.traits?.flaws?.length >= 2
-  );
-
-  // Check if there are other characters (for relationships step)
-  const hasOtherCharacters = allCharacters.filter(c => c.id !== character.id).length > 0;
-
-  // Calculate total steps (skip relationships if no other characters)
-  const totalWizardSteps = hasOtherCharacters ? 6 : 5;
+  const [isModifyingAvatar, setIsModifyingAvatar] = useState(false);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -467,8 +442,15 @@ export function CharacterForm({
     });
   };
 
-  // Avatar cooldown - available for future use
-  const { canRegenerate: _canRegenerate, waitSeconds: _waitSeconds, recordRegeneration: _recordRegeneration } = useAvatarCooldown(character.id);
+  // Avatar cooldown (uses extracted hook)
+  const { canRegenerate, waitSeconds, recordRegeneration } = useAvatarCooldown(character.id);
+
+  // Handle avatar regeneration with cooldown
+  const handleUserRegenerate = () => {
+    if (!canRegenerate) return;
+    recordRegeneration();
+    onRegenerateAvatarsWithTraits?.();
+  };
 
   const canSaveName = character.name && character.name.trim().length >= 2;
 
@@ -486,27 +468,6 @@ export function CharacterForm({
 
   // Get display photo URL
   const displayPhoto = character.photos?.face || character.photos?.original;
-
-  // Wizard navigation functions
-  const canProceedFromStep = (stepNum: WizardStep): boolean => {
-    switch (stepNum) {
-      case 1: return step1Complete;
-      case 2: return (character.traits?.strengths?.length || 0) >= 3;
-      case 3: return (character.traits?.flaws?.length || 0) >= 2;
-      case 4: case 5: case 6: return true;
-      default: return false;
-    }
-  };
-
-  const goToNextStep = () => {
-    if (wizardStep < totalWizardSteps && canProceedFromStep(wizardStep)) {
-      setWizardStep((wizardStep + 1) as WizardStep);
-    }
-  };
-
-  const goToPrevStep = () => {
-    if (wizardStep > 1) setWizardStep((wizardStep - 1) as WizardStep);
-  };
 
   // Step 1: Name entry + Avatar placeholder
   if (step === 'name') {
@@ -643,263 +604,869 @@ export function CharacterForm({
     );
   }
 
-  // ============================================================================
-  // EXISTING CHARACTER: Compact Edit View
-  // ============================================================================
-  if (isExistingCharacter && !editingSection) {
-    return (
-      <div className="space-y-4">
-        {/* Top section: Photo + Info on left, Avatar on right */}
-        <div className="flex gap-6">
-          {/* Left: Photo and editable info */}
-          <div className="flex-1">
-            <div className="flex items-start gap-4 mb-4">
-              <div className="flex-shrink-0">
-                {displayPhoto ? (
-                  <img src={displayPhoto} alt={character.name}
-                    className="w-20 h-20 rounded-full object-cover border-2 border-gray-300 cursor-pointer hover:opacity-80"
-                    onClick={() => setLightboxImage(displayPhoto)} />
-                ) : (
-                  <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
-                    <Upload size={24} className="text-gray-400" />
+  // Step 2: Traits and characteristics
+  return (
+    <div className="space-y-4">
+      {/* Main two-column layout on PC: left (photo/info/avatar) | right (traits) */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+        {/* Left column: Photo, info, avatar - fixed width on PC */}
+        <div className="lg:w-60 flex-shrink-0">
+          {/* Photo, name, and basic info */}
+          <div className="space-y-3">
+          {/* Header with photo and name */}
+          <div className="flex items-center gap-3 mb-3">
+            {/* Photo thumbnail */}
+            <div className="flex-shrink-0">
+              {isAnalyzingPhoto ? (
+                <div className="w-14 h-14 rounded-full bg-indigo-100 border-2 border-indigo-400 flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : displayPhoto ? (
+                <img
+                  src={displayPhoto}
+                  alt={character.name}
+                  className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setLightboxImage(displayPhoto)}
+                  title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
+                  <Upload size={18} className="text-gray-400" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <h3 className="text-xl font-bold text-gray-800">{character.name}</h3>
+              {/* Change Photo button - always visible */}
+              <label className="cursor-pointer bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs hover:bg-gray-200 flex items-center gap-1 w-fit transition-colors border border-gray-200">
+                <Upload size={10} />
+                {language === 'de' ? 'Foto ändern' : language === 'fr' ? 'Changer la photo' : 'Change Photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* Basic Info - Stacked vertically */}
+          <div className="space-y-2 mb-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.gender}</label>
+              <select
+                value={character.gender}
+                onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
+                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs bg-white focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="male">{t.male}</option>
+                <option value="female">{t.female}</option>
+                <option value="other">{t.other}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.age}</label>
+              <input
+                type="number"
+                value={character.age}
+                onChange={(e) => updateField('age', e.target.value)}
+                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs focus:border-indigo-500 focus:outline-none"
+                min="1"
+                max="120"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">
+                {language === 'de' ? 'Grösse' : language === 'fr' ? 'Taille' : 'Height'}
+              </label>
+              <input
+                type="number"
+                value={character.physical?.height || ''}
+                onChange={(e) => updatePhysical('height', e.target.value)}
+                className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs focus:border-indigo-500 focus:outline-none"
+                placeholder="cm"
+                min="50"
+                max="250"
+              />
+            </div>
+          </div>
+
+          {/* Physical Features - Only in dev mode */}
+          {developerMode && (
+            <details className="bg-gray-50 border border-gray-200 rounded-lg mt-2">
+              <summary className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
+                {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
+              </summary>
+              <div className="px-3 pb-3">
+                <PhysicalTraitsGrid
+                  character={character}
+                  language={language}
+                  updatePhysical={updatePhysical}
+                  updateApparentAge={(v) => updateField('apparentAge', v)}
+                />
+              </div>
+            </details>
+          )}
+
+          {/* Avatar section - below info on mobile, in same column on PC */}
+          <div className="text-center">
+            {character.avatars?.standard ? (
+              <div className="relative">
+                <img
+                  src={character.avatars.standard}
+                  alt={`${character.name} avatar`}
+                  className={`w-40 h-56 object-contain rounded-lg border-2 bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'border-amber-400 opacity-80' : 'border-indigo-300'}`}
+                  onClick={() => setEnlargedAvatar(true)}
+                  title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
+                />
+                {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
               </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-gray-800 mb-2">{character.name}</h3>
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <select value={character.gender} onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm bg-white">
-                    <option value="male">{t.male}</option>
-                    <option value="female">{t.female}</option>
-                    <option value="other">{t.other}</option>
-                  </select>
-                  <input type="number" value={character.age} onChange={(e) => updateField('age', e.target.value)}
-                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm" placeholder={language === 'de' ? 'Alter' : 'Age'} />
-                  <input type="number" value={character.physical?.height || ''} onChange={(e) => updatePhysical('height', e.target.value)}
-                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="cm" />
+            ) : (
+              <div className="w-40 h-56 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
+                {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs text-indigo-600 font-medium px-2 text-center">
+                      {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création...' : 'Creating...'}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-gray-400 text-center px-2">
+                    {language === 'de' ? 'Kein Avatar' : 'No avatar'}
+                  </span>
+                )}
+              </div>
+            )}
+            {/* Enlarged avatar modal */}
+            {enlargedAvatar && character.avatars?.standard && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+                onClick={() => setEnlargedAvatar(false)}
+              >
+                <img
+                  src={character.avatars.standard}
+                  alt={`${character.name} avatar`}
+                  className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <button
+                  className="absolute top-4 right-4 text-white text-3xl hover:text-gray-300"
+                  onClick={() => setEnlargedAvatar(false)}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            {/* Avatar action buttons */}
+            <div className="mt-2 space-y-1">
+              {/* Modify Avatar button - for all users (blue style) */}
+              <button
+                onClick={() => setIsModifyingAvatar(true)}
+                className="w-full px-2 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex items-center justify-center gap-1 border border-indigo-200"
+              >
+                <Pencil size={10} />
+                {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+              </button>
+              {/* Regenerate button - developer mode only */}
+              {developerMode && (
+                <button
+                  onClick={handleUserRegenerate}
+                  disabled={!canRegenerate || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                  className="w-full px-2 py-1 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                  title={!canRegenerate ? `Wait ${waitSeconds}s` : undefined}
+                >
+                  <RefreshCw size={10} />
+                  {!canRegenerate ? (
+                    `${waitSeconds}s`
+                  ) : (isRegeneratingAvatars || isRegeneratingAvatarsWithTraits) ? (
+                    language === 'de' ? 'Generiere...' : 'Generating...'
+                  ) : (
+                    language === 'de' ? 'Neu generieren' : 'Regenerate'
+                  )}
+                </button>
+              )}
+            </div>
+            {/* Developer mode: show face match score with full details */}
+            {developerMode && character.avatars?.faceMatch?.standard && (
+              <details className="mt-1 text-left">
+                <summary className={`text-[10px] font-medium cursor-pointer ${
+                  character.avatars.faceMatch.standard.score >= 6 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  Face eval: {character.avatars.faceMatch.standard.score}/10
+                </summary>
+                <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
+                  {character.avatars.faceMatch.standard.details}
+                </pre>
+              </details>
+            )}
+            {/* Developer mode: show extracted clothing per avatar */}
+            {developerMode && character.avatars?.clothing && Object.keys(character.avatars.clothing).length > 0 && (
+              <details className="mt-1 text-left">
+                <summary className="text-[10px] font-medium cursor-pointer text-blue-600">
+                  Clothing ({Object.keys(character.avatars.clothing).length} avatars)
+                </summary>
+                <div className="mt-1 p-2 rounded text-[9px] border bg-gray-100 border-gray-200 space-y-1">
+                  {Object.entries(character.avatars.clothing).map(([category, clothing]) => (
+                    <div key={category}>
+                      <span className="font-semibold">{category}:</span> {clothing}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+            {/* Developer mode: show full raw API response */}
+            {developerMode && character.avatars?.rawEvaluation && (
+              <details className="mt-1 text-left">
+                <summary className="text-[10px] font-medium cursor-pointer text-purple-600">
+                  Full API Response
+                </summary>
+                <pre className="mt-1 p-2 rounded text-[8px] whitespace-pre-wrap overflow-auto max-h-64 border bg-gray-100 border-gray-200">
+                  {JSON.stringify(character.avatars.rawEvaluation, null, 2)}
+                </pre>
+              </details>
+            )}
+          </div>
+          </div>
+        </div>
+
+        {/* Right column: Traits - full width */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* Trait Selectors */}
+          <TraitSelector
+            label={t.strengths}
+            traits={localizedStrengths}
+            selectedTraits={character.traits?.strengths || []}
+            onSelect={(traits) => updateTraits('strengths', traits)}
+            minRequired={3}
+          />
+
+          <TraitSelector
+            label={language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : 'Flaws'}
+            traits={localizedFlaws}
+            selectedTraits={character.traits?.flaws || []}
+            onSelect={(traits) => updateTraits('flaws', traits)}
+            minRequired={2}
+          />
+
+          <TraitSelector
+            label={language === 'de' ? 'Konflikte / Herausforderungen' : language === 'fr' ? 'Conflits / Défis' : 'Conflicts / Challenges'}
+            traits={localizedChallenges}
+            selectedTraits={character.traits?.challenges || []}
+            onSelect={(traits) => updateTraits('challenges', traits)}
+          />
+
+          {/* Special Details */}
+          <div>
+            <label className="block text-lg font-semibold mb-2 text-indigo-700">{t.specialDetails}</label>
+            <textarea
+              value={character.traits?.specialDetails || ''}
+              onChange={(e) => updateTraits('specialDetails', e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
+              placeholder={t.specialDetailsPlaceholder}
+              rows={3}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Developer Mode: Show body crop with transparent background */}
+      {developerMode && character.photos?.bodyNoBg && (
+        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3">
+          <h4 className="text-xs font-semibold text-yellow-700 mb-2">
+            Body Crop (No Background)
+          </h4>
+          <div className="flex justify-center">
+            <img
+              src={character.photos.bodyNoBg}
+              alt={`${character.name} body crop`}
+              className="max-h-48 object-contain rounded border border-gray-300"
+              style={{ background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 20px 20px' }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Developer Mode: Show raw Gemini response from photo analysis */}
+      {developerMode && photoAnalysisDebug?.rawResponse && (
+        <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
+          <summary className="text-xs font-semibold text-purple-700 cursor-pointer">
+            Raw Gemini Response (Photo Analysis)
+            {photoAnalysisDebug.error && <span className="text-red-500 ml-2">⚠️ {photoAnalysisDebug.error}</span>}
+          </summary>
+          <pre className="mt-2 p-2 bg-white rounded text-[10px] whitespace-pre-wrap overflow-auto max-h-64 border border-purple-200 font-mono">
+            {photoAnalysisDebug.rawResponse}
+          </pre>
+        </details>
+      )}
+
+      {/* Clothing Avatars (developer only - all 4 variants) */}
+      {developerMode && (
+        <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-2">
+            {language === 'de' ? 'Kleidungs-Avatare' : language === 'fr' ? 'Avatars vestimentaires' : 'Clothing Avatars'}
+            {character.avatars?.status === 'generating' && (
+              <span className="text-xs font-normal text-teal-500 flex items-center gap-1">
+                <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                {language === 'de' ? 'Generierung läuft...' : 'Generating...'}
+              </span>
+            )}
+            {character.avatars?.status === 'complete' && !character.avatars?.stale && (
+              <span className="text-xs font-normal text-green-600">
+                {language === 'de' ? 'Fertig' : language === 'fr' ? 'Terminé' : 'Complete'}
+              </span>
+            )}
+            {character.avatars?.stale && (
+              <span className="text-xs font-normal text-amber-600">
+                ⚠️ {language === 'de' ? 'Von altem Foto' : language === 'fr' ? 'De l\'ancienne photo' : 'From previous photo'}
+              </span>
+            )}
+            {character.avatars?.status === 'failed' && (
+              <span className="text-xs font-normal text-red-600">
+                {language === 'de' ? 'Fehlgeschlagen' : language === 'fr' ? 'Échoué' : 'Failed'}
+              </span>
+            )}
+          </h4>
+          <div className="grid grid-cols-4 gap-2">
+            {(['winter', 'standard', 'summer', 'formal'] as const).map((category) => (
+              <div key={category} className="text-center">
+                <div className="text-xs font-medium text-gray-600 mb-1 capitalize">
+                  {category === 'winter' ? '❄️' : category === 'summer' ? '☀️' : category === 'formal' ? '👔' : '👕'}
+                  <span className="ml-0.5">
+                    {language === 'de'
+                      ? (category === 'winter' ? 'Winter' : category === 'summer' ? 'Sommer' : category === 'formal' ? 'Formal' : 'Standard')
+                      : category}
+                  </span>
+                </div>
+                {character.avatars?.[category] ? (
+                  <div
+                    className="relative cursor-pointer group"
+                    onClick={() => setLightboxImage(character.avatars?.[category] || null)}
+                    title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
+                  >
+                    <img
+                      src={character.avatars[category]}
+                      alt={`${character.name} - ${category}`}
+                      className={`w-full h-40 object-contain rounded border bg-white transition-all group-hover:shadow-lg group-hover:scale-[1.02] ${character.avatars?.stale ? 'border-amber-400 opacity-75' : 'border-teal-200'}`}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded flex items-center justify-center">
+                      <span className="text-white opacity-0 group-hover:opacity-100 text-lg">🔍</span>
+                    </div>
+                    {character.avatars?.stale && (
+                      <div className="absolute top-1 right-1 bg-amber-500 text-white text-[8px] px-1 py-0.5 rounded">
+                        {language === 'de' ? 'Alt' : 'Old'}
+                      </div>
+                    )}
+                    {developerMode && character.avatars?.faceMatch?.[category] && (
+                      <div className={`absolute bottom-1 left-1 text-white text-[8px] px-1 py-0.5 rounded font-medium ${
+                        character.avatars.faceMatch[category].score >= 6 ? 'bg-green-600' : 'bg-red-600'
+                      }`}>
+                        {character.avatars.faceMatch[category].score}/10
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full h-40 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-[10px]">
+                    {character.avatars?.status === 'generating' ? '...' : '—'}
+                  </div>
+                )}
+                {/* Dev mode: Always show clothing description below avatar */}
+                {developerMode && character.avatars?.clothing?.[category] && (
+                  <div className="mt-1 p-1.5 rounded text-[10px] text-left bg-blue-50 border border-blue-200 text-blue-700">
+                    <span className="font-semibold">👕 </span>
+                    {character.avatars.clothing[category]}
+                  </div>
+                )}
+                {developerMode && character.avatars?.[category] && !character.avatars?.clothing?.[category] && (
+                  <div className="mt-1 p-1.5 rounded text-[10px] text-left bg-amber-50 border border-amber-200 text-amber-600">
+                    ⚠️ No clothing data - regenerate avatar
+                  </div>
+                )}
+                {developerMode && (
+                  <>
+                    {character.avatars?.prompts?.[category] && (
+                      <details className="mt-1 text-left">
+                        <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">Show prompt</summary>
+                        <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
+                          {character.avatars.prompts[category]}
+                        </pre>
+                      </details>
+                    )}
+                    {character.avatars?.faceMatch?.[category] && (
+                      <details className="mt-1 text-left">
+                        <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">
+                          Face eval ({character.avatars.faceMatch[category].score}/10)
+                        </summary>
+                        <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
+                          {character.avatars.faceMatch[category].details}
+                        </pre>
+                      </details>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            {character.avatars?.generatedAt && (
+              <div className="text-xs text-teal-500">
+                Generated: {new Date(character.avatars.generatedAt).toLocaleString()}
+              </div>
+            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {onRegenerateAvatarsWithTraits && (
+                <button
+                  onClick={onRegenerateAvatarsWithTraits}
+                  disabled={isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                  className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  title={language === 'de' ? 'Generiert Avatare mit allen physischen Merkmalen (Brille, Haarfarbe, etc.)' : 'Generates avatars with all physical traits (glasses, hair color, etc.)'}
+                >
+                  {isRegeneratingAvatarsWithTraits ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {language === 'de' ? 'Generiere...' : 'Generating...'}
+                    </>
+                  ) : (
+                    <>{language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}</>
+                  )}
+                </button>
+              )}
+              {onRegenerateAvatars && (
+                <button
+                  onClick={onRegenerateAvatars}
+                  disabled={isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                  className="px-3 py-1.5 text-xs font-medium bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  title={language === 'de' ? 'Alte Methode ohne physische Merkmale' : 'Old method without physical traits'}
+                >
+                  {isRegeneratingAvatars ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {language === 'de' ? 'Generiere...' : 'Generating...'}
+                    </>
+                  ) : (
+                    <>{language === 'de' ? 'Ohne Merkmale (alt)' : language === 'fr' ? 'Sans traits (ancien)' : 'Without Traits (old)'}</>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Costumed Avatars (developer only - from visual bible costumes) */}
+      {developerMode && character.avatars?.costumed && Object.keys(character.avatars.costumed).length > 0 && (
+        <div className="bg-orange-50 border border-orange-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-orange-700 mb-3 flex items-center gap-2">
+            🎭 {language === 'de' ? 'Kostümierte Avatare' : language === 'fr' ? 'Avatars costumés' : 'Costumed Avatars'}
+            <span className="text-xs font-normal text-orange-500">
+              ({Object.keys(character.avatars.costumed).length} {language === 'de' ? 'Kostüme' : 'costumes'})
+            </span>
+          </h4>
+          <div className="grid grid-cols-4 gap-2">
+            {Object.entries(character.avatars.costumed).map(([costumeType, avatarData]) => {
+              const imageUrl = typeof avatarData === 'string' ? avatarData : avatarData?.imageData;
+              const clothing = typeof avatarData === 'object' ? avatarData?.clothing : undefined;
+              return (
+                <div key={costumeType} className="text-center">
+                  <div className="text-xs font-medium text-orange-600 mb-1 truncate" title={costumeType}>
+                    🎭 {costumeType}
+                  </div>
+                  {imageUrl ? (
+                    <div
+                      className="relative cursor-pointer group"
+                      onClick={() => setLightboxImage(imageUrl)}
+                      title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`${character.name} - ${costumeType}`}
+                        className="w-full h-40 object-contain rounded border border-orange-200 bg-white transition-all group-hover:shadow-lg group-hover:scale-[1.02]"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded flex items-center justify-center">
+                        <span className="text-white opacity-0 group-hover:opacity-100 text-lg">🔍</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-40 rounded border border-dashed border-orange-300 bg-orange-100/50 flex items-center justify-center text-orange-400 text-[10px]">
+                      —
+                    </div>
+                  )}
+                  {/* Show clothing description if available */}
+                  {clothing && (
+                    <div className="mt-1 p-1.5 rounded text-[10px] text-left bg-orange-100 border border-orange-200 text-orange-700">
+                      <span className="font-semibold">👕 </span>
+                      {clothing}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Styled Avatars (developer only - pre-converted to art styles) */}
+      {developerMode && character.avatars?.styledAvatars && Object.keys(character.avatars.styledAvatars).length > 0 && (
+        <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
+            🎨 {language === 'de' ? 'Stilisierte Avatare' : language === 'fr' ? 'Avatars stylisés' : 'Styled Avatars'}
+            <span className="text-xs font-normal text-purple-500">
+              ({Object.keys(character.avatars.styledAvatars).length} {language === 'de' ? 'Stile' : 'styles'})
+            </span>
+          </h4>
+          <div className="space-y-4">
+            {Object.entries(character.avatars.styledAvatars).map(([artStyle, avatars]) => {
+              const styleLabels: Record<string, { en: string; de: string; emoji: string }> = {
+                'pixar': { en: 'Pixar 3D', de: 'Pixar 3D', emoji: '🎬' },
+                'watercolor': { en: 'Watercolor', de: 'Aquarell', emoji: '🎨' },
+                'comic-book': { en: 'Comic Book', de: 'Comic', emoji: '💥' },
+                'anime': { en: 'Anime', de: 'Anime', emoji: '🌸' },
+                'oil-painting': { en: 'Oil Painting', de: 'Ölmalerei', emoji: '🖼️' },
+                'colored-pencil': { en: 'Colored Pencil', de: 'Buntstift', emoji: '✏️' },
+                'storybook': { en: 'Storybook', de: 'Bilderbuch', emoji: '📖' },
+              };
+              const styleInfo = styleLabels[artStyle] || { en: artStyle, de: artStyle, emoji: '🎭' };
+              const clothingOrder = ['standard', 'winter', 'summer', 'formal'] as const;
+              const clothingEmojis: Record<string, string> = {
+                'standard': '👕',
+                'winter': '❄️',
+                'summer': '☀️',
+                'formal': '👔'
+              };
+
+              // Get costumed avatars if they exist
+              const costumedAvatars = (avatars as Record<string, unknown>).costumed as Record<string, string> | undefined;
+              const costumeTypes = costumedAvatars ? Object.keys(costumedAvatars) : [];
+
+              return (
+                <div key={artStyle} className="border border-purple-200 rounded-lg p-3 bg-white">
+                  <h5 className="text-xs font-semibold text-purple-600 mb-2">
+                    {styleInfo.emoji} {language === 'de' ? styleInfo.de : styleInfo.en}
+                  </h5>
+                  {/* Standard clothing avatars */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {clothingOrder.map((category) => {
+                      const avatar = avatars[category];
+                      return (
+                        <div key={category} className="text-center">
+                          <div className="text-[10px] text-gray-500 mb-1">
+                            {clothingEmojis[category]} {category}
+                          </div>
+                          {avatar ? (
+                            <img
+                              src={avatar}
+                              alt={`${character.name} - ${artStyle} - ${category}`}
+                              className="w-full h-32 object-contain rounded border border-purple-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => setLightboxImage(avatar)}
+                              title="Click to enlarge"
+                            />
+                          ) : (
+                            <div className="w-full h-32 rounded border border-dashed border-purple-200 bg-purple-50/50 flex items-center justify-center text-purple-300 text-[10px]">
+                              —
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Costumed avatars (from visual bible) */}
+                  {costumeTypes.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-purple-200">
+                      <div className="text-[10px] font-medium text-orange-600 mb-2">
+                        🎭 {language === 'de' ? 'Kostümierte Avatare' : 'Costumed Avatars'}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {costumeTypes.map((costumeType) => {
+                          const avatar = costumedAvatars![costumeType];
+                          return (
+                            <div key={costumeType} className="text-center">
+                              <div className="text-[10px] text-orange-500 mb-1 truncate" title={costumeType}>
+                                🎭 {costumeType}
+                              </div>
+                              {avatar ? (
+                                <img
+                                  src={avatar}
+                                  alt={`${character.name} - ${artStyle} - ${costumeType}`}
+                                  className="w-full h-32 object-contain rounded border border-orange-200 bg-orange-50/50 cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => setLightboxImage(avatar)}
+                                  title="Click to enlarge"
+                                />
+                              ) : (
+                                <div className="w-full h-32 rounded border border-dashed border-orange-200 bg-orange-50/50 flex items-center justify-center text-orange-300 text-[10px]">
+                                  —
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Relationships with other characters */}
+      {allCharacters.length > 1 && onRelationshipChange && onRelationshipTextChange && (
+        <CharacterRelationships
+          character={character}
+          allCharacters={allCharacters}
+          relationships={relationships}
+          relationshipTexts={relationshipTexts}
+          onRelationshipChange={onRelationshipChange}
+          onRelationshipTextChange={onRelationshipTextChange}
+          customRelationships={customRelationships}
+          onAddCustomRelationship={onAddCustomRelationship}
+        />
+      )}
+
+      {/* Save/Cancel Buttons */}
+      <div className="flex gap-3 max-w-md">
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+          >
+            {t.cancel}
+          </button>
+        )}
+        <Button
+          onClick={() => {
+            // If no avatars yet and we can generate them, save + generate
+            // Otherwise just save
+            const hasAvatars = !!(character.avatars?.winter || character.avatars?.standard || character.avatars?.summer || character.avatars?.formal);
+            if (!hasAvatars && onSaveAndRegenerateWithTraits) {
+              onSaveAndRegenerateWithTraits();
+            } else {
+              onSave();
+            }
+          }}
+          disabled={!canSaveCharacter || isLoading || isRegeneratingAvatarsWithTraits}
+          loading={isLoading || isRegeneratingAvatarsWithTraits}
+          icon={Save}
+          className={onCancel ? "flex-1" : "w-full"}
+        >
+          {t.saveCharacter}
+        </Button>
+      </div>
+
+      {!canSaveCharacter && (
+        <p className="text-sm text-red-500 text-center">
+          {t.selectStrengthsFlaws}
+        </p>
+      )}
+
+      {/* Lightbox for enlarged styled avatars */}
+      <ImageLightbox
+        src={lightboxImage}
+        onClose={() => setLightboxImage(null)}
+      />
+
+      {/* Full-page modal for Modify Avatar */}
+      {isModifyingAvatar && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+            </h2>
+            <button
+              onClick={() => setIsModifyingAvatar(false)}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Content - Responsive: side by side on wide screens, stacked on mobile */}
+          <div className="flex-1 overflow-auto p-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Left side (or top on mobile): Avatar preview */}
+                <div className="flex-shrink-0 flex justify-center md:justify-start">
+                  {character.avatars?.standard ? (
+                    <img
+                      src={character.avatars.standard}
+                      alt={`${character.name} avatar`}
+                      className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
+                    />
+                  ) : (
+                    <div className="w-48 h-64 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
+                      <span className="text-gray-400 text-sm">
+                        {language === 'de' ? 'Kein Avatar' : 'No avatar'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right side (or bottom on mobile): Form fields */}
+                <div className="flex-1 space-y-4">
+                  {/* Physical traits - FIRST */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
+                    </h3>
+                    <PhysicalTraitsGrid
+                      character={character}
+                      language={language}
+                      updatePhysical={updatePhysical}
+                      updateApparentAge={(v) => updateField('apparentAge', v)}
+                    />
+                  </div>
+
+                  {/* Clothing - SECOND - Structured inputs */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      {language === 'de' ? 'Kleidung' : language === 'fr' ? 'Vêtements' : 'Clothing'}
+                    </h3>
+                    <div className="space-y-3">
+                      {/* Full body option (dress, jumpsuit) - shown first for females */}
+                      {character.gender === 'female' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            {language === 'de' ? 'Kleid / Overall' : language === 'fr' ? 'Robe / Combinaison' : 'Dress / Jumpsuit'}
+                          </label>
+                          <input
+                            type="text"
+                            value={character.clothing?.structured?.fullBody || ''}
+                            onChange={(e) => onChange({
+                              ...character,
+                              clothing: {
+                                ...character.clothing,
+                                structured: {
+                                  ...character.clothing?.structured,
+                                  fullBody: e.target.value,
+                                  // Clear upper/lower if full body is entered
+                                  ...(e.target.value ? { upperBody: '', lowerBody: '' } : {}),
+                                },
+                              },
+                            })}
+                            placeholder={language === 'de' ? 'z.B. rotes Sommerkleid' : language === 'fr' ? 'ex. robe d\'été rouge' : 'e.g. red summer dress'}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      {/* Upper body - disabled if full body is entered */}
+                      <div className={character.clothing?.structured?.fullBody ? 'opacity-50' : ''}>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          {language === 'de' ? 'Oberteil' : language === 'fr' ? 'Haut' : 'Upper Body'}
+                        </label>
+                        <input
+                          type="text"
+                          value={character.clothing?.structured?.upperBody || ''}
+                          onChange={(e) => onChange({
+                            ...character,
+                            clothing: {
+                              ...character.clothing,
+                              structured: {
+                                ...character.clothing?.structured,
+                                upperBody: e.target.value,
+                              },
+                            },
+                          })}
+                          disabled={!!character.clothing?.structured?.fullBody}
+                          placeholder={language === 'de' ? 'z.B. blaues T-Shirt' : language === 'fr' ? 'ex. t-shirt bleu' : 'e.g. blue t-shirt'}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        />
+                      </div>
+
+                      {/* Lower body - disabled if full body is entered */}
+                      <div className={character.clothing?.structured?.fullBody ? 'opacity-50' : ''}>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          {language === 'de' ? 'Unterteil' : language === 'fr' ? 'Bas' : 'Lower Body'}
+                        </label>
+                        <input
+                          type="text"
+                          value={character.clothing?.structured?.lowerBody || ''}
+                          onChange={(e) => onChange({
+                            ...character,
+                            clothing: {
+                              ...character.clothing,
+                              structured: {
+                                ...character.clothing?.structured,
+                                lowerBody: e.target.value,
+                              },
+                            },
+                          })}
+                          disabled={!!character.clothing?.structured?.fullBody}
+                          placeholder={language === 'de' ? 'z.B. dunkle Jeans' : language === 'fr' ? 'ex. jeans foncé' : 'e.g. dark jeans'}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        />
+                      </div>
+
+                      {/* Shoes */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          {language === 'de' ? 'Schuhe' : language === 'fr' ? 'Chaussures' : 'Shoes'}
+                        </label>
+                        <input
+                          type="text"
+                          value={character.clothing?.structured?.shoes || ''}
+                          onChange={(e) => onChange({
+                            ...character,
+                            clothing: {
+                              ...character.clothing,
+                              structured: {
+                                ...character.clothing?.structured,
+                                shoes: e.target.value,
+                              },
+                            },
+                          })}
+                          placeholder={language === 'de' ? 'z.B. weiße Turnschuhe' : language === 'fr' ? 'ex. baskets blanches' : 'e.g. white sneakers'}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right: Big Avatar */}
-          <div className="flex-shrink-0">
-            {character.avatars?.standard ? (
-              <img src={character.avatars.standard} alt={`${character.name} avatar`}
-                className="w-40 h-56 object-contain rounded-lg border border-gray-200 bg-white cursor-pointer hover:opacity-90"
-                onClick={() => setLightboxImage(character.avatars?.standard || null)} />
-            ) : (
-              <div className="w-40 h-56 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400 text-xs">
-                {language === 'de' ? 'Kein Avatar' : 'No avatar'}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Traits - clean rows without colors */}
-        <div className="space-y-2 text-sm">
-          <div className="flex items-start gap-2">
-            <span className="font-medium text-gray-700 w-24 flex-shrink-0">{t.strengths}:</span>
-            <span className="flex-1 text-gray-600">{(character.traits?.strengths || []).join(', ') || '—'}</span>
-            <button onClick={() => setEditingSection('strengths')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="font-medium text-gray-700 w-24 flex-shrink-0">{language === 'de' ? 'Schwächen' : 'Weaknesses'}:</span>
-            <span className="flex-1 text-gray-600">{(character.traits?.flaws || []).join(', ') || '—'}</span>
-            <button onClick={() => setEditingSection('weaknesses')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="font-medium text-gray-700 w-24 flex-shrink-0">{language === 'de' ? 'Konflikte' : 'Conflicts'}:</span>
-            <span className="flex-1 text-gray-600">{(character.traits?.challenges || []).join(', ') || '—'}</span>
-            <button onClick={() => setEditingSection('conflicts')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="font-medium text-gray-700 w-24 flex-shrink-0">{t.specialDetails}:</span>
-            <span className="flex-1 text-gray-600">{character.traits?.specialDetails || '—'}</span>
-            <button onClick={() => setEditingSection('details')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
-          </div>
-          {hasOtherCharacters && (
-            <div className="flex items-start gap-2">
-              <span className="font-medium text-gray-700 w-24 flex-shrink-0">{language === 'de' ? 'Beziehungen' : 'Relationships'}:</span>
-              <span className="flex-1 text-gray-600">
-                {Object.keys(relationships).length > 0 ? `${Object.keys(relationships).length} ${language === 'de' ? 'definiert' : 'defined'}` : '—'}
-              </span>
-              <button onClick={() => setEditingSection('relationships')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
-            </div>
-          )}
-        </div>
-
-        {/* Save button */}
-        <div className="flex gap-3 pt-2">
-          {onCancel && (<button onClick={onCancel} className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300">{t.cancel}</button>)}
-          <Button onClick={onSave} disabled={isLoading} loading={isLoading} icon={Save} className={onCancel ? "flex-1" : "flex-1"}>{t.saveCharacter}</Button>
-        </div>
-        <ImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
-      </div>
-    );
-  }
-
-  // ============================================================================
-  // EDITING SECTION MODAL (for existing characters)
-  // ============================================================================
-  if (editingSection) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setEditingSection(null)} className="p-2 hover:bg-gray-100 rounded-full"><ChevronLeft size={20} /></button>
-          <h3 className="text-xl font-bold text-gray-800">
-            {editingSection === 'strengths' && t.strengths}
-            {editingSection === 'weaknesses' && (language === 'de' ? 'Schwächen' : 'Weaknesses')}
-            {editingSection === 'conflicts' && (language === 'de' ? 'Konflikte' : 'Conflicts')}
-            {editingSection === 'details' && t.specialDetails}
-            {editingSection === 'relationships' && (language === 'de' ? 'Beziehungen' : 'Relationships')}
-          </h3>
-        </div>
-        {editingSection === 'strengths' && <TraitSelector label="" traits={localizedStrengths} selectedTraits={character.traits?.strengths || []} onSelect={(traits) => updateTraits('strengths', traits)} minRequired={3} />}
-        {editingSection === 'weaknesses' && <TraitSelector label="" traits={localizedFlaws} selectedTraits={character.traits?.flaws || []} onSelect={(traits) => updateTraits('flaws', traits)} minRequired={2} />}
-        {editingSection === 'conflicts' && <TraitSelector label="" traits={localizedChallenges} selectedTraits={character.traits?.challenges || []} onSelect={(traits) => updateTraits('challenges', traits)} />}
-        {editingSection === 'details' && (
-          <textarea value={character.traits?.specialDetails || ''} onChange={(e) => updateTraits('specialDetails', e.target.value)}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none" placeholder={t.specialDetailsPlaceholder} rows={4} />
-        )}
-        {editingSection === 'relationships' && onRelationshipChange && onRelationshipTextChange && (
-          <CharacterRelationships character={character} allCharacters={allCharacters} relationships={relationships} relationshipTexts={relationshipTexts}
-            onRelationshipChange={onRelationshipChange} onRelationshipTextChange={onRelationshipTextChange} customRelationships={customRelationships} onAddCustomRelationship={onAddCustomRelationship} />
-        )}
-        <button onClick={() => setEditingSection(null)} className="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg font-semibold hover:bg-indigo-700 flex items-center justify-center gap-2">
-          <Check size={18} />{language === 'de' ? 'Fertig' : 'Done'}
-        </button>
-      </div>
-    );
-  }
-
-  // ============================================================================
-  // NEW CHARACTER: Wizard Flow
-  // ============================================================================
-  return (
-    <div className="space-y-4">
-      {/* Wizard progress */}
-      <div className="flex items-center justify-center gap-2 mb-4">
-        {Array.from({ length: totalWizardSteps }, (_, i) => i + 1).map((stepNum) => (
-          <div key={stepNum} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-            stepNum === wizardStep ? 'bg-indigo-600 text-white' : stepNum < wizardStep ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
-          }`}>{stepNum < wizardStep ? <Check size={14} /> : stepNum}</div>
-        ))}
-      </div>
-
-      {/* Step 1: Photo + Info */}
-      {wizardStep === 1 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-center">{language === 'de' ? 'Foto & Grunddaten' : 'Photo & Basic Info'}</h3>
-          <div className="flex flex-col items-center gap-4">
-            {isAnalyzingPhoto ? (
-              <div className="w-32 h-32 rounded-full bg-indigo-100 border-4 border-indigo-400 flex items-center justify-center">
-                <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : displayPhoto ? (
-              <img src={displayPhoto} alt={character.name} className="w-32 h-32 rounded-full object-cover border-4 border-indigo-400" />
-            ) : (
-              <div className="w-32 h-32 rounded-full bg-gray-200 border-4 border-dashed border-gray-300 flex items-center justify-center">
-                <Upload size={32} className="text-gray-400" />
-              </div>
-            )}
-            <label className="cursor-pointer bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 flex items-center gap-2">
-              <Upload size={16} />{displayPhoto ? (language === 'de' ? 'Foto ändern' : 'Change Photo') : (language === 'de' ? 'Foto hochladen' : 'Upload Photo')}
-              <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-            </label>
-          </div>
-          <div className="space-y-3 max-w-sm mx-auto">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.gender}</label>
-              <select value={character.gender} onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
-                <option value="male">{t.male}</option><option value="female">{t.female}</option><option value="other">{t.other}</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.age}</label>
-              <input type="number" value={character.age} onChange={(e) => updateField('age', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none" min="1" max="120" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{language === 'de' ? 'Grösse (cm)' : 'Height (cm)'}</label>
-              <input type="number" value={character.physical?.height || ''} onChange={(e) => updatePhysical('height', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none" placeholder="cm" min="50" max="250" />
+          {/* Footer with buttons */}
+          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="max-w-4xl mx-auto flex gap-3">
+              <button
+                onClick={() => setIsModifyingAvatar(false)}
+                className="flex-1 px-4 py-3 text-sm font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => {
+                  setIsModifyingAvatar(false);
+                  if (onRegenerateAvatarsWithTraits) {
+                    recordRegeneration();
+                    onRegenerateAvatarsWithTraits();
+                  }
+                }}
+                disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              >
+                {isRegeneratingAvatarsWithTraits ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {language === 'de' ? 'Generiere...' : 'Generating...'}
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    {language === 'de' ? 'Speichern & Neu generieren' : language === 'fr' ? 'Enregistrer et régénérer' : 'Save & Regenerate'}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Step 2: Strengths */}
-      {wizardStep === 2 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-center">{language === 'de' ? 'Wähle mindestens 3 Stärken' : 'Select at least 3 strengths'}</h3>
-          <TraitSelector label="" traits={localizedStrengths} selectedTraits={character.traits?.strengths || []} onSelect={(traits) => updateTraits('strengths', traits)} minRequired={3} />
-        </div>
-      )}
-
-      {/* Step 3: Weaknesses */}
-      {wizardStep === 3 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-center">{language === 'de' ? 'Wähle mindestens 2 Schwächen' : 'Select at least 2 weaknesses'}</h3>
-          <TraitSelector label="" traits={localizedFlaws} selectedTraits={character.traits?.flaws || []} onSelect={(traits) => updateTraits('flaws', traits)} minRequired={2} />
-        </div>
-      )}
-
-      {/* Step 4: Conflicts */}
-      {wizardStep === 4 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-center">{language === 'de' ? 'Konflikte (optional)' : 'Conflicts (optional)'}</h3>
-          <TraitSelector label="" traits={localizedChallenges} selectedTraits={character.traits?.challenges || []} onSelect={(traits) => updateTraits('challenges', traits)} />
-        </div>
-      )}
-
-      {/* Step 5: Special Details */}
-      {wizardStep === 5 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-center">{language === 'de' ? 'Besondere Details (optional)' : 'Special Details (optional)'}</h3>
-          <p className="text-sm text-gray-500 text-center">{language === 'de' ? 'Hobbys, Interessen...' : 'Hobbies, interests...'}</p>
-          <textarea value={character.traits?.specialDetails || ''} onChange={(e) => updateTraits('specialDetails', e.target.value)}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none" placeholder={t.specialDetailsPlaceholder} rows={4} />
-        </div>
-      )}
-
-      {/* Step 6: Relationships */}
-      {wizardStep === 6 && hasOtherCharacters && onRelationshipChange && onRelationshipTextChange && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-center">{language === 'de' ? 'Beziehungen' : 'Relationships'}</h3>
-          <CharacterRelationships character={character} allCharacters={allCharacters} relationships={relationships} relationshipTexts={relationshipTexts}
-            onRelationshipChange={onRelationshipChange} onRelationshipTextChange={onRelationshipTextChange} customRelationships={customRelationships} onAddCustomRelationship={onAddCustomRelationship} />
-        </div>
-      )}
-
-      {/* Avatar preview */}
-      {character.avatars?.standard && wizardStep > 1 && (
-        <div className="fixed bottom-24 right-4 z-10">
-          <img src={character.avatars.standard} alt={`${character.name} avatar`}
-            className="w-16 h-24 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg cursor-pointer hover:scale-105 transition-transform"
-            onClick={() => setLightboxImage(character.avatars?.standard || null)} />
-        </div>
-      )}
-
-      {/* Navigation */}
-      <div className="flex gap-3 pt-4">
-        {wizardStep > 1 && (
-          <button onClick={goToPrevStep} className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 flex items-center justify-center gap-2">
-            <ChevronLeft size={18} />{language === 'de' ? 'Zurück' : 'Back'}
-          </button>
-        )}
-        {wizardStep < totalWizardSteps ? (
-          <button onClick={goToNextStep} disabled={!canProceedFromStep(wizardStep)}
-            className={`flex-1 px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${canProceedFromStep(wizardStep) ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
-            {language === 'de' ? 'Weiter' : 'Next'}<ChevronRight size={18} />
-          </button>
-        ) : (
-          <Button onClick={onSave} disabled={!canSaveCharacter || isLoading} loading={isLoading} icon={Save} className="flex-1">{t.saveCharacter}</Button>
-        )}
-      </div>
-      <ImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
     </div>
   );
 }
