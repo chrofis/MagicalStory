@@ -61,7 +61,7 @@ export function TraitSelector({
         ) : (
           <ChevronRight size={18} className="text-gray-400 group-hover:text-indigo-500" />
         )}
-        <span className="text-lg font-semibold text-indigo-700">
+        <span className="text-lg font-semibold text-gray-800">
           {label}
         </span>
         {minRequired > 0 && (

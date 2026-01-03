@@ -862,7 +862,7 @@ export function CharacterForm({
 
           {/* Special Details */}
           <div>
-            <label className="block text-lg font-semibold mb-2 text-indigo-700">{t.specialDetails}</label>
+            <label className="block text-lg font-semibold mb-2 text-gray-800">{t.specialDetails}</label>
             <textarea
               value={character.traits?.specialDetails || ''}
               onChange={(e) => updateTraits('specialDetails', e.target.value)}
@@ -871,6 +871,20 @@ export function CharacterForm({
               rows={3}
             />
           </div>
+
+          {/* Relationships with other characters */}
+          {allCharacters.length > 1 && onRelationshipChange && onRelationshipTextChange && (
+            <CharacterRelationships
+              character={character}
+              allCharacters={allCharacters}
+              relationships={relationships}
+              relationshipTexts={relationshipTexts}
+              onRelationshipChange={onRelationshipChange}
+              onRelationshipTextChange={onRelationshipTextChange}
+              customRelationships={customRelationships}
+              onAddCustomRelationship={onAddCustomRelationship}
+            />
+          )}
         </div>
       </div>
 
@@ -1211,20 +1225,6 @@ export function CharacterForm({
             })}
           </div>
         </div>
-      )}
-
-      {/* Relationships with other characters */}
-      {allCharacters.length > 1 && onRelationshipChange && onRelationshipTextChange && (
-        <CharacterRelationships
-          character={character}
-          allCharacters={allCharacters}
-          relationships={relationships}
-          relationshipTexts={relationshipTexts}
-          onRelationshipChange={onRelationshipChange}
-          onRelationshipTextChange={onRelationshipTextChange}
-          customRelationships={customRelationships}
-          onAddCustomRelationship={onAddCustomRelationship}
-        />
       )}
 
       {/* Save/Cancel Buttons */}

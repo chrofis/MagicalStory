@@ -6704,7 +6704,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       outlinePrompt: unifiedPrompt,
       outlineModelId: unifiedModelId,
       outlineUsage: unifiedUsage,
-      storyTextPrompts,
+      storyTextPrompts: [], // Not used in unified mode
       storyText: fullStoryText,
       visualBible,
       styledAvatarGeneration: getStyledAvatarGenerationLog(),

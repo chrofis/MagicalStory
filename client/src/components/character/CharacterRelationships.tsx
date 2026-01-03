@@ -94,7 +94,7 @@ export function CharacterRelationships({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-lg font-semibold text-indigo-700 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
         <Heart size={18} /> {translations.relationships}
       </h3>
 
