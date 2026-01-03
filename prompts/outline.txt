@@ -64,8 +64,6 @@ Title: [Your creative title here]
 
 # Part 2: Clothing Requirements (for Avatar Generation)
 
-**OUTPUT THIS SECTION FIRST** - This determines which character avatar variations to generate before story creation begins.
-
 For each main character ({CHARACTER_NAMES}), specify which clothing variations are needed in the story:
 
 - **standard** - Everyday casual clothes (baseline from reference photo)
@@ -75,7 +73,7 @@ For each main character ({CHARACTER_NAMES}), specify which clothing variations a
 
 **Guidelines:**
 - Prefer `standard` when the story doesn't require special clothing
-- For `standard`, `winter`, `summer`: Only describe **signature elements** that differ from the reference photo (hat, boots, scarf, accessories)
+- For `standard`, `winter`, `summer`: Only describe **signature elements** that differ from the reference photo (hat, boots, scarf, vest, accessories)
 - For `costumed`: Provide **complete outfit description** (full transformation)
 - Only mark variations as `used: true` if they actually appear in the story
 
