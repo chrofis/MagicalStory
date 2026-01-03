@@ -91,27 +91,75 @@ router.post('/', authenticateToken, async (req, res) => {
         existingCharacters = existingData.characters || [];
       }
 
-      // Merge styledAvatars from existing characters into new characters
+      // Merge styledAvatars and costumed avatars from existing characters into new characters
       let preservedCount = 0;
       const mergedCharacters = (characters || []).map(newChar => {
         const existingChar = existingCharacters.find(c => c.id === newChar.id || c.name === newChar.name);
-        if (existingChar?.avatars?.styledAvatars) {
-          // Preserve styledAvatars from database
-          preservedCount++;
+        if (!existingChar?.avatars) return newChar;
+
+        let hasChanges = false;
+        const mergedAvatars = { ...newChar.avatars };
+
+        // Preserve styledAvatars from database
+        if (existingChar.avatars.styledAvatars) {
           const styles = Object.keys(existingChar.avatars.styledAvatars);
           console.log(`[Characters] POST - Preserving styledAvatars for ${newChar.name}: ${styles.join(', ')}`);
+          // Deep merge styled avatars (including costumed sub-types)
+          mergedAvatars.styledAvatars = {
+            ...mergedAvatars.styledAvatars
+          };
+          for (const [styleKey, styleValue] of Object.entries(existingChar.avatars.styledAvatars)) {
+            if (typeof styleValue === 'object' && styleValue !== null) {
+              mergedAvatars.styledAvatars[styleKey] = {
+                ...mergedAvatars.styledAvatars?.[styleKey],
+                ...styleValue
+              };
+            }
+          }
+          hasChanges = true;
+        }
+
+        // Preserve costumed avatars from database (nested structure: { costumed: { pirate: "...", superhero: "..." } })
+        if (existingChar.avatars.costumed) {
+          const costumeTypes = Object.keys(existingChar.avatars.costumed);
+          console.log(`[Characters] POST - Preserving costumed avatars for ${newChar.name}: ${costumeTypes.join(', ')}`);
+          mergedAvatars.costumed = {
+            ...mergedAvatars.costumed,
+            ...existingChar.avatars.costumed
+          };
+          hasChanges = true;
+        }
+
+        // Preserve clothing descriptions for costumed
+        if (existingChar.avatars.clothing?.costumed) {
+          if (!mergedAvatars.clothing) mergedAvatars.clothing = {};
+          mergedAvatars.clothing.costumed = {
+            ...mergedAvatars.clothing?.costumed,
+            ...existingChar.avatars.clothing.costumed
+          };
+          hasChanges = true;
+        }
+
+        // Preserve signatures
+        if (existingChar.avatars.signatures) {
+          mergedAvatars.signatures = {
+            ...mergedAvatars.signatures,
+            ...existingChar.avatars.signatures
+          };
+          hasChanges = true;
+        }
+
+        if (hasChanges) {
+          preservedCount++;
           return {
             ...newChar,
-            avatars: {
-              ...newChar.avatars,
-              styledAvatars: existingChar.avatars.styledAvatars
-            }
+            avatars: mergedAvatars
           };
         }
         return newChar;
       });
       if (preservedCount > 0) {
-        console.log(`[Characters] POST - Preserved styledAvatars for ${preservedCount} characters`);
+        console.log(`[Characters] POST - Preserved avatar data for ${preservedCount} characters`);
       }
 
       // Store character data as an object with all related information

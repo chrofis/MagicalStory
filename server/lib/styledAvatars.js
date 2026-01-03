@@ -203,11 +203,24 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
   for (const char of characters) {
     const existingStyled = char.avatars?.styledAvatars?.[artStyle];
     if (existingStyled) {
-      for (const [clothingCategory, styledAvatar] of Object.entries(existingStyled)) {
-        if (styledAvatar && styledAvatar.startsWith('data:image')) {
+      for (const [clothingCategory, styledAvatarOrObject] of Object.entries(existingStyled)) {
+        // Handle nested costumed structure: { costumed: { pirate: "...", superhero: "..." } }
+        if (clothingCategory === 'costumed' && typeof styledAvatarOrObject === 'object' && styledAvatarOrObject !== null) {
+          for (const [costumeType, styledAvatar] of Object.entries(styledAvatarOrObject)) {
+            if (styledAvatar && typeof styledAvatar === 'string' && styledAvatar.startsWith('data:image')) {
+              const cacheKey = getAvatarCacheKey(char.name, `costumed:${costumeType}`, artStyle);
+              if (!styledAvatarCache.has(cacheKey)) {
+                styledAvatarCache.set(cacheKey, styledAvatar);
+                preloadedCount++;
+              }
+            }
+          }
+        }
+        // Standard categories (winter, summer, standard, formal)
+        else if (typeof styledAvatarOrObject === 'string' && styledAvatarOrObject.startsWith('data:image')) {
           const cacheKey = getAvatarCacheKey(char.name, clothingCategory, artStyle);
           if (!styledAvatarCache.has(cacheKey)) {
-            styledAvatarCache.set(cacheKey, styledAvatar);
+            styledAvatarCache.set(cacheKey, styledAvatarOrObject);
             preloadedCount++;
           }
         }
@@ -238,10 +251,23 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
 
       // Get original avatar for this clothing category
       const avatars = char.avatars || char.clothingAvatars;
-      const originalAvatar = avatars?.[clothingCategory] ||
-                            avatars?.standard ||
-                            char.bodyNoBgUrl ||
-                            char.photoUrl;
+      let originalAvatar = null;
+
+      // Handle costumed:pirate format
+      if (clothingCategory.startsWith('costumed:')) {
+        const costumeType = clothingCategory.split(':')[1];
+        originalAvatar = avatars?.costumed?.[costumeType];
+      } else {
+        originalAvatar = avatars?.[clothingCategory];
+      }
+
+      // Fallback chain
+      if (!originalAvatar) {
+        originalAvatar = avatars?.standard ||
+                        avatars?.formal ||  // Legacy backwards compat
+                        char.bodyNoBgUrl ||
+                        char.photoUrl;
+      }
 
       if (originalAvatar && originalAvatar.startsWith('data:image')) {
         neededAvatars.set(cacheKey, {
@@ -429,12 +455,28 @@ function getStyledAvatarsForCharacter(characterName, artStyle) {
   const result = {};
   let foundAny = false;
 
+  // Check standard categories
   for (const category of clothingCategories) {
     const cacheKey = getAvatarCacheKey(characterName, category, artStyle);
     const styledAvatar = styledAvatarCache.get(cacheKey);
     if (styledAvatar) {
       result[category] = styledAvatar;
       foundAny = true;
+    }
+  }
+
+  // Check for costumed sub-types in cache (pattern: charactername_costumed:type_artstyle)
+  const charPrefix = `${characterName.toLowerCase()}_costumed:`;
+  const styleSuffix = `_${artStyle}`;
+  for (const [key, value] of styledAvatarCache.entries()) {
+    if (key.startsWith(charPrefix) && key.endsWith(styleSuffix)) {
+      // Extract costume type from key
+      const costumeType = key.slice(charPrefix.length, key.length - styleSuffix.length);
+      if (costumeType) {
+        if (!result.costumed) result.costumed = {};
+        result.costumed[costumeType] = value;
+        foundAny = true;
+      }
     }
   }
 

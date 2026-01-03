@@ -6240,6 +6240,102 @@ async function processStoryJob(jobId) {
       inputData.title = storyTitle;
     }
 
+    // ===== DYNAMIC AVATAR GENERATION BASED ON OUTLINE =====
+    // Generate only the avatar variations needed for this story
+    const clothingRequirements = outlineParser.extractClothingRequirements();
+    if (clothingRequirements && Object.keys(clothingRequirements).length > 0 && !skipImages) {
+      log.debug(`👔 [PIPELINE] Clothing requirements found for ${Object.keys(clothingRequirements).length} characters`);
+
+      // Import the dynamic avatar generator
+      const { generateDynamicAvatar } = require('./server/routes/avatars');
+
+      // Track which avatars we generate
+      const avatarsGenerated = [];
+      const avatarsFailed = [];
+
+      for (const [charName, requirements] of Object.entries(clothingRequirements)) {
+        const char = inputData.characters?.find(c =>
+          c.name.toLowerCase() === charName.toLowerCase()
+        );
+        if (!char) {
+          log.debug(`[AVATAR] Character "${charName}" not found in input, skipping`);
+          continue;
+        }
+
+        // Initialize avatars structure if needed
+        if (!char.avatars) char.avatars = {};
+        if (!char.avatars.clothing) char.avatars.clothing = {};
+        if (!char.avatars.signatures) char.avatars.signatures = {};
+
+        for (const [category, config] of Object.entries(requirements)) {
+          if (!config || !config.used) continue;
+
+          // Check if avatar already exists
+          let avatarExists = false;
+          if (category === 'costumed' && config.costume) {
+            const costumeKey = config.costume.toLowerCase();
+            if (!char.avatars.costumed) char.avatars.costumed = {};
+            avatarExists = !!char.avatars.costumed[costumeKey];
+          } else {
+            avatarExists = !!char.avatars[category];
+          }
+
+          if (avatarExists) {
+            log.debug(`[AVATAR] ${char.name} already has ${category}${config.costume ? ':' + config.costume : ''} avatar, skipping`);
+            continue;
+          }
+
+          // Generate the missing avatar
+          const logCategory = config.costume ? `costumed:${config.costume}` : category;
+          log.debug(`🎭 [AVATAR] Generating ${logCategory} avatar for ${char.name}...`);
+
+          await dbPool.query(
+            'UPDATE story_jobs SET progress_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [`Generating ${logCategory} avatar for ${char.name}...`, jobId]
+          );
+
+          try {
+            const result = await generateDynamicAvatar(char, category, config);
+
+            if (result.success && result.imageData) {
+              // Store the avatar on the character
+              if (category === 'costumed' && result.costumeType) {
+                char.avatars.costumed[result.costumeType] = result.imageData;
+                // Store clothing description for costumed
+                if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+                if (result.clothing) {
+                  char.avatars.clothing.costumed[result.costumeType] = result.clothing;
+                }
+              } else {
+                char.avatars[category] = result.imageData;
+                if (result.clothing) {
+                  char.avatars.clothing[category] = result.clothing;
+                }
+                if (result.signature) {
+                  char.avatars.signatures[category] = result.signature;
+                }
+              }
+              avatarsGenerated.push(`${char.name}:${logCategory}`);
+              log.debug(`✅ [AVATAR] Generated ${logCategory} avatar for ${char.name}`);
+            } else {
+              avatarsFailed.push(`${char.name}:${logCategory}`);
+              log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
+            }
+          } catch (err) {
+            avatarsFailed.push(`${char.name}:${logCategory}`);
+            log.error(`❌ [AVATAR] Error generating ${logCategory} for ${char.name}:`, err.message);
+          }
+        }
+      }
+
+      if (avatarsGenerated.length > 0) {
+        log.debug(`✅ [PIPELINE] Generated ${avatarsGenerated.length} dynamic avatars: ${avatarsGenerated.join(', ')}`);
+      }
+      if (avatarsFailed.length > 0) {
+        log.warn(`⚠️ [PIPELINE] Failed to generate ${avatarsFailed.length} avatars: ${avatarsFailed.join(', ')}`);
+      }
+    }
+
     // START COVER GENERATION IN PARALLEL (optimization: don't wait for page images)
     // Covers only need: outline (for scenes), character photos, art style - all available now
     let coverGenerationPromise = null;
@@ -6551,12 +6647,19 @@ Output Format:
 
             // Detect which characters appear in this scene
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
-            const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
+            const clothingRaw = parseClothingCategory(sceneDescription) || 'standard';
+            // Parse costumed:pirate format
+            let clothingCategory = clothingRaw;
+            let costumeType = null;
+            if (clothingRaw.startsWith('costumed:')) {
+              clothingCategory = 'costumed';
+              costumeType = clothingRaw.split(':')[1];
+            }
             // Store clothing for future pages' context (clothing consistency)
-            pageClothingForContext[pageNum] = clothingCategory;
-            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+            pageClothingForContext[pageNum] = clothingRaw;
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType);
             referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
-            log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingCategory})...`);
+            log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingRaw})...`);
 
             // Generate image
             const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum, false, referencePhotos);
@@ -6990,13 +7093,20 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Detect which characters appear in this scene
             const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
             // Parse clothing category from scene description
-            const clothingCategory = parseClothingCategory(sceneDescription) || 'standard';
+            const clothingRaw = parseClothingCategory(sceneDescription) || 'standard';
+            // Parse costumed:pirate format
+            let clothingCategory = clothingRaw;
+            let costumeType = null;
+            if (clothingRaw.startsWith('costumed:')) {
+              clothingCategory = 'costumed';
+              costumeType = clothingRaw.split(':')[1];
+            }
             // Store clothing for future pages' context (clothing consistency)
-            pageClothingForContext[pageNum] = clothingCategory;
+            pageClothingForContext[pageNum] = clothingRaw;
             // Use detailed photo info (with names) for labeled reference images
-            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType);
             referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
-            log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory})...`);
+            log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingRaw})...`);
 
             // Generate image from scene description with scene-specific characters and visual bible
             const imagePrompt = buildImagePrompt(sceneDescription, inputData, sceneCharacters, true, visualBible, pageNum, false, referencePhotos);
