@@ -605,10 +605,12 @@ export function CharacterForm({
   // Step 2: Traits and characteristics
   return (
     <div className="space-y-4">
-      {/* Top section: Header with photo/name on left, avatar on right */}
-      <div className="flex gap-4">
-        {/* Left side: Photo, name, and basic info */}
-        <div className="flex-1 min-w-0">
+      {/* Main two-column layout on PC: left (photo/info/avatar) | right (traits) */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+        {/* Left column: Photo, info, avatar - fixed width on PC */}
+        <div className="lg:w-60 flex-shrink-0">
+          {/* Photo, name, and basic info */}
+          <div className="space-y-3">
           {/* Header with photo and name */}
           <div className="flex items-center gap-3 mb-3">
             {/* Photo thumbnail */}
@@ -702,10 +704,8 @@ export function CharacterForm({
               </div>
             </details>
           )}
-        </div>
 
-        {/* Right side: Standard avatar for all users - 25% bigger, object-contain to show full body */}
-        <div className="flex-shrink-0 w-40">
+          {/* Avatar section - below info on mobile, in same column on PC */}
           <div className="text-center">
             {character.avatars?.standard ? (
               <div className="relative">
@@ -826,6 +826,46 @@ export function CharacterForm({
                 </pre>
               </details>
             )}
+          </div>
+          </div>
+        </div>
+
+        {/* Right column: Traits - flexible width with max-width for readability */}
+        <div className="flex-1 min-w-0 max-w-2xl space-y-4">
+          {/* Trait Selectors */}
+          <TraitSelector
+            label={t.strengths}
+            traits={localizedStrengths}
+            selectedTraits={character.traits?.strengths || []}
+            onSelect={(traits) => updateTraits('strengths', traits)}
+            minRequired={3}
+          />
+
+          <TraitSelector
+            label={language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : 'Flaws'}
+            traits={localizedFlaws}
+            selectedTraits={character.traits?.flaws || []}
+            onSelect={(traits) => updateTraits('flaws', traits)}
+            minRequired={2}
+          />
+
+          <TraitSelector
+            label={language === 'de' ? 'Konflikte / Herausforderungen' : language === 'fr' ? 'Conflits / Défis' : 'Conflicts / Challenges'}
+            traits={localizedChallenges}
+            selectedTraits={character.traits?.challenges || []}
+            onSelect={(traits) => updateTraits('challenges', traits)}
+          />
+
+          {/* Special Details */}
+          <div>
+            <label className="block text-lg font-semibold mb-2 text-indigo-700">{t.specialDetails}</label>
+            <textarea
+              value={character.traits?.specialDetails || ''}
+              onChange={(e) => updateTraits('specialDetails', e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
+              placeholder={t.specialDetailsPlaceholder}
+              rows={3}
+            />
           </div>
         </div>
       </div>
@@ -1169,42 +1209,6 @@ export function CharacterForm({
         </div>
       )}
 
-      {/* Trait Selectors */}
-      <TraitSelector
-        label={t.strengths}
-        traits={localizedStrengths}
-        selectedTraits={character.traits?.strengths || []}
-        onSelect={(traits) => updateTraits('strengths', traits)}
-        minRequired={3}
-      />
-
-      <TraitSelector
-        label={language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : 'Flaws'}
-        traits={localizedFlaws}
-        selectedTraits={character.traits?.flaws || []}
-        onSelect={(traits) => updateTraits('flaws', traits)}
-        minRequired={2}
-      />
-
-      <TraitSelector
-        label={language === 'de' ? 'Konflikte / Herausforderungen' : language === 'fr' ? 'Conflits / Défis' : 'Conflicts / Challenges'}
-        traits={localizedChallenges}
-        selectedTraits={character.traits?.challenges || []}
-        onSelect={(traits) => updateTraits('challenges', traits)}
-      />
-
-      {/* Special Details */}
-      <div>
-        <label className="block text-lg font-semibold mb-2 text-indigo-700">{t.specialDetails}</label>
-        <textarea
-          value={character.traits?.specialDetails || ''}
-          onChange={(e) => updateTraits('specialDetails', e.target.value)}
-          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
-          placeholder={t.specialDetailsPlaceholder}
-          rows={3}
-        />
-      </div>
-
       {/* Relationships with other characters */}
       {allCharacters.length > 1 && onRelationshipChange && onRelationshipTextChange && (
         <CharacterRelationships
@@ -1220,7 +1224,7 @@ export function CharacterForm({
       )}
 
       {/* Save/Cancel Buttons */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 max-w-md">
         {onCancel && (
           <button
             onClick={onCancel}
