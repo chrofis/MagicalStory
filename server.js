@@ -4390,10 +4390,12 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
  * and triggers callbacks to start cover image generation early
  */
 class ProgressiveCoverParser {
-  constructor(onVisualBibleComplete, onCoverSceneComplete) {
+  constructor(onVisualBibleComplete, onCoverSceneComplete, onClothingRequirementsComplete) {
     this.onVisualBibleComplete = onVisualBibleComplete;
     this.onCoverSceneComplete = onCoverSceneComplete;
+    this.onClothingRequirementsComplete = onClothingRequirementsComplete;
     this.fullText = '';
+    this.clothingRequirementsEmitted = false;
     this.visualBibleEmitted = false;
     this.emittedCovers = new Set();  // 'titlePage', 'initialPage', 'backCover'
   }
@@ -4405,6 +4407,31 @@ class ProgressiveCoverParser {
    */
   processChunk(chunk, fullText) {
     this.fullText = fullText;
+
+    // Check for Clothing Requirements completion
+    // Clothing Requirements is complete when we see ---VISUAL BIBLE--- after ---CLOTHING REQUIREMENTS---
+    if (!this.clothingRequirementsEmitted && fullText.includes('---CLOTHING REQUIREMENTS---') && fullText.includes('---VISUAL BIBLE---')) {
+      const clothingMatch = fullText.match(/---CLOTHING REQUIREMENTS---\s*([\s\S]*?)(?=---VISUAL BIBLE---|$)/i);
+      if (clothingMatch) {
+        this.clothingRequirementsEmitted = true;
+        const clothingSection = clothingMatch[1].trim();
+        log.debug(`🌊 [STREAM-COVER] Clothing Requirements section complete (${clothingSection.length} chars)`);
+
+        // Extract JSON from the section (may be wrapped in ```json ... ```)
+        const jsonMatch = clothingSection.match(/```json\s*([\s\S]*?)```/i) ||
+                          clothingSection.match(/\{[\s\S]*"clothingRequirements"[\s\S]*\}/);
+        if (jsonMatch && this.onClothingRequirementsComplete) {
+          try {
+            const jsonStr = jsonMatch[1] || jsonMatch[0];
+            const parsed = JSON.parse(jsonStr);
+            log.debug(`👕 [STREAM-COVER] Parsed clothing requirements for ${Object.keys(parsed.clothingRequirements || parsed).length} characters`);
+            this.onClothingRequirementsComplete(parsed.clothingRequirements || parsed);
+          } catch (e) {
+            log.error(`❌ [STREAM-COVER] Failed to parse clothing requirements JSON: ${e.message}`);
+          }
+        }
+      }
+    }
 
     // Check for Visual Bible completion
     // Visual Bible is complete when we see ---TITLE PAGE--- after ---VISUAL BIBLE---
@@ -4877,11 +4904,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Characters found in scene: ${sceneCharacters.map(c => c.name).join(', ') || 'NONE'}`);
 
         // Parse clothing category from scene description
-        const clothingCategory = parseClothingCategory(sceneDesc) || 'standard';
-        log.debug(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
+        // Handle costumed:type format (e.g., "costumed:pirate")
+        const clothingRaw = parseClothingCategory(sceneDesc) || 'standard';
+        let clothingCategory = clothingRaw;
+        let costumeType = null;
+        if (clothingRaw.startsWith('costumed:')) {
+          clothingCategory = 'costumed';
+          costumeType = clothingRaw.split(':')[1];
+        }
+        log.debug(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingCategory}${costumeType ? ':' + costumeType : ''}`);
 
         // Use detailed photo info (with names) for labeled reference images
-        const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+        const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType);
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
         // Log with visual bible info if available
@@ -4995,9 +5029,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
       try {
         // Extract clothing from block first (more reliable), fallback to parsing scene
+        // Handle both simple (winter/summer/standard) and costumed:type formats
         let clothing = null;
+        let costumeType = null;
         if (rawBlock) {
-          const clothingMatch = rawBlock.match(/CLOTHING:\s*(winter|summer|formal|standard)/i);
+          const clothingMatch = rawBlock.match(/CLOTHING:\s*(winter|summer|standard|costumed(?::\w+)?)/i);
           if (clothingMatch) {
             clothing = clothingMatch[1].toLowerCase();
           }
@@ -5005,18 +5041,23 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (!clothing) {
           clothing = parseClothingCategory(sceneDescription) || 'standard';
         }
+        // Parse costumed:type format
+        if (clothing && clothing.startsWith('costumed:')) {
+          costumeType = clothing.split(':')[1];
+          clothing = 'costumed';
+        }
 
         // Determine character selection based on cover type
         let referencePhotos;
         if (coverType === 'titlePage') {
           // Front cover: Main character prominently, maybe 1-2 supporting
           const frontCoverCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
-          referencePhotos = getCharacterPhotoDetails(frontCoverCharacters.length > 0 ? frontCoverCharacters : inputData.characters || [], clothing);
-          log.debug(`📕 [STREAM-COVER] Generating front cover: ${referencePhotos.length} characters, clothing: ${clothing}`);
+          referencePhotos = getCharacterPhotoDetails(frontCoverCharacters.length > 0 ? frontCoverCharacters : inputData.characters || [], clothing, costumeType);
+          log.debug(`📕 [STREAM-COVER] Generating front cover: ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
         } else {
           // Initial page and back cover: ALL characters
-          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing);
-          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}`);
+          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType);
+          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
         }
 
         // Build the prompt
@@ -5112,6 +5153,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
     // Set up cover parser to start cover image generation during streaming
     const shouldStreamCovers = !skipImages;
+
+    // Track clothing requirements and avatar generation
+    let streamingClothingRequirements = null;
+    const avatarGenerationPromises = [];
+
     const coverParser = new ProgressiveCoverParser(
       // onVisualBibleComplete
       (parsedVB, rawSection) => {
@@ -5124,6 +5170,83 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (shouldStreamCovers) {
           const coverPromise = streamLimit(() => generateCoverImageDuringStream(coverType, sceneDescription, rawBlock, extractedTitle));
           streamingCoverPromises.push(coverPromise);
+        }
+      },
+      // onClothingRequirementsComplete
+      async (clothingRequirements) => {
+        streamingClothingRequirements = clothingRequirements;
+        if (skipImages) return;
+
+        // Generate missing avatars based on clothing requirements
+        const { generateDynamicAvatar } = require('./server/routes/avatars');
+        const characters = inputData.characters || [];
+
+        log.debug(`👕 [STORYBOOK] Processing clothing requirements for ${Object.keys(clothingRequirements).length} characters`);
+
+        for (const [charName, requirements] of Object.entries(clothingRequirements)) {
+          const char = characters.find(c =>
+            c.name.toLowerCase() === charName.toLowerCase() ||
+            c.name.toLowerCase().includes(charName.toLowerCase()) ||
+            charName.toLowerCase().includes(c.name.toLowerCase())
+          );
+
+          if (!char) {
+            log.debug(`👕 [STORYBOOK] Character "${charName}" not found in input characters, skipping`);
+            continue;
+          }
+
+          // Ensure avatars object exists
+          if (!char.avatars) char.avatars = {};
+
+          for (const [category, config] of Object.entries(requirements)) {
+            if (!config.used) continue;
+
+            // Check if avatar already exists
+            let avatarExists = false;
+            if (category === 'costumed' && config.costume) {
+              const costumeKey = config.costume.toLowerCase();
+              if (!char.avatars.costumed) char.avatars.costumed = {};
+              avatarExists = !!char.avatars.costumed[costumeKey];
+            } else {
+              avatarExists = !!char.avatars[category];
+            }
+
+            if (avatarExists) {
+              log.debug(`👕 [STORYBOOK] ${char.name} already has ${category} avatar, skipping`);
+              continue;
+            }
+
+            // Generate missing avatar
+            log.debug(`👕 [STORYBOOK] Generating ${category}${config.costume ? ':' + config.costume : ''} avatar for ${char.name}...`);
+            const avatarPromise = (async () => {
+              try {
+                const result = await generateDynamicAvatar(char, category, config);
+                if (result.success && result.imageData) {
+                  if (category === 'costumed' && result.costumeType) {
+                    if (!char.avatars.costumed) char.avatars.costumed = {};
+                    char.avatars.costumed[result.costumeType] = result.imageData;
+                    log.debug(`✅ [STORYBOOK] Generated costumed:${result.costumeType} avatar for ${char.name}`);
+                  } else {
+                    char.avatars[category] = result.imageData;
+                    log.debug(`✅ [STORYBOOK] Generated ${category} avatar for ${char.name}`);
+                  }
+                  // Also store clothing description if available
+                  if (result.clothingDescription) {
+                    if (!char.avatars.clothing) char.avatars.clothing = {};
+                    if (category === 'costumed') {
+                      if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+                      char.avatars.clothing.costumed[result.costumeType] = result.clothingDescription;
+                    } else {
+                      char.avatars.clothing[category] = result.clothingDescription;
+                    }
+                  }
+                }
+              } catch (e) {
+                log.error(`❌ [STORYBOOK] Failed to generate ${category} avatar for ${char.name}: ${e.message}`);
+              }
+            })();
+            avatarGenerationPromises.push(avatarPromise);
+          }
         }
       }
     );
@@ -5169,6 +5292,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     } catch (apiError) {
       log.error(`[STORYBOOK] Claude API streaming call failed:`, apiError.message);
       throw apiError;
+    }
+
+    // Wait for avatar generation to complete before generating images
+    if (avatarGenerationPromises.length > 0) {
+      log.debug(`👕 [STORYBOOK] Waiting for ${avatarGenerationPromises.length} avatar generations to complete...`);
+      await Promise.all(avatarGenerationPromises);
+      log.debug(`✅ [STORYBOOK] All avatar generations complete`);
     }
 
     // Wait for any cover images started during streaming
@@ -5220,9 +5350,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       backCover: ''
     };
 
-    // Helper to extract clothing from a block
+    // Helper to extract clothing from a block (supports costumed:type format)
     const extractClothingFromBlock = (block) => {
-      const clothingMatch = block.match(/CLOTHING:\s*(winter|summer|formal|standard)/i);
+      const clothingMatch = block.match(/CLOTHING:\s*(winter|summer|standard|costumed(?::\w+)?)/i);
       return clothingMatch ? clothingMatch[1].toLowerCase() : null;
     };
 
@@ -5391,11 +5521,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Characters found in scene: ${sceneCharacters.map(c => c.name).join(', ') || 'NONE'}`);
 
           // Parse clothing category from scene description
-          const clothingCategory = parseClothingCategory(scene.description) || 'standard';
-          log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}`);
+          // Handle costumed:type format (e.g., "costumed:pirate")
+          const clothingRaw = parseClothingCategory(scene.description) || 'standard';
+          let clothingCategory = clothingRaw;
+          let costumeType = null;
+          if (clothingRaw.startsWith('costumed:')) {
+            clothingCategory = 'costumed';
+            costumeType = clothingRaw.split(':')[1];
+          }
+          log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}${costumeType ? ':' + costumeType : ''}`);
 
           // Use detailed photo info (with names) for labeled reference images
-          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType);
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Reference photos: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
           // Apply styled avatars (pre-converted to target art style)

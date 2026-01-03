@@ -59,13 +59,22 @@ Create a simple story arc:
 - Describe spatial relationships between characters clearly for the illustrator. (Good: "The dog runs toward the back right. The girl stands in the front left, watching the dog." Bad: "A dog is running, the girl is looking at the dog.")
 - Optionally suggest composition: close-up, medium shot, wide shot, bird's eye view
 
-# Clothing Categories
+# Clothing Requirements (for Avatar Generation)
 
-Select ONE clothing category per scene based on the context:
-- **winter** - Cold weather scenes (coats, scarves, boots, snow)
-- **summer** - Warm weather scenes (t-shirts, shorts, light dresses)
-- **formal** - Special occasions (suits, dresses, fancy attire, parties)
-- **standard** - Everyday casual scenes (regular clothes, indoor activities)
+For each main character ({MAIN_CHARACTER_NAMES}), specify which clothing variations are needed in the story:
+
+- **standard** - Everyday casual clothes (baseline from reference photo)
+- **winter** - Cold weather additions
+- **summer** - Warm weather variations
+- **costumed** - Full costume transformation (pirate, superhero, cowboy, princess, etc.)
+
+**Guidelines:**
+- Prefer `standard` when the story doesn't require special clothing
+- For `standard`, `winter`, `summer`: Only describe **signature elements** that differ from the reference photo (hat, boots, scarf, vest, accessories)
+- For `costumed`: Provide **complete outfit description** (full transformation)
+- Only mark variations as `used: true` if they actually appear in the story
+
+Select ONE clothing category per scene based on the context. Use `[Clothing: category]` in each scene.
 
 
 # VISUAL BIBLE (MINIMUM {PAGES} ENTRIES REQUIRED)
@@ -120,12 +129,26 @@ For each person NOT a main character:
 
 # Output Format
 
-You MUST provide output in this EXACT order: TITLE, VISUAL BIBLE, COVER SCENES, then all story pages.
+You MUST provide output in this EXACT order: TITLE, CLOTHING REQUIREMENTS, VISUAL BIBLE, COVER SCENES, then all story pages.
 
 **IMPORTANT: All SCENE descriptions must be VISUAL ONLY. Do NOT include any text instructions in scenes (no title text, no dedication text, no website text). Text will be added separately to the images.**
 
 ---TITLE---
 TITLE: [Creative story title]
+
+---CLOTHING REQUIREMENTS---
+```json
+{
+  "clothingRequirements": {
+    "[Character1Name]": {
+      "standard": { "used": true, "signature": "[signature items if any]" },
+      "winter": { "used": true/false, "signature": "[cold weather additions]" },
+      "summer": { "used": true/false, "signature": "[warm weather items]" },
+      "costumed": { "used": true/false, "costume": "[costume type]", "description": "[full outfit description]" }
+    }
+  }
+}
+```
 
 ---VISUAL BIBLE---
 (Add at least {PAGES} entries - all locations, objects, animals, and secondary characters)
@@ -159,7 +182,7 @@ Setting: [Cover scene that sets the mood for the story]
 Characters: [MAIN CHARACTER ONLY or with 1-2 supporting characters maximum - main character must be the STAR of this image, large and center]
 Action: [An inviting cover moment featuring primarily the main character]
 Mood: [Welcoming, magical, exciting, etc.]
-Clothing: [winter/summer/formal/standard]
+Clothing: [winter/summer/standard OR costumed:type]
 **CHARACTER RULE: Feature the MAIN CHARACTER prominently in the CENTER. Include few or no other characters - this is the main character's spotlight moment.**
 
 ---INITIAL PAGE---
@@ -168,7 +191,7 @@ Setting: [A warm, inviting scene that welcomes readers into the story world]
 Characters: [ALL characters from the story gathered together, with the MAIN CHARACTER positioned in the CENTER]
 Action: [A group moment showing all characters together, main character central]
 Mood: [Warm, welcoming, cozy]
-Clothing: [winter/summer/formal/standard]
+Clothing: [winter/summer/standard OR costumed:type]
 **CHARACTER RULE: Include ALL characters in this scene. The main character should be in the CENTER, with all other characters arranged around them.**
 
 ---BACK COVER---
@@ -177,7 +200,7 @@ Setting: [A satisfying concluding scene that provides closure]
 Characters: [ALL characters from the story together as a group, with EQUAL prominence - no character should dominate]
 Action: [A peaceful group moment showing all characters together, celebrating or content]
 Mood: [Happy, content, peaceful, hopeful]
-Clothing: [winter/summer/formal/standard]
+Clothing: [winter/summer/standard OR costumed:type]
 **CHARACTER RULE: Include ALL characters with EQUAL visual prominence. No single character should be the focus - this is a GROUP scene where everyone matters equally.**
 
 ---PAGE 1---
@@ -188,7 +211,7 @@ SCENE:
 Setting: [Indoor or Outdoor, Location, time of day, atmosphere]
 Characters: [Who is in this scene, 1-2 characters. In exceptions 3 characters not more] 
 Action: [What is happening - the key visual moment]
-Clothing: [winter/summer/formal/standard - pick ONE based on scene context]
+Clothing: [winter/summer/standard OR costumed:type - pick ONE based on scene context]
 Mood: [Emotional tone]
 
 ---PAGE 2---
@@ -199,7 +222,7 @@ SCENE:
 Setting: [Indoor or Outdoor, Location, time of day, atmosphere]
 Characters: [Who is in this scene, 1-2 characters. In exceptions 3 characters not more]
 Action: [Key visual moment]
-Clothing: [winter/summer/formal/standard - pick ONE based on scene context]
+Clothing: [winter/summer/standard OR costumed:type - pick ONE based on scene context]
 Mood: [Emotional tone]
 
 ... continue for all {PAGES} pages ...
