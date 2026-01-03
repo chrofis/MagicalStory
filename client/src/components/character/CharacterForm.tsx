@@ -769,54 +769,19 @@ export function CharacterForm({
               </div>
             )}
             {/* Avatar action buttons */}
-            {isModifyingAvatar ? (
-              /* Modify mode: Save/Cancel buttons */
-              <div className="mt-2 flex gap-1">
+            <div className="mt-2 space-y-1">
+              {/* Modify Avatar button - for standard mode users (blue style) */}
+              {!developerMode && (
                 <button
-                  onClick={() => {
-                    setIsModifyingAvatar(false);
-                    // Trigger avatar regeneration with updated traits
-                    if (onRegenerateAvatarsWithTraits) {
-                      recordRegeneration();
-                      onRegenerateAvatarsWithTraits();
-                    }
-                  }}
-                  disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
-                  className="flex-1 px-2 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                  onClick={() => setIsModifyingAvatar(true)}
+                  className="w-full px-2 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex items-center justify-center gap-1 border border-indigo-200"
                 >
-                  {isRegeneratingAvatarsWithTraits ? (
-                    <>
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {language === 'de' ? 'Generiere...' : 'Saving...'}
-                    </>
-                  ) : (
-                    <>
-                      <Save size={12} />
-                      {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : 'Save'}
-                    </>
-                  )}
+                  <Pencil size={10} />
+                  {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
                 </button>
-                <button
-                  onClick={() => setIsModifyingAvatar(false)}
-                  className="px-2 py-1.5 text-xs font-medium bg-gray-200 text-gray-700 rounded hover:bg-gray-300 flex items-center justify-center"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ) : (
-              /* Normal mode: Modify Avatar button (standard users) or Regenerate (all users) */
-              <div className="mt-2 space-y-1">
-                {/* Modify Avatar button - for standard mode users to access physical traits */}
-                {!developerMode && (
-                  <button
-                    onClick={() => setIsModifyingAvatar(true)}
-                    className="w-full px-2 py-1.5 text-xs font-medium bg-amber-100 text-amber-700 rounded hover:bg-amber-200 flex items-center justify-center gap-1 border border-amber-200"
-                  >
-                    <Pencil size={10} />
-                    {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
-                  </button>
-                )}
-                {/* Regenerate button for all users */}
+              )}
+              {/* Regenerate button - developer mode only */}
+              {developerMode && (
                 <button
                   onClick={handleUserRegenerate}
                   disabled={!canRegenerate || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
@@ -832,8 +797,8 @@ export function CharacterForm({
                     language === 'de' ? 'Neu generieren' : 'Regenerate'
                   )}
                 </button>
-              </div>
-            )}
+              )}
+            </div>
             {/* Developer mode: show face match score with full details */}
             {developerMode && character.avatars?.faceMatch?.standard && (
               <details className="mt-1 text-left">
@@ -1206,6 +1171,101 @@ export function CharacterForm({
         src={lightboxImage}
         onClose={() => setLightboxImage(null)}
       />
+
+      {/* Full-page modal for Modify Avatar (standard mode only) */}
+      {isModifyingAvatar && !developerMode && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+            </h2>
+            <button
+              onClick={() => setIsModifyingAvatar(false)}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-auto p-4">
+            <div className="max-w-lg mx-auto space-y-6">
+              {/* Avatar preview */}
+              <div className="flex justify-center">
+                {character.avatars?.standard ? (
+                  <img
+                    src={character.avatars.standard}
+                    alt={`${character.name} avatar`}
+                    className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
+                  />
+                ) : (
+                  <div className="w-48 h-64 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
+                    <span className="text-gray-400 text-sm">
+                      {language === 'de' ? 'Kein Avatar' : 'No avatar'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Physical traits */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                  {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
+                </h3>
+                <PhysicalTraitsGrid
+                  character={character}
+                  language={language}
+                  updatePhysical={updatePhysical}
+                  updateApparentAge={(v) => updateField('apparentAge', v)}
+                />
+                <p className="mt-3 text-xs text-gray-500">
+                  {language === 'de'
+                    ? 'Ändern Sie die Merkmale und speichern Sie, um einen neuen Avatar zu generieren.'
+                    : language === 'fr'
+                    ? 'Modifiez les caractéristiques et enregistrez pour générer un nouvel avatar.'
+                    : 'Modify the features and save to generate a new avatar.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer with buttons */}
+          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="max-w-lg mx-auto flex gap-3">
+              <button
+                onClick={() => setIsModifyingAvatar(false)}
+                className="flex-1 px-4 py-3 text-sm font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => {
+                  setIsModifyingAvatar(false);
+                  if (onRegenerateAvatarsWithTraits) {
+                    recordRegeneration();
+                    onRegenerateAvatarsWithTraits();
+                  }
+                }}
+                disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              >
+                {isRegeneratingAvatarsWithTraits ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {language === 'de' ? 'Generiere...' : 'Generating...'}
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    {language === 'de' ? 'Speichern & Neu generieren' : language === 'fr' ? 'Enregistrer et régénérer' : 'Save & Regenerate'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
