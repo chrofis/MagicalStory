@@ -4,6 +4,7 @@ import { storyTypes, lifeChallenges, educationalTopics, realisticSetting } from 
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
 import type { StoryLanguageCode } from '@/types/story';
+import type { GenerationMode } from '@/hooks/useDeveloperMode';
 
 // Story language options (same as WizardStep3BookSettings)
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
@@ -40,6 +41,8 @@ interface WizardStep6Props {
   developerMode: boolean;
   imageGenMode: 'parallel' | 'sequential' | null;
   onImageGenModeChange: (mode: 'parallel' | 'sequential' | null) => void;
+  generationMode?: GenerationMode;
+  onGenerationModeChange?: (mode: GenerationMode) => void;
 }
 
 /**
@@ -68,6 +71,8 @@ export function WizardStep6Summary({
   developerMode,
   imageGenMode,
   onImageGenModeChange,
+  generationMode = 'auto',
+  onGenerationModeChange,
 }: WizardStep6Props) {
   const { language } = useLanguage();
   const lang = language as 'en' | 'de' | 'fr';
@@ -311,6 +316,27 @@ export function WizardStep6Summary({
               </button>
             </div>
           </div>
+
+          {/* Generation Pipeline */}
+          {onGenerationModeChange && (
+            <div className="mt-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Generation Pipeline
+              </label>
+              <select
+                value={generationMode}
+                onChange={(e) => onGenerationModeChange(e.target.value as GenerationMode)}
+                className="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-sm font-medium bg-white"
+              >
+                <option value="auto">Auto (based on reading level)</option>
+                <option value="pictureBook">Single Prompt (Picture Book)</option>
+                <option value="outlineAndText">Outline + Text (Standard)</option>
+              </select>
+              <p className="text-xs text-gray-600 mt-1">
+                Auto: 1st-grade uses single prompt, standard/advanced use outline+text.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

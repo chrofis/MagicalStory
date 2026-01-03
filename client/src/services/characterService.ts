@@ -230,12 +230,37 @@ export interface CharacterData {
   customFears: string[];
 }
 
+// Extracted traits from avatar evaluation
+export interface ExtractedTraits {
+  age?: string;
+  apparentAge?: string;
+  gender?: string;
+  build?: string;
+  eyeColor?: string;
+  hairColor?: string;
+  hairLength?: string;
+  hairStyle?: string;
+  facialHair?: string;
+  face?: string;
+  other?: string;
+}
+
+// Structured clothing from avatar evaluation
+export interface ExtractedClothing {
+  upperBody?: string | null;
+  lowerBody?: string | null;
+  shoes?: string | null;
+  fullBody?: string | null;
+}
+
 // Result type for avatar generation
 export interface AvatarGenerationResult {
   characterId: number;
   characterName: string;
   success: boolean;
   avatars?: CharacterAvatars;
+  extractedTraits?: ExtractedTraits;      // Physical traits extracted from reference photo
+  extractedClothing?: ExtractedClothing;   // Clothing extracted from generated avatar
   error?: string;
   skipped?: boolean;
   skipReason?: string;
@@ -283,6 +308,8 @@ export const characterService = {
   async generateClothingAvatars(character: Character): Promise<{
     success: boolean;
     avatars?: CharacterAvatars;
+    extractedTraits?: ExtractedTraits;
+    extractedClothing?: ExtractedClothing;
     error?: string;
   }> {
     try {
@@ -312,7 +339,10 @@ export const characterService = {
 
       const response = await api.post<{
         success: boolean;
-        clothingAvatars?: CharacterAvatars;
+        clothingAvatars?: CharacterAvatars & {
+          extractedTraits?: ExtractedTraits;
+          structuredClothing?: Record<string, ExtractedClothing>;
+        };
         error?: string;
       }>('/api/generate-clothing-avatars', {
         characterId: character.id,
@@ -322,12 +352,29 @@ export const characterService = {
         age: character.age,
         apparentAge: character.apparentAge,
         gender: character.gender,
-        build: character.physical?.build || 'average',
+        build: character.physical?.build,  // Don't send default - server will default to 'athletic'
       });
 
       if (response.success && response.clothingAvatars) {
         log.success(`Clothing avatars generated for ${character.name}`);
-        return { success: true, avatars: response.clothingAvatars };
+
+        // Extract traits and clothing from the response
+        const extractedTraits = response.clothingAvatars.extractedTraits;
+        const extractedClothing = response.clothingAvatars.structuredClothing?.standard;
+
+        if (extractedTraits) {
+          log.info(`Extracted traits: ${JSON.stringify(extractedTraits)}`);
+        }
+        if (extractedClothing) {
+          log.info(`Extracted clothing: ${JSON.stringify(extractedClothing)}`);
+        }
+
+        return {
+          success: true,
+          avatars: response.clothingAvatars,
+          extractedTraits,
+          extractedClothing,
+        };
       } else {
         log.error(`Failed to generate avatars: ${response.error}`);
         return { success: false, error: response.error };
@@ -541,6 +588,7 @@ export const characterService = {
   /**
    * Generate avatars for a single character and save to storage
    * This is the core function that handles generation + persistence
+   * Also populates physical traits and clothing from the evaluation
    */
   async generateAndSaveAvatarForCharacter(
     character: Character,
@@ -574,6 +622,8 @@ export const characterService = {
       }
 
       result.avatars = genResult.avatars;
+      result.extractedTraits = genResult.extractedTraits;
+      result.extractedClothing = genResult.extractedClothing;
 
       // Now save back to storage
       onProgress?.('saving', `Saving avatars for ${character.name}...`);
@@ -581,12 +631,55 @@ export const characterService = {
       // Fetch current data to get relationships and other characters
       const currentData = await characterService.getCharacterData();
 
-      // Update the character with new avatars
-      // IMPORTANT: Use the input `character` object (which has the user's edits), not `c` from API
+      // Build updated character with avatars AND extracted traits/clothing
+      let updatedCharacter = { ...character, avatars: genResult.avatars };
+
+      // Populate physical traits from extraction (if available)
+      if (genResult.extractedTraits) {
+        const traits = genResult.extractedTraits;
+        updatedCharacter = {
+          ...updatedCharacter,
+          // Update age and gender if extracted
+          age: traits.age || updatedCharacter.age,
+          gender: (traits.gender as 'male' | 'female' | 'other') || updatedCharacter.gender,
+          apparentAge: (traits.apparentAge as AgeCategory) || updatedCharacter.apparentAge,
+          // Update physical traits
+          physical: {
+            ...updatedCharacter.physical,
+            build: traits.build || updatedCharacter.physical?.build,
+            eyeColor: traits.eyeColor || updatedCharacter.physical?.eyeColor,
+            hairColor: traits.hairColor || updatedCharacter.physical?.hairColor,
+            hairLength: traits.hairLength || updatedCharacter.physical?.hairLength,
+            hairStyle: traits.hairStyle || updatedCharacter.physical?.hairStyle,
+            facialHair: traits.facialHair || updatedCharacter.physical?.facialHair,
+            face: traits.face || updatedCharacter.physical?.face,
+            other: traits.other || updatedCharacter.physical?.other,
+          },
+        };
+        log.info(`📋 Populated physical traits from extraction for ${character.name}`);
+      }
+
+      // Populate structured clothing from extraction (if available)
+      if (genResult.extractedClothing) {
+        const clothing = genResult.extractedClothing;
+        updatedCharacter = {
+          ...updatedCharacter,
+          clothing: {
+            ...updatedCharacter.clothing,
+            structured: {
+              upperBody: clothing.upperBody || undefined,
+              lowerBody: clothing.lowerBody || undefined,
+              shoes: clothing.shoes || undefined,
+              fullBody: clothing.fullBody || undefined,
+            },
+          },
+        };
+        log.info(`👕 Populated structured clothing from extraction for ${character.name}`);
+      }
+
+      // Update the character with new avatars and extracted data
       const updatedCharacters = currentData.characters.map(c =>
-        c.id === character.id
-          ? { ...character, avatars: genResult.avatars }  // Preserve all fields from input character
-          : c
+        c.id === character.id ? updatedCharacter : c
       );
 
       // Save back

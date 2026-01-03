@@ -30,7 +30,8 @@ const KEYWORDS = {
 };
 
 // Clothing categories (same across languages)
-const CLOTHING_CATEGORIES = ['winter', 'summer', 'formal', 'standard'];
+// Note: 'formal' replaced by 'costumed' - existing formal avatars used as fallback
+const CLOTHING_CATEGORIES = ['winter', 'summer', 'costumed', 'standard'];
 
 // ============================================================================
 // REGEX BUILDERS - Create patterns from keywords

@@ -2047,8 +2047,6 @@ export default function StoryWizard() {
             storyLanguage={storyLanguage}
             onStoryLanguageChange={setStoryLanguage}
             developerMode={developerMode}
-            generationMode={generationMode}
-            onGenerationModeChange={setGenerationMode}
           />
         );
 
@@ -2102,6 +2100,8 @@ export default function StoryWizard() {
             developerMode={developerMode}
             imageGenMode={imageGenMode}
             onImageGenModeChange={setImageGenMode}
+            generationMode={generationMode}
+            onGenerationModeChange={setGenerationMode}
           />
         );
 
