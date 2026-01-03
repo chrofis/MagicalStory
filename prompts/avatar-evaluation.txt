@@ -13,7 +13,10 @@ Focus on features that remain constant (not expressions or temporary states).
 
 TASK 3: CLOTHING EXTRACTION (from IMAGE 2 - the generated avatar)
 Describe the EXACT clothing visible on the AI-generated avatar.
-Categorize into: upperBody, lowerBody, shoes, or fullBody (for dresses/jumpsuits).
+IMPORTANT - Choose ONE of these two options:
+  Option A: Dress/Jumpsuit → set "fullBody" with description, set "upperBody" and "lowerBody" to null
+  Option B: Separate top + bottom → set "upperBody" and "lowerBody", set "fullBody" to null
+Never fill both fullBody AND upperBody/lowerBody - they are mutually exclusive!
 
 IMPORTANT: For fields marked "MUST be one of:", use the EXACT English values listed.
 
@@ -39,9 +42,9 @@ Return a JSON object with this EXACT structure:
     "other": "<glasses, scars, moles, freckles, piercings, or 'none'>"
   },
   "clothing": {
-    "upperBody": "<garment type with color, e.g. 'red t-shirt', 'blue sweater', or null if wearing dress>",
-    "lowerBody": "<garment type with color, e.g. 'dark blue jeans', 'black skirt', or null if wearing dress>",
-    "shoes": "<footwear with color, e.g. 'white sneakers', 'brown boots'>",
-    "fullBody": "<for dresses/jumpsuits only, e.g. 'floral summer dress', or null if wearing separate top/bottom>"
+    "upperBody": "<e.g. 'red t-shirt', 'blue sweater' - OR null if fullBody is set>",
+    "lowerBody": "<e.g. 'dark blue jeans', 'black skirt' - OR null if fullBody is set>",
+    "shoes": "<e.g. 'white sneakers', 'brown boots'>",
+    "fullBody": "<e.g. 'floral summer dress', 'black jumpsuit' - OR null if upperBody/lowerBody are set>"
   }
 }
