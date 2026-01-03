@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from 'react';
-import { Upload, Save, RefreshCw, Sparkles, Wand2 } from 'lucide-react';
+import { Upload, Save, RefreshCw, Sparkles, Wand2, Pencil, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
@@ -354,6 +354,7 @@ export function CharacterForm({
   const { t, language } = useLanguage();
   const [enlargedAvatar, setEnlargedAvatar] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [isModifyingAvatar, setIsModifyingAvatar] = useState(false);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -620,8 +621,8 @@ export function CharacterForm({
         <div className="flex-1 min-w-0">
           {/* Header with photo and name */}
           <div className="flex items-center gap-3 mb-3">
-            {/* Photo with change option */}
-            <label className="flex-shrink-0 relative group cursor-pointer">
+            {/* Photo thumbnail */}
+            <div className="flex-shrink-0">
               {isAnalyzingPhoto ? (
                 <div className="w-14 h-14 rounded-full bg-indigo-100 border-2 border-indigo-400 flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
@@ -637,17 +638,21 @@ export function CharacterForm({
                   <Upload size={18} className="text-gray-400" />
                 </div>
               )}
-              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                <Upload size={14} className="text-white" />
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </label>
-            <h3 className="text-xl font-bold text-gray-800">{character.name}</h3>
+            </div>
+            <div className="flex flex-col gap-1">
+              <h3 className="text-xl font-bold text-gray-800">{character.name}</h3>
+              {/* Change Photo button - always visible */}
+              <label className="cursor-pointer bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs hover:bg-gray-200 flex items-center gap-1 w-fit transition-colors border border-gray-200">
+                <Upload size={10} />
+                {language === 'de' ? 'Foto ändern' : language === 'fr' ? 'Changer la photo' : 'Change Photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
           </div>
 
           {/* Basic Info - Compact grid */}
@@ -691,20 +696,22 @@ export function CharacterForm({
             </div>
           </div>
 
-          {/* Physical Features - Collapsible */}
-          <details className="bg-gray-50 border border-gray-200 rounded-lg mt-2">
-            <summary className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
-              {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
-            </summary>
-            <div className="px-3 pb-3">
-              <PhysicalTraitsGrid
-                character={character}
-                language={language}
-                updatePhysical={updatePhysical}
-                updateApparentAge={(v) => updateField('apparentAge', v)}
-              />
-            </div>
-          </details>
+          {/* Physical Features - Only in dev mode or when modifying avatar */}
+          {(developerMode || isModifyingAvatar) && (
+            <details className="bg-gray-50 border border-gray-200 rounded-lg mt-2" open={isModifyingAvatar}>
+              <summary className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
+                {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
+              </summary>
+              <div className="px-3 pb-3">
+                <PhysicalTraitsGrid
+                  character={character}
+                  language={language}
+                  updatePhysical={updatePhysical}
+                  updateApparentAge={(v) => updateField('apparentAge', v)}
+                />
+              </div>
+            </details>
+          )}
         </div>
 
         {/* Right side: Standard avatar for all users - 25% bigger, object-contain to show full body */}
@@ -761,22 +768,72 @@ export function CharacterForm({
                 </button>
               </div>
             )}
-            {/* Regenerate button for all users */}
-            <button
-              onClick={handleUserRegenerate}
-              disabled={!canRegenerate || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
-              className="mt-2 w-full px-2 py-1 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-              title={!canRegenerate ? `Wait ${waitSeconds}s` : undefined}
-            >
-              <RefreshCw size={10} />
-              {!canRegenerate ? (
-                `${waitSeconds}s`
-              ) : (isRegeneratingAvatars || isRegeneratingAvatarsWithTraits) ? (
-                language === 'de' ? 'Generiere...' : 'Generating...'
-              ) : (
-                language === 'de' ? 'Neu generieren' : 'Regenerate'
-              )}
-            </button>
+            {/* Avatar action buttons */}
+            {isModifyingAvatar ? (
+              /* Modify mode: Save/Cancel buttons */
+              <div className="mt-2 flex gap-1">
+                <button
+                  onClick={() => {
+                    setIsModifyingAvatar(false);
+                    // Trigger avatar regeneration with updated traits
+                    if (onRegenerateAvatarsWithTraits) {
+                      recordRegeneration();
+                      onRegenerateAvatarsWithTraits();
+                    }
+                  }}
+                  disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                  className="flex-1 px-2 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  {isRegeneratingAvatarsWithTraits ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {language === 'de' ? 'Generiere...' : 'Saving...'}
+                    </>
+                  ) : (
+                    <>
+                      <Save size={12} />
+                      {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : 'Save'}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsModifyingAvatar(false)}
+                  className="px-2 py-1.5 text-xs font-medium bg-gray-200 text-gray-700 rounded hover:bg-gray-300 flex items-center justify-center"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              /* Normal mode: Modify Avatar button (standard users) or Regenerate (all users) */
+              <div className="mt-2 space-y-1">
+                {/* Modify Avatar button - for standard mode users to access physical traits */}
+                {!developerMode && (
+                  <button
+                    onClick={() => setIsModifyingAvatar(true)}
+                    className="w-full px-2 py-1.5 text-xs font-medium bg-amber-100 text-amber-700 rounded hover:bg-amber-200 flex items-center justify-center gap-1 border border-amber-200"
+                  >
+                    <Pencil size={10} />
+                    {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+                  </button>
+                )}
+                {/* Regenerate button for all users */}
+                <button
+                  onClick={handleUserRegenerate}
+                  disabled={!canRegenerate || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                  className="w-full px-2 py-1 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                  title={!canRegenerate ? `Wait ${waitSeconds}s` : undefined}
+                >
+                  <RefreshCw size={10} />
+                  {!canRegenerate ? (
+                    `${waitSeconds}s`
+                  ) : (isRegeneratingAvatars || isRegeneratingAvatarsWithTraits) ? (
+                    language === 'de' ? 'Generiere...' : 'Generating...'
+                  ) : (
+                    language === 'de' ? 'Neu generieren' : 'Regenerate'
+                  )}
+                </button>
+              </div>
+            )}
             {/* Developer mode: show face match score with full details */}
             {developerMode && character.avatars?.faceMatch?.standard && (
               <details className="mt-1 text-left">
