@@ -231,10 +231,8 @@ export interface CharacterData {
 }
 
 // Extracted traits from avatar evaluation
+// Note: age/gender are NOT extracted - user inputs them
 export interface ExtractedTraits {
-  age?: string;
-  apparentAge?: string;
-  gender?: string;
   build?: string;
   eyeColor?: string;
   hairColor?: string;
@@ -637,15 +635,12 @@ export const characterService = {
       let updatedCharacter = { ...character, avatars: genResult.avatars };
 
       // Populate physical traits from extraction (if available)
+      // Note: gender and age are NOT extracted - user must input them
       if (genResult.extractedTraits) {
         const traits = genResult.extractedTraits;
         updatedCharacter = {
           ...updatedCharacter,
-          // Update age and gender if extracted
-          age: traits.age || updatedCharacter.age,
-          gender: (traits.gender as 'male' | 'female' | 'other') || updatedCharacter.gender,
-          apparentAge: (traits.apparentAge as AgeCategory) || updatedCharacter.apparentAge,
-          // Update physical traits
+          // Update physical traits only (not age/gender - user inputs those)
           physical: {
             ...updatedCharacter.physical,
             build: traits.build || updatedCharacter.physical?.build,

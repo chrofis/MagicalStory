@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from 'react';
-import { Upload, Save, RefreshCw, Wand2, Pencil, X } from 'lucide-react';
+import { Upload, Save, RefreshCw, Pencil, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
@@ -120,62 +120,6 @@ const FACIAL_HAIR_OPTIONS: { value: string; label: string; labelDe: string; labe
   { value: 'short beard', label: 'Short Beard', labelDe: 'Kurzer Bart', labelFr: 'Barbe courte' },
   { value: 'full beard', label: 'Full Beard', labelDe: 'Vollbart', labelFr: 'Barbe complète' },
   { value: 'long beard', label: 'Long Beard', labelDe: 'Langer Bart', labelFr: 'Longue barbe' },
-];
-
-// Clothing options - Upper body
-const UPPER_BODY_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
-  { value: '', label: '— Select —', labelDe: '— Wählen —', labelFr: '— Choisir —' },
-  { value: 't-shirt', label: 'T-Shirt', labelDe: 'T-Shirt', labelFr: 'T-shirt' },
-  { value: 'long-sleeve shirt', label: 'Long-Sleeve Shirt', labelDe: 'Langarmshirt', labelFr: 'Chemise à manches longues' },
-  { value: 'blouse', label: 'Blouse', labelDe: 'Bluse', labelFr: 'Chemisier' },
-  { value: 'sweater', label: 'Sweater', labelDe: 'Pullover', labelFr: 'Pull' },
-  { value: 'hoodie', label: 'Hoodie', labelDe: 'Kapuzenpullover', labelFr: 'Sweat à capuche' },
-  { value: 'cardigan', label: 'Cardigan', labelDe: 'Strickjacke', labelFr: 'Cardigan' },
-  { value: 'jacket', label: 'Jacket', labelDe: 'Jacke', labelFr: 'Veste' },
-  { value: 'coat', label: 'Coat', labelDe: 'Mantel', labelFr: 'Manteau' },
-  { value: 'tank top', label: 'Tank Top', labelDe: 'Tanktop', labelFr: 'Débardeur' },
-  { value: 'polo shirt', label: 'Polo Shirt', labelDe: 'Poloshirt', labelFr: 'Polo' },
-  { value: 'dress shirt', label: 'Dress Shirt', labelDe: 'Hemd', labelFr: 'Chemise habillée' },
-  { value: 'suit jacket', label: 'Suit Jacket', labelDe: 'Anzugjacke', labelFr: 'Veste de costume' },
-];
-
-// Clothing options - Lower body
-const LOWER_BODY_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
-  { value: '', label: '— Select —', labelDe: '— Wählen —', labelFr: '— Choisir —' },
-  { value: 'jeans', label: 'Jeans', labelDe: 'Jeans', labelFr: 'Jean' },
-  { value: 'pants', label: 'Pants', labelDe: 'Hose', labelFr: 'Pantalon' },
-  { value: 'shorts', label: 'Shorts', labelDe: 'Shorts', labelFr: 'Short' },
-  { value: 'skirt', label: 'Skirt', labelDe: 'Rock', labelFr: 'Jupe' },
-  { value: 'leggings', label: 'Leggings', labelDe: 'Leggings', labelFr: 'Legging' },
-  { value: 'sweatpants', label: 'Sweatpants', labelDe: 'Jogginghose', labelFr: 'Jogging' },
-  { value: 'dress pants', label: 'Dress Pants', labelDe: 'Anzughose', labelFr: 'Pantalon habillé' },
-  { value: 'cargo pants', label: 'Cargo Pants', labelDe: 'Cargohose', labelFr: 'Pantalon cargo' },
-];
-
-// Clothing options - Shoes
-const SHOES_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
-  { value: '', label: '— Select —', labelDe: '— Wählen —', labelFr: '— Choisir —' },
-  { value: 'sneakers', label: 'Sneakers', labelDe: 'Turnschuhe', labelFr: 'Baskets' },
-  { value: 'boots', label: 'Boots', labelDe: 'Stiefel', labelFr: 'Bottes' },
-  { value: 'sandals', label: 'Sandals', labelDe: 'Sandalen', labelFr: 'Sandales' },
-  { value: 'flip-flops', label: 'Flip-Flops', labelDe: 'Flip-Flops', labelFr: 'Tongs' },
-  { value: 'dress shoes', label: 'Dress Shoes', labelDe: 'Anzugschuhe', labelFr: 'Chaussures habillées' },
-  { value: 'heels', label: 'Heels', labelDe: 'Absatzschuhe', labelFr: 'Talons' },
-  { value: 'loafers', label: 'Loafers', labelDe: 'Slipper', labelFr: 'Mocassins' },
-  { value: 'ballet flats', label: 'Ballet Flats', labelDe: 'Ballerinas', labelFr: 'Ballerines' },
-  { value: 'winter boots', label: 'Winter Boots', labelDe: 'Winterstiefel', labelFr: 'Bottes d\'hiver' },
-];
-
-// Clothing options - Full body (dress, gown, jumpsuit)
-const FULL_BODY_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
-  { value: '', label: '— None (use upper + lower) —', labelDe: '— Keins (Ober- + Unterteil) —', labelFr: '— Aucun (haut + bas) —' },
-  { value: 'casual dress', label: 'Casual Dress', labelDe: 'Freizeitkleid', labelFr: 'Robe décontractée' },
-  { value: 'summer dress', label: 'Summer Dress', labelDe: 'Sommerkleid', labelFr: 'Robe d\'été' },
-  { value: 'formal dress', label: 'Formal Dress', labelDe: 'Abendkleid', labelFr: 'Robe de soirée' },
-  { value: 'maxi dress', label: 'Maxi Dress', labelDe: 'Maxikleid', labelFr: 'Robe longue' },
-  { value: 'cocktail dress', label: 'Cocktail Dress', labelDe: 'Cocktailkleid', labelFr: 'Robe de cocktail' },
-  { value: 'jumpsuit', label: 'Jumpsuit', labelDe: 'Overall', labelFr: 'Combinaison' },
-  { value: 'romper', label: 'Romper', labelDe: 'Spielanzug', labelFr: 'Barboteuse' },
 ];
 
 // Simple inline editable field - click to edit, blur/enter to save
@@ -434,7 +378,7 @@ export function CharacterForm({
   onCancel,
   onPhotoChange,
   onContinueToTraits,
-  onSaveAndGenerateAvatar,
+  onSaveAndGenerateAvatar: _onSaveAndGenerateAvatar,  // No longer used - avatar auto-generates on photo upload
   onSaveAndRegenerateWithTraits,
   onRegenerateAvatars,
   onRegenerateAvatarsWithTraits,
@@ -630,37 +574,6 @@ export function CharacterForm({
               </div>
             </div>
           </div>
-
-          {/* Right side: Avatar placeholder */}
-          <div className="flex-shrink-0 w-36">
-            <div className="text-center">
-              <div className="w-36 h-48 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
-                {(isGeneratingAvatar || character.avatars?.status === 'generating') ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs text-indigo-600 font-medium px-2 text-center">
-                      {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création de l\'avatar...' : 'Creating avatar...'}
-                    </span>
-                  </div>
-                ) : character.avatars?.standard ? (
-                  <img
-                    src={character.avatars.standard}
-                    alt={`${character.name} avatar`}
-                    className="w-full h-full object-contain rounded-lg"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-2 px-2">
-                    <Wand2 size={24} className="text-gray-300" />
-                    <span className="text-[10px] text-gray-400 text-center">
-                      {language === 'de' ? 'Avatar wird nach dem Speichern erstellt' :
-                       language === 'fr' ? 'L\'avatar sera créé après la sauvegarde' :
-                       'Avatar will be created after saving'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Buttons */}
@@ -674,15 +587,15 @@ export function CharacterForm({
             </button>
           )}
           <Button
-            onClick={onSaveAndGenerateAvatar || onContinueToTraits}
+            onClick={onContinueToTraits}
             disabled={!canSaveName || isLoading || isAnalyzingPhoto}
             loading={isLoading}
-            icon={Wand2}
+            icon={Save}
             className={onCancel ? "flex-1" : "w-full"}
           >
-            {language === 'de' ? 'Speichern & Avatar erstellen' :
-             language === 'fr' ? 'Enregistrer et créer l\'avatar' :
-             'Save & Generate Avatar'}
+            {language === 'de' ? 'Speichern' :
+             language === 'fr' ? 'Enregistrer' :
+             'Save'}
           </Button>
         </div>
       </div>
@@ -773,9 +686,9 @@ export function CharacterForm({
             </div>
           </div>
 
-          {/* Physical Features - Only in dev mode or when modifying avatar */}
-          {(developerMode || isModifyingAvatar) && (
-            <details className="bg-gray-50 border border-gray-200 rounded-lg mt-2" open={isModifyingAvatar}>
+          {/* Physical Features - Only in dev mode */}
+          {developerMode && (
+            <details className="bg-gray-50 border border-gray-200 rounded-lg mt-2">
               <summary className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
                 {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
               </summary>
@@ -1258,8 +1171,8 @@ export function CharacterForm({
         onClose={() => setLightboxImage(null)}
       />
 
-      {/* Full-page modal for Modify Avatar (standard mode only) */}
-      {isModifyingAvatar && !developerMode && (
+      {/* Full-page modal for Modify Avatar */}
+      {isModifyingAvatar && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -1322,7 +1235,8 @@ export function CharacterForm({
                           <label className="block text-xs font-medium text-gray-600 mb-1">
                             {language === 'de' ? 'Kleid / Overall' : language === 'fr' ? 'Robe / Combinaison' : 'Dress / Jumpsuit'}
                           </label>
-                          <select
+                          <input
+                            type="text"
                             value={character.clothing?.structured?.fullBody || ''}
                             onChange={(e) => onChange({
                               ...character,
@@ -1331,28 +1245,24 @@ export function CharacterForm({
                                 structured: {
                                   ...character.clothing?.structured,
                                   fullBody: e.target.value,
-                                  // Clear upper/lower if full body is selected
+                                  // Clear upper/lower if full body is entered
                                   ...(e.target.value ? { upperBody: '', lowerBody: '' } : {}),
                                 },
                               },
                             })}
+                            placeholder={language === 'de' ? 'z.B. rotes Sommerkleid' : language === 'fr' ? 'ex. robe d\'été rouge' : 'e.g. red summer dress'}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
-                          >
-                            {FULL_BODY_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
                       )}
 
-                      {/* Upper body - disabled if full body is selected */}
+                      {/* Upper body - disabled if full body is entered */}
                       <div className={character.clothing?.structured?.fullBody ? 'opacity-50' : ''}>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
                           {language === 'de' ? 'Oberteil' : language === 'fr' ? 'Haut' : 'Upper Body'}
                         </label>
-                        <select
+                        <input
+                          type="text"
                           value={character.clothing?.structured?.upperBody || ''}
                           onChange={(e) => onChange({
                             ...character,
@@ -1365,22 +1275,18 @@ export function CharacterForm({
                             },
                           })}
                           disabled={!!character.clothing?.structured?.fullBody}
+                          placeholder={language === 'de' ? 'z.B. blaues T-Shirt' : language === 'fr' ? 'ex. t-shirt bleu' : 'e.g. blue t-shirt'}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {UPPER_BODY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
 
-                      {/* Lower body - disabled if full body is selected */}
+                      {/* Lower body - disabled if full body is entered */}
                       <div className={character.clothing?.structured?.fullBody ? 'opacity-50' : ''}>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
                           {language === 'de' ? 'Unterteil' : language === 'fr' ? 'Bas' : 'Lower Body'}
                         </label>
-                        <select
+                        <input
+                          type="text"
                           value={character.clothing?.structured?.lowerBody || ''}
                           onChange={(e) => onChange({
                             ...character,
@@ -1393,14 +1299,9 @@ export function CharacterForm({
                             },
                           })}
                           disabled={!!character.clothing?.structured?.fullBody}
+                          placeholder={language === 'de' ? 'z.B. dunkle Jeans' : language === 'fr' ? 'ex. jeans foncé' : 'e.g. dark jeans'}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          {LOWER_BODY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
 
                       {/* Shoes */}
@@ -1408,7 +1309,8 @@ export function CharacterForm({
                         <label className="block text-xs font-medium text-gray-600 mb-1">
                           {language === 'de' ? 'Schuhe' : language === 'fr' ? 'Chaussures' : 'Shoes'}
                         </label>
-                        <select
+                        <input
+                          type="text"
                           value={character.clothing?.structured?.shoes || ''}
                           onChange={(e) => onChange({
                             ...character,
@@ -1420,14 +1322,9 @@ export function CharacterForm({
                               },
                             },
                           })}
+                          placeholder={language === 'de' ? 'z.B. weiße Turnschuhe' : language === 'fr' ? 'ex. baskets blanches' : 'e.g. white sneakers'}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
-                        >
-                          {SHOES_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
                     </div>
                   </div>
