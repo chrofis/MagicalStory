@@ -44,7 +44,6 @@ function loadArtStylePrompts() {
         }
       }
     }
-    log.debug(`[STYLED AVATARS] Loaded ${Object.keys(prompts).length} art style prompts`);
   } catch (err) {
     log.error(`[STYLED AVATARS] Failed to load art-styles.txt:`, err.message);
   }
@@ -59,7 +58,6 @@ function loadStyledAvatarTemplate() {
     // Remove comment lines
     const lines = content.split('\n').filter(line => !line.trim().startsWith('#'));
     const template = lines.join('\n').trim();
-    log.debug(`[STYLED AVATARS] Loaded styled avatar template (${template.length} chars)`);
     return template;
   } catch (err) {
     log.error(`[STYLED AVATARS] Failed to load styled-avatar.txt:`, err.message);

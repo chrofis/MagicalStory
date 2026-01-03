@@ -75,11 +75,14 @@ function loadEmailTemplates() {
       if (fs.existsSync(filePath)) {
         const templateName = file.replace('.html', '');
         EMAIL_TEMPLATES[templateName] = fs.readFileSync(filePath, 'utf8');
-        console.log(`📧 Loaded email template: ${templateName}`);
       }
     } catch (err) {
       console.error(`❌ Failed to load email template ${file}:`, err.message);
     }
+  }
+  const count = Object.keys(EMAIL_TEMPLATES).length;
+  if (count > 0) {
+    console.log(`📧 Loaded ${count} email templates`);
   }
 }
 

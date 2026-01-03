@@ -14,6 +14,14 @@ import base64
 from io import BytesIO
 from PIL import Image
 import traceback
+import logging
+import sys
+
+# Suppress Flask development server warning
+cli = sys.modules.get('flask.cli')
+if cli:
+    cli.show_server_banner = lambda *args: None
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 app = Flask(__name__)
 CORS(app)
