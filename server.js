@@ -6553,7 +6553,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             qualityReasoning: coverResult.reasoning,
             wasRegenerated: coverResult.wasRegenerated,
             totalAttempts: coverResult.totalAttempts,
-            retryHistory: coverResult.retryHistory
+            retryHistory: coverResult.retryHistory,
+            // Dev mode: which reference photos/avatars were used
+            referencePhotos: coverPhotos
           };
           addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'cover_images', coverResult.modelId);
         }
@@ -6630,7 +6632,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           qualityReasoning: imageResult?.reasoning,
           wasRegenerated: imageResult?.wasRegenerated,
           totalAttempts: imageResult?.totalAttempts,
-          retryHistory: imageResult?.retryHistory
+          retryHistory: imageResult?.retryHistory,
+          // Dev mode: which reference photos/avatars were used
+          referencePhotos: pagePhotos
         };
       }))
     );
