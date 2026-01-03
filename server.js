@@ -6446,8 +6446,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       clothing: scene.clothing || 'standard'
     }));
 
-    // Create pageClothingData for storage compatibility
-    const pageClothing = {};
+    // Update pageClothing for storage compatibility (with fallback to 'standard')
     storyPages.forEach((page, index) => {
       pageClothing[index + 1] = page.clothing || 'standard';
     });
