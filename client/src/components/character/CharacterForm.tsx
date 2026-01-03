@@ -284,7 +284,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         {changedTraits?.build && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
 
-      {/* Row 4: Face | Facial Hair (males) or Other (females) */}
+      {/* Row 4: Face | Facial Hair (non-females) or Other (females) */}
       <InlineEditField
         label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
         value={character.physical?.face || ''}
@@ -293,7 +293,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         isAiExtracted={isAiExtracted}
         isChanged={changedTraits?.face}
       />
-      {character.gender === 'male' ? (
+      {character.gender !== 'female' ? (
         <div className="flex items-center gap-2">
           <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
             {language === 'de' ? 'Bart' : language === 'fr' ? 'Barbe' : 'Facial Hair'}:
@@ -323,8 +323,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         />
       )}
 
-      {/* Row 5: Other (for males) - spans full width if male */}
-      {character.gender === 'male' && (
+      {/* Row 5: Other (for non-females) - spans full width */}
+      {character.gender !== 'female' && (
         <div className="col-span-2">
           <InlineEditField
             label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
