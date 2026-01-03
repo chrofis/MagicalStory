@@ -1,11 +1,3 @@
-# Styled Costumed Avatar Prompt
-# Generates a costumed avatar directly in the target art style (single API call).
-# Placeholders:
-#   {ART_STYLE_PROMPT} - Art style description from art-styles.txt
-#   {COSTUME_DESCRIPTION} - Full costume description from visual bible
-#   {COSTUME_TYPE} - Costume name (e.g., "Cowboy", "Pirate")
-#   {PHYSICAL_TRAITS} - Physical characteristics section (optional)
-
 TASK: Create a 2x2 GRID IMAGE with 4 views of the EXACT individual from the reference photo.
 
 ART STYLE (CRITICAL - apply to entire image):
@@ -29,11 +21,20 @@ GRID REQUIREMENTS:
 - Both profile views (top right and bottom right) MUST face the SAME direction (RIGHT)
 - Each quadrant has clean background appropriate to the art style
 - All 4 quadrants show the SAME costume
+- TOP QUADRANTS: Head and shoulders, face clearly visible
+- BOTTOM QUADRANTS: Full body from head to toe, shoes visible
 
 IDENTITY PERSISTENCE (CRITICAL):
-- Face: 100% identical to reference photo - same face shape, features, expression style
+- Face: 100% identical to reference photo - Direct replication, not averaged - same face shape, features, expression style
 - The person must be clearly recognizable as the same individual
 - Hair color, eye color, skin tone must match exactly
+- The output MUST preserve the exact age, ethnicity, facial geometry, and unique micro-markers of the person in the provided reference photos
+- If the subject is a child, they MUST remain a child with child-like proportions and features. Do not mature the face.
+- If the subject has specific facial markers (moles, scars, eye shape), these MUST be retained with 100% accuracy.
+- Body: Use the APPARENT AGE and BUILD from PHYSICAL CHARACTERISTICS below. Generate age-appropriate body proportions matching that age category.
+- Lighting: Natural, even, studio-style diffused light.
+- NO "BEAUTIFICATION".Do not apply "Standard Fashion Model" features. The face must be a literal duplicate of the reference.
+- The goal is a photographic "Documentary" level of facial realism.
 - Apply the art style while preserving identity
 
 COSTUME - {COSTUME_TYPE}:
@@ -42,9 +43,9 @@ COSTUME - {COSTUME_TYPE}:
 This is a COMPLETE outfit change. The character wears this entire costume from head to toe.
 Include ALL costume elements: headwear, shirt/top, pants/skirt/dress, footwear, and any accessories.
 The costume should look authentic and age-appropriate for a children's book illustration.
+PHYSICAL_TRAITS:
 {PHYSICAL_TRAITS}
 
-TOP QUADRANTS: Head and shoulders, face clearly visible
-BOTTOM QUADRANTS: Full body from head to toe, shoes visible
+
 
 Output: High quality image in the specified art style.
