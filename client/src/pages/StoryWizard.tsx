@@ -810,10 +810,10 @@ export default function StoryWizard() {
     if (storyCategory === 'adventure' && theme !== '') {
       safeSetStep(4);
     }
-    // Life-challenge/Educational: advance when setting is selected
-    // Only advance if topic is already set (meaning user is at the final setting step)
-    // This prevents auto-advance when 'realistic' is set as default during category selection
-    else if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic !== '' && theme !== '') {
+    // Life-challenge/Educational: advance when a non-realistic setting is selected
+    // Only advance if topic is already set AND theme is not 'realistic'
+    // 'realistic' means user wants to go back to theme selection, not advance
+    else if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic !== '' && theme !== '' && theme !== 'realistic') {
       safeSetStep(4);
     }
   };

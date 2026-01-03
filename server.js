@@ -6421,6 +6421,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'cover_images', coverResult.modelId);
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
 
+        // Save partial_cover checkpoint for progressive display
+        const coverKey = coverType === 'titlePage' ? 'frontCover' : coverType;
+        const checkpointData = {
+          type: coverKey,
+          imageData: coverResult.imageData,
+          description: sceneDescription,
+          qualityScore: coverResult.score,
+          modelId: coverResult.modelId
+        };
+        // Include title for frontCover so UI can transition to story display
+        if (coverType === 'titlePage' && streamingTitle) {
+          checkpointData.storyTitle = streamingTitle;
+        }
+        const checkpointIndex = coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? 1 : 2;
+        await saveCheckpoint(jobId, 'partial_cover', checkpointData, checkpointIndex);
+        log.debug(`💾 [UNIFIED] Saved ${coverKey} for progressive display`);
+
         return {
           type: coverType,
           imageData: coverResult.imageData,
@@ -6557,6 +6574,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       unifiedModelId,
       unifiedUsage
     });
+
+    // Save story_text checkpoint for progressive display (UI can show text immediately)
+    const pageTextMap = {};
+    storyPages.forEach(page => {
+      pageTextMap[page.pageNumber] = page.text;
+    });
+    await saveCheckpoint(jobId, 'story_text', {
+      title,
+      dedication: inputData.dedication || '',
+      pageTexts: pageTextMap,
+      fullStoryText
+    });
+    log.debug(`💾 [UNIFIED] Saved story text for progressive display (${storyPages.length} pages)`);
 
     // Update progress: Story text complete
     const avatarsStarted = streamingAvatarPromises.length;
@@ -6782,6 +6812,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         if (imageResult?.imageData) {
           addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'page_images', imageResult.modelId);
+
+          // Save partial_page checkpoint for progressive display
+          await saveCheckpoint(jobId, 'partial_page', {
+            pageNumber: pageNum,
+            text: scene.text,
+            sceneDescription: scene.sceneDescription,
+            imageData: imageResult.imageData,
+            qualityScore: imageResult.score,
+            modelId: imageResult.modelId
+          }, pageNum);
+          log.debug(`💾 [UNIFIED] Saved page ${pageNum} for progressive display`);
         }
 
         return {
@@ -6807,18 +6848,62 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     log.debug(`📖 [UNIFIED] Generated ${allImages.filter(p => p.imageData).length}/${allImages.length} page images`);
 
-    // Calculate total cost
-    let totalCost = 0;
-    for (const [funcName, funcUsage] of Object.entries(tokenUsage.byFunction)) {
-      if (funcUsage.calls > 0) {
-        const models = Array.from(funcUsage.models);
-        const model = models[0] || funcUsage.provider;
-        const cost = calculateCost(model, funcUsage.input_tokens, funcUsage.output_tokens, funcUsage.thinking_tokens);
-        totalCost += cost.total;
-      }
+    // Log token usage summary with costs (including thinking tokens)
+    const totalInputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].input_tokens, 0);
+    const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].output_tokens, 0);
+    const totalThinkingTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].thinking_tokens, 0);
+    const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens, tokenUsage.anthropic.thinking_tokens);
+    const geminiTextCost = calculateCost('gemini_text', tokenUsage.gemini_text.input_tokens, tokenUsage.gemini_text.output_tokens, tokenUsage.gemini_text.thinking_tokens);
+    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens, tokenUsage.gemini_image.thinking_tokens);
+    const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens, tokenUsage.gemini_quality.thinking_tokens);
+    const totalCost = anthropicCost.total + geminiTextCost.total + geminiImageCost.total + geminiQualityCost.total;
+
+    log.debug(`📊 [UNIFIED] Token usage & cost summary:`);
+    log.debug(`   BY PROVIDER:`);
+    const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` + ${tokenUsage.anthropic.thinking_tokens.toLocaleString()} think` : '';
+    const thinkingTextStr = tokenUsage.gemini_text.thinking_tokens > 0 ? ` + ${tokenUsage.gemini_text.thinking_tokens.toLocaleString()} think` : '';
+    const thinkingImageStr = tokenUsage.gemini_image.thinking_tokens > 0 ? ` + ${tokenUsage.gemini_image.thinking_tokens.toLocaleString()} think` : '';
+    const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` + ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString()} think` : '';
+    log.debug(`   Anthropic:      ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr}  $${anthropicCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Text:    ${tokenUsage.gemini_text.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_text.output_tokens.toLocaleString().padStart(8)} out${thinkingTextStr}  $${geminiTextCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Image:   ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out${thinkingImageStr}  $${geminiImageCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Quality: ${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr}  $${geminiQualityCost.total.toFixed(4)}`);
+
+    // Log by function
+    log.debug(`   BY FUNCTION:`);
+    const byFunc = tokenUsage.byFunction;
+    const getCostModel = (func) => func.provider || 'anthropic';
+    const getModels = (func) => Array.from(func.models).join(', ') || func.provider || 'unknown';
+
+    if (byFunc.unified_story?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.unified_story), byFunc.unified_story.input_tokens, byFunc.unified_story.output_tokens, byFunc.unified_story.thinking_tokens);
+      const thinkStr = byFunc.unified_story.thinking_tokens > 0 ? ` + ${byFunc.unified_story.thinking_tokens.toLocaleString()} think` : '';
+      log.debug(`   Unified Story: ${byFunc.unified_story.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.unified_story.output_tokens.toLocaleString().padStart(8)} out${thinkStr} (${byFunc.unified_story.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.unified_story)}]`);
+    }
+    if (byFunc.scene_expansion?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.scene_expansion), byFunc.scene_expansion.input_tokens, byFunc.scene_expansion.output_tokens, byFunc.scene_expansion.thinking_tokens);
+      log.debug(`   Scene Expand:  ${byFunc.scene_expansion.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_expansion.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_expansion.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_expansion)}]`);
+    }
+    if (byFunc.cover_images?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.cover_images), byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens, byFunc.cover_images.thinking_tokens);
+      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_images)}]`);
+    }
+    if (byFunc.cover_quality?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens, byFunc.cover_quality.thinking_tokens);
+      log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
+    }
+    if (byFunc.page_images?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.page_images), byFunc.page_images.input_tokens, byFunc.page_images.output_tokens, byFunc.page_images.thinking_tokens);
+      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_images)}]`);
+    }
+    if (byFunc.page_quality?.calls > 0) {
+      const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
+      log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
 
-    log.debug(`💰 [UNIFIED] Total estimated cost: $${totalCost.toFixed(4)}`);
+    const thinkingTotal = totalThinkingTokens > 0 ? ` + ${totalThinkingTokens.toLocaleString()} thinking` : '';
+    log.debug(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output${thinkingTotal} tokens`);
+    log.debug(`   💰 TOTAL COST: $${totalCost.toFixed(4)}`);
 
     log.debug(`📝 [UNIFIED] Updating job status to 95% (finalizing)...`);
     await dbPool.query(

@@ -186,7 +186,7 @@ export function WizardStep6Summary({
         {/* Reading Level & Pages */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500">{t.level}:</span>
-          <span className="font-medium">{getReadingLevelLabel()} / {pages} {t.pagesLabel.toLowerCase()}</span>
+          <span className="font-medium">{getReadingLevelLabel()} / {pages} {t.pagesLabel}</span>
           <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Story Type */}
