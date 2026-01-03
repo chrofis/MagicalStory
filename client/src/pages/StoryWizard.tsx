@@ -989,9 +989,9 @@ export default function StoryWizard() {
             };
           });
 
-          // Auto-start avatar generation after face detection
-          // Avatar evaluation will extract physical traits and clothing
-          log.info(`🎨 Auto-starting avatar generation after face detection...`);
+          // Auto-start avatar generation in BACKGROUND after face detection
+          // Don't await - let user continue while avatar generates
+          log.info(`🎨 Auto-starting avatar generation in background...`);
           setIsGeneratingAvatar(true);
 
           // Get the updated character for avatar generation
@@ -1003,26 +1003,28 @@ export default function StoryWizard() {
           });
 
           if (charForGeneration) {
-            try {
-              const result = await characterService.generateAndSaveAvatarForCharacter(charForGeneration);
-
-              if (result.success && result.character) {
-                // Update with generated avatar and extracted traits/clothing
-                setCurrentCharacter(result.character);
-                setCharacters(prev => prev.map(c =>
-                  c.id === result.character!.id ? result.character! : c
-                ));
-                log.success(`✅ Avatar generated and traits extracted for ${charForGeneration.name}`);
-              } else {
-                log.error(`❌ Avatar generation failed: ${result.error}`);
+            // Run avatar generation in background (don't await)
+            characterService.generateAndSaveAvatarForCharacter(charForGeneration)
+              .then(result => {
+                if (result.success && result.character) {
+                  // Update with generated avatar and extracted traits/clothing
+                  setCurrentCharacter(result.character);
+                  setCharacters(prev => prev.map(c =>
+                    c.id === result.character!.id ? result.character! : c
+                  ));
+                  log.success(`✅ Avatar generated and traits extracted for ${charForGeneration.name}`);
+                } else {
+                  log.error(`❌ Avatar generation failed: ${result.error}`);
+                  setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+                }
+              })
+              .catch(error => {
+                log.error(`❌ Avatar generation error:`, error);
                 setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
-              }
-            } catch (error) {
-              log.error(`❌ Avatar generation error:`, error);
-              setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
-            } finally {
-              setIsGeneratingAvatar(false);
-            }
+              })
+              .finally(() => {
+                setIsGeneratingAvatar(false);
+              });
           }
         } else {
           // Check for specific errors
