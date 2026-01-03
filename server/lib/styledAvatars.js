@@ -178,17 +178,20 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       inputs: {
         facePhoto: hasMultipleRefs ? {
           identifier: getImageIdentifier(facePhoto),
-          sizeKB: getImageSizeKB(facePhoto)
+          sizeKB: getImageSizeKB(facePhoto),
+          imageData: facePhoto // Full image for dev mode display
         } : null,
         originalAvatar: {
           identifier: getImageIdentifier(originalAvatar),
-          sizeKB: getImageSizeKB(originalAvatar)
+          sizeKB: getImageSizeKB(originalAvatar),
+          imageData: originalAvatar // Full image for dev mode display
         }
       },
       prompt: fullPrompt,
       output: {
         identifier: getImageIdentifier(downsized),
-        sizeKB: getImageSizeKB(downsized)
+        sizeKB: getImageSizeKB(downsized),
+        imageData: downsized // Full image for dev mode display
       }
     });
 
@@ -207,11 +210,13 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       inputs: {
         facePhoto: hasMultipleRefs ? {
           identifier: getImageIdentifier(facePhoto),
-          sizeKB: getImageSizeKB(facePhoto)
+          sizeKB: getImageSizeKB(facePhoto),
+          imageData: facePhoto
         } : null,
         originalAvatar: {
           identifier: getImageIdentifier(originalAvatar),
-          sizeKB: getImageSizeKB(originalAvatar)
+          sizeKB: getImageSizeKB(originalAvatar),
+          imageData: originalAvatar
         }
       }
     });

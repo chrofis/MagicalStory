@@ -25,11 +25,11 @@ interface StyledAvatarGenerationEntry {
   success: boolean;
   error?: string;
   inputs: {
-    facePhoto: { identifier: string; sizeKB: number } | null;
-    originalAvatar: { identifier: string; sizeKB: number };
+    facePhoto: { identifier: string; sizeKB: number; imageData?: string } | null;
+    originalAvatar: { identifier: string; sizeKB: number; imageData?: string };
   };
   prompt?: string;
-  output?: { identifier: string; sizeKB: number };
+  output?: { identifier: string; sizeKB: number; imageData?: string };
 }
 
 interface StoryDisplayProps {
@@ -1191,22 +1191,36 @@ export function StoryDisplay({
                       {/* Inputs */}
                       <div className="bg-blue-50 p-2 rounded text-xs">
                         <span className="font-semibold text-blue-700">Inputs:</span>
-                        <div className="mt-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-600">Face Photo:</span>
-                            {entry.inputs.facePhoto ? (
-                              <span className="text-blue-600">
-                                {entry.inputs.facePhoto.identifier} ({entry.inputs.facePhoto.sizeKB} KB)
-                              </span>
+                        <div className="mt-2 flex flex-wrap gap-3">
+                          <div className="flex flex-col items-center">
+                            <span className="text-gray-600 text-[10px] mb-1">Face Photo</span>
+                            {entry.inputs.facePhoto?.imageData ? (
+                              <img
+                                src={entry.inputs.facePhoto.imageData}
+                                alt="Face"
+                                className="w-16 h-16 object-cover rounded border border-blue-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => setEnlargedImage({ src: entry.inputs.facePhoto!.imageData!, title: 'Face Photo' })}
+                                title={`${entry.inputs.facePhoto.sizeKB} KB - Click to enlarge`}
+                              />
+                            ) : entry.inputs.facePhoto ? (
+                              <span className="text-blue-600 text-[10px]">{entry.inputs.facePhoto.sizeKB} KB</span>
                             ) : (
-                              <span className="text-gray-400 italic">Not provided</span>
+                              <span className="text-gray-400 italic text-[10px]">N/A</span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-600">Original Avatar:</span>
-                            <span className="text-blue-600">
-                              {entry.inputs.originalAvatar.identifier} ({entry.inputs.originalAvatar.sizeKB} KB)
-                            </span>
+                          <div className="flex flex-col items-center">
+                            <span className="text-gray-600 text-[10px] mb-1">Original Avatar</span>
+                            {entry.inputs.originalAvatar?.imageData ? (
+                              <img
+                                src={entry.inputs.originalAvatar.imageData}
+                                alt="Avatar"
+                                className="w-16 h-16 object-cover rounded border border-blue-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => setEnlargedImage({ src: entry.inputs.originalAvatar.imageData!, title: 'Original Avatar' })}
+                                title={`${entry.inputs.originalAvatar.sizeKB} KB - Click to enlarge`}
+                              />
+                            ) : (
+                              <span className="text-blue-600 text-[10px]">{entry.inputs.originalAvatar.sizeKB} KB</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1227,10 +1241,18 @@ export function StoryDisplay({
                       {entry.success && entry.output && (
                         <div className="bg-green-50 p-2 rounded text-xs">
                           <span className="font-semibold text-green-700">Output:</span>
-                          <div className="mt-1">
-                            <span className="text-green-600">
-                              {entry.output.identifier} ({entry.output.sizeKB} KB)
-                            </span>
+                          <div className="mt-2 flex flex-col items-start">
+                            {entry.output.imageData ? (
+                              <img
+                                src={entry.output.imageData}
+                                alt="Output"
+                                className="w-24 h-24 object-cover rounded border border-green-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => setEnlargedImage({ src: entry.output!.imageData!, title: 'Styled Avatar Output' })}
+                                title={`${entry.output.sizeKB} KB - Click to enlarge`}
+                              />
+                            ) : (
+                              <span className="text-green-600">{entry.output.sizeKB} KB</span>
+                            )}
                           </div>
                         </div>
                       )}
