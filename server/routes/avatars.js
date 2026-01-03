@@ -14,6 +14,48 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 
 // ============================================================================
+// COSTUMED AVATAR GENERATION LOG (for developer mode auditing)
+// ============================================================================
+
+// Generation log for developer mode auditing
+// Tracks all costumed avatar generations with inputs, prompts, outputs, timing
+let costumedAvatarGenerationLog = [];
+
+/**
+ * Create a short identifier for an image (first 12 chars of base64 data after header)
+ */
+function getImageIdentifier(imageData) {
+  if (!imageData || typeof imageData !== 'string') return null;
+  const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  return base64.substring(0, 12) + '...';
+}
+
+/**
+ * Get the size of an image in KB from base64
+ */
+function getImageSizeKB(imageData) {
+  if (!imageData || typeof imageData !== 'string') return 0;
+  const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  return Math.round((base64.length * 3 / 4) / 1024);
+}
+
+/**
+ * Get the costumed avatar generation log for developer mode auditing
+ */
+function getCostumedAvatarGenerationLog() {
+  return [...costumedAvatarGenerationLog];
+}
+
+/**
+ * Clear the costumed avatar generation log
+ */
+function clearCostumedAvatarGenerationLog() {
+  const count = costumedAvatarGenerationLog.length;
+  costumedAvatarGenerationLog = [];
+  log.debug(`🗑️ [COSTUMED AVATARS] Generation log cleared (${count} entries)`);
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 

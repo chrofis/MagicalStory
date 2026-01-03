@@ -23,7 +23,7 @@ GRID LAYOUT (with clear black dividing lines between quadrants):
 GRID REQUIREMENTS:
 - Draw clear BLACK LINES (2-3px) separating the 4 quadrants
 - Both profile views (top right and bottom right) MUST face the SAME direction (RIGHT)
-- Each quadrant has clean background appropriate to the art style
+- Each quadrant has white background 
 - All 4 quadrants show the SAME costume
 - TOP QUADRANTS: Head and shoulders, face clearly visible
 - BOTTOM QUADRANTS: Full body from head to toe, shoes visible

@@ -51,6 +51,7 @@ You MUST follow these text length guidelines strictly. Each page's story text mu
 - Write in third person (he/she/they)
 - Let readers discover personality through what characters DO, not what they ARE told
 - Your characters must feel like real people, not cardboard cutouts.
+- Do not repeat the visual traits of the character in the text. Max, the red-haired boy is fine for the scene hint, do not repeat this in the story text.
 
 **SHOW, don't TELL:**
 - NEVER mention trait words directly (don't write "She was brave" or "He was shy") SHOW traits through actions, dialogue, and behavior
