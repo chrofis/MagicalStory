@@ -82,14 +82,16 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
 
 /**
  * Convert a single avatar to target art style
- * @param {string} originalAvatar - Base64 image data URL
+ * @param {string} originalAvatar - Base64 image data URL (clothing/body reference)
  * @param {string} artStyle - Target art style (pixar, watercolor, etc.)
  * @param {string} characterName - Character name for logging
+ * @param {string} facePhoto - High-resolution face photo for identity (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null) {
   const startTime = Date.now();
-  log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style...`);
+  const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
+  log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style (${hasMultipleRefs ? '2 reference images' : 'single image'})...`);
 
   // Get art style prompt from loaded prompts
   const artStylePrompt = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS.pixar;
@@ -110,13 +112,28 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName) {
       fullPrompt = `Convert this person into the following art style: ${artStylePrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features.`;
     }
 
-    // Call image API to convert the avatar
-    // We pass the original avatar as a reference photo
-    // Use 'avatar' evaluation type (lightweight, no quality retry)
-    const result = await callGeminiAPIForImage(fullPrompt, [{
-      name: characterName,
+    // Build reference photos array
+    // Image 1: Face photo (for identity) - if available
+    // Image 2: Original avatar (for body/clothing)
+    const referencePhotos = [];
+
+    if (hasMultipleRefs) {
+      // Pass face photo first (Image 1 - identity reference)
+      referencePhotos.push({
+        name: `${characterName}_face`,
+        photoUrl: facePhoto
+      });
+    }
+
+    // Pass original avatar (Image 2 - body/clothing reference, or Image 1 if no face photo)
+    referencePhotos.push({
+      name: hasMultipleRefs ? `${characterName}_avatar` : characterName,
       photoUrl: originalAvatar
-    }], null, 'avatar');
+    });
+
+    // Call image API to convert the avatar
+    // Use 'avatar' evaluation type (lightweight, no quality retry)
+    const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar');
 
     if (!result || !result.imageData) {
       throw new Error('No image returned from API');
@@ -141,10 +158,11 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName) {
  * @param {string} characterName
  * @param {string} clothingCategory
  * @param {string} artStyle
- * @param {string} originalAvatar - Base64 image data URL
+ * @param {string} originalAvatar - Base64 image data URL (body/clothing reference)
+ * @param {string} facePhoto - High-resolution face photo for identity (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first
@@ -164,7 +182,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName);
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto);
       styledAvatarCache.set(cacheKey, styledAvatar);
       return styledAvatar;
     } finally {
@@ -232,7 +250,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
   }
 
   // Collect all unique character + clothing combinations needed
-  const neededAvatars = new Map(); // key -> { characterName, clothingCategory, originalAvatar }
+  const neededAvatars = new Map(); // key -> { characterName, clothingCategory, originalAvatar, facePhoto }
 
   for (const requirement of pageRequirements) {
     const { clothingCategory, characterNames } = requirement;
@@ -279,11 +297,16 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
         originalAvatar = fallbackAvatar;
       }
 
+      // Get high-resolution face photo for identity preservation
+      // Priority: face thumbnail (768px) > original photo
+      const facePhoto = char.photos?.face || char.photos?.original || char.photoUrl || null;
+
       if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
         neededAvatars.set(cacheKey, {
           characterName: charName,
           clothingCategory,
-          originalAvatar
+          originalAvatar,
+          facePhoto
         });
       }
     }
@@ -299,9 +322,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
 
   // Convert all needed avatars in parallel
   const conversionPromises = [];
-  for (const [cacheKey, { characterName, clothingCategory, originalAvatar }] of neededAvatars) {
+  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto }] of neededAvatars) {
     conversionPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar)
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto)
         .then(styledAvatar => ({ cacheKey, styledAvatar, success: true }))
         .catch(error => {
           log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}:`, error.message);
