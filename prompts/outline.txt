@@ -62,7 +62,47 @@ Title: [Your creative title here]
 
 ---
 
-# Part 2: Visual Bible (for Illustration Consistency)
+# Part 2: Clothing Requirements (for Avatar Generation)
+
+**OUTPUT THIS SECTION FIRST** - This determines which character avatar variations to generate before story creation begins.
+
+For each main character ({CHARACTER_NAMES}), specify which clothing variations are needed in the story:
+
+- **standard** - Everyday casual clothes (baseline from reference photo)
+- **winter** - Cold weather additions
+- **summer** - Warm weather variations
+- **costumed** - Full costume transformation (pirate, superhero, cowboy, princess, etc.)
+
+**Guidelines:**
+- Prefer `standard` when the story doesn't require special clothing
+- For `standard`, `winter`, `summer`: Only describe **signature elements** that differ from the reference photo (hat, boots, scarf, accessories)
+- For `costumed`: Provide **complete outfit description** (full transformation)
+- Only mark variations as `used: true` if they actually appear in the story
+
+**Output as JSON:**
+
+```json
+{
+  "clothingRequirements": {
+    "Sophie": {
+      "standard": { "used": true, "signature": "brown cowboy boots, leather belt with silver buckle" },
+      "winter": { "used": false },
+      "summer": { "used": true, "signature": "straw sun hat, open-toe sandals" },
+      "costumed": { "used": true, "costume": "Pirate", "description": "Tricorn hat with red feather, striped red-white shirt, brown leather vest with gold buttons, black pants tucked into tall boots, red sash belt, gold hoop earring" }
+    },
+    "Max": {
+      "standard": { "used": true },
+      "winter": { "used": true, "signature": "thick wool scarf, fur-lined boots, knit beanie" },
+      "summer": { "used": false },
+      "costumed": { "used": false }
+    }
+  }
+}
+```
+
+---
+
+# Part 3: Visual Bible (for Illustration Consistency)
 
 List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensures consistent illustrations throughout the book.
 
@@ -132,7 +172,7 @@ List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensu
 
 ---
 
-# Part 3: Cover Scene Descriptions
+# Part 4: Cover Scene Descriptions
 
 In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for these 3 cover elements.
 
@@ -152,7 +192,7 @@ In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for th
 
 ---
 
-# Part 4: Plot Structure
+# Part 5: Plot Structure
 
 Create a detailed {PAGES}-page story outline with a compelling plot. The focus of the plot must be on the main character(s).
 Clearly define:
@@ -192,7 +232,7 @@ Example:
 
 ---
 
-# Part 5: Character Development Arcs
+# Part 6: Character Development Arcs
 
 For EACH main character provided, detail their development arc by describing:
 
@@ -214,7 +254,7 @@ For all other characters:
 
 ---
 
-# Part 6: Page-by-Page Breakdown
+# Part 7: Page-by-Page Breakdown
 
 For EACH of the {PAGES} story pages, provide:
 
@@ -230,15 +270,16 @@ For EACH of the {PAGES} story pages, provide:
 
 ---
 
-# CRITICAL: You MUST generate ALL 6 sections
+# CRITICAL: You MUST generate ALL 7 sections
 
 **You MUST complete ALL sections listed above:**
 1. Title
-2. Visual Bible (with all subsections)
-3. Cover Scenes (all 3: Title Page, Initial Page, Back Cover)
-4. Plot Structure (with Themes, Tone, and Clothing Continuity)
-5. Character Development Arcs (for ALL characters)
-6. Page-by-Page Breakdown (for ALL {PAGES} pages, from Page 1 to Page {PAGES})
+2. Clothing Requirements (JSON for each main character)
+3. Visual Bible (with all subsections)
+4. Cover Scenes (all 3: Title Page, Initial Page, Back Cover)
+5. Plot Structure (with Themes, Tone, and Clothing Continuity)
+6. Character Development Arcs (for ALL characters)
+7. Page-by-Page Breakdown (for ALL {PAGES} pages, from Page 1 to Page {PAGES})
 
 **DO NOT STOP EARLY.** The outline is incomplete unless it contains detailed breakdowns for every single page from 1 to {PAGES}.
 
@@ -246,10 +287,31 @@ For EACH of the {PAGES} story pages, provide:
 
 # Format Your Response
 
-**IMPORTANT: Output MUST be in this EXACT order: Title → Visual Bible → Cover Scenes → Plot Structure → Character Arcs → Pages**
+**IMPORTANT: Output MUST be in this EXACT order: Title → Clothing Requirements → Visual Bible → Cover Scenes → Plot Structure → Character Arcs → Pages**
 
 ## Title
 Title: [Story title]
+
+## Clothing Requirements
+
+```json
+{
+  "clothingRequirements": {
+    "[Character1Name]": {
+      "standard": { "used": true, "signature": "[signature items if any]" },
+      "winter": { "used": true/false, "signature": "[cold weather additions]" },
+      "summer": { "used": true/false, "signature": "[warm weather items]" },
+      "costumed": { "used": true/false, "costume": "[costume type]", "description": "[full outfit description]" }
+    },
+    "[Character2Name]": {
+      "standard": { "used": true },
+      "winter": { "used": false },
+      "summer": { "used": false },
+      "costumed": { "used": false }
+    }
+  }
+}
+```
 
 ## Visual Bible
 

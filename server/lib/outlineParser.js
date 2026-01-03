@@ -683,6 +683,105 @@ class OutlineParser {
     );
     return match ? match[1].trim() : null;
   }
+
+  // --------------------------------------------------------------------------
+  // CLOTHING REQUIREMENTS EXTRACTION
+  // --------------------------------------------------------------------------
+
+  /**
+   * Extract clothing requirements JSON for avatar generation
+   * @returns {Object|null} - Parsed clothingRequirements or null if not found
+   */
+  extractClothingRequirements() {
+    if (this._cache.clothingRequirements !== undefined) return this._cache.clothingRequirements;
+
+    // Look for clothingRequirements JSON block
+    // Pattern: ```json { "clothingRequirements": { ... } } ``` or inline JSON
+    const jsonBlockMatch = this.outline.match(
+      /```json\s*(\{[\s\S]*?"clothingRequirements"[\s\S]*?\})\s*```/i
+    );
+
+    if (jsonBlockMatch) {
+      try {
+        const parsed = JSON.parse(jsonBlockMatch[1]);
+        if (parsed.clothingRequirements) {
+          this._cache.clothingRequirements = parsed.clothingRequirements;
+          log.debug(`[OUTLINE-PARSER] Extracted clothingRequirements for ${Object.keys(parsed.clothingRequirements).length} characters`);
+          return this._cache.clothingRequirements;
+        }
+      } catch (e) {
+        log.warn(`[OUTLINE-PARSER] Failed to parse clothingRequirements JSON: ${e.message}`);
+      }
+    }
+
+    // Fallback: look for ## Clothing Requirements section with inline JSON
+    const sectionMatch = this.outline.match(
+      /##\s*Clothing\s*Requirements[\s\S]*?```json\s*(\{[\s\S]*?\})\s*```/i
+    );
+
+    if (sectionMatch) {
+      try {
+        const parsed = JSON.parse(sectionMatch[1]);
+        if (parsed.clothingRequirements) {
+          this._cache.clothingRequirements = parsed.clothingRequirements;
+          log.debug(`[OUTLINE-PARSER] Extracted clothingRequirements (section format) for ${Object.keys(parsed.clothingRequirements).length} characters`);
+          return this._cache.clothingRequirements;
+        }
+      } catch (e) {
+        log.warn(`[OUTLINE-PARSER] Failed to parse clothingRequirements JSON from section: ${e.message}`);
+      }
+    }
+
+    this._cache.clothingRequirements = null;
+    log.debug('[OUTLINE-PARSER] No clothingRequirements found');
+    return null;
+  }
+
+  /**
+   * Get which clothing variations are needed for a specific character
+   * @param {string} characterName - Character name to look up
+   * @returns {Object|null} - { standard: {...}, winter: {...}, summer: {...}, costumed: {...} } or null
+   */
+  getCharacterClothingRequirements(characterName) {
+    const requirements = this.extractClothingRequirements();
+    if (!requirements) return null;
+
+    // Case-insensitive lookup
+    const nameLower = characterName.toLowerCase();
+    for (const [name, data] of Object.entries(requirements)) {
+      if (name.toLowerCase() === nameLower) {
+        return data;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get list of clothing variations needed for avatar generation
+   * @returns {Array<{characterName: string, variation: string, signature?: string, costume?: string, description?: string}>}
+   */
+  getRequiredAvatarVariations() {
+    const requirements = this.extractClothingRequirements();
+    if (!requirements) return [];
+
+    const variations = [];
+    for (const [characterName, data] of Object.entries(requirements)) {
+      for (const [variation, config] of Object.entries(data)) {
+        if (config && config.used === true) {
+          variations.push({
+            characterName,
+            variation,
+            signature: config.signature || null,
+            costume: config.costume || null,
+            description: config.description || null
+          });
+        }
+      }
+    }
+
+    log.debug(`[OUTLINE-PARSER] Required avatar variations: ${variations.length} total`);
+    return variations;
+  }
 }
 
 // ============================================================================
