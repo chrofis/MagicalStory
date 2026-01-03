@@ -4926,8 +4926,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingCategory}${costumeType ? ':' + costumeType : ''}`);
 
         // Use detailed photo info (with names) for labeled reference images
-        // Pass artStyle to get styled costumed avatars if available
-        const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle);
+        // Pass artStyle and clothingRequirements for per-character costume lookup
+        const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, streamingClothingRequirements);
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
         // Log with visual bible info if available
@@ -5545,8 +5545,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}${costumeType ? ':' + costumeType : ''}`);
 
           // Use detailed photo info (with names) for labeled reference images
-          // Pass artStyle to use pre-generated styled costumed avatars when available
-          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle);
+          // Pass artStyle and clothingRequirements for per-character costume lookup
+          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, streamingClothingRequirements);
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Reference photos: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
           // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
@@ -6382,10 +6382,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const sceneDescription = hint.hint || hint.scene || '';
         const coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
 
-        // Get character photos with clothing
+        // Handle costumed:type format
+        let effectiveCategory = clothingCategory;
+        let costumeType = null;
+        if (clothingCategory.startsWith('costumed:')) {
+          effectiveCategory = 'costumed';
+          costumeType = clothingCategory.split(':')[1];
+        }
+
+        // Get character photos with clothing - pass clothingRequirements for per-character costume lookup
         let coverPhotos = getCharacterPhotoDetails(
           coverType === 'titlePage' ? coverCharacters : inputData.characters,
-          clothingCategory
+          effectiveCategory,
+          costumeType,
+          artStyle,
+          streamingClothingRequirements
         );
         coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
 
@@ -6742,7 +6753,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           costumeType = clothingCategory.split(':')[1];
         }
 
-        const pagePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveCategory, costumeType, inputData.artStyle);
+        // Pass clothingRequirements so each character's costume type can be looked up
+        const pagePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveCategory, costumeType, inputData.artStyle, clothingRequirements);
 
         const imagePrompt = buildImagePrompt(
           scene.sceneDescription,
@@ -7413,8 +7425,14 @@ async function processStoryJob(jobId) {
       // Prepare all cover generation promises
       // Front cover - pass artStyle for styled costumed avatars
       const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
-      const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
-      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing, null, artStyle);
+      const frontCoverClothingRaw = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
+      let frontCoverClothing = frontCoverClothingRaw;
+      let frontCoverCostumeType = null;
+      if (frontCoverClothingRaw.startsWith('costumed:')) {
+        frontCoverClothing = 'costumed';
+        frontCoverCostumeType = frontCoverClothingRaw.split(':')[1];
+      }
+      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing, frontCoverCostumeType, artStyle, clothingRequirements);
       // For non-costumed avatars, apply styled avatars from cache
       if (frontCoverClothing !== 'costumed') {
         frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
@@ -7429,8 +7447,14 @@ async function processStoryJob(jobId) {
       coverPrompts.frontCover = frontCoverPrompt;
 
       // Initial page - pass artStyle for styled costumed avatars
-      const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
-      let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing, null, artStyle);
+      const initialPageClothingRaw = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
+      let initialPageClothing = initialPageClothingRaw;
+      let initialPageCostumeType = null;
+      if (initialPageClothingRaw.startsWith('costumed:')) {
+        initialPageClothing = 'costumed';
+        initialPageCostumeType = initialPageClothingRaw.split(':')[1];
+      }
+      let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing, initialPageCostumeType, artStyle, clothingRequirements);
       if (initialPageClothing !== 'costumed') {
         initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
       }
@@ -7452,8 +7476,14 @@ async function processStoryJob(jobId) {
       coverPrompts.initialPage = initialPagePrompt;
 
       // Back cover - pass artStyle for styled costumed avatars
-      const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
-      let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing, null, artStyle);
+      const backCoverClothingRaw = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
+      let backCoverClothing = backCoverClothingRaw;
+      let backCoverCostumeType = null;
+      if (backCoverClothingRaw.startsWith('costumed:')) {
+        backCoverClothing = 'costumed';
+        backCoverCostumeType = backCoverClothingRaw.split(':')[1];
+      }
+      let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing, backCoverCostumeType, artStyle, clothingRequirements);
       if (backCoverClothing !== 'costumed') {
         backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
       }
@@ -7686,8 +7716,8 @@ Output Format:
             }
             // Store clothing for future pages' context (clothing consistency)
             pageClothingForContext[pageNum] = clothingRaw;
-            // Pass artStyle to use pre-generated styled costumed avatars when available
-            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle);
+            // Pass artStyle and clothingRequirements for per-character costume lookup
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, clothingRequirements);
             // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
             if (clothingCategory !== 'costumed') {
               referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
@@ -8137,8 +8167,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Store clothing for future pages' context (clothing consistency)
             pageClothingForContext[pageNum] = clothingRaw;
             // Use detailed photo info (with names) for labeled reference images
-            // Pass artStyle to use pre-generated styled costumed avatars when available
-            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle);
+            // Pass artStyle and clothingRequirements for per-character costume lookup
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, clothingRequirements);
             // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
             if (clothingCategory !== 'costumed') {
               referencePhotos = applyStyledAvatars(referencePhotos, artStyle);

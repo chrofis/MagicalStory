@@ -563,9 +563,10 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
  * @param {string} clothingCategory - Optional clothing category to show which avatar is used
  * @param {string} costumeType - Optional costume type for 'costumed' category (e.g., 'pirate', 'superhero')
  * @param {string} artStyle - Optional art style to look for styled avatars first
+ * @param {Object} clothingRequirements - Optional per-character clothing requirements from outline
  * @returns {Array} Array of objects with character name and photo type used
  */
-function getCharacterPhotoDetails(characters, clothingCategory = null, costumeType = null, artStyle = null) {
+function getCharacterPhotoDetails(characters, clothingCategory = null, costumeType = null, artStyle = null, clothingRequirements = null) {
   if (!characters || characters.length === 0) return [];
 
   // Fallback priority for clothing avatars when exact match not found
@@ -591,10 +592,19 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
 
       // Handle costumed category - check styled avatars first, then regular costumed
       if (clothingCategory === 'costumed') {
-        // If specific costumeType provided, use it; otherwise auto-detect
+        // If specific costumeType provided, use it; otherwise look up from clothingRequirements
         let costumeKey = costumeType?.toLowerCase();
 
-        // Auto-detect costume from styledAvatars or regular costumed
+        // Look up costume type from clothingRequirements (per-character)
+        if (!costumeKey && clothingRequirements) {
+          const charReqs = clothingRequirements[char.name];
+          if (charReqs?.costumed?.costume) {
+            costumeKey = charReqs.costumed.costume.toLowerCase();
+            log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from clothingRequirements`);
+          }
+        }
+
+        // Auto-detect costume from styledAvatars or regular costumed (fallback)
         if (!costumeKey) {
           // First check styled avatars for this art style
           if (artStyle && avatars?.styledAvatars?.[artStyle]?.costumed) {
