@@ -1208,6 +1208,37 @@ export function CharacterForm({
                 )}
               </div>
 
+              {/* Clothing */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                  {language === 'de' ? 'Kleidung' : language === 'fr' ? 'Vêtements' : 'Clothing'}
+                </h3>
+                <textarea
+                  value={character.clothing?.current || character.avatars?.clothing?.standard || ''}
+                  onChange={(e) => onChange({
+                    ...character,
+                    clothing: {
+                      ...character.clothing,
+                      current: e.target.value,
+                    },
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none resize-none"
+                  placeholder={language === 'de'
+                    ? 'z.B. Rotes T-Shirt, blaue Jeans, weisse Sneaker'
+                    : language === 'fr'
+                    ? 'p.ex. T-shirt rouge, jeans bleu, baskets blanches'
+                    : 'e.g. Red t-shirt, blue jeans, white sneakers'}
+                  rows={3}
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  {language === 'de'
+                    ? 'Beschreiben Sie die Kleidung, die der Avatar tragen soll.'
+                    : language === 'fr'
+                    ? 'Décrivez les vêtements que l\'avatar doit porter.'
+                    : 'Describe the clothing the avatar should wear.'}
+                </p>
+              </div>
+
               {/* Physical traits */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">
