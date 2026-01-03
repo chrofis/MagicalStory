@@ -126,7 +126,9 @@ const {
   collectAvatarRequirements,
   clearStyledAvatarCache,
   getStyledAvatarCacheStats,
-  exportStyledAvatarsForPersistence
+  exportStyledAvatarsForPersistence,
+  getStyledAvatarGenerationLog,
+  clearStyledAvatarGenerationLog
 } = require('./server/lib/styledAvatars');
 const {
   TEXT_MODELS,
@@ -4716,6 +4718,9 @@ class ProgressiveStoryPageParser {
 async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}) {
   log.debug(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
+  // Clear styled avatar generation log for fresh tracking
+  clearStyledAvatarGenerationLog();
+
   // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {
     // By provider (for backwards compatibility) - includes thinking_tokens for Gemini 2.5
@@ -5857,6 +5862,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       coverImages: coverImages,
       imagePrompts: imagePrompts,
       coverPrompts: coverPrompts,  // Cover image prompts for dev mode
+      styledAvatarGeneration: getStyledAvatarGenerationLog(),  // Styled avatar generation log for dev mode
       storyType: inputData.storyType,
       storyDetails: inputData.storyDetails,
       pages: sceneCount,
@@ -6139,6 +6145,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 // ============================================================================
 async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}) {
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
+
+  // Clear styled avatar generation log for fresh tracking
+  clearStyledAvatarGenerationLog();
 
   // Token usage tracker - same structure as other modes
   const tokenUsage = {
@@ -7937,6 +7946,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       coverImages,
       imagePrompts,
       coverPrompts,  // Cover image prompts for dev mode
+      styledAvatarGeneration: getStyledAvatarGenerationLog(),  // Styled avatar generation log for dev mode
       title: storyTitle,
       textOnly: skipImages // Mark if this was text-only generation
     };

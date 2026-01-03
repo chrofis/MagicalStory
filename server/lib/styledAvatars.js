@@ -26,6 +26,29 @@ const styledAvatarCache = new Map();
 // Value: Promise that resolves to the styled avatar
 const conversionInProgress = new Map();
 
+// Generation log for developer mode auditing
+// Tracks all avatar conversions with inputs, prompts, outputs, timing
+let styledAvatarGenerationLog = [];
+
+/**
+ * Create a short identifier for an image (first 8 chars of base64 data after header)
+ * Used for logging without storing full image data
+ */
+function getImageIdentifier(imageData) {
+  if (!imageData || typeof imageData !== 'string') return null;
+  const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  return base64.substring(0, 12) + '...';
+}
+
+/**
+ * Get the size of an image in KB from base64
+ */
+function getImageSizeKB(imageData) {
+  if (!imageData || typeof imageData !== 'string') return 0;
+  const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  return Math.round((base64.length * 3 / 4) / 1024);
+}
+
 // Load art style prompts from prompts/art-styles.txt
 function loadArtStylePrompts() {
   const promptsPath = path.join(__dirname, '../../prompts/art-styles.txt');
@@ -145,9 +168,54 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     const duration = Date.now() - startTime;
     log.debug(`✅ [STYLED AVATAR] ${characterName} converted to ${artStyle} in ${duration}ms`);
 
+    // Log generation details for developer mode auditing
+    styledAvatarGenerationLog.push({
+      timestamp: new Date().toISOString(),
+      characterName,
+      artStyle,
+      durationMs: duration,
+      success: true,
+      inputs: {
+        facePhoto: hasMultipleRefs ? {
+          identifier: getImageIdentifier(facePhoto),
+          sizeKB: getImageSizeKB(facePhoto)
+        } : null,
+        originalAvatar: {
+          identifier: getImageIdentifier(originalAvatar),
+          sizeKB: getImageSizeKB(originalAvatar)
+        }
+      },
+      prompt: fullPrompt,
+      output: {
+        identifier: getImageIdentifier(downsized),
+        sizeKB: getImageSizeKB(downsized)
+      }
+    });
+
     return downsized;
   } catch (error) {
     log.error(`❌ [STYLED AVATAR] Failed to convert ${characterName} to ${artStyle}:`, error.message);
+
+    // Log failed generation
+    styledAvatarGenerationLog.push({
+      timestamp: new Date().toISOString(),
+      characterName,
+      artStyle,
+      durationMs: Date.now() - startTime,
+      success: false,
+      error: error.message,
+      inputs: {
+        facePhoto: hasMultipleRefs ? {
+          identifier: getImageIdentifier(facePhoto),
+          sizeKB: getImageSizeKB(facePhoto)
+        } : null,
+        originalAvatar: {
+          identifier: getImageIdentifier(originalAvatar),
+          sizeKB: getImageSizeKB(originalAvatar)
+        }
+      }
+    });
+
     // Return original avatar as fallback
     return originalAvatar;
   }
@@ -537,6 +605,24 @@ function exportStyledAvatarsForPersistence(characters, artStyle) {
   return result;
 }
 
+/**
+ * Get the styled avatar generation log for developer mode auditing
+ * @returns {Array} Array of generation log entries
+ */
+function getStyledAvatarGenerationLog() {
+  return [...styledAvatarGenerationLog];
+}
+
+/**
+ * Clear the styled avatar generation log
+ * Call this at the start of a new story generation
+ */
+function clearStyledAvatarGenerationLog() {
+  const count = styledAvatarGenerationLog.length;
+  styledAvatarGenerationLog = [];
+  log.debug(`🗑️ [STYLED AVATARS] Generation log cleared (${count} entries)`);
+}
+
 module.exports = {
   // Core functions
   getOrCreateStyledAvatar,
@@ -556,6 +642,10 @@ module.exports = {
   // Persistence
   getStyledAvatarsForCharacter,
   exportStyledAvatarsForPersistence,
+
+  // Developer mode auditing
+  getStyledAvatarGenerationLog,
+  clearStyledAvatarGenerationLog,
 
   // Utility
   getAvatarCacheKey,
