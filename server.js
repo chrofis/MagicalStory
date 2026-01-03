@@ -6497,7 +6497,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (!hint) return;
 
         const clothingCategory = hint.clothing || 'standard';
-        const coverCharacters = getCharactersInScene(hint.scene || '', inputData.characters);
+        // Parser returns 'hint' property, not 'scene'
+        const sceneDescription = hint.hint || hint.scene || '';
+        const coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
 
         // Get character photos with clothing
         let costumeType = null;
@@ -6515,7 +6517,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Build cover prompt
         const coverPrompt = buildImagePrompt(
-          hint.scene || `Cover scene for ${title}`,
+          sceneDescription || `Cover scene for ${title}`,
           inputData,
           coverCharacters,
           false,
@@ -6545,7 +6547,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const storageKey = coverType === 'titlePage' ? 'frontCover' : coverType;
           coverImages[storageKey] = {
             imageData: coverResult.imageData,
-            description: hint.scene,
+            description: sceneDescription,
             prompt: coverPrompt,
             qualityScore: coverResult.score,
             qualityReasoning: coverResult.reasoning,
