@@ -1022,8 +1022,19 @@ export default function StoryWizard() {
             characterService.generateAndSaveAvatarForCharacter(charForGeneration)
               .then(result => {
                 if (result.success && result.character) {
-                  // Update with generated avatar and extracted traits/clothing
-                  setCurrentCharacter(result.character);
+                  // Merge result with current state to preserve user's trait selections
+                  // (avatar generation runs async, user may have edited traits meanwhile)
+                  setCurrentCharacter(prev => {
+                    if (!prev) return result.character!;
+                    return {
+                      ...prev,
+                      // Take avatars and physical traits from result
+                      avatars: result.character!.avatars,
+                      physical: result.character!.physical,
+                      clothing: result.character!.clothing,
+                      // Keep user's current traits (they may have edited while avatar was generating)
+                    };
+                  });
                   setCharacters(prev => prev.map(c =>
                     c.id === result.character!.id ? result.character! : c
                   ));
