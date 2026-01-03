@@ -796,6 +796,20 @@ export const storyService = {
       story: string;
       storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
       visualBible?: VisualBible;
+      styledAvatarGeneration?: Array<{
+        timestamp: string;
+        characterName: string;
+        artStyle: string;
+        durationMs: number;
+        success: boolean;
+        error?: string;
+        inputs: {
+          facePhoto: { identifier: string; sizeKB: number } | null;
+          originalAvatar: { identifier: string; sizeKB: number };
+        };
+        prompt?: string;
+        output?: { identifier: string; sizeKB: number };
+      }>;
       sceneDescriptions: SceneDescription[];
       sceneImages: SceneImage[];
       coverImages?: CoverImages;
@@ -827,6 +841,20 @@ export const storyService = {
         storyText?: string; // Server uses storyText
         storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
         visualBible?: VisualBible;
+        styledAvatarGeneration?: Array<{
+          timestamp: string;
+          characterName: string;
+          artStyle: string;
+          durationMs: number;
+          success: boolean;
+          error?: string;
+          inputs: {
+            facePhoto: { identifier: string; sizeKB: number } | null;
+            originalAvatar: { identifier: string; sizeKB: number };
+          };
+          prompt?: string;
+          output?: { identifier: string; sizeKB: number };
+        }>;
         sceneDescriptions?: SceneDescription[];
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
@@ -863,6 +891,7 @@ export const storyService = {
         story: resultData.storyText || '', // Map storyText -> story
         storyTextPrompts: resultData.storyTextPrompts,
         visualBible: resultData.visualBible,
+        styledAvatarGeneration: resultData.styledAvatarGeneration,
         sceneDescriptions: resultData.sceneDescriptions || [],
         sceneImages: resultData.sceneImages || [],
         coverImages: resultData.coverImages,

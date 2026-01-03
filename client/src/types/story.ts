@@ -235,6 +235,20 @@ export interface SavedStory {
     usage?: TokenUsage;  // Token usage for this batch
   }>;
   visualBible?: Partial<VisualBible>;
+  styledAvatarGeneration?: Array<{
+    timestamp: string;
+    characterName: string;
+    artStyle: string;
+    durationMs: number;
+    success: boolean;
+    error?: string;
+    inputs: {
+      facePhoto: { identifier: string; sizeKB: number } | null;
+      originalAvatar: { identifier: string; sizeKB: number };
+    };
+    prompt?: string;
+    output?: { identifier: string; sizeKB: number };
+  }>;
   sceneDescriptions?: SceneDescription[];
   sceneImages?: SceneImage[];
   coverImages?: CoverImages;
