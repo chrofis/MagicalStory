@@ -511,12 +511,10 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
 
     const isFemale = gender === 'female';
 
-    // Define clothing categories
+    // Define clothing categories - only generate standard avatar
+    // Winter, summer, formal avatars are no longer generated automatically
     const clothingCategories = {
-      winter: { emoji: '❄️' },
-      standard: { emoji: '👕' },
-      summer: { emoji: '☀️' },
-      formal: { emoji: '👔' }
+      standard: { emoji: '👕' }
     };
 
     const results = {
@@ -684,15 +682,15 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       }
     };
 
-    // PHASE 1: Generate all 4 avatars in parallel
-    log.debug(`🚀 [CLOTHING AVATARS] Starting PARALLEL generation of 4 avatars for ${name}...`);
+    // PHASE 1: Generate standard avatar only
+    log.debug(`🚀 [CLOTHING AVATARS] Generating standard avatar for ${name}...`);
     const generationStart = Date.now();
     const generationPromises = Object.entries(clothingCategories).map(
       ([category, config]) => generateSingleAvatar(category, config)
     );
     const generatedAvatars = await Promise.all(generationPromises);
     const generationTime = Date.now() - generationStart;
-    log.debug(`⚡ [CLOTHING AVATARS] All 4 avatars generated in ${generationTime}ms (parallel)`);
+    log.debug(`⚡ [CLOTHING AVATARS] Standard avatar generated in ${generationTime}ms`);
 
     // Store prompts and images
     for (const { category, prompt, imageData } of generatedAvatars) {
@@ -726,18 +724,17 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       }
     }
 
-    log.debug(`✅ [CLOTHING AVATARS] Total time: ${Date.now() - generationStart}ms (was ~25s sequential)`)
+    log.debug(`✅ [CLOTHING AVATARS] Total time: ${Date.now() - generationStart}ms`)
 
-    // Check if at least one avatar was generated
-    const generatedCount = ['winter', 'standard', 'summer', 'formal'].filter(c => results[c]).length;
-    if (generatedCount === 0) {
-      return res.status(500).json({ error: 'Failed to generate any avatars' });
+    // Check if standard avatar was generated
+    if (!results.standard) {
+      return res.status(500).json({ error: 'Failed to generate avatar' });
     }
 
     results.status = 'complete';
     results.generatedAt = new Date().toISOString();
 
-    log.debug(`✅ [CLOTHING AVATARS] Generated ${generatedCount}/4 avatars for ${name}`);
+    log.debug(`✅ [CLOTHING AVATARS] Generated standard avatar for ${name}`);
     res.json({ success: true, clothingAvatars: results });
 
   } catch (err) {
