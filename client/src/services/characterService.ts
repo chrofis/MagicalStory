@@ -259,6 +259,7 @@ export interface AvatarGenerationResult {
   characterName: string;
   success: boolean;
   avatars?: CharacterAvatars;
+  character?: Character;                   // Updated character with avatars and extracted traits/clothing
   extractedTraits?: ExtractedTraits;      // Physical traits extracted from reference photo
   extractedClothing?: ExtractedClothing;   // Clothing extracted from generated avatar
   error?: string;
@@ -342,6 +343,7 @@ export const characterService = {
         clothingAvatars?: CharacterAvatars & {
           extractedTraits?: ExtractedTraits;
           structuredClothing?: Record<string, ExtractedClothing>;
+          rawEvaluation?: Record<string, unknown>;  // Full unfiltered API response for dev mode
         };
         error?: string;
       }>('/api/generate-clothing-avatars', {
@@ -689,6 +691,7 @@ export const characterService = {
       });
 
       result.success = true;
+      result.character = updatedCharacter;  // Return the updated character with avatars and extracted data
       onProgress?.('complete', `Avatars saved for ${character.name}`);
       log.success(`✅ Avatars generated and saved for ${character.name}`);
 

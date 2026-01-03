@@ -74,6 +74,7 @@ export interface CharacterAvatars {
   faceMatch?: Record<ClothingCategory, FaceMatchResult>; // Face match evaluation results (dev mode only)
   clothing?: Record<ClothingCategory, string>; // Extracted clothing descriptions per avatar (e.g., "red winter parka, blue jeans")
   prompts?: Record<ClothingCategory, string>; // Actual prompts used for generation (dev mode only)
+  rawEvaluation?: Record<string, unknown>; // Full unfiltered API response (dev mode only)
   // Styled avatars converted to different art styles (e.g., Pixar, watercolor)
   // Key: art style (e.g., 'pixar'), Value: avatars per clothing category
   styledAvatars?: Record<string, Record<ClothingCategory, string>>;

@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from 'react';
-import { Upload, Save, RefreshCw, Sparkles, Wand2, Pencil, X } from 'lucide-react';
+import { Upload, Save, RefreshCw, Wand2, Pencil, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
@@ -445,7 +445,7 @@ export function CharacterForm({
   isRegeneratingAvatarsWithTraits,
   step,
   developerMode,
-  changedTraits,
+  changedTraits: _changedTraits,  // Unused but kept for future use
   photoAnalysisDebug,
   relationships = {},
   relationshipTexts = {},
@@ -525,10 +525,7 @@ export function CharacterForm({
   // Get display photo URL
   const displayPhoto = character.photos?.face || character.photos?.original;
 
-  // Check if any traits changed (for showing indicator)
-  const hasChangedTraits = changedTraits && Object.values(changedTraits).some(v => v);
-
-  // Step 1: Name entry + Physical traits (AI-extracted) + Avatar placeholder
+  // Step 1: Name entry + Avatar placeholder
   if (step === 'name') {
     return (
       <div className="space-y-6">
@@ -588,20 +585,16 @@ export function CharacterForm({
               </div>
             </div>
 
-            {/* Basic Info - Gender, Age */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Basic Info - Gender, Age, Height */}
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 mb-0.5 flex items-center gap-1">
-                  <Sparkles size={10} className="text-gray-300" />
+                <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
                   {t.gender}
-                  {changedTraits?.gender && <span className="text-amber-500">●</span>}
                 </label>
                 <select
                   value={character.gender}
                   onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
-                  className={`w-full px-2 py-1.5 border rounded text-sm focus:border-indigo-500 focus:outline-none ${
-                    changedTraits?.gender ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 text-gray-600'
-                  }`}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
                 >
                   <option value="male">{t.male}</option>
                   <option value="female">{t.female}</option>
@@ -609,51 +602,32 @@ export function CharacterForm({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-400 mb-0.5 flex items-center gap-1">
-                  <Sparkles size={10} className="text-gray-300" />
+                <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
                   {t.age}
-                  {changedTraits?.age && <span className="text-amber-500">●</span>}
                 </label>
                 <input
                   type="number"
                   value={character.age}
                   onChange={(e) => updateField('age', e.target.value)}
-                  className={`w-full px-2 py-1.5 border rounded text-sm focus:border-indigo-500 focus:outline-none ${
-                    changedTraits?.age ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 text-gray-600'
-                  }`}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
                   min="1"
                   max="120"
                 />
               </div>
-            </div>
-
-            {/* Physical Features - AI-extracted (grayed, editable) */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles size={14} className="text-gray-400" />
-                <span className="text-xs font-medium text-gray-500">
-                  {language === 'de' ? 'KI-erkannte Merkmale' : language === 'fr' ? 'Caractéristiques détectées par l\'IA' : 'AI-detected features'}
-                </span>
-                {hasChangedTraits && (
-                  <span className="text-xs text-amber-600 flex items-center gap-1">
-                    <span className="text-amber-500">●</span>
-                    {language === 'de' ? 'Geändert' : language === 'fr' ? 'Modifié' : 'Changed'}
-                  </span>
-                )}
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
+                  {language === 'de' ? 'Größe (cm)' : language === 'fr' ? 'Taille (cm)' : 'Height (cm)'}
+                </label>
+                <input
+                  type="number"
+                  value={character.physical?.height || ''}
+                  onChange={(e) => updatePhysical('height', e.target.value)}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+                  placeholder="170"
+                  min="50"
+                  max="250"
+                />
               </div>
-              <PhysicalTraitsGrid
-                character={character}
-                language={language}
-                updatePhysical={updatePhysical}
-                updateApparentAge={(v) => updateField('apparentAge', v)}
-                changedTraits={changedTraits}
-                isAiExtracted={true}
-              />
-              <p className="mt-2 text-[10px] text-gray-400 italic">
-                {language === 'de' ? 'Diese Merkmale wurden aus dem Foto erkannt. Sie können sie bearbeiten.' :
-                 language === 'fr' ? 'Ces caractéristiques ont été détectées à partir de la photo. Vous pouvez les modifier.' :
-                 'These features were detected from the photo. You can edit them.'}
-              </p>
             </div>
           </div>
 
@@ -873,16 +847,14 @@ export function CharacterForm({
             )}
             {/* Avatar action buttons */}
             <div className="mt-2 space-y-1">
-              {/* Modify Avatar button - for standard mode users (blue style) */}
-              {!developerMode && (
-                <button
-                  onClick={() => setIsModifyingAvatar(true)}
-                  className="w-full px-2 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex items-center justify-center gap-1 border border-indigo-200"
-                >
-                  <Pencil size={10} />
-                  {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
-                </button>
-              )}
+              {/* Modify Avatar button - for all users (blue style) */}
+              <button
+                onClick={() => setIsModifyingAvatar(true)}
+                className="w-full px-2 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex items-center justify-center gap-1 border border-indigo-200"
+              >
+                <Pencil size={10} />
+                {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+              </button>
               {/* Regenerate button - developer mode only */}
               {developerMode && (
                 <button
@@ -928,6 +900,17 @@ export function CharacterForm({
                     </div>
                   ))}
                 </div>
+              </details>
+            )}
+            {/* Developer mode: show full raw API response */}
+            {developerMode && character.avatars?.rawEvaluation && (
+              <details className="mt-1 text-left">
+                <summary className="text-[10px] font-medium cursor-pointer text-purple-600">
+                  Full API Response
+                </summary>
+                <pre className="mt-1 p-2 rounded text-[8px] whitespace-pre-wrap overflow-auto max-h-64 border bg-gray-100 border-gray-200">
+                  {JSON.stringify(character.avatars.rawEvaluation, null, 2)}
+                </pre>
               </details>
             )}
           </div>

@@ -968,56 +968,14 @@ export default function StoryWizard() {
             }
           }
 
+          // Photo analysis now only returns face/body crops
+          // Physical traits and clothing are extracted during avatar evaluation
           setCurrentCharacter(prev => {
             if (!prev) return null;
 
-            // Physical traits: always overwrite with new values (except height)
-            const newPhysical = analysis.physical ? {
-              // Keep height only if already set, otherwise use analysis
-              height: prev.physical?.height || analysis.physical.height,
-              // Always overwrite other physical traits from photo analysis
-              build: analysis.physical.build || prev.physical?.build,
-              face: analysis.physical.face || prev.physical?.face,
-              eyeColor: analysis.physical.eyeColor || prev.physical?.eyeColor,
-              hairColor: analysis.physical.hairColor || prev.physical?.hairColor,
-              hairLength: analysis.physical.hairLength || prev.physical?.hairLength,
-              hairStyle: analysis.physical.hairStyle || prev.physical?.hairStyle,
-              hair: analysis.physical.hair || prev.physical?.hair,  // Legacy
-              other: analysis.physical.other || prev.physical?.other,
-            } : prev.physical;
-
-            // Compare previous vs new traits to highlight changes
-            const prevTraits = previousTraitsRef.current;
-            if (prevTraits && (prevTraits.physical || prevTraits.gender || prevTraits.age)) {
-              const changes: ChangedTraits = {};
-              // Only mark as changed if there WAS a previous value AND it's different
-              if (prevTraits.physical?.eyeColor && newPhysical?.eyeColor !== prevTraits.physical.eyeColor) changes.eyeColor = true;
-              if (prevTraits.physical?.hairColor && newPhysical?.hairColor !== prevTraits.physical.hairColor) changes.hairColor = true;
-              if (prevTraits.physical?.hairLength && newPhysical?.hairLength !== prevTraits.physical.hairLength) changes.hairLength = true;
-              if (prevTraits.physical?.hairStyle && newPhysical?.hairStyle !== prevTraits.physical.hairStyle) changes.hairStyle = true;
-              if (prevTraits.physical?.hair && newPhysical?.hair !== prevTraits.physical.hair) changes.hair = true;
-              if (prevTraits.physical?.face && newPhysical?.face !== prevTraits.physical.face) changes.face = true;
-              if (prevTraits.physical?.build && newPhysical?.build !== prevTraits.physical.build) changes.build = true;
-              if (prevTraits.physical?.other && newPhysical?.other !== prevTraits.physical.other) changes.other = true;
-              if (prevTraits.gender && analysis.gender && analysis.gender !== prevTraits.gender) changes.gender = true;
-              if (prevTraits.age && analysis.age && analysis.age !== prevTraits.age) changes.age = true;
-
-              // Only set if there are actual changes
-              if (Object.keys(changes).length > 0) {
-                log.info('Traits changed from previous photo:', changes);
-                setChangedTraits(changes);
-              }
-            }
-
             return {
               ...prev,
-              // Gender: only fill if blank (preserve user value)
-              gender: prev.gender || (analysis.gender as 'male' | 'female' | 'other'),
-              // Age: only fill if blank (preserve user value)
-              age: prev.age || analysis.age || '',
-              // Apparent age: always set from analysis if available (visual appearance)
-              apparentAge: analysis.apparentAge || prev.apparentAge,
-              // Photos
+              // Photos from face/body detection
               photos: {
                 original: analysis.photos?.face || originalPhotoUrl,
                 face: analysis.photos?.face,
@@ -1026,14 +984,46 @@ export default function StoryWizard() {
                 faceBox: analysis.photos?.faceBox,
                 bodyBox: analysis.photos?.bodyBox,
               },
-              // Physical traits (merged above)
-              physical: newPhysical,
-              // Clothing from analysis
-              clothing: analysis.clothing || prev.clothing,
-              // Clear avatars when new photo is uploaded - must regenerate with new face
-              avatars: undefined,
+              // Clear avatars - will regenerate with new face
+              avatars: { status: 'generating' as const },
             };
           });
+
+          // Auto-start avatar generation after face detection
+          // Avatar evaluation will extract physical traits and clothing
+          log.info(`🎨 Auto-starting avatar generation after face detection...`);
+          setIsGeneratingAvatar(true);
+
+          // Get the updated character for avatar generation
+          const charForGeneration = await new Promise<Character | null>(resolve => {
+            setCurrentCharacter(prev => {
+              resolve(prev);
+              return prev;
+            });
+          });
+
+          if (charForGeneration) {
+            try {
+              const result = await characterService.generateAndSaveAvatarForCharacter(charForGeneration);
+
+              if (result.success && result.character) {
+                // Update with generated avatar and extracted traits/clothing
+                setCurrentCharacter(result.character);
+                setCharacters(prev => prev.map(c =>
+                  c.id === result.character!.id ? result.character! : c
+                ));
+                log.success(`✅ Avatar generated and traits extracted for ${charForGeneration.name}`);
+              } else {
+                log.error(`❌ Avatar generation failed: ${result.error}`);
+                setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+              }
+            } catch (error) {
+              log.error(`❌ Avatar generation error:`, error);
+              setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+            } finally {
+              setIsGeneratingAvatar(false);
+            }
+          }
         } else {
           // Check for specific errors
           if (analysis.error === 'no_face_detected') {

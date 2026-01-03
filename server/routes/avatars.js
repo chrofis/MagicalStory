@@ -679,6 +679,7 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       clothing: {},           // Legacy: text clothing per category
       structuredClothing: {}, // New: structured clothing from evaluation
       extractedTraits: null,  // Physical traits extracted from reference photo
+      rawEvaluation: null,    // Full unfiltered API response (for dev mode)
       prompts: {}
     };
 
@@ -872,6 +873,11 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       for (const { category, faceMatchResult } of evalResults) {
         if (faceMatchResult) {
           results.faceMatch[category] = { score: faceMatchResult.score, details: faceMatchResult.details };
+
+          // Store full raw evaluation for dev mode (only from first result)
+          if (faceMatchResult.raw && !results.rawEvaluation) {
+            results.rawEvaluation = faceMatchResult.raw;
+          }
 
           // Store extracted physical traits (from reference photo)
           if (faceMatchResult.physicalTraits && !results.extractedTraits) {
