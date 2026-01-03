@@ -406,7 +406,14 @@ export function CharacterForm({
   // Wizard state for new character creation
   type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
   type EditSection = 'strengths' | 'weaknesses' | 'conflicts' | 'details' | 'relationships' | null;
-  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
+
+  // Check if step 1 info is already complete (from photo analysis)
+  const hasPhoto = !!(character.photos?.face || character.photos?.original);
+  const hasBasicInfo = !!(character.gender && character.age && String(character.age).trim() !== '');
+  const step1Complete = hasPhoto && hasBasicInfo;
+
+  // Start at step 2 if photo + basic info already filled
+  const [wizardStep, setWizardStep] = useState<WizardStep>(step1Complete ? 2 : 1);
   const [editingSection, setEditingSection] = useState<EditSection>(null);
 
   // Determine if character is "new" (needs wizard) or "existing" (compact edit view)
@@ -483,7 +490,7 @@ export function CharacterForm({
   // Wizard navigation functions
   const canProceedFromStep = (stepNum: WizardStep): boolean => {
     switch (stepNum) {
-      case 1: return !!(displayPhoto && character.gender && character.age);
+      case 1: return step1Complete;
       case 2: return (character.traits?.strengths?.length || 0) >= 3;
       case 3: return (character.traits?.flaws?.length || 0) >= 2;
       case 4: case 5: case 6: return true;
@@ -642,105 +649,91 @@ export function CharacterForm({
   if (isExistingCharacter && !editingSection) {
     return (
       <div className="space-y-4">
-        {/* Header with photo, name, and avatar */}
-        <div className="flex items-start gap-4">
+        {/* Top section: Photo + Info on left, Avatar on right */}
+        <div className="flex gap-6">
+          {/* Left: Photo and editable info */}
+          <div className="flex-1">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0">
+                {displayPhoto ? (
+                  <img src={displayPhoto} alt={character.name}
+                    className="w-20 h-20 rounded-full object-cover border-2 border-gray-300 cursor-pointer hover:opacity-80"
+                    onClick={() => setLightboxImage(displayPhoto)} />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gray-100 border-2 border-gray-300 flex items-center justify-center">
+                    <Upload size={24} className="text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{character.name}</h3>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <select value={character.gender} onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm bg-white">
+                    <option value="male">{t.male}</option>
+                    <option value="female">{t.female}</option>
+                    <option value="other">{t.other}</option>
+                  </select>
+                  <input type="number" value={character.age} onChange={(e) => updateField('age', e.target.value)}
+                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm" placeholder={language === 'de' ? 'Alter' : 'Age'} />
+                  <input type="number" value={character.physical?.height || ''} onChange={(e) => updatePhysical('height', e.target.value)}
+                    className="w-20 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="cm" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Big Avatar */}
           <div className="flex-shrink-0">
-            {displayPhoto ? (
-              <img src={displayPhoto} alt={character.name}
-                className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400 cursor-pointer hover:opacity-80"
-                onClick={() => setLightboxImage(displayPhoto)} />
+            {character.avatars?.standard ? (
+              <img src={character.avatars.standard} alt={`${character.name} avatar`}
+                className="w-40 h-56 object-contain rounded-lg border border-gray-200 bg-white cursor-pointer hover:opacity-90"
+                onClick={() => setLightboxImage(character.avatars?.standard || null)} />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
-                <Upload size={20} className="text-gray-400" />
+              <div className="w-40 h-56 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400 text-xs">
+                {language === 'de' ? 'Kein Avatar' : 'No avatar'}
               </div>
             )}
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-bold text-gray-800">{character.name}</h3>
-            <p className="text-sm text-gray-500">
-              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : 'Male') :
-               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : 'Female') : (language === 'de' ? 'Andere' : 'Other')}
-              {character.age && `, ${character.age} ${language === 'de' ? 'Jahre' : 'years'}`}
-              {character.physical?.height && `, ${character.physical.height}cm`}
-            </p>
-          </div>
-          {character.avatars?.standard && (
-            <img src={character.avatars.standard} alt={`${character.name} avatar`}
-              className="w-20 h-28 object-contain rounded-lg border-2 border-indigo-300 bg-white cursor-pointer hover:opacity-90"
-              onClick={() => setLightboxImage(character.avatars?.standard || null)} />
-          )}
         </div>
 
-        {/* Compact trait sections with edit buttons */}
-        <div className="space-y-3">
-          {/* Strengths */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold text-green-700">{t.strengths}</h4>
-              <button onClick={() => setEditingSection('strengths')} className="text-green-600 hover:text-green-800 p-1"><Pencil size={14} /></button>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {(character.traits?.strengths || []).map((trait) => (
-                <span key={trait} className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">{trait}</span>
-              ))}
-            </div>
+        {/* Traits - clean rows without colors */}
+        <div className="space-y-2 text-sm">
+          <div className="flex items-start gap-2">
+            <span className="font-medium text-gray-700 w-24 flex-shrink-0">{t.strengths}:</span>
+            <span className="flex-1 text-gray-600">{(character.traits?.strengths || []).join(', ') || '—'}</span>
+            <button onClick={() => setEditingSection('strengths')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
           </div>
-
-          {/* Weaknesses */}
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold text-red-700">{language === 'de' ? 'Schwächen' : 'Weaknesses'}</h4>
-              <button onClick={() => setEditingSection('weaknesses')} className="text-red-600 hover:text-red-800 p-1"><Pencil size={14} /></button>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {(character.traits?.flaws || []).map((trait) => (
-                <span key={trait} className="px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs">{trait}</span>
-              ))}
-            </div>
+          <div className="flex items-start gap-2">
+            <span className="font-medium text-gray-700 w-24 flex-shrink-0">{language === 'de' ? 'Schwächen' : 'Weaknesses'}:</span>
+            <span className="flex-1 text-gray-600">{(character.traits?.flaws || []).join(', ') || '—'}</span>
+            <button onClick={() => setEditingSection('weaknesses')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
           </div>
-
-          {/* Conflicts */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold text-amber-700">{language === 'de' ? 'Konflikte' : 'Conflicts'}</h4>
-              <button onClick={() => setEditingSection('conflicts')} className="text-amber-600 hover:text-amber-800 p-1"><Pencil size={14} /></button>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {(character.traits?.challenges || []).length > 0 ? (
-                (character.traits?.challenges || []).map((trait) => (
-                  <span key={trait} className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs">{trait}</span>
-                ))
-              ) : (<span className="text-xs text-gray-400 italic">{language === 'de' ? 'Keine' : 'None'}</span>)}
-            </div>
+          <div className="flex items-start gap-2">
+            <span className="font-medium text-gray-700 w-24 flex-shrink-0">{language === 'de' ? 'Konflikte' : 'Conflicts'}:</span>
+            <span className="flex-1 text-gray-600">{(character.traits?.challenges || []).join(', ') || '—'}</span>
+            <button onClick={() => setEditingSection('conflicts')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
           </div>
-
-          {/* Special Details */}
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold text-purple-700">{t.specialDetails}</h4>
-              <button onClick={() => setEditingSection('details')} className="text-purple-600 hover:text-purple-800 p-1"><Pencil size={14} /></button>
-            </div>
-            <p className="text-xs text-gray-600">{character.traits?.specialDetails || <span className="italic text-gray-400">{language === 'de' ? 'Keine' : 'None'}</span>}</p>
+          <div className="flex items-start gap-2">
+            <span className="font-medium text-gray-700 w-24 flex-shrink-0">{t.specialDetails}:</span>
+            <span className="flex-1 text-gray-600">{character.traits?.specialDetails || '—'}</span>
+            <button onClick={() => setEditingSection('details')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
           </div>
-
-          {/* Relationships */}
           {hasOtherCharacters && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-blue-700">{language === 'de' ? 'Beziehungen' : 'Relationships'}</h4>
-                <button onClick={() => setEditingSection('relationships')} className="text-blue-600 hover:text-blue-800 p-1"><Pencil size={14} /></button>
-              </div>
-              <p className="text-xs text-gray-600">
-                {Object.keys(relationships).length > 0 ? `${Object.keys(relationships).length} ${language === 'de' ? 'definiert' : 'defined'}` : <span className="italic text-gray-400">{language === 'de' ? 'Keine' : 'None'}</span>}
-              </p>
+            <div className="flex items-start gap-2">
+              <span className="font-medium text-gray-700 w-24 flex-shrink-0">{language === 'de' ? 'Beziehungen' : 'Relationships'}:</span>
+              <span className="flex-1 text-gray-600">
+                {Object.keys(relationships).length > 0 ? `${Object.keys(relationships).length} ${language === 'de' ? 'definiert' : 'defined'}` : '—'}
+              </span>
+              <button onClick={() => setEditingSection('relationships')} className="text-gray-400 hover:text-gray-600 p-1"><Pencil size={14} /></button>
             </div>
           )}
         </div>
 
         {/* Save button */}
-        <div className="flex gap-3 max-w-md">
+        <div className="flex gap-3 pt-2">
           {onCancel && (<button onClick={onCancel} className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300">{t.cancel}</button>)}
-          <Button onClick={onSave} disabled={isLoading} loading={isLoading} icon={Save} className={onCancel ? "flex-1" : "w-full"}>{t.saveCharacter}</Button>
+          <Button onClick={onSave} disabled={isLoading} loading={isLoading} icon={Save} className={onCancel ? "flex-1" : "flex-1"}>{t.saveCharacter}</Button>
         </div>
         <ImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
       </div>
