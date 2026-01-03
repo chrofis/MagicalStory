@@ -6541,7 +6541,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
 
         if (coverResult?.imageData) {
-          coverImages[coverType] = coverResult.imageData;
+          // Map coverType to frontend expected keys
+          const storageKey = coverType === 'titlePage' ? 'frontCover' : coverType;
+          coverImages[storageKey] = {
+            imageData: coverResult.imageData,
+            description: hint.scene,
+            prompt: coverPrompt,
+            qualityScore: coverResult.score,
+            qualityReasoning: coverResult.reasoning,
+            wasRegenerated: coverResult.wasRegenerated,
+            totalAttempts: coverResult.totalAttempts,
+            retryHistory: coverResult.retryHistory
+          };
           addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'cover_images', coverResult.modelId);
         }
       })));
@@ -6609,14 +6620,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         return {
           pageNumber: pageNum,
           text: scene.text,
-          sceneDescription: scene.sceneDescription,
-          image: imageResult?.imageData || null,
-          imagePrompt
+          description: scene.sceneDescription,
+          imageData: imageResult?.imageData || null,
+          prompt: imagePrompt,
+          // Include quality info if available
+          qualityScore: imageResult?.score,
+          qualityReasoning: imageResult?.reasoning,
+          wasRegenerated: imageResult?.wasRegenerated,
+          totalAttempts: imageResult?.totalAttempts,
+          retryHistory: imageResult?.retryHistory
         };
       }))
     );
 
-    log.debug(`📖 [UNIFIED] Generated ${allImages.filter(p => p.image).length}/${allImages.length} page images`);
+    log.debug(`📖 [UNIFIED] Generated ${allImages.filter(p => p.imageData).length}/${allImages.length} page images`);
 
     // Calculate total cost
     let totalCost = 0;
