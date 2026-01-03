@@ -15,6 +15,31 @@ const { OutlineParser, extractCharacterNamesFromScene } = require('./outlinePars
 const { getLanguageNote } = require('./languages');
 
 // ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Format a clothing object into a readable string
+ * @param {Object} clothingObj - Object with upperBody, lowerBody, shoes, fullBody properties
+ * @returns {string} Formatted clothing description
+ */
+function formatClothingObject(clothingObj) {
+  if (!clothingObj) return '';
+  if (typeof clothingObj === 'string') return clothingObj;
+
+  const parts = [];
+  if (clothingObj.fullBody) {
+    parts.push(clothingObj.fullBody);
+  } else {
+    if (clothingObj.upperBody) parts.push(clothingObj.upperBody);
+    if (clothingObj.lowerBody) parts.push(clothingObj.lowerBody);
+  }
+  if (clothingObj.shoes) parts.push(clothingObj.shoes);
+
+  return parts.join(', ');
+}
+
+// ============================================================================
 // JSON METADATA EXTRACTION - Parse structured data from scene descriptions
 // ============================================================================
 
@@ -398,18 +423,27 @@ function getCharactersInScene(sceneDescription, characters) {
  * Get photo URLs for specific characters based on clothing category
  * Prefers clothing avatar for the category > fallback categories > body with no background > body crop > face photo
  * @param {Array} characters - Array of character objects (filtered to scene)
- * @param {string} clothingCategory - Optional clothing category (winter, summer, formal, standard)
+ * @param {string} clothingCategory - Optional clothing category (winter, summer, formal, standard, costumed)
  * @returns {Array} Array of photo URLs for image generation
  */
 function getCharacterPhotos(characters, clothingCategory = null) {
   if (!characters || characters.length === 0) return [];
+
+  // Helper to extract URL from avatar data (handles object format)
+  const extractUrl = (avatarData) => {
+    if (!avatarData) return null;
+    if (typeof avatarData === 'string') return avatarData;
+    if (typeof avatarData === 'object' && avatarData.imageData) return avatarData.imageData;
+    return null;
+  };
 
   // Fallback priority for clothing avatars (same as getCharacterPhotoDetails)
   const clothingFallbackOrder = {
     winter: ['standard', 'formal', 'summer'],
     summer: ['standard', 'formal', 'winter'],
     formal: ['standard', 'winter', 'summer'],
-    standard: ['formal', 'summer', 'winter']
+    standard: ['formal', 'summer', 'winter'],
+    costumed: ['standard', 'formal']
   };
 
   return characters
@@ -417,9 +451,18 @@ function getCharacterPhotos(characters, clothingCategory = null) {
       // Support both avatar structures (char.avatars and char.clothingAvatars)
       const avatars = char.avatars || char.clothingAvatars;
 
+      // Handle costumed category - auto-detect costume type
+      if (clothingCategory === 'costumed' && avatars?.costumed) {
+        const availableCostumes = Object.keys(avatars.costumed);
+        if (availableCostumes.length > 0) {
+          const url = extractUrl(avatars.costumed[availableCostumes[0]]);
+          if (url) return url;
+        }
+      }
+
       // If clothing category specified and character has clothing avatar for it, use it
-      if (clothingCategory && avatars && avatars[clothingCategory]) {
-        return avatars[clothingCategory];
+      if (clothingCategory && clothingCategory !== 'costumed' && avatars && avatars[clothingCategory]) {
+        return extractUrl(avatars[clothingCategory]);
       }
 
       // Try fallback clothing categories before falling back to body photos
@@ -428,7 +471,7 @@ function getCharacterPhotos(characters, clothingCategory = null) {
         for (const fallbackCategory of fallbacks) {
           if (avatars[fallbackCategory]) {
             log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${clothingCategory}, using ${fallbackCategory}`);
-            return avatars[fallbackCategory];
+            return extractUrl(avatars[fallbackCategory]);
           }
         }
       }
@@ -569,15 +612,43 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       let usedClothingCategory = null;
 
       // Handle costumed category with sub-type (e.g., costumed.pirate)
-      if (clothingCategory === 'costumed' && costumeType && avatars?.costumed) {
-        const costumeKey = costumeType.toLowerCase();
-        if (avatars.costumed[costumeKey]) {
+      if (clothingCategory === 'costumed' && avatars?.costumed) {
+        // If specific costumeType provided, use it; otherwise auto-detect from character's avatars
+        let costumeKey = costumeType?.toLowerCase();
+
+        // Auto-detect: find the first available costume for this character
+        if (!costumeKey) {
+          const availableCostumes = Object.keys(avatars.costumed);
+          if (availableCostumes.length > 0) {
+            costumeKey = availableCostumes[0];
+            log.debug(`[AVATAR AUTO-DETECT] ${char.name}: found costume "${costumeKey}"`);
+          }
+        }
+
+        if (costumeKey && avatars.costumed[costumeKey]) {
+          // Handle object format (from dynamic avatar generation: {imageData, clothing})
+          let avatarData = avatars.costumed[costumeKey];
+          if (typeof avatarData === 'object' && avatarData.imageData) {
+            photoUrl = avatarData.imageData;
+            // Also extract clothing description from the object if available
+            if (avatarData.clothing) {
+              clothingDescription = typeof avatarData.clothing === 'string'
+                ? avatarData.clothing
+                : formatClothingObject(avatarData.clothing);
+            }
+          } else {
+            photoUrl = avatarData;
+          }
+
           photoType = `costumed-${costumeKey}`;
-          photoUrl = avatars.costumed[costumeKey];
           usedClothingCategory = `costumed:${costumeKey}`;
-          // Get clothing description for costumed avatar
-          if (avatars.clothing?.costumed?.[costumeKey]) {
-            clothingDescription = avatars.clothing.costumed[costumeKey];
+
+          // Get clothing description from separate clothing object if not already set
+          if (!clothingDescription && avatars.clothing?.costumed?.[costumeKey]) {
+            const clothingData = avatars.clothing.costumed[costumeKey];
+            clothingDescription = typeof clothingData === 'string'
+              ? clothingData
+              : formatClothingObject(clothingData);
           }
         }
       }

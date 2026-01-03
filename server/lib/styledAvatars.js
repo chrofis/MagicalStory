@@ -261,15 +261,25 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
         originalAvatar = avatars?.[clothingCategory];
       }
 
-      // Fallback chain
-      if (!originalAvatar) {
-        originalAvatar = avatars?.standard ||
-                        avatars?.formal ||  // Legacy backwards compat
-                        char.bodyNoBgUrl ||
-                        char.photoUrl;
+      // Handle object avatar format (from dynamic avatar generation: {imageData, clothing})
+      if (originalAvatar && typeof originalAvatar === 'object' && originalAvatar.imageData) {
+        originalAvatar = originalAvatar.imageData;
       }
 
-      if (originalAvatar && originalAvatar.startsWith('data:image')) {
+      // Fallback chain
+      if (!originalAvatar) {
+        let fallbackAvatar = avatars?.standard ||
+                             avatars?.formal ||  // Legacy backwards compat
+                             char.bodyNoBgUrl ||
+                             char.photoUrl;
+        // Handle object format in fallback too
+        if (fallbackAvatar && typeof fallbackAvatar === 'object' && fallbackAvatar.imageData) {
+          fallbackAvatar = fallbackAvatar.imageData;
+        }
+        originalAvatar = fallbackAvatar;
+      }
+
+      if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
         neededAvatars.set(cacheKey, {
           characterName: charName,
           clothingCategory,
