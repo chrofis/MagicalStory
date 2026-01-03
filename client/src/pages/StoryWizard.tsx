@@ -89,7 +89,7 @@ export default function StoryWizard() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
-  const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits'>('photo');
+  const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits' | 'characteristics' | 'relationships'>('photo');
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);  // Background avatar generation
   const [isRegeneratingAvatars, setIsRegeneratingAvatars] = useState(false);

@@ -348,6 +348,8 @@ interface CharacterFormProps {
   onCancel?: () => void;
   onPhotoChange: (file: File) => void;
   onContinueToTraits?: () => void;
+  onContinueToCharacteristics?: () => void;
+  onContinueToRelationships?: () => void;
   isNewCharacter?: boolean;  // Show simplified traits view for new characters
   onSaveAndGenerateAvatar?: () => void;  // New: triggers avatar generation
   onSaveAndRegenerateWithTraits?: () => void;  // Combined save + regenerate with traits
@@ -358,7 +360,7 @@ interface CharacterFormProps {
   isGeneratingAvatar?: boolean;  // New: background avatar generation in progress
   isRegeneratingAvatars?: boolean;
   isRegeneratingAvatarsWithTraits?: boolean;
-  step: 'name' | 'traits';
+  step: 'name' | 'traits' | 'characteristics' | 'relationships';
   developerMode?: boolean;
   changedTraits?: ChangedTraits;  // New: which traits changed from previous photo
   photoAnalysisDebug?: { rawResponse?: string; error?: string };  // Debug info for dev mode
@@ -379,6 +381,8 @@ export function CharacterForm({
   onCancel,
   onPhotoChange,
   onContinueToTraits,
+  onContinueToCharacteristics,
+  onContinueToRelationships,
   isNewCharacter = false,
   onSaveAndGenerateAvatar: _onSaveAndGenerateAvatar,  // No longer used - avatar auto-generates on photo upload
   onSaveAndRegenerateWithTraits,
@@ -659,6 +663,151 @@ export function CharacterForm({
           />
         </div>
 
+        {/* Next/Cancel Buttons */}
+        <div className="flex gap-3 pt-4">
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            >
+              {t.cancel}
+            </button>
+          )}
+          <Button
+            onClick={onContinueToCharacteristics}
+            disabled={!canSaveCharacter || isLoading}
+            loading={isLoading}
+            icon={ArrowRight}
+            className={onCancel ? "flex-1" : "w-full"}
+          >
+            {language === 'de' ? 'Weiter' :
+             language === 'fr' ? 'Suivant' :
+             'Next'}
+          </Button>
+        </div>
+
+        {!canSaveCharacter && (
+          <p className="text-sm text-red-500 text-center">
+            {t.selectStrengthsFlaws}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Step 3: Characteristics/Special Details for NEW characters
+  if (isNewCharacter && step === 'characteristics') {
+    return (
+      <div className="space-y-6">
+        {/* Header with character info */}
+        <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
+          {displayPhoto && (
+            <img
+              src={displayPhoto}
+              alt={character.name}
+              className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
+            />
+          )}
+          <div>
+            <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
+            <p className="text-sm text-gray-500">
+              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : 'Male') :
+               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : 'Female') :
+               (language === 'de' ? 'Andere' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : 'years'}
+            </p>
+          </div>
+        </div>
+
+        {/* Special Details */}
+        <div>
+          <label className="block text-lg font-semibold mb-2 text-gray-800">{t.specialDetails}</label>
+          <textarea
+            value={character.traits?.specialDetails || ''}
+            onChange={(e) => updateTraits('specialDetails', e.target.value)}
+            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
+            placeholder={t.specialDetailsPlaceholder}
+            rows={5}
+          />
+          <p className="text-sm text-gray-500 mt-2">
+            {language === 'de'
+              ? 'Füge hier besondere Details hinzu, die den Charakter einzigartig machen (optional).'
+              : language === 'fr'
+              ? 'Ajoutez ici des détails spéciaux qui rendent le personnage unique (facultatif).'
+              : 'Add any special details that make this character unique (optional).'}
+          </p>
+        </div>
+
+        {/* Next/Cancel Buttons */}
+        <div className="flex gap-3 pt-4">
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            >
+              {t.cancel}
+            </button>
+          )}
+          <Button
+            onClick={allCharacters.length > 0 ? onContinueToRelationships : onSave}
+            disabled={isLoading}
+            loading={isLoading}
+            icon={allCharacters.length > 0 ? ArrowRight : Save}
+            className={onCancel ? "flex-1" : "w-full"}
+          >
+            {allCharacters.length > 0
+              ? (language === 'de' ? 'Weiter' : language === 'fr' ? 'Suivant' : 'Next')
+              : t.saveCharacter}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 4: Relationships for NEW characters (only if there are other characters)
+  if (isNewCharacter && step === 'relationships') {
+    return (
+      <div className="space-y-6">
+        {/* Header with character info */}
+        <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
+          {displayPhoto && (
+            <img
+              src={displayPhoto}
+              alt={character.name}
+              className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
+            />
+          )}
+          <div>
+            <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
+            <p className="text-sm text-gray-500">
+              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : 'Male') :
+               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : 'Female') :
+               (language === 'de' ? 'Andere' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : 'years'}
+            </p>
+          </div>
+        </div>
+
+        {/* Relationships with other characters */}
+        {allCharacters.length > 0 && onRelationshipChange && onRelationshipTextChange ? (
+          <CharacterRelationships
+            character={character}
+            allCharacters={allCharacters}
+            relationships={relationships}
+            relationshipTexts={relationshipTexts}
+            onRelationshipChange={onRelationshipChange}
+            onRelationshipTextChange={onRelationshipTextChange}
+            customRelationships={customRelationships}
+            onAddCustomRelationship={onAddCustomRelationship}
+          />
+        ) : (
+          <p className="text-center text-gray-500 py-8">
+            {language === 'de'
+              ? 'Erstelle weitere Charaktere, um Beziehungen hinzuzufügen.'
+              : language === 'fr'
+              ? 'Créez d\'autres personnages pour ajouter des relations.'
+              : 'Create more characters to add relationships.'}
+          </p>
+        )}
+
         {/* Save/Cancel Buttons */}
         <div className="flex gap-3 pt-4">
           {onCancel && (
@@ -671,7 +820,7 @@ export function CharacterForm({
           )}
           <Button
             onClick={onSave}
-            disabled={!canSaveCharacter || isLoading}
+            disabled={isLoading}
             loading={isLoading}
             icon={Save}
             className={onCancel ? "flex-1" : "w-full"}
@@ -679,12 +828,6 @@ export function CharacterForm({
             {t.saveCharacter}
           </Button>
         </div>
-
-        {!canSaveCharacter && (
-          <p className="text-sm text-red-500 text-center">
-            {t.selectStrengthsFlaws}
-          </p>
-        )}
       </div>
     );
   }

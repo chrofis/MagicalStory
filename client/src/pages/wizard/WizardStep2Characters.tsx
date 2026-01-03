@@ -11,7 +11,7 @@ type CharacterRole = 'out' | 'in' | 'main';
 interface WizardStep2Props {
   characters: Character[];
   currentCharacter: Character | null;
-  characterStep: 'photo' | 'name' | 'traits';
+  characterStep: 'photo' | 'name' | 'traits' | 'characteristics' | 'relationships';
   showCharacterCreated: boolean;
   isLoading: boolean;
   isAnalyzingPhoto: boolean;
@@ -26,7 +26,7 @@ interface WizardStep2Props {
   excludedCharacters: number[];
   onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   onCharacterChange: (character: Character | null) => void;
-  onCharacterStepChange: (step: 'photo' | 'name' | 'traits') => void;
+  onCharacterStepChange: (step: 'photo' | 'name' | 'traits' | 'characteristics' | 'relationships') => void;
   onPhotoSelect: (file: File) => void;
   onSaveAndGenerateAvatar: () => void;  // Save traits and trigger avatar generation
   onSaveCharacter: () => void;
@@ -137,7 +137,7 @@ export function WizardStep2Characters({
       );
     }
 
-    // Step 2c: Traits - simplified view for new characters
+    // Step 2c+: Traits, Characteristics, Relationships
     // Check if this is a new character (not yet in the characters list)
     const isNewChar = !characters.find(c => c.id === currentCharacter.id);
     return (
@@ -152,6 +152,8 @@ export function WizardStep2Characters({
           onSave={onSaveCharacter}
           onCancel={() => onCharacterChange(null)}
           onPhotoChange={onPhotoSelect}
+          onContinueToCharacteristics={() => onCharacterStepChange('characteristics')}
+          onContinueToRelationships={() => onCharacterStepChange('relationships')}
           onRegenerateAvatars={onRegenerateAvatars}
           onRegenerateAvatarsWithTraits={onRegenerateAvatarsWithTraits}
           onSaveAndRegenerateWithTraits={onSaveAndRegenerateWithTraits}
@@ -160,7 +162,7 @@ export function WizardStep2Characters({
           isGeneratingAvatar={isGeneratingAvatar}
           isRegeneratingAvatars={isRegeneratingAvatars}
           isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
-          step="traits"
+          step={characterStep as 'traits' | 'characteristics' | 'relationships'}
           developerMode={developerMode}
           changedTraits={changedTraits}
           photoAnalysisDebug={photoAnalysisDebug}
