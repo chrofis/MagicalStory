@@ -732,6 +732,8 @@ export const storyService = {
     relationshipTexts: RelationshipTextMap;
     skipImages?: boolean;
     imageGenMode?: 'parallel' | 'sequential' | null;
+    // Developer generation mode override (pictureBook = single prompt, outlineAndText = outline+text)
+    generationMode?: 'pictureBook' | 'outlineAndText';
     // Developer skip options
     skipOutline?: boolean;
     skipText?: boolean;
@@ -769,6 +771,7 @@ export const storyService = {
       relationshipTexts: data.relationshipTexts,
       skipImages: data.skipImages,
       imageGenMode: data.imageGenMode,
+      generationMode: data.generationMode,
       // Developer skip options
       skipOutline: data.skipOutline,
       skipText: data.skipText,

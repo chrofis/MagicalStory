@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BookOpen } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
+import type { GenerationMode } from '@/hooks/useDeveloperMode';
 
 // Story language options
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
@@ -19,6 +20,8 @@ interface WizardStep3Props {
   storyLanguage: StoryLanguageCode;
   onStoryLanguageChange: (lang: StoryLanguageCode) => void;
   developerMode: boolean;
+  generationMode?: GenerationMode;
+  onGenerationModeChange?: (mode: GenerationMode) => void;
 }
 
 /**
@@ -33,6 +36,8 @@ export function WizardStep3BookSettings({
   storyLanguage,
   onStoryLanguageChange,
   developerMode,
+  generationMode = 'auto',
+  onGenerationModeChange,
 }: WizardStep3Props) {
   const { t, language } = useLanguage();
 
@@ -179,6 +184,28 @@ export function WizardStep3BookSettings({
               ? (language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below')
               : (language === 'de' ? 'Abwechselnd Textseite und Bildseite' : language === 'fr' ? 'Alternance de pages de texte et d\'images' : 'Alternating text page and image page')
             }
+          </p>
+        </div>
+      )}
+
+      {/* Developer Mode: Generation Pipeline Override */}
+      {developerMode && onGenerationModeChange && (
+        <div className="mt-6 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+          <label className="block text-sm font-semibold text-yellow-800 mb-2">
+            DEV: Generation Pipeline
+          </label>
+          <select
+            value={generationMode}
+            onChange={(e) => onGenerationModeChange(e.target.value as GenerationMode)}
+            className="w-full px-3 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-600 focus:outline-none text-sm font-medium bg-white"
+          >
+            <option value="auto">Auto (based on reading level)</option>
+            <option value="pictureBook">Single Prompt (Picture Book)</option>
+            <option value="outlineAndText">Outline + Text (Standard)</option>
+          </select>
+          <p className="text-xs text-yellow-700 mt-1">
+            Auto: 1st-grade uses single prompt, standard/advanced use outline+text.
+            Override to test either approach at any reading level.
           </p>
         </div>
       )}

@@ -212,7 +212,6 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
       credential: admin.credential.cert(serviceAccount)
     });
     firebaseInitialized = true;
-    log.debug('🔥 Firebase Admin SDK initialized from base64 env var');
   } catch (err) {
     log.warn('⚠️  Firebase Admin SDK initialization from base64 failed:', err.message);
   }
@@ -227,7 +226,6 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
       credential: admin.credential.cert(serviceAccount)
     });
     firebaseInitialized = true;
-    log.debug('🔥 Firebase Admin SDK initialized from JSON env var');
   } catch (err) {
     log.warn('⚠️  Firebase Admin SDK initialization failed:', err.message);
   }
@@ -238,7 +236,6 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
       credential: admin.credential.cert(serviceAccount)
     });
     firebaseInitialized = true;
-    log.debug('🔥 Firebase Admin SDK initialized from file:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
   } catch (err) {
     log.warn('⚠️  Firebase Admin SDK initialization from file failed:', err.message);
   }
@@ -6113,8 +6110,19 @@ async function processStoryJob(jobId) {
       log.debug(`🔧 [PIPELINE] User overrides applied: ${JSON.stringify(filteredUserOverrides)}`);
     }
 
-    // Check if this is a picture book (1st-grade) - use simplified combined flow
-    const isPictureBook = inputData.languageLevel === '1st-grade';
+    // Check if this is a picture book - use simplified combined flow
+    // Developer can override with generationMode: 'pictureBook' or 'outlineAndText'
+    let isPictureBook;
+    if (inputData.generationMode === 'pictureBook') {
+      isPictureBook = true;
+      log.debug(`📚 [PIPELINE] Generation mode override: pictureBook (forced single prompt)`);
+    } else if (inputData.generationMode === 'outlineAndText') {
+      isPictureBook = false;
+      log.debug(`📚 [PIPELINE] Generation mode override: outlineAndText (forced outline+text)`);
+    } else {
+      // Auto: use reading level to determine mode (1st-grade = picture book)
+      isPictureBook = inputData.languageLevel === '1st-grade';
+    }
 
     // Get language for scene descriptions (use centralized config)
     const lang = inputData.language || 'en';

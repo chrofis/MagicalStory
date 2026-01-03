@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
 import type { ModelSelections } from '@/components/generation';
 
+// Generation mode: auto follows reading level, others force specific pipeline
+export type GenerationMode = 'auto' | 'pictureBook' | 'outlineAndText';
+
 interface DeveloperModeState {
   developerMode: boolean;
   setDeveloperMode: (enabled: boolean) => void;
   imageGenMode: 'parallel' | 'sequential' | null;
   setImageGenMode: (mode: 'parallel' | 'sequential' | null) => void;
+  // Generation pipeline mode (dev override for reading level behavior)
+  generationMode: GenerationMode;
+  setGenerationMode: (mode: GenerationMode) => void;
   // Skip flags for faster testing
   devSkipOutline: boolean;
   setDevSkipOutline: (skip: boolean) => void;
@@ -31,6 +37,9 @@ export function useDeveloperMode(): DeveloperModeState {
     return localStorage.getItem('developer_mode') === 'true';
   });
   const [imageGenMode, setImageGenMode] = useState<'parallel' | 'sequential' | null>(null);
+
+  // Generation pipeline mode (override reading level behavior)
+  const [generationMode, setGenerationMode] = useState<GenerationMode>('auto');
 
   // Developer skip options for faster testing
   const [devSkipOutline, setDevSkipOutline] = useState(false);
@@ -64,6 +73,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setDeveloperMode,
     imageGenMode,
     setImageGenMode,
+    generationMode,
+    setGenerationMode,
     devSkipOutline,
     setDevSkipOutline,
     devSkipText,
