@@ -39,6 +39,7 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.avatarMainPrompt = await fs.readFile(path.join(promptsDir, 'avatar-main-prompt.txt'), 'utf-8');
     PROMPT_TEMPLATES.avatarRetryPrompt = await fs.readFile(path.join(promptsDir, 'avatar-retry-prompt.txt'), 'utf-8');
     PROMPT_TEMPLATES.avatarEvaluation = await fs.readFile(path.join(promptsDir, 'avatar-evaluation.txt'), 'utf-8');
+    PROMPT_TEMPLATES.styledCostumedAvatar = await fs.readFile(path.join(promptsDir, 'styled-costumed-avatar.txt'), 'utf-8');
     // Visual Bible and editing prompts
     PROMPT_TEMPLATES.visualBibleAnalysis = await fs.readFile(path.join(promptsDir, 'visual-bible-analysis.txt'), 'utf-8');
     PROMPT_TEMPLATES.illustrationEdit = await fs.readFile(path.join(promptsDir, 'illustration-edit.txt'), 'utf-8');

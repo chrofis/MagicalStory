@@ -1,0 +1,50 @@
+# Styled Costumed Avatar Prompt
+# Generates a costumed avatar directly in the target art style (single API call).
+# Placeholders:
+#   {ART_STYLE_PROMPT} - Art style description from art-styles.txt
+#   {COSTUME_DESCRIPTION} - Full costume description from visual bible
+#   {COSTUME_TYPE} - Costume name (e.g., "Cowboy", "Pirate")
+#   {PHYSICAL_TRAITS} - Physical characteristics section (optional)
+
+TASK: Create a 2x2 GRID IMAGE with 4 views of the EXACT individual from the reference photo.
+
+ART STYLE (CRITICAL - apply to entire image):
+{ART_STYLE_PROMPT}
+
+GRID LAYOUT (with clear black dividing lines between quadrants):
++-------------------+-------------------+
+|  TOP LEFT         |  TOP RIGHT        |
+|  Face - Front     |  Face - 3/4       |
+|  (looking at      |  Profile (75deg   |
+|   camera)         |   looking RIGHT)  |
++-------------------+-------------------+
+|  BOTTOM LEFT      |  BOTTOM RIGHT     |
+|  Full Body        |  Full Body        |
+|  Front View       |  Profile View     |
+|  (facing camera)  |  (facing RIGHT)   |
++-------------------+-------------------+
+
+GRID REQUIREMENTS:
+- Draw clear BLACK LINES (2-3px) separating the 4 quadrants
+- Both profile views (top right and bottom right) MUST face the SAME direction (RIGHT)
+- Each quadrant has clean background appropriate to the art style
+- All 4 quadrants show the SAME costume
+
+IDENTITY PERSISTENCE (CRITICAL):
+- Face: 100% identical to reference photo - same face shape, features, expression style
+- The person must be clearly recognizable as the same individual
+- Hair color, eye color, skin tone must match exactly
+- Apply the art style while preserving identity
+
+COSTUME - {COSTUME_TYPE}:
+{COSTUME_DESCRIPTION}
+
+This is a COMPLETE outfit change. The character wears this entire costume from head to toe.
+Include ALL costume elements: headwear, shirt/top, pants/skirt/dress, footwear, and any accessories.
+The costume should look authentic and age-appropriate for a children's book illustration.
+{PHYSICAL_TRAITS}
+
+TOP QUADRANTS: Head and shoulders, face clearly visible
+BOTTOM QUADRANTS: Full body from head to toe, shoes visible
+
+Output: High quality image in the specified art style.

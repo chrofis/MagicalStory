@@ -1013,6 +1013,58 @@ export function CharacterForm({
         </div>
       )}
 
+      {/* Dynamic Costumed Avatars (developer only - from visual bible costumes) */}
+      {developerMode && character.avatars?.costumed && Object.keys(character.avatars.costumed).length > 0 && (
+        <div className="bg-orange-50 border border-orange-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-orange-700 mb-3 flex items-center gap-2">
+            🎭 {language === 'de' ? 'Kostümierte Avatare' : language === 'fr' ? 'Avatars costumés' : 'Costumed Avatars'}
+            <span className="text-xs font-normal text-orange-500">
+              ({Object.keys(character.avatars.costumed).length} {language === 'de' ? 'Kostüme' : 'costumes'})
+            </span>
+          </h4>
+          <div className="grid grid-cols-4 gap-2">
+            {Object.entries(character.avatars.costumed).map(([costumeType, avatarData]) => {
+              const imageUrl = typeof avatarData === 'string' ? avatarData : avatarData?.imageData;
+              const clothing = typeof avatarData === 'object' ? avatarData?.clothing : undefined;
+              return (
+                <div key={costumeType} className="text-center">
+                  <div className="text-xs font-medium text-orange-600 mb-1 truncate" title={costumeType}>
+                    🎭 {costumeType}
+                  </div>
+                  {imageUrl ? (
+                    <div
+                      className="relative cursor-pointer group"
+                      onClick={() => setLightboxImage(imageUrl)}
+                      title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`${character.name} - ${costumeType}`}
+                        className="w-full h-40 object-contain rounded border border-orange-200 bg-white transition-all group-hover:shadow-lg group-hover:scale-[1.02]"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded flex items-center justify-center">
+                        <span className="text-white opacity-0 group-hover:opacity-100 text-lg">🔍</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full h-40 rounded border border-dashed border-orange-300 bg-orange-100/50 flex items-center justify-center text-orange-400 text-[10px]">
+                      —
+                    </div>
+                  )}
+                  {/* Show clothing description if available */}
+                  {clothing && (
+                    <div className="mt-1 p-1.5 rounded text-[10px] text-left bg-orange-100 border border-orange-200 text-orange-700">
+                      <span className="font-semibold">👕 </span>
+                      {clothing}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Styled Avatars (developer only - pre-converted to art styles) */}
       {developerMode && character.avatars?.styledAvatars && Object.keys(character.avatars.styledAvatars).length > 0 && (
         <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
@@ -1042,11 +1094,16 @@ export function CharacterForm({
                 'formal': '👔'
               };
 
+              // Get costumed avatars if they exist
+              const costumedAvatars = (avatars as Record<string, unknown>).costumed as Record<string, string> | undefined;
+              const costumeTypes = costumedAvatars ? Object.keys(costumedAvatars) : [];
+
               return (
                 <div key={artStyle} className="border border-purple-200 rounded-lg p-3 bg-white">
                   <h5 className="text-xs font-semibold text-purple-600 mb-2">
                     {styleInfo.emoji} {language === 'de' ? styleInfo.de : styleInfo.en}
                   </h5>
+                  {/* Standard clothing avatars */}
                   <div className="grid grid-cols-4 gap-2">
                     {clothingOrder.map((category) => {
                       const avatar = avatars[category];
@@ -1072,6 +1129,39 @@ export function CharacterForm({
                       );
                     })}
                   </div>
+                  {/* Costumed avatars (from visual bible) */}
+                  {costumeTypes.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-purple-200">
+                      <div className="text-[10px] font-medium text-orange-600 mb-2">
+                        🎭 {language === 'de' ? 'Kostümierte Avatare' : 'Costumed Avatars'}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {costumeTypes.map((costumeType) => {
+                          const avatar = costumedAvatars![costumeType];
+                          return (
+                            <div key={costumeType} className="text-center">
+                              <div className="text-[10px] text-orange-500 mb-1 truncate" title={costumeType}>
+                                🎭 {costumeType}
+                              </div>
+                              {avatar ? (
+                                <img
+                                  src={avatar}
+                                  alt={`${character.name} - ${artStyle} - ${costumeType}`}
+                                  className="w-full h-32 object-contain rounded border border-orange-200 bg-orange-50/50 cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => setLightboxImage(avatar)}
+                                  title="Click to enlarge"
+                                />
+                              ) : (
+                                <div className="w-full h-32 rounded border border-dashed border-orange-200 bg-orange-50/50 flex items-center justify-center text-orange-300 text-[10px]">
+                                  —
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

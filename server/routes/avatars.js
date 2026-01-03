@@ -465,6 +465,206 @@ async function generateDynamicAvatar(character, category, config) {
   }
 }
 
+/**
+ * Load art style prompts from prompts/art-styles.txt
+ */
+function loadArtStylePrompts() {
+  const fs = require('fs');
+  const artStylesPath = require('path').join(__dirname, '../../prompts/art-styles.txt');
+  const prompts = {};
+  try {
+    const content = fs.readFileSync(artStylesPath, 'utf8');
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const colonIndex = trimmed.indexOf(':');
+        if (colonIndex > 0) {
+          const styleId = trimmed.substring(0, colonIndex).trim();
+          const prompt = trimmed.substring(colonIndex + 1).trim();
+          prompts[styleId] = prompt;
+        }
+      }
+    }
+  } catch (err) {
+    log.error(`[AVATARS] Failed to load art-styles.txt:`, err.message);
+  }
+  return prompts;
+}
+
+const ART_STYLE_PROMPTS = loadArtStylePrompts();
+
+/**
+ * Generate a styled costumed avatar in a single API call
+ * Combines costume transformation + art style conversion
+ *
+ * @param {Object} character - Character object with photoUrl, physicalTraits, etc.
+ * @param {Object} config - { costume: string, description: string }
+ * @param {string} artStyle - Art style ID (pixar, watercolor, oil, etc.)
+ * @returns {Promise<Object>} - { success, imageData, clothing, costumeType, artStyle, error? }
+ */
+async function generateStyledCostumedAvatar(character, config, artStyle) {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    log.error('[STYLED COSTUME] No Gemini API key available');
+    return { success: false, error: 'Avatar generation service unavailable' };
+  }
+
+  const facePhoto = character.photoUrl || character.photos?.face || character.photos?.original;
+  if (!facePhoto) {
+    log.error(`[STYLED COSTUME] No face photo for ${character.name}`);
+    return { success: false, error: 'No face photo available' };
+  }
+
+  const costumeType = (config.costume || 'costume').toLowerCase();
+  const artStylePrompt = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS.pixar || '';
+
+  log.debug(`🎨 [STYLED COSTUME] Generating ${costumeType} avatar in ${artStyle} style for ${character.name}`);
+
+  try {
+    // Build physical traits section
+    let physicalTraitsSection = '';
+    const physicalTraits = character.physical || character.physicalTraits;
+    if (physicalTraits || character.build || character.age) {
+      const traitParts = [];
+      if (character.apparentAge) {
+        traitParts.push(`Apparent age: ${character.apparentAge}`);
+      } else if (character.age) {
+        traitParts.push(`Age: ${character.age} years old`);
+      }
+      if (character.build) traitParts.push(`Build: ${character.build}`);
+      else if (physicalTraits?.build) traitParts.push(`Build: ${physicalTraits.build}`);
+      if (physicalTraits?.hairColor) traitParts.push(`Hair color: ${physicalTraits.hairColor}`);
+      if (physicalTraits?.hairStyle) traitParts.push(`Hair style: ${physicalTraits.hairStyle}`);
+      if (physicalTraits?.eyeColor) traitParts.push(`Eye color: ${physicalTraits.eyeColor}`);
+      if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
+      if (traitParts.length > 0) {
+        physicalTraitsSection = `\n\nPHYSICAL CHARACTERISTICS (preserve these):\n${traitParts.join('\n')}`;
+      }
+    }
+
+    // Build the combined prompt using the styled-costumed-avatar template
+    const template = PROMPT_TEMPLATES.styledCostumedAvatar || '';
+    const avatarPrompt = fillTemplate(template, {
+      'ART_STYLE_PROMPT': artStylePrompt,
+      'COSTUME_DESCRIPTION': config.description || 'A creative costume appropriate for the story',
+      'COSTUME_TYPE': config.costume || 'Costume',
+      'PHYSICAL_TRAITS': physicalTraitsSection
+    });
+
+    // Prepare image data
+    const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
+      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+    const requestBody = {
+      systemInstruction: {
+        parts: [{
+          text: `You are an expert character artist creating stylized avatar illustrations for children's books.
+Your task is to transform a reference photo into a ${artStyle} style illustration while preserving the person's identity and applying a specific costume.`
+        }]
+      },
+      contents: [{
+        parts: [
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: base64Data
+            }
+          },
+          { text: avatarPrompt }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.4,
+        responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: {
+          aspectRatio: "9:16"
+        }
+      },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+      ]
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error(`❌ [STYLED COSTUME] Generation failed:`, errorText);
+      return { success: false, error: `API error: ${response.status}` };
+    }
+
+    let data = await response.json();
+
+    // Log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    if (inputTokens > 0 || outputTokens > 0) {
+      console.log(`📊 [STYLED COSTUME] ${costumeType}@${artStyle} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    }
+
+    // Check if blocked by safety filters
+    if (data.promptFeedback?.blockReason) {
+      log.warn(`[STYLED COSTUME] Blocked by safety filters:`, data.promptFeedback.blockReason);
+      return { success: false, error: `Blocked by safety filters: ${data.promptFeedback.blockReason}` };
+    }
+
+    // Extract image from response
+    let imageData = null;
+    if (data.candidates && data.candidates[0]?.content?.parts) {
+      for (const part of data.candidates[0].content.parts) {
+        if (part.inlineData?.mimeType?.startsWith('image/')) {
+          const imgMime = part.inlineData.mimeType;
+          imageData = `data:${imgMime};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+    }
+
+    if (!imageData) {
+      log.error(`❌ [STYLED COSTUME] No image in response`);
+      return { success: false, error: 'No image generated' };
+    }
+
+    // Compress the avatar
+    const compressed = await compressImageToJPEG(imageData, 85, 768);
+    const finalImageData = compressed || imageData;
+
+    // Evaluate face match to get clothing description
+    let clothingDescription = null;
+    const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, finalImageData, geminiApiKey);
+    if (faceMatchResult?.clothing) {
+      clothingDescription = faceMatchResult.clothing;
+      log.debug(`👕 [STYLED COSTUME] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
+    }
+
+    log.debug(`✅ [STYLED COSTUME] Generated ${costumeType}@${artStyle} avatar for ${character.name}`);
+
+    return {
+      success: true,
+      imageData: finalImageData,
+      clothing: clothingDescription,
+      costumeType: costumeType,
+      artStyle: artStyle
+    };
+
+  } catch (err) {
+    log.error(`❌ [STYLED COSTUME] Error:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 // ============================================================================
 // ROUTES
 // ============================================================================
@@ -934,3 +1134,4 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
 
 module.exports = router;
 module.exports.generateDynamicAvatar = generateDynamicAvatar;
+module.exports.generateStyledCostumedAvatar = generateStyledCostumedAvatar;

@@ -585,9 +585,10 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
  * @param {Array} characters - Array of character objects
  * @param {string} clothingCategory - Optional clothing category to show which avatar is used
  * @param {string} costumeType - Optional costume type for 'costumed' category (e.g., 'pirate', 'superhero')
+ * @param {string} artStyle - Optional art style to look for styled avatars first
  * @returns {Array} Array of objects with character name and photo type used
  */
-function getCharacterPhotoDetails(characters, clothingCategory = null, costumeType = null) {
+function getCharacterPhotoDetails(characters, clothingCategory = null, costumeType = null, artStyle = null) {
   if (!characters || characters.length === 0) return [];
 
   // Fallback priority for clothing avatars when exact match not found
@@ -611,44 +612,69 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       let clothingDescription = null;
       let usedClothingCategory = null;
 
-      // Handle costumed category with sub-type (e.g., costumed.pirate)
-      if (clothingCategory === 'costumed' && avatars?.costumed) {
-        // If specific costumeType provided, use it; otherwise auto-detect from character's avatars
+      // Handle costumed category - check styled avatars first, then regular costumed
+      if (clothingCategory === 'costumed') {
+        // If specific costumeType provided, use it; otherwise auto-detect
         let costumeKey = costumeType?.toLowerCase();
 
-        // Auto-detect: find the first available costume for this character
+        // Auto-detect costume from styledAvatars or regular costumed
         if (!costumeKey) {
-          const availableCostumes = Object.keys(avatars.costumed);
-          if (availableCostumes.length > 0) {
-            costumeKey = availableCostumes[0];
-            log.debug(`[AVATAR AUTO-DETECT] ${char.name}: found costume "${costumeKey}"`);
+          // First check styled avatars for this art style
+          if (artStyle && avatars?.styledAvatars?.[artStyle]?.costumed) {
+            const styledCostumes = Object.keys(avatars.styledAvatars[artStyle].costumed);
+            if (styledCostumes.length > 0) {
+              costumeKey = styledCostumes[0];
+              log.debug(`[AVATAR AUTO-DETECT] ${char.name}: found styled costume "${costumeKey}" for ${artStyle}`);
+            }
+          }
+          // Then check regular costumed avatars
+          if (!costumeKey && avatars?.costumed) {
+            const regularCostumes = Object.keys(avatars.costumed);
+            if (regularCostumes.length > 0) {
+              costumeKey = regularCostumes[0];
+              log.debug(`[AVATAR AUTO-DETECT] ${char.name}: found costume "${costumeKey}"`);
+            }
           }
         }
 
-        if (costumeKey && avatars.costumed[costumeKey]) {
-          // Handle object format (from dynamic avatar generation: {imageData, clothing})
-          let avatarData = avatars.costumed[costumeKey];
-          if (typeof avatarData === 'object' && avatarData.imageData) {
-            photoUrl = avatarData.imageData;
-            // Also extract clothing description from the object if available
-            if (avatarData.clothing) {
-              clothingDescription = typeof avatarData.clothing === 'string'
-                ? avatarData.clothing
-                : formatClothingObject(avatarData.clothing);
+        if (costumeKey) {
+          // First priority: styled costumed avatar (already in target art style)
+          if (artStyle && avatars?.styledAvatars?.[artStyle]?.costumed?.[costumeKey]) {
+            photoUrl = avatars.styledAvatars[artStyle].costumed[costumeKey];
+            photoType = `styled-costumed-${costumeKey}`;
+            usedClothingCategory = `costumed:${costumeKey}`;
+            log.debug(`[AVATAR STYLED] ${char.name}: using styled ${costumeKey}@${artStyle}`);
+            // Get clothing description
+            if (avatars?.clothing?.costumed?.[costumeKey]) {
+              const clothingData = avatars.clothing.costumed[costumeKey];
+              clothingDescription = typeof clothingData === 'string'
+                ? clothingData
+                : formatClothingObject(clothingData);
             }
-          } else {
-            photoUrl = avatarData;
           }
+          // Second priority: regular costumed avatar
+          else if (avatars?.costumed?.[costumeKey]) {
+            let avatarData = avatars.costumed[costumeKey];
+            if (typeof avatarData === 'object' && avatarData.imageData) {
+              photoUrl = avatarData.imageData;
+              if (avatarData.clothing) {
+                clothingDescription = typeof avatarData.clothing === 'string'
+                  ? avatarData.clothing
+                  : formatClothingObject(avatarData.clothing);
+              }
+            } else {
+              photoUrl = avatarData;
+            }
+            photoType = `costumed-${costumeKey}`;
+            usedClothingCategory = `costumed:${costumeKey}`;
 
-          photoType = `costumed-${costumeKey}`;
-          usedClothingCategory = `costumed:${costumeKey}`;
-
-          // Get clothing description from separate clothing object if not already set
-          if (!clothingDescription && avatars.clothing?.costumed?.[costumeKey]) {
-            const clothingData = avatars.clothing.costumed[costumeKey];
-            clothingDescription = typeof clothingData === 'string'
-              ? clothingData
-              : formatClothingObject(clothingData);
+            // Get clothing description from separate clothing object if not already set
+            if (!clothingDescription && avatars?.clothing?.costumed?.[costumeKey]) {
+              const clothingData = avatars.clothing.costumed[costumeKey];
+              clothingDescription = typeof clothingData === 'string'
+                ? clothingData
+                : formatClothingObject(clothingData);
+            }
           }
         }
       }

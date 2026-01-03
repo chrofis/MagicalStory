@@ -4915,7 +4915,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Clothing category: ${clothingCategory}${costumeType ? ':' + costumeType : ''}`);
 
         // Use detailed photo info (with names) for labeled reference images
-        const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType);
+        // Pass artStyle to get styled costumed avatars if available
+        const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle);
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
         // Log with visual bible info if available
@@ -5532,11 +5533,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Clothing category: ${clothingCategory}${costumeType ? ':' + costumeType : ''}`);
 
           // Use detailed photo info (with names) for labeled reference images
-          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType);
+          // Pass artStyle to use pre-generated styled costumed avatars when available
+          let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle);
           log.debug(`🔍 [DEBUG STORYBOOK PAGE ${pageNum}] Reference photos: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
-          // Apply styled avatars (pre-converted to target art style)
-          referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+          // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
+          if (clothingCategory !== 'costumed') {
+            referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+          }
 
           // Log visual bible usage
           if (vBible) {
@@ -6379,12 +6383,15 @@ async function processStoryJob(jobId) {
 
     // ===== DYNAMIC AVATAR GENERATION BASED ON OUTLINE =====
     // Generate only the avatar variations needed for this story
+    // For costumed avatars: generate styled version directly (costume + art style in one call)
     const clothingRequirements = outlineParser.extractClothingRequirements();
+    const artStyle = inputData.artStyle || 'pixar';
+
     if (clothingRequirements && Object.keys(clothingRequirements).length > 0 && !skipImages) {
       log.debug(`👔 [PIPELINE] Clothing requirements found for ${Object.keys(clothingRequirements).length} characters`);
 
-      // Import the dynamic avatar generator
-      const { generateDynamicAvatar } = require('./server/routes/avatars');
+      // Import avatar generators
+      const { generateDynamicAvatar, generateStyledCostumedAvatar } = require('./server/routes/avatars');
 
       // Track which avatars we generate
       const avatarsGenerated = [];
@@ -6403,6 +6410,7 @@ async function processStoryJob(jobId) {
         if (!char.avatars) char.avatars = {};
         if (!char.avatars.clothing) char.avatars.clothing = {};
         if (!char.avatars.signatures) char.avatars.signatures = {};
+        if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
 
         for (const [category, config] of Object.entries(requirements)) {
           if (!config || !config.used) continue;
@@ -6411,8 +6419,10 @@ async function processStoryJob(jobId) {
           let avatarExists = false;
           if (category === 'costumed' && config.costume) {
             const costumeKey = config.costume.toLowerCase();
-            if (!char.avatars.costumed) char.avatars.costumed = {};
-            avatarExists = !!char.avatars.costumed[costumeKey];
+            // Check for styled costumed avatar (new structure)
+            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+            if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+            avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
           } else {
             avatarExists = !!char.avatars[category];
           }
@@ -6432,18 +6442,32 @@ async function processStoryJob(jobId) {
           );
 
           try {
-            const result = await generateDynamicAvatar(char, category, config);
+            let result;
 
-            if (result.success && result.imageData) {
-              // Store the avatar on the character
-              if (category === 'costumed' && result.costumeType) {
-                char.avatars.costumed[result.costumeType] = result.imageData;
-                // Store clothing description for costumed
+            if (category === 'costumed' && config.costume) {
+              // For costumed: generate styled version directly (costume + art style in one call)
+              result = await generateStyledCostumedAvatar(char, config, artStyle);
+
+              if (result.success && result.imageData) {
+                const costumeKey = result.costumeType;
+                // Store in styledAvatars structure
+                char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
+                // Store clothing description
                 if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
                 if (result.clothing) {
-                  char.avatars.clothing.costumed[result.costumeType] = result.clothing;
+                  char.avatars.clothing.costumed[costumeKey] = result.clothing;
                 }
+                avatarsGenerated.push(`${char.name}:${logCategory}@${artStyle}`);
+                log.debug(`✅ [AVATAR] Generated styled ${logCategory}@${artStyle} avatar for ${char.name}`);
               } else {
+                avatarsFailed.push(`${char.name}:${logCategory}`);
+                log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
+              }
+            } else {
+              // For standard/winter/summer: use original dynamic avatar (realistic)
+              result = await generateDynamicAvatar(char, category, config);
+
+              if (result.success && result.imageData) {
                 char.avatars[category] = result.imageData;
                 if (result.clothing) {
                   char.avatars.clothing[category] = result.clothing;
@@ -6451,12 +6475,12 @@ async function processStoryJob(jobId) {
                 if (result.signature) {
                   char.avatars.signatures[category] = result.signature;
                 }
+                avatarsGenerated.push(`${char.name}:${logCategory}`);
+                log.debug(`✅ [AVATAR] Generated ${logCategory} avatar for ${char.name}`);
+              } else {
+                avatarsFailed.push(`${char.name}:${logCategory}`);
+                log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
               }
-              avatarsGenerated.push(`${char.name}:${logCategory}`);
-              log.debug(`✅ [AVATAR] Generated ${logCategory} avatar for ${char.name}`);
-            } else {
-              avatarsFailed.push(`${char.name}:${logCategory}`);
-              log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
             }
           } catch (err) {
             avatarsFailed.push(`${char.name}:${logCategory}`);
@@ -6526,11 +6550,14 @@ async function processStoryJob(jobId) {
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
 
       // Prepare all cover generation promises
-      // Front cover
+      // Front cover - pass artStyle for styled costumed avatars
       const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
       const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
-      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
-      frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
+      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing, null, artStyle);
+      // For non-costumed avatars, apply styled avatars from cache
+      if (frontCoverClothing !== 'costumed') {
+        frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
+      }
       const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
         TITLE_PAGE_SCENE: titlePageScene,
         STYLE_DESCRIPTION: styleDescription,
@@ -6540,10 +6567,12 @@ async function processStoryJob(jobId) {
       });
       coverPrompts.frontCover = frontCoverPrompt;
 
-      // Initial page
+      // Initial page - pass artStyle for styled costumed avatars
       const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
-      let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
-      initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
+      let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing, null, artStyle);
+      if (initialPageClothing !== 'costumed') {
+        initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
+      }
       const initialPagePrompt = inputData.dedication && inputData.dedication.trim()
         ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
             INITIAL_PAGE_SCENE: initialPageScene,
@@ -6561,10 +6590,12 @@ async function processStoryJob(jobId) {
           });
       coverPrompts.initialPage = initialPagePrompt;
 
-      // Back cover
+      // Back cover - pass artStyle for styled costumed avatars
       const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
-      let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
-      backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
+      let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing, null, artStyle);
+      if (backCoverClothing !== 'costumed') {
+        backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
+      }
       const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
         BACK_COVER_SCENE: backCoverScene,
         STYLE_DESCRIPTION: styleDescription,
@@ -6794,8 +6825,12 @@ Output Format:
             }
             // Store clothing for future pages' context (clothing consistency)
             pageClothingForContext[pageNum] = clothingRaw;
-            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType);
-            referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+            // Pass artStyle to use pre-generated styled costumed avatars when available
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle);
+            // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
+            if (clothingCategory !== 'costumed') {
+              referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+            }
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingRaw})...`);
 
             // Generate image
@@ -7241,8 +7276,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Store clothing for future pages' context (clothing consistency)
             pageClothingForContext[pageNum] = clothingRaw;
             // Use detailed photo info (with names) for labeled reference images
-            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType);
-            referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+            // Pass artStyle to use pre-generated styled costumed avatars when available
+            let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle);
+            // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
+            if (clothingCategory !== 'costumed') {
+              referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+            }
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingRaw})...`);
 
             // Generate image from scene description with scene-specific characters and visual bible

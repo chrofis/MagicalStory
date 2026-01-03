@@ -62,6 +62,21 @@ export interface FaceMatchResult {
   details: string;  // Full evaluation text with feature breakdown
 }
 
+// Styled avatar set for a specific art style (includes standard clothing + costumed)
+export interface StyledAvatarSet {
+  winter?: string;
+  standard?: string;
+  summer?: string;
+  formal?: string;
+  costumed?: Record<string, string>; // Key: costume type (e.g., "Cowboy"), Value: avatar URL
+}
+
+// Costumed avatar data (for non-styled costumed avatars)
+export interface CostumedAvatarData {
+  imageData: string;  // Avatar URL/data
+  clothing: string;   // Clothing description used
+}
+
 // Generated avatars for each clothing category
 export interface CharacterAvatars {
   winter?: string;
@@ -76,8 +91,10 @@ export interface CharacterAvatars {
   prompts?: Record<ClothingCategory, string>; // Actual prompts used for generation (dev mode only)
   rawEvaluation?: Record<string, unknown>; // Full unfiltered API response (dev mode only)
   // Styled avatars converted to different art styles (e.g., Pixar, watercolor)
-  // Key: art style (e.g., 'pixar'), Value: avatars per clothing category
-  styledAvatars?: Record<string, Record<ClothingCategory, string>>;
+  // Key: art style (e.g., 'pixar'), Value: avatars per clothing category + optional costumed avatars
+  styledAvatars?: Record<string, StyledAvatarSet>;
+  // Dynamic costumed avatars (from visual bible costumes, e.g., "Cowboy", "Pirate")
+  costumed?: Record<string, CostumedAvatarData>;
 }
 
 // Structured clothing details

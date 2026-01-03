@@ -4,12 +4,15 @@ Photo Analyzer API - Face Detection and Background Removal
 Uses MediaPipe for fast face detection and background removal (no heavy AI models)
 """
 
+# Disable MediaPipe GPU to avoid OpenGL/EGL errors on headless systems
+import os
+os.environ["MEDIAPIPE_DISABLE_GPU"] = "1"
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mediapipe as mp
 import cv2
 import numpy as np
-import os
 import base64
 from io import BytesIO
 from PIL import Image
