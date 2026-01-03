@@ -74,7 +74,6 @@ function extractSceneMetadata(sceneDescription) {
   // Look for ```json block
   const jsonBlockMatch = sceneDescription.match(/```json\s*([\s\S]*?)```/i);
   if (!jsonBlockMatch || !jsonBlockMatch[1]) {
-    log.debug('[METADATA] No JSON block found in scene description');
     return null;
   }
 
@@ -84,18 +83,15 @@ function extractSceneMetadata(sceneDescription) {
 
     // Validate expected fields
     if (!metadata.characters || !Array.isArray(metadata.characters)) {
-      log.debug('[METADATA] JSON block missing or invalid "characters" array');
       return null;
     }
 
-    log.debug(`[METADATA] Extracted: ${metadata.characters.length} characters, clothing="${metadata.clothing}", ${(metadata.objects || []).length} objects`);
     return {
       characters: metadata.characters || [],
       clothing: metadata.clothing || null,
       objects: metadata.objects || []
     };
   } catch (e) {
-    log.debug(`[METADATA] Failed to parse JSON block: ${e.message}`);
     return null;
   }
 }
@@ -339,21 +335,16 @@ function getCharactersInScene(sceneDescription, characters) {
     return [];
   }
 
-  // DEBUG: Log available characters for matching
-  log.debug(`[CHAR DETECT] Available characters for matching: ${characters.map(c => c.name).join(', ')} (${characters.length} total)`);
-
   // Step 0: Try JSON metadata block first (most reliable)
   const metadata = extractSceneMetadata(sceneDescription);
   if (metadata && metadata.characters && metadata.characters.length > 0) {
-    log.debug(`[CHAR DETECT] Using JSON metadata: ${metadata.characters.join(', ')}`);
-
     // Match JSON character names to available characters
     const matchedCharacters = characters.filter(char => {
       if (!char.name) return false;
       const nameLower = char.name.toLowerCase().trim();
       const firstName = nameLower.split(' ')[0];
 
-      const matched = metadata.characters.some(jsonName => {
+      return metadata.characters.some(jsonName => {
         const jsonLower = jsonName.toLowerCase().trim();
         return jsonLower === nameLower ||
                jsonLower === firstName ||
@@ -362,13 +353,9 @@ function getCharactersInScene(sceneDescription, characters) {
                jsonLower.includes(firstName) ||
                firstName.includes(jsonLower);
       });
-
-      log.debug(`[CHAR DETECT]   - "${char.name}" -> ${matched ? 'MATCHED' : 'NO MATCH'} (JSON)`);
-      return matched;
     });
 
     if (matchedCharacters.length > 0) {
-      log.debug(`[CHAR DETECT] Matched ${matchedCharacters.length} characters from JSON: ${matchedCharacters.map(c => c.name).join(', ')}`);
       return matchedCharacters;
     }
   }
@@ -377,38 +364,28 @@ function getCharactersInScene(sceneDescription, characters) {
   const parsedNames = extractCharacterNamesFromScene(sceneDescription);
 
   if (parsedNames.length > 0) {
-    log.debug(`[CHAR DETECT] Parsed ${parsedNames.length} character names (markdown): ${parsedNames.join(', ')}`);
-
     // Match main characters whose names appear in the parsed list
     const matchedCharacters = characters.filter(char => {
       if (!char.name) return false;
       const nameLower = char.name.toLowerCase().trim();
       const firstName = nameLower.split(' ')[0];
 
-      const matched = parsedNames.some(parsed =>
+      return parsedNames.some(parsed =>
         parsed === nameLower ||
         parsed === firstName ||
         parsed.includes(nameLower) ||
         nameLower.includes(parsed) ||
-        // Handle partial matches (e.g., "sophie" matches "Sophie Miller")
         parsed.includes(firstName) ||
         firstName.includes(parsed)
       );
-
-      // DEBUG: Log each character match attempt
-      log.debug(`[CHAR DETECT]   - "${char.name}" (nameLower="${nameLower}", firstName="${firstName}") -> ${matched ? 'MATCHED' : 'NO MATCH'}`);
-
-      return matched;
     });
 
     if (matchedCharacters.length > 0) {
-      log.debug(`[CHAR DETECT] Matched ${matchedCharacters.length} main characters: ${matchedCharacters.map(c => c.name).join(', ')}`);
       return matchedCharacters;
     }
   }
 
   // Step 2: Fallback to simple text matching if parser found nothing
-  log.debug(`[CHAR DETECT] No structured matches, falling back to text search`);
   const sceneLower = sceneDescription.toLowerCase();
 
   return characters.filter(char => {
