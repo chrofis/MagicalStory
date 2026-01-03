@@ -348,6 +348,7 @@ interface CharacterFormProps {
   onCancel?: () => void;
   onPhotoChange: (file: File) => void;
   onContinueToTraits?: () => void;
+  isNewCharacter?: boolean;  // Show simplified traits view for new characters
   onSaveAndGenerateAvatar?: () => void;  // New: triggers avatar generation
   onSaveAndRegenerateWithTraits?: () => void;  // Combined save + regenerate with traits
   onRegenerateAvatars?: () => void;
@@ -378,6 +379,7 @@ export function CharacterForm({
   onCancel,
   onPhotoChange,
   onContinueToTraits,
+  isNewCharacter = false,
   onSaveAndGenerateAvatar: _onSaveAndGenerateAvatar,  // No longer used - avatar auto-generates on photo upload
   onSaveAndRegenerateWithTraits,
   onRegenerateAvatars,
@@ -604,7 +606,86 @@ export function CharacterForm({
     );
   }
 
-  // Step 2: Traits and characteristics
+  // Step 2a: Simplified traits view for NEW characters (just strengths, weaknesses, conflicts)
+  if (isNewCharacter && step === 'traits') {
+    return (
+      <div className="space-y-6">
+        {/* Header with character info */}
+        <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
+          {displayPhoto && (
+            <img
+              src={displayPhoto}
+              alt={character.name}
+              className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
+            />
+          )}
+          <div>
+            <h3 className="text-2xl font-bold text-gray-800">{character.name}</h3>
+            <p className="text-sm text-gray-500">
+              {character.gender === 'male' ? (language === 'de' ? 'Männlich' : 'Male') :
+               character.gender === 'female' ? (language === 'de' ? 'Weiblich' : 'Female') :
+               (language === 'de' ? 'Andere' : 'Other')}, {character.age} {language === 'de' ? 'Jahre' : 'years'}
+            </p>
+          </div>
+        </div>
+
+        {/* Trait Selectors */}
+        <div className="space-y-4">
+          <TraitSelector
+            label={t.strengths}
+            traits={localizedStrengths}
+            selectedTraits={character.traits?.strengths || []}
+            onSelect={(traits) => updateTraits('strengths', traits)}
+            minRequired={3}
+          />
+
+          <TraitSelector
+            label={language === 'de' ? 'Schwächen' : language === 'fr' ? 'Défauts' : 'Flaws'}
+            traits={localizedFlaws}
+            selectedTraits={character.traits?.flaws || []}
+            onSelect={(traits) => updateTraits('flaws', traits)}
+            minRequired={2}
+          />
+
+          <TraitSelector
+            label={language === 'de' ? 'Konflikte / Herausforderungen' : language === 'fr' ? 'Conflits / Défis' : 'Conflicts / Challenges'}
+            traits={localizedChallenges}
+            selectedTraits={character.traits?.challenges || []}
+            onSelect={(traits) => updateTraits('challenges', traits)}
+          />
+        </div>
+
+        {/* Save/Cancel Buttons */}
+        <div className="flex gap-3 pt-4">
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            >
+              {t.cancel}
+            </button>
+          )}
+          <Button
+            onClick={onSave}
+            disabled={!canSaveCharacter || isLoading}
+            loading={isLoading}
+            icon={Save}
+            className={onCancel ? "flex-1" : "w-full"}
+          >
+            {t.saveCharacter}
+          </Button>
+        </div>
+
+        {!canSaveCharacter && (
+          <p className="text-sm text-red-500 text-center">
+            {t.selectStrengthsFlaws}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Step 2b: Full traits and characteristics view (for editing existing characters)
   return (
     <div className="space-y-4">
       {/* Main two-column layout on PC: left (photo/info/avatar) | right (traits) */}

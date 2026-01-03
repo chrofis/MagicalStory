@@ -131,12 +131,15 @@ export function WizardStep2Characters({
             developerMode={developerMode}
             changedTraits={changedTraits}
             photoAnalysisDebug={photoAnalysisDebug}
+            isNewCharacter={true}
           />
         </div>
       );
     }
 
-    // Step 2c: Traits and characteristics
+    // Step 2c: Traits - simplified view for new characters
+    // Check if this is a new character (not yet in the characters list)
+    const isNewChar = !characters.find(c => c.id === currentCharacter.id);
     return (
       <div className="space-y-6">
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -167,6 +170,7 @@ export function WizardStep2Characters({
           onRelationshipTextChange={onRelationshipTextChange}
           customRelationships={customRelationships}
           onAddCustomRelationship={onAddCustomRelationship}
+          isNewCharacter={isNewChar}
         />
       </div>
     );
