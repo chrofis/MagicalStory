@@ -6440,6 +6440,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           text: page.text,
           sceneHint: page.sceneHint,
           sceneDescription: expansionResult.text,
+          sceneDescriptionPrompt: expansionPrompt, // Dev mode: Art Director prompt
+          sceneDescriptionModelId: expansionResult.modelId, // Dev mode: model used
           clothing: page.clothing,
           characters: page.characters
         };
@@ -6452,7 +6454,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const allSceneDescriptions = expandedScenes.map(scene => ({
       pageNumber: scene.pageNumber,
       description: scene.sceneDescription,
-      clothing: scene.clothing || 'standard'
+      clothing: scene.clothing || 'standard',
+      // Dev mode: Art Director prompt and model used
+      prompt: scene.sceneDescriptionPrompt,
+      modelId: scene.sceneDescriptionModelId
     }));
 
     // Update pageClothing for storage compatibility (with fallback to 'standard')
@@ -6636,6 +6641,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           description: scene.sceneDescription,
           imageData: imageResult?.imageData || null,
           prompt: imagePrompt,
+          // Dev mode: Art Director prompt used to create scene description
+          sceneDescriptionPrompt: scene.sceneDescriptionPrompt,
+          sceneDescriptionModelId: scene.sceneDescriptionModelId,
           // Include quality info if available
           qualityScore: imageResult?.score,
           qualityReasoning: imageResult?.reasoning,

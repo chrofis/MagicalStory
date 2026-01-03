@@ -810,6 +810,22 @@ export const storyService = {
         prompt?: string;
         output?: { identifier: string; sizeKB: number };
       }>;
+      costumedAvatarGeneration?: Array<{
+        timestamp: string;
+        characterName: string;
+        costumeType: string;
+        artStyle: string;
+        costumeDescription: string;
+        durationMs: number;
+        success: boolean;
+        error?: string;
+        inputs: {
+          facePhoto: { identifier: string; sizeKB: number };
+          standardAvatar: { identifier: string; sizeKB: number } | null;
+        };
+        prompt?: string;
+        output?: { identifier: string; sizeKB: number };
+      }>;
       sceneDescriptions: SceneDescription[];
       sceneImages: SceneImage[];
       coverImages?: CoverImages;
@@ -855,6 +871,22 @@ export const storyService = {
           prompt?: string;
           output?: { identifier: string; sizeKB: number };
         }>;
+        costumedAvatarGeneration?: Array<{
+          timestamp: string;
+          characterName: string;
+          costumeType: string;
+          artStyle: string;
+          costumeDescription: string;
+          durationMs: number;
+          success: boolean;
+          error?: string;
+          inputs: {
+            facePhoto: { identifier: string; sizeKB: number };
+            standardAvatar: { identifier: string; sizeKB: number } | null;
+          };
+          prompt?: string;
+          output?: { identifier: string; sizeKB: number };
+        }>;
         sceneDescriptions?: SceneDescription[];
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
@@ -892,6 +924,7 @@ export const storyService = {
         storyTextPrompts: resultData.storyTextPrompts,
         visualBible: resultData.visualBible,
         styledAvatarGeneration: resultData.styledAvatarGeneration,
+        costumedAvatarGeneration: resultData.costumedAvatarGeneration,
         sceneDescriptions: resultData.sceneDescriptions || [],
         sceneImages: resultData.sceneImages || [],
         coverImages: resultData.coverImages,

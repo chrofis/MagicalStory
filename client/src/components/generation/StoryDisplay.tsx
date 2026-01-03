@@ -1295,6 +1295,122 @@ export function StoryDisplay({
             </details>
           )}
 
+          {/* Costumed Avatar Generation Log */}
+          {costumedAvatarGeneration && costumedAvatarGeneration.length > 0 && (
+            <details className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-orange-800 hover:text-orange-900 flex items-center gap-2">
+                <Images size={20} />
+                {language === 'de'
+                  ? `Kostüm-Avatare (${costumedAvatarGeneration.length})`
+                  : language === 'fr'
+                    ? `Avatars costumés (${costumedAvatarGeneration.length})`
+                    : `Costumed Avatars (${costumedAvatarGeneration.length})`}
+              </summary>
+              <div className="mt-4 space-y-4">
+                {costumedAvatarGeneration.map((entry, index) => (
+                  <details key={index} className={`border rounded-lg p-3 ${entry.success ? 'bg-white border-orange-200' : 'bg-red-50 border-red-300'}`}>
+                    <summary className="cursor-pointer text-sm font-semibold text-orange-700 hover:text-orange-800 flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${entry.success ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      {entry.characterName} - {entry.costumeType} ({entry.artStyle})
+                      <span className="text-xs text-gray-500 ml-auto">
+                        {(entry.durationMs / 1000).toFixed(1)}s
+                      </span>
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      {/* Costume Description */}
+                      {entry.costumeDescription && (
+                        <div className="bg-yellow-50 p-2 rounded text-xs">
+                          <span className="font-semibold text-yellow-700">Costume:</span>
+                          <p className="mt-1 text-gray-700">{entry.costumeDescription}</p>
+                        </div>
+                      )}
+
+                      {/* Inputs */}
+                      <div className="bg-blue-50 p-2 rounded text-xs">
+                        <span className="font-semibold text-blue-700">Inputs:</span>
+                        <div className="mt-2 flex flex-wrap gap-3">
+                          <div className="flex flex-col items-center">
+                            <span className="text-gray-600 text-[10px] mb-1">Face Photo</span>
+                            {entry.inputs.facePhoto?.imageData ? (
+                              <img
+                                src={entry.inputs.facePhoto.imageData}
+                                alt="Face"
+                                className="w-16 h-16 object-cover rounded border border-blue-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => setEnlargedImage({ src: entry.inputs.facePhoto!.imageData!, title: 'Face Photo' })}
+                                title={`${entry.inputs.facePhoto.sizeKB} KB - Click to enlarge`}
+                              />
+                            ) : (
+                              <span className="text-blue-600 text-[10px]">{entry.inputs.facePhoto?.sizeKB || 0} KB</span>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <span className="text-gray-600 text-[10px] mb-1">Standard Avatar</span>
+                            {entry.inputs.standardAvatar?.imageData ? (
+                              <img
+                                src={entry.inputs.standardAvatar.imageData}
+                                alt="Avatar"
+                                className="w-16 h-16 object-cover rounded border border-blue-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => setEnlargedImage({ src: entry.inputs.standardAvatar!.imageData!, title: 'Standard Avatar' })}
+                                title={`${entry.inputs.standardAvatar.sizeKB} KB - Click to enlarge`}
+                              />
+                            ) : (
+                              <span className="text-gray-400 italic text-[10px]">N/A</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Prompt */}
+                      {entry.prompt && (
+                        <details className="bg-purple-50 p-2 rounded text-xs">
+                          <summary className="cursor-pointer font-semibold text-purple-700 hover:text-purple-800">
+                            Prompt ({entry.prompt.length} chars)
+                          </summary>
+                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-48 overflow-y-auto">
+                            {entry.prompt}
+                          </pre>
+                        </details>
+                      )}
+
+                      {/* Output */}
+                      {entry.success && entry.output && (
+                        <div className="bg-green-50 p-2 rounded text-xs">
+                          <span className="font-semibold text-green-700">Output:</span>
+                          <div className="mt-2 flex flex-col items-start">
+                            {entry.output.imageData ? (
+                              <img
+                                src={entry.output.imageData}
+                                alt="Output"
+                                className="w-24 h-24 object-cover rounded border border-green-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => setEnlargedImage({ src: entry.output!.imageData!, title: 'Costumed Avatar Output' })}
+                                title={`${entry.output.sizeKB} KB - Click to enlarge`}
+                              />
+                            ) : (
+                              <span className="text-green-600">{entry.output.sizeKB} KB</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error */}
+                      {!entry.success && entry.error && (
+                        <div className="bg-red-50 p-2 rounded text-xs">
+                          <span className="font-semibold text-red-700">Error:</span>
+                          <p className="mt-1 text-red-600">{entry.error}</p>
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
+                      <div className="text-[10px] text-gray-400">
+                        Generated: {new Date(entry.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </details>
+          )}
+
           {/* All Scene Descriptions */}
           {sceneDescriptions.length > 0 && (
             <details className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
