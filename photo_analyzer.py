@@ -263,12 +263,12 @@ def process_photo(image_data, is_base64=True):
                 face_region[:, :, :3] = (face_img[:, :, :3] * alpha + face_region[:, :, :3] * (1 - alpha)).astype(np.uint8)
                 face_region[:, :, 3] = 255
 
-                # Resize to 200x200
-                face_thumb = cv2.resize(square, (200, 200))
+                # Resize to 768x768 (high quality for avatar generation)
+                face_thumb = cv2.resize(square, (768, 768), interpolation=cv2.INTER_LANCZOS4)
                 face_thumb_bgr = cv2.cvtColor(face_thumb, cv2.COLOR_BGRA2BGR)
-                _, buffer = cv2.imencode('.jpg', face_thumb_bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                _, buffer = cv2.imencode('.jpg', face_thumb_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
                 face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
-                print("   Face thumbnail created")
+                print("   Face thumbnail created (768x768)")
 
         # Body with transparent background
         if body_box and full_img_rgba is not None:

@@ -510,16 +510,20 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
     return { success: false, error: 'Avatar generation service unavailable' };
   }
 
-  const facePhoto = character.photoUrl || character.photos?.face || character.photos?.original;
+  // Get high-resolution face photo (prefer original, then face thumbnail)
+  const facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
   if (!facePhoto) {
     log.error(`[STYLED COSTUME] No face photo for ${character.name}`);
     return { success: false, error: 'No face photo available' };
   }
 
+  // Get standard avatar for body reference (already has correct proportions)
+  const standardAvatar = character.avatars?.standard;
+
   const costumeType = (config.costume || 'costume').toLowerCase();
   const artStylePrompt = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS.pixar || '';
 
-  log.debug(`🎨 [STYLED COSTUME] Generating ${costumeType} avatar in ${artStyle} style for ${character.name}`);
+  log.debug(`🎨 [STYLED COSTUME] Generating ${costumeType} avatar in ${artStyle} style for ${character.name} (${standardAvatar ? '2 reference images' : 'face only'})`);
 
   try {
     // Build physical traits section
@@ -552,26 +556,54 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
       'PHYSICAL_TRAITS': physicalTraitsSection
     });
 
-    // Prepare image data
-    const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
-      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+    // Prepare face photo data
+    const faceBase64 = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const faceMimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
+      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Build image parts array (face photo + optional standard avatar)
+    const imageParts = [
+      {
+        inline_data: {
+          mime_type: faceMimeType,
+          data: faceBase64
+        }
+      }
+    ];
+
+    // Add standard avatar as second reference if available
+    if (standardAvatar) {
+      const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
+      const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/) ?
+        standardAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+      imageParts.push({
+        inline_data: {
+          mime_type: avatarMimeType,
+          data: avatarBase64
+        }
+      });
+    }
+
+    // Build system instruction based on available references
+    const systemText = standardAvatar
+      ? `You are an expert character artist creating stylized avatar illustrations for children's books.
+You are given TWO reference images:
+1. A high-resolution face photo showing the person's exact facial features
+2. A standard avatar showing the person's body proportions and build
+Your task is to create a new avatar in ${artStyle} style that:
+- Preserves the EXACT facial identity from the face photo (image 1)
+- Uses the body proportions from the standard avatar (image 2)
+- Applies the specified costume`
+      : `You are an expert character artist creating stylized avatar illustrations for children's books.
+Your task is to transform a reference photo into a ${artStyle} style illustration while preserving the person's identity and applying a specific costume.`;
 
     const requestBody = {
       systemInstruction: {
-        parts: [{
-          text: `You are an expert character artist creating stylized avatar illustrations for children's books.
-Your task is to transform a reference photo into a ${artStyle} style illustration while preserving the person's identity and applying a specific costume.`
-        }]
+        parts: [{ text: systemText }]
       },
       contents: [{
         parts: [
-          {
-            inline_data: {
-              mime_type: mimeType,
-              data: base64Data
-            }
-          },
+          ...imageParts,
           { text: avatarPrompt }
         ]
       }],
