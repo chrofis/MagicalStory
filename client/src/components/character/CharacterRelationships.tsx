@@ -1,4 +1,4 @@
-import { Heart, ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { relationshipTypes, getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
 import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
@@ -94,8 +94,8 @@ export function CharacterRelationships({
 
   return (
     <div className="space-y-3">
-      <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-        <Heart size={18} /> {translations.relationships}
+      <h3 className="text-lg font-semibold text-gray-800">
+        {translations.relationships}
       </h3>
 
       <div className="space-y-3">
@@ -124,7 +124,7 @@ export function CharacterRelationships({
           return (
             <div
               key={otherChar.id}
-              className={`rounded-lg p-3 md:p-4 w-full lg:w-3/4 mx-auto ${
+              className={`rounded-lg p-3 md:p-4 w-full ${
                 isForwardDefined
                   ? 'bg-blue-50 border-2 border-blue-300'
                   : 'bg-white border-[3px] border-red-500'

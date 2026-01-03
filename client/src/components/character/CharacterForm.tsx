@@ -709,14 +709,14 @@ export function CharacterForm({
             </details>
           )}
 
-          {/* Avatar section - below info on mobile, in same column on PC */}
-          <div className="text-center">
+          {/* Avatar section - full width of left column */}
+          <div>
             {character.avatars?.standard ? (
               <div className="relative">
                 <img
                   src={character.avatars.standard}
                   alt={`${character.name} avatar`}
-                  className={`w-40 h-56 object-contain rounded-lg border-2 bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'border-amber-400 opacity-80' : 'border-indigo-300'}`}
+                  className={`w-full object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
                   onClick={() => setEnlargedAvatar(true)}
                   title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                 />
@@ -727,7 +727,7 @@ export function CharacterForm({
                 )}
               </div>
             ) : (
-              <div className="w-40 h-56 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
+              <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
                 {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />

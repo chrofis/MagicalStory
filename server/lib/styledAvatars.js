@@ -505,44 +505,98 @@ function applyStyledAvatars(characterPhotos, artStyle) {
  * @param {Array} characters - All characters in the story
  * @param {Object} pageClothing - Clothing per page { pageNum: clothingCategory }
  * @param {string} defaultClothing - Default clothing category
+ * @param {Object} clothingRequirements - Per-character clothing requirements from outline (optional)
  * @returns {Array<{pageNumber, clothingCategory, characterNames}>}
  */
-function collectAvatarRequirements(sceneDescriptions, characters, pageClothing = {}, defaultClothing = 'standard') {
+function collectAvatarRequirements(sceneDescriptions, characters, pageClothing = {}, defaultClothing = 'standard', clothingRequirements = null) {
   const { getCharactersInScene, parseClothingCategory } = require('./storyHelpers');
 
   const requirements = [];
 
-  for (const scene of sceneDescriptions) {
-    const pageNum = scene.pageNumber;
-    const description = scene.description || '';
+  // If we have explicit per-character clothing requirements from outline, use those
+  if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
+    // Build per-character clothing map: { charName: clothingCategory }
+    const characterClothingMap = {};
+    for (const [charName, reqs] of Object.entries(clothingRequirements)) {
+      // Find the first category with used=true
+      for (const [category, config] of Object.entries(reqs)) {
+        if (config && config.used) {
+          if (category === 'costumed' && config.costume) {
+            characterClothingMap[charName] = `costumed:${config.costume.toLowerCase()}`;
+          } else {
+            characterClothingMap[charName] = category;
+          }
+          break; // Use first 'used' category
+        }
+      }
+      // Default to standard if no category is used
+      if (!characterClothingMap[charName]) {
+        characterClothingMap[charName] = 'standard';
+      }
+    }
 
-    // Get characters in this scene
-    const sceneCharacters = getCharactersInScene(description, characters);
-    const characterNames = sceneCharacters.map(c => c.name);
+    log.debug(`🎨 [AVATAR REQS] Per-character clothing: ${JSON.stringify(characterClothingMap)}`);
 
-    // Get clothing for this page
-    const clothingCategory = pageClothing[pageNum] || parseClothingCategory(description) || defaultClothing;
+    // For each scene, add requirements per character based on their specific clothing
+    for (const scene of sceneDescriptions) {
+      const pageNum = scene.pageNumber;
+      const description = scene.description || '';
 
-    requirements.push({
-      pageNumber: pageNum,
-      clothingCategory,
-      characterNames
-    });
-  }
+      // Get characters in this scene
+      const sceneCharacters = getCharactersInScene(description, characters);
 
-  // Add cover requirements ONLY for clothing categories actually used in the story
-  // This avoids generating unused styled avatars (e.g., winter avatars for a summer story)
-  const usedClothingCategories = new Set(requirements.map(r => r.clothingCategory));
-  // Always include 'standard' as fallback for covers
-  usedClothingCategories.add('standard');
+      // Add requirement for each character with their specific clothing
+      for (const char of sceneCharacters) {
+        const clothingCategory = characterClothingMap[char.name] || defaultClothing;
+        requirements.push({
+          pageNumber: pageNum,
+          clothingCategory,
+          characterNames: [char.name]
+        });
+      }
+    }
 
-  const allCharacterNames = characters.map(c => c.name);
-  for (const clothing of usedClothingCategories) {
-    requirements.push({
-      pageNumber: 'cover',
-      clothingCategory: clothing,
-      characterNames: allCharacterNames
-    });
+    // For covers, each character needs their specific clothing
+    for (const char of characters) {
+      const clothingCategory = characterClothingMap[char.name] || defaultClothing;
+      requirements.push({
+        pageNumber: 'cover',
+        clothingCategory,
+        characterNames: [char.name]
+      });
+    }
+  } else {
+    // Fallback: infer from page clothing (old behavior)
+    for (const scene of sceneDescriptions) {
+      const pageNum = scene.pageNumber;
+      const description = scene.description || '';
+
+      // Get characters in this scene
+      const sceneCharacters = getCharactersInScene(description, characters);
+      const characterNames = sceneCharacters.map(c => c.name);
+
+      // Get clothing for this page
+      const clothingCategory = pageClothing[pageNum] || parseClothingCategory(description) || defaultClothing;
+
+      requirements.push({
+        pageNumber: pageNum,
+        clothingCategory,
+        characterNames
+      });
+    }
+
+    // Add cover requirements for clothing categories used in the story
+    const usedClothingCategories = new Set(requirements.map(r => r.clothingCategory));
+    usedClothingCategories.add('standard'); // Always include standard as fallback
+
+    const allCharacterNames = characters.map(c => c.name);
+    for (const clothing of usedClothingCategories) {
+      requirements.push({
+        pageNumber: 'cover',
+        clothingCategory: clothing,
+        characterNames: allCharacterNames
+      });
+    }
   }
 
   return requirements;

@@ -5498,7 +5498,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             allSceneDescriptions,
             inputData.characters || [],
             {}, // pageClothing - will parse from scene descriptions
-            'standard'
+            'standard',
+            streamingClothingRequirements // Pass per-character clothing requirements
           );
           // Convert avatars in parallel
           await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements);
@@ -6389,7 +6390,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       sceneDescriptions,
       inputData.characters || [],
       pageClothing,
-      'standard'
+      'standard',
+      clothingRequirements // Pass per-character clothing requirements
     );
 
     // Now prepare styled avatars (convert existing avatars to target art style)
@@ -7195,22 +7197,41 @@ async function processStoryJob(jobId) {
     if (artStyle !== 'realistic' && inputData.characters && !skipImages) {
       log.debug(`🎨 [PIPELINE] Preparing styled avatars for ${artStyle} style...`);
       try {
-        // Build requirements for all possible clothing categories (covers + pages)
-        const avatarRequirements = [
-          { pageNumber: 'cover', clothingCategory: 'standard', characterNames: inputData.characters.map(c => c.name) },
-          { pageNumber: 'cover', clothingCategory: 'winter', characterNames: inputData.characters.map(c => c.name) },
-          { pageNumber: 'cover', clothingCategory: 'summer', characterNames: inputData.characters.map(c => c.name) },
-          { pageNumber: 'cover', clothingCategory: 'formal', characterNames: inputData.characters.map(c => c.name) }
-        ];
-        // Add requirements for each scene based on clothing
-        for (let i = 1; i <= sceneCount; i++) {
-          const clothing = pageClothingData.pageClothing[i] || pageClothingData.primaryClothing || 'standard';
-          avatarRequirements.push({
-            pageNumber: i,
-            clothingCategory: clothing,
-            characterNames: inputData.characters.map(c => c.name)
-          });
+        // Build avatar requirements based on per-character clothing from outline
+        const avatarRequirements = [];
+
+        // Use clothing requirements from outline for per-character avatars
+        if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
+          for (const [charName, reqs] of Object.entries(clothingRequirements)) {
+            // Find which clothing category this character uses
+            let usedCategory = 'standard';
+            for (const [category, config] of Object.entries(reqs)) {
+              if (config && config.used) {
+                if (category === 'costumed' && config.costume) {
+                  usedCategory = `costumed:${config.costume.toLowerCase()}`;
+                } else {
+                  usedCategory = category;
+                }
+                break;
+              }
+            }
+            // Add for cover and all pages
+            avatarRequirements.push({ pageNumber: 'cover', clothingCategory: usedCategory, characterNames: [charName] });
+            for (let i = 1; i <= sceneCount; i++) {
+              avatarRequirements.push({ pageNumber: i, clothingCategory: usedCategory, characterNames: [charName] });
+            }
+          }
+          log.debug(`🎨 [PIPELINE] Built ${avatarRequirements.length} avatar requirements from clothing requirements`);
+        } else {
+          // Fallback: use page clothing data (old behavior)
+          const allCharNames = inputData.characters.map(c => c.name);
+          avatarRequirements.push({ pageNumber: 'cover', clothingCategory: 'standard', characterNames: allCharNames });
+          for (let i = 1; i <= sceneCount; i++) {
+            const clothing = pageClothingData.pageClothing[i] || pageClothingData.primaryClothing || 'standard';
+            avatarRequirements.push({ pageNumber: i, clothingCategory: clothing, characterNames: allCharNames });
+          }
         }
+
         // Convert avatars in parallel
         await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements);
         log.debug(`✅ [PIPELINE] Styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
