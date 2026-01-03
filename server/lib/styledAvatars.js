@@ -340,6 +340,23 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
       // Skip if already in our list to convert
       if (neededAvatars.has(cacheKey)) continue;
 
+      // For costumed avatars, check if styled version already exists in character data
+      // (generateStyledCostumedAvatar creates styled versions directly)
+      if (clothingCategory.startsWith('costumed:')) {
+        const costumeType = clothingCategory.split(':')[1];
+        const existingStyledCostumed = char.avatars?.styledAvatars?.[artStyle]?.costumed;
+        if (existingStyledCostumed) {
+          // Check for exact match or any costume that starts with this type
+          const hasMatch = Object.keys(existingStyledCostumed).some(key =>
+            key === costumeType || key.startsWith(costumeType) || costumeType.startsWith(key)
+          );
+          if (hasMatch) {
+            log.debug(`⏭️ [STYLED AVATARS] Skipping ${charName}:${clothingCategory} - already has styled costumed avatar`);
+            continue;
+          }
+        }
+      }
+
       // Get original avatar for this clothing category
       const avatars = char.avatars || char.clothingAvatars;
       let originalAvatar = null;
