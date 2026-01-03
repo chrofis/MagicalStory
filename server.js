@@ -6256,17 +6256,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [20, 'Preparing character avatars...', jobId]
     );
 
-    // Collect avatar requirements from clothing requirements
+    // Collect avatar requirements from story pages
+    // Convert storyPages to format expected by collectAvatarRequirements
+    const sceneDescriptions = storyPages.map(page => ({
+      pageNumber: page.pageNumber || storyPages.indexOf(page) + 1,
+      description: page.sceneHint || page.text || ''
+    }));
+    const pageClothing = {};
+    storyPages.forEach((page, index) => {
+      if (page.clothing) {
+        pageClothing[page.pageNumber || index + 1] = page.clothing;
+      }
+    });
+
     const avatarRequirements = collectAvatarRequirements(
-      inputData.characters,
-      inputData.artStyle,
-      clothingRequirements,
-      storyPages.map(p => p.clothing)
+      sceneDescriptions,
+      inputData.characters || [],
+      pageClothing,
+      'standard'
     );
 
     if (avatarRequirements.length > 0) {
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars`);
-      await prepareStyledAvatars(avatarRequirements, inputData.characters);
+      await prepareStyledAvatars(avatarRequirements, inputData.characters, inputData.artStyle);
       applyStyledAvatars(inputData.characters);
     }
 
