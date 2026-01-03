@@ -6386,6 +6386,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         const coverPhotos = getCharacterPhotoDetails(coverCharacters, effectiveCategory, costumeType, inputData.artStyle);
 
+        // Determine page number for Visual Bible context
+        // titlePage/initialPage: use first page context, backCover: use last page context
+        const coverPageNumber = coverType === 'backCover' ? sceneCount : 1;
+
         // Build cover prompt
         const coverPrompt = buildImagePrompt(
           hint.scene || `Cover scene for ${title}`,
@@ -6393,7 +6397,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverCharacters,
           false,
           visualBible,
-          0,
+          coverPageNumber,
           true,
           coverPhotos
         );
@@ -6504,24 +6508,122 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     log.debug(`💰 [UNIFIED] Total estimated cost: $${totalCost.toFixed(4)}`);
 
-    // Build final result
-    const result = {
-      title,
-      pages: allImages,
-      coverImages,
-      visualBible,
-      clothingRequirements,
-      tokenUsage,
-      estimatedCost: totalCost,
-      generationMode: 'unified'
-    };
-
+    log.debug(`📝 [UNIFIED] Updating job status to 95% (finalizing)...`);
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [95, 'Finalizing story...', jobId]
     );
 
-    return result;
+    // Save story to stories table so it appears in My Stories
+    const storyId = jobId; // Use jobId as storyId for consistency
+    const storyData = {
+      id: storyId,
+      title: title,
+      storyType: inputData.storyType || '',
+      artStyle: inputData.artStyle || 'pixar',
+      language: inputData.language || 'en',
+      languageLevel: inputData.languageLevel || '1st-grade',
+      pages: inputData.pages || sceneCount,
+      dedication: inputData.dedication || '',
+      characters: inputData.characters || [],
+      mainCharacters: inputData.mainCharacters || [],
+      relationships: inputData.relationships || {},
+      relationshipTexts: inputData.relationshipTexts || {},
+      outline: unifiedResult.text, // Full unified response
+      outlinePrompt: unifiedPrompt, // Prompt sent to API (dev mode)
+      outlineModelId: unifiedModelId, // Model used (dev mode)
+      outlineUsage: unifiedUsage, // Token usage (dev mode)
+      storyTextPrompts: storyTextPrompts, // Story text batch prompts (dev mode)
+      visualBible: visualBible, // Recurring visual elements for consistency
+      styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
+      storyText: fullStoryText,
+      originalStory: fullStoryText, // Store original for restore functionality
+      sceneDescriptions: allSceneDescriptions,
+      sceneImages: allImages,
+      coverImages: coverImages,
+      pageClothing: pageClothingData, // Clothing per page
+      tokenUsage: tokenUsage, // Token usage statistics for cost tracking
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    log.debug(`💾 [UNIFIED] Saving story to database...`);
+    await upsertStory(storyId, userId, storyData);
+    log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
+
+    // Log credit completion (credits were already reserved at job creation)
+    try {
+      const jobResult = await dbPool.query(
+        'SELECT credits_reserved FROM story_jobs WHERE id = $1',
+        [jobId]
+      );
+      if (jobResult.rows.length > 0 && jobResult.rows[0].credits_reserved > 0) {
+        const creditsUsed = jobResult.rows[0].credits_reserved;
+        const userResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [userId]);
+        const currentBalance = userResult.rows[0]?.credits || 0;
+
+        await dbPool.query(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [userId, 0, currentBalance, 'story_complete', jobId, `Story completed - ${creditsUsed} credits used`]
+        );
+        log.info(`💳 [UNIFIED] Story completed, ${creditsUsed} credits used for job ${jobId}`);
+      }
+    } catch (creditErr) {
+      log.error('❌ [UNIFIED] Failed to log credit completion:', creditErr.message);
+    }
+
+    // Build final result
+    const resultData = {
+      storyId,
+      title,
+      outline: unifiedResult.text,
+      outlinePrompt: unifiedPrompt,
+      outlineModelId: unifiedModelId,
+      outlineUsage: unifiedUsage,
+      storyTextPrompts,
+      storyText: fullStoryText,
+      visualBible,
+      styledAvatarGeneration: getStyledAvatarGenerationLog(),
+      sceneDescriptions: allSceneDescriptions,
+      sceneImages: allImages,
+      coverImages,
+      tokenUsage,
+      estimatedCost: totalCost,
+      generationMode: 'unified'
+    };
+
+    // Mark job as completed
+    await dbPool.query(
+      `UPDATE story_jobs
+       SET status = $1, progress = $2, progress_message = $3, result_data = $4,
+           credits_reserved = 0, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5`,
+      ['completed', 100, 'Story generation complete!', JSON.stringify(resultData), jobId]
+    );
+
+    // Clear styled avatar cache to free memory
+    clearStyledAvatarCache();
+
+    log.info(`✅ [UNIFIED] Job ${jobId} completed successfully`);
+
+    // Send story completion email to customer
+    try {
+      const userResult = await dbPool.query(
+        'SELECT email, username, shipping_first_name, preferred_language FROM users WHERE id = $1',
+        [userId]
+      );
+      if (userResult.rows.length > 0 && userResult.rows[0].email) {
+        const user = userResult.rows[0];
+        const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
+        const emailLanguage = user.preferred_language || inputData.language || 'English';
+        await email.sendStoryCompleteEmail(user.email, firstName, title, storyId, emailLanguage);
+      }
+    } catch (emailErr) {
+      log.error('❌ [UNIFIED] Failed to send story complete email:', emailErr);
+    }
+
+    return resultData;
 
   } catch (error) {
     log.error(`❌ [UNIFIED] Error generating story:`, error.message);

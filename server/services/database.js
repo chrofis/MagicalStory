@@ -28,6 +28,7 @@ function initializePool() {
     max: parseInt(process.env.DB_POOL_MAX) || 20, // Maximum connections
     idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000, // Close idle connections after 30s
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT) || 10000, // Timeout connecting after 10s
+    statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT) || 120000, // Query timeout after 120s (prevent infinite hangs)
   };
 
   dbPool = new Pool(poolConfig);
