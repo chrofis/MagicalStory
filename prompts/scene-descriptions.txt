@@ -75,11 +75,11 @@ Include COMPLETE physical descriptions of all characters, objects, and locations
   - If two objects touch (hand holding tool, character gripping object), assign distinct materials/colors to define boundaries
   - Example: "A [wooden-brown] stick in a [pink-skin] hand" (Use hyphens to bind attributes to objects)
 
-**CLOTHING CONSISTENCY (for METADATA JSON):**
-- Check the PREVIOUS 2 SCENES' clothing category
-- Use the SAME category unless the scene transitions between indoor/outdoor
-- If the outline specifies a clothing change, follow it
-- Categories: winter, summer, formal, standard
+**CLOTHING FOR THIS PAGE:** {CURRENT_CLOTHING}
+
+Use this exact clothing category in your METADATA JSON "clothing" field.
+This was determined from the story outline's clothing continuity plan.
+Valid categories: winter, summer, formal, standard
 
 4. **Objects & Animals:** If any RECURRING ELEMENTS appear:
    - Copy their description VERBATIM from above

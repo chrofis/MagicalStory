@@ -1565,7 +1565,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     log.debug(`🔄 [REGEN SCENE ${pageNumber}] Expected clothing from outline: ${expectedClothing}`)
 
     // Generate new scene description (includes Visual Bible recurring elements)
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes);
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing);
     const sceneResult = await callClaudeAPI(scenePrompt, 2048);
     const newSceneDescription = sceneResult.text;
 
@@ -6519,8 +6519,11 @@ Output Format:
           }
         }
 
+        // Get current page's clothing from outline
+        const currentClothing = pageClothingData?.pageClothing?.[pageNum] || pageClothingData?.primaryClothing || 'standard';
+
         // Generate scene description using Art Director prompt (in story language)
-        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes);
+        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes, currentClothing);
 
         // Start scene description + image generation (don't await)
         const imagePromise = limit(async () => {
@@ -6957,10 +6960,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
           log.debug(`🔗 [SEQUENTIAL ${i + 1}/${allPages.length}] Processing page ${pageNum}...`);
 
+          // Get current page's clothing from outline
+          const currentClothing = pageClothingData?.pageClothing?.[pageNum] || pageClothingData?.primaryClothing || 'standard';
+
           try {
             // Generate scene description using Art Director prompt (in story language)
             // Pass visualBible so recurring elements are included in scene description
-            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes);
+            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes, currentClothing);
 
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${seqSceneModelOverride ? ` [model: ${seqSceneModelOverride}]` : ''}`);
             const sceneDescResult = await callTextModel(scenePrompt, 4000, seqSceneModelOverride);

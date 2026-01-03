@@ -1126,8 +1126,9 @@ ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
  * @param {string} language - Output language
  * @param {Object} visualBible - Visual Bible data
  * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint} for previous pages (max 2)
+ * @param {string} currentClothing - Clothing category for this page from outline (winter/summer/formal/standard)
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null, previousScenes = []) {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null, previousScenes = [], currentClothing = 'standard') {
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -1244,6 +1245,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       PAGE_CONTENT: pageContent,
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
+      CURRENT_CLOTHING: currentClothing,
       LANGUAGE: language,
       LANGUAGE_NOTE: getLanguageNote(language)
     });
