@@ -1073,6 +1073,54 @@ class UnifiedStoryParser {
     if (jsonMatch) {
       try {
         this._cache.visualBible = JSON.parse(jsonMatch[1]);
+
+        // Add computed 'description' field for secondary characters (combining individual fields)
+        if (this._cache.visualBible.secondaryCharacters) {
+          this._cache.visualBible.secondaryCharacters = this._cache.visualBible.secondaryCharacters.map(char => {
+            if (!char.description) {
+              const parts = [];
+              if (char.age) parts.push(char.age);
+              if (char.build) parts.push(char.build);
+              if (char.hair) parts.push(`hair: ${char.hair}`);
+              if (char.face) parts.push(char.face);
+              if (char.signatureLook) parts.push(`Signature: ${char.signatureLook}`);
+              if (char.clothing) parts.push(`Clothing: ${char.clothing}`);
+              char.description = parts.join('. ') || char.name;
+            }
+            return char;
+          });
+        }
+
+        // Add computed 'description' field for animals (combining individual fields)
+        if (this._cache.visualBible.animals) {
+          this._cache.visualBible.animals = this._cache.visualBible.animals.map(animal => {
+            if (!animal.description) {
+              const parts = [];
+              if (animal.species) parts.push(animal.species);
+              if (animal.size) parts.push(animal.size);
+              if (animal.coloring) parts.push(animal.coloring);
+              if (animal.features) parts.push(animal.features);
+              animal.description = parts.join('. ') || animal.name;
+            }
+            return animal;
+          });
+        }
+
+        // Add computed 'description' field for locations (combining individual fields)
+        if (this._cache.visualBible.locations) {
+          this._cache.visualBible.locations = this._cache.visualBible.locations.map(loc => {
+            if (!loc.description) {
+              const parts = [];
+              if (loc.setting) parts.push(loc.setting);
+              if (loc.colors) parts.push(`Colors: ${loc.colors}`);
+              if (loc.features) parts.push(loc.features);
+              if (loc.signatureElement) parts.push(`Signature: ${loc.signatureElement}`);
+              loc.description = parts.join('. ') || loc.name;
+            }
+            return loc;
+          });
+        }
+
         const counts = {
           secondary: this._cache.visualBible.secondaryCharacters?.length || 0,
           animals: this._cache.visualBible.animals?.length || 0,
