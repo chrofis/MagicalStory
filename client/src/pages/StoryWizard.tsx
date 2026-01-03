@@ -177,6 +177,20 @@ export default function StoryWizard() {
   const [outlineUsage, setOutlineUsage] = useState<{ input_tokens: number; output_tokens: number } | undefined>(); // Token usage for outline (dev mode)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>>([]); // API prompts for story text (dev mode)
   const [visualBible, setVisualBible] = useState<VisualBible | null>(null); // Visual Bible for dev mode
+  const [styledAvatarGeneration, setStyledAvatarGeneration] = useState<Array<{
+    timestamp: string;
+    characterName: string;
+    artStyle: string;
+    durationMs: number;
+    success: boolean;
+    error?: string;
+    inputs: {
+      facePhoto: { identifier: string; sizeKB: number } | null;
+      originalAvatar: { identifier: string; sizeKB: number };
+    };
+    prompt?: string;
+    output?: { identifier: string; sizeKB: number };
+  }>>([]); // Styled avatar generation log (dev mode)
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
@@ -295,6 +309,7 @@ export default function StoryWizard() {
             setOutlineModelId(story.outlineModelId);
             setOutlineUsage(story.outlineUsage);
             setStoryTextPrompts(story.storyTextPrompts || []);
+            setStyledAvatarGeneration(story.styledAvatarGeneration || []);
 
             // Visual Bible
             if (story.visualBible) {
@@ -1862,6 +1877,7 @@ export default function StoryWizard() {
           setOutlineModelId(status.result.outlineModelId);
           setOutlineUsage(status.result.outlineUsage);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
+          setStyledAvatarGeneration(status.result.styledAvatarGeneration || []);
           // Ensure visualBible has required fields (backward compatibility)
           if (status.result.visualBible) {
             setVisualBible({
@@ -2158,6 +2174,7 @@ export default function StoryWizard() {
               storyLanguage={storyLanguage}
               isGenerating={isGenerating}
               developerMode={developerMode}
+              styledAvatarGeneration={styledAvatarGeneration}
               storyId={storyId}
               onVisualBibleChange={storyId ? async (updatedBible) => {
                 try {

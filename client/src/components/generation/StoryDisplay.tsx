@@ -17,6 +17,21 @@ interface StoryTextPrompt {
   usage?: { input_tokens: number; output_tokens: number };
 }
 
+interface StyledAvatarGenerationEntry {
+  timestamp: string;
+  characterName: string;
+  artStyle: string;
+  durationMs: number;
+  success: boolean;
+  error?: string;
+  inputs: {
+    facePhoto: { identifier: string; sizeKB: number } | null;
+    originalAvatar: { identifier: string; sizeKB: number };
+  };
+  prompt?: string;
+  output?: { identifier: string; sizeKB: number };
+}
+
 interface StoryDisplayProps {
   title: string;
   story: string;
@@ -45,6 +60,7 @@ interface StoryDisplayProps {
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
   developerMode?: boolean;
+  styledAvatarGeneration?: StyledAvatarGenerationEntry[];
   // Partial story fields
   isPartial?: boolean;
   failureReason?: string;
@@ -100,6 +116,7 @@ export function StoryDisplay({
   onVisualBibleChange,
   storyId,
   developerMode = false,
+  styledAvatarGeneration = [],
   isPartial = false,
   failureReason,
   generatedPages,
@@ -1145,6 +1162,94 @@ export function StoryDisplay({
                     {language === 'de' ? 'Keine wiederkehrenden Elemente gefunden' : language === 'fr' ? 'Aucun élément récurrent trouvé' : 'No recurring elements found in this story'}
                   </div>
                 )}
+              </div>
+            </details>
+          )}
+
+          {/* Styled Avatar Generation Log */}
+          {styledAvatarGeneration && styledAvatarGeneration.length > 0 && (
+            <details className="bg-pink-50 border-2 border-pink-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-pink-800 hover:text-pink-900 flex items-center gap-2">
+                <Images size={20} />
+                {language === 'de'
+                  ? `Stilisierte Avatare (${styledAvatarGeneration.length})`
+                  : language === 'fr'
+                    ? `Avatars stylisés (${styledAvatarGeneration.length})`
+                    : `Styled Avatars (${styledAvatarGeneration.length})`}
+              </summary>
+              <div className="mt-4 space-y-4">
+                {styledAvatarGeneration.map((entry, index) => (
+                  <details key={index} className={`border rounded-lg p-3 ${entry.success ? 'bg-white border-pink-200' : 'bg-red-50 border-red-300'}`}>
+                    <summary className="cursor-pointer text-sm font-semibold text-pink-700 hover:text-pink-800 flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${entry.success ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      {entry.characterName} - {entry.artStyle}
+                      <span className="text-xs text-gray-500 ml-auto">
+                        {(entry.durationMs / 1000).toFixed(1)}s
+                      </span>
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      {/* Inputs */}
+                      <div className="bg-blue-50 p-2 rounded text-xs">
+                        <span className="font-semibold text-blue-700">Inputs:</span>
+                        <div className="mt-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-600">Face Photo:</span>
+                            {entry.inputs.facePhoto ? (
+                              <span className="text-blue-600">
+                                {entry.inputs.facePhoto.identifier} ({entry.inputs.facePhoto.sizeKB} KB)
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 italic">Not provided</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-600">Original Avatar:</span>
+                            <span className="text-blue-600">
+                              {entry.inputs.originalAvatar.identifier} ({entry.inputs.originalAvatar.sizeKB} KB)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Prompt */}
+                      {entry.prompt && (
+                        <details className="bg-purple-50 p-2 rounded text-xs">
+                          <summary className="cursor-pointer font-semibold text-purple-700 hover:text-purple-800">
+                            Prompt ({entry.prompt.length} chars)
+                          </summary>
+                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-48 overflow-y-auto">
+                            {entry.prompt}
+                          </pre>
+                        </details>
+                      )}
+
+                      {/* Output */}
+                      {entry.success && entry.output && (
+                        <div className="bg-green-50 p-2 rounded text-xs">
+                          <span className="font-semibold text-green-700">Output:</span>
+                          <div className="mt-1">
+                            <span className="text-green-600">
+                              {entry.output.identifier} ({entry.output.sizeKB} KB)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error */}
+                      {!entry.success && entry.error && (
+                        <div className="bg-red-50 p-2 rounded text-xs">
+                          <span className="font-semibold text-red-700">Error:</span>
+                          <p className="mt-1 text-red-600">{entry.error}</p>
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
+                      <div className="text-[10px] text-gray-400">
+                        Generated: {new Date(entry.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                  </details>
+                ))}
               </div>
             </details>
           )}
