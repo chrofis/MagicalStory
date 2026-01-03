@@ -109,25 +109,25 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
 
 4. **Objects & Animals:**
 
-   * **Lasso:**
+   * **Lasso [ART001]:**
      - Braided brown leather, about 3 meters long, with metal ring at the end, shows signs of use
      - POSITION: Coiled beside Sophie in the grass, partially visible between the blades
 
-   * **Cowboy Hat:**
+   * **Cowboy Hat [CLO001]:**
      - Beige felt hat with wide brim, brown leather band with small turquoise bead, slightly worn but well-maintained
      - POSITION: Firmly on Sophie's head, casting a light shadow on her face
 
-   * **Backpack:**
+   * **Backpack [ART002]:**
      - Red backpack with black straps, multiple outer pockets, water bottle hanging on the side
      - POSITION: On Sophie's back, side pocket slightly open
 
-   * **Eli:**
+   * **Eli [ART003]:**
      - Stuffed elephant toy, gray with pink inner ears, small enough to fit under an arm (about 25 cm), worn spot on right ear, friendly embroidered face
      - POSITION: Peeking partially out of the open side pocket of Sophie's backpack, one ear and head visible
 
 5. **METADATA (JSON):**
 ```json
-{"characters": ["Sophie", "Prairie Dog"], "clothing": "standard", "objects": ["Lasso", "Cowboy Hat", "Backpack", "Eli"]}
+{"characters": ["Sophie", "Prairie Dog"], "clothing": "standard", "objects": ["Lasso [ART001]", "Cowboy Hat [CLO001]", "Backpack [ART002]", "Eli [ART003]"]}
 ```
 ```
 
@@ -136,6 +136,12 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
 - This is used to attach reference images - missing characters = missing references
 - Main characters use their name (e.g., "Sophie")
 - Animals/creatures use their name (e.g., "Prairie Dog", "Whiskers")
+
+**CRITICAL: The "objects" array MUST include Visual Bible identifiers when available.**
+- If an object has an identifier from RECURRING ELEMENTS (e.g., [ART001], [CLO001]), include it
+- Format: "ObjectName [ID]" (e.g., "Schatzkarte [ART002]", "Magic Wand [ART001]")
+- This allows the image generator to look up the full description for visual consistency
+- Objects without Visual Bible entries can be listed by name only
 
 **IMPORTANT: Always include section 5 METADATA with valid JSON at the end of your output.**
 

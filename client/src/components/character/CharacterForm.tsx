@@ -493,7 +493,9 @@ export function CharacterForm({
                   <img
                     src={displayPhoto}
                     alt="Character"
-                    className="w-24 h-24 rounded-full object-cover border-4 border-indigo-400 shadow-lg"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-indigo-400 shadow-lg cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setLightboxImage(displayPhoto)}
+                    title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                   />
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-gray-300 flex items-center justify-center">
@@ -623,7 +625,9 @@ export function CharacterForm({
                 <img
                   src={displayPhoto}
                   alt={character.name}
-                  className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400"
+                  className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setLightboxImage(displayPhoto)}
+                  title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                 />
               ) : (
                 <div className="w-14 h-14 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
