@@ -1,4 +1,4 @@
-import { Wand2, Sparkles, Loader2, Palette, Pencil } from 'lucide-react';
+import { Wand2, Sparkles, Loader2, Pencil } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { storyTypes, lifeChallenges, educationalTopics, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
@@ -156,30 +156,28 @@ export function WizardStep6Summary({
         <Wand2 size={24} /> {t.title}
       </h2>
 
-      {/* Summary of all selections - compact inline format */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      {/* Summary of all selections - 3x2 grid layout */}
+      <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
+        {/* Row 1 */}
         {/* Main Characters */}
-        {getMainCharacterNames() && (
-          <div className="flex items-center gap-1 group">
-            <span className="text-gray-500">{t.mainChars}:</span>
-            <span className="font-medium text-indigo-700">{getMainCharacterNames()}</span>
-            <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
-          </div>
-        )}
+        <div className="flex items-center gap-1 group">
+          <span className="text-gray-500">{t.mainChars}:</span>
+          <span className="font-medium text-indigo-700">{getMainCharacterNames() || '-'}</span>
+          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+        </div>
         {/* Supporting Characters */}
-        {getSupportingCharacterNames() && (
-          <div className="flex items-center gap-1 group">
-            <span className="text-gray-500">{t.supportingChars}:</span>
-            <span className="font-medium text-gray-700">{getSupportingCharacterNames()}</span>
-            <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
-          </div>
-        )}
+        <div className="flex items-center gap-1 group">
+          <span className="text-gray-500">{t.supportingChars}:</span>
+          <span className="font-medium text-gray-700">{getSupportingCharacterNames() || '-'}</span>
+          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+        </div>
         {/* Language */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500">{t.languageLabel}:</span>
           <span className="font-medium">{getStoryLanguageName()}</span>
           <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
+        {/* Row 2 */}
         {/* Reading Level & Pages */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500">{t.level}:</span>
@@ -199,7 +197,7 @@ export function WizardStep6Summary({
         {/* Art Style */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500">{t.artStyleLabel}:</span>
-          <span className="font-medium flex items-center gap-1"><Palette size={12} className="text-purple-600" />{getArtStyleName()}</span>
+          <span className="font-medium">{getArtStyleName()}</span>
           <button onClick={() => onEditStep(4)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
       </div>

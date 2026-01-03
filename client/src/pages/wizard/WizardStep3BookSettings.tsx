@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BookOpen, Globe } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
@@ -102,7 +102,9 @@ export function WizardStep3BookSettings({
 
         {/* Story Language Selection - Dropdown on the right */}
         <div className="flex items-center gap-2">
-          <Globe size={20} className="text-gray-600" />
+          <span className="text-sm text-gray-600">
+            {language === 'de' ? 'Sprachvariante:' : language === 'fr' ? 'Variante:' : 'Language:'}
+          </span>
           <div className="relative">
             <select
               value={storyLanguage}
