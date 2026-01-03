@@ -6502,10 +6502,8 @@ async function processStoryJob(jobId) {
     let coverGenerationPromise = null;
     const coverPrompts = {};  // Store cover prompts for dev mode
 
-    // Get art style for styled avatars
-    const artStyle = inputData.artStyle || 'pixar';
-
     // Prepare styled avatars for non-realistic art styles (parallel with outline parsing)
+    // Note: artStyle is already declared earlier in this scope
     if (artStyle !== 'realistic' && inputData.characters && !skipImages) {
       log.debug(`🎨 [PIPELINE] Preparing styled avatars for ${artStyle} style...`);
       try {
