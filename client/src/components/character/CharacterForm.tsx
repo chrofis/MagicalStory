@@ -540,10 +540,11 @@ export function CharacterForm({
                   {t.gender}
                 </label>
                 <select
-                  value={character.gender}
+                  value={character.gender || ''}
                   onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
                   className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
                 >
+                  <option value="">{language === 'de' ? '— Unbekannt —' : language === 'fr' ? '— Inconnu —' : '— Unknown —'}</option>
                   <option value="male">{t.male}</option>
                   <option value="female">{t.female}</option>
                   <option value="other">{t.other}</option>
@@ -629,7 +630,7 @@ export function CharacterForm({
           </div>
         </div>
 
-        {/* Trait Selectors */}
+        {/* Trait Selectors - expanded by default for new characters */}
         <div className="space-y-4">
           <TraitSelector
             label={t.strengths}
@@ -637,6 +638,7 @@ export function CharacterForm({
             selectedTraits={character.traits?.strengths || []}
             onSelect={(traits) => updateTraits('strengths', traits)}
             minRequired={3}
+            defaultExpanded={true}
           />
 
           <TraitSelector
@@ -645,6 +647,7 @@ export function CharacterForm({
             selectedTraits={character.traits?.flaws || []}
             onSelect={(traits) => updateTraits('flaws', traits)}
             minRequired={2}
+            defaultExpanded={true}
           />
 
           <TraitSelector
@@ -652,6 +655,7 @@ export function CharacterForm({
             traits={localizedChallenges}
             selectedTraits={character.traits?.challenges || []}
             onSelect={(traits) => updateTraits('challenges', traits)}
+            defaultExpanded={true}
           />
         </div>
 
@@ -737,10 +741,11 @@ export function CharacterForm({
             <div>
               <label className="block text-[10px] font-semibold text-gray-500 mb-0.5">{t.gender}</label>
               <select
-                value={character.gender}
+                value={character.gender || ''}
                 onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
                 className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs bg-white focus:border-indigo-500 focus:outline-none"
               >
+                <option value="">{language === 'de' ? '— Unbekannt —' : language === 'fr' ? '— Inconnu —' : '— Unknown —'}</option>
                 <option value="male">{t.male}</option>
                 <option value="female">{t.female}</option>
                 <option value="other">{t.other}</option>

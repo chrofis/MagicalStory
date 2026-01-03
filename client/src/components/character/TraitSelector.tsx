@@ -9,6 +9,7 @@ interface TraitSelectorProps {
   onSelect: (traits: string[]) => void;
   minRequired?: number;
   allowCustom?: boolean;
+  defaultExpanded?: boolean;
 }
 
 export function TraitSelector({
@@ -18,10 +19,11 @@ export function TraitSelector({
   onSelect,
   minRequired = 0,
   allowCustom = true,
+  defaultExpanded = false,
 }: TraitSelectorProps) {
   const { t, language } = useLanguage();
   const [customTrait, setCustomTrait] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // Track custom traits added via the input field
   const [localCustomTraits, setLocalCustomTraits] = useState<string[]>([]);

@@ -192,7 +192,7 @@ const {
   buildSceneExpansionPrompt,
   buildUnifiedStoryPrompt
 } = require('./server/lib/storyHelpers');
-const { OutlineParser, UnifiedStoryParser } = require('./server/lib/outlineParser');
+const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -6225,27 +6225,302 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // PHASE 1: Generate complete story with unified prompt
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [10, 'Generating story structure and pages...', jobId]
+      [5, 'Starting story generation...', jobId]
     );
 
     const unifiedPrompt = buildUnifiedStoryPrompt(inputData, sceneCount);
     log.debug(`📖 [UNIFIED] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages`);
 
-    // Use streaming for the unified story generation
-    const unifiedResult = await callTextModelStreaming(unifiedPrompt, 20000, null, modelOverrides.outlineModel);
+    // Art style for avatar generation
+    const artStyle = inputData.artStyle || 'pixar';
+
+    // Track streaming progress and parallel tasks
+    let streamingTitle = null;
+    let streamingClothingRequirements = null;
+    let streamingVisualBible = null;
+    let streamingCoverHints = null;
+    let streamingPagesDetected = 0;
+    let lastProgressUpdate = Date.now();
+
+    // Track parallel tasks started during streaming
+    const streamingAvatarPromises = [];
+    const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
+    const streamingCoverPromises = new Map(); // coverType -> promise
+    const streamingExpandedPages = new Map(); // pageNum -> page data (for scene expansion)
+    let avatarsStartedDuringStreaming = false;
+    let coversStartedDuringStreaming = false;
+
+    // Rate limiters for streaming tasks (aggressive parallelism)
+    const streamAvatarLimit = pLimit(10);  // Avatars are fast, run many in parallel
+    const streamSceneLimit = pLimit(10);   // Scene expansions are text-only, can parallelize heavily
+    const streamCoverLimit = pLimit(3);    // Only 3 covers total anyway
+
+    // Import avatar generators
+    const { generateDynamicAvatar, generateStyledCostumedAvatar } = require('./server/routes/avatars');
+
+    // Helper: Start avatar generation for a character's clothing requirement
+    const startAvatarGeneration = async (charName, requirements) => {
+      if (skipImages) return;
+
+      const char = inputData.characters?.find(c =>
+        c.name.toLowerCase() === charName.toLowerCase()
+      );
+      if (!char) return;
+
+      // Initialize avatars structure
+      if (!char.avatars) char.avatars = {};
+      if (!char.avatars.clothing) char.avatars.clothing = {};
+      if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+
+      for (const [category, config] of Object.entries(requirements)) {
+        if (!config || !config.used) continue;
+
+        // Check if avatar already exists
+        let avatarExists = false;
+        if (category === 'costumed' && config.costume) {
+          const costumeKey = config.costume.toLowerCase();
+          if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+          if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+          avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
+        } else {
+          avatarExists = !!char.avatars[category];
+        }
+
+        if (avatarExists) {
+          log.debug(`⚡ [STREAM-AVATAR] ${char.name} ${category} avatar already exists`);
+          continue;
+        }
+
+        // Queue avatar generation
+        const avatarPromise = streamAvatarLimit(async () => {
+          try {
+            if (category === 'costumed' && config.costume) {
+              log.debug(`⚡ [STREAM-AVATAR] Generating costumed avatar for ${char.name}: ${config.costume}`);
+              const result = await generateStyledCostumedAvatar(char, artStyle, config.costume, config.description);
+              if (result?.url) {
+                if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+                if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+                char.avatars.styledAvatars[artStyle].costumed[config.costume.toLowerCase()] = result.url;
+                log.debug(`✅ [STREAM-AVATAR] ${char.name} costumed:${config.costume} complete`);
+              }
+            } else if (['winter', 'summer', 'standard'].includes(category)) {
+              log.debug(`⚡ [STREAM-AVATAR] Generating ${category} avatar for ${char.name}`);
+              const result = await generateDynamicAvatar(char, category, config.signature);
+              if (result?.url) {
+                char.avatars[category] = result.url;
+                log.debug(`✅ [STREAM-AVATAR] ${char.name} ${category} complete`);
+              }
+            }
+          } catch (err) {
+            log.error(`❌ [STREAM-AVATAR] Failed for ${char.name} ${category}: ${err.message}`);
+          }
+        });
+        streamingAvatarPromises.push(avatarPromise);
+      }
+    };
+
+    // Helper: Start scene expansion for a page
+    const startSceneExpansion = (page) => {
+      if (streamingSceneExpansionPromises.has(page.pageNumber)) return;
+
+      // Need visual bible for scene expansion - queue if not available yet
+      const expansionPromise = streamSceneLimit(async () => {
+        // Wait for visual bible if not yet available
+        while (!streamingVisualBible) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+
+        const sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
+        const expansionPrompt = buildSceneDescriptionPrompt(
+          page.pageNumber,
+          page.text,
+          sceneCharacters,
+          page.sceneHint,
+          langText,
+          streamingVisualBible,
+          [],
+          page.clothing || 'standard'
+        );
+
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 2000, null, modelOverrides.sceneDescriptionModel);
+        const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
+        addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
+
+        log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} scene expanded`);
+        return {
+          pageNumber: page.pageNumber,
+          text: page.text,
+          sceneHint: page.sceneHint,
+          sceneDescription: expansionResult.text,
+          sceneDescriptionPrompt: expansionPrompt,
+          sceneDescriptionModelId: expansionResult.modelId,
+          clothing: page.clothing,
+          characters: page.characters
+        };
+      });
+
+      streamingSceneExpansionPromises.set(page.pageNumber, expansionPromise);
+      log.debug(`⚡ [STREAM-SCENE] Started expansion for page ${page.pageNumber}`);
+    };
+
+    // Helper: Start cover generation
+    const startCoverGeneration = (coverType, hint) => {
+      if (streamingCoverPromises.has(coverType) || skipImages || skipCovers) return;
+
+      const coverPromise = streamCoverLimit(async () => {
+        // Wait for visual bible if not yet available
+        while (!streamingVisualBible) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+
+        // Wait for avatars to complete (needed for reference photos)
+        if (streamingAvatarPromises.length > 0) {
+          await Promise.all(streamingAvatarPromises);
+        }
+
+        const clothingCategory = hint.clothing || 'standard';
+        const sceneDescription = hint.hint || hint.scene || '';
+        const coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
+
+        // Get character photos with clothing
+        let coverPhotos = getCharacterPhotoDetails(
+          coverType === 'titlePage' ? coverCharacters : inputData.characters,
+          clothingCategory
+        );
+        coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
+
+        const coverPageNumber = coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? -1 : -2;
+        const coverPrompt = buildImagePrompt(
+          sceneDescription || `Cover scene for ${streamingTitle || 'story'}`,
+          inputData,
+          coverCharacters,
+          false,
+          streamingVisualBible,
+          coverPageNumber,
+          true,
+          coverPhotos
+        );
+
+        const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
+        const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+        const coverResult = await generateImageWithQualityRetry(
+          coverPrompt, coverPhotos, null, 'cover', null, null, null, coverModelOverrides, coverLabel
+        );
+
+        addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'cover_images', coverResult.modelId);
+        log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
+
+        return {
+          type: coverType,
+          imageData: coverResult.imageData,
+          description: sceneDescription,
+          prompt: coverPrompt,
+          qualityScore: coverResult.score,
+          qualityReasoning: coverResult.reasoning,
+          wasRegenerated: coverResult.wasRegenerated,
+          totalAttempts: coverResult.totalAttempts,
+          retryHistory: coverResult.retryHistory,
+          referencePhotos: coverPhotos,
+          modelId: coverResult.modelId
+        };
+      });
+
+      streamingCoverPromises.set(coverType, coverPromise);
+      log.debug(`⚡ [STREAM-COVER] Started generation for ${coverType}`);
+    };
+
+    // Progressive parser with callbacks for streaming updates AND parallel task initiation
+    const progressiveParser = new ProgressiveUnifiedParser({
+      onTitle: (title) => {
+        streamingTitle = title;
+      },
+      onClothingRequirements: (requirements) => {
+        streamingClothingRequirements = requirements;
+        // Start avatar generation immediately
+        if (!avatarsStartedDuringStreaming && !skipImages) {
+          avatarsStartedDuringStreaming = true;
+          log.debug(`⚡ [STREAM] Starting avatar generation for ${Object.keys(requirements).length} characters`);
+          for (const [charName, charReqs] of Object.entries(requirements)) {
+            startAvatarGeneration(charName, charReqs);
+          }
+        }
+      },
+      onVisualBible: (vb) => {
+        streamingVisualBible = vb;
+        // Filter main characters from Visual Bible
+        filterMainCharactersFromVisualBible(streamingVisualBible, inputData.characters);
+        log.debug(`⚡ [STREAM] Visual Bible ready - scene expansions can now proceed`);
+      },
+      onCoverHints: () => {
+        // Cover hints section complete - we'll start covers when we have individual hints
+        // The parser doesn't provide individual hints in the callback, so we'll handle this differently
+      },
+      onPageComplete: (page) => {
+        streamingPagesDetected = Math.max(streamingPagesDetected, page.pageNumber);
+        // Store page data for scene expansion
+        streamingExpandedPages.set(page.pageNumber, page);
+        // Start scene expansion immediately
+        startSceneExpansion(page);
+      },
+      onProgress: async (type, message, pageNum) => {
+        // Rate limit progress updates (max once per 500ms)
+        const now = Date.now();
+        if (now - lastProgressUpdate < 500) return;
+        lastProgressUpdate = now;
+
+        // Calculate progress based on parallel work happening
+        let progress = 5;
+        if (type === 'title') progress = 6;
+        else if (type === 'clothing') progress = 7;
+        else if (type === 'arcs') progress = 8;
+        else if (type === 'plot') progress = 9;
+        else if (type === 'visualBible') progress = 10;
+        else if (type === 'covers') progress = 11;
+        else if (type === 'page' && pageNum) {
+          progress = 12 + Math.min(3, Math.floor((pageNum / sceneCount) * 3));
+        }
+
+        // Enhance message to show parallel work
+        let enhancedMessage = message;
+        const avatarCount = streamingAvatarPromises.length;
+        const sceneCount = streamingSceneExpansionPromises.size;
+        if (avatarCount > 0 || sceneCount > 0) {
+          const parts = [];
+          if (avatarCount > 0) parts.push(`${avatarCount} avatars`);
+          if (sceneCount > 0) parts.push(`${sceneCount} scenes`);
+          enhancedMessage = `${message} (${parts.join(', ')} in progress)`;
+        }
+
+        try {
+          await dbPool.query(
+            'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+            [progress, enhancedMessage, jobId]
+          );
+        } catch (e) {
+          // Ignore progress update errors
+        }
+      }
+    });
+
+    // Use streaming with progressive parsing and parallel task initiation
+    const unifiedResult = await callTextModelStreaming(unifiedPrompt, 20000, (chunk, fullText) => {
+      progressiveParser.processChunk(chunk, fullText);
+    }, modelOverrides.outlineModel);
     const unifiedResponse = unifiedResult.text;
     const unifiedModelId = unifiedResult.modelId;
     const unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
     const unifiedProvider = unifiedResult.provider === 'google' ? 'gemini_text' : 'anthropic';
     addUsage(unifiedProvider, unifiedUsage, 'unified_story', unifiedModelId);
 
-    log.debug(`📖 [UNIFIED] Response length: ${unifiedResponse.length} chars`);
+    // Finalize streaming parser
+    progressiveParser.finalize();
+    log.debug(`📖 [UNIFIED] Response length: ${unifiedResponse.length} chars, ${streamingPagesDetected} pages detected during streaming`);
 
-    // Parse the unified response
+    // Parse the unified response (full parse for complete data)
     const parser = new UnifiedStoryParser(unifiedResponse);
-    const title = parser.extractTitle() || inputData.storyType || 'Untitled Story';
-    const clothingRequirements = parser.extractClothingRequirements();
-    const visualBible = parser.extractVisualBible();
+    const title = parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story';
+    const clothingRequirements = parser.extractClothingRequirements() || streamingClothingRequirements;
+    const visualBible = parser.extractVisualBible() || streamingVisualBible || {};
     const coverHints = parser.extractCoverHints();
     const storyPages = parser.extractPages();
 
@@ -6272,116 +6547,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       unifiedUsage
     });
 
-    // PHASE 2: Generate avatars for clothing requirements (if needed)
+    // Update progress: Story text complete
+    const avatarsStarted = streamingAvatarPromises.length;
+    const scenesStarted = streamingSceneExpansionPromises.size;
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [20, 'Preparing character avatars...', jobId]
+      [18, `Story complete: "${title}" (${avatarsStarted} avatars, ${scenesStarted} scenes in parallel)`, jobId]
     );
 
-    const artStyle = inputData.artStyle || 'pixar';
-
-    // Generate missing avatars based on clothing requirements from story
-    if (clothingRequirements && Object.keys(clothingRequirements).length > 0 && !skipImages) {
-      log.debug(`👔 [UNIFIED] Clothing requirements found for ${Object.keys(clothingRequirements).length} characters`);
-
-      const { generateDynamicAvatar, generateStyledCostumedAvatar } = require('./server/routes/avatars');
-
-      const avatarsGenerated = [];
-      const avatarsFailed = [];
-
-      for (const [charName, requirements] of Object.entries(clothingRequirements)) {
-        const char = inputData.characters?.find(c =>
-          c.name.toLowerCase() === charName.toLowerCase()
-        );
-        if (!char) {
-          log.debug(`[UNIFIED AVATAR] Character "${charName}" not found, skipping`);
-          continue;
-        }
-
-        // Initialize avatars structure
-        if (!char.avatars) char.avatars = {};
-        if (!char.avatars.clothing) char.avatars.clothing = {};
-        if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
-
-        for (const [category, config] of Object.entries(requirements)) {
-          if (!config || !config.used) continue;
-
-          // Check if avatar already exists
-          let avatarExists = false;
-          if (category === 'costumed' && config.costume) {
-            const costumeKey = config.costume.toLowerCase();
-            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-            if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-            avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
-          } else {
-            avatarExists = !!char.avatars[category];
-          }
-
-          if (avatarExists) {
-            log.debug(`[UNIFIED AVATAR] ${char.name} already has ${category}${config.costume ? ':' + config.costume : ''} avatar`);
-            continue;
-          }
-
-          const logCategory = config.costume ? `costumed:${config.costume}` : category;
-          log.debug(`🎭 [UNIFIED AVATAR] Generating ${logCategory} avatar for ${char.name}...`);
-
-          await dbPool.query(
-            'UPDATE story_jobs SET progress_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-            [`Generating ${logCategory} avatar for ${char.name}...`, jobId]
-          );
-
-          try {
-            let result;
-
-            if (category === 'costumed' && config.costume) {
-              // Generate styled costumed avatar (costume + art style in one call)
-              result = await generateStyledCostumedAvatar(char, config, artStyle);
-
-              if (result.success && result.imageData) {
-                const costumeKey = result.costumeType;
-                char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
-                if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-                if (result.clothing) {
-                  char.avatars.clothing.costumed[costumeKey] = result.clothing;
-                }
-                avatarsGenerated.push(`${char.name}:${logCategory}@${artStyle}`);
-                log.debug(`✅ [UNIFIED AVATAR] Generated styled ${logCategory}@${artStyle} for ${char.name}`);
-              } else {
-                avatarsFailed.push(`${char.name}:${logCategory}`);
-                log.warn(`⚠️ [UNIFIED AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
-              }
-            } else {
-              // For standard/winter/summer: use dynamic avatar generation
-              result = await generateDynamicAvatar(char, category, config);
-
-              if (result.success && result.imageData) {
-                char.avatars[category] = result.imageData;
-                if (result.clothing) {
-                  char.avatars.clothing[category] = result.clothing;
-                }
-                avatarsGenerated.push(`${char.name}:${logCategory}`);
-                log.debug(`✅ [UNIFIED AVATAR] Generated ${logCategory} for ${char.name}`);
-              } else {
-                avatarsFailed.push(`${char.name}:${logCategory}`);
-                log.warn(`⚠️ [UNIFIED AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
-              }
-            }
-          } catch (e) {
-            avatarsFailed.push(`${char.name}:${logCategory}`);
-            log.error(`❌ [UNIFIED AVATAR] Error generating ${logCategory} for ${char.name}: ${e.message}`);
-          }
+    // Start cover generation now that we have full cover hints
+    if (!skipImages && !skipCovers && coverHints) {
+      const coverTypes = ['titlePage', 'initialPage', 'backCover'];
+      for (const coverType of coverTypes) {
+        const hint = coverHints[coverType];
+        if (hint && !streamingCoverPromises.has(coverType)) {
+          startCoverGeneration(coverType, hint);
         }
       }
-
-      if (avatarsGenerated.length > 0) {
-        log.debug(`✅ [UNIFIED] Generated ${avatarsGenerated.length} avatars: ${avatarsGenerated.join(', ')}`);
-      }
-      if (avatarsFailed.length > 0) {
-        log.warn(`⚠️ [UNIFIED] Failed to generate ${avatarsFailed.length} avatars: ${avatarsFailed.join(', ')}`);
-      }
+      log.debug(`⚡ [UNIFIED] Started ${streamingCoverPromises.size} cover generations`);
     }
 
-    // Collect avatar requirements from story pages for styled avatar preparation
+    // PHASE 2: Wait for avatar generation to complete
+    await dbPool.query(
+      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+      [20, `Waiting for ${streamingAvatarPromises.length} avatars...`, jobId]
+    );
+
+    if (streamingAvatarPromises.length > 0) {
+      log.debug(`⏳ [UNIFIED] Waiting for ${streamingAvatarPromises.length} avatar generations started during streaming...`);
+      await Promise.all(streamingAvatarPromises);
+      log.debug(`✅ [UNIFIED] All streaming avatar generations complete`);
+    }
+
+    // Collect avatar requirements and prepare styled avatars
     const sceneDescriptions = storyPages.map(page => ({
       pageNumber: page.pageNumber || storyPages.indexOf(page) + 1,
       description: page.sceneHint || page.text || ''
@@ -6398,57 +6596,42 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       inputData.characters || [],
       pageClothing,
       'standard',
-      clothingRequirements // Pass per-character clothing requirements
+      clothingRequirements
     );
 
-    // Now prepare styled avatars (convert existing avatars to target art style)
+    // Prepare styled avatars (convert existing avatars to target art style)
     if (avatarRequirements.length > 0 && artStyle !== 'realistic') {
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle}`);
       await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements);
     }
 
-    // PHASE 3: Expand scene hints with Art Director (parallel)
+    // PHASE 3: Wait for scene expansion to complete (most should be done by now)
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [30, 'Expanding scene descriptions...', jobId]
+      [30, `Finalizing ${streamingSceneExpansionPromises.size} scene expansions...`, jobId]
     );
 
-    const sceneExpansionLimit = pLimit(5);
-    const expandedScenes = await Promise.all(
-      storyPages.map((page, index) => sceneExpansionLimit(async () => {
-        const pageNum = index + 1;
-        const sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
+    // Start any missing scene expansions (pages that weren't detected during streaming)
+    for (const page of storyPages) {
+      if (!streamingSceneExpansionPromises.has(page.pageNumber)) {
+        log.debug(`⚡ [UNIFIED] Starting late scene expansion for page ${page.pageNumber}`);
+        startSceneExpansion(page);
+      }
+    }
 
-        // Build scene expansion prompt
-        const expansionPrompt = buildSceneDescriptionPrompt(
-          pageNum,
-          page.text,
-          sceneCharacters,
-          page.sceneHint,
-          langText,
-          visualBible,
-          [], // No previous scenes needed for expansion
-          page.clothing || 'standard'
-        );
-
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 2000, null, modelOverrides.sceneDescriptionModel);
-        const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
-        addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
-
-        return {
-          pageNumber: pageNum,
-          text: page.text,
-          sceneHint: page.sceneHint,
-          sceneDescription: expansionResult.text,
-          sceneDescriptionPrompt: expansionPrompt, // Dev mode: Art Director prompt
-          sceneDescriptionModelId: expansionResult.modelId, // Dev mode: model used
-          clothing: page.clothing,
-          characters: page.characters
-        };
-      }))
+    // Wait for all scene expansions
+    log.debug(`⏳ [UNIFIED] Waiting for ${streamingSceneExpansionPromises.size} scene expansions...`);
+    const sceneResults = await Promise.all(
+      Array.from(streamingSceneExpansionPromises.values())
     );
 
-    log.debug(`📖 [UNIFIED] Expanded ${expandedScenes.length} scene descriptions`);
+    // Sort by page number and create expandedScenes array
+    const expandedScenes = sceneResults.sort((a, b) => a.pageNumber - b.pageNumber);
+    log.debug(`✅ [UNIFIED] All ${expandedScenes.length} scene expansions complete`);
+
+    // Log streaming efficiency
+    const pagesFromStreaming = streamingExpandedPages.size;
+    log.debug(`📊 [UNIFIED] Streaming efficiency: ${pagesFromStreaming}/${storyPages.length} pages started during streaming`);
 
     // Create allSceneDescriptions array for storage compatibility
     const allSceneDescriptions = expandedScenes.map(scene => ({
@@ -6495,88 +6678,42 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       return result;
     }
 
-    // PHASE 4: Generate cover images (parallel)
-    await dbPool.query(
-      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [40, 'Generating cover images...', jobId]
-    );
-
+    // PHASE 4: Wait for cover images (started during/after streaming)
     const coverImages = {};
-    if (!skipCovers && coverHints) {
-      const coverLimit = pLimit(3);
-      const coverTypes = ['titlePage', 'initialPage', 'backCover'];
+    if (streamingCoverPromises.size > 0) {
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [40, `Waiting for ${streamingCoverPromises.size} cover images...`, jobId]
+      );
 
-      await Promise.all(coverTypes.map(coverType => coverLimit(async () => {
-        const hint = coverHints[coverType];
-        if (!hint) return;
+      log.debug(`⏳ [UNIFIED] Waiting for ${streamingCoverPromises.size} cover generations...`);
+      const coverResults = await Promise.all(
+        Array.from(streamingCoverPromises.values())
+      );
 
-        const clothingCategory = hint.clothing || 'standard';
-        // Parser returns 'hint' property, not 'scene'
-        const sceneDescription = hint.hint || hint.scene || '';
-        const coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
-
-        // Get character photos with clothing
-        let costumeType = null;
-        let effectiveCategory = clothingCategory;
-        if (clothingCategory.startsWith('costumed:')) {
-          effectiveCategory = 'costumed';
-          costumeType = clothingCategory.split(':')[1];
-        }
-
-        const coverPhotos = getCharacterPhotoDetails(coverCharacters, effectiveCategory, costumeType, inputData.artStyle);
-
-        // Determine page number for Visual Bible context
-        // titlePage/initialPage: use first page context, backCover: use last page context
-        const coverPageNumber = coverType === 'backCover' ? sceneCount : 1;
-
-        // Build cover prompt
-        const coverPrompt = buildImagePrompt(
-          sceneDescription || `Cover scene for ${title}`,
-          inputData,
-          coverCharacters,
-          false,
-          visualBible,
-          coverPageNumber,
-          true,
-          coverPhotos
-        );
-
-        // Generate cover image with quality retry
-        const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-        const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
-        const coverResult = await generateImageWithQualityRetry(
-          coverPrompt,
-          coverPhotos,
-          null,
-          'cover',
-          null,
-          null,
-          null,
-          coverModelOverrides,
-          coverLabel
-        );
-
-        if (coverResult?.imageData) {
+      // Map results to coverImages object
+      for (const result of coverResults) {
+        if (result?.imageData) {
           // Map coverType to frontend expected keys
-          const storageKey = coverType === 'titlePage' ? 'frontCover' : coverType;
+          const storageKey = result.type === 'titlePage' ? 'frontCover' : result.type;
           coverImages[storageKey] = {
-            imageData: coverResult.imageData,
-            description: sceneDescription,
-            prompt: coverPrompt,
-            qualityScore: coverResult.score,
-            qualityReasoning: coverResult.reasoning,
-            wasRegenerated: coverResult.wasRegenerated,
-            totalAttempts: coverResult.totalAttempts,
-            retryHistory: coverResult.retryHistory,
-            // Dev mode: which reference photos/avatars were used
-            referencePhotos: coverPhotos
+            imageData: result.imageData,
+            description: result.description,
+            prompt: result.prompt,
+            qualityScore: result.qualityScore,
+            qualityReasoning: result.qualityReasoning,
+            wasRegenerated: result.wasRegenerated,
+            totalAttempts: result.totalAttempts,
+            retryHistory: result.retryHistory,
+            referencePhotos: result.referencePhotos,
+            modelId: result.modelId
           };
-          addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'cover_images', coverResult.modelId);
         }
-      })));
+      }
+      log.debug(`✅ [UNIFIED] All ${Object.keys(coverImages).length} cover images complete`);
+    } else {
+      log.debug(`📖 [UNIFIED] No cover images to generate (skipCovers=${skipCovers})`);
     }
-
-    log.debug(`📖 [UNIFIED] Generated ${Object.keys(coverImages).length} cover images`);
 
     // PHASE 5: Generate page images (parallel with rate limiting)
     await dbPool.query(

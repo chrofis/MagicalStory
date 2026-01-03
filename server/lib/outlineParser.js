@@ -1274,12 +1274,320 @@ class UnifiedStoryParser {
 }
 
 // ============================================================================
+// PROGRESSIVE UNIFIED PARSER (for streaming)
+// ============================================================================
+
+/**
+ * Progressive parser for unified story responses during streaming.
+ * Detects completed sections and pages as they arrive and triggers callbacks.
+ */
+class ProgressiveUnifiedParser {
+  /**
+   * @param {Object} callbacks - Callbacks for each section type
+   * @param {Function} callbacks.onTitle - Called when title is detected
+   * @param {Function} callbacks.onClothingRequirements - Called when clothing JSON is complete
+   * @param {Function} callbacks.onCharacterArcs - Called when character arcs section is complete
+   * @param {Function} callbacks.onPlotStructure - Called when plot structure section is complete
+   * @param {Function} callbacks.onVisualBible - Called when visual bible JSON is complete
+   * @param {Function} callbacks.onCoverHints - Called when cover hints section is complete
+   * @param {Function} callbacks.onPageComplete - Called when a story page is complete
+   * @param {Function} callbacks.onProgress - Called with progress updates for UI
+   */
+  constructor(callbacks = {}) {
+    this.callbacks = callbacks;
+    this.fullText = '';
+
+    // Track which sections have been emitted
+    this.emitted = {
+      title: false,
+      clothingRequirements: false,
+      characterArcs: false,
+      plotStructure: false,
+      visualBible: false,
+      coverHints: false,
+      pages: new Set()
+    };
+
+    // Section markers in order
+    this.sectionMarkers = [
+      '---TITLE---',
+      '---CLOTHING REQUIREMENTS---',
+      '---CHARACTER ARCS---',
+      '---PLOT STRUCTURE---',
+      '---VISUAL BIBLE---',
+      '---COVER SCENE HINTS---',
+      '---STORY PAGES---'
+    ];
+  }
+
+  /**
+   * Process a new chunk of streamed text
+   * @param {string} chunk - New text chunk
+   * @param {string} fullText - Complete text so far
+   */
+  processChunk(chunk, fullText) {
+    this.fullText = fullText;
+
+    // Check for newly completed sections
+    this._checkTitle();
+    this._checkClothingRequirements();
+    this._checkCharacterArcs();
+    this._checkPlotStructure();
+    this._checkVisualBible();
+    this._checkCoverHints();
+    this._checkPages();
+  }
+
+  /**
+   * Check if title section is complete
+   */
+  _checkTitle() {
+    if (this.emitted.title) return;
+
+    // Title is complete when we see the next section marker
+    if (!this.fullText.includes('---TITLE---')) return;
+    if (!this.fullText.includes('---CLOTHING REQUIREMENTS---')) return;
+
+    const match = this.fullText.match(/---TITLE---\s*(?:TITLE:\s*)?(.+?)(?:\n|---CLOTHING)/i);
+    if (match) {
+      const title = match[1].trim();
+      this.emitted.title = true;
+      log.debug(`🌊 [STREAM-UNIFIED] Title detected: "${title}"`);
+
+      if (this.callbacks.onTitle) {
+        this.callbacks.onTitle(title);
+      }
+      if (this.callbacks.onProgress) {
+        this.callbacks.onProgress('title', `Story title: "${title}"`);
+      }
+    }
+  }
+
+  /**
+   * Check if clothing requirements JSON is complete
+   */
+  _checkClothingRequirements() {
+    if (this.emitted.clothingRequirements) return;
+
+    // Complete when we see CHARACTER ARCS marker
+    if (!this.fullText.includes('---CLOTHING REQUIREMENTS---')) return;
+    if (!this.fullText.includes('---CHARACTER ARCS---')) return;
+
+    const sectionMatch = this.fullText.match(/---CLOTHING REQUIREMENTS---\s*([\s\S]*?)(?=---CHARACTER ARCS---)/i);
+    if (!sectionMatch) return;
+
+    const section = sectionMatch[1];
+    const jsonMatch = section.match(/```json\s*([\s\S]*?)```/i) ||
+                      section.match(/(\{[\s\S]*?"clothingRequirements"[\s\S]*?\})/);
+
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        const requirements = parsed.clothingRequirements || parsed;
+        this.emitted.clothingRequirements = true;
+        log.debug(`🌊 [STREAM-UNIFIED] Clothing requirements detected for ${Object.keys(requirements).length} characters`);
+
+        if (this.callbacks.onClothingRequirements) {
+          this.callbacks.onClothingRequirements(requirements);
+        }
+        if (this.callbacks.onProgress) {
+          this.callbacks.onProgress('clothing', `Clothing for ${Object.keys(requirements).length} characters`);
+        }
+      } catch (e) {
+        // JSON not valid yet, wait for more data
+      }
+    }
+  }
+
+  /**
+   * Check if character arcs section is complete
+   */
+  _checkCharacterArcs() {
+    if (this.emitted.characterArcs) return;
+
+    if (!this.fullText.includes('---CHARACTER ARCS---')) return;
+    if (!this.fullText.includes('---PLOT STRUCTURE---')) return;
+
+    this.emitted.characterArcs = true;
+    log.debug(`🌊 [STREAM-UNIFIED] Character arcs section complete`);
+
+    if (this.callbacks.onCharacterArcs) {
+      this.callbacks.onCharacterArcs();
+    }
+    if (this.callbacks.onProgress) {
+      this.callbacks.onProgress('arcs', 'Character development planned');
+    }
+  }
+
+  /**
+   * Check if plot structure section is complete
+   */
+  _checkPlotStructure() {
+    if (this.emitted.plotStructure) return;
+
+    if (!this.fullText.includes('---PLOT STRUCTURE---')) return;
+    if (!this.fullText.includes('---VISUAL BIBLE---')) return;
+
+    this.emitted.plotStructure = true;
+    log.debug(`🌊 [STREAM-UNIFIED] Plot structure section complete`);
+
+    if (this.callbacks.onPlotStructure) {
+      this.callbacks.onPlotStructure();
+    }
+    if (this.callbacks.onProgress) {
+      this.callbacks.onProgress('plot', 'Story structure defined');
+    }
+  }
+
+  /**
+   * Check if visual bible JSON is complete
+   */
+  _checkVisualBible() {
+    if (this.emitted.visualBible) return;
+
+    if (!this.fullText.includes('---VISUAL BIBLE---')) return;
+    if (!this.fullText.includes('---COVER SCENE HINTS---')) return;
+
+    const sectionMatch = this.fullText.match(/---VISUAL BIBLE---\s*([\s\S]*?)(?=---COVER SCENE HINTS---)/i);
+    if (!sectionMatch) return;
+
+    const section = sectionMatch[1];
+    const jsonMatch = section.match(/```json\s*([\s\S]*?)```/i);
+
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        this.emitted.visualBible = true;
+
+        const entryCount = (parsed.secondaryCharacters?.length || 0) +
+                          (parsed.animals?.length || 0) +
+                          (parsed.artifacts?.length || 0) +
+                          (parsed.locations?.length || 0);
+
+        log.debug(`🌊 [STREAM-UNIFIED] Visual Bible detected with ${entryCount} entries`);
+
+        if (this.callbacks.onVisualBible) {
+          this.callbacks.onVisualBible(parsed);
+        }
+        if (this.callbacks.onProgress) {
+          this.callbacks.onProgress('visualBible', `Visual Bible: ${entryCount} elements`);
+        }
+      } catch (e) {
+        // JSON not valid yet
+      }
+    }
+  }
+
+  /**
+   * Check if cover hints section is complete
+   */
+  _checkCoverHints() {
+    if (this.emitted.coverHints) return;
+
+    if (!this.fullText.includes('---COVER SCENE HINTS---')) return;
+    if (!this.fullText.includes('---STORY PAGES---')) return;
+
+    this.emitted.coverHints = true;
+    log.debug(`🌊 [STREAM-UNIFIED] Cover hints section complete`);
+
+    if (this.callbacks.onCoverHints) {
+      this.callbacks.onCoverHints();
+    }
+    if (this.callbacks.onProgress) {
+      this.callbacks.onProgress('covers', 'Cover scenes defined');
+    }
+  }
+
+  /**
+   * Check for newly completed story pages
+   */
+  _checkPages() {
+    if (!this.fullText.includes('---STORY PAGES---')) return;
+
+    // Find all page blocks
+    const pagePattern = /---\s*Page\s+(\d+)\s*---\s*([\s\S]*?)(?=---\s*Page\s+\d+\s*---|$)/gi;
+
+    let match;
+    while ((match = pagePattern.exec(this.fullText)) !== null) {
+      const pageNum = parseInt(match[1], 10);
+      const content = match[2];
+
+      // Skip if already emitted
+      if (this.emitted.pages.has(pageNum)) continue;
+
+      // A page is complete when we have TEXT and SCENE HINT
+      const hasText = /TEXT:\s*\S/.test(content);
+      const hasHint = /SCENE HINT:\s*\S/.test(content);
+
+      // Check if there's a next page (means this one is complete) or end of content
+      const nextPageIndex = this.fullText.indexOf(`--- Page ${pageNum + 1} ---`);
+      const isLastKnownPage = nextPageIndex === -1;
+
+      // Only emit if we're confident the page is complete
+      // Either there's a next page, or we have both TEXT and SCENE HINT
+      if (nextPageIndex > match.index || (isLastKnownPage && hasText && hasHint && content.includes('Characters:'))) {
+        // Extract page data
+        const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
+        const text = textMatch ? textMatch[1].trim() : '';
+
+        const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Clothing:|Characters:|---\s*Page|$)/i);
+        const sceneHint = hintMatch ? hintMatch[1].trim() : '';
+
+        const clothingMatch = content.match(/Clothing:\s*(\S+)/i);
+        const clothing = clothingMatch ? clothingMatch[1].toLowerCase() : 'standard';
+
+        const charactersMatch = content.match(/Characters:\s*(.+?)(?:\n|$)/i);
+        const characters = charactersMatch
+          ? charactersMatch[1].split(/[,&]/).map(c => c.trim()).filter(c => c.length > 0)
+          : [];
+
+        this.emitted.pages.add(pageNum);
+        log.debug(`🌊 [STREAM-UNIFIED] Page ${pageNum} complete`);
+
+        if (this.callbacks.onPageComplete) {
+          this.callbacks.onPageComplete({
+            pageNumber: pageNum,
+            text,
+            sceneHint,
+            clothing,
+            characters
+          });
+        }
+        if (this.callbacks.onProgress) {
+          this.callbacks.onProgress('page', `Writing page ${pageNum}...`, pageNum);
+        }
+      }
+    }
+  }
+
+  /**
+   * Finalize parsing - emit any remaining pages
+   */
+  finalize() {
+    // Re-check pages one more time to catch the last page
+    this._checkPages();
+
+    log.debug(`🌊 [STREAM-UNIFIED] Finalized: ${this.emitted.pages.size} pages emitted`);
+    return {
+      title: this.emitted.title,
+      clothingRequirements: this.emitted.clothingRequirements,
+      characterArcs: this.emitted.characterArcs,
+      plotStructure: this.emitted.plotStructure,
+      visualBible: this.emitted.visualBible,
+      coverHints: this.emitted.coverHints,
+      pageCount: this.emitted.pages.size
+    };
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
 module.exports = {
   OutlineParser,
   UnifiedStoryParser,
+  ProgressiveUnifiedParser,
   KEYWORDS,
   CLOTHING_CATEGORIES,
   keywordPattern,
