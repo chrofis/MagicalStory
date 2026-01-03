@@ -866,29 +866,38 @@ export function CharacterForm({
               </span>
             )}
           </h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-4 gap-2">
             {(['winter', 'standard', 'summer', 'formal'] as const).map((category) => (
               <div key={category} className="text-center">
-                <div className="text-sm font-medium text-gray-600 mb-2 capitalize">
-                  {category === 'winter' ? '❄️ ' : category === 'summer' ? '☀️ ' : category === 'formal' ? '👔 ' : '👕 '}
-                  {language === 'de'
-                    ? (category === 'winter' ? 'Winter' : category === 'summer' ? 'Sommer' : category === 'formal' ? 'Formal' : 'Standard')
-                    : category}
+                <div className="text-xs font-medium text-gray-600 mb-1 capitalize">
+                  {category === 'winter' ? '❄️' : category === 'summer' ? '☀️' : category === 'formal' ? '👔' : '👕'}
+                  <span className="ml-0.5">
+                    {language === 'de'
+                      ? (category === 'winter' ? 'Winter' : category === 'summer' ? 'Sommer' : category === 'formal' ? 'Formal' : 'Standard')
+                      : category}
+                  </span>
                 </div>
                 {character.avatars?.[category] ? (
-                  <div className="relative">
+                  <div
+                    className="relative cursor-pointer group"
+                    onClick={() => setLightboxImage(character.avatars?.[category] || null)}
+                    title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
+                  >
                     <img
                       src={character.avatars[category]}
                       alt={`${character.name} - ${category}`}
-                      className={`w-full h-64 object-contain rounded border bg-white ${character.avatars?.stale ? 'border-amber-400 opacity-75' : 'border-teal-200'}`}
+                      className={`w-full h-40 object-contain rounded border bg-white transition-all group-hover:shadow-lg group-hover:scale-[1.02] ${character.avatars?.stale ? 'border-amber-400 opacity-75' : 'border-teal-200'}`}
                     />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all rounded flex items-center justify-center">
+                      <span className="text-white opacity-0 group-hover:opacity-100 text-lg">🔍</span>
+                    </div>
                     {character.avatars?.stale && (
-                      <div className="absolute top-1 right-1 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded">
-                        {language === 'de' ? 'Altes Foto' : language === 'fr' ? 'Ancienne' : 'Old photo'}
+                      <div className="absolute top-1 right-1 bg-amber-500 text-white text-[8px] px-1 py-0.5 rounded">
+                        {language === 'de' ? 'Alt' : 'Old'}
                       </div>
                     )}
                     {developerMode && character.avatars?.faceMatch?.[category] && (
-                      <div className={`absolute bottom-1 left-1 text-white text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                      <div className={`absolute bottom-1 left-1 text-white text-[8px] px-1 py-0.5 rounded font-medium ${
                         character.avatars.faceMatch[category].score >= 6 ? 'bg-green-600' : 'bg-red-600'
                       }`}>
                         {character.avatars.faceMatch[category].score}/10
@@ -896,8 +905,8 @@ export function CharacterForm({
                     )}
                   </div>
                 ) : (
-                  <div className="w-full h-64 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-xs">
-                    {character.avatars?.status === 'generating' ? '...' : 'Not generated'}
+                  <div className="w-full h-40 rounded border border-dashed border-teal-300 bg-teal-100/50 flex items-center justify-center text-teal-400 text-[10px]">
+                    {character.avatars?.status === 'generating' ? '...' : '—'}
                   </div>
                 )}
                 {/* Dev mode: Always show clothing description below avatar */}
