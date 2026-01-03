@@ -110,6 +110,74 @@ const HAIR_STYLE_OPTIONS: { value: string; label: string; labelDe: string; label
   { value: 'side bangs', label: 'Side Bangs', labelDe: 'Seitenpony', labelFr: 'Frange de côté' },
 ];
 
+// Facial hair options (for males)
+const FACIAL_HAIR_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  { value: 'none', label: 'None', labelDe: 'Keiner', labelFr: 'Aucune' },
+  { value: 'clean-shaven', label: 'Clean Shaven', labelDe: 'Glatt rasiert', labelFr: 'Rasé de près' },
+  { value: 'stubble', label: 'Stubble', labelDe: 'Stoppeln', labelFr: 'Barbe de 3 jours' },
+  { value: 'mustache', label: 'Mustache', labelDe: 'Schnurrbart', labelFr: 'Moustache' },
+  { value: 'goatee', label: 'Goatee', labelDe: 'Ziegenbart', labelFr: 'Bouc' },
+  { value: 'short beard', label: 'Short Beard', labelDe: 'Kurzer Bart', labelFr: 'Barbe courte' },
+  { value: 'full beard', label: 'Full Beard', labelDe: 'Vollbart', labelFr: 'Barbe complète' },
+  { value: 'long beard', label: 'Long Beard', labelDe: 'Langer Bart', labelFr: 'Longue barbe' },
+];
+
+// Clothing options - Upper body
+const UPPER_BODY_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  { value: '', label: '— Select —', labelDe: '— Wählen —', labelFr: '— Choisir —' },
+  { value: 't-shirt', label: 'T-Shirt', labelDe: 'T-Shirt', labelFr: 'T-shirt' },
+  { value: 'long-sleeve shirt', label: 'Long-Sleeve Shirt', labelDe: 'Langarmshirt', labelFr: 'Chemise à manches longues' },
+  { value: 'blouse', label: 'Blouse', labelDe: 'Bluse', labelFr: 'Chemisier' },
+  { value: 'sweater', label: 'Sweater', labelDe: 'Pullover', labelFr: 'Pull' },
+  { value: 'hoodie', label: 'Hoodie', labelDe: 'Kapuzenpullover', labelFr: 'Sweat à capuche' },
+  { value: 'cardigan', label: 'Cardigan', labelDe: 'Strickjacke', labelFr: 'Cardigan' },
+  { value: 'jacket', label: 'Jacket', labelDe: 'Jacke', labelFr: 'Veste' },
+  { value: 'coat', label: 'Coat', labelDe: 'Mantel', labelFr: 'Manteau' },
+  { value: 'tank top', label: 'Tank Top', labelDe: 'Tanktop', labelFr: 'Débardeur' },
+  { value: 'polo shirt', label: 'Polo Shirt', labelDe: 'Poloshirt', labelFr: 'Polo' },
+  { value: 'dress shirt', label: 'Dress Shirt', labelDe: 'Hemd', labelFr: 'Chemise habillée' },
+  { value: 'suit jacket', label: 'Suit Jacket', labelDe: 'Anzugjacke', labelFr: 'Veste de costume' },
+];
+
+// Clothing options - Lower body
+const LOWER_BODY_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  { value: '', label: '— Select —', labelDe: '— Wählen —', labelFr: '— Choisir —' },
+  { value: 'jeans', label: 'Jeans', labelDe: 'Jeans', labelFr: 'Jean' },
+  { value: 'pants', label: 'Pants', labelDe: 'Hose', labelFr: 'Pantalon' },
+  { value: 'shorts', label: 'Shorts', labelDe: 'Shorts', labelFr: 'Short' },
+  { value: 'skirt', label: 'Skirt', labelDe: 'Rock', labelFr: 'Jupe' },
+  { value: 'leggings', label: 'Leggings', labelDe: 'Leggings', labelFr: 'Legging' },
+  { value: 'sweatpants', label: 'Sweatpants', labelDe: 'Jogginghose', labelFr: 'Jogging' },
+  { value: 'dress pants', label: 'Dress Pants', labelDe: 'Anzughose', labelFr: 'Pantalon habillé' },
+  { value: 'cargo pants', label: 'Cargo Pants', labelDe: 'Cargohose', labelFr: 'Pantalon cargo' },
+];
+
+// Clothing options - Shoes
+const SHOES_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  { value: '', label: '— Select —', labelDe: '— Wählen —', labelFr: '— Choisir —' },
+  { value: 'sneakers', label: 'Sneakers', labelDe: 'Turnschuhe', labelFr: 'Baskets' },
+  { value: 'boots', label: 'Boots', labelDe: 'Stiefel', labelFr: 'Bottes' },
+  { value: 'sandals', label: 'Sandals', labelDe: 'Sandalen', labelFr: 'Sandales' },
+  { value: 'flip-flops', label: 'Flip-Flops', labelDe: 'Flip-Flops', labelFr: 'Tongs' },
+  { value: 'dress shoes', label: 'Dress Shoes', labelDe: 'Anzugschuhe', labelFr: 'Chaussures habillées' },
+  { value: 'heels', label: 'Heels', labelDe: 'Absatzschuhe', labelFr: 'Talons' },
+  { value: 'loafers', label: 'Loafers', labelDe: 'Slipper', labelFr: 'Mocassins' },
+  { value: 'ballet flats', label: 'Ballet Flats', labelDe: 'Ballerinas', labelFr: 'Ballerines' },
+  { value: 'winter boots', label: 'Winter Boots', labelDe: 'Winterstiefel', labelFr: 'Bottes d\'hiver' },
+];
+
+// Clothing options - Full body (dress, gown, jumpsuit)
+const FULL_BODY_OPTIONS: { value: string; label: string; labelDe: string; labelFr: string }[] = [
+  { value: '', label: '— None (use upper + lower) —', labelDe: '— Keins (Ober- + Unterteil) —', labelFr: '— Aucun (haut + bas) —' },
+  { value: 'casual dress', label: 'Casual Dress', labelDe: 'Freizeitkleid', labelFr: 'Robe décontractée' },
+  { value: 'summer dress', label: 'Summer Dress', labelDe: 'Sommerkleid', labelFr: 'Robe d\'été' },
+  { value: 'formal dress', label: 'Formal Dress', labelDe: 'Abendkleid', labelFr: 'Robe de soirée' },
+  { value: 'maxi dress', label: 'Maxi Dress', labelDe: 'Maxikleid', labelFr: 'Robe longue' },
+  { value: 'cocktail dress', label: 'Cocktail Dress', labelDe: 'Cocktailkleid', labelFr: 'Robe de cocktail' },
+  { value: 'jumpsuit', label: 'Jumpsuit', labelDe: 'Overall', labelFr: 'Combinaison' },
+  { value: 'romper', label: 'Romper', labelDe: 'Spielanzug', labelFr: 'Barboteuse' },
+];
+
 // Simple inline editable field - click to edit, blur/enter to save
 interface InlineEditFieldProps {
   label: string;
@@ -272,7 +340,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         {changedTraits?.build && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
 
-      {/* Row 4: Face | Other */}
+      {/* Row 4: Face | Facial Hair (males) or Other (females) */}
       <InlineEditField
         label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
         value={character.physical?.face || ''}
@@ -281,14 +349,49 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         isAiExtracted={isAiExtracted}
         isChanged={changedTraits?.face}
       />
-      <InlineEditField
-        label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
-        value={character.physical?.other || ''}
-        placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
-        onChange={(v) => updatePhysical('other', v)}
-        isAiExtracted={isAiExtracted}
-        isChanged={changedTraits?.other}
-      />
+      {character.gender === 'male' ? (
+        <div className="flex items-center gap-2">
+          <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
+            {language === 'de' ? 'Bart' : language === 'fr' ? 'Barbe' : 'Facial Hair'}:
+          </span>
+          <select
+            value={character.physical?.facialHair || ''}
+            onChange={(e) => updatePhysical('facialHair', e.target.value)}
+            className={selectClass(changedTraits?.facialHair)}
+          >
+            <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
+            {FACIAL_HAIR_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+              </option>
+            ))}
+          </select>
+          {changedTraits?.facialHair && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+        </div>
+      ) : (
+        <InlineEditField
+          label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
+          value={character.physical?.other || ''}
+          placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
+          onChange={(v) => updatePhysical('other', v)}
+          isAiExtracted={isAiExtracted}
+          isChanged={changedTraits?.other}
+        />
+      )}
+
+      {/* Row 5: Other (for males) - spans full width if male */}
+      {character.gender === 'male' && (
+        <div className="col-span-2">
+          <InlineEditField
+            label={language === 'de' ? 'Sonstiges' : language === 'fr' ? 'Autre' : 'Other'}
+            value={character.physical?.other || ''}
+            placeholder={language === 'de' ? 'z.B. Brille' : 'e.g. glasses'}
+            onChange={(v) => updatePhysical('other', v)}
+            isAiExtracted={isAiExtracted}
+            isChanged={changedTraits?.other}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1188,82 +1291,171 @@ export function CharacterForm({
             </button>
           </div>
 
-          {/* Content */}
+          {/* Content - Responsive: side by side on wide screens, stacked on mobile */}
           <div className="flex-1 overflow-auto p-4">
-            <div className="max-w-lg mx-auto space-y-6">
-              {/* Avatar preview */}
-              <div className="flex justify-center">
-                {character.avatars?.standard ? (
-                  <img
-                    src={character.avatars.standard}
-                    alt={`${character.name} avatar`}
-                    className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
-                  />
-                ) : (
-                  <div className="w-48 h-64 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
-                    <span className="text-gray-400 text-sm">
-                      {language === 'de' ? 'Kein Avatar' : 'No avatar'}
-                    </span>
+            <div className="max-w-4xl mx-auto">
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Left side (or top on mobile): Avatar preview */}
+                <div className="flex-shrink-0 flex justify-center md:justify-start">
+                  {character.avatars?.standard ? (
+                    <img
+                      src={character.avatars.standard}
+                      alt={`${character.name} avatar`}
+                      className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
+                    />
+                  ) : (
+                    <div className="w-48 h-64 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
+                      <span className="text-gray-400 text-sm">
+                        {language === 'de' ? 'Kein Avatar' : 'No avatar'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right side (or bottom on mobile): Form fields */}
+                <div className="flex-1 space-y-4">
+                  {/* Physical traits - FIRST */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
+                    </h3>
+                    <PhysicalTraitsGrid
+                      character={character}
+                      language={language}
+                      updatePhysical={updatePhysical}
+                      updateApparentAge={(v) => updateField('apparentAge', v)}
+                    />
                   </div>
-                )}
-              </div>
 
-              {/* Clothing */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                  {language === 'de' ? 'Kleidung' : language === 'fr' ? 'Vêtements' : 'Clothing'}
-                </h3>
-                <textarea
-                  value={character.clothing?.current || character.avatars?.clothing?.standard || ''}
-                  onChange={(e) => onChange({
-                    ...character,
-                    clothing: {
-                      ...character.clothing,
-                      current: e.target.value,
-                    },
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none resize-none"
-                  placeholder={language === 'de'
-                    ? 'z.B. Rotes T-Shirt, blaue Jeans, weisse Sneaker'
-                    : language === 'fr'
-                    ? 'p.ex. T-shirt rouge, jeans bleu, baskets blanches'
-                    : 'e.g. Red t-shirt, blue jeans, white sneakers'}
-                  rows={3}
-                />
-                <p className="mt-2 text-xs text-gray-500">
-                  {language === 'de'
-                    ? 'Beschreiben Sie die Kleidung, die der Avatar tragen soll.'
-                    : language === 'fr'
-                    ? 'Décrivez les vêtements que l\'avatar doit porter.'
-                    : 'Describe the clothing the avatar should wear.'}
-                </p>
-              </div>
+                  {/* Clothing - SECOND - Structured inputs */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                      {language === 'de' ? 'Kleidung' : language === 'fr' ? 'Vêtements' : 'Clothing'}
+                    </h3>
+                    <div className="space-y-3">
+                      {/* Full body option (dress, jumpsuit) - shown first for females */}
+                      {character.gender === 'female' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            {language === 'de' ? 'Kleid / Overall' : language === 'fr' ? 'Robe / Combinaison' : 'Dress / Jumpsuit'}
+                          </label>
+                          <select
+                            value={character.clothing?.structured?.fullBody || ''}
+                            onChange={(e) => onChange({
+                              ...character,
+                              clothing: {
+                                ...character.clothing,
+                                structured: {
+                                  ...character.clothing?.structured,
+                                  fullBody: e.target.value,
+                                  // Clear upper/lower if full body is selected
+                                  ...(e.target.value ? { upperBody: '', lowerBody: '' } : {}),
+                                },
+                              },
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                          >
+                            {FULL_BODY_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
-              {/* Physical traits */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                  {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
-                </h3>
-                <PhysicalTraitsGrid
-                  character={character}
-                  language={language}
-                  updatePhysical={updatePhysical}
-                  updateApparentAge={(v) => updateField('apparentAge', v)}
-                />
-                <p className="mt-3 text-xs text-gray-500">
-                  {language === 'de'
-                    ? 'Ändern Sie die Merkmale und speichern Sie, um einen neuen Avatar zu generieren.'
-                    : language === 'fr'
-                    ? 'Modifiez les caractéristiques et enregistrez pour générer un nouvel avatar.'
-                    : 'Modify the features and save to generate a new avatar.'}
-                </p>
+                      {/* Upper body - disabled if full body is selected */}
+                      <div className={character.clothing?.structured?.fullBody ? 'opacity-50' : ''}>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          {language === 'de' ? 'Oberteil' : language === 'fr' ? 'Haut' : 'Upper Body'}
+                        </label>
+                        <select
+                          value={character.clothing?.structured?.upperBody || ''}
+                          onChange={(e) => onChange({
+                            ...character,
+                            clothing: {
+                              ...character.clothing,
+                              structured: {
+                                ...character.clothing?.structured,
+                                upperBody: e.target.value,
+                              },
+                            },
+                          })}
+                          disabled={!!character.clothing?.structured?.fullBody}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        >
+                          {UPPER_BODY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Lower body - disabled if full body is selected */}
+                      <div className={character.clothing?.structured?.fullBody ? 'opacity-50' : ''}>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          {language === 'de' ? 'Unterteil' : language === 'fr' ? 'Bas' : 'Lower Body'}
+                        </label>
+                        <select
+                          value={character.clothing?.structured?.lowerBody || ''}
+                          onChange={(e) => onChange({
+                            ...character,
+                            clothing: {
+                              ...character.clothing,
+                              structured: {
+                                ...character.clothing?.structured,
+                                lowerBody: e.target.value,
+                              },
+                            },
+                          })}
+                          disabled={!!character.clothing?.structured?.fullBody}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        >
+                          {LOWER_BODY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Shoes */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          {language === 'de' ? 'Schuhe' : language === 'fr' ? 'Chaussures' : 'Shoes'}
+                        </label>
+                        <select
+                          value={character.clothing?.structured?.shoes || ''}
+                          onChange={(e) => onChange({
+                            ...character,
+                            clothing: {
+                              ...character.clothing,
+                              structured: {
+                                ...character.clothing?.structured,
+                                shoes: e.target.value,
+                              },
+                            },
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                        >
+                          {SHOES_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {language === 'de' ? opt.labelDe : language === 'fr' ? opt.labelFr : opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Footer with buttons */}
           <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-            <div className="max-w-lg mx-auto flex gap-3">
+            <div className="max-w-4xl mx-auto flex gap-3">
               <button
                 onClick={() => setIsModifyingAvatar(false)}
                 className="flex-1 px-4 py-3 text-sm font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"

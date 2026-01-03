@@ -15,6 +15,7 @@ export interface PhysicalTraits {
   hairLength?: string;   // Hair length (e.g., "shoulder-length", "chin-length", "mid-back")
   hairStyle?: string;    // Hair texture/style (e.g., "straight", "wavy", "curly ponytail")
   hair?: string;         // Legacy: combined hair description (deprecated, use hairColor + hairLength + hairStyle)
+  facialHair?: string;   // Facial hair for males (e.g., "none", "stubble", "beard", "mustache", "goatee")
   other?: string;        // Glasses, birthmarks, always-present accessories
 }
 
@@ -27,6 +28,7 @@ export interface ChangedTraits {
   hairLength?: boolean;
   hairStyle?: boolean;
   hair?: boolean;        // Legacy
+  facialHair?: boolean;
   other?: boolean;
   gender?: boolean;
   age?: boolean;
@@ -77,9 +79,18 @@ export interface CharacterAvatars {
   styledAvatars?: Record<string, Record<ClothingCategory, string>>;
 }
 
+// Structured clothing details
+export interface StructuredClothing {
+  upperBody?: string;    // T-shirt, sweater, blouse, jacket, etc.
+  lowerBody?: string;    // Pants, jeans, skirt, shorts, etc.
+  shoes?: string;        // Sneakers, boots, sandals, heels, etc.
+  fullBody?: string;     // Dress, gown, jumpsuit - overrides upper+lower when set
+}
+
 // Clothing information
 export interface CharacterClothing {
-  current?: string;  // What they're wearing in the reference photo
+  current?: string;           // Legacy: free-text description
+  structured?: StructuredClothing;  // Structured clothing details
 }
 
 // Generated outfit for a specific page
