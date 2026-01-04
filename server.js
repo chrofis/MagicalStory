@@ -7120,6 +7120,42 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
 
+    // Persist styled avatars to the characters table (so they show in character editor)
+    if (artStyle !== 'realistic' && inputData.characters) {
+      try {
+        const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
+        if (styledAvatarsMap.size > 0) {
+          log.debug(`💾 [UNIFIED] Persisting ${styledAvatarsMap.size} styled avatar sets to characters table...`);
+          const characterId = `characters_${userId}`;
+          const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+          if (charResult.rows.length > 0) {
+            const charData = JSON.parse(charResult.rows[0].data);
+            const chars = charData.characters || [];
+            let updatedCount = 0;
+            for (const dbChar of chars) {
+              // Match by name (trim to handle trailing spaces)
+              const styledAvatars = styledAvatarsMap.get(dbChar.name) || styledAvatarsMap.get(dbChar.name?.trim());
+              if (styledAvatars) {
+                if (!dbChar.avatars) dbChar.avatars = {};
+                if (!dbChar.avatars.styledAvatars) dbChar.avatars.styledAvatars = {};
+                dbChar.avatars.styledAvatars[artStyle] = styledAvatars;
+                updatedCount++;
+                log.debug(`   ✓ Saved ${Object.keys(styledAvatars).length} ${artStyle} avatars for "${dbChar.name}"`);
+              }
+            }
+            if (updatedCount > 0) {
+              charData.characters = chars;
+              await dbPool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
+              log.debug(`💾 [UNIFIED] Updated ${updatedCount} characters in database with ${artStyle} styled avatars`);
+            }
+          }
+        }
+      } catch (persistErr) {
+        log.error('❌ [UNIFIED] Failed to persist styled avatars to characters table:', persistErr.message);
+        // Non-fatal - story generation continues
+      }
+    }
+
     // Log credit completion (credits were already reserved at job creation)
     try {
       const jobResult = await dbPool.query(

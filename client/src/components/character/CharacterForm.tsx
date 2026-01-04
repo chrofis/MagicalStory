@@ -1174,8 +1174,11 @@ export function CharacterForm({
               </span>
             )}
           </h4>
-          <div className="grid grid-cols-4 gap-2">
-            {(['winter', 'standard', 'summer', 'formal'] as const).map((category) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* Only show categories that have avatars - standard is always shown if any avatar exists */}
+            {(['winter', 'standard', 'summer', 'formal'] as const)
+              .filter((category) => character.avatars?.[category] || category === 'standard')
+              .map((category) => (
               <div key={category} className="text-center">
                 <div className="text-xs font-medium text-gray-600 mb-1 capitalize">
                   {category === 'winter' ? '❄️' : category === 'summer' ? '☀️' : category === 'formal' ? '👔' : '👕'}
