@@ -288,8 +288,13 @@ export default function StoryWizard() {
 
   // Load saved story from URL parameter - uses progressive loading for better UX
   useEffect(() => {
+    const urlStoryId = searchParams.get('storyId');
+    // Ensure step is 6 when viewing a saved story (even if localStorage has a different step)
+    if (urlStoryId && step !== 6) {
+      setStep(6);
+    }
+
     const loadSavedStory = async () => {
-      const urlStoryId = searchParams.get('storyId');
       if (!urlStoryId || !isAuthenticated) return;
 
       log.info('Loading saved story progressively:', urlStoryId);
@@ -674,21 +679,16 @@ export default function StoryWizard() {
       }
     };
 
-    // Skip loading characters when viewing a saved story (storyId in URL)
-    // The story's visualBible contains all needed character info
-    const urlStoryId = searchParams.get('storyId');
-    if (urlStoryId) {
-      setInitialCharacterLoadDone(true);
-      return;
-    }
-
+    // Always load characters even when viewing a saved story (storyId in URL)
+    // This ensures user can navigate back to step 1 and see their saved characters
+    // instead of being prompted to create new ones with terms acceptance
     if (isAuthenticated) {
       loadCharacterData();
     } else if (!isAuthLoading) {
       // Not authenticated and auth is done loading - mark as done (no characters to load)
       setInitialCharacterLoadDone(true);
     }
-  }, [isAuthenticated, isAuthLoading, searchParams]);
+  }, [isAuthenticated, isAuthLoading]);
 
   // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh
