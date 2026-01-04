@@ -6395,6 +6395,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         const sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
+
+        // Build previous scenes context (last 2 pages) from pages parsed during streaming
+        const previousScenes = [];
+        for (let prevPage = page.pageNumber - 2; prevPage < page.pageNumber; prevPage++) {
+          if (prevPage >= 1 && streamingExpandedPages.has(prevPage)) {
+            const prev = streamingExpandedPages.get(prevPage);
+            previousScenes.push({
+              pageNumber: prevPage,
+              text: prev.text,
+              sceneHint: prev.sceneHint || '',
+              clothing: prev.characterClothing || null
+            });
+          }
+        }
+
         const expansionPrompt = buildSceneDescriptionPrompt(
           page.pageNumber,
           page.text,
@@ -6402,7 +6417,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           page.sceneHint,
           langText,
           streamingVisualBible,
-          [],
+          previousScenes,
           page.characterClothing || {}
         );
 
