@@ -1096,9 +1096,12 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @param {Function|null} usageTracker - Optional callback to track token usage: (imageUsage, qualityUsage) => void
  * @param {Function|null} callTextModel - Function to call text model for scene rewriting
  * @param {Object|null} modelOverrides - Model overrides: { imageModel, qualityModel }
+ * @param {string} pageContext - Context label for logging
+ * @param {Object} options - Additional options: { isAdmin }
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
-async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '') {
+async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '', options = {}) {
+  const { isAdmin = false } = options;
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
@@ -1267,7 +1270,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         const repairResult = await autoRepairWithTargets(
           result.imageData,
           result.fixTargets,
-          0  // No additional inspection attempts
+          0,  // No additional inspection attempts
+          { includeDebugImages: isAdmin }  // Include before/after images for admin users
         );
 
         if (repairResult.repaired && repairResult.imageData !== result.imageData) {
@@ -1827,9 +1831,12 @@ IMPORTANT INSTRUCTIONS:
  * @param {string} imageData - Base64 image data URL
  * @param {Array} fixTargets - Array of {boundingBox, issue, fixPrompt} from evaluation
  * @param {number} maxAdditionalAttempts - Extra inspection-based attempts after combined fix (default 0)
+ * @param {Object} options - Optional settings
+ * @param {boolean} options.includeDebugImages - Include before/after images in repair history (for admin users)
  * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
  */
-async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0) {
+async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempts = 0, options = {}) {
+  const { includeDebugImages = false } = options;
   const repairHistory = [];
   let currentImage = imageData;
 
@@ -1905,34 +1912,45 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
 
     if (!repaired || !repaired.imageData) {
       log.warn(`⚠️ [AUTO-REPAIR] Combined inpainting failed for ${fixTargets.length} targets`);
-      repairHistory.push({
+      const historyEntry = {
         attempt: 1,
         errorType: 'combined-pre-computed',
         description: fixTargets.map(t => t.issue).join('; '),
         boundingBoxes: boundingBoxes,
         fixPrompt: combinedPrompt,
-        // maskImage, beforeImage, afterImage omitted - would bloat storage
         success: false,
         skippedInspection: true,
         targetCount: fixTargets.length,
         timestamp: new Date().toISOString()
-      });
+      };
+      // Include debug images for admin users
+      if (includeDebugImages) {
+        historyEntry.maskImage = combinedMask;
+        historyEntry.beforeImage = currentImage;
+      }
+      repairHistory.push(historyEntry);
     } else {
       // Record successful combined repair with usage
-      repairHistory.push({
+      const historyEntry = {
         attempt: 1,
         errorType: 'combined-pre-computed',
         description: fixTargets.map(t => t.issue).join('; '),
         boundingBoxes: boundingBoxes,
         fixPrompt: combinedPrompt,
-        // maskImage, beforeImage, afterImage omitted - would bloat storage
         success: true,
         skippedInspection: true,
         targetCount: fixTargets.length,
         usage: repaired.usage,
         modelId: repaired.modelId,
         timestamp: new Date().toISOString()
-      });
+      };
+      // Include debug images for admin users
+      if (includeDebugImages) {
+        historyEntry.maskImage = combinedMask;
+        historyEntry.beforeImage = currentImage;
+        historyEntry.afterImage = repaired.imageData;
+      }
+      repairHistory.push(historyEntry);
 
       currentImage = repaired.imageData;
 
@@ -1958,7 +1976,7 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
   // Phase 2: Optional additional inspection-based repairs
   if (maxAdditionalAttempts > 0) {
     log.debug(`🔄 [AUTO-REPAIR] Running ${maxAdditionalAttempts} additional inspection-based attempts...`);
-    const additionalResult = await autoRepairImage(currentImage, maxAdditionalAttempts);
+    const additionalResult = await autoRepairImage(currentImage, maxAdditionalAttempts, { includeDebugImages });
     if (additionalResult.repaired) {
       currentImage = additionalResult.imageData;
       repairHistory.push(...additionalResult.repairHistory);
@@ -1994,9 +2012,12 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
  * Runs up to maxAttempts cycles of inspect → mask → fix
  * @param {string} imageData - Base64 image data URL
  * @param {number} maxAttempts - Maximum repair cycles (default 2)
+ * @param {Object} options - Optional settings
+ * @param {boolean} options.includeDebugImages - Include before/after images in repair history (for admin users)
  * @returns {Promise<{imageData: string, repaired: boolean, repairHistory: Array}>}
  */
-async function autoRepairImage(imageData, maxAttempts = 2) {
+async function autoRepairImage(imageData, maxAttempts = 2, options = {}) {
+  const { includeDebugImages = false } = options;
   const repairHistory = [];
   let currentImage = imageData;
 
@@ -2037,30 +2058,41 @@ async function autoRepairImage(imageData, maxAttempts = 2) {
 
     if (!repaired || !repaired.imageData) {
       log.warn(`⚠️ [AUTO-REPAIR] Inpainting failed at attempt ${attempt}`);
-      repairHistory.push({
+      const historyEntry = {
         attempt,
         errorType: inspection.errorType,
         description: inspection.description,
         boundingBox: inspection.boundingBox,
         fixPrompt: inspection.fixPrompt,
-        // maskImage, beforeImage, afterImage omitted - would bloat storage
         success: false,
         timestamp: new Date().toISOString()
-      });
+      };
+      // Include debug images for admin users
+      if (includeDebugImages) {
+        historyEntry.maskImage = mask;
+        historyEntry.beforeImage = currentImage;
+      }
+      repairHistory.push(historyEntry);
       break;
     }
 
     // Record the repair
-    repairHistory.push({
+    const historyEntry = {
       attempt,
       errorType: inspection.errorType,
       description: inspection.description,
       boundingBox: inspection.boundingBox,
       fixPrompt: inspection.fixPrompt,
-      // maskImage, beforeImage, afterImage omitted - would bloat storage
       success: true,
       timestamp: new Date().toISOString()
-    });
+    };
+    // Include debug images for admin users
+    if (includeDebugImages) {
+      historyEntry.maskImage = mask;
+      historyEntry.beforeImage = currentImage;
+      historyEntry.afterImage = repaired.imageData;
+    }
+    repairHistory.push(historyEntry);
 
     currentImage = repaired.imageData;
     log.info(`✅ [AUTO-REPAIR] Repair ${attempt} complete: fixed ${inspection.errorType}`);

@@ -647,10 +647,12 @@ export default function StoryWizard() {
     const loadCharacterData = async () => {
       try {
         setIsLoading(true);
-        const data = await characterService.getCharacterData();
+        // Pass developerMode to load all avatar variants for admin users
+        const data = await characterService.getCharacterData(developerMode);
         log.info('Loaded character data from API:', {
           characters: data.characters.length,
           relationships: Object.keys(data.relationships).length,
+          includeAllAvatars: developerMode,
         });
 
         setCharacters(data.characters);
@@ -688,7 +690,7 @@ export default function StoryWizard() {
       // Not authenticated and auth is done loading - mark as done (no characters to load)
       setInitialCharacterLoadDone(true);
     }
-  }, [isAuthenticated, isAuthLoading]);
+  }, [isAuthenticated, isAuthLoading, developerMode]);
 
   // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh

@@ -4,6 +4,9 @@ Your strengths:
 - **Character development**: Every character has believable motivations and grows through the story
 - **Internal logic**: Plot events follow naturally from what came before - no forced coincidences or illogical jumps
 
+Your task:
+Generate a story outline or Structural Action Blueprint. This is a technical skeleton of events, not a narrative. Focus exclusively on the 'What' and 'Who,' never the 'How' or 'How it feels'
+
 
 STORY CATEGORY: {STORY_CATEGORY}
 STORY THEME/SETTING: {STORY_TYPE_NAME}

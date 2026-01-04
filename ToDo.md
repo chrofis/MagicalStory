@@ -1,79 +1,42 @@
 **Bugs / Features**
-
-verify Email sends back to login screen not generating the story
-
-No 2nd Email is sent
-
-generate pdf button colour
-
 Legal - add email legal@magicalstory.ch \& privacy@magicalstory.ch
-
 Legal - block US
+Legal - delete images after 30 days
 
-Home page snaps below the step 1
-
-Home page, last button like first button
-
+Avatar creation flow. First one without physical details. than read physical details from avatar. Than use details for future avatars. Correct way to implement this?
 
 
 
 
 **Ideas:**
+Flow of avatar generation when creating new. (not same as when editing)
+Pop up to guide first time users through webpage
+Propose stories based on main character
 
-Allow user to edit how avatar should be, hair, build \& clothing
-
-Single page for story generation
 
 Allow to configure a 2nd story while first one is generating
-
 Avatar generation only upon Email verification
-
 Image evalution for cover images
-
 Home page convert pictures to animated gifs
-
 Szene prompt to be restructured. Instructions what to do first, characters \& bible 2nd, story 3rd
 
 
 
-
-
 **Test:**
-
+Allow user to edit how avatar should be, hair, build \& clothing
 Allow users to edit text
-
 Allow users to regenerate image
-
-Show which model was used in developer view
-
-When going back status is not checked
-
-Back buttons don't point back
-
 Scene prompt to use previous page and scene text as input, not just current page.
-
+verify Email sends back to login screen not generating the story
 Email verification before generating story
-
 ein emoji in home page unter button
-
 streaming display
-
 regenerate does not work
-
 Regenerating cover
-
 story generation does not work anymore
-
 Allow to select characters
-
 Character count completely wrong.
-
 Token count seems off
-
-
-
-
-
 
 
 ---
@@ -254,5 +217,11 @@ Click for the accept is below the box
 
 No person detected
 
-
-
+Home page snaps below the step 1
+Home page, last button like first button
+generate pdf button colour
+Single page for story generation
+Show which model was used in developer view
+When going back status is not checked
+Back buttons don't point back
+Secondary characters are added to scene -composition, but not extracted from visual bible
