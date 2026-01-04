@@ -6,6 +6,8 @@ The MagicalStory system has two primary generation pipelines:
 1. **Story Generation** - Creates narrative, scene descriptions, and coordinated image generation
 2. **Avatar Generation** - Creates character reference avatars with clothing variations, styled conversions, and costumed variants
 
+**Key Feature (v2.0):** Per-character clothing - Different characters can wear different outfits in the same scene.
+
 ---
 
 ## Part 1: Story Generation Flow
@@ -29,9 +31,9 @@ INPUT: Story parameters (title, characters, pages, language, style)
    ↓
 [STAGE 1: OUTLINE GENERATION]
    ├─ buildStoryPrompt() or buildUnifiedStoryPrompt()
-   ├─ Call Claude API
-   ├─ Parse with OutlineParser or UnifiedStoryParser
-   └─ Extract: scenes, clothing per page, visual bible
+   ├─ Call Claude API with streaming
+   ├─ Progressive parsing with ProgressiveUnifiedParser
+   └─ Extract: scenes, per-character clothing, visual bible
    ↓
 [STAGE 2: CLOTHING & AVATAR PREPARATION]
    ├─ extractClothingRequirements() - Per-character variations
@@ -42,13 +44,13 @@ INPUT: Story parameters (title, characters, pages, language, style)
 [STAGE 3: SCENE DESCRIPTIONS]
    ├─ For each page:
    │  ├─ getCharactersInScene()
-   │  ├─ buildSceneDescriptionPrompt()
+   │  ├─ buildSceneDescriptionPrompt(characterClothing)
    │  └─ Call Claude API
    ↓
 [STAGE 4: IMAGE GENERATION]
    ├─ Generate covers (title, initial, back)
    └─ Generate page images (parallel)
-      ├─ getCharacterPhotoDetails()
+      ├─ getCharacterPhotoDetails() with per-character clothing
       ├─ buildImagePrompt()
       └─ Call Gemini 2.5 Flash Image API
    ↓
@@ -57,295 +59,467 @@ INPUT: Story parameters (title, characters, pages, language, style)
    └─ Export styled avatars for persistence
 ```
 
-### 1.3 Key Files
-
-| File | Purpose |
-|------|---------|
-| server.js | Main generation orchestration |
-| server/lib/storyHelpers.js | Helper functions for prompts, character handling |
-| server/lib/outlineParser.js | Parse outline/unified responses |
-| server/lib/styledAvatars.js | Style conversion & caching |
-| server/routes/avatars.js | Avatar generation API |
-
 ---
 
-## Part 2: Avatar Generation Flow
+## Part 2: Per-Character Clothing System
 
-### 2.1 Avatar Types
+### 2.1 New Format in Story Prompt
 
-1. **Clothing Avatars** - Body with different outfits (standard, winter, summer)
-2. **Styled Avatars** - Converted to art style (Pixar, watercolor, etc.)
-3. **Costumed Avatars** - Full costume transformations (pirate, ninja, etc.)
+The story-unified.txt prompt now outputs per-character clothing:
 
-### 2.2 Data Structure
-
-```javascript
-character.avatars = {
-  // Clothing-based avatars
-  standard: "data:image/jpeg;base64,...",
-  winter: "...",
-  summer: "...",
-
-  // Costumed avatars
-  costumed: {
-    pirate: "...",
-    ninja: "..."
-  },
-
-  // Styled variants
-  styledAvatars: {
-    pixar: {
-      standard: "...",
-      costumed: { pirate: "..." }
-    },
-    watercolor: { ... }
-  },
-
-  // Clothing descriptions
-  clothing: {
-    standard: { fullBody: "...", shoes: "..." }
-  }
-};
+```
+SCENE HINT:
+[1-2 sentences describing the scene]
+Characters:
+- Lukas: costumed:superhero
+- Franziska: standard
+- Sophie: winter
 ```
 
-### 2.3 Key Functions
-
-| Function | File | Purpose |
-|----------|------|---------|
-| generateDynamicAvatar | avatars.js | Generate single avatar with clothing |
-| generateStyledCostumedAvatar | avatars.js | Costume + style in one call |
-| prepareStyledAvatars | styledAvatars.js | Convert to art style |
-| applyStyledAvatars | styledAvatars.js | Apply styled versions to photos |
-| getCharacterPhotoDetails | storyHelpers.js | Select correct avatar for scene |
-
----
-
-## Part 3: Identified Duplications
-
-### 3.1 HIGH PRIORITY - Token Tracking (300+ lines duplicated)
-
-**Problem:** Identical token tracking code in 3 functions:
-- `processStorybookJob` (server.js:4722)
-- `processUnifiedStoryJob` (server.js:6153)
-- `processStoryJob` (server.js:7070)
-
-**Duplicated Code:**
-```javascript
-const tokenUsage = {
-  anthropic: {...},
-  gemini_text: {...},
-  gemini_image: {...},
-  byFunction: {...}
-};
-const addUsage = (provider, usage, functionName, modelName) => {...};
-const calculateCost = (...) => {...};
-```
-
-**Solution:** Extract to `server/lib/tokenTracking.js`:
-```javascript
-class TokenTracker {
-  constructor()
-  addUsage(provider, usage, functionName, modelName)
-  calculateCost(model, inputTokens, outputTokens, thinkingTokens)
-  getReport()
-}
-```
-
-### 3.2 HIGH PRIORITY - Character Reference Building
-
-**Problem:** Gender term and physical description logic duplicated:
-
-| Location | Function |
-|----------|----------|
-| storyHelpers.js:871 | `getGenderTerm` in buildCharacterReferenceList |
-| storyHelpers.js:1463 | `getGenderTerm` in buildImagePrompt (IDENTICAL) |
-
-**Solution:** Extract shared helpers:
-```javascript
-function getAgeAppropriateGenderTerm(gender, apparentAge)
-function buildHairDescription(physical, legacyField)
-function buildPhysicalTraitsParts(char)
-```
-
-### 3.3 MEDIUM PRIORITY - Art Style Prompts Loaded Twice
-
-**Problem:** `loadArtStylePrompts()` and `ART_STYLE_PROMPTS` defined in:
-- avatars.js:513, 537
-- styledAvatars.js:53, 92
-
-**Solution:** Load once in `server/lib/prompts.js`, import where needed.
-
-### 3.4 MEDIUM PRIORITY - Clothing Parsing
-
-**Problem:** Similar clothing extraction in multiple places:
-- `parseClothingCategory` (storyHelpers.js:469)
-- `_extractClothingFromBlock` (outlineParser.js:549)
-- Inline parsing in outlineParser
-
-**Solution:** Consolidate into `server/lib/clothingParser.js`:
-```javascript
-function parseClothingFromScene(text, format='any')
-function mapClothingCategory(category) // handles 'formal' → 'standard'
-```
-
-### 3.5 LOW PRIORITY - Unused Function
-
-**Check if still used:**
-- `extractTraitsWithGemini` (avatars.js:65) - May be deprecated since traits are now extracted in `evaluateAvatarFaceMatch`
-
----
-
-## Part 4: Improvement Proposals
-
-### 4.1 Consolidate Token Tracking (Estimated: 2-3 hours)
-
-Create `server/lib/tokenTracking.js`:
-
-```javascript
-class TokenTracker {
-  constructor() {
-    this.usage = { anthropic: {}, gemini_text: {}, gemini_image: {}, byFunction: {} };
-  }
-
-  addUsage(provider, usage, functionName, modelName) { ... }
-  calculateCost(model, inputTokens, outputTokens, thinkingTokens) { ... }
-  getUsageSummary() { ... }
-  exportForDatabase() { ... }
-}
-
-module.exports = { TokenTracker };
-```
-
-Update all 3 generation functions to use it.
-
-### 4.2 Consolidate Character Helpers (Estimated: 1-2 hours)
-
-Add to `storyHelpers.js`:
-
-```javascript
-// At top of file - shared helpers
-function getAgeAppropriateGenderTerm(gender, apparentAge) {
-  // ... single implementation
-}
-
-function buildHairDescription(physical, legacyHairField) {
-  // Handles both new structure (color/length/style) and legacy
-}
-```
-
-Remove duplicates from `buildCharacterReferenceList` and `buildImagePrompt`.
-
-### 4.3 Centralize Art Style Prompts (Estimated: 30 min)
-
-In `server/services/prompts.js`:
-```javascript
-// Add to existing prompts.js
-const ART_STYLE_PROMPTS = loadArtStylePrompts();
-module.exports.ART_STYLE_PROMPTS = ART_STYLE_PROMPTS;
-```
-
-Update imports in `avatars.js` and `styledAvatars.js`.
-
-### 4.4 Simplify Avatar Lookup (Estimated: 1 hour)
-
-Current flow is complex:
-1. Generate costumed avatar → store in character object
-2. Convert to style → store in cache
-3. Scene needs avatar → look up from character OR cache
-4. Mismatch between keys causes fallback
-
-**Proposal:** Always store styled avatars in character objects immediately after conversion:
-
-```javascript
-// In prepareStyledAvatars, after conversion:
-char.avatars.styledAvatars[artStyle][clothingCategory] = styledAvatar;
-```
-
-This eliminates cache/object mismatch issues.
-
-### 4.5 Unified ClothingRequirements Structure
-
-Current issue: Two different structures used:
-1. **From outline (nested):** `{ CharName: { costumed: { used, costume, description } } }`
-2. **For scene lookup (flat):** `{ CharName: "costumed:ninja-trainingsanzug" }`
-
-**Proposal:** Use flat structure everywhere, convert at parse time:
-```javascript
-// In UnifiedStoryParser.extractClothingRequirements():
-// Convert to flat: { CharName: "costumed:costume-type" }
-```
-
----
-
-## Part 5: Data Flow Diagram
+### 2.2 Data Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      STORY GENERATION                            │
+│                    PER-CHARACTER CLOTHING FLOW                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  INPUT: Characters, Story Params                                 │
-│    ↓                                                             │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ STAGE 1: Generate Outline/Story                          │   │
-│  │  └→ Claude API → Parser → clothingRequirements           │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│    ↓                                                             │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ STAGE 2: Prepare Avatars                                  │   │
-│  │  ├→ collectAvatarRequirements()                          │   │
-│  │  ├→ generateStyledCostumedAvatar() for costumed chars    │   │
-│  │  ├→ prepareStyledAvatars() for style conversion          │   │
-│  │  └→ Store in char.avatars.styledAvatars[style]           │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│    ↓                                                             │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ STAGE 3: Generate Images                                  │   │
-│  │  ├→ getCharacterPhotoDetails(chars, clothing, artStyle,  │   │
-│  │  │                           clothingRequirements)        │   │
-│  │  │   └→ Looks up costume from clothingRequirements       │   │
-│  │  │   └→ Finds avatar in styledAvatars[artStyle].costumed │   │
-│  │  ├→ buildImagePrompt() with character references         │   │
-│  │  └→ Gemini API → Scene Images                            │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│    ↓                                                             │
-│  OUTPUT: Complete Story with Images                              │
+│  1. PARSING (outlineParser.js)                                   │
+│     parseCharacterClothingBlock(content)                         │
+│        ↓                                                         │
+│     Returns: {                                                   │
+│       characterClothing: { "Lukas": "costumed:superhero", ... }  │
+│       characters: ["Lukas", "Franziska"]                         │
+│     }                                                            │
+│                                                                  │
+│  2. SCENE EXPANSION (server.js → storyHelpers.js)                │
+│     buildSceneDescriptionPrompt(characterClothing)               │
+│        ↓                                                         │
+│     Formats as:                                                  │
+│       - Lukas: costumed:superhero                                │
+│       - Franziska: standard                                      │
+│                                                                  │
+│  3. IMAGE GENERATION (server.js)                                 │
+│     sceneClothingRequirements[char.name]._currentClothing        │
+│        ↓                                                         │
+│     getCharacterPhotoDetails() checks _currentClothing           │
+│        ↓                                                         │
+│     Each character gets correct avatar for THEIR clothing        │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Part 6: Files Summary
+## Part 3: Function Reference
 
-| File | Lines | Purpose | Consolidation Opportunity |
-|------|-------|---------|--------------------------|
-| server.js | ~9000 | Main server, story generation | Extract token tracking |
-| server/lib/storyHelpers.js | ~2000 | Prompt building, character handling | Extract gender/hair helpers |
-| server/lib/styledAvatars.js | ~730 | Style conversion, caching | Remove duplicate art style loading |
-| server/lib/outlineParser.js | ~1600 | Parse outline responses | Share clothing keywords |
-| server/routes/avatars.js | ~1000 | Avatar generation API | Check for unused functions |
+### 3.1 Parsing Functions (outlineParser.js)
 
----
+#### `parseCharacterClothingBlock(content)`
+**Purpose:** Parse per-character clothing from scene content block
 
-## Part 7: Priority Action Items
+**Inputs:**
+- `content: string` - Block content containing Characters: section
 
-1. **Immediate (fixes current bugs):**
-   - [x] Fix `generateStyledCostumedAvatar` parameter order
-   - [x] Fix `clothingRequirements` lookup (flat string format)
-   - [x] Pass `clothingRequirements` to `getCharacterPhotoDetails`
+**Outputs:**
+```javascript
+{
+  characterClothing: { [name: string]: string },  // e.g., { "Lukas": "costumed:superhero" }
+  characters: string[]  // e.g., ["Lukas", "Franziska"]
+}
+```
 
-2. **Short-term (reduce code duplication):**
-   - [ ] Extract TokenTracker class
-   - [ ] Consolidate gender term helpers
-   - [ ] Centralize art style prompts
+**Location:** outlineParser.js:47-92
 
-3. **Medium-term (improve architecture):**
-   - [ ] Unify clothingRequirements structure
-   - [ ] Store styled avatars directly in character objects
-   - [ ] Consolidate clothing parsing
+**Notes:**
+- Supports new format: `- Name: category`
+- Falls back to legacy format: `Characters: Name1, Name2` + `Clothing: category`
 
 ---
 
-*Document generated: 2026-01-04*
-*Last updated after fixing costumed avatar generation bugs*
+#### `class UnifiedStoryParser`
+**Purpose:** Parse complete unified story response
+
+**Constructor:**
+- `response: string` - Full Claude response
+
+**Key Methods:**
+
+| Method | Output | Purpose |
+|--------|--------|---------|
+| `extractTitle()` | `string \| null` | Get story title |
+| `extractClothingRequirements()` | `Object \| null` | Per-character outfit definitions |
+| `extractVisualBible()` | `Object \| null` | Recurring visual elements |
+| `extractCoverHints()` | `{ titlePage, initialPage, backCover }` | Cover scene hints with characterClothing |
+| `extractPages()` | `Array<Page>` | All story pages |
+
+**Page Object Structure:**
+```javascript
+{
+  pageNumber: number,
+  text: string,
+  sceneHint: string,
+  characterClothing: { [name]: string },  // NEW in v2.0
+  characters: string[]
+}
+```
+
+**Location:** outlineParser.js:936-1285
+
+---
+
+#### `class ProgressiveUnifiedParser`
+**Purpose:** Stream-based parsing for progressive generation
+
+**Constructor:**
+```javascript
+new ProgressiveUnifiedParser({
+  onTitle: (title) => {},
+  onClothingRequirements: (reqs) => {},
+  onVisualBible: (bible) => {},
+  onCoverHints: () => {},
+  onPageComplete: (page) => {},
+  onProgress: (type, message, data) => {}
+})
+```
+
+**Key Methods:**
+
+| Method | Purpose |
+|--------|---------|
+| `addChunk(text)` | Process streaming chunk |
+| `finalize()` | Complete parsing, emit remaining pages |
+
+**Emitted Page Object:**
+```javascript
+{
+  pageNumber: number,
+  text: string,
+  sceneHint: string,
+  characterClothing: { [name]: string },  // NEW in v2.0
+  characters: string[]
+}
+```
+
+**Location:** outlineParser.js:1328-1700
+
+---
+
+### 3.2 Scene Description Functions (storyHelpers.js)
+
+#### `buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc, language, visualBible, previousScenes, characterClothing)`
+
+**Purpose:** Build Art Director scene description prompt
+
+**Inputs:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `pageNumber` | `number` | - | Current page number |
+| `pageContent` | `string` | - | Story text for page |
+| `characters` | `Array` | - | Character data array |
+| `shortSceneDesc` | `string` | `''` | Scene hint from story |
+| `language` | `string` | `'English'` | Output language |
+| `visualBible` | `Object` | `null` | Recurring elements |
+| `previousScenes` | `Array` | `[]` | Previous 2 pages for context |
+| `characterClothing` | `Object\|string` | `{}` | Per-character clothing map |
+
+**Outputs:**
+- `string` - Complete Art Director prompt
+
+**characterClothing Format:**
+```javascript
+// New format (per-character)
+{ "Lukas": "costumed:superhero", "Franziska": "standard" }
+
+// Legacy format (single value for all)
+"standard"
+```
+
+**Location:** storyHelpers.js:1266-1420
+
+---
+
+#### `getCharacterPhotoDetails(characters, clothingCategory, costumeType, artStyle, clothingRequirements)`
+
+**Purpose:** Get avatar/photo details for scene characters with per-character clothing support
+
+**Inputs:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `characters` | `Array` | - | Character objects |
+| `clothingCategory` | `string` | `null` | Default clothing category |
+| `costumeType` | `string` | `null` | Default costume type |
+| `artStyle` | `string` | `null` | Target art style |
+| `clothingRequirements` | `Object` | `null` | Per-character clothing info |
+
+**Per-Character Override:**
+If `clothingRequirements[charName]._currentClothing` exists, it overrides the default:
+```javascript
+// Example clothingRequirements with _currentClothing
+{
+  "Lukas": {
+    "_currentClothing": "costumed:superhero",  // Scene-specific
+    "costumed": { "costume": "superhero", "used": true }  // Story-level
+  },
+  "Franziska": {
+    "_currentClothing": "standard"
+  }
+}
+```
+
+**Outputs:**
+```javascript
+Array<{
+  name: string,
+  id: string,
+  photoType: string,  // 'styled-costumed-superhero', 'clothing-standard', etc.
+  photoUrl: string,   // Base64 or URL
+  photoHash: string,
+  clothingCategory: string,
+  clothingDescription: string | null,
+  hasPhoto: boolean
+}>
+```
+
+**Location:** storyHelpers.js:569-761
+
+---
+
+### 3.3 Avatar Generation Functions (styledAvatars.js)
+
+#### `collectAvatarRequirements(sceneDescriptions, pageClothing, clothingRequirements, characters)`
+
+**Purpose:** Analyze scenes to determine required avatar variations
+
+**Inputs:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `sceneDescriptions` | `Array<{pageNumber, description}>` | Scene hints |
+| `pageClothing` | `Object<pageNum, Object\|string>` | Clothing per page (per-character or single) |
+| `clothingRequirements` | `Object` | Story-level outfit definitions |
+| `characters` | `Array` | Character data |
+
+**Outputs:**
+```javascript
+{
+  characterClothingMap: {
+    [charName]: string[]  // ['standard', 'costumed:superhero']
+  },
+  costumedCharacters: string[],
+  stylingNeeded: boolean
+}
+```
+
+**Location:** styledAvatars.js:264-370
+
+---
+
+#### `prepareStyledAvatars(characters, artStyle, characterClothingMap, costumedAvatarPromises)`
+
+**Purpose:** Convert avatars to target art style
+
+**Inputs:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `characters` | `Array` | Character data |
+| `artStyle` | `string` | Target style (pixar, watercolor, etc.) |
+| `characterClothingMap` | `Object` | Required clothing per character |
+| `costumedAvatarPromises` | `Array` | Pending costume generations |
+
+**Outputs:**
+```javascript
+{
+  styledAvatarsPromise: Promise<void>,
+  prepStats: {
+    stylingGenerated: number,
+    stylingCached: number,
+    costumedGenerated: number,
+    costumedCached: number
+  }
+}
+```
+
+**Location:** styledAvatars.js:372-550
+
+---
+
+### 3.4 Server Integration (server.js)
+
+#### Scene Generation Integration
+
+**Location:** server.js:6890-6940
+
+```javascript
+// Build per-character clothing lookup
+const perCharClothing = scene.characterClothing || {};
+
+// Create merged requirements with _currentClothing
+const sceneClothingRequirements = { ...clothingRequirements };
+for (const char of sceneCharacters) {
+  const charClothing = perCharClothing[char.name] || defaultClothing;
+  sceneClothingRequirements[char.name] = {
+    ...sceneClothingRequirements[char.name],
+    _currentClothing: charClothing
+  };
+}
+
+// Get avatars with per-character clothing
+const pagePhotos = getCharacterPhotoDetails(
+  sceneCharacters,
+  defaultCategory,
+  defaultCostumeType,
+  inputData.artStyle,
+  sceneClothingRequirements
+);
+```
+
+---
+
+## Part 4: Avatar Structure
+
+### 4.1 Character Avatar Object
+
+```javascript
+character.avatars = {
+  // Base clothing avatars
+  standard: "data:image/jpeg;base64,...",
+  winter: "...",
+  summer: "...",
+
+  // Costumed avatars (keyed by costume type)
+  costumed: {
+    superhero: "...",
+    pirate: "...",
+    ninja: "..."
+  },
+
+  // Styled variants (converted to art style)
+  styledAvatars: {
+    pixar: {
+      standard: "...",
+      winter: "...",
+      costumed: {
+        superhero: "...",
+        pirate: "..."
+      }
+    },
+    watercolor: { ... }
+  },
+
+  // Extracted clothing descriptions
+  clothing: {
+    standard: { fullBody: "...", shoes: "..." },
+    costumed: {
+      superhero: { fullBody: "...", cape: "..." }
+    }
+  }
+};
+```
+
+### 4.2 Clothing Category Resolution
+
+**Priority Order:**
+1. Per-scene `_currentClothing` from characterClothing
+2. Story-level `clothingRequirements` lookup
+3. Auto-detect from available avatars
+4. Default to 'standard'
+
+**Avatar Selection Priority:**
+1. Styled avatar for art style + clothing
+2. Regular clothing avatar
+3. Fallback chain: costumed → formal → standard → body photo
+
+---
+
+## Part 5: Key Files
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| server.js | Main orchestration | processUnifiedStoryJob, startSceneExpansion |
+| server/lib/storyHelpers.js | Prompt building, avatar lookup | buildSceneDescriptionPrompt, getCharacterPhotoDetails |
+| server/lib/outlineParser.js | Parse story responses | UnifiedStoryParser, parseCharacterClothingBlock |
+| server/lib/styledAvatars.js | Style conversion | collectAvatarRequirements, prepareStyledAvatars |
+| prompts/story-unified.txt | Story generation prompt | Per-character clothing format |
+| prompts/scene-descriptions.txt | Scene expansion prompt | CHARACTER_CLOTHING template |
+
+---
+
+## Part 6: Prompt Templates
+
+### 6.1 Story Unified (story-unified.txt)
+
+**Scene Hint Format:**
+```
+SCENE HINT:
+[1-2 sentences describing the scene]
+Characters:
+- [CharacterName]: [standard | winter | summer | costumed:type]
+- [CharacterName]: [clothing category]
+```
+
+**Critical Rules:**
+- NEVER use "same" - always explicit category
+- Each character must be listed with their clothing
+- Format is machine-parsed
+
+### 6.2 Scene Descriptions (scene-descriptions.txt)
+
+**Template Variable:**
+```
+**Character clothing for this page:**
+{CHARACTER_CLOTHING}
+```
+
+**Formatted as:**
+```
+- Lukas: costumed:superhero
+- Franziska: standard
+```
+
+---
+
+## Part 7: Migration Notes
+
+### From v1 (single clothing) to v2 (per-character)
+
+**Backwards Compatibility:**
+- Parser supports legacy format (`Clothing: standard` + `Characters: A, B`)
+- `buildSceneDescriptionPrompt` accepts both object and string
+- `getCharacterPhotoDetails` uses default category if `_currentClothing` not set
+
+**Data Structure Changes:**
+| v1 | v2 |
+|----|-----|
+| `page.clothing: string` | `page.characterClothing: Object` |
+| Single clothing per page | Per-character clothing per page |
+| `Clothing: standard` in scene hint | `- Name: standard` format |
+
+---
+
+## Part 8: Debugging
+
+### Common Issues
+
+1. **Wrong avatar selected:**
+   - Check `_currentClothing` is set in clothingRequirements
+   - Verify avatar exists at `char.avatars.styledAvatars[artStyle][category]`
+
+2. **Clothing not parsed:**
+   - Check scene hint format matches `- Name: category`
+   - Look for `[UNIFIED-PARSER]` debug logs
+
+3. **Fallback to body photo:**
+   - Check `[AVATAR FALLBACK]` logs
+   - Verify styled avatar generation completed
+
+### Logging
+
+Key log prefixes:
+- `[AVATAR LOOKUP]` - Avatar selection per character
+- `[UNIFIED-PARSER]` - Story parsing
+- `[STREAM-UNIFIED]` - Progressive parsing
+- `[SCENE PROMPT]` - Scene description building
+
+---
+
+*Document updated: 2026-01-04*
+*Version: 2.0 - Per-character clothing support*
