@@ -5061,23 +5061,25 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           clothing = 'costumed';
         }
 
+        // Get art style for avatar lookup
+        const artStyleId = inputData.artStyle || 'pixar';
+
         // Determine character selection based on cover type
         let referencePhotos;
         if (coverType === 'titlePage') {
           // Front cover: Main character prominently, maybe 1-2 supporting
           const frontCoverCharacters = getCharactersInScene(sceneDescription, inputData.characters || []);
-          referencePhotos = getCharacterPhotoDetails(frontCoverCharacters.length > 0 ? frontCoverCharacters : inputData.characters || [], clothing, costumeType);
+          referencePhotos = getCharacterPhotoDetails(frontCoverCharacters.length > 0 ? frontCoverCharacters : inputData.characters || [], clothing, costumeType, artStyleId, streamingClothingRequirements);
           log.debug(`📕 [STREAM-COVER] Generating front cover: ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
         } else {
           // Initial page and back cover: ALL characters
-          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType);
+          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType, artStyleId, streamingClothingRequirements);
           log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
         }
 
         // Build the prompt
         let coverPrompt;
         const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible) : '';
-        const artStyleId = inputData.artStyle || 'pixar';
         const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
         if (coverType === 'titlePage') {
@@ -5732,10 +5734,19 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const frontCoverCharacters = getCharactersInScene(titlePageScene, inputData.characters || []);
           // Use extracted clothing or parse from scene description
           const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
+          // Handle costumed:type format
+          let frontCoverClothingCat = frontCoverClothing;
+          let frontCoverCostumeType = null;
+          if (frontCoverClothing.startsWith('costumed:')) {
+            frontCoverCostumeType = frontCoverClothing.split(':')[1];
+            frontCoverClothingCat = 'costumed';
+          }
           // Use detailed photo info (with names) for labeled reference images
-          let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing);
-          // Apply styled avatars (pre-converted to target art style)
-          frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
+          let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothingCat, frontCoverCostumeType, artStyleId, streamingClothingRequirements);
+          // Apply styled avatars (pre-converted to target art style) for non-costumed
+          if (frontCoverClothingCat !== 'costumed') {
+            frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
+          }
           log.debug(`📕 [STORYBOOK] Front cover: ${frontCoverCharacters.length} characters (${frontCoverCharacters.map(c => c.name).join(', ') || 'none'}), clothing: ${frontCoverClothing}`);
 
           const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
@@ -5773,9 +5784,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (!coverImages.initialPage) {
           // Use extracted clothing or parse from scene description
           const initialPageClothing = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
-          let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing);
-          // Apply styled avatars (pre-converted to target art style)
-          initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
+          // Handle costumed:type format
+          let initialClothingCat = initialPageClothing;
+          let initialCostumeType = null;
+          if (initialPageClothing.startsWith('costumed:')) {
+            initialCostumeType = initialPageClothing.split(':')[1];
+            initialClothingCat = 'costumed';
+          }
+          let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialClothingCat, initialCostumeType, artStyleId, streamingClothingRequirements);
+          // Apply styled avatars (pre-converted to target art style) for non-costumed
+          if (initialClothingCat !== 'costumed') {
+            initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
+          }
           log.debug(`📕 [STORYBOOK] Initial page: ALL ${initialPagePhotos.length} characters (group scene with main character centered), clothing: ${initialPageClothing}`);
 
           const initialPrompt = inputData.dedication && inputData.dedication.trim()
@@ -5821,9 +5841,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (!coverImages.backCover) {
           // Use extracted clothing or parse from scene description
           const backCoverClothing = coverScenes.backCover?.clothing || parseClothingCategory(backCoverScene) || 'standard';
-          let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing);
-          // Apply styled avatars (pre-converted to target art style)
-          backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
+          // Handle costumed:type format
+          let backClothingCat = backCoverClothing;
+          let backCostumeType = null;
+          if (backCoverClothing.startsWith('costumed:')) {
+            backCostumeType = backCoverClothing.split(':')[1];
+            backClothingCat = 'costumed';
+          }
+          let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backClothingCat, backCostumeType, artStyleId, streamingClothingRequirements);
+          // Apply styled avatars (pre-converted to target art style) for non-costumed
+          if (backClothingCat !== 'costumed') {
+            backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
+          }
           log.debug(`📕 [STORYBOOK] Back cover: ALL ${backCoverPhotos.length} characters (equal prominence group scene), clothing: ${backCoverClothing}`);
 
           const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
@@ -5965,6 +5994,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
+      pageClothing: pageClothing, // Clothing per page
+      clothingRequirements: streamingClothingRequirements, // Per-character clothing requirements
       tokenUsage: tokenUsage, // Token usage statistics for cost tracking
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -6318,7 +6349,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }
             } else if (['winter', 'summer', 'standard'].includes(category)) {
               log.debug(`⚡ [STREAM-AVATAR] Generating ${category} avatar for ${char.name}`);
-              const result = await generateDynamicAvatar(char, category, config.signature);
+              const result = await generateDynamicAvatar(char, category, config);
               if (result?.url) {
                 char.avatars[category] = result.url;
                 // Invalidate any cached styled versions since source avatar changed
@@ -7014,6 +7045,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       sceneImages: allImages,
       coverImages: coverImages,
       pageClothing: pageClothingData, // Clothing per page
+      clothingRequirements: clothingRequirements, // Per-character clothing requirements
       tokenUsage: tokenUsage, // Token usage statistics for cost tracking
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -8672,6 +8704,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       coverImages: coverImages,
       visualBible: visualBible, // Visual Bible for recurring element consistency (dev mode)
       pageClothing: pageClothingData, // Clothing per page extracted from outline
+      clothingRequirements: clothingRequirements, // Per-character clothing requirements
       tokenUsage: tokenUsage, // Token usage statistics for cost tracking
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

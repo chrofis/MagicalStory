@@ -596,12 +596,21 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         let costumeKey = costumeType?.toLowerCase();
 
         // Look up costume type from clothingRequirements (per-character)
-        // clothingRequirements is a flat map: { "CharName": "costumed:costume-type" }
+        // clothingRequirements can be:
+        // - Nested: { "CharName": { "costumed": { "costume": "superhero", "used": true } } }
+        // - Flat: { "CharName": "costumed:superhero" }
         if (!costumeKey && clothingRequirements) {
           const charClothing = clothingRequirements[char.name];
           if (typeof charClothing === 'string' && charClothing.startsWith('costumed:')) {
+            // Flat format
             costumeKey = charClothing.split(':')[1].toLowerCase();
-            log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from clothingRequirements`);
+            log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from flat clothingRequirements`);
+          } else if (charClothing && typeof charClothing === 'object' && charClothing.costumed) {
+            // Nested format
+            if (charClothing.costumed.used && charClothing.costumed.costume) {
+              costumeKey = charClothing.costumed.costume.toLowerCase();
+              log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from nested clothingRequirements`);
+            }
           }
         }
 
@@ -1567,6 +1576,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
       return false;
     };
+
+    // First, look up secondary characters from metadata.characters
+    if (metadata.characters && metadata.characters.length > 0) {
+      for (const charName of metadata.characters) {
+        // Look up in secondaryCharacters
+        const secondaryChar = (visualBible.secondaryCharacters || []).find(sc => matchesEntry(sc, charName));
+        if (secondaryChar) {
+          const description = secondaryChar.extractedDescription || secondaryChar.description;
+          requiredObjects.push({ name: secondaryChar.name, id: secondaryChar.id, type: 'secondary character', description });
+        }
+      }
+    }
 
     for (const objName of metadata.objects) {
       // Look up in artifacts

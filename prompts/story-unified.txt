@@ -239,9 +239,9 @@ TEXT:
 [Full story text for this page - follow reading level guidelines]
 
 SCENE HINT:
-[1-2 sentences describing the KEY VISUAL MOMENT for illustration]
+[1-2 sentences describing the KEY VISUAL MOMENT for illustration - use real character names, not aliases]
 Clothing: [standard | winter | summer | costumed:type | same]
-Characters: [List character names appearing in this scene]
+Characters: [ALWAYS use real names from character list, with alias in parentheses if used in story. E.g., "Tim (as Superbrain)"]
 
 --- Page 2 ---
 TEXT:
@@ -265,5 +265,6 @@ Characters: [Names]
 5. **Show don't tell** - Demonstrate character traits through actions
 6. **Clothing consistency** - Use "same" unless there's a specific reason to change
 7. **Visual Bible accuracy** - Add all scenes and elements, with specific colors
+8. **Character names in illustrations** - The Characters field MUST use the character's REAL NAME from the provided list, even if the story text uses a nickname, alias, or alter-ego. Add the alias in parentheses. Example: If "Tim" becomes "Superbrain" in the story, write `Characters: Tim (as Superbrain)` - this ensures the illustrator uses the correct reference photos.
 
 **DO NOT STOP until you have written all {PAGES} pages with TEXT and SCENE HINT for each.**

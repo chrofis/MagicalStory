@@ -587,23 +587,24 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
 
   // If we have explicit per-character clothing requirements from outline, use those
   if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
-    // Build per-character clothing map: { charName: clothingCategory }
+    // Build per-character clothing map: { charName: [clothingCategories] }
+    // A character can have MULTIPLE used categories (e.g., standard AND costumed)
     const characterClothingMap = {};
     for (const [charName, reqs] of Object.entries(clothingRequirements)) {
-      // Find the first category with used=true
+      characterClothingMap[charName] = [];
+      // Collect ALL categories with used=true
       for (const [category, config] of Object.entries(reqs)) {
         if (config && config.used) {
           if (category === 'costumed' && config.costume) {
-            characterClothingMap[charName] = `costumed:${config.costume.toLowerCase()}`;
+            characterClothingMap[charName].push(`costumed:${config.costume.toLowerCase()}`);
           } else {
-            characterClothingMap[charName] = category;
+            characterClothingMap[charName].push(category);
           }
-          break; // Use first 'used' category
         }
       }
       // Default to standard if no category is used
-      if (!characterClothingMap[charName]) {
-        characterClothingMap[charName] = 'standard';
+      if (characterClothingMap[charName].length === 0) {
+        characterClothingMap[charName] = ['standard'];
       }
     }
 
@@ -617,25 +618,29 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
       // Get characters in this scene
       const sceneCharacters = getCharactersInScene(description, characters);
 
-      // Add requirement for each character with their specific clothing
+      // Add requirement for each character with ALL their clothing categories
       for (const char of sceneCharacters) {
-        const clothingCategory = characterClothingMap[char.name] || defaultClothing;
+        const clothingCategories = characterClothingMap[char.name] || [defaultClothing];
+        for (const clothingCategory of clothingCategories) {
+          requirements.push({
+            pageNumber: pageNum,
+            clothingCategory,
+            characterNames: [char.name]
+          });
+        }
+      }
+    }
+
+    // For covers, each character needs ALL their clothing variations
+    for (const char of characters) {
+      const clothingCategories = characterClothingMap[char.name] || [defaultClothing];
+      for (const clothingCategory of clothingCategories) {
         requirements.push({
-          pageNumber: pageNum,
+          pageNumber: 'cover',
           clothingCategory,
           characterNames: [char.name]
         });
       }
-    }
-
-    // For covers, each character needs their specific clothing
-    for (const char of characters) {
-      const clothingCategory = characterClothingMap[char.name] || defaultClothing;
-      requirements.push({
-        pageNumber: 'cover',
-        clothingCategory,
-        characterNames: [char.name]
-      });
     }
   } else {
     // Fallback: infer from page clothing (old behavior)
