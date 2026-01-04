@@ -1748,7 +1748,7 @@ export default function StoryWizard() {
       // Create the story generation job with developer skip options
       // Filter out excluded characters - only send characters that are in the story
       const charactersForStory = characters.filter(c => !excludedCharacters.includes(c.id));
-      const { jobId: newJobId } = await storyService.createStoryJob({
+      const { jobId: newJobId, creditsRemaining } = await storyService.createStoryJob({
         storyType,
         storyTypeName: getStoryTypeName(),
         storyCategory: storyCategory || undefined,
@@ -1787,6 +1787,11 @@ export default function StoryWizard() {
 
       setJobId(newJobId);
       log.info('Story job created:', newJobId);
+
+      // Update credits immediately when job starts (credits are reserved/deducted at job creation)
+      if (creditsRemaining !== undefined && creditsRemaining !== null) {
+        updateCredits(creditsRemaining);
+      }
 
       // Poll for job status
       let completed = false;

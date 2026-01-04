@@ -118,6 +118,20 @@ export interface RepairAttempt {
   timestamp: string;
 }
 
+// Generation log entry for debugging story generation
+export type GenerationLogStage = 'outline' | 'avatars' | 'scenes' | 'images' | 'covers' | 'finalize';
+export type GenerationLogLevel = 'info' | 'warn' | 'error' | 'debug';
+
+export interface GenerationLogEntry {
+  timestamp: string;
+  stage: GenerationLogStage;
+  level: GenerationLogLevel;
+  event: string;           // Short event name (e.g., 'avatar_lookup', 'fallback', 'costume_generated')
+  message: string;         // Human-readable description
+  character?: string;      // Character name if relevant
+  details?: Record<string, unknown>;  // Additional structured data
+}
+
 export interface ReferencePhoto {
   name: string;
   id: number;
@@ -276,6 +290,8 @@ export interface SavedStory {
   failureReason?: string;
   generatedPages?: number;
   totalPages?: number;
+  // Generation log for debugging (dev mode)
+  generationLog?: GenerationLogEntry[];
 }
 
 export interface StoryGenerationProgress {

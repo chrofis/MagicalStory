@@ -546,7 +546,7 @@ export function CharacterForm({
                 <select
                   value={character.gender || ''}
                   onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-base focus:border-indigo-500 focus:outline-none"
                 >
                   <option value="">{language === 'de' ? '— Unbekannt —' : language === 'fr' ? '— Inconnu —' : '— Unknown —'}</option>
                   <option value="male">{t.male}</option>
@@ -562,7 +562,7 @@ export function CharacterForm({
                   type="number"
                   value={character.age}
                   onChange={(e) => updateField('age', e.target.value)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-base focus:border-indigo-500 focus:outline-none"
                   min="1"
                   max="120"
                 />
@@ -575,7 +575,7 @@ export function CharacterForm({
                   type="number"
                   value={character.physical?.height || ''}
                   onChange={(e) => updatePhysical('height', e.target.value)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-base focus:border-indigo-500 focus:outline-none"
                   placeholder="170"
                   min="50"
                   max="250"
@@ -1578,7 +1578,7 @@ export function CharacterForm({
                               },
                             })}
                             placeholder={language === 'de' ? 'z.B. rotes Sommerkleid' : language === 'fr' ? 'ex. robe d\'été rouge' : 'e.g. red summer dress'}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
                           />
                         </div>
                       )}
@@ -1603,7 +1603,7 @@ export function CharacterForm({
                           })}
                           disabled={!!character.clothing?.structured?.fullBody}
                           placeholder={language === 'de' ? 'z.B. blaues T-Shirt' : language === 'fr' ? 'ex. t-shirt bleu' : 'e.g. blue t-shirt'}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                       </div>
 
@@ -1627,7 +1627,7 @@ export function CharacterForm({
                           })}
                           disabled={!!character.clothing?.structured?.fullBody}
                           placeholder={language === 'de' ? 'z.B. dunkle Jeans' : language === 'fr' ? 'ex. jeans foncé' : 'e.g. dark jeans'}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                       </div>
 
@@ -1650,7 +1650,7 @@ export function CharacterForm({
                             },
                           })}
                           placeholder={language === 'de' ? 'z.B. weiße Turnschuhe' : language === 'fr' ? 'ex. baskets blanches' : 'e.g. white sneakers'}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
                         />
                       </div>
                     </div>

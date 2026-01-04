@@ -748,11 +748,11 @@ export const storyService = {
       coverImageModel?: string | null;
       qualityModel?: string | null;
     };
-  }): Promise<{ jobId: string }> {
+  }): Promise<{ jobId: string; creditsRemaining?: number }> {
     // Generate idempotency key to prevent duplicate job creation on retries
     const idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const response = await api.post<{ jobId: string; message: string; existing?: boolean }>('/api/jobs/create-story', {
+    const response = await api.post<{ jobId: string; message: string; existing?: boolean; creditsRemaining?: number }>('/api/jobs/create-story', {
       idempotencyKey,
       storyType: data.storyType,
       storyTypeName: data.storyTypeName,
@@ -780,7 +780,7 @@ export const storyService = {
       // Developer model overrides
       modelOverrides: data.modelOverrides,
     });
-    return { jobId: response.jobId };
+    return { jobId: response.jobId, creditsRemaining: response.creditsRemaining };
   },
 
   async getJobStatus(jobId: string): Promise<{
