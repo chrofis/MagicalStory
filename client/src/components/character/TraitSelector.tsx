@@ -134,7 +134,7 @@ export function TraitSelector({
                     ? 'Ajouter personnalisé...'
                     : 'Add custom...'
                 }
-                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
               />
               <button
                 onClick={addCustomTrait}
