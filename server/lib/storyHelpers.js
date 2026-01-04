@@ -1540,20 +1540,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     }
   }
 
-  // Build Visual Bible section with ALL recurring elements (animals, artifacts, locations)
-  let visualBibleSection = '';
-  if (visualBible && pageNumber !== null) {
-    const sceneCharacterNames = sceneCharacters ? sceneCharacters.map(c => c.name) : null;
-    visualBibleSection = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames, language);
-    if (visualBibleSection) {
-      log.debug(`[IMAGE PROMPT] Added Visual Bible section for page ${pageNumber}`);
-    }
-  }
-
   // Build required objects section from metadata.objects by looking up in Visual Bible
   // This ensures objects listed in scene metadata are included with their full descriptions
   // Supports lookup by name OR identifier (e.g., "CLO001", "ART002", etc.)
+  //
+  // OPTIMIZATION: Scene description already selects which visual bible elements are needed
+  // and outputs them in JSON metadata. We use ONLY those elements instead of the entire bible.
   let requiredObjectsSection = '';
+  let hasRequiredObjects = false;
   if (metadata && metadata.objects && metadata.objects.length > 0 && visualBible) {
     const requiredObjects = [];
 
@@ -1617,6 +1611,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     }
 
     if (requiredObjects.length > 0) {
+      hasRequiredObjects = true;
       // Build the required objects section with language-appropriate header
       let header;
       if (language === 'de') {
@@ -1633,7 +1628,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         requiredObjectsSection += `* **${obj.name}**${idLabel} (${obj.type}): ${obj.description}\n`;
       }
 
-      log.debug(`[IMAGE PROMPT] Added ${requiredObjects.length} required objects from metadata: ${requiredObjects.map(o => `${o.name}${o.id ? ` [${o.id}]` : ''}`).join(', ')}`);
+      log.debug(`[IMAGE PROMPT] Added ${requiredObjects.length} required objects from metadata (skipping full Visual Bible)`);
+    }
+  }
+
+  // FALLBACK: Only add full Visual Bible if scene description didn't specify required objects
+  // This handles storybook mode where there's no separate scene description step
+  let visualBibleSection = '';
+  if (!hasRequiredObjects && visualBible && pageNumber !== null) {
+    const sceneCharacterNames = sceneCharacters ? sceneCharacters.map(c => c.name) : null;
+    visualBibleSection = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames, language);
+    if (visualBibleSection) {
+      log.debug(`[IMAGE PROMPT] Added full Visual Bible section for page ${pageNumber} (no metadata.objects)`);
     }
   }
 
