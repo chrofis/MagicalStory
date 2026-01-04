@@ -6580,11 +6580,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     storyPages.forEach(page => {
       pageTextMap[page.pageNumber] = page.text;
     });
+    // Frontend expects: { title, dedication, pageTexts, sceneDescriptions, totalPages }
     await saveCheckpoint(jobId, 'story_text', {
       title,
       dedication: inputData.dedication || '',
       pageTexts: pageTextMap,
-      fullStoryText
+      sceneDescriptions: storyPages.map(page => ({
+        pageNumber: page.pageNumber,
+        description: page.sceneHint || '',
+        clothing: page.clothing || 'standard'
+      })),
+      totalPages: storyPages.length
     });
     log.debug(`💾 [UNIFIED] Saved story text for progressive display (${storyPages.length} pages)`);
 
@@ -6679,9 +6685,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       pageNumber: scene.pageNumber,
       description: scene.sceneDescription,
       clothing: scene.clothing || 'standard',
+      outlineExtract: scene.outlineExtract || scene.sceneHint || '',
       // Dev mode: Art Director prompt and model used
-      prompt: scene.sceneDescriptionPrompt,
-      modelId: scene.sceneDescriptionModelId
+      scenePrompt: scene.sceneDescriptionPrompt,
+      textModelId: scene.sceneDescriptionModelId
     }));
 
     // Update pageClothing for storage compatibility (with fallback to 'standard')
@@ -6980,7 +6987,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       outlineModelId: unifiedModelId,
       outlineUsage: unifiedUsage,
       storyTextPrompts: [], // Not used in unified mode
-      storyText: fullStoryText,
+      story: fullStoryText,  // Frontend expects 'story' not 'storyText'
       visualBible,
       styledAvatarGeneration: getStyledAvatarGenerationLog(),
       costumedAvatarGeneration: getCostumedAvatarGenerationLog(),
