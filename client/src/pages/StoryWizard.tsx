@@ -19,7 +19,7 @@ import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits } from '@/types/character';
-import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages } from '@/types/story';
+import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
@@ -191,6 +191,7 @@ export default function StoryWizard() {
     prompt?: string;
     output?: { identifier: string; sizeKB: number };
   }>>([]); // Styled avatar generation log (dev mode)
+  const [generationLog, setGenerationLog] = useState<GenerationLogEntry[]>([]); // Generation log (dev mode)
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
@@ -314,6 +315,7 @@ export default function StoryWizard() {
             setOutlineUsage(story.outlineUsage);
             setStoryTextPrompts(story.storyTextPrompts || []);
             setStyledAvatarGeneration(story.styledAvatarGeneration || []);
+            setGenerationLog(story.generationLog || []);
 
             // Visual Bible
             if (story.visualBible) {
@@ -1898,6 +1900,7 @@ export default function StoryWizard() {
           setOutlineUsage(status.result.outlineUsage);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
           setStyledAvatarGeneration(status.result.styledAvatarGeneration || []);
+          setGenerationLog(status.result.generationLog || []);
           // Ensure visualBible has required fields (backward compatibility)
           if (status.result.visualBible) {
             setVisualBible({
@@ -2195,6 +2198,7 @@ export default function StoryWizard() {
               isGenerating={isGenerating}
               developerMode={developerMode}
               styledAvatarGeneration={styledAvatarGeneration}
+              generationLog={generationLog}
               storyId={storyId}
               onVisualBibleChange={storyId ? async (updatedBible) => {
                 try {

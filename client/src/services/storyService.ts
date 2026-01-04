@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, GenerationLogEntry } from '@/types/story';
 
 interface StoryDraft {
   storyType: string;
@@ -826,6 +826,7 @@ export const storyService = {
         prompt?: string;
         output?: { identifier: string; sizeKB: number };
       }>;
+      generationLog?: GenerationLogEntry[];
       sceneDescriptions: SceneDescription[];
       sceneImages: SceneImage[];
       coverImages?: CoverImages;
@@ -887,6 +888,7 @@ export const storyService = {
           prompt?: string;
           output?: { identifier: string; sizeKB: number };
         }>;
+        generationLog?: GenerationLogEntry[];
         sceneDescriptions?: SceneDescription[];
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
@@ -925,6 +927,7 @@ export const storyService = {
         visualBible: resultData.visualBible,
         styledAvatarGeneration: resultData.styledAvatarGeneration,
         costumedAvatarGeneration: resultData.costumedAvatarGeneration,
+        generationLog: resultData.generationLog,
         sceneDescriptions: resultData.sceneDescriptions || [],
         sceneImages: resultData.sceneImages || [],
         coverImages: resultData.coverImages,

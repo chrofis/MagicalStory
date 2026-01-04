@@ -194,6 +194,7 @@ const {
   buildUnifiedStoryPrompt
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
+const { GenerationLogger } = require('./server/lib/generationLogger');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -6162,6 +6163,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   clearStyledAvatarGenerationLog();
   clearCostumedAvatarGenerationLog();
 
+  // Generation logger for debugging
+  const genLog = new GenerationLogger();
+  genLog.setStage('outline');
+
   // Token usage tracker - same structure as other modes
   const tokenUsage = {
     anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
@@ -6307,6 +6312,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
                 char.avatars.styledAvatars[artStyle].costumed[config.costume.toLowerCase()] = result.imageData;
                 log.debug(`✅ [STREAM-AVATAR] ${char.name} costumed:${config.costume} complete`);
+                genLog.costumeGenerated(char.name, config.costume, true, { artStyle });
+              } else {
+                genLog.costumeGenerated(char.name, config.costume, false, { artStyle, error: result?.error });
               }
             } else if (['winter', 'summer', 'standard'].includes(category)) {
               log.debug(`⚡ [STREAM-AVATAR] Generating ${category} avatar for ${char.name}`);
@@ -6652,6 +6660,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // PHASE 2: Wait for avatar generation to complete
+    genLog.setStage('avatars');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [20, `Waiting for ${streamingAvatarPromises.length} avatars...`, jobId]
@@ -6690,6 +6699,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // PHASE 3: Wait for scene expansion to complete (most should be done by now)
+    genLog.setStage('scenes');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [30, `Finalizing ${streamingSceneExpansionPromises.size} scene expansions...`, jobId]
@@ -6764,6 +6774,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // PHASE 4: Wait for cover images (started during/after streaming)
+    genLog.setStage('covers');
     const coverImages = {};
     if (streamingCoverPromises.size > 0) {
       await dbPool.query(
@@ -6801,6 +6812,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // PHASE 5: Generate page images (parallel with rate limiting)
+    genLog.setStage('images');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [50, 'Generating page illustrations...', jobId]
@@ -6829,6 +6841,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Pass clothingRequirements so each character's costume type can be looked up
         const pagePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveCategory, costumeType, inputData.artStyle, clothingRequirements);
+
+        // Log avatar selections for each character
+        for (const photo of pagePhotos) {
+          if (photo.photoType === 'none' || !photo.hasPhoto) {
+            genLog.avatarFallback(photo.name, `No avatar found for ${effectiveCategory}`, {
+              pageNumber: pageNum,
+              requestedCategory: effectiveCategory,
+              costumeType
+            });
+          } else {
+            genLog.avatarLookup(photo.name, `Using ${photo.photoType}${photo.isStyled ? ' (styled)' : ''}`, {
+              pageNumber: pageNum,
+              photoType: photo.photoType,
+              isStyled: photo.isStyled,
+              clothingCategory: photo.clothingCategory
+            });
+          }
+        }
 
         const imagePrompt = buildImagePrompt(
           scene.sceneDescription,
@@ -7015,6 +7045,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.error('❌ [UNIFIED] Failed to log credit completion:', creditErr.message);
     }
 
+    // Finalize generation log
+    genLog.setStage('finalize');
+    genLog.finalize();
+
     // Build final result
     const resultData = {
       storyId,
@@ -7033,7 +7067,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       coverImages,
       tokenUsage,
       estimatedCost: totalCost,
-      generationMode: 'unified'
+      generationMode: 'unified',
+      generationLog: genLog.getEntries()
     };
 
     // Mark job as completed

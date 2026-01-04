@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal } from './story';
@@ -79,6 +79,7 @@ interface StoryDisplayProps {
   developerMode?: boolean;
   styledAvatarGeneration?: StyledAvatarGenerationEntry[];
   costumedAvatarGeneration?: CostumedAvatarGenerationEntry[];
+  generationLog?: GenerationLogEntry[];
   // Partial story fields
   isPartial?: boolean;
   failureReason?: string;
@@ -136,6 +137,7 @@ export function StoryDisplay({
   developerMode = false,
   styledAvatarGeneration = [],
   costumedAvatarGeneration = [],
+  generationLog = [],
   isPartial = false,
   failureReason,
   generatedPages,
@@ -1415,6 +1417,68 @@ export function StoryDisplay({
                       </div>
                     </div>
                   </details>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/* Generation Log */}
+          {generationLog && generationLog.length > 0 && (
+            <details className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-slate-800 hover:text-slate-900 flex items-center gap-2">
+                <FileText size={20} />
+                {language === 'de'
+                  ? `Generierungslog (${generationLog.length})`
+                  : language === 'fr'
+                    ? `Journal de génération (${generationLog.length})`
+                    : `Generation Log (${generationLog.length})`}
+                {/* Show warning/error counts */}
+                {generationLog.filter(e => e.level === 'warn').length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-yellow-200 text-yellow-800 text-xs rounded-full">
+                    {generationLog.filter(e => e.level === 'warn').length} warnings
+                  </span>
+                )}
+                {generationLog.filter(e => e.level === 'error').length > 0 && (
+                  <span className="ml-1 px-2 py-0.5 bg-red-200 text-red-800 text-xs rounded-full">
+                    {generationLog.filter(e => e.level === 'error').length} errors
+                  </span>
+                )}
+              </summary>
+              <div className="mt-4 space-y-1 max-h-96 overflow-y-auto">
+                {generationLog.map((entry, index) => (
+                  <div
+                    key={index}
+                    className={`text-xs p-2 rounded flex items-start gap-2 ${
+                      entry.level === 'error' ? 'bg-red-50 text-red-800' :
+                      entry.level === 'warn' ? 'bg-yellow-50 text-yellow-800' :
+                      entry.level === 'debug' ? 'bg-gray-50 text-gray-600' :
+                      'bg-white text-slate-700'
+                    }`}
+                  >
+                    {/* Timestamp */}
+                    <span className="text-gray-400 font-mono text-[10px] whitespace-nowrap">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </span>
+                    {/* Stage badge */}
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
+                      entry.stage === 'outline' ? 'bg-blue-100 text-blue-700' :
+                      entry.stage === 'avatars' ? 'bg-purple-100 text-purple-700' :
+                      entry.stage === 'scenes' ? 'bg-green-100 text-green-700' :
+                      entry.stage === 'images' ? 'bg-orange-100 text-orange-700' :
+                      entry.stage === 'covers' ? 'bg-pink-100 text-pink-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {entry.stage}
+                    </span>
+                    {/* Character name if present */}
+                    {entry.character && (
+                      <span className="font-medium text-slate-600">[{entry.character}]</span>
+                    )}
+                    {/* Message */}
+                    <span className="flex-1">{entry.message}</span>
+                    {/* Event type */}
+                    <span className="text-gray-400 text-[10px]">{entry.event}</span>
+                  </div>
                 ))}
               </div>
             </details>
