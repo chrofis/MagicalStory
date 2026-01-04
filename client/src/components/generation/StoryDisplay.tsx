@@ -302,6 +302,15 @@ export function StoryDisplay({
   const extractImageSummary = (fullDescription: string): string => {
     if (!fullDescription) return '';
 
+    // NEW FORMAT: Look for section 6 "Image Summary (Language):" at the end
+    // This is the localized version for user editing
+    const section6Match = fullDescription.match(
+      /6\.\s*\*\*Image Summary\s*\([^)]+\)(?::\s*\*\*|\*\*:?)\s*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*|```|$)/i
+    );
+    if (section6Match && section6Match[1] && section6Match[1].trim()) {
+      return section6Match[1].trim();
+    }
+
     // Try to extract just the Image Summary section (supports EN, DE, FR)
     // Handles both newline and same-line formats:
     // "1. **Bildzusammenfassung**\nSophie steht..." OR "1. **Bildzusammenfassung** Sophie steht..."
