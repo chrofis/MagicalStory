@@ -134,8 +134,56 @@ For all other characters:
 **Themes**: [2-3 themes appropriate for age group]
 **Tone**: [Overall feeling: adventurous, heartwarming, playful, magical]
 
+
+---STORY DRAFT---
+Draft the story. Focus on creativity first.
+For EACH of the {PAGES} pages, output in this EXACT format:
+
+**Draft [Page number]**
+[Full story text for this page - follow reading level guidelines]
+
+... continue for ALL {PAGES} pages ...
+
+
+---CRITICAL ANALYSIS---
+Analyze the draft above for logical issues. Be harsh and critical.
+1. List all logical inconsistencies (timeline errors, physical impossibilities, character motivation issues).
+2. List any reading level violations.
+3. For each issue, write a specific instruction on how you will fix it in the final version.
+
+**Example STORY DRAFT and CRITICAL ANALYSIS:**
+```
+---STORY DRAFT---
+
+**Draft 1**
+Sophie woke up early and ran to the window. Snow! Real snow was falling outside. She grabbed her red boots and hurried downstairs to find Grandma already making hot chocolate.
+
+**Draft 2**
+"Can we build a snowman?" Sophie asked, bouncing on her toes. Grandma smiled and handed her a warm mug. "First, drink this. Then we'll bundle up."
+
+**Draft 3**
+Outside, the garden looked like a white blanket. Sophie rolled the first snowball while Grandma watched from the porch with Max the dog.
+
+---CRITICAL ANALYSIS---
+
+1. **Logical inconsistencies:**
+   - Page 1: Sophie "grabbed her red boots" but we never see her put them on before going outside
+   - Page 3: Max appears without introduction - readers don't know who Max is
+   - Page 1-2: Timeline unclear - did Sophie get dressed between grabbing boots and drinking hot chocolate?
+
+2. **Reading level violations:**
+   - None detected - word count appropriate for target level
+
+3. **Fixes for final version:**
+   - Page 1: Change to "grabbed her coat" (boots can be assumed)
+   - Page 2: Add brief mention of Max the dog waiting by the door
+   - Page 3: Remove "Max the dog" since he's now introduced on page 2
+```
+
+
+
 ---VISUAL BIBLE---
-Scan these outline and ADD all new visual elements. Use unique identifiers:
+Scan the draft and extract all elements that need to be consistent for visualization. Use unique identifiers:
 - Secondary Characters: CHR001, CHR002...
 - Animals & Creatures: ANI001, ANI002...
 - Artifacts (Objects): ART001, ART002...
@@ -236,6 +284,8 @@ Characters:
 - [CharacterName]: [clothing category]
 
 ---STORY PAGES---
+Rewrite the story based on the draft, BUT YOU MUST APPLY ALL FIXES from the CRITICAL ANALYSIS section
+The final output must be logically consistent and error-free.
 
 For EACH of the {PAGES} pages, output in this EXACT format:
 
