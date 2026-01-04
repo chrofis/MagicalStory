@@ -6206,7 +6206,20 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
 async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}) {
+  const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
+
+  // Timing tracker for all stages
+  const timing = {
+    start: timingStart,
+    storyGenStart: null,
+    storyGenEnd: null,
+    coversStart: null,
+    coversEnd: null,
+    pagesStart: null,
+    pagesEnd: null,
+    end: null
+  };
 
   // Clear avatar generation logs for fresh tracking
   clearStyledAvatarGenerationLog();
@@ -6529,11 +6542,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
-        const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, null, null, coverModelOverrides, coverLabel
-        );
 
-        addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'cover_images', coverResult.modelId);
+        // Usage tracker for cover images
+        const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+          if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
+        };
+
+        const coverResult = await generateImageWithQualityRetry(
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel
+        );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
 
         // Save partial_cover checkpoint for progressive display
@@ -6646,14 +6664,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     });
 
     // Use streaming with progressive parsing and parallel task initiation
+    timing.storyGenStart = Date.now();
     const unifiedResult = await callTextModelStreaming(unifiedPrompt, 20000, (chunk, fullText) => {
       progressiveParser.processChunk(chunk, fullText);
     }, modelOverrides.outlineModel);
+    timing.storyGenEnd = Date.now();
     const unifiedResponse = unifiedResult.text;
     const unifiedModelId = unifiedResult.modelId;
     const unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
     const unifiedProvider = unifiedResult.provider === 'google' ? 'gemini_text' : 'anthropic';
     addUsage(unifiedProvider, unifiedUsage, 'unified_story', unifiedModelId);
+    log.debug(`⏱️ [UNIFIED] Story generation: ${((timing.storyGenEnd - timing.storyGenStart) / 1000).toFixed(1)}s`);
 
     // Finalize streaming parser
     progressiveParser.finalize();
@@ -6862,10 +6883,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         [40, `Waiting for ${streamingCoverPromises.size} cover images...`, jobId]
       );
 
+      timing.coversStart = timing.coversStart || Date.now(); // May have started during streaming
       log.debug(`⏳ [UNIFIED] Waiting for ${streamingCoverPromises.size} cover generations...`);
       const coverResults = await Promise.all(
         Array.from(streamingCoverPromises.values())
       );
+      timing.coversEnd = Date.now();
 
       // Map results to coverImages object
       for (const result of coverResults) {
@@ -6887,6 +6910,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
       }
       log.debug(`✅ [UNIFIED] All ${Object.keys(coverImages).length} cover images complete`);
+      log.debug(`⏱️ [UNIFIED] Cover images: ${((timing.coversEnd - (timing.coversStart || timing.storyGenEnd)) / 1000).toFixed(1)}s`);
     } else {
       log.debug(`📖 [UNIFIED] No cover images to generate (skipCovers=${skipCovers})`);
     }
@@ -6898,6 +6922,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [50, 'Generating page illustrations...', jobId]
     );
 
+    timing.pagesStart = Date.now();
     const imageLimit = pLimit(5);
     const allImages = await Promise.all(
       expandedScenes.map((scene, index) => imageLimit(async () => {
@@ -6968,20 +6993,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
 
         const pageModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
+
+        // Usage tracker for page images
+        const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+          if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+          if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
+        };
+
         const imageResult = await generateImageWithQualityRetry(
           imagePrompt,
           pagePhotos,
           null,
           'scene',
           null,
-          null,
+          pageUsageTracker,
           null,
           pageModelOverrides,
           `PAGE ${pageNum}`
         );
 
         if (imageResult?.imageData) {
-          addUsage('gemini_image', { input_tokens: 0, output_tokens: 0 }, 'page_images', imageResult.modelId);
 
           // Save partial_page checkpoint for progressive display
           await saveCheckpoint(jobId, 'partial_page', {
@@ -7112,6 +7143,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       pageClothing: pageClothingData, // Clothing per page
       clothingRequirements: clothingRequirements, // Per-character clothing requirements
       tokenUsage: tokenUsage, // Token usage statistics for cost tracking
+      generationLog: genLog.getEntries(), // Generation log for dev mode
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
