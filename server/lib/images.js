@@ -1800,9 +1800,14 @@ IMPORTANT INSTRUCTIONS:
         const inlineData = part.inlineData || part.inline_data;
         if (inlineData && inlineData.data) {
           const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
-          const editedImageData = `data:${respMimeType};base64,${inlineData.data}`;
+          const rawImageData = `data:${respMimeType};base64,${inlineData.data}`;
+
+          // Compress inpainted image to JPEG (same as initial generation)
+          log.debug('🗜️  [INPAINT] Compressing repaired image to JPEG...');
+          const compressedImageData = await compressImageToJPEG(rawImageData);
+
           log.info(`✅ [INPAINT] Successfully inpainted image (tokens: ${usage.input_tokens} in, ${usage.output_tokens} out)`);
-          return { imageData: editedImageData, usage, modelId };
+          return { imageData: compressedImageData, usage, modelId };
         }
       }
     }

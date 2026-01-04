@@ -22,7 +22,7 @@ Include COMPLETE physical descriptions of all characters, objects, and locations
 - For MAIN CHARACTERS: use their EXACT NAME and FULL physical description from below
 - For Secondary characters or any other objects from the RECURRING ELEMENTS, copy their name and identifier
 - For BACKGROUND CHARACTERS: describe generically (e.g., "other children playing in the background")
-- BANNED collective nouns for main characters: "the family", "everyone", "the group", "the team"
+- BANNED collective nouns for main characters (in ANY language): "the family/die Familie/la famille", "everyone/alle/tout le monde", "the group/die Gruppe/le groupe", "the team/das Team/l'équipe". ALWAYS use individual character names instead.
 - Describe spatial relationships clearly for the illustrator
   - Good: "The dog runs toward the back right. Sophie stands in the front left, watching."
   - Bad: "A dog is running, the girl is looking at the dog."
@@ -183,7 +183,7 @@ Sophie is on the right side of the image, the prairie dog on the left on his ele
 - Every main character in the scene MUST be named explicitly (but NOT physically described - handled by image system)
 - For RECURRING ELEMENTS, use descriptions EXACTLY as provided
 - Keep total output under 1000 words - be detailed but concise
-- **OUTPUT LANGUAGE: Write the entire scene description in {LANGUAGE}**
+- **OUTPUT LANGUAGE: Write section 1 (Image Summary) TWICE: first in English, then translated to {LANGUAGE}. All other sections remain in English.**
 
 **SAFETY - AVOID THESE SETTINGS:**
 - Bedroom/sleeping scenes → use living room, garden, or outdoor alternatives
