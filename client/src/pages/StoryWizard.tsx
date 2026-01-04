@@ -1485,9 +1485,9 @@ export default function StoryWizard() {
       if (step === 1 && currentCharacter && newStep !== 1) {
         await saveCharacter();
       }
-      // Save relationships when leaving step 2
-      if (step === 2 && newStep !== 2) {
-        await saveAllCharacterData();
+      // Save relationships when leaving step 1 (fire and forget)
+      if (step === 1 && newStep !== 1) {
+        saveAllCharacterData(); // No await - runs in background
       }
       // Clear currentCharacter when entering step 1 to show character list
       if (newStep === 1 && step !== 1) {
