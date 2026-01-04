@@ -141,8 +141,8 @@ const FILE_UPLOAD_CONFIG = {
 // Common validation schemas
 const schemas = {
   register: {
-    username: { required: true, type: 'string', minLength: 3, maxLength: 30 },
-    email: { required: true, type: 'email' },
+    username: { required: true, type: 'email' },  // Username is the email address
+    email: { type: 'email' },  // Optional, server uses username as email
     password: passwordRules
   },
   login: {
