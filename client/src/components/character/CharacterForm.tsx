@@ -537,8 +537,8 @@ export function CharacterForm({
               </div>
             </div>
 
-            {/* Basic Info - Gender, Age, Height */}
-            <div className="grid grid-cols-3 gap-3">
+            {/* Basic Info - Gender, Age, Height - stack on mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
                   {t.gender}
