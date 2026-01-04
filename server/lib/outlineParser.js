@@ -55,8 +55,9 @@ function parseCharacterClothingBlock(content) {
   const charactersBlockMatch = content.match(/Characters:\s*([\s\S]*?)(?=---\s*Page|$)/i);
   if (charactersBlockMatch) {
     const block = charactersBlockMatch[1];
-    // Match lines like "- Name: category" or "- Name (alias): category"
-    const linePattern = /^-\s*([^:]+):\s*(standard|winter|summer|costumed:\S+)/gim;
+    // Match lines like "- Name: category" or "Name: category" (with or without leading hyphen)
+    // Also allows "* Name: category" bullet format
+    const linePattern = /^[-*]?\s*([^:\n]+):\s*(standard|winter|summer|costumed:\S+)/gim;
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();
@@ -65,6 +66,16 @@ function parseCharacterClothingBlock(content) {
       const baseName = rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
       characters.push(rawName);
       characterClothing[baseName] = clothing;
+    }
+    // Debug: log if Characters block found but no per-character clothing parsed
+    if (characters.length === 0 && block.trim()) {
+      log.debug(`[CLOTHING-PARSE] Characters block found but no per-char format matched. Block: "${block.substring(0, 200)}..."`);
+    }
+  } else {
+    // Debug: log if no Characters block found at all
+    const hasCharactersWord = content.includes('Characters');
+    if (hasCharactersWord) {
+      log.debug(`[CLOTHING-PARSE] Content has "Characters" but regex didn't match. Content snippet: "${content.substring(content.indexOf('Characters'), content.indexOf('Characters') + 200)}..."`);
     }
   }
 
@@ -1665,7 +1676,10 @@ class ProgressiveUnifiedParser {
         const { characterClothing, characters } = parseCharacterClothingBlock(content);
 
         this.emitted.pages.add(pageNum);
-        log.debug(`🌊 [STREAM-UNIFIED] Page ${pageNum} complete`);
+        const clothingStr = Object.keys(characterClothing).length > 0
+          ? Object.entries(characterClothing).map(([n, c]) => `${n}:${c}`).join(', ')
+          : 'none';
+        log.debug(`🌊 [STREAM-UNIFIED] Page ${pageNum} complete (clothing: ${clothingStr})`);
 
         if (this.callbacks.onPageComplete) {
           this.callbacks.onPageComplete({
