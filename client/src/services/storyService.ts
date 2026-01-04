@@ -337,6 +337,7 @@ export const storyService = {
       initialPage: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
       backCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
     } | null;
+    generationLog?: GenerationLogEntry[];
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');

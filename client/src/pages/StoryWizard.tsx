@@ -411,6 +411,10 @@ export default function StoryWizard() {
                       return updated;
                     });
                   }
+                  // Load generation log from dev metadata
+                  if (devMetadata.generationLog?.length) {
+                    setGenerationLog(devMetadata.generationLog);
+                  }
                   log.debug('Dev metadata merged into story');
                 }
               }).catch(err => {

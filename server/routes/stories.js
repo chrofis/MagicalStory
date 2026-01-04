@@ -368,7 +368,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           totalAttempts: story.coverImages.backCover.totalAttempts || null,
           referencePhotos: story.coverImages.backCover.referencePhotos || null
         } : null
-      } : null
+      } : null,
+      // Generation log (avatar lookups, stage transitions, etc.)
+      generationLog: story.generationLog || []
     };
 
     console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries`);
