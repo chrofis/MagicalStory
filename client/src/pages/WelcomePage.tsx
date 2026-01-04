@@ -7,17 +7,16 @@ import { Camera, Sparkles, BookOpen, ArrowRight, Gift, Coins } from 'lucide-reac
 const translations = {
   en: {
     welcome: 'Welcome to MagicalStory!',
-    subtitle: "Let's create your personalized storybook",
-    introText: "You're about to turn your photos into a magical illustrated story. Here's how it works:",
+    subtitle: "Let's create your personalized storybook. Here's how it works:",
 
     step1Title: 'Create Characters',
-    step1Desc: 'Upload photos of your family and friends. Our AI transforms them into beautiful illustrated characters.',
+    step1Desc: 'Upload photos of family and friends. Add character details to bring the story to life.',
 
     step2Title: 'Design Your Story',
-    step2Desc: 'Choose a theme, art style, and story length. Add personal details to make it unique.',
+    step2Desc: 'Choose a theme, art style, and personalize the story. Once ready, we create your story and send you an email.',
 
     step3Title: 'Print & Share',
-    step3Desc: 'Download as PDF instantly or order a professionally printed hardcover book.',
+    step3Desc: 'Download as PDF instantly or order a printed book.',
 
     creditsTitle: 'Your Starting Credits',
     creditsAmount: '500',
@@ -31,17 +30,16 @@ const translations = {
   },
   de: {
     welcome: 'Willkommen bei MagicalStory!',
-    subtitle: 'Erstellen wir dein personalisiertes Geschichtenbuch',
-    introText: 'Du wirst gleich deine Fotos in eine magische illustrierte Geschichte verwandeln. So funktioniert es:',
+    subtitle: 'Erstellen wir dein personalisiertes Geschichtenbuch. So funktioniert es:',
 
     step1Title: 'Charaktere erstellen',
-    step1Desc: 'Lade Fotos von Familie und Freunden hoch. Unsere KI verwandelt sie in wunderschöne illustrierte Charaktere.',
+    step1Desc: 'Lade Fotos von Familie und Freunden hoch. Füge Charakter-Details hinzu, um die Geschichte lebendig zu machen.',
 
     step2Title: 'Geschichte gestalten',
-    step2Desc: 'Wähle ein Thema, einen Kunststil und die Länge der Geschichte. Füge persönliche Details hinzu.',
+    step2Desc: 'Wähle ein Thema, einen Kunststil und personalisiere die Geschichte. Sobald alles fertig ist, erstellen wir deine Geschichte und senden dir eine E-Mail.',
 
     step3Title: 'Drucken & Teilen',
-    step3Desc: 'Sofort als PDF herunterladen oder ein professionell gedrucktes Hardcover-Buch bestellen.',
+    step3Desc: 'Sofort als PDF herunterladen oder ein gedrucktes Buch bestellen.',
 
     creditsTitle: 'Deine Startguthaben',
     creditsAmount: '500',
@@ -55,17 +53,16 @@ const translations = {
   },
   fr: {
     welcome: 'Bienvenue sur MagicalStory!',
-    subtitle: 'Créons votre livre d\'histoires personnalisé',
-    introText: 'Vous allez transformer vos photos en une histoire illustrée magique. Voici comment ça marche:',
+    subtitle: "Créons votre livre d'histoires personnalisé. Voici comment ça marche:",
 
     step1Title: 'Créer des personnages',
-    step1Desc: 'Téléchargez des photos de votre famille et amis. Notre IA les transforme en magnifiques personnages illustrés.',
+    step1Desc: "Téléchargez des photos de votre famille et amis. Ajoutez des détails aux personnages pour donner vie à l'histoire.",
 
     step2Title: 'Concevoir votre histoire',
-    step2Desc: 'Choisissez un thème, un style artistique et la longueur. Ajoutez des détails personnels.',
+    step2Desc: "Choisissez un thème, un style artistique et personnalisez l'histoire. Une fois prêt, nous créons votre histoire et vous envoyons un e-mail.",
 
     step3Title: 'Imprimer & Partager',
-    step3Desc: 'Téléchargez en PDF instantanément ou commandez un livre relié imprimé professionnellement.',
+    step3Desc: 'Téléchargez en PDF instantanément ou commandez un livre imprimé.',
 
     creditsTitle: 'Vos crédits de départ',
     creditsAmount: '500',
@@ -109,56 +106,36 @@ export default function WelcomePage() {
       icon: Camera,
       title: t.step1Title,
       desc: t.step1Desc,
-      color: 'bg-blue-500',
+      color: 'bg-indigo-500',
     },
     {
       icon: Sparkles,
       title: t.step2Title,
       desc: t.step2Desc,
-      color: 'bg-purple-500',
+      color: 'bg-indigo-500',
     },
     {
       icon: BookOpen,
       title: t.step3Title,
       desc: t.step3Desc,
-      color: 'bg-green-500',
+      color: 'bg-indigo-500',
     },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      {/* Header */}
-      <div className="pt-8 pb-4 px-4">
-        <div className="max-w-2xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 mb-6">
-            <Sparkles className="w-8 h-8 text-indigo-600" />
-            <span className="text-2xl font-bold text-indigo-600">MagicalStory</span>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
-      <div className="px-4 pb-12">
+      <div className="px-4 py-12">
         <div className="max-w-2xl mx-auto">
           {/* Welcome Message */}
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
               {t.welcome}
             </h1>
-            <p className="text-lg text-gray-600 mb-2">
+            <p className="text-lg text-gray-600">
               {t.subtitle}
             </p>
-            {user?.username && (
-              <p className="text-indigo-600 font-medium">
-                {user.username}
-              </p>
-            )}
           </div>
-
-          {/* Intro Text */}
-          <p className="text-center text-gray-600 mb-8">
-            {t.introText}
-          </p>
 
           {/* Steps */}
           <div className="space-y-4 mb-8">

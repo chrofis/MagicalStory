@@ -51,7 +51,7 @@ const MODEL_DEFAULTS = {
   idea: 'claude-sonnet',               // Story idea generation
   outline: 'claude-sonnet',            // Story outline generation
   storyText: 'claude-sonnet',          // Story narrative text
-  sceneDescription: 'claude-haiku',    // Scene description for images
+  sceneDescription: 'claude-sonnet',   // Scene description for images
 
   // Image models
   pageImage: 'gemini-2.5-flash-image',       // Regular page images
