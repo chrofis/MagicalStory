@@ -2618,9 +2618,20 @@ export default function StoryWizard() {
             </div>
           );
         }
-        // If generating but no content yet, show nothing (popup overlay handles this)
+        // If generating but no content yet, show a loading indicator
+        // (This can happen if we transition to step 6 before data arrives)
         if (isGenerating) {
-          return null;
+          return (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
+              <p className="text-xl font-semibold text-indigo-700">
+                {language === 'de' ? 'Geschichte wird erstellt...' : language === 'fr' ? 'Création de l\'histoire...' : 'Creating your story...'}
+              </p>
+              <p className="text-indigo-500 mt-2">
+                {language === 'de' ? 'Einen Moment Geduld bitte' : language === 'fr' ? 'Veuillez patienter' : 'Please wait a moment'}
+              </p>
+            </div>
+          );
         }
         return (
           <div className="text-center py-12">
