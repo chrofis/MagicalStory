@@ -590,10 +590,27 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       let clothingDescription = null;
       let usedClothingCategory = null;
 
+      // Check for per-character clothing from scene (_currentClothing field)
+      // This overrides the default clothingCategory for this specific character
+      let effectiveClothingCategory = clothingCategory;
+      let effectiveCostumeType = costumeType;
+      if (clothingRequirements && clothingRequirements[char.name]?._currentClothing) {
+        const charCurrentClothing = clothingRequirements[char.name]._currentClothing;
+        if (charCurrentClothing.startsWith('costumed:')) {
+          effectiveClothingCategory = 'costumed';
+          effectiveCostumeType = charCurrentClothing.split(':')[1];
+          log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${charCurrentClothing}`);
+        } else {
+          effectiveClothingCategory = charCurrentClothing;
+          effectiveCostumeType = null;
+          log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing = ${effectiveClothingCategory}`);
+        }
+      }
+
       // Handle costumed category - check styled avatars first, then regular costumed
-      if (clothingCategory === 'costumed') {
+      if (effectiveClothingCategory === 'costumed') {
         // If specific costumeType provided, use it; otherwise look up from clothingRequirements
-        let costumeKey = costumeType?.toLowerCase();
+        let costumeKey = effectiveCostumeType?.toLowerCase();
 
         // Look up costume type from clothingRequirements (per-character)
         // clothingRequirements can be:
@@ -676,18 +693,18 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         }
       }
       // Check for exact clothing avatar (standard, winter, summer)
-      else if (clothingCategory && clothingCategory !== 'costumed' && avatars && avatars[clothingCategory]) {
-        photoType = `clothing-${clothingCategory}`;
-        photoUrl = avatars[clothingCategory];
-        usedClothingCategory = clothingCategory;
+      else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
+        photoType = `clothing-${effectiveClothingCategory}`;
+        photoUrl = avatars[effectiveClothingCategory];
+        usedClothingCategory = effectiveClothingCategory;
         // Get extracted clothing description for this avatar
-        if (avatars.clothing && avatars.clothing[clothingCategory]) {
-          clothingDescription = avatars.clothing[clothingCategory];
+        if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
+          clothingDescription = avatars.clothing[effectiveClothingCategory];
         }
       }
 
       // Backwards compatibility: use legacy 'formal' avatar for costumed requests
-      if (!photoUrl && clothingCategory === 'costumed' && avatars?.formal) {
+      if (!photoUrl && effectiveClothingCategory === 'costumed' && avatars?.formal) {
         log.debug(`[AVATAR COMPAT] ${char.name}: Using legacy 'formal' avatar for costumed request`);
         photoType = 'clothing-formal';
         photoUrl = avatars.formal;
@@ -698,8 +715,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       }
 
       // Try fallback clothing avatars before falling back to body photo
-      if (!photoUrl && clothingCategory && avatars) {
-        const fallbacks = clothingFallbackOrder[clothingCategory] || ['standard', 'summer', 'winter'];
+      if (!photoUrl && effectiveClothingCategory && avatars) {
+        const fallbacks = clothingFallbackOrder[effectiveClothingCategory] || ['standard', 'summer', 'winter'];
         for (const fallbackCategory of fallbacks) {
           if (avatars[fallbackCategory]) {
             photoType = `clothing-${fallbackCategory}`;
@@ -709,7 +726,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
             if (avatars.clothing && avatars.clothing[fallbackCategory]) {
               clothingDescription = avatars.clothing[fallbackCategory];
             }
-            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${clothingCategory}, using ${fallbackCategory}`);
+            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using ${fallbackCategory}`);
             break;
           }
         }
@@ -735,7 +752,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         photoType,
         photoUrl,
         photoHash: hashImageData(photoUrl),  // For dev mode verification
-        clothingCategory: usedClothingCategory || clothingCategory || null,
+        clothingCategory: usedClothingCategory || effectiveClothingCategory || null,
         clothingDescription,  // Exact clothing from avatar eval (e.g., "red winter parka, blue jeans")
         hasPhoto: photoType !== 'none'
       };
@@ -1271,10 +1288,10 @@ ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
  * @param {string} shortSceneDesc - Scene hint from outline (current page)
  * @param {string} language - Output language
  * @param {Object} visualBible - Visual Bible data
- * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint} for previous pages (max 2)
- * @param {string} currentClothing - Clothing category for this page from outline (winter/summer/formal/standard)
+ * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint, characterClothing} for previous pages (max 2)
+ * @param {Object|string} characterClothing - Per-character clothing map {Name: 'category'} or legacy string
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null, previousScenes = [], currentClothing = 'standard') {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null, previousScenes = [], characterClothing = {}) {
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -1375,11 +1392,33 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       if (prev.sceneHint) {
         previousScenesText += `  Scene: ${prev.sceneHint}\n`;
       }
-      if (prev.clothing) {
+      // Show per-character clothing for previous scenes
+      if (prev.characterClothing && typeof prev.characterClothing === 'object') {
+        const clothingList = Object.entries(prev.characterClothing)
+          .map(([name, cat]) => `${name}: ${cat}`)
+          .join(', ');
+        if (clothingList) {
+          previousScenesText += `  Clothing: ${clothingList}\n`;
+        }
+      } else if (prev.clothing) {
+        // Legacy format fallback
         previousScenesText += `  Clothing: ${prev.clothing}\n`;
       }
     }
     previousScenesText += '\n';
+  }
+
+  // Format per-character clothing for prompt
+  let characterClothingText = '';
+  if (characterClothing && typeof characterClothing === 'object' && Object.keys(characterClothing).length > 0) {
+    characterClothingText = Object.entries(characterClothing)
+      .map(([name, category]) => `- ${name}: ${category}`)
+      .join('\n');
+  } else if (typeof characterClothing === 'string') {
+    // Legacy format: single clothing for all
+    characterClothingText = `All characters: ${characterClothing}`;
+  } else {
+    characterClothingText = 'All characters: standard';
   }
 
   // Use template from file if available
@@ -1391,7 +1430,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       PAGE_CONTENT: pageContent,
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
-      CURRENT_CLOTHING: currentClothing,
+      CHARACTER_CLOTHING: characterClothingText,
       LANGUAGE: language,
       LANGUAGE_NOTE: getLanguageNote(language)
     });

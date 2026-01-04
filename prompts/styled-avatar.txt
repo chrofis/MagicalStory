@@ -1,4 +1,4 @@
-TASK: Create a 2x2 GRID IMAGE with 4 views of the EXACT individual from the reference images, converted to the target art style.
+TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference images, converted to the target art style.
 
 REFERENCE IMAGES PROVIDED:
 - Image 1: High-resolution face photo - use for EXACT facial identity (face shape, features, skin tone, eye color, hair)
@@ -21,10 +21,10 @@ GRID LAYOUT (with clear black dividing lines between quadrants):
 +-------------------+-------------------+
 
 GRID REQUIREMENTS:
-- Draw clear BLACK LINES (2-3px) separating the 4 quadrants
+- Clean 2x2 collage layout with a thin neutral divider
 - Both profile views (top right and bottom right) MUST face the SAME direction (RIGHT)
-- Each quadrant has white background 
-- All 4 quadrants show the SAME outfit from Image 2
+- Each quadrant has solid light grey (off-white) studio background
+- All 4 quadrants show the SAME outfit from Image 2. If the outfit has pattern/logos they must be identical in size, color, and placement in all four views.
 - TOP QUADRANTS: Head and shoulders, face clearly visible
 - BOTTOM QUADRANTS: Full body from head to toe, shoes visible
 
@@ -35,6 +35,7 @@ IDENTITY PERSISTENCE (CRITICAL):
 - If the subject is a child, they MUST remain a child with child-like proportions and features. Do not mature the face.
 - If the subject has specific facial markers (moles, scars, eye shape), these MUST be retained with 100% accuracy.
 - Body: Use the body proportions from Image 2 (standard avatar)
+- Enforce an age-accurate head-to-body ratio to ensure skeletal proportions match the facial age (Reference: Infant=4, Child=6, Teen=7, Adult=8)
 - Lighting: Natural, even, studio-style diffused light.
 - NO "BEAUTIFICATION". Do not apply "Standard Fashion Model" features. The face must be a literal duplicate of Image 1.
 - The goal is a photographic "Documentary" level of facial realism, rendered in the target art style.

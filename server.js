@@ -6403,7 +6403,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           langText,
           streamingVisualBible,
           [],
-          page.clothing || 'standard'
+          page.characterClothing || {}
         );
 
         const expansionResult = await callTextModelStreaming(expansionPrompt, 2000, null, modelOverrides.sceneDescriptionModel);
@@ -6418,7 +6418,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneDescription: expansionResult.text,
           sceneDescriptionPrompt: expansionPrompt,
           sceneDescriptionModelId: expansionResult.modelId,
-          clothing: page.clothing,
+          characterClothing: page.characterClothing,
           characters: page.characters
         };
       });
@@ -6688,7 +6688,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       sceneDescriptions: storyPages.map(page => ({
         pageNumber: page.pageNumber,
         description: page.sceneHint || '',
-        clothing: page.clothing || 'standard'
+        characterClothing: page.characterClothing || {}
       })),
       totalPages: printPageCount  // Use print page count for accurate display
     });
@@ -6732,10 +6732,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       pageNumber: page.pageNumber || storyPages.indexOf(page) + 1,
       description: page.sceneHint || page.text || ''
     }));
+    // Build pageClothing from per-character clothing data
     const pageClothing = {};
     storyPages.forEach((page, index) => {
-      if (page.clothing) {
-        pageClothing[page.pageNumber || index + 1] = page.clothing;
+      if (page.characterClothing && Object.keys(page.characterClothing).length > 0) {
+        pageClothing[page.pageNumber || index + 1] = page.characterClothing;
       }
     });
 
@@ -6786,19 +6787,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const allSceneDescriptions = expandedScenes.map(scene => ({
       pageNumber: scene.pageNumber,
       description: scene.sceneDescription,
-      clothing: scene.clothing || 'standard',
+      characterClothing: scene.characterClothing || {},
       outlineExtract: scene.outlineExtract || scene.sceneHint || '',
       // Dev mode: Art Director prompt and model used
       scenePrompt: scene.sceneDescriptionPrompt,
       textModelId: scene.sceneDescriptionModelId
     }));
 
-    // Update pageClothing for storage compatibility (with fallback to 'standard')
+    // Update pageClothing for storage compatibility (per-character format)
     storyPages.forEach((page, index) => {
-      pageClothing[index + 1] = page.clothing || 'standard';
+      if (page.characterClothing && Object.keys(page.characterClothing).length > 0) {
+        pageClothing[index + 1] = page.characterClothing;
+      }
     });
+    // pageClothingData now stores per-character clothing objects
     const pageClothingData = {
-      primaryClothing: storyPages[0]?.clothing || 'standard',
+      primaryClothing: 'standard',  // Legacy field, kept for compatibility
       pageClothing
     };
 
@@ -6885,17 +6889,33 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
 
         const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
-        const clothingCategory = scene.clothing || 'standard';
 
-        let costumeType = null;
-        let effectiveCategory = clothingCategory;
-        if (clothingCategory.startsWith('costumed:')) {
-          effectiveCategory = 'costumed';
-          costumeType = clothingCategory.split(':')[1];
+        // Build per-character clothing lookup from scene.characterClothing
+        // scene.characterClothing = { "Lukas": "costumed:superhero", "Franziska": "standard" }
+        const perCharClothing = scene.characterClothing || {};
+
+        // Get default clothing (fallback for characters not in the map)
+        const defaultClothing = Object.values(perCharClothing)[0] || 'standard';
+        let defaultCategory = defaultClothing;
+        let defaultCostumeType = null;
+        if (defaultClothing.startsWith('costumed:')) {
+          defaultCategory = 'costumed';
+          defaultCostumeType = defaultClothing.split(':')[1];
         }
 
-        // Pass clothingRequirements so each character's costume type can be looked up
-        const pagePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveCategory, costumeType, inputData.artStyle, clothingRequirements);
+        // Pass per-character clothing requirements merged with story-level requirements
+        // Each character's clothing category from scene.characterClothing
+        const sceneClothingRequirements = { ...clothingRequirements };
+        for (const char of sceneCharacters) {
+          const charClothing = perCharClothing[char.name] || defaultClothing;
+          if (!sceneClothingRequirements[char.name]) {
+            sceneClothingRequirements[char.name] = {};
+          }
+          // Add the current scene's clothing selection
+          sceneClothingRequirements[char.name]._currentClothing = charClothing;
+        }
+
+        const pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultCategory, defaultCostumeType, inputData.artStyle, sceneClothingRequirements);
 
         // Log avatar selections for each character
         for (const photo of pagePhotos) {
@@ -8228,7 +8248,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     // Calculate actual print page count:
     // Picture book (1st-grade): 1 page per scene
     // Standard/Advanced: 2 pages per scene (text page + image page)
-    const isPictureBookLayout = inputData.languageLevel === '1st-grade';
+    // Note: isPictureBookLayout is already defined above based on generationMode
     const printPageCount = isPictureBookLayout ? sceneCount : sceneCount * 2;
 
     await saveCheckpoint(jobId, 'story_text', {

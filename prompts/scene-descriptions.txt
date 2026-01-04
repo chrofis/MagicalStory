@@ -28,8 +28,9 @@ You are an award-winning Art Director with 20 years of experience in children's 
 **Story Text if current scene:**
 {PAGE_CONTENT}
 
-**Clothing for this page:** {CURRENT_CLOTHING}
-(Use this in your METADATA JSON. Valid: winter, summer, formal, standard)
+**Character clothing for this page:**
+{CHARACTER_CLOTHING}
+(Each character has their own clothing category. Use the appropriate category for each character in your illustration. Valid: standard, winter, summer, costumed:type)
 
 **MAIN CHARACTERS:** {CHARACTERS}
 

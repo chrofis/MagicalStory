@@ -34,6 +34,64 @@ const KEYWORDS = {
 const CLOTHING_CATEGORIES = ['winter', 'summer', 'costumed', 'standard'];
 
 // ============================================================================
+// SHARED HELPERS - Used by both UnifiedStoryParser and ProgressiveUnifiedParser
+// ============================================================================
+
+/**
+ * Parse per-character clothing block from page content
+ * Format: Characters:\n- Name1: category\n- Name2: category
+ * Also supports legacy format: Characters: Name1, Name2 with separate Clothing: line
+ * @param {string} content - Block content to parse
+ * @returns {{characterClothing: Object, characters: string[]}}
+ */
+function parseCharacterClothingBlock(content) {
+  const characterClothing = {};
+  const characters = [];
+
+  // Try new per-character format first:
+  // Characters:
+  // - Name1: standard
+  // - Name2 (alias): costumed:type
+  const charactersBlockMatch = content.match(/Characters:\s*([\s\S]*?)(?=---\s*Page|$)/i);
+  if (charactersBlockMatch) {
+    const block = charactersBlockMatch[1];
+    // Match lines like "- Name: category" or "- Name (alias): category"
+    const linePattern = /^-\s*([^:]+):\s*(standard|winter|summer|costumed:\S+)/gim;
+    let lineMatch;
+    while ((lineMatch = linePattern.exec(block)) !== null) {
+      const rawName = lineMatch[1].trim();
+      const clothing = lineMatch[2].toLowerCase();
+      // Extract base name (remove alias in parentheses for lookup, keep for display)
+      const baseName = rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      characters.push(rawName);
+      characterClothing[baseName] = clothing;
+    }
+  }
+
+  // If no per-character format found, try legacy format
+  if (characters.length === 0) {
+    // Legacy: Characters: Name1, Name2 on single line
+    const legacyMatch = content.match(/Characters:\s*(.+?)(?:\n|$)/i);
+    if (legacyMatch) {
+      const charList = legacyMatch[1].split(/[,&]/).map(c => c.trim()).filter(c => c.length > 0);
+      characters.push(...charList);
+    }
+    // Legacy: Clothing: category (single value for all)
+    const clothingMatch = content.match(/Clothing:\s*(\S+)/i);
+    if (clothingMatch) {
+      const clothing = clothingMatch[1].toLowerCase();
+      // Apply same clothing to all characters
+      characters.forEach(char => {
+        const baseName = char.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        characterClothing[baseName] = clothing === 'same' ? 'standard' : clothing;
+      });
+    }
+  }
+
+  return { characterClothing, characters };
+}
+
+// ============================================================================
 // REGEX BUILDERS - Create patterns from keywords
 // ============================================================================
 
@@ -1139,17 +1197,17 @@ class UnifiedStoryParser {
   }
 
   /**
-   * Extract cover scene hints
-   * @returns {{titlePage: {hint: string, clothing: string}, initialPage: {hint: string, clothing: string}, backCover: {hint: string, clothing: string}}}
+   * Extract cover scene hints with per-character clothing
+   * @returns {{titlePage: {hint: string, characterClothing: Object, characters: string[]}, ...}}
    */
   extractCoverHints() {
     if (this._cache.coverHints !== undefined) return this._cache.coverHints;
 
     const sectionMatch = this.response.match(/---COVER SCENE HINTS---\s*([\s\S]*?)(?=---STORY PAGES---|$)/i);
     const defaults = {
-      titlePage: { hint: '', clothing: 'standard' },
-      initialPage: { hint: '', clothing: 'standard' },
-      backCover: { hint: '', clothing: 'standard' }
+      titlePage: { hint: '', characterClothing: {}, characters: [] },
+      initialPage: { hint: '', characterClothing: {}, characters: [] },
+      backCover: { hint: '', characterClothing: {}, characters: [] }
     };
 
     if (!sectionMatch) {
@@ -1159,17 +1217,26 @@ class UnifiedStoryParser {
 
     const section = sectionMatch[1];
 
-    // Extract each cover hint
+    // Extract each cover hint with per-character clothing
     const extractCover = (label) => {
-      const pattern = new RegExp(`\\*\\*${label}\\*\\*\\s*(?:Hint:)?\\s*(.+?)(?:\\nClothing:\\s*(\\S+))?(?=\\n\\*\\*|$)`, 'is');
-      const match = section.match(pattern);
-      if (match) {
-        return {
-          hint: match[1].trim(),
-          clothing: (match[2] || 'standard').toLowerCase()
-        };
+      // Match the cover block from **Label** to the next **Label** or end
+      const blockPattern = new RegExp(`\\*\\*${label}\\*\\*\\s*([\\s\\S]*?)(?=\\n\\*\\*(?:Title Page|Initial Page|Back Cover)\\*\\*|$)`, 'i');
+      const blockMatch = section.match(blockPattern);
+
+      if (!blockMatch) {
+        return { hint: '', characterClothing: {}, characters: [] };
       }
-      return { hint: '', clothing: 'standard' };
+
+      const block = blockMatch[1];
+
+      // Extract hint (first line after Hint: or just the first content line)
+      const hintMatch = block.match(/(?:Hint:\s*)?([^\n]+)/i);
+      const hint = hintMatch ? hintMatch[1].trim() : '';
+
+      // Extract per-character clothing
+      const { characterClothing, characters } = parseCharacterClothingBlock(block);
+
+      return { hint, characterClothing, characters };
     };
 
     this._cache.coverHints = {
@@ -1184,7 +1251,7 @@ class UnifiedStoryParser {
 
   /**
    * Extract all story pages with text, scene hint, clothing, and characters
-   * @returns {Array<{pageNumber: number, text: string, sceneHint: string, clothing: string, characters: string[]}>}
+   * @returns {Array<{pageNumber: number, text: string, sceneHint: string, characterClothing: Object, characters: string[]}>}
    */
   extractPages() {
     if (this._cache.pages !== undefined) return this._cache.pages;
@@ -1203,30 +1270,21 @@ class UnifiedStoryParser {
       const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
       const text = textMatch ? textMatch[1].trim() : '';
 
-      // Extract SCENE HINT section
-      const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Clothing:|Characters:|---\s*Page|$)/i);
+      // Extract SCENE HINT section (stops at Characters: which is now multi-line)
+      const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters:|---\s*Page|$)/i);
       const sceneHint = hintMatch ? hintMatch[1].trim() : '';
 
-      // Extract Clothing
-      const clothingMatch = content.match(/Clothing:\s*(\S+)/i);
-      let clothing = clothingMatch ? clothingMatch[1].toLowerCase() : 'standard';
-      if (clothing === 'same' || clothing === '[same]') {
-        // Use previous page's clothing or default to standard
-        const prevPage = pages.length > 0 ? pages[pages.length - 1] : null;
-        clothing = prevPage ? prevPage.clothing : 'standard';
-      }
-
-      // Extract Characters
-      const charactersMatch = content.match(/Characters:\s*(.+?)(?:\n|$)/i);
-      const characters = charactersMatch
-        ? charactersMatch[1].split(/[,&]/).map(c => c.trim()).filter(c => c.length > 0)
-        : [];
+      // Extract per-character clothing from new format:
+      // Characters:
+      // - Name1: standard
+      // - Name2: costumed:superhero
+      const { characterClothing, characters } = parseCharacterClothingBlock(content);
 
       pages.push({
         pageNumber,
         text,
         sceneHint,
-        clothing,
+        characterClothing,
         characters
       });
     }
@@ -1600,16 +1658,11 @@ class ProgressiveUnifiedParser {
         const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
         const text = textMatch ? textMatch[1].trim() : '';
 
-        const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Clothing:|Characters:|---\s*Page|$)/i);
+        const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters:|---\s*Page|$)/i);
         const sceneHint = hintMatch ? hintMatch[1].trim() : '';
 
-        const clothingMatch = content.match(/Clothing:\s*(\S+)/i);
-        const clothing = clothingMatch ? clothingMatch[1].toLowerCase() : 'standard';
-
-        const charactersMatch = content.match(/Characters:\s*(.+?)(?:\n|$)/i);
-        const characters = charactersMatch
-          ? charactersMatch[1].split(/[,&]/).map(c => c.trim()).filter(c => c.length > 0)
-          : [];
+        // Extract per-character clothing using shared helper
+        const { characterClothing, characters } = parseCharacterClothingBlock(content);
 
         this.emitted.pages.add(pageNum);
         log.debug(`🌊 [STREAM-UNIFIED] Page ${pageNum} complete`);
@@ -1619,7 +1672,7 @@ class ProgressiveUnifiedParser {
             pageNumber: pageNum,
             text,
             sceneHint,
-            clothing,
+            characterClothing,
             characters
           });
         }
