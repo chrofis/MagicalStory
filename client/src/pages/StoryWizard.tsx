@@ -1350,6 +1350,7 @@ export default function StoryWizard() {
         customWeaknesses: [],
         customFears: [],
       });
+      relationshipsDirty.current = false; // Reset - relationships were just saved
       log.success('Character data saved successfully');
 
       setCharacters(updatedCharacters);
