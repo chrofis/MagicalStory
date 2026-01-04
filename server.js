@@ -6368,8 +6368,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             } else if (['winter', 'summer', 'standard'].includes(category)) {
               log.debug(`⚡ [STREAM-AVATAR] Generating ${category} avatar for ${char.name}`);
               const result = await generateDynamicAvatar(char, category, config);
-              if (result?.url) {
-                char.avatars[category] = result.url;
+              if (result?.success && result?.imageData) {
+                char.avatars[category] = result.imageData;
                 // Invalidate any cached styled versions since source avatar changed
                 invalidateStyledAvatarForCategory(char.name, category, char);
                 log.debug(`✅ [STREAM-AVATAR] ${char.name} ${category} complete`);
