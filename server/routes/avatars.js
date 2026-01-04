@@ -997,10 +997,12 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
 
     const isFemale = gender === 'female';
 
-    // Define clothing categories - only generate standard avatar
-    // Winter, summer, formal avatars are no longer generated automatically
+    // Define clothing categories - generate winter, standard, and summer avatars in parallel
+    // Formal avatar is not generated (rarely needed)
     const clothingCategories = {
-      standard: { emoji: '👕' }
+      winter: { emoji: '❄️' },
+      standard: { emoji: '👕' },
+      summer: { emoji: '☀️' }
     };
 
     const results = {
@@ -1171,15 +1173,16 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       }
     };
 
-    // PHASE 1: Generate standard avatar only
-    log.debug(`🚀 [CLOTHING AVATARS] Generating standard avatar for ${name}...`);
+    // PHASE 1: Generate all clothing avatars in parallel (winter, standard, summer)
+    const categoryCount = Object.keys(clothingCategories).length;
+    log.debug(`🚀 [CLOTHING AVATARS] Generating ${categoryCount} avatars for ${name} in parallel...`);
     const generationStart = Date.now();
     const generationPromises = Object.entries(clothingCategories).map(
       ([category, config]) => generateSingleAvatar(category, config)
     );
     const generatedAvatars = await Promise.all(generationPromises);
     const generationTime = Date.now() - generationStart;
-    log.debug(`⚡ [CLOTHING AVATARS] Standard avatar generated in ${generationTime}ms`);
+    log.debug(`⚡ [CLOTHING AVATARS] ${categoryCount} avatars generated in ${generationTime}ms (parallel)`);
 
     // Store prompts and images
     for (const { category, prompt, imageData } of generatedAvatars) {
