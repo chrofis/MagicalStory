@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ImpersonationBanner } from './components/common/ImpersonationBanner';
+import { ScrollToTop } from './components/common/ScrollToTop';
 
 // Lazy load pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -21,6 +22,7 @@ const Impressum = lazy(() => import('./pages/Impressum'));
 function App() {
   return (
     <>
+      <ScrollToTop />
       <ImpersonationBanner />
       <Suspense fallback={<LoadingSpinner fullScreen />}>
         <Routes>

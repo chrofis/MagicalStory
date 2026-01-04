@@ -140,14 +140,19 @@ export default function LandingPage() {
       ? decodeURIComponent(redirectParam)
       : null;
 
+    console.log('[AUTH SUCCESS] Starting redirect logic', { redirectUrl, redirectParam });
+
     if (redirectUrl) {
+      console.log('[AUTH SUCCESS] Redirecting to URL param:', redirectUrl);
       navigate(redirectUrl);
     } else {
       // Check if user has any stories - redirect accordingly
       try {
         const { pagination } = await storyService.getStories({ limit: 1 });
+        console.log('[AUTH SUCCESS] Stories count:', pagination.total);
         if (pagination.total > 0) {
           // Existing user with stories → go to My Stories
+          console.log('[AUTH SUCCESS] Has stories, going to /stories');
           navigate('/stories');
         } else {
           // New user without stories
@@ -157,16 +162,20 @@ export default function LandingPage() {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
           });
           const quotaData = await quotaResponse.json();
+          console.log('[AUTH SUCCESS] Quota data:', quotaData);
 
           // If user hasn't consented to photo terms yet, show welcome page
           if (!quotaData.photoConsentAt) {
+            console.log('[AUTH SUCCESS] No consent, going to /welcome');
             navigate('/welcome');
           } else {
+            console.log('[AUTH SUCCESS] Has consent, going to /create');
             navigate('/create');
           }
         }
-      } catch {
+      } catch (error) {
         // On error, default to welcome page for new users
+        console.error('[AUTH SUCCESS] Error:', error);
         navigate('/welcome');
       }
     }
