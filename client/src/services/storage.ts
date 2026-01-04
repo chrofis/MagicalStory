@@ -133,6 +133,7 @@ export function clearAuthStorage(): void {
     'impersonation_state',
     'auth_redirect_url',
     'pendingStoryGeneration',
+    'developer_mode', // Clear developer mode on logout to prevent non-admins from seeing dev features
   ];
 
   authKeys.forEach(key => removeItem(key));

@@ -157,6 +157,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const user = JSON.parse(userJson) as User;
+
+        // Clear developer mode for non-admin users on session restore
+        if (user.role !== 'admin') {
+          storage.removeItem('developer_mode');
+        }
+
         // Restore impersonation state if present
         const impersonationJson = storage.getItem(STORAGE_KEYS.IMPERSONATION_STATE);
         let isImpersonating = false;
@@ -196,6 +202,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     storage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
     storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
     storage.removeItem(STORAGE_KEYS.IMPERSONATION_STATE);
+
+    // Clear developer mode for non-admin users (prevents non-admins from seeing dev features
+    // if an admin previously enabled it on the same browser)
+    if (user.role !== 'admin') {
+      storage.removeItem('developer_mode');
+    }
 
     // Set UI language based on user's preferred language, but only if no language is already set
     // This preserves the language the user selected on the landing page before logging in
