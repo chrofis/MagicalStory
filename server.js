@@ -6400,17 +6400,47 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
         coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
 
-        const coverPageNumber = coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? -1 : -2;
-        const coverPrompt = buildImagePrompt(
-          sceneDescription || `Cover scene for ${streamingTitle || 'story'}`,
-          inputData,
-          coverCharacters,
-          false,
-          streamingVisualBible,
-          coverPageNumber,
-          true,
-          coverPhotos
-        );
+        // Build cover prompt using proper templates (not generic buildImagePrompt)
+        const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar;
+        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible) : '';
+        const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
+
+        let coverPrompt;
+        if (coverType === 'titlePage') {
+          // Front cover: include title for text rendering
+          const storyTitle = streamingTitle || inputData.title || 'My Story';
+          coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+            TITLE_PAGE_SCENE: sceneDescription,
+            STYLE_DESCRIPTION: styleDescription,
+            STORY_TITLE: storyTitle,
+            CHARACTER_REFERENCE_LIST: characterRefList,
+            VISUAL_BIBLE: visualBibleText
+          });
+        } else if (coverType === 'initialPage') {
+          // Initial page: with or without dedication
+          coverPrompt = inputData.dedication && inputData.dedication.trim()
+            ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+                INITIAL_PAGE_SCENE: sceneDescription,
+                STYLE_DESCRIPTION: styleDescription,
+                DEDICATION: inputData.dedication,
+                CHARACTER_REFERENCE_LIST: characterRefList,
+                VISUAL_BIBLE: visualBibleText
+              })
+            : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+                INITIAL_PAGE_SCENE: sceneDescription,
+                STYLE_DESCRIPTION: styleDescription,
+                CHARACTER_REFERENCE_LIST: characterRefList,
+                VISUAL_BIBLE: visualBibleText
+              });
+        } else {
+          // Back cover
+          coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+            BACK_COVER_SCENE: sceneDescription,
+            STYLE_DESCRIPTION: styleDescription,
+            CHARACTER_REFERENCE_LIST: characterRefList,
+            VISUAL_BIBLE: visualBibleText
+          });
+        }
 
         const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';

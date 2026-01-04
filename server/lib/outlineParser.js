@@ -1459,6 +1459,76 @@ class ProgressiveUnifiedParser {
         const parsed = JSON.parse(jsonMatch[1]);
         this.emitted.visualBible = true;
 
+        // Add computed 'description' field for all entry types (same logic as extractVisualBible)
+        if (parsed.secondaryCharacters) {
+          parsed.secondaryCharacters = parsed.secondaryCharacters.map(char => {
+            if (!char.description) {
+              const parts = [];
+              if (char.age) parts.push(char.age);
+              if (char.build) parts.push(char.build);
+              if (char.hair) parts.push(`hair: ${char.hair}`);
+              if (char.face) parts.push(char.face);
+              if (char.signatureLook) parts.push(`Signature: ${char.signatureLook}`);
+              if (char.clothing) parts.push(`Clothing: ${char.clothing}`);
+              char.description = parts.join('. ') || char.name;
+            }
+            return char;
+          });
+        }
+
+        if (parsed.animals) {
+          parsed.animals = parsed.animals.map(animal => {
+            if (!animal.description) {
+              const parts = [];
+              if (animal.species) parts.push(animal.species);
+              if (animal.size) parts.push(animal.size);
+              if (animal.coloring) parts.push(animal.coloring);
+              if (animal.features) parts.push(animal.features);
+              animal.description = parts.join('. ') || animal.name;
+            }
+            return animal;
+          });
+        }
+
+        if (parsed.artifacts) {
+          parsed.artifacts = parsed.artifacts.map(item => {
+            if (!item.description) {
+              const parts = [];
+              if (item.type) parts.push(item.type);
+              if (item.appearance) parts.push(item.appearance);
+              if (item.size) parts.push(item.size);
+              item.description = parts.join('. ') || item.name;
+            }
+            return item;
+          });
+        }
+
+        if (parsed.locations) {
+          parsed.locations = parsed.locations.map(loc => {
+            if (!loc.description) {
+              const parts = [];
+              if (loc.type) parts.push(loc.type);
+              if (loc.atmosphere) parts.push(loc.atmosphere);
+              if (loc.keyFeatures) parts.push(loc.keyFeatures);
+              loc.description = parts.join('. ') || loc.name;
+            }
+            return loc;
+          });
+        }
+
+        if (parsed.vehicles) {
+          parsed.vehicles = parsed.vehicles.map(v => {
+            if (!v.description) {
+              const parts = [];
+              if (v.type) parts.push(v.type);
+              if (v.appearance) parts.push(v.appearance);
+              if (v.size) parts.push(v.size);
+              v.description = parts.join('. ') || v.name;
+            }
+            return v;
+          });
+        }
+
         const entryCount = (parsed.secondaryCharacters?.length || 0) +
                           (parsed.animals?.length || 0) +
                           (parsed.artifacts?.length || 0) +
