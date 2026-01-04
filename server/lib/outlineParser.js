@@ -1663,8 +1663,9 @@ class ProgressiveUnifiedParser {
       const isLastKnownPage = nextPageIndex === -1;
 
       // Only emit if we're confident the page is complete
-      // Either there's a next page, or we have both TEXT and SCENE HINT
-      if (nextPageIndex > match.index || (isLastKnownPage && hasText && hasHint && content.includes('Characters:'))) {
+      // Either there's a next page, or we have both TEXT and SCENE HINT plus at least one character with clothing
+      const hasCharacterClothing = /Characters:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\n]*:\s*(?:standard|winter|summer|costumed:\S+))/mi.test(content);
+      if (nextPageIndex > match.index || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
         // Extract page data
         const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
         const text = textMatch ? textMatch[1].trim() : '';
