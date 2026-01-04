@@ -423,10 +423,22 @@ character.avatars = {
 3. Auto-detect from available avatars
 4. Default to 'standard'
 
-**Avatar Selection Priority:**
-1. Styled avatar for art style + clothing
-2. Regular clothing avatar
-3. Fallback chain: costumed → formal → standard → body photo
+**Avatar Selection Priority (for requested category):**
+1. Styled avatar for art style + clothing (e.g., `styledAvatars.watercolor.summer`)
+2. Unstyled clothing avatar (e.g., `avatars.summer`)
+
+**Fallback Chain (if requested category not found):**
+1. Styled fallback (e.g., `styledAvatars.watercolor.standard`)
+2. Unstyled fallback (e.g., `avatars.standard`)
+3. Body photo (bodyNoBg → body → face)
+
+**Fallback Order by Category:**
+| Requested | Fallback Order |
+|-----------|----------------|
+| winter | standard, summer |
+| summer | standard, winter |
+| standard | summer, winter |
+| costumed | standard |
 
 ---
 
