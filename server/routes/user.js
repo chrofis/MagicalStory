@@ -16,9 +16,10 @@ router.get('/quota', authenticateToken, async (req, res) => {
   try {
     let credits;
     let preferredLanguage = 'English';
+    let photoConsentAt = null;
 
     if (isDatabaseMode()) {
-      const selectQuery = 'SELECT credits, preferred_language FROM users WHERE id = $1';
+      const selectQuery = 'SELECT credits, preferred_language, photo_consent_at FROM users WHERE id = $1';
       const rows = await dbQuery(selectQuery, [req.user.id]);
 
       if (rows.length === 0) {
@@ -27,6 +28,7 @@ router.get('/quota', authenticateToken, async (req, res) => {
 
       credits = rows[0].credits !== undefined ? rows[0].credits : 500;
       preferredLanguage = rows[0].preferred_language || 'English';
+      photoConsentAt = rows[0].photo_consent_at || null;
     } else {
       // File mode not supported in modular routes
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -35,7 +37,8 @@ router.get('/quota', authenticateToken, async (req, res) => {
     res.json({
       credits: credits,
       unlimited: credits === -1,
-      preferredLanguage: preferredLanguage
+      preferredLanguage: preferredLanguage,
+      photoConsentAt: photoConsentAt
     });
   } catch (err) {
     console.error('Error fetching user credits:', err);

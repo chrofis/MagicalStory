@@ -150,12 +150,24 @@ export default function LandingPage() {
           // Existing user with stories → go to My Stories
           navigate('/stories');
         } else {
-          // New user without stories → go to Create
-          navigate('/create');
+          // New user without stories
+          // Check if they've completed onboarding (photoConsentAt is set)
+          // Need to re-fetch user data since auth just completed
+          const quotaResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/user/quota`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+          });
+          const quotaData = await quotaResponse.json();
+
+          // If user hasn't consented to photo terms yet, show welcome page
+          if (!quotaData.photoConsentAt) {
+            navigate('/welcome');
+          } else {
+            navigate('/create');
+          }
         }
       } catch {
-        // On error, default to create page
-        navigate('/create');
+        // On error, default to welcome page for new users
+        navigate('/welcome');
       }
     }
   };
