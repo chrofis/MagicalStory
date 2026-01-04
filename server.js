@@ -9424,7 +9424,7 @@ app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
         status: job.status,
         progress: job.progress,
         progressMessage: job.progress_message,
-        resultData: job.result_data,
+        result: job.result_data,  // Frontend expects 'result' not 'resultData'
         errorMessage: job.error_message,
         createdAt: job.created_at,
         completedAt: job.completed_at,

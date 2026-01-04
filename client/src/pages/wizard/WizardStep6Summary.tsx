@@ -161,49 +161,47 @@ export function WizardStep6Summary({
         <Wand2 size={24} /> {t.title}
       </h2>
 
-      {/* Summary of all selections - 3x2 grid layout */}
-      <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
-        {/* Row 1 */}
+      {/* Summary of all selections - responsive: stack on mobile, 3x2 grid on wide */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-sm bg-gray-50 rounded-lg p-3">
         {/* Main Characters */}
         <div className="flex items-center gap-1 group">
-          <span className="text-gray-500">{t.mainChars}:</span>
-          <span className="font-medium text-indigo-700">{getMainCharacterNames() || '-'}</span>
-          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <span className="text-gray-500 whitespace-nowrap">{t.mainChars}:</span>
+          <span className="font-medium text-indigo-700 truncate">{getMainCharacterNames() || '-'}</span>
+          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Supporting Characters */}
         <div className="flex items-center gap-1 group">
-          <span className="text-gray-500">{t.supportingChars}:</span>
-          <span className="font-medium text-gray-700">{getSupportingCharacterNames() || '-'}</span>
-          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <span className="text-gray-500 whitespace-nowrap">{t.supportingChars}:</span>
+          <span className="font-medium text-gray-700 truncate">{getSupportingCharacterNames() || '-'}</span>
+          <button onClick={() => onEditStep(1)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Language */}
         <div className="flex items-center gap-1 group">
-          <span className="text-gray-500">{t.languageLabel}:</span>
-          <span className="font-medium">{getStoryLanguageName()}</span>
-          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <span className="text-gray-500 whitespace-nowrap">{t.languageLabel}:</span>
+          <span className="font-medium truncate">{getStoryLanguageName()}</span>
+          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
-        {/* Row 2 */}
         {/* Reading Level & Pages */}
         <div className="flex items-center gap-1 group">
-          <span className="text-gray-500">{t.level}:</span>
-          <span className="font-medium">{getReadingLevelLabel()} / {pages} {language === 'de' ? t.pagesLabel : t.pagesLabel.toLowerCase()}</span>
-          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <span className="text-gray-500 whitespace-nowrap">{t.level}:</span>
+          <span className="font-medium truncate">{getReadingLevelLabel()} / {pages} {language === 'de' ? t.pagesLabel : t.pagesLabel.toLowerCase()}</span>
+          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Story Type */}
         <div className="flex items-center gap-1 group">
-          <span className="text-gray-500">{t.storyType}:</span>
-          <span className="font-medium">
+          <span className="text-gray-500 whitespace-nowrap">{t.storyType}:</span>
+          <span className="font-medium truncate">
             {storyCategory === 'adventure' ? getThemeName() : (
               <>{getTopicName()}{storyTheme && storyTheme !== 'realistic' && ` + ${getThemeName()}`}</>
             )}
           </span>
-          <button onClick={() => onEditStep(3)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <button onClick={() => onEditStep(3)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Art Style */}
         <div className="flex items-center gap-1 group">
-          <span className="text-gray-500">{t.artStyleLabel}:</span>
-          <span className="font-medium">{getArtStyleName()}</span>
-          <button onClick={() => onEditStep(4)} className="p-0.5 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <span className="text-gray-500 whitespace-nowrap">{t.artStyleLabel}:</span>
+          <span className="font-medium truncate">{getArtStyleName()}</span>
+          <button onClick={() => onEditStep(4)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
       </div>
 
