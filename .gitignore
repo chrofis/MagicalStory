@@ -48,3 +48,10 @@ npm-debug.log*
 # Firebase service account (secrets)
 *.firebase*.json
 *-firebase-adminsdk-*.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

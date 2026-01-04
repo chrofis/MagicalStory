@@ -119,7 +119,7 @@ export function StoryDisplay({
   sceneImages,
   sceneDescriptions = [],
   coverImages,
-  languageLevel = 'standard',
+  languageLevel: _languageLevel = 'standard', // Kept for backward compatibility, layout now auto-detected
   storyLanguage,
   isGenerating = false,
   onDownloadPdf,
@@ -157,7 +157,6 @@ export function StoryDisplay({
   onSelectImageVersion,
 }: StoryDisplayProps) {
   const { t, language } = useLanguage();
-  const isPictureBook = languageLevel === '1st-grade';
 
   // Use story language for in-story labels (Page/Seite), fallback to UI language
   // Normalize de-ch/de-de to 'de' for label matching
@@ -435,6 +434,13 @@ export function StoryDisplay({
   const displayStory = isEditMode ? editedStory : story;
   const storyPages = parseStoryPages(displayStory);
   const hasImages = sceneImages.length > 0;
+
+  // Detect layout from actual data:
+  // - 1:1 layout (unified/storybook): 1 image per text page (sceneImages.length === storyPages.length)
+  // - 2:1 layout (outlineAndText): 1 image per 2 text pages (sceneImages.length === Math.ceil(storyPages.length / 2))
+  const isPictureBook = sceneImages.length === 0 ||
+    storyPages.length === 0 ||
+    sceneImages.length === storyPages.length; // Exact 1:1 match
 
   // Progressive mode: Calculate max viewable page
   // For picture book: User can see page N if page N-1 has an image (1:1 text:image)

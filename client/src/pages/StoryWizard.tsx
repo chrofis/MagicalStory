@@ -2151,9 +2151,11 @@ export default function StoryWizard() {
         );
 
       case 6:
-        // Step 6: Show StoryDisplay if we have final story OR progressive data OR front cover during generation
-        // This allows transitioning to StoryDisplay as soon as front cover is ready
-        if (generatedStory || progressiveStoryData || (isGenerating && coverImages.frontCover)) {
+        // Step 6: Show StoryDisplay when we have any content to display
+        // During generation: show as soon as we have story text OR any cover image
+        // After generation: show if we have the final story
+        if (generatedStory || progressiveStoryData ||
+            (isGenerating && (coverImages.frontCover || coverImages.initialPage || coverImages.backCover))) {
           // Build scene images from progressive data if still generating
           const displaySceneImages = generatedStory
             ? sceneImages
