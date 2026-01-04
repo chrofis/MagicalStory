@@ -1689,7 +1689,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 
     if (isShortSummary) {
       console.log(`📝 [REGEN] Expanding short scene summary (${inputDescription.length} chars) to full Art Director format...`);
-      const language = storyData.language || 'English';
+      // Use language code (e.g., 'de-ch', 'en') not name (e.g., 'English')
+      const language = storyData.language || 'en';
       const expansionPrompt = buildSceneExpansionPrompt(inputDescription, storyData, sceneCharacters, visualBible, language);
 
       try {

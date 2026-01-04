@@ -306,8 +306,11 @@ export function StoryDisplay({
 
     // NEW FORMAT: Look for section 6 "Image Summary (Language):" at the end
     // This is the localized version for user editing
+    // Handles two formats from LLM:
+    // Format 1: "6. **Image Summary (Deutsch)**\nSophie kniet..."
+    // Format 2: "**6. Image Summary (Deutsch)**\nSophie kniet..."
     const section6Match = fullDescription.match(
-      /6\.\s*\*\*Image Summary\s*\([^)]+\)(?::\s*\*\*|\*\*:?)\s*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*|```|$)/i
+      /(?:\*\*)?6\.?\s*(?:\*\*)?\s*Image Summary\s*\([^)]+\)\s*\*\*\s*([\s\S]*?)(?=\n\s*(?:\*\*)?\d+\.|\n---|\n```|$)/i
     );
     if (section6Match && section6Match[1] && section6Match[1].trim()) {
       return section6Match[1].trim();
