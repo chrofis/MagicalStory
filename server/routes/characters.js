@@ -91,13 +91,94 @@ router.post('/', authenticateToken, async (req, res) => {
         existingCharacters = existingData.characters || [];
       }
 
-      // Merge styledAvatars and costumed avatars from existing characters into new characters
+      // Merge server-side data from existing characters into new characters
+      // This preserves avatar data AND character fields that may not be sent by the frontend
       let preservedCount = 0;
       const mergedCharacters = (characters || []).map(newChar => {
         const existingChar = existingCharacters.find(c => c.id === newChar.id || c.name === newChar.name);
-        if (!existingChar?.avatars) return newChar;
+        if (!existingChar) return newChar;
 
         let hasChanges = false;
+        let mergedChar = { ...newChar };
+
+        // Preserve character-level fields that may be missing from frontend
+        // These are fields that get lost if frontend doesn't explicitly send them
+
+        const preservedFields = [];
+
+        // Preserve height from physical traits if not in new data
+        if (existingChar.height && !newChar.height) {
+          mergedChar.height = existingChar.height;
+          preservedFields.push('height');
+          hasChanges = true;
+        }
+
+        // Preserve apparent_age if not in new data
+        if (existingChar.apparent_age && !newChar.apparent_age) {
+          mergedChar.apparent_age = existingChar.apparent_age;
+          preservedFields.push('apparent_age');
+          hasChanges = true;
+        }
+
+        // Preserve physical traits that may be missing
+        if (existingChar.build && !newChar.build) {
+          mergedChar.build = existingChar.build;
+          preservedFields.push('build');
+          hasChanges = true;
+        }
+
+        // Preserve eye_color if not in new data
+        if (existingChar.eye_color && !newChar.eye_color) {
+          mergedChar.eye_color = existingChar.eye_color;
+          preservedFields.push('eye_color');
+          hasChanges = true;
+        }
+
+        // Preserve hair_color if not in new data
+        if (existingChar.hair_color && !newChar.hair_color) {
+          mergedChar.hair_color = existingChar.hair_color;
+          preservedFields.push('hair_color');
+          hasChanges = true;
+        }
+
+        // Preserve hair_style if not in new data
+        if (existingChar.hair_style && !newChar.hair_style) {
+          mergedChar.hair_style = existingChar.hair_style;
+          preservedFields.push('hair_style');
+          hasChanges = true;
+        }
+
+        // Preserve other_features if not in new data
+        if (existingChar.other_features && !newChar.other_features) {
+          mergedChar.other_features = existingChar.other_features;
+          preservedFields.push('other_features');
+          hasChanges = true;
+        }
+
+        // Preserve 'other' field (glasses, etc.) if not in new data
+        if (existingChar.other && !newChar.other) {
+          mergedChar.other = existingChar.other;
+          preservedFields.push('other');
+          hasChanges = true;
+        }
+
+        // Preserve clothing data (structured clothing details)
+        if (existingChar.clothing && !newChar.clothing) {
+          mergedChar.clothing = existingChar.clothing;
+          preservedFields.push('clothing');
+          hasChanges = true;
+        }
+
+        if (preservedFields.length > 0) {
+          console.log(`[Characters] POST - Preserving fields for ${newChar.name}: ${preservedFields.join(', ')}`);
+        }
+
+        // Preserve clothing_avatars/avatars from existing if not sent
+        if (!existingChar.avatars) {
+          if (hasChanges) preservedCount++;
+          return mergedChar;
+        }
+
         const mergedAvatars = { ...newChar.avatars };
 
         // Preserve styledAvatars from database
@@ -152,14 +233,14 @@ router.post('/', authenticateToken, async (req, res) => {
         if (hasChanges) {
           preservedCount++;
           return {
-            ...newChar,
+            ...mergedChar,
             avatars: mergedAvatars
           };
         }
-        return newChar;
+        return mergedChar;
       });
       if (preservedCount > 0) {
-        console.log(`[Characters] POST - Preserved avatar data for ${preservedCount} characters`);
+        console.log(`[Characters] POST - Preserved data for ${preservedCount} characters`);
       }
 
       // Store character data as an object with all related information
