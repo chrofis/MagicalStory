@@ -6410,6 +6410,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
+        const pageClothing = page.characterClothing || {};
+        const clothingStr = Object.keys(pageClothing).length > 0
+          ? Object.entries(pageClothing).map(([n, c]) => `${n}:${c}`).join(', ')
+          : 'none';
+        log.debug(`⚡ [STREAM-SCENE] Page ${page.pageNumber} starting expansion (clothing: ${clothingStr}, prev: ${previousScenes.length} pages)`);
+
         const expansionPrompt = buildSceneDescriptionPrompt(
           page.pageNumber,
           page.text,
@@ -6418,7 +6424,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           langText,
           streamingVisualBible,
           previousScenes,
-          page.characterClothing || {}
+          pageClothing
         );
 
         const expansionResult = await callTextModelStreaming(expansionPrompt, 2000, null, modelOverrides.sceneDescriptionModel);
