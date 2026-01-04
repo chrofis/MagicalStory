@@ -32,6 +32,33 @@ function translateMessage(message: string, language: string): string {
     return message;
   }
 
+  // Handle "Generating illustration X/Y..." pattern
+  const illustrationMatch = message.match(/^Generating illustration (\d+)\/(\d+)\.\.\.$/);
+  if (illustrationMatch) {
+    const [, current, total] = illustrationMatch;
+    if (language === 'de') return `Illustration ${current}/${total} wird erstellt...`;
+    if (language === 'fr') return `Création de l'illustration ${current}/${total}...`;
+    return message;
+  }
+
+  // Handle "Generating X avatar for Y..." pattern
+  const avatarMatch = message.match(/^Generating (\w+) avatar for (.+)\.\.\.$/);
+  if (avatarMatch) {
+    const [, category, name] = avatarMatch;
+    if (language === 'de') return `${name}: ${category}-Avatar wird erstellt...`;
+    if (language === 'fr') return `Création de l'avatar ${category} pour ${name}...`;
+    return message;
+  }
+
+  // Handle "X cover images ready. Generating remaining covers..." pattern
+  const coverReadyMatch = message.match(/^(\d+) cover images? ready\. Generating remaining covers\.\.\.$/);
+  if (coverReadyMatch) {
+    const [, count] = coverReadyMatch;
+    if (language === 'de') return `${count} Cover fertig. Weitere Cover werden erstellt...`;
+    if (language === 'fr') return `${count} couverture(s) prête(s). Création des couvertures restantes...`;
+    return message;
+  }
+
   const translations: Record<string, Record<string, string>> = {
     'Writing story...': {
       de: 'Geschichte wird geschrieben...',
@@ -40,6 +67,14 @@ function translateMessage(message: string, language: string): string {
     'Creating covers...': {
       de: 'Cover werden erstellt...',
       fr: 'Création des couvertures...',
+    },
+    'Generating cover images...': {
+      de: 'Cover werden erstellt...',
+      fr: 'Création des couvertures...',
+    },
+    'Generating page illustrations...': {
+      de: 'Seitenbilder werden erstellt...',
+      fr: 'Création des illustrations...',
     },
     'Generating picture book story and scenes...': {
       de: 'Geschichte und Szenen werden erstellt...',

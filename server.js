@@ -6674,6 +6674,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     storyPages.forEach(page => {
       pageTextMap[page.pageNumber] = page.text;
     });
+    // Calculate actual print page count:
+    // Picture book (1st-grade): 1 page per scene
+    // Standard/Advanced: 2 pages per scene (text page + image page)
+    const isPictureBook = inputData.languageLevel === '1st-grade';
+    const printPageCount = isPictureBook ? storyPages.length : storyPages.length * 2;
+
     // Frontend expects: { title, dedication, pageTexts, sceneDescriptions, totalPages }
     await saveCheckpoint(jobId, 'story_text', {
       title,
@@ -6684,9 +6690,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         description: page.sceneHint || '',
         clothing: page.clothing || 'standard'
       })),
-      totalPages: storyPages.length
+      totalPages: printPageCount  // Use print page count for accurate display
     });
-    log.debug(`💾 [UNIFIED] Saved story text for progressive display (${storyPages.length} pages)`);
+    log.debug(`💾 [UNIFIED] Saved story text for progressive display (${storyPages.length} scenes = ${printPageCount} print pages)`);
 
     // Update progress: Story text complete
     const avatarsStarted = streamingAvatarPromises.length;
@@ -8219,6 +8225,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       pageTextMap[page.pageNumber] = page.content;
     });
 
+    // Calculate actual print page count:
+    // Picture book (1st-grade): 1 page per scene
+    // Standard/Advanced: 2 pages per scene (text page + image page)
+    const isPictureBookLayout = inputData.languageLevel === '1st-grade';
+    const printPageCount = isPictureBookLayout ? sceneCount : sceneCount * 2;
+
     await saveCheckpoint(jobId, 'story_text', {
       title: storyTitle,
       dedication: inputData.dedication || '',
@@ -8230,9 +8242,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         scenePrompt: sd.scenePrompt || '',
         textModelId: sd.textModelId || ''
       })),
-      totalPages: sceneCount
+      totalPages: printPageCount  // Use print page count for accurate display
     });
-    log.debug(`💾 [STORY] Saved story_text checkpoint with ${Object.keys(pageTextMap).length} pages for progressive display`);
+    log.debug(`💾 [STORY] Saved story_text checkpoint with ${Object.keys(pageTextMap).length} scenes = ${printPageCount} print pages for progressive display`);
 
     // Wait for images only if not skipping
     if (!skipImages) {

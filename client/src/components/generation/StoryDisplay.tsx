@@ -2133,10 +2133,19 @@ export function StoryDisplay({
                         )}
                       </div>
                     ) : (
-                      <div className="w-full flex items-center justify-center bg-gray-100 rounded-lg p-8 mb-4">
-                        <p className="text-gray-500 text-center">
-                          {storyLang === 'de' ? 'Kein Bild für diese Seite' : storyLang === 'fr' ? 'Pas d\'image pour cette page' : 'No image for this page'}
-                        </p>
+                      <div className={`w-full flex flex-col items-center justify-center rounded-lg p-8 mb-4 ${isGenerating ? 'bg-gradient-to-br from-indigo-100 to-purple-100' : 'bg-gray-100'}`}>
+                        {isGenerating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
+                            <p className="text-indigo-600 font-medium text-center">
+                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : 'Image is being created...'}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-gray-500 text-center">
+                            {storyLang === 'de' ? 'Kein Bild für diese Seite' : storyLang === 'fr' ? 'Pas d\'image pour cette page' : 'No image for this page'}
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -2456,10 +2465,19 @@ export function StoryDisplay({
                         )}
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center bg-gray-100 rounded-lg p-8">
-                        <p className="text-gray-500 text-center">
-                          {storyLang === 'de' ? 'Kein Bild für diese Seite' : storyLang === 'fr' ? 'Pas d\'image pour cette page' : 'No image for this page'}
-                        </p>
+                      <div className={`flex flex-col items-center justify-center rounded-lg p-8 ${isGenerating ? 'bg-gradient-to-br from-indigo-100 to-purple-100' : 'bg-gray-100'}`}>
+                        {isGenerating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
+                            <p className="text-indigo-600 font-medium text-center">
+                              {storyLang === 'de' ? 'Bild wird noch erstellt...' : storyLang === 'fr' ? 'Image en cours de création...' : 'Image is being created...'}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-gray-500 text-center">
+                            {storyLang === 'de' ? 'Kein Bild für diese Seite' : storyLang === 'fr' ? 'Pas d\'image pour cette page' : 'No image for this page'}
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -2512,8 +2530,8 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Placeholder for remaining pages during generation */}
-      {isGenerating && story && (
+      {/* Placeholder for remaining pages during generation - only show if not all images are complete */}
+      {isGenerating && story && sceneImages.filter(img => img.imageData).length < storyPages.length && (
         <div className="mt-8 max-w-2xl mx-auto">
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 border-dashed rounded-xl p-8">
             <div className="flex flex-col items-center text-center">

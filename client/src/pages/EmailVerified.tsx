@@ -9,7 +9,7 @@ import { CheckCircle, Loader2, Monitor, Sparkles, LogIn } from 'lucide-react';
 const translations = {
   en: {
     title: 'Email Verified!',
-    checkingOtherWindow: 'Checking if your story is starting in the other window...',
+    checkingOtherWindow: 'Please return to your original browser window where your story should now be generating...',
     generatingInOtherWindow: 'Your story is being generated in your other browser window!',
     otherWindowHint: 'You can close this tab and return to your original window.',
     manualHint: 'Your original window may have been closed. Click below to create your story.',
@@ -20,7 +20,7 @@ const translations = {
   },
   de: {
     title: 'E-Mail bestätigt!',
-    checkingOtherWindow: 'Prüfe, ob Ihre Geschichte im anderen Fenster startet...',
+    checkingOtherWindow: 'Bitte kehren Sie zu Ihrem ursprünglichen Browserfenster zurück, wo Ihre Geschichte nun generiert werden sollte...',
     generatingInOtherWindow: 'Ihre Geschichte wird im anderen Browserfenster generiert!',
     otherWindowHint: 'Sie können diesen Tab schließen und zu Ihrem ursprünglichen Fenster zurückkehren.',
     manualHint: 'Ihr ursprüngliches Fenster wurde möglicherweise geschlossen. Klicken Sie unten, um Ihre Geschichte zu erstellen.',
@@ -31,7 +31,7 @@ const translations = {
   },
   fr: {
     title: 'E-mail verifie!',
-    checkingOtherWindow: 'Verification si votre histoire demarre dans l\'autre fenetre...',
+    checkingOtherWindow: 'Veuillez retourner a votre fenetre de navigateur d\'origine ou votre histoire devrait maintenant etre generee...',
     generatingInOtherWindow: 'Votre histoire est en cours de generation dans votre autre fenetre!',
     otherWindowHint: 'Vous pouvez fermer cet onglet et retourner a votre fenetre d\'origine.',
     manualHint: 'Votre fenetre d\'origine a peut-etre ete fermee. Cliquez ci-dessous pour creer votre histoire.',
@@ -99,8 +99,8 @@ export default function EmailVerified() {
         return;
       }
 
-      // Wait 5 seconds for original window (polling every 3s) to detect verification and start
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Wait 10 seconds for original window (polling every 3s) to detect verification and start
+      await new Promise(resolve => setTimeout(resolve, 10000));
 
       if (!isMountedRef.current) return;
 

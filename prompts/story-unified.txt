@@ -220,15 +220,20 @@ Add at least {PAGES} entries. Even if an element appears only once, add it for v
 
 **Title Page**
 Hint: [1-2 sentences - main character, mood, setting. Keep simple.]
-Clothing: [category]
+Characters:
+- [CharacterName]: [standard | winter | summer | costumed:type]
 
 **Initial Page**
 Hint: [1-2 sentences - all characters together, welcoming atmosphere]
-Clothing: [category]
+Characters:
+- [CharacterName]: [clothing category]
+- [CharacterName]: [clothing category]
 
 **Back Cover**
 Hint: [1-2 sentences - happy conclusion, all characters together]
-Clothing: [category]
+Characters:
+- [CharacterName]: [clothing category]
+- [CharacterName]: [clothing category]
 
 ---STORY PAGES---
 
@@ -240,8 +245,9 @@ TEXT:
 
 SCENE HINT:
 [1-2 sentences describing the KEY VISUAL MOMENT for illustration - use real character names, not aliases]
-Clothing: [standard | winter | summer | costumed:type | same]
-Characters: [ALWAYS use real names from character list, with alias in parentheses if used in story. E.g., "Tim (as Superbrain)"]
+Characters:
+- [CharacterName]: [standard | winter | summer | costumed:type]
+- [CharacterName]: [standard | winter | summer | costumed:type]
 
 --- Page 2 ---
 TEXT:
@@ -249,10 +255,19 @@ TEXT:
 
 SCENE HINT:
 [Key visual moment]
-Clothing: [same] or [category if changed]
-Characters: [Names]
+Characters:
+- [CharacterName]: [clothing category]
+- [CharacterName]: [clothing category]
 
 ... continue for ALL {PAGES} pages ...
+
+**IMPORTANT - Character Clothing Format:**
+- List EVERY character appearing in the scene on a separate line
+- Each line MUST follow format: `- [Name]: [category]`
+- Valid categories: `standard`, `winter`, `summer`, `costumed:type` (e.g., `costumed:superhero`)
+- NEVER use "same" - always specify the explicit clothing category for each character
+- Different characters CAN have different clothing in the same scene
+- This format is machine-parsed, so follow it exactly
 
 ---
 
@@ -263,8 +278,8 @@ Characters: [Names]
 3. **Scene hints are BRIEF** - Just 1-2 sentences, not full descriptions
 4. **Follow reading level** - Match text length to specified reading level
 5. **Show don't tell** - Demonstrate character traits through actions
-6. **Clothing consistency** - Use "same" unless there's a specific reason to change
+6. **Per-character clothing** - EVERY character in each scene MUST have explicit clothing: `- Name: category`. NEVER use "same". Valid categories: standard, winter, summer, costumed:type
 7. **Visual Bible accuracy** - Add all scenes and elements, with specific colors
-8. **Character names in illustrations** - The Characters field MUST use the character's REAL NAME from the provided list, even if the story text uses a nickname, alias, or alter-ego. Add the alias in parentheses. Example: If "Tim" becomes "Superbrain" in the story, write `Characters: Tim (as Superbrain)` - this ensures the illustrator uses the correct reference photos.
+8. **Character names in illustrations** - Use the character's REAL NAME from the provided list, even if the story uses a nickname or alias. Add alias in parentheses: `- Tim (as Superbrain): costumed:superhero`
 
 **DO NOT STOP until you have written all {PAGES} pages with TEXT and SCENE HINT for each.**

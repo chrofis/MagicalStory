@@ -1,4 +1,4 @@
-TASK: Create a 2x2 GRID IMAGE with 4 views of the EXACT individual from the reference photos.
+TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference photos.
 
 GRID LAYOUT (with clear black dividing lines between quadrants):
 ┌─────────────────┬─────────────────┐
@@ -14,10 +14,10 @@ GRID LAYOUT (with clear black dividing lines between quadrants):
 └─────────────────┴─────────────────┘
 
 CRITICAL GRID REQUIREMENTS:
-- Draw clear BLACK LINES (2-3px) separating the 4 quadrants
-- Both profile views (top right and bottom right) MUST face the SAME direction (RIGHT)
-- Each quadrant has pure white background (#FFFFFF)
-- All 4 quadrants show the SAME outfit
+- Clean 2x2 collage layout with a thin neutral divider.
+- Both profile views (top right and bottom right) the face looks towards the RIGHT
+- Each quadrant has solid light grey (off-white) studio background
+- All 4 quadrants show the SAME outfit. If the outfit has pattern/ logos the must be identical in size, color, and placement in all four views.
 
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.
@@ -31,6 +31,7 @@ IDENTITY PERSISTENCE:
 - Hair and face must be fully visible. Avoid hats and hoods.
 - Biometric precision: The face must not be averaged or replaced.
 - Focus: Ultra-sharp focus on facial features.
+- Enforce an age-accurate head-to-body ratio to ensure skeletal proportions match the facial age (Reference: Infant=4, Child=6, Teen=7, Adult=8)
 
 WARDROBE DETAILS:
 - Style Transfer Rule: Copy the EXACT pattern AND colors from the input image. Just change from short to long sleeves / legs, etc.

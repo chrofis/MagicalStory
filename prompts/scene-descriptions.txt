@@ -135,6 +135,9 @@ Sophie kniet im hohen Präriegras, trommelt mit den Fingern auf ihr Knie, währe
 **Camera & Physics Logic:**
 - Characters moving away → "Back view, seen from behind"
 - Characters interacting → "Side profile" or "Wide angle action shot"
+- Character acting heroic → use a Low Angle (camera looking up) to make them appear powerful. 
+- Character is overwhelmed  → use a High Angle.
+- If scene needs full attention to main character → slightly blur the background elements (lab tables, beakers)to keep the focus sharp on main character
 - Pulling/towing → "Taut rope, straight tension, body weight leaning back"
 - Carrying heavy objects → "Posture straining, knees bent"
 - Objects touching → Use distinct materials/colors: "A [wooden-brown] stick in a [pink-skin] hand"
