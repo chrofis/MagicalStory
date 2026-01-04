@@ -1705,14 +1705,22 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 
     // Get clothing category - prefer outline pageClothing, then parse from description
     const pageClothingData = storyData.pageClothing || null;
+    const clothingRequirements = storyData.clothingRequirements || null;
     let clothingCategory = pageClothingData?.pageClothing?.[pageNumber] || null;
     if (!clothingCategory) {
       clothingCategory = parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
     }
+    // Handle costumed:type format
+    let effectiveClothing = clothingCategory;
+    let costumeType = null;
+    if (clothingCategory && clothingCategory.startsWith('costumed:')) {
+      costumeType = clothingCategory.split(':')[1];
+      effectiveClothing = 'costumed';
+    }
+    const artStyle = storyData.artStyle || 'pixar';
     // Use detailed photo info (with names) for labeled reference images
-    const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory);
+    const referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, clothingRequirements);
     log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}${pageClothingData ? ' (from outline)' : ' (parsed)'}`);
-
 
     // Build image prompt with scene-specific characters and visual bible
     // Use isStorybook=true to include Visual Bible section in prompt
@@ -2001,16 +2009,25 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       coverClothing = coverScenes.backCover?.clothing || parseClothingCategory(sceneDescription) || 'standard';
     }
 
+    // Handle costumed:type format
+    let effectiveCoverClothing = coverClothing;
+    let coverCostumeType = null;
+    if (coverClothing && coverClothing.startsWith('costumed:')) {
+      coverCostumeType = coverClothing.split(':')[1];
+      effectiveCoverClothing = 'costumed';
+    }
+    const clothingRequirements = storyData.clothingRequirements || null;
+
     // Get character photos with correct clothing variant
     let coverCharacterPhotos;
     if (normalizedCoverType === 'front') {
       // Front cover: detect which characters appear in the scene
       const frontCoverCharacters = getCharactersInScene(sceneDescription, storyData.characters || []);
-      coverCharacterPhotos = getCharacterPhotoDetails(frontCoverCharacters, coverClothing);
+      coverCharacterPhotos = getCharacterPhotoDetails(frontCoverCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] Front cover: ${frontCoverCharacters.length} characters, clothing: ${coverClothing}`);
     } else {
       // Initial/Back covers: use ALL characters
-      coverCharacterPhotos = getCharacterPhotoDetails(storyData.characters || [], coverClothing);
+      coverCharacterPhotos = getCharacterPhotoDetails(storyData.characters || [], effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ALL ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
     }
 
