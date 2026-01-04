@@ -6405,7 +6405,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               pageNumber: prevPage,
               text: prev.text,
               sceneHint: prev.sceneHint || '',
-              clothing: prev.characterClothing || null
+              characterClothing: prev.characterClothing || null
             });
           }
         }
