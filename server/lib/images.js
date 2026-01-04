@@ -1217,7 +1217,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       console.log(`✅ [QUALITY RETRY] No text expected and none found - correct`);
     }
 
-    // Store this attempt in history
+    // Store this attempt in history (WITHOUT imageData to avoid bloating storage)
     retryHistory.push({
       attempt: attempts,
       type: 'generation',
@@ -1227,7 +1227,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       textIssue: result.textIssue,
       expectedText: result.expectedText,
       actualText: result.actualText,
-      imageData: result.imageData,
+      // imageData omitted - would bloat storage by ~3MB per attempt
+      hasImage: !!result.imageData,
       modelId: result.modelId,
       timestamp: new Date().toISOString()
     });
@@ -1905,9 +1906,7 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
         description: fixTargets.map(t => t.issue).join('; '),
         boundingBoxes: boundingBoxes,
         fixPrompt: combinedPrompt,
-        maskImage: combinedMask,
-        beforeImage: currentImage,
-        afterImage: null,
+        // maskImage, beforeImage, afterImage omitted - would bloat storage
         success: false,
         skippedInspection: true,
         targetCount: fixTargets.length,
@@ -1921,9 +1920,7 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
         description: fixTargets.map(t => t.issue).join('; '),
         boundingBoxes: boundingBoxes,
         fixPrompt: combinedPrompt,
-        maskImage: combinedMask,
-        beforeImage: currentImage,
-        afterImage: repaired.imageData,
+        // maskImage, beforeImage, afterImage omitted - would bloat storage
         success: true,
         skippedInspection: true,
         targetCount: fixTargets.length,
@@ -2041,9 +2038,7 @@ async function autoRepairImage(imageData, maxAttempts = 2) {
         description: inspection.description,
         boundingBox: inspection.boundingBox,
         fixPrompt: inspection.fixPrompt,
-        maskImage: mask,
-        beforeImage: currentImage,
-        afterImage: null,
+        // maskImage, beforeImage, afterImage omitted - would bloat storage
         success: false,
         timestamp: new Date().toISOString()
       });
@@ -2057,9 +2052,7 @@ async function autoRepairImage(imageData, maxAttempts = 2) {
       description: inspection.description,
       boundingBox: inspection.boundingBox,
       fixPrompt: inspection.fixPrompt,
-      maskImage: mask,
-      beforeImage: currentImage,
-      afterImage: repaired.imageData,
+      // maskImage, beforeImage, afterImage omitted - would bloat storage
       success: true,
       timestamp: new Date().toISOString()
     });
