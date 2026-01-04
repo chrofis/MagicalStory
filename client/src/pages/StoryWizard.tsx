@@ -276,6 +276,10 @@ export default function StoryWizard() {
       newParams.delete('new');
       setSearchParams(newParams, { replace: true });
 
+      // Clear any character being edited and reset to character list
+      setCurrentCharacter(null);
+      setCharacterStep('photo');
+
       // Ensure we're on step 1
       setStep(1);
     }
@@ -2432,6 +2436,10 @@ export default function StoryWizard() {
                 localStorage.removeItem('story_excluded_characters');
                 localStorage.removeItem('wizard_step');
                 localStorage.removeItem('verificationGenerationStarted');
+
+                // Clear any character being edited and reset to character list
+                setCurrentCharacter(null);
+                setCharacterStep('photo');
 
                 // Go back to step 1
                 setStep(1);
