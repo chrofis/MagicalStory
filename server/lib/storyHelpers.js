@@ -692,7 +692,18 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
           }
         }
       }
-      // Check for exact clothing avatar (standard, winter, summer)
+      // Check for styled avatar FIRST (standard, winter, summer in target art style)
+      else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && artStyle && avatars?.styledAvatars?.[artStyle]?.[effectiveClothingCategory]) {
+        photoType = `styled-${effectiveClothingCategory}`;
+        photoUrl = avatars.styledAvatars[artStyle][effectiveClothingCategory];
+        usedClothingCategory = effectiveClothingCategory;
+        log.debug(`[AVATAR STYLED] ${char.name}: using styled ${effectiveClothingCategory}@${artStyle}`);
+        // Get extracted clothing description
+        if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
+          clothingDescription = avatars.clothing[effectiveClothingCategory];
+        }
+      }
+      // Fallback to unstyled clothing avatar (standard, winter, summer)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
         photoType = `clothing-${effectiveClothingCategory}`;
         photoUrl = avatars[effectiveClothingCategory];
@@ -715,19 +726,39 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       }
 
       // Try fallback clothing avatars before falling back to body photo
+      // Check styled fallbacks first, then unstyled
       if (!photoUrl && effectiveClothingCategory && avatars) {
         const fallbacks = clothingFallbackOrder[effectiveClothingCategory] || ['standard', 'summer', 'winter'];
-        for (const fallbackCategory of fallbacks) {
-          if (avatars[fallbackCategory]) {
-            photoType = `clothing-${fallbackCategory}`;
-            photoUrl = avatars[fallbackCategory];
-            usedClothingCategory = fallbackCategory;
-            // Get extracted clothing description for fallback avatar
-            if (avatars.clothing && avatars.clothing[fallbackCategory]) {
-              clothingDescription = avatars.clothing[fallbackCategory];
+
+        // First pass: check styled avatars
+        if (artStyle && avatars?.styledAvatars?.[artStyle]) {
+          for (const fallbackCategory of fallbacks) {
+            if (avatars.styledAvatars[artStyle][fallbackCategory]) {
+              photoType = `styled-${fallbackCategory}`;
+              photoUrl = avatars.styledAvatars[artStyle][fallbackCategory];
+              usedClothingCategory = fallbackCategory;
+              if (avatars.clothing && avatars.clothing[fallbackCategory]) {
+                clothingDescription = avatars.clothing[fallbackCategory];
+              }
+              log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using styled ${fallbackCategory}@${artStyle}`);
+              break;
             }
-            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using ${fallbackCategory}`);
-            break;
+          }
+        }
+
+        // Second pass: check unstyled avatars
+        if (!photoUrl) {
+          for (const fallbackCategory of fallbacks) {
+            if (avatars[fallbackCategory]) {
+              photoType = `clothing-${fallbackCategory}`;
+              photoUrl = avatars[fallbackCategory];
+              usedClothingCategory = fallbackCategory;
+              if (avatars.clothing && avatars.clothing[fallbackCategory]) {
+                clothingDescription = avatars.clothing[fallbackCategory];
+              }
+              log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using unstyled ${fallbackCategory}`);
+              break;
+            }
           }
         }
       }
