@@ -86,16 +86,17 @@ export default function WelcomePage() {
   const t = translations[language] || translations.en;
 
   // Redirect if user has already consented (not a new user)
+  // Admins can view this page without redirect (for testing/preview)
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/');
       return;
     }
-    if (user?.photoConsentAt) {
+    if (user?.photoConsentAt && user?.role !== 'admin') {
       // User has already been through onboarding, redirect to create
       navigate('/create');
     }
-  }, [isAuthenticated, user?.photoConsentAt, navigate]);
+  }, [isAuthenticated, user?.photoConsentAt, user?.role, navigate]);
 
   const handleStart = () => {
     // Clear wizard step so new users start at step 1
