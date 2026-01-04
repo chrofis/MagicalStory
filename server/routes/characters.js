@@ -11,8 +11,13 @@ const { dbQuery, isDatabaseMode, logActivity } = require('../services/database')
 const { authenticateToken } = require('../middleware/auth');
 
 // GET /api/characters - Get user's characters
+// Query params:
+//   - includeAllAvatars=true: Include all avatar variants (dev mode only)
+//   By default, only returns 'standard' avatar to reduce payload size
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    const includeAllAvatars = req.query.includeAllAvatars === 'true' && req.user.role === 'admin';
+
     let characterData = {
       characters: [],
       relationships: {},
@@ -34,7 +39,7 @@ router.get('/', authenticateToken, async (req, res) => {
         LIMIT 1
       `;
       const rows = await dbQuery(selectQuery, [req.user.id]);
-      console.log(`[Characters] GET - Found ${rows.length} rows for user_id: ${req.user.id}`);
+      console.log(`[Characters] GET - Found ${rows.length} rows for user_id: ${req.user.id}, includeAllAvatars: ${includeAllAvatars}`);
 
       if (rows.length > 0) {
         const data = JSON.parse(rows[0].data);
@@ -50,11 +55,43 @@ router.get('/', authenticateToken, async (req, res) => {
           };
         }
         console.log(`[Characters] GET - Final characters count: ${characterData.characters.length}`);
-        // Debug: Check for styled avatars
-        for (const char of characterData.characters) {
-          if (char.avatars?.styledAvatars) {
-            const styles = Object.keys(char.avatars.styledAvatars);
-            console.log(`[Characters] GET - ${char.name} has styledAvatars for: ${styles.join(', ')}`);
+
+        // Strip heavy avatar data for non-dev users to reduce payload
+        // Normal users only see 'standard' avatar in the UI
+        if (!includeAllAvatars) {
+          let strippedSize = 0;
+          characterData.characters = characterData.characters.map(char => {
+            if (!char.avatars) return char;
+
+            // Calculate stripped size for logging
+            const fullAvatarsJson = JSON.stringify(char.avatars);
+
+            // Keep only essential avatar data
+            const lightAvatars = {
+              standard: char.avatars.standard,
+              status: char.avatars.status,
+              stale: char.avatars.stale,
+              generatedAt: char.avatars.generatedAt
+            };
+
+            const lightAvatarsJson = JSON.stringify(lightAvatars);
+            strippedSize += fullAvatarsJson.length - lightAvatarsJson.length;
+
+            return {
+              ...char,
+              avatars: lightAvatars
+            };
+          });
+          if (strippedSize > 0) {
+            console.log(`[Characters] GET - Stripped ${(strippedSize / 1024 / 1024).toFixed(2)} MB of avatar data for normal user`);
+          }
+        } else {
+          // Debug: Check for styled avatars (dev mode)
+          for (const char of characterData.characters) {
+            if (char.avatars?.styledAvatars) {
+              const styles = Object.keys(char.avatars.styledAvatars);
+              console.log(`[Characters] GET - ${char.name} has styledAvatars for: ${styles.join(', ')}`);
+            }
           }
         }
       }

@@ -94,7 +94,7 @@ export function WizardStep3BookSettings({
   return (
     <div className="space-y-6">
       {/* Header with Story Language Selection on the right */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-start justify-between flex-wrap gap-4">
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           <BookOpen size={24} />
           {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : 'Book Format'}

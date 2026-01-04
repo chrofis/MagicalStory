@@ -266,13 +266,23 @@ export interface AvatarGenerationResult {
 }
 
 export const characterService = {
-  async getCharacters(): Promise<Character[]> {
-    const response = await api.get<CharacterDataResponse>('/api/characters');
+  /**
+   * Get characters from API
+   * @param includeAllAvatars - If true, includes all avatar variants (dev mode only, requires admin role)
+   */
+  async getCharacters(includeAllAvatars = false): Promise<Character[]> {
+    const url = includeAllAvatars ? '/api/characters?includeAllAvatars=true' : '/api/characters';
+    const response = await api.get<CharacterDataResponse>(url);
     return (response.characters || []).map(mapCharacterFromApi);
   },
 
-  async getCharacterData(): Promise<CharacterData> {
-    const response = await api.get<CharacterDataResponse>('/api/characters');
+  /**
+   * Get full character data including relationships
+   * @param includeAllAvatars - If true, includes all avatar variants (dev mode only, requires admin role)
+   */
+  async getCharacterData(includeAllAvatars = false): Promise<CharacterData> {
+    const url = includeAllAvatars ? '/api/characters?includeAllAvatars=true' : '/api/characters';
+    const response = await api.get<CharacterDataResponse>(url);
     const mapped = (response.characters || []).map(mapCharacterFromApi);
     return {
       characters: mapped,

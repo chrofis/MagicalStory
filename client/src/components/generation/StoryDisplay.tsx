@@ -437,7 +437,8 @@ export function StoryDisplay({
   const hasImages = sceneImages.length > 0;
 
   // Progressive mode: Calculate max viewable page
-  // User can see page N if page N-1 has an image (or if N is page 1)
+  // For picture book: User can see page N if page N-1 has an image (1:1 text:image)
+  // For normal story: User can see page N if scene ceil(N/2) has an image (2:1 text:image)
   const getMaxViewablePage = (): number => {
     if (!progressiveMode) return storyPages.length;
     if (storyPages.length === 0) return 0;
@@ -447,11 +448,14 @@ export function StoryDisplay({
 
     // Check each subsequent page
     for (let i = 2; i <= storyPages.length; i++) {
-      const prevPageNum = i - 1;
-      // Check if previous page has an image (from sceneImages or completedPageImages)
-      const prevHasImage = sceneImages.some(img => img.pageNumber === prevPageNum && img.imageData) ||
-                          !!completedPageImages[prevPageNum];
-      if (prevHasImage) {
+      // For picture book: each text page has its own image (pageNumber matches)
+      // For normal story: each scene has 2 text pages, so scene number = ceil(textPage/2)
+      const imagePageNum = isPictureBook ? (i - 1) : Math.ceil((i - 1) / 2);
+
+      // Check if the required image exists (from sceneImages or completedPageImages)
+      const hasRequiredImage = sceneImages.some(img => img.pageNumber === imagePageNum && img.imageData) ||
+                               !!completedPageImages[imagePageNum];
+      if (hasRequiredImage) {
         maxPage = i;
       } else {
         break;
@@ -463,10 +467,8 @@ export function StoryDisplay({
   const maxViewablePage = getMaxViewablePage();
   const totalProgressivePages = progressiveData?.totalPages || storyPages.length;
 
-  // Debug: Log progressive state
-  if (progressiveMode && maxViewablePage !== totalProgressivePages) {
-    console.log(`[PROGRESSIVE] maxViewable=${maxViewablePage}, total=${totalProgressivePages}, completedImages=${Object.keys(completedPageImages).length}, isGenerating=${isGenerating}`);
-  }
+  // Debug: Log progressive state (only when values change significantly, to avoid spam)
+  // Removed excessive logging - use browser DevTools if needed
 
   // Helper to get cover image data (handles both string and object formats)
   const getCoverImageData = (img: string | CoverImageData | null | undefined): string | null => {
@@ -1810,9 +1812,12 @@ export function StoryDisplay({
 
           {storyPages.slice(0, progressiveMode ? maxViewablePage : storyPages.length).map((pageText, index) => {
             const pageNumber = index + 1;
-            const image = sceneImages.find(img => img.pageNumber === pageNumber);
+            // For picture book: 1:1 mapping (text page = image page)
+            // For normal story: 2:1 mapping (2 text pages per scene, so scene = ceil(textPage/2))
+            const sceneNumber = isPictureBook ? pageNumber : Math.ceil(pageNumber / 2);
+            const image = sceneImages.find(img => img.pageNumber === sceneNumber);
             // In progressive mode, also check completedPageImages for the image
-            const progressiveImageData = progressiveMode ? completedPageImages[pageNumber] : undefined;
+            const progressiveImageData = progressiveMode ? completedPageImages[sceneNumber] : undefined;
             const hasPageImage = !!(image?.imageData || progressiveImageData);
             const isWaitingForImage = progressiveMode && pageNumber === maxViewablePage && !hasPageImage;
 
