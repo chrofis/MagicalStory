@@ -125,6 +125,7 @@ const {
   applyStyledAvatars,
   collectAvatarRequirements,
   clearStyledAvatarCache,
+  invalidateStyledAvatarForCategory,
   getStyledAvatarCacheStats,
   exportStyledAvatarsForPersistence,
   getStyledAvatarGenerationLog,
@@ -5237,9 +5238,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                   if (category === 'costumed' && result.costumeType) {
                     if (!char.avatars.costumed) char.avatars.costumed = {};
                     char.avatars.costumed[result.costumeType] = result.imageData;
+                    // Invalidate any cached styled versions since source avatar changed
+                    invalidateStyledAvatarForCategory(char.name, `costumed:${result.costumeType}`, char);
                     log.debug(`✅ [STORYBOOK] Generated costumed:${result.costumeType} avatar for ${char.name}`);
                   } else {
                     char.avatars[category] = result.imageData;
+                    // Invalidate any cached styled versions since source avatar changed
+                    invalidateStyledAvatarForCategory(char.name, category, char);
                     log.debug(`✅ [STORYBOOK] Generated ${category} avatar for ${char.name}`);
                   }
                   // Also store clothing description if available
@@ -6308,6 +6313,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               const result = await generateDynamicAvatar(char, category, config.signature);
               if (result?.url) {
                 char.avatars[category] = result.url;
+                // Invalidate any cached styled versions since source avatar changed
+                invalidateStyledAvatarForCategory(char.name, category, char);
                 log.debug(`✅ [STREAM-AVATAR] ${char.name} ${category} complete`);
               }
             }
@@ -7447,6 +7454,8 @@ async function processStoryJob(jobId) {
 
               if (result.success && result.imageData) {
                 char.avatars[category] = result.imageData;
+                // Invalidate any cached styled versions since source avatar changed
+                invalidateStyledAvatarForCategory(char.name, category, char);
                 if (result.clothing) {
                   char.avatars.clothing[category] = result.clothing;
                 }
@@ -9362,10 +9371,15 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
       log.error(`❌ Job ${jobId} failed:`, err);
     });
 
+    // Get current credits to return to frontend
+    const creditsResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [userId]);
+    const creditsRemaining = creditsResult.rows[0]?.credits ?? null;
+
     res.json({
       success: true,
       jobId,
-      message: 'Story generation started. This will take approximately 10 minutes.'
+      message: 'Story generation started. This will take approximately 10 minutes.',
+      creditsRemaining  // Return updated credits so frontend can update immediately
     });
   } catch (err) {
     log.error('Error creating story job:', err);

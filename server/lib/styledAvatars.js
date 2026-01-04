@@ -468,6 +468,61 @@ function clearStyledAvatarCache() {
 }
 
 /**
+ * Invalidate styled avatars for a specific character and clothing category.
+ * Call this when a new source avatar is generated to ensure styled versions are regenerated.
+ *
+ * @param {string} characterName - Character name
+ * @param {string} clothingCategory - Clothing category (e.g., 'summer', 'winter', 'costumed:pirate')
+ * @param {Object} character - Optional character object to also clear styledAvatars from character data
+ */
+function invalidateStyledAvatarForCategory(characterName, clothingCategory, character = null) {
+  const charLower = characterName.toLowerCase();
+  let clearedCount = 0;
+
+  // Clear from in-memory cache for all art styles
+  const keysToDelete = [];
+  for (const key of styledAvatarCache.keys()) {
+    // Key format: charactername_clothingcategory_artstyle
+    if (key.startsWith(`${charLower}_${clothingCategory}_`)) {
+      keysToDelete.push(key);
+    }
+  }
+
+  for (const key of keysToDelete) {
+    styledAvatarCache.delete(key);
+    clearedCount++;
+  }
+
+  // Also clear from character data if provided
+  if (character && character.avatars?.styledAvatars) {
+    for (const artStyle of Object.keys(character.avatars.styledAvatars)) {
+      const styledForStyle = character.avatars.styledAvatars[artStyle];
+      if (!styledForStyle) continue;
+
+      // Handle costumed:type format
+      if (clothingCategory.startsWith('costumed:')) {
+        const costumeType = clothingCategory.split(':')[1];
+        if (styledForStyle.costumed && styledForStyle.costumed[costumeType]) {
+          delete styledForStyle.costumed[costumeType];
+          clearedCount++;
+          log.debug(`🗑️ [STYLED AVATARS] Invalidated ${characterName}'s ${artStyle} costumed:${costumeType} from character data`);
+        }
+      } else if (styledForStyle[clothingCategory]) {
+        delete styledForStyle[clothingCategory];
+        clearedCount++;
+        log.debug(`🗑️ [STYLED AVATARS] Invalidated ${characterName}'s ${artStyle} ${clothingCategory} from character data`);
+      }
+    }
+  }
+
+  if (clearedCount > 0) {
+    log.debug(`🗑️ [STYLED AVATARS] Invalidated ${clearedCount} styled avatar(s) for ${characterName}:${clothingCategory}`);
+  }
+
+  return clearedCount;
+}
+
+/**
  * Get cache statistics
  * @returns {{size: number, inProgress: number}}
  */
@@ -713,6 +768,7 @@ module.exports = {
   getStyledAvatar,
   hasStyledAvatar,
   clearStyledAvatarCache,
+  invalidateStyledAvatarForCategory,
   getStyledAvatarCacheStats,
 
   // Persistence
