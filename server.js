@@ -5219,9 +5219,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         for (const [charName, requirements] of Object.entries(clothingRequirements)) {
           const char = characters.find(c =>
-            c.name.toLowerCase() === charName.toLowerCase() ||
-            c.name.toLowerCase().includes(charName.toLowerCase()) ||
-            charName.toLowerCase().includes(c.name.toLowerCase())
+            c.name.trim().toLowerCase() === charName.trim().toLowerCase() ||
+            c.name.trim().toLowerCase().includes(charName.trim().toLowerCase()) ||
+            charName.trim().toLowerCase().includes(c.name.trim().toLowerCase())
           );
 
           if (!char) {
@@ -6336,9 +6336,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (skipImages) return;
 
       const char = inputData.characters?.find(c =>
-        c.name.toLowerCase() === charName.toLowerCase()
+        c.name.trim().toLowerCase() === charName.trim().toLowerCase()
       );
-      if (!char) return;
+      if (!char) {
+        log.debug(`⚠️ [STREAM-AVATAR] Character "${charName}" not found in input characters`);
+        return;
+      }
 
       // Initialize avatars structure
       if (!char.avatars) char.avatars = {};
@@ -7605,7 +7608,7 @@ async function processStoryJob(jobId) {
 
       for (const [charName, requirements] of Object.entries(clothingRequirements)) {
         const char = inputData.characters?.find(c =>
-          c.name.toLowerCase() === charName.toLowerCase()
+          c.name.trim().toLowerCase() === charName.trim().toLowerCase()
         );
         if (!char) {
           log.debug(`[AVATAR] Character "${charName}" not found in input, skipping`);
