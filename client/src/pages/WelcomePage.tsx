@@ -98,6 +98,8 @@ export default function WelcomePage() {
   }, [isAuthenticated, user?.photoConsentAt, navigate]);
 
   const handleStart = () => {
+    // Clear wizard step so new users start at step 1
+    localStorage.removeItem('wizard_step');
     navigate('/create');
   };
 
