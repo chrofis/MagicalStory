@@ -138,6 +138,7 @@ export function LoginForm({
           value={email}
           onChange={(e) => handleEmailChange(e.target.value)}
           placeholder="your@email.com"
+          autoComplete="email"
           required
           disabled={isLoading}
         />
@@ -147,6 +148,7 @@ export function LoginForm({
           label={t.password}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
           required
           disabled={isLoading}
         />

@@ -48,6 +48,14 @@ function parseCharacterClothingBlock(content) {
   const characterClothing = {};
   const characters = [];
 
+  // Debug: log content length and Characters section existence
+  const hasChars = content.includes('Characters:');
+  log.debug(`[PARSE-CLOTHING] Content length: ${content.length}, has "Characters:": ${hasChars}`);
+  if (hasChars) {
+    const idx = content.indexOf('Characters:');
+    log.debug(`[PARSE-CLOTHING] Characters section: "${content.substring(idx, idx + 150).replace(/\n/g, '\\n')}"`);
+  }
+
   // Try new per-character format first:
   // Characters:
   // - Name1: standard

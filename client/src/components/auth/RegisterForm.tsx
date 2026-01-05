@@ -103,6 +103,7 @@ export function RegisterForm({
           value={email}
           onChange={(e) => handleEmailChange(e.target.value)}
           placeholder="your@email.com"
+          autoComplete="email"
           required
           disabled={isLoading}
         />
@@ -112,6 +113,7 @@ export function RegisterForm({
           label={t.password}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
           required
           disabled={isLoading}
           helperText={t.passwordMinChars}
