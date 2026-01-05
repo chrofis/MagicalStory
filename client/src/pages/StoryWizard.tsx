@@ -1758,7 +1758,7 @@ export default function StoryWizard() {
   // Handler when user selects one of the generated ideas
   const handleSelectIdea = (idea: string) => {
     setStoryDetails(idea);
-    setGeneratedIdeas([]); // Clear the ideas selection UI
+    // Don't clear generatedIdeas - let user switch between options
   };
 
   const generateIdeas = async () => {

@@ -84,15 +84,25 @@ export function WizardStep6Summary({
 
   // Editable versions of the generated ideas
   const [editableIdeas, setEditableIdeas] = useState<string[]>([]);
+  // Track which option is selected (null = none, 0 = first, 1 = second)
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
   // Sync editable ideas when generated ideas change
   useEffect(() => {
     if (generatedIdeas.length > 0) {
       setEditableIdeas([...generatedIdeas]);
+      setSelectedOption(null); // Reset selection when new ideas arrive
     } else {
       setEditableIdeas([]);
+      setSelectedOption(null);
     }
   }, [generatedIdeas]);
+
+  // Handle option selection
+  const handleSelectOption = (index: number) => {
+    setSelectedOption(index);
+    onSelectIdea(editableIdeas[index]);
+  };
 
   // Helper functions
   const getMainCharacterNames = () => {
@@ -172,6 +182,9 @@ export function WizardStep6Summary({
     pagesLabel: language === 'de' ? 'Seiten' : language === 'fr' ? 'Pages' : 'Pages',
     chooseIdea: language === 'de' ? 'Wählen Sie eine Idee oder bearbeiten Sie sie:' : language === 'fr' ? 'Choisissez une idée ou modifiez-la:' : 'Choose an idea or edit it:',
     useThis: language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this',
+    option1: language === 'de' ? 'Option 1' : language === 'fr' ? 'Option 1' : 'Option 1',
+    option2: language === 'de' ? 'Option 2' : language === 'fr' ? 'Option 2' : 'Option 2',
+    selected: language === 'de' ? 'Ausgewählt' : language === 'fr' ? 'Sélectionné' : 'Selected',
   };
 
   return (
@@ -265,28 +278,63 @@ export function WizardStep6Summary({
         {editableIdeas.length >= 2 ? (
           <div className="space-y-4">
             <p className="text-sm text-gray-600 mb-2">{t.chooseIdea}</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {editableIdeas.map((idea, index) => (
-                <div key={index} className="flex flex-col">
-                  <textarea
-                    value={idea}
-                    onChange={(e) => {
-                      const newIdeas = [...editableIdeas];
-                      newIdeas[index] = e.target.value;
-                      setEditableIdeas(newIdeas);
-                    }}
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-600 focus:outline-none text-base resize-none"
-                    rows={6}
-                  />
-                  <button
-                    onClick={() => onSelectIdea(editableIdeas[index])}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-b-lg font-semibold hover:bg-green-700 transition-all"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {editableIdeas.map((idea, index) => {
+                const isSelected = selectedOption === index;
+                const optionTitle = index === 0 ? t.option1 : t.option2;
+                return (
+                  <div
+                    key={index}
+                    className={`flex flex-col rounded-xl overflow-hidden transition-all ${
+                      isSelected
+                        ? 'ring-4 ring-green-500 shadow-lg shadow-green-100'
+                        : 'ring-1 ring-gray-200 hover:ring-2 hover:ring-indigo-300'
+                    }`}
                   >
-                    <Check size={18} />
-                    {t.useThis}
-                  </button>
-                </div>
-              ))}
+                    {/* Title bar */}
+                    <div className={`px-4 py-2 font-semibold flex items-center justify-between ${
+                      isSelected ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      <span>{optionTitle}</span>
+                      {isSelected && (
+                        <span className="flex items-center gap-1 text-sm">
+                          <Check size={16} />
+                          {t.selected}
+                        </span>
+                      )}
+                    </div>
+                    {/* Textarea */}
+                    <textarea
+                      value={idea}
+                      onChange={(e) => {
+                        const newIdeas = [...editableIdeas];
+                        newIdeas[index] = e.target.value;
+                        setEditableIdeas(newIdeas);
+                        // If this option was selected, update the story details too
+                        if (isSelected) {
+                          onSelectIdea(e.target.value);
+                        }
+                      }}
+                      className={`w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none ${
+                        isSelected ? 'bg-green-50' : 'bg-white'
+                      }`}
+                      rows={10}
+                    />
+                    {/* Select button */}
+                    <button
+                      onClick={() => handleSelectOption(index)}
+                      className={`flex items-center justify-center gap-2 px-4 py-3 font-semibold transition-all ${
+                        isSelected
+                          ? 'bg-green-600 text-white cursor-default'
+                          : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      }`}
+                    >
+                      <Check size={18} />
+                      {isSelected ? t.selected : t.useThis}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : (
