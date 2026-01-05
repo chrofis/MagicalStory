@@ -1,5 +1,5 @@
 import api from './api';
-import type { Character, CharacterAvatars, GeneratedOutfit, AgeCategory } from '@/types/character';
+import type { Character, CharacterAvatars, GeneratedOutfit, AgeCategory, StructuredClothing } from '@/types/character';
 import { createLogger } from './logger';
 
 const log = createLogger('CharacterService');
@@ -78,6 +78,8 @@ interface CharacterApiResponse {
   fears?: string[];
   // Clothing (snake_case + camelCase legacy)
   clothing?: string;
+  structured_clothing?: StructuredClothing;
+  structuredClothing?: StructuredClothing;
   clothing_style?: string;
   clothingStyle?: string;
   clothing_colors?: string;
@@ -138,8 +140,11 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
 
     avatars: api.avatars || api.clothing_avatars || api.clothingAvatars,
 
-    clothing: api.clothing
-      ? { current: api.clothing }
+    clothing: (api.clothing || api.structured_clothing || api.structuredClothing)
+      ? {
+          current: api.clothing,
+          structured: api.structured_clothing || api.structuredClothing,
+        }
       : undefined,
 
     generatedOutfits: (api.generated_outfits || api.generatedOutfits) as Record<number, GeneratedOutfit> | undefined,
@@ -183,6 +188,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     fears: char.traits?.challenges,
     // Clothing
     clothing: char.clothing?.current,
+    structured_clothing: char.clothing?.structured,
     clothing_avatars: char.avatars,
     avatars: char.avatars,  // Also send as avatars for backend compatibility
     // Generated outfits per page
