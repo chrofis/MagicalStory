@@ -403,6 +403,8 @@ export const characterService = {
   async generateClothingAvatarsWithTraits(character: Character): Promise<{
     success: boolean;
     avatars?: CharacterAvatars;
+    extractedTraits?: ExtractedTraits;
+    extractedClothing?: ExtractedClothing;
     error?: string;
   }> {
     try {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo } from '@/services';
@@ -43,17 +43,23 @@ import { adminTranslations, StatCard } from './admin';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, isAuthenticated, impersonate, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { language } = useLanguage();
+
+  // Read initial tab from URL query parameter
+  const tabFromUrl = searchParams.get('tab') as 'stats' | 'users' | 'products' | null;
+  const initialTab = tabFromUrl && ['stats', 'users', 'products'].includes(tabFromUrl) ? tabFromUrl : 'stats';
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products'>(initialTab);
 
   // Modal states
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
@@ -88,21 +94,40 @@ export default function AdminDashboard() {
   // Use extracted translations
   const texts = adminTranslations[language as keyof typeof adminTranslations] || adminTranslations.en;
 
-  const fetchData = async (page = 1, search = '') => {
+  // Fetch stats separately (expensive query - only when needed)
+  const fetchStats = async () => {
+    if (stats) return; // Already loaded
+    setIsLoadingStats(true);
+    try {
+      const statsData = await adminService.getStats();
+      setStats(statsData);
+    } catch (err) {
+      console.error('Failed to load stats:', err);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  // Fetch users (fast query)
+  const fetchUsers = async (page = 1, search = '') => {
     setIsLoading(true);
     setError(null);
     try {
-      const [statsData, usersResponse] = await Promise.all([
-        adminService.getStats(),
-        adminService.getUsers({ page, limit: 50, search }).catch(() => ({ users: [], pagination: null })),
-      ]);
-      setStats(statsData);
+      const usersResponse = await adminService.getUsers({ page, limit: 50, search });
       setUsers(usersResponse.users || []);
       setPagination(usersResponse.pagination || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Legacy function for backwards compatibility
+  const fetchData = async (page = 1, search = '') => {
+    await fetchUsers(page, search);
+    if (activeTab === 'stats') {
+      await fetchStats();
     }
   };
 
@@ -116,11 +141,25 @@ export default function AdminDashboard() {
     fetchData(1, userSearch);
   };
 
+  // Load users on mount (fast query, always needed for users tab)
   useEffect(() => {
     if (isAuthenticated && (user?.role === 'admin' || isImpersonating)) {
-      fetchData();
+      fetchUsers();
     }
   }, [isAuthenticated, user, isImpersonating]);
+
+  // Load stats only when stats tab is active
+  useEffect(() => {
+    if (isAuthenticated && (user?.role === 'admin' || isImpersonating) && activeTab === 'stats') {
+      fetchStats();
+    }
+  }, [isAuthenticated, user, isImpersonating, activeTab]);
+
+  // Update URL when tab changes
+  const handleTabChange = (tab: 'stats' | 'users' | 'products') => {
+    setActiveTab(tab);
+    setSearchParams(tab === 'stats' ? {} : { tab });
+  };
 
   const handleCleanOrphaned = async () => {
     setIsActionLoading(true);
@@ -501,7 +540,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
           <button
-            onClick={() => setActiveTab('stats')}
+            onClick={() => handleTabChange('stats')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'stats'
                 ? 'bg-indigo-600 text-white'
@@ -511,7 +550,7 @@ export default function AdminDashboard() {
             {texts.stats}
           </button>
           <button
-            onClick={() => setActiveTab('users')}
+            onClick={() => handleTabChange('users')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'users'
                 ? 'bg-indigo-600 text-white'
@@ -521,7 +560,7 @@ export default function AdminDashboard() {
             {texts.users}
           </button>
           <button
-            onClick={() => setActiveTab('products')}
+            onClick={() => handleTabChange('products')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
               activeTab === 'products'
                 ? 'bg-indigo-600 text-white'
@@ -536,39 +575,46 @@ export default function AdminDashboard() {
         {activeTab === 'stats' && (
           <>
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              <StatCard
-                icon={<Users className="w-8 h-8 text-purple-600" />}
-                title={texts.totalUsers}
-                value={stats?.totalUsers ?? 0}
-              />
-              <StatCard
-                icon={<BookOpen className="w-8 h-8 text-pink-600" />}
-                title={texts.totalStories}
-                value={stats?.totalStories ?? 0}
-              />
-              <StatCard
-                icon={<Users className="w-8 h-8 text-blue-600" />}
-                title={texts.totalCharacters}
-                value={stats?.totalCharacters ?? 0}
-              />
-              <StatCard
-                icon={<Image className="w-8 h-8 text-green-600" />}
-                title={texts.totalImages}
-                value={stats?.totalImages ?? 0}
-              />
-              <StatCard
-                icon={<AlertTriangle className="w-8 h-8 text-yellow-600" />}
-                title={texts.orphanedFiles}
-                value={stats?.orphanedFiles ?? 0}
-              />
-              <StatCard
-                icon={<Database className="w-8 h-8 text-indigo-600" />}
-                title={texts.databaseSize}
-                value={stats?.databaseSize ?? 'N/A'}
-                isString
-              />
-            </div>
+            {isLoadingStats ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <span className="ml-3 text-gray-600">{texts.loading || 'Loading statistics...'}</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <StatCard
+                  icon={<Users className="w-8 h-8 text-purple-600" />}
+                  title={texts.totalUsers}
+                  value={stats?.totalUsers ?? 0}
+                />
+                <StatCard
+                  icon={<BookOpen className="w-8 h-8 text-pink-600" />}
+                  title={texts.totalStories}
+                  value={stats?.totalStories ?? 0}
+                />
+                <StatCard
+                  icon={<Users className="w-8 h-8 text-blue-600" />}
+                  title={texts.totalCharacters}
+                  value={stats?.totalCharacters ?? 0}
+                />
+                <StatCard
+                  icon={<Image className="w-8 h-8 text-green-600" />}
+                  title={texts.totalImages}
+                  value={stats?.totalImages ?? 0}
+                />
+                <StatCard
+                  icon={<AlertTriangle className="w-8 h-8 text-yellow-600" />}
+                  title={texts.orphanedFiles}
+                  value={stats?.orphanedFiles ?? 0}
+                />
+                <StatCard
+                  icon={<Database className="w-8 h-8 text-indigo-600" />}
+                  title={texts.databaseSize}
+                  value={stats?.databaseSize ?? 'N/A'}
+                  isString
+                />
+              </div>
+            )}
 
             {/* Admin Actions */}
             <div className="bg-white rounded-2xl shadow-lg p-6">

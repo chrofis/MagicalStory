@@ -49,11 +49,17 @@ export const adventureThemeGroups: AdventureThemeGroup[] = [
 ];
 
 export const storyTypes: StoryType[] = [
-  // Historical Times (pirates, knights & princess, wild west, ninja)
+  // Historical Times
   { id: 'pirate', name: { en: 'Pirate Adventure', de: 'Piraten-Abenteuer', fr: 'Aventure de Pirates' }, emoji: '🏴‍☠️', group: 'historical' },
   { id: 'knight', name: { en: 'Knights & Princess', de: 'Ritter & Prinzessin', fr: 'Chevaliers & Princesse' }, emoji: '⚔️', group: 'historical' },
-  { id: 'cowboy', name: { en: 'Wild West', de: 'Wilder Westen', fr: 'Far West' }, emoji: '🤠', group: 'historical' },
+  { id: 'cowboy', name: { en: 'Cowboys & Indians', de: 'Cowboys und Indianer', fr: 'Cowboys et Indiens' }, emoji: '🤠', group: 'historical' },
   { id: 'ninja', name: { en: 'Secret Ninja', de: 'Geheimer Ninja', fr: 'Ninja Secret' }, emoji: '🥷', group: 'historical' },
+  { id: 'viking', name: { en: 'Viking Adventure', de: 'Wikinger-Abenteuer', fr: 'Aventure Viking' }, emoji: '⚓', group: 'historical' },
+  { id: 'roman', name: { en: 'Ancient Rome', de: 'Antikes Rom', fr: 'Rome Antique' }, emoji: '🏛️', group: 'historical' },
+  { id: 'egyptian', name: { en: 'Ancient Egypt', de: 'Altes Ägypten', fr: 'Égypte Ancienne' }, emoji: '🏺', group: 'historical' },
+  { id: 'greek', name: { en: 'Ancient Greece', de: 'Antikes Griechenland', fr: 'Grèce Antique' }, emoji: '🏺', group: 'historical' },
+  { id: 'caveman', name: { en: 'Stone Age', de: 'Steinzeit', fr: 'Âge de Pierre' }, emoji: '🦴', group: 'historical' },
+  { id: 'samurai', name: { en: 'Samurai Adventure', de: 'Samurai-Abenteuer', fr: 'Aventure Samouraï' }, emoji: '🎌', group: 'historical' },
 
   // Fantasy & Magic (wizard & witch combined, dragon, unicorn, mermaid, dinosaur, superhero)
   { id: 'wizard', name: { en: 'Wizard & Witch', de: 'Zauberer & Hexe', fr: 'Sorcier & Sorcière' }, emoji: '🧙', group: 'fantasy' },
@@ -70,10 +76,11 @@ export const storyTypes: StoryType[] = [
   { id: 'farm', name: { en: 'Farm Life', de: 'Bauernhof-Leben', fr: 'Vie à la Ferme' }, emoji: '🐄', group: 'locations' },
   { id: 'forest', name: { en: 'Forest Friends', de: 'Waldfreunde', fr: 'Amis de la Forêt' }, emoji: '🦊', group: 'locations' },
 
-  // Heroes & Helpers / Professions (firefighter, doctor, police)
+  // Heroes & Helpers / Professions (firefighter, doctor, police, detective)
   { id: 'fireman', name: { en: 'Brave Firefighter', de: 'Tapferer Feuerwehrmann', fr: 'Pompier Courageux' }, emoji: '🚒', group: 'professions' },
   { id: 'doctor', name: { en: 'Helpful Doctor', de: 'Hilfreicher Arzt', fr: 'Docteur Serviable' }, emoji: '👨‍⚕️', group: 'professions' },
   { id: 'police', name: { en: 'Police Officer', de: 'Polizist', fr: 'Policier' }, emoji: '👮', group: 'professions' },
+  { id: 'detective', name: { en: 'Detective Mystery', de: 'Detektiv-Geheimnis', fr: 'Mystère Détective' }, emoji: '🔍', group: 'professions' },
 
   // Seasonal (christmas, new year, easter, halloween)
   { id: 'christmas', name: { en: 'Christmas Story', de: 'Weihnachts-Geschichte', fr: 'Histoire de Noël' }, emoji: '🎄', group: 'seasonal' },

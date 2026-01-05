@@ -205,11 +205,12 @@ function parseTeachingGuideFile(filePath) {
 const PROMPTS_DIR = path.join(__dirname, '../../prompts');
 const EDUCATIONAL_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'educational-guides.txt'));
 const LIFE_CHALLENGE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
+const ADVENTURE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'adventure-guides.txt'));
 
 /**
  * Get teaching guide for a specific topic
- * @param {string} category - 'educational' or 'life-challenge'
- * @param {string} topicId - The topic ID (e.g., 'months-year', 'potty-training')
+ * @param {string} category - 'educational', 'life-challenge', or 'adventure'
+ * @param {string} topicId - The topic ID (e.g., 'months-year', 'potty-training', 'pirate')
  * @returns {string|null} The teaching guide content or null if not found
  */
 function getTeachingGuide(category, topicId) {
@@ -222,6 +223,8 @@ function getTeachingGuide(category, topicId) {
     return EDUCATIONAL_GUIDES.get(normalizedId) || null;
   } else if (category === 'life-challenge') {
     return LIFE_CHALLENGE_GUIDES.get(normalizedId) || null;
+  } else if (category === 'adventure') {
+    return ADVENTURE_GUIDES.get(normalizedId) || null;
   }
   return null;
 }
@@ -2006,13 +2009,20 @@ ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${stor
 ${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
 ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
   } else {
-    categoryGuidelines = `This is an ADVENTURE story with a ${storyTheme || 'adventure'} theme.
+    // Adventure category - get theme-specific guide
+    const adventureGuide = getTeachingGuide('adventure', storyTheme);
+
+    categoryGuidelines = `This is an ADVENTURE story with a "${storyTheme || 'adventure'}" theme.
 
 **IMPORTANT GUIDELINES for Adventure Stories:**
 - Create an exciting, engaging adventure appropriate for the age group
 - Include elements typical of the ${storyTheme || 'adventure'} theme
 - Balance action and excitement with character development
-- Include challenges that the characters must overcome`;
+- Include challenges that the characters must overcome
+- Historical and fantasy themes SHOULD use costumed clothing for authenticity
+
+${adventureGuide ? `**THEME-SPECIFIC GUIDANCE for "${storyTheme}":**
+${adventureGuide}` : ''}`;
   }
 
   // Build characters JSON with relationships

@@ -20,6 +20,11 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// Stats cache to avoid expensive queries on every request
+let statsCache = null;
+let statsCacheTime = 0;
+const STATS_CACHE_TTL = 60000; // 1 minute cache
+
 // GET /api/admin/stats
 router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -27,86 +32,72 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Admin stats are only available in database mode' });
     }
 
+    // Return cached stats if still valid
+    const now = Date.now();
+    if (statsCache && (now - statsCacheTime) < STATS_CACHE_TTL) {
+      console.log('📊 [ADMIN] Returning cached stats');
+      return res.json(statsCache);
+    }
+
     console.log('📊 [ADMIN] Fetching dashboard statistics...');
+    const startTime = Date.now();
 
     const pool = getPool();
 
-    // Run all stats queries in parallel for better performance
+    // Run fast queries in parallel (avoid expensive JSON aggregation)
     const [
       userCountResult,
       storyCountResult,
       fileCountResult,
-      characterCountResult,
       orphanedFilesResult,
       imageFilesResult,
-      embeddedImagesResult
+      dbSizeResult
     ] = await Promise.all([
       pool.query('SELECT COUNT(*) as count FROM users'),
       pool.query('SELECT COUNT(*) as count FROM stories'),
       pool.query('SELECT COUNT(*) as count FROM files'),
-      // Count individual characters using database aggregation
+      // Get orphaned files count (fast query with EXISTS)
       pool.query(`
-        SELECT COALESCE(SUM(
-          CASE
-            WHEN data::jsonb -> 'characters' IS NOT NULL
-            THEN jsonb_array_length(data::jsonb -> 'characters')
-            ELSE 0
-          END
-        ), 0) as total_characters
-        FROM characters
-      `),
-      // Get orphaned files
-      pool.query(`
-        SELECT f.id, f.story_id, f.file_type, f.file_size, f.filename, f.created_at
+        SELECT COUNT(*) as count
         FROM files f
         WHERE f.story_id IS NOT NULL
           AND NOT EXISTS (
             SELECT 1 FROM stories s WHERE s.id = f.story_id
           )
-        ORDER BY f.created_at DESC
-        LIMIT 100
       `),
       // Count images in files table
       pool.query(
         "SELECT COUNT(*) as count FROM files WHERE file_type = 'image' OR mime_type LIKE 'image/%'"
       ),
-      // Count images embedded in story data using database aggregation
+      // Get database size
       pool.query(`
-        SELECT COALESCE(SUM(
-          CASE
-            WHEN data::jsonb -> 'sceneImages' IS NOT NULL
-            THEN jsonb_array_length(data::jsonb -> 'sceneImages')
-            ELSE 0
-          END
-        ), 0) as embedded_images
-        FROM stories
-      `)
+        SELECT pg_size_pretty(pg_database_size(current_database())) as total_size
+      `).catch(() => ({ rows: [{ total_size: 'N/A' }] }))
     ]);
 
-    const totalCharacters = parseInt(characterCountResult.rows[0].total_characters) || 0;
-    const embeddedImagesCount = parseInt(embeddedImagesResult.rows[0].embedded_images) || 0;
+    // Estimate total images (10 per story average) instead of expensive JSON scan
+    const storyCount = parseInt(storyCountResult.rows[0].count);
+    const estimatedEmbeddedImages = storyCount * 10;
 
-    // Get database size
-    let databaseSize = 'N/A';
-    try {
-      const dbSizeResult = await pool.query(`
-        SELECT pg_size_pretty(pg_database_size(current_database())) as total_size
-      `);
-      databaseSize = dbSizeResult.rows[0].total_size;
-    } catch (dbSizeErr) {
-      console.warn('⚠️ Could not get database size:', dbSizeErr.message);
-    }
+    // Estimate characters (5 per character record average)
+    const characterCountResult = await pool.query('SELECT COUNT(*) as count FROM characters');
+    const estimatedCharacters = parseInt(characterCountResult.rows[0].count) * 5;
 
     const stats = {
       totalUsers: parseInt(userCountResult.rows[0].count),
-      totalStories: parseInt(storyCountResult.rows[0].count),
-      totalCharacters: totalCharacters,
-      totalImages: embeddedImagesCount + parseInt(imageFilesResult.rows[0].count),
-      orphanedFiles: orphanedFilesResult.rows.length,
-      databaseSize: databaseSize
+      totalStories: storyCount,
+      totalCharacters: estimatedCharacters,
+      totalImages: estimatedEmbeddedImages + parseInt(imageFilesResult.rows[0].count),
+      orphanedFiles: parseInt(orphanedFilesResult.rows[0].count),
+      databaseSize: dbSizeResult.rows[0].total_size
     };
 
-    log.info(`✅ [ADMIN] Stats: ${stats.totalUsers} users, ${stats.totalStories} stories, ${stats.totalCharacters} characters, ${stats.totalImages} total images, ${stats.orphanedFiles} orphaned files, DB size: ${stats.databaseSize}`);
+    // Cache the stats
+    statsCache = stats;
+    statsCacheTime = now;
+
+    const duration = Date.now() - startTime;
+    log.info(`✅ [ADMIN] Stats in ${duration}ms: ${stats.totalUsers} users, ${stats.totalStories} stories, ~${stats.totalCharacters} characters, ~${stats.totalImages} images, ${stats.orphanedFiles} orphaned, DB: ${stats.databaseSize}`);
 
     res.json(stats);
   } catch (err) {
