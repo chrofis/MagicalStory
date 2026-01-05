@@ -23,7 +23,7 @@ CRITICAL GRID REQUIREMENTS:
 
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.
-- Body: Use the APPARENT AGE from PHYSICAL CHARACTERISTICS below. Generate age-appropriate body proportions matching that age category.
+- Body: Generate age-appropriate body proportions based on the apparent age visible in the reference photo.
 - Setting: Pure clean white background (#FFFFFF) in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
 - Top quadrants: Head and shoulders, face clearly visible
@@ -33,7 +33,6 @@ BODY TRANSFORMATION (CRITICAL):
 - Generate the person with an ATHLETIC, FIT body type by default
 - Do NOT preserve overweight or heavy body proportions from the reference photo
 - Keep the EXACT same face and identity, but transform the body to be slim and athletic
-- Only exception: if BUILD is explicitly specified in PHYSICAL CHARACTERISTICS below (e.g., "heavy", "large", "stocky"), use that body type instead
 - For children: fit and healthy, age-appropriate athletic proportions
 
 IDENTITY PERSISTENCE:

@@ -1,8 +1,7 @@
-TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference images.
+TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference avatar.
 
-REFERENCE IMAGES PROVIDED:
-- Image 1: High-resolution face photo - use for EXACT facial identity (face shape, features, skin tone, eye color, hair)
-- Image 2 (if provided): Standard avatar - use for body proportions and build reference
+REFERENCE IMAGE PROVIDED:
+- Standard avatar showing the person's face and body proportions - use for EXACT facial identity AND body proportions
 
 ART STYLE (CRITICAL - apply to entire image):
 {ART_STYLE_PROMPT}
@@ -29,16 +28,16 @@ GRID REQUIREMENTS:
 - BOTTOM QUADRANTS: Full body from head to toe, shoes visible
 
 IDENTITY PERSISTENCE (CRITICAL):
-- Face: 100% identical to Image 1 (face photo) - Direct replication, not averaged - same face shape, features, expression style
+- Face: 100% identical to reference avatar - Direct replication, not averaged - same face shape, features, expression style
 - The person must be clearly recognizable as the same individual
-- Hair color, eye color, skin tone must match exactly from Image 1
-- The output MUST preserve the exact age, ethnicity, facial geometry, and unique micro-markers of the person in Image 1
+- Hair color, eye color, skin tone must match exactly from the reference avatar
+- The output MUST preserve the exact age, ethnicity, facial geometry, and unique micro-markers of the person in the reference
 - If the subject is a child, they MUST remain a child with child-like proportions and features. Do not mature the face.
 - If the subject has specific facial markers (moles, scars, eye shape), these MUST be retained with 100% accuracy.
-- Body: If Image 2 (standard avatar) is provided, use its body proportions. Otherwise use PHYSICAL CHARACTERISTICS below.
+- Body: Use the same body proportions as shown in the reference avatar
 - Enforce an age-accurate head-to-body ratio to ensure skeletal proportions match the facial age (Reference: Infant=4, Child=6, Teen=7, Adult=8)
 - Lighting: Natural, even, studio-style diffused light.
-- NO "BEAUTIFICATION". Do not apply "Standard Fashion Model" features. The face must be a literal duplicate of Image 1.
+- NO "BEAUTIFICATION". Do not apply "Standard Fashion Model" features. The face must be a literal duplicate of the reference.
 - The goal is a photographic "Documentary" level of facial realism.
 - Apply the art style while preserving identity
 
@@ -49,9 +48,5 @@ This is a COMPLETE outfit change from neck to toe.
 Include costume elements: shirt/top, pants/skirt/dress, footwear, and any accessories.
 CRITICAL: NO HATS, HELMETS, CROWNS, OR HEAD COVERINGS of any kind. The head and hair must remain completely uncovered so the character's face is fully visible and recognizable.
 The costume should look authentic and age-appropriate for a children's book illustration.
-PHYSICAL_TRAITS:
-{PHYSICAL_TRAITS}
-
-
 
 Output: High quality image in the specified art style.

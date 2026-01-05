@@ -362,38 +362,12 @@ async function generateDynamicAvatar(character, category, config) {
   log.debug(`🎭 [DYNAMIC AVATAR] Generating ${logCategory} avatar for ${character.name}`);
 
   try {
-    // Build physical traits section
-    let physicalTraitsSection = '';
-    const physicalTraits = character.physical || character.physicalTraits;
-    if (physicalTraits || character.build || character.age) {
-      const traitParts = [];
-      if (character.apparentAge) {
-        traitParts.push(`Apparent age: ${character.apparentAge}`);
-      } else if (character.age) {
-        traitParts.push(`Age: ${character.age} years old`);
-      }
-      if (character.build) traitParts.push(`Build: ${character.build}`);
-      else if (physicalTraits?.build) traitParts.push(`Build: ${physicalTraits.build}`);
-      if (physicalTraits?.hairColor) traitParts.push(`Hair color: ${physicalTraits.hairColor}`);
-      if (physicalTraits?.hairLength) traitParts.push(`Hair length: ${physicalTraits.hairLength}`);
-      if (physicalTraits?.hairStyle) traitParts.push(`Hair style: ${physicalTraits.hairStyle}`);
-      if (physicalTraits?.eyeColor) traitParts.push(`Eye color: ${physicalTraits.eyeColor}`);
-      if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
-      if (physicalTraits?.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
-      if (traitParts.length > 0) {
-        physicalTraitsSection = `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
-      }
-    }
-
     // Build the prompt
     const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
     const clothingPrompt = getDynamicClothingPrompt(category, config, isFemale);
-    let avatarPrompt = fillTemplate(promptPart, {
+    const avatarPrompt = fillTemplate(promptPart, {
       'CLOTHING_STYLE': clothingPrompt
     });
-    if (physicalTraitsSection) {
-      avatarPrompt += physicalTraitsSection;
-    }
 
     // Prepare image data
     const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
@@ -553,92 +527,50 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
     return { success: false, error: 'Avatar generation service unavailable' };
   }
 
-  // Get high-resolution face photo (prefer original, then face thumbnail)
-  const facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
-  if (!facePhoto) {
-    log.error(`[STYLED COSTUME] No face photo for ${character.name}`);
-    return { success: false, error: 'No face photo available' };
-  }
-
-  // Get standard avatar for body reference (already has correct proportions)
+  // Get standard avatar as the only reference image (it already has correct face + proportions)
   const standardAvatar = character.avatars?.standard;
+  if (!standardAvatar) {
+    log.error(`[STYLED COSTUME] No standard avatar for ${character.name}`);
+    return { success: false, error: 'No standard avatar available - generate clothing avatars first' };
+  }
 
   const costumeType = (config.costume || 'costume').toLowerCase();
   const artStylePrompt = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS.pixar || '';
 
-  log.debug(`🎨 [STYLED COSTUME] Generating ${costumeType} avatar in ${artStyle} style for ${character.name} (${standardAvatar ? '2 reference images' : 'face only'})`);
+  log.debug(`🎨 [STYLED COSTUME] Generating ${costumeType} avatar in ${artStyle} style for ${character.name}`);
 
   try {
-    // Build physical traits section
-    let physicalTraitsSection = '';
-    const physicalTraits = character.physical || character.physicalTraits;
-    if (physicalTraits || character.build || character.age) {
-      const traitParts = [];
-      if (character.apparentAge) {
-        traitParts.push(`Apparent age: ${character.apparentAge}`);
-      } else if (character.age) {
-        traitParts.push(`Age: ${character.age} years old`);
-      }
-      if (character.build) traitParts.push(`Build: ${character.build}`);
-      else if (physicalTraits?.build) traitParts.push(`Build: ${physicalTraits.build}`);
-      if (physicalTraits?.hairColor) traitParts.push(`Hair color: ${physicalTraits.hairColor}`);
-      if (physicalTraits?.hairStyle) traitParts.push(`Hair style: ${physicalTraits.hairStyle}`);
-      if (physicalTraits?.eyeColor) traitParts.push(`Eye color: ${physicalTraits.eyeColor}`);
-      if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
-      if (traitParts.length > 0) {
-        physicalTraitsSection = `\n\nPHYSICAL CHARACTERISTICS (preserve these):\n${traitParts.join('\n')}`;
-      }
-    }
-
     // Build the combined prompt using the styled-costumed-avatar template
     const template = PROMPT_TEMPLATES.styledCostumedAvatar || '';
     const avatarPrompt = fillTemplate(template, {
       'ART_STYLE_PROMPT': artStylePrompt,
       'COSTUME_DESCRIPTION': config.description || 'A creative costume appropriate for the story',
       'COSTUME_TYPE': config.costume || 'Costume',
-      'PHYSICAL_TRAITS': physicalTraitsSection
+      'PHYSICAL_TRAITS': '' // Physical traits removed - input image is sufficient
     });
 
-    // Prepare face photo data
-    const faceBase64 = facePhoto.replace(/^data:image\/\w+;base64,/, '');
-    const faceMimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
-      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    // Prepare standard avatar data as the only reference
+    const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
+    const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/) ?
+      standardAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Build image parts array (face photo + optional standard avatar)
+    // Build image parts array with only the standard avatar
     const imageParts = [
       {
-        inline_data: {
-          mime_type: faceMimeType,
-          data: faceBase64
-        }
-      }
-    ];
-
-    // Add standard avatar as second reference if available
-    if (standardAvatar) {
-      const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
-      const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/) ?
-        standardAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
-      imageParts.push({
         inline_data: {
           mime_type: avatarMimeType,
           data: avatarBase64
         }
-      });
-    }
+      }
+    ];
 
-    // Build system instruction based on available references
-    const systemText = standardAvatar
-      ? `You are an expert character artist creating stylized avatar illustrations for children's books.
-You are given TWO reference images:
-1. A high-resolution face photo showing the person's exact facial features
-2. A standard avatar showing the person's body proportions and build
+    // System instruction for single reference image
+    const systemText = `You are an expert character artist creating stylized avatar illustrations for children's books.
+You are given a reference avatar showing the person's face and body proportions.
 Your task is to create a new avatar in ${artStyle} style that:
-- Preserves the EXACT facial identity from the face photo (image 1)
-- Uses the body proportions from the standard avatar (image 2)
-- Applies the specified costume`
-      : `You are an expert character artist creating stylized avatar illustrations for children's books.
-Your task is to transform a reference photo into a ${artStyle} style illustration while preserving the person's identity and applying a specific costume.`;
+- Preserves the EXACT facial identity from the reference avatar
+- Uses the same body proportions from the reference avatar
+- Applies the specified costume`;
 
     const requestBody = {
       systemInstruction: {
@@ -917,21 +849,9 @@ router.get('/avatar-prompt', authenticateToken, async (req, res) => {
     // Build the prompt from template
     const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
     const clothingStyle = getClothingStylePrompt(category, isFemale);
-    let avatarPrompt = fillTemplate(promptPart, {
+    const avatarPrompt = fillTemplate(promptPart, {
       'CLOTHING_STYLE': clothingStyle
     });
-
-    // If physical traits are provided, append them
-    if (req.query.withTraits === 'true' || req.query.build) {
-      const traitParts = [];
-      if (req.query.build) traitParts.push(`Build: ${req.query.build}`);
-      if (req.query.hair) traitParts.push(`Hair: ${req.query.hair}`);
-      if (req.query.face) traitParts.push(`Face: ${req.query.face}`);
-      if (req.query.other) traitParts.push(`Distinctive features: ${req.query.other}`);
-      if (traitParts.length > 0) {
-        avatarPrompt += `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
-      }
-    }
 
     res.json({ success: true, prompt: avatarPrompt });
   } catch (error) {
@@ -957,43 +877,7 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       return res.status(503).json({ error: 'Avatar generation service unavailable' });
     }
 
-    // Build physical traits section for avatar generation
-    // Default build to "athletic" for initial generation (can be changed by user later)
-    const effectiveBuild = build || physicalTraits?.build || 'athletic';
-
-    let physicalTraitsSection = '';
-    const traitParts = [];
-
-    // Add apparent age first (most important for body generation)
-    if (apparentAge) {
-      traitParts.push(`Apparent age: ${apparentAge}`);
-    } else if (age) {
-      traitParts.push(`Age: ${age} years old`);
-    }
-
-    // Always include build (defaulting to athletic)
-    traitParts.push(`Build: ${effectiveBuild}`);
-
-    // Use new separated hair fields if available, otherwise fall back to combined 'hair' field
-    if (physicalTraits?.hairColor) traitParts.push(`Hair color: ${physicalTraits.hairColor}`);
-    if (physicalTraits?.hairLength) traitParts.push(`Hair length: ${physicalTraits.hairLength}`);
-    if (physicalTraits?.hairStyle) traitParts.push(`Hair style: ${physicalTraits.hairStyle}`);
-    if (!physicalTraits?.hairColor && !physicalTraits?.hairLength && !physicalTraits?.hairStyle && physicalTraits?.hair) {
-      traitParts.push(`Hair: ${physicalTraits.hair}`);
-    }
-    if (physicalTraits?.eyeColor) traitParts.push(`Eye color: ${physicalTraits.eyeColor}`);
-    if (physicalTraits?.facialHair && physicalTraits.facialHair !== 'none') {
-      traitParts.push(`Facial hair: ${physicalTraits.facialHair}`);
-    }
-    if (physicalTraits?.face) traitParts.push(`Face: ${physicalTraits.face}`);
-    if (physicalTraits?.other) traitParts.push(`Distinctive features: ${physicalTraits.other}`);
-
-    if (traitParts.length > 0) {
-      physicalTraitsSection = `\n\nPHYSICAL CHARACTERISTICS (MUST INCLUDE):\n${traitParts.join('\n')}`;
-    }
-    log.debug(`👔 [CLOTHING AVATARS] Using build: ${effectiveBuild}, traits: ${traitParts.join(', ')}`);
-
-    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})${physicalTraits ? ' WITH TRAITS' : ''}`);
+    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})`);
 
     const isFemale = gender === 'female';
 
@@ -1052,9 +936,6 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         let avatarPrompt = fillTemplate(promptPart, {
           'CLOTHING_STYLE': clothingStylePrompt
         });
-        if (physicalTraitsSection) {
-          avatarPrompt += physicalTraitsSection;
-        }
         // Add user-specified clothing ONLY for standard avatar (not winter/summer)
         // Winter and summer should use their seasonal clothing styles
         if (userClothingSection && category === 'standard') {
