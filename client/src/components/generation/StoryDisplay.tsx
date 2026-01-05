@@ -1433,7 +1433,8 @@ export function StoryDisplay({
             </details>
           )}
 
-          {/* Generation Log */}
+          {/* Generation Log - Debug: check console for generationLog count */}
+          {(() => { console.log('[StoryDisplay] generationLog:', generationLog?.length, 'entries, developerMode:', developerMode); return null; })()}
           {generationLog && generationLog.length > 0 && (
             <details className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-slate-800 hover:text-slate-900 flex items-center gap-2">

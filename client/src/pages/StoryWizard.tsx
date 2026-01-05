@@ -320,6 +320,7 @@ export default function StoryWizard() {
             setOutlineUsage(story.outlineUsage);
             setStoryTextPrompts(story.storyTextPrompts || []);
             setStyledAvatarGeneration(story.styledAvatarGeneration || []);
+            console.log('[StoryWizard] Loading story metadata, generationLog:', story.generationLog?.length || 0, 'entries');
             setGenerationLog(story.generationLog || []);
 
             // Visual Bible
@@ -417,6 +418,7 @@ export default function StoryWizard() {
                     });
                   }
                   // Load generation log from dev metadata
+                  console.log('[StoryWizard] Dev metadata generationLog:', devMetadata.generationLog?.length || 0, 'entries');
                   if (devMetadata.generationLog?.length) {
                     setGenerationLog(devMetadata.generationLog);
                   }

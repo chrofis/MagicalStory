@@ -373,7 +373,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       generationLog: story.generationLog || []
     };
 
-    console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries`);
+    console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries, generationLog: ${devMetadata.generationLog?.length || 0} entries`);
     res.json(devMetadata);
   } catch (err) {
     console.error('❌ Error fetching dev metadata:', err);
