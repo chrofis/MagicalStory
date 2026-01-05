@@ -46,6 +46,8 @@ test.describe('Landing Page Analysis', () => {
 
   test('check accessibility basics', async ({ page }) => {
     await page.goto('/');
+    // Wait for React to hydrate
+    await page.waitForSelector('h1', { timeout: 5000 }).catch(() => {});
 
     // Check for missing alt text on images
     const imagesWithoutAlt = await page.locator('img:not([alt])').count();
@@ -203,23 +205,14 @@ test.describe('Auth Flow Analysis', () => {
     await registerLink.click();
     await page.waitForTimeout(500);
 
-    // Check for password requirements display
-    const passwordRequirements = await page.getByText(/8 characters|min|password requirements/i).isVisible().catch(() => false);
+    // Check for password requirements display (site uses 6 characters minimum)
+    const passwordRequirements = await page.getByText(/6 characters|6 Zeichen|6 caractères|minimum/i).isVisible().catch(() => false);
     if (!passwordRequirements) {
-      logImprovement('Show password requirements before user types (e.g., "Minimum 8 characters")');
+      logImprovement('Show password requirements before user types');
     }
 
-    // Check for password confirmation field
-    const confirmPassword = await page.locator('input[type="password"]').count();
-    if (confirmPassword < 2) {
-      logImprovement('Consider adding password confirmation field to prevent typos');
-    }
-
-    // Check for terms/privacy checkbox
-    const termsCheckbox = await page.locator('input[type="checkbox"]').count();
-    if (termsCheckbox === 0) {
-      logImprovement('Consider adding terms of service acceptance checkbox');
-    }
+    // Note: Terms of service checkbox is shown on welcome page after first login, not in registration form
+    // Note: Password confirmation field intentionally not included (user preference)
   });
 });
 

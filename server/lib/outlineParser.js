@@ -65,11 +65,12 @@ function parseCharacterClothingBlock(content) {
     const block = charactersBlockMatch[1];
     // Match lines like "- Name: category" or "Name: category" (with or without leading hyphen)
     // Also allows "* Name: category" bullet format
-    const linePattern = /^[-*]?\s*([^:\n]+):\s*(standard|winter|summer|costumed:\S+)/gim;
+    // costumed:[^\n]+ allows costume names with spaces like "mittelalterlicher Junge"
+    const linePattern = /^[-*]?\s*([^:\n]+):\s*(standard|winter|summer|costumed:[^\n]+)/gim;
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();
-      const clothing = lineMatch[2].toLowerCase();
+      const clothing = lineMatch[2].trim().toLowerCase();
       // Extract base name (remove alias in parentheses for lookup, keep for display)
       const baseName = rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
       characters.push(rawName);
@@ -1672,7 +1673,7 @@ class ProgressiveUnifiedParser {
 
       // Only emit if we're confident the page is complete
       // Either there's a next page, or we have both TEXT and SCENE HINT plus at least one character with clothing
-      const hasCharacterClothing = /Characters:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\n]*:\s*(?:standard|winter|summer|costumed:\S+))/mi.test(content);
+      const hasCharacterClothing = /Characters:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\n]*:\s*(?:standard|winter|summer|costumed:[^\n]+))/mi.test(content);
       if (nextPageIndex > match.index || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
         // Extract page data
         const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);

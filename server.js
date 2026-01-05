@@ -7173,7 +7173,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       updatedAt: new Date().toISOString()
     };
 
-    log.debug(`💾 [UNIFIED] Saving story to database...`);
+    log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
 
@@ -7262,6 +7262,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     };
 
     // Mark job as completed
+    log.debug(`📊 [UNIFIED] resultData generationLog has ${resultData.generationLog?.length || 0} entries`);
     await dbPool.query(
       `UPDATE story_jobs
        SET status = $1, progress = $2, progress_message = $3, result_data = $4,
