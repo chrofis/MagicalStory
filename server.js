@@ -6289,7 +6289,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     return { input: inputCost, output: outputCost, thinking: thinkingCost, total: inputCost + outputCost + thinkingCost };
   };
 
-  const sceneCount = inputData.pages;
+  // Calculate scene count based on layout:
+  // - Picture Book (1st-grade): 1 scene per page (image + text combined)
+  // - Standard/Advanced: 1 scene per 2 pages (text page + image page)
+  const isPictureBookLayout = inputData.languageLevel === '1st-grade';
+  const sceneCount = isPictureBookLayout ? inputData.pages : Math.floor(inputData.pages / 2);
   const lang = inputData.language || 'en';
   const { getLanguageNameEnglish } = require('./server/lib/languages');
   const langText = getLanguageNameEnglish(lang);
