@@ -1484,10 +1484,31 @@ ${teachingGuide}`
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
-    const result = await callTextModel(prompt, 650, modelToUse);
+    const result = await callTextModel(prompt, 1200, modelToUse);
 
-    // Return prompt and model for dev mode display
-    res.json({ storyIdea: result.text.trim(), prompt, model: modelToUse });
+    // Parse the response to extract 2 ideas
+    const responseText = result.text.trim();
+    const idea1Match = responseText.match(/\[IDEA_1\]\s*([\s\S]*?)(?=\[IDEA_2\]|$)/);
+    const idea2Match = responseText.match(/\[IDEA_2\]\s*([\s\S]*?)$/);
+
+    const idea1 = idea1Match ? idea1Match[1].trim() : '';
+    const idea2 = idea2Match ? idea2Match[1].trim() : '';
+
+    // If parsing failed, treat the whole response as a single idea
+    const storyIdeas = (idea1 && idea2)
+      ? [idea1, idea2]
+      : [responseText];
+
+    log.debug(`  Generated ${storyIdeas.length} idea(s)`);
+
+    // Return ideas array, prompt and model for dev mode display
+    // Also include legacy storyIdea field for backwards compatibility
+    res.json({
+      storyIdeas,
+      storyIdea: storyIdeas[0], // backwards compatibility
+      prompt,
+      model: modelToUse
+    });
 
   } catch (err) {
     log.error('Generate story ideas error:', err);

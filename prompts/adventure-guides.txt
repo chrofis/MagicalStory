@@ -7,12 +7,13 @@ COSTUME: costumed:pirate
 Outfit: Striped sailor shirt (red/white or blue/white), leather vest, baggy pants tucked into tall boots, wide leather belt. NO HAT.
 
 Story guidance:
+- Story can start as pirate or can start in normal cloathing and contain a dream or travel to pirat island
 - Set on ships, tropical islands, or coastal towns
 - Include treasure maps, sea voyages, friendly sea creatures (dolphins, parrots, crabs)
 - Pirates as fun adventurers, not scary villains
 - Focus on teamwork, exploration, and problem-solving
 - Key props: treasure chest, rolled-up map, parrot, ship wheel, compass, telescope
-- Avoid: Violence, scary storms, walking the plank
+
 
 [knight]
 COSTUME: costumed:knight
@@ -20,11 +21,11 @@ Outfit: Chainmail tunic over colored surcoat (blue, red, or green), leather belt
 
 Story guidance:
 - Set in castles, enchanted forests, medieval villages
-- Include quests, dragons (friendly or challenging), royalty, tournaments
+- Include quests, royalty, tournaments
 - Knights as brave, kind, and honorable protectors
 - Focus on courage, helping others, keeping promises
 - Key props: shield with emblem, wooden sword, banner, castle tower, drawbridge
-- Avoid: Graphic battles, scary dungeons
+
 
 [viking]
 COSTUME: costumed:viking
@@ -48,11 +49,9 @@ Story guidance:
 - Include chariot races, mosaics, Roman baths, toga parties
 - Educational opportunities: Roman numerals, Latin words, engineering marvels
 - Key props: laurel branch (held, not worn), scrolls, columns, mosaic tiles, Roman coins
-- Avoid: Gladiator combat, slavery references
 
 [detective]
-COSTUME: costumed:detective
-Outfit: Tan or beige trench coat over smart clothes, magnifying glass in pocket, small notebook and pencil, sensible shoes. NO HAT.
+COSTUME: not needed, use standard, summer or winter avatar
 
 Story guidance:
 - Mystery-solving adventures with age-appropriate puzzles
@@ -60,7 +59,7 @@ Story guidance:
 - Mysteries about: lost items, missing pets, secret messages, treasure hunts
 - Focus on observation, logic, teamwork, asking good questions
 - Key props: magnifying glass, notebook, flashlight, footprint molds, secret codes
-- Avoid: Scary criminals, dangerous situations
+
 
 [cowboy]
 COSTUME: costumed:cowboy
@@ -72,7 +71,7 @@ Story guidance:
 - Cowboys as helpful ranch hands, honest adventurers, animal friends
 - Can include Native American friends with respectful, accurate portrayal
 - Key props: lasso, saddle, campfire, cactus, horseshoe, wagon
-- Avoid: Gun violence, stereotypes
+
 
 [egyptian]
 COSTUME: costumed:egyptian
@@ -84,7 +83,7 @@ Story guidance:
 - Egyptians as builders, scribes, artists, astronomers
 - Educational: hieroglyphic writing, pyramid building, Nile flooding cycle
 - Key props: papyrus scrolls, ankh symbol, sphinx statue, palm trees, golden artifacts
-- Avoid: Scary mummy curses, tomb traps
+
 
 [greek]
 COSTUME: costumed:greek
@@ -92,11 +91,11 @@ Outfit: White toga or chiton (draped fabric), rope or leather belt, leather sand
 
 Story guidance:
 - Set in ancient Greece: white marble temples, Olympic stadiums, bustling agora (marketplace), Mediterranean coastline
-- Include philosophers asking big questions, athletes training, child-friendly Greek gods (as helpers)
+- Include philosophers asking big questions, athletes training, child-friendly Greek gods (as helpers), boats
 - Greeks as thinkers, athletes, artists, storytellers
 - Educational: Greek myths (friendly versions), Olympics origins, democracy basics
 - Key props: olive branches (held), amphora vases, columns, lyres, discus
-- Avoid: Scary monsters (simplify Medusa, Minotaur), war stories
+
 
 [caveman]
 COSTUME: costumed:caveman
@@ -109,7 +108,7 @@ Story guidance:
 - Cavemen as inventors (fire, tools, art), artists (cave paintings), close-knit families
 - Focus on discovery, creativity, cooperation
 - Key props: wooden clubs, fire pit, cave paintings, stone tools, berry baskets
-- Avoid: Scary predators, violent hunting
+
 
 [samurai]
 COSTUME: costumed:samurai
@@ -121,7 +120,7 @@ Story guidance:
 - Samurai as protectors, scholars, poets (different from ninja stealth)
 - Focus on discipline, respect, protecting the weak, inner peace
 - Key props: wooden katana (bokken), folding fan, bonsai trees, koi ponds, paper lanterns
-- Avoid: Graphic sword fighting, war scenes
+
 
 [ninja]
 COSTUME: costumed:ninja
@@ -133,7 +132,7 @@ Story guidance:
 - Ninjas as clever problem-solvers who use wit over force
 - Focus on stealth, agility, puzzle-solving, clever tricks
 - Key props: grappling hook, harmless smoke bombs (for escapes), throwing stars (toy/wooden), bamboo
-- Avoid: Weapons as weapons, assassination themes
+
 
 [wizard]
 COSTUME: costumed:wizard
@@ -145,7 +144,7 @@ Story guidance:
 - Wizards as wise teachers, curious students, protectors of magic
 - Focus on learning, responsibility with power, friendship
 - Key props: magic wand, spell book, crystal ball, cauldron, glowing orbs
-- Avoid: Dark magic, scary transformations
+
 
 [superhero]
 COSTUME: costumed:superhero
@@ -157,7 +156,7 @@ Story guidance:
 - Superheroes as helpers, friends, and role models
 - Focus on using abilities responsibly, helping community, teamwork
 - Key props: cape, emblem, gadget belt (for non-powered heroes)
-- Avoid: Scary villains, property destruction
+
 
 [mermaid]
 COSTUME: costumed:mermaid
@@ -169,4 +168,4 @@ Story guidance:
 - Mermaids as curious, kind, protective of ocean life
 - Focus on friendship, protecting nature, bridging land and sea worlds
 - Key props: seashells, pearls, coral, treasure from shipwrecks, sea glass
-- Avoid: Dangerous sea creatures, drowning situations
+

@@ -1,4 +1,5 @@
-import { Wand2, Sparkles, Loader2, Pencil } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Wand2, Sparkles, Loader2, Pencil, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { storyTypes, lifeChallenges, educationalTopics, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
@@ -35,6 +36,8 @@ interface WizardStep6Props {
   onGenerateIdeas: () => Promise<void>;
   isGeneratingIdeas: boolean;
   ideaPrompt: { prompt: string; model: string } | null;
+  generatedIdeas: string[];
+  onSelectIdea: (idea: string) => void;
   // Navigation
   onEditStep: (step: number) => void;
   // Developer options
@@ -67,6 +70,8 @@ export function WizardStep6Summary({
   onGenerateIdeas,
   isGeneratingIdeas,
   ideaPrompt,
+  generatedIdeas,
+  onSelectIdea,
   onEditStep,
   developerMode,
   imageGenMode,
@@ -76,6 +81,18 @@ export function WizardStep6Summary({
 }: WizardStep6Props) {
   const { language } = useLanguage();
   const lang = language as 'en' | 'de' | 'fr';
+
+  // Editable versions of the generated ideas
+  const [editableIdeas, setEditableIdeas] = useState<string[]>([]);
+
+  // Sync editable ideas when generated ideas change
+  useEffect(() => {
+    if (generatedIdeas.length > 0) {
+      setEditableIdeas([...generatedIdeas]);
+    } else {
+      setEditableIdeas([]);
+    }
+  }, [generatedIdeas]);
 
   // Helper functions
   const getMainCharacterNames = () => {
@@ -153,6 +170,8 @@ export function WizardStep6Summary({
     supportingChars: language === 'de' ? 'Nebenfiguren' : language === 'fr' ? 'Personnages secondaires' : 'Also in story',
     level: language === 'de' ? 'Lesestufe' : language === 'fr' ? 'Niveau' : 'Level',
     pagesLabel: language === 'de' ? 'Seiten' : language === 'fr' ? 'Pages' : 'Pages',
+    chooseIdea: language === 'de' ? 'Wählen Sie eine Idee oder bearbeiten Sie sie:' : language === 'fr' ? 'Choisissez une idée ou modifiez-la:' : 'Choose an idea or edit it:',
+    useThis: language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this',
   };
 
   return (
@@ -242,16 +261,46 @@ export function WizardStep6Summary({
           </details>
         )}
 
-        <textarea
-          value={storyDetails}
-          onChange={(e) => onStoryDetailsChange(e.target.value)}
-          placeholder={t.storyDetailsPlaceholder}
-          className={`w-full px-3 py-2 border-2 rounded-lg focus:border-indigo-600 focus:outline-none text-base ${
-            storyDetails.trim() ? 'border-gray-300' : 'border-orange-300 bg-orange-50'
-          }`}
-          rows={6}
-          disabled={isGeneratingIdeas}
-        />
+        {/* Two-idea selection UI */}
+        {editableIdeas.length >= 2 ? (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 mb-2">{t.chooseIdea}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {editableIdeas.map((idea, index) => (
+                <div key={index} className="flex flex-col">
+                  <textarea
+                    value={idea}
+                    onChange={(e) => {
+                      const newIdeas = [...editableIdeas];
+                      newIdeas[index] = e.target.value;
+                      setEditableIdeas(newIdeas);
+                    }}
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-600 focus:outline-none text-base resize-none"
+                    rows={6}
+                  />
+                  <button
+                    onClick={() => onSelectIdea(editableIdeas[index])}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-b-lg font-semibold hover:bg-green-700 transition-all"
+                  >
+                    <Check size={18} />
+                    {t.useThis}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <textarea
+            value={storyDetails}
+            onChange={(e) => onStoryDetailsChange(e.target.value)}
+            placeholder={t.storyDetailsPlaceholder}
+            className={`w-full px-3 py-2 border-2 rounded-lg focus:border-indigo-600 focus:outline-none text-base ${
+              storyDetails.trim() ? 'border-gray-300' : 'border-orange-300 bg-orange-50'
+            }`}
+            rows={6}
+            disabled={isGeneratingIdeas}
+          />
+        )}
       </div>
 
       {/* Dedication - Optional */}

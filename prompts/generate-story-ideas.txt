@@ -52,6 +52,20 @@ Example 2: "In a castle during winter in medieval times, the kitchen runs out of
 
 Example 3: "In a forest where animals can talk, a rabbit loses her way home. She asks an owl for directions, but the owl speaks in riddles. A fox offers to guide her, but leads her in circles. The rabbit must figure out the owl's riddle to find the path."
 
-Write ONLY the story idea description, nothing else. Be specific about what happens!
+---
+
+OUTPUT FORMAT - Generate exactly TWO different story ideas:
+
+[IDEA_1]
+<first story idea here>
+
+[IDEA_2]
+<second story idea here>
+
+IMPORTANT:
+- The two ideas must be DIFFERENT - different plots, different locations, or different approaches
+- For adventure themes: one idea can start IN the adventure world, the other can start in normal life and transition to adventure (via dream, play, time travel, magic portal, etc.)
+- Both ideas must use the same characters
+- Write ONLY the two ideas in the format above, nothing else
 
 
