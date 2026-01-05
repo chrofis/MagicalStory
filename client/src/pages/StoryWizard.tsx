@@ -746,7 +746,10 @@ export default function StoryWizard() {
       // Not authenticated and auth is done loading - mark as done (no characters to load)
       setInitialCharacterLoadDone(true);
     }
-  }, [isAuthenticated, isAuthLoading, developerMode]);
+    // Note: developerMode removed from deps to avoid reload on toggle
+    // Extra avatar data (includeAllAvatars) is nice-to-have, not critical
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isAuthLoading]);
 
   // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh

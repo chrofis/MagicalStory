@@ -23,6 +23,9 @@ interface DeveloperModeState {
   setDevSkipImages: (skip: boolean) => void;
   devSkipCovers: boolean;
   setDevSkipCovers: (skip: boolean) => void;
+  // Auto-repair: automatically fix detected issues in generated images (default: OFF)
+  enableAutoRepair: boolean;
+  setEnableAutoRepair: (enable: boolean) => void;
   // Model selections
   modelSelections: ModelSelections;
   setModelSelections: React.Dispatch<React.SetStateAction<ModelSelections>>;
@@ -47,6 +50,9 @@ export function useDeveloperMode(): DeveloperModeState {
   const [devSkipSceneDescriptions, setDevSkipSceneDescriptions] = useState(false);
   const [devSkipImages, setDevSkipImages] = useState(false);
   const [devSkipCovers, setDevSkipCovers] = useState(false);
+
+  // Auto-repair: automatically fix detected issues in generated images (default: OFF)
+  const [enableAutoRepair, setEnableAutoRepair] = useState(false);
 
   // Developer model selection (admin only)
   const [modelSelections, setModelSelections] = useState<ModelSelections>({
@@ -85,6 +91,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setDevSkipImages,
     devSkipCovers,
     setDevSkipCovers,
+    enableAutoRepair,
+    setEnableAutoRepair,
     modelSelections,
     setModelSelections,
   };

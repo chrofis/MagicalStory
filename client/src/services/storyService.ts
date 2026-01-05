@@ -770,6 +770,8 @@ export const storyService = {
     skipText?: boolean;
     skipSceneDescriptions?: boolean;
     skipCovers?: boolean;
+    // Developer feature options
+    enableAutoRepair?: boolean;
     // Developer model overrides (admin only)
     modelOverrides?: {
       outlineModel?: string | null;
@@ -808,6 +810,8 @@ export const storyService = {
       skipText: data.skipText,
       skipSceneDescriptions: data.skipSceneDescriptions,
       skipCovers: data.skipCovers,
+      // Developer feature options
+      enableAutoRepair: data.enableAutoRepair,
       // Developer model overrides
       modelOverrides: data.modelOverrides,
     });

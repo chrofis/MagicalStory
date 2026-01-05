@@ -1101,7 +1101,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '', options = {}) {
-  const { isAdmin = false } = options;
+  const { isAdmin = false, enableAutoRepair = false } = options;
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
@@ -1259,10 +1259,14 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       };
     }
 
-    // AUTO-REPAIR: Run if score <= 90% AND there are fix targets (even if above regeneration threshold)
-    // This tries to improve the image before deciding whether to accept or regenerate
+    // AUTO-REPAIR: Run if enabled AND score <= 90% AND there are fix targets
+    // This is OFF by default - can be enabled via developer mode
     const AUTO_REPAIR_THRESHOLD = 90;
-    if (!hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0) {
+    const couldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0;
+    if (couldRepair && !enableAutoRepair) {
+      log.debug(`⏭️ [QUALITY RETRY] ${pageLabel}Auto-repair skipped (disabled). Score ${score}%, ${result.fixTargets.length} fix targets available.`);
+    }
+    if (enableAutoRepair && couldRepair) {
       log.info(`🔧 [QUALITY RETRY] ${pageLabel}Score ${score}% <= ${AUTO_REPAIR_THRESHOLD}%, attempting auto-repair on ${result.fixTargets.length} fix targets...`);
       try {
         // Inpainting uses text-based coordinates instead of mask images
