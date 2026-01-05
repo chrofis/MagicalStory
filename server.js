@@ -6668,8 +6668,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     });
 
     // Use streaming with progressive parsing and parallel task initiation
+    // Use 64000 tokens to match Claude Sonnet's max output capacity for longer stories
     timing.storyGenStart = Date.now();
-    const unifiedResult = await callTextModelStreaming(unifiedPrompt, 20000, (chunk, fullText) => {
+    const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
       progressiveParser.processChunk(chunk, fullText);
     }, modelOverrides.outlineModel);
     timing.storyGenEnd = Date.now();
@@ -6957,7 +6958,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Each character's clothing category from scene.characterClothing
         const sceneClothingRequirements = { ...clothingRequirements };
         for (const char of sceneCharacters) {
-          const charClothing = perCharClothing[char.name] || defaultClothing;
+          // Find clothing using trimmed name comparison (handles trailing whitespace)
+          const charNameTrimmed = char.name.trim().toLowerCase();
+          const charClothing = Object.entries(perCharClothing).find(
+            ([name]) => name.trim().toLowerCase() === charNameTrimmed
+          )?.[1] || defaultClothing;
           if (!sceneClothingRequirements[char.name]) {
             sceneClothingRequirements[char.name] = {};
           }
