@@ -1215,6 +1215,8 @@ export default function StoryWizard() {
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
         // Merge extracted traits with existing physical traits (don't overwrite user edits)
+        // Track which traits came from extraction vs user
+        const existingSource = currentCharacter.physicalTraitsSource || {};
         const mergedPhysical = result.extractedTraits ? {
           ...currentCharacter.physical,
           // Only fill in missing traits from extraction
@@ -1225,6 +1227,17 @@ export default function StoryWizard() {
           build: currentCharacter.physical?.build || result.extractedTraits.build,
           face: currentCharacter.physical?.face || result.extractedTraits.face,
         } : currentCharacter.physical;
+
+        // Track source of each trait - 'extracted' for new traits, preserve existing source for user edits
+        const mergedTraitsSource = result.extractedTraits ? {
+          ...existingSource,
+          eyeColor: existingSource.eyeColor || (result.extractedTraits.eyeColor ? 'extracted' : undefined),
+          hairColor: existingSource.hairColor || (result.extractedTraits.hairColor ? 'extracted' : undefined),
+          hairLength: existingSource.hairLength || (result.extractedTraits.hairLength ? 'extracted' : undefined),
+          hairStyle: existingSource.hairStyle || (result.extractedTraits.hairStyle ? 'extracted' : undefined),
+          build: existingSource.build || (result.extractedTraits.build ? 'extracted' : undefined),
+          face: existingSource.face || (result.extractedTraits.face ? 'extracted' : undefined),
+        } as typeof existingSource : existingSource;
 
         // Merge extracted clothing (filter out null values)
         const mergedClothing = result.extractedClothing ? {
@@ -1245,6 +1258,7 @@ export default function StoryWizard() {
           ...prev,
           avatars: freshAvatars,
           physical: mergedPhysical,
+          physicalTraitsSource: mergedTraitsSource,
           clothing: mergedClothing,
         } : prev);
         setCharacters(prev => prev.map(c =>
@@ -1252,6 +1266,7 @@ export default function StoryWizard() {
             ...c,
             avatars: freshAvatars,
             physical: mergedPhysical,
+            physicalTraitsSource: mergedTraitsSource,
             clothing: mergedClothing,
           } : c
         ));
@@ -1315,6 +1330,8 @@ export default function StoryWizard() {
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
         // Merge extracted traits with existing physical traits (don't overwrite user edits)
+        // Track which traits came from extraction vs user
+        const existingSource2 = latestChar.physicalTraitsSource || {};
         const mergedPhysical = result.extractedTraits ? {
           ...latestChar.physical,
           eyeColor: latestChar.physical?.eyeColor || result.extractedTraits.eyeColor,
@@ -1324,6 +1341,17 @@ export default function StoryWizard() {
           build: latestChar.physical?.build || result.extractedTraits.build,
           face: latestChar.physical?.face || result.extractedTraits.face,
         } : latestChar.physical;
+
+        // Track source of each trait - 'extracted' for new traits, preserve existing source
+        const mergedTraitsSource2 = result.extractedTraits ? {
+          ...existingSource2,
+          eyeColor: existingSource2.eyeColor || (result.extractedTraits.eyeColor ? 'extracted' : undefined),
+          hairColor: existingSource2.hairColor || (result.extractedTraits.hairColor ? 'extracted' : undefined),
+          hairLength: existingSource2.hairLength || (result.extractedTraits.hairLength ? 'extracted' : undefined),
+          hairStyle: existingSource2.hairStyle || (result.extractedTraits.hairStyle ? 'extracted' : undefined),
+          build: existingSource2.build || (result.extractedTraits.build ? 'extracted' : undefined),
+          face: existingSource2.face || (result.extractedTraits.face ? 'extracted' : undefined),
+        } as typeof existingSource2 : existingSource2;
 
         // Merge extracted clothing (filter out null values)
         const mergedClothing = result.extractedClothing ? {
@@ -1342,6 +1370,7 @@ export default function StoryWizard() {
           ...prev,
           avatars: freshAvatars,
           physical: mergedPhysical,
+          physicalTraitsSource: mergedTraitsSource2,
           clothing: mergedClothing,
         } : prev);
         setCharacters(prev => prev.map(c =>
@@ -1349,6 +1378,7 @@ export default function StoryWizard() {
             ...c,
             avatars: freshAvatars,
             physical: mergedPhysical,
+            physicalTraitsSource: mergedTraitsSource2,
             clothing: mergedClothing,
           } : c
         ));
@@ -1360,6 +1390,7 @@ export default function StoryWizard() {
           ...latestChar,
           avatars: freshAvatars,
           physical: mergedPhysical,
+          physicalTraitsSource: mergedTraitsSource2,
           clothing: mergedClothing,
         };
         const latestCharacters2 = await new Promise<Character[]>(resolve => {

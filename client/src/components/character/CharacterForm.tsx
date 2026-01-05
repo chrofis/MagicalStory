@@ -8,7 +8,7 @@ import CharacterRelationships from './CharacterRelationships';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory } from '@/services/characterService';
-import type { Character, PhysicalTraits, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
+import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
 import type { CustomRelationshipPair } from '@/constants/relationships';
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
@@ -426,7 +426,7 @@ export function CharacterForm({
     }
   };
 
-  // Update physical traits
+  // Update physical traits and mark as 'user' source
   const updatePhysical = (field: keyof PhysicalTraits, value: string) => {
     onChange({
       ...character,
@@ -434,6 +434,11 @@ export function CharacterForm({
         ...character.physical,
         [field]: value,
       },
+      // Mark this trait as user-edited so it will be sent during regeneration
+      physicalTraitsSource: {
+        ...character.physicalTraitsSource,
+        [field]: 'user' as const,
+      } as PhysicalTraitsSource,
     });
   };
 

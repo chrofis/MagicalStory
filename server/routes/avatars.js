@@ -946,7 +946,7 @@ router.get('/avatar-prompt', authenticateToken, async (req, res) => {
  */
 router.post('/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits } = req.body;
+    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
@@ -1021,6 +1021,25 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
       facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
+    // Build user clothing section if provided
+    let userClothingSection = '';
+    if (clothing) {
+      const clothingParts = [];
+      if (clothing.fullBody) {
+        clothingParts.push(`Full outfit: ${clothing.fullBody}`);
+      } else {
+        if (clothing.upperBody) clothingParts.push(`Top: ${clothing.upperBody}`);
+        if (clothing.lowerBody) clothingParts.push(`Bottom: ${clothing.lowerBody}`);
+      }
+      if (clothing.shoes) clothingParts.push(`Shoes: ${clothing.shoes}`);
+      if (clothing.accessories) clothingParts.push(`Accessories: ${clothing.accessories}`);
+
+      if (clothingParts.length > 0) {
+        userClothingSection = `\n\nUSER-SPECIFIED CLOTHING (MUST USE - override default clothing style):\n${clothingParts.join('\n')}\nIMPORTANT: Use the user-specified clothing above instead of the default clothing style.`;
+        log.debug(`👕 [CLOTHING AVATARS] Using user-specified clothing: ${clothingParts.join(', ')}`);
+      }
+    }
+
     // Helper function to generate a single avatar
     const generateSingleAvatar = async (category, config) => {
       try {
@@ -1035,6 +1054,10 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         });
         if (physicalTraitsSection) {
           avatarPrompt += physicalTraitsSection;
+        }
+        // Add user-specified clothing if provided (overrides default style)
+        if (userClothingSection) {
+          avatarPrompt += userClothingSection;
         }
 
         const requestBody = {

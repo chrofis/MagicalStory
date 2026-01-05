@@ -363,6 +363,8 @@ export const characterService = {
         apparentAge: character.apparentAge,
         gender: character.gender,
         build: character.physical?.build,  // Don't send default - server will default to 'athletic'
+        // Pass user-entered clothing to override defaults
+        clothing: character.clothing?.structured,
       });
 
       if (response.success && response.clothingAvatars) {
@@ -433,6 +435,40 @@ export const characterService = {
       log.info(`Generating clothing avatars WITH TRAITS for ${character.name} (id: ${character.id}), using: ${character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : 'original'}`);
       log.info(`Physical traits: ${JSON.stringify(character.physical)}`);
 
+      // Filter traits to only include those with 'user' source
+      // This prevents reinforcing extraction errors during regeneration
+      const traitsSource = character.physicalTraitsSource || {};
+      const userTraits: typeof character.physical = {};
+      if (character.physical) {
+        if (traitsSource.eyeColor === 'user' && character.physical.eyeColor) {
+          userTraits.eyeColor = character.physical.eyeColor;
+        }
+        if (traitsSource.hairColor === 'user' && character.physical.hairColor) {
+          userTraits.hairColor = character.physical.hairColor;
+        }
+        if (traitsSource.hairLength === 'user' && character.physical.hairLength) {
+          userTraits.hairLength = character.physical.hairLength;
+        }
+        if (traitsSource.hairStyle === 'user' && character.physical.hairStyle) {
+          userTraits.hairStyle = character.physical.hairStyle;
+        }
+        if (traitsSource.build === 'user' && character.physical.build) {
+          userTraits.build = character.physical.build;
+        }
+        if (traitsSource.face === 'user' && character.physical.face) {
+          userTraits.face = character.physical.face;
+        }
+        if (traitsSource.facialHair === 'user' && character.physical.facialHair) {
+          userTraits.facialHair = character.physical.facialHair;
+        }
+        if (traitsSource.other === 'user' && character.physical.other) {
+          userTraits.other = character.physical.other;
+        }
+      }
+
+      const hasUserTraits = Object.keys(userTraits).length > 0;
+      log.info(`Physical traits to send (user-edited only): ${hasUserTraits ? JSON.stringify(userTraits) : 'none'}`);
+
       const response = await api.post<{
         success: boolean;
         clothingAvatars?: CharacterAvatars & {
@@ -448,9 +484,11 @@ export const characterService = {
         age: character.age,
         apparentAge: character.apparentAge,
         gender: character.gender,
-        build: character.physical?.build || 'average',
-        // Pass all physical traits to include in the avatar generation prompt
-        physicalTraits: character.physical,
+        build: userTraits.build || 'average',
+        // Only pass user-edited physical traits (not extracted ones)
+        physicalTraits: hasUserTraits ? userTraits : undefined,
+        // Pass user-entered clothing to override defaults
+        clothing: character.clothing?.structured,
       });
 
       if (response.success && response.clothingAvatars) {

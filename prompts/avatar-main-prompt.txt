@@ -1,5 +1,7 @@
 TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference photos.
 
+OUTPUT STYLE: PHOTOREALISTIC - This must look like a professional fashion photograph, NOT a cartoon, NOT animated, NOT Pixar style.
+
 GRID LAYOUT (with clear black dividing lines between quadrants):
 ┌─────────────────┬─────────────────┐
 │  TOP LEFT       │  TOP RIGHT      │
@@ -21,11 +23,18 @@ CRITICAL GRID REQUIREMENTS:
 
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.
-- Body: Use the APPARENT AGE and BUILD from PHYSICAL CHARACTERISTICS below. Generate age-appropriate body proportions matching that age category.
+- Body: Use the APPARENT AGE from PHYSICAL CHARACTERISTICS below. Generate age-appropriate body proportions matching that age category.
 - Setting: Pure clean white background (#FFFFFF) in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
 - Top quadrants: Head and shoulders, face clearly visible
 - Bottom quadrants: Full body, head to toe. Shoes visible.
+
+BODY TRANSFORMATION (CRITICAL):
+- Generate the person with an ATHLETIC, FIT body type by default
+- Do NOT preserve overweight or heavy body proportions from the reference photo
+- Keep the EXACT same face and identity, but transform the body to be slim and athletic
+- Only exception: if BUILD is explicitly specified in PHYSICAL CHARACTERISTICS below (e.g., "heavy", "large", "stocky"), use that body type instead
+- For children: fit and healthy, age-appropriate athletic proportions
 
 IDENTITY PERSISTENCE:
 - Hair and face must be fully visible. Avoid hats and hoods.

@@ -35,6 +35,23 @@ export interface ChangedTraits {
   apparentAge?: boolean;
 }
 
+// Source of a physical trait value
+export type TraitSource = 'photo' | 'extracted' | 'user';
+
+// Tracks where each physical trait value came from
+// Only 'user' source traits are sent to generation (to avoid reinforcing extraction errors)
+export interface PhysicalTraitsSource {
+  build?: TraitSource;
+  face?: TraitSource;
+  eyeColor?: TraitSource;
+  hairColor?: TraitSource;
+  hairLength?: TraitSource;
+  hairStyle?: TraitSource;
+  hair?: TraitSource;        // Legacy
+  facialHair?: TraitSource;
+  other?: TraitSource;
+}
+
 // Psychological traits
 export interface PsychologicalTraits {
   strengths: string[];
@@ -144,6 +161,8 @@ export interface Character {
 
   // Physical traits (from photo analysis)
   physical?: PhysicalTraits;
+  // Tracks the source of each physical trait (photo, extracted, user)
+  physicalTraitsSource?: PhysicalTraitsSource;
 
   // Psychological traits
   traits: PsychologicalTraits;
