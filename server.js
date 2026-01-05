@@ -7478,10 +7478,10 @@ async function processStoryJob(jobId) {
     const langText = getLanguageNameEnglish(lang);
 
     // Calculate number of story scenes to generate:
-    // - Picture Book / Unified: 1 scene per page (image + text on same page)
-    // - OutlineAndText: 1 scene per 2 print pages (text page + facing image page)
+    // - Picture Book (1st-grade): 1 scene per page (image + text on same page)
+    // - Standard/Advanced: 1 scene per 2 print pages (text page + facing image page)
     const printPages = inputData.pages;  // Total pages when printed
-    const isPictureBookLayout = generationMode !== 'outlineAndText';
+    const isPictureBookLayout = inputData.languageLevel === '1st-grade';
     const sceneCount = isPictureBookLayout ? printPages : Math.floor(printPages / 2);
     log.debug(`📚 [PIPELINE] Print pages: ${printPages}, Mode: ${generationMode}, Scenes to generate: ${sceneCount}`);
 
