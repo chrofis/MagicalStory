@@ -2378,6 +2378,7 @@ export default function StoryWizard() {
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}
               sceneDescriptions={progressiveStoryData?.sceneDescriptions || sceneDescriptions}
+              characters={characters}
               // Progressive mode props - active when generating (even before story text arrives)
               progressiveMode={isGenerating}
               progressiveData={progressiveStoryData || undefined}
@@ -2406,11 +2407,11 @@ export default function StoryWizard() {
                     : 'Failed to update Visual Bible');
                 }
               } : undefined}
-              onRegenerateImage={storyId ? async (pageNumber: number, editedScene?: string) => {
+              onRegenerateImage={storyId ? async (pageNumber: number, editedScene?: string, characterIds?: number[]) => {
                 try {
-                  log.info('Regenerating image for page:', pageNumber, editedScene ? '(scene edited)' : '');
+                  log.info('Regenerating image for page:', pageNumber, editedScene ? '(scene edited)' : '', characterIds ? `(${characterIds.length} characters)` : '');
                   setIsGenerating(true);
-                  const result = await storyService.regenerateImage(storyId, pageNumber, editedScene);
+                  const result = await storyService.regenerateImage(storyId, pageNumber, editedScene, characterIds);
                   log.info('Regenerate result:', { hasImageData: !!result?.imageData, length: result?.imageData?.length, versionCount: result?.versionCount, creditsRemaining: result?.creditsRemaining });
                   if (!result?.imageData) {
                     log.error('No imageData in response!', result);

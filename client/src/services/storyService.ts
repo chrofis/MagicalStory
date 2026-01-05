@@ -522,7 +522,7 @@ export const storyService = {
     return response;
   },
 
-  async regenerateImage(storyId: string, pageNum: number, editedScene?: string): Promise<{
+  async regenerateImage(storyId: string, pageNum: number, editedScene?: string, characterIds?: number[]): Promise<{
     imageData: string;
     qualityScore?: number;
     qualityReasoning?: string;
@@ -560,7 +560,7 @@ export const storyService = {
       newPrompt?: string;
     }>(
       `/api/stories/${storyId}/regenerate/image/${pageNum}`,
-      { editedScene }
+      { editedScene, characterIds }
     );
     return response;
   },

@@ -1610,7 +1610,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
 app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { customPrompt, editedScene } = req.body;
+    const { customPrompt, editedScene, characterIds } = req.body;
     const pageNumber = parseInt(pageNum);
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
@@ -1679,16 +1679,28 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       log.debug(`📖 [REGEN] Visual Bible: ${relevantEntries.length} entries relevant to page ${pageNumber}`);
     }
 
-    // Detect which characters appear in this scene (from input description)
-    const sceneCharacters = getCharactersInScene(inputDescription, storyData.characters || []);
+    // Determine which characters appear in this scene
+    // Priority: explicit characterIds from user selection > text detection from scene description
+    let sceneCharacters;
+    if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
+      // Use explicit character selection from UI
+      sceneCharacters = (storyData.characters || []).filter(c => characterIds.includes(c.id));
+      log.debug(`👥 [REGEN] Using ${sceneCharacters.length} explicitly selected characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
+    } else {
+      // Fall back to text detection
+      sceneCharacters = getCharactersInScene(inputDescription, storyData.characters || []);
+      log.debug(`👥 [REGEN] Detected ${sceneCharacters.length} characters from text: ${sceneCharacters.map(c => c.name).join(', ')}`);
+    }
 
-    // Expand short scene summary to full Art Director format
-    // This ensures regenerated images have the same detailed prompts as original generation
+    // Expand scene to full Art Director format
+    // ALWAYS expand if user edited the scene (to ensure fresh, consistent prompts)
+    // Also expand if it's a short summary without Art Director sections
     let expandedDescription = inputDescription;
-    const isShortSummary = inputDescription.length < 500 && !inputDescription.includes('**Setting');
+    const hasArtDirectorFormat = inputDescription.includes('**Setting') || inputDescription.includes('**Character Composition');
+    const shouldExpand = sceneWasEdited || (!hasArtDirectorFormat && inputDescription.length < 1500);
 
-    if (isShortSummary) {
-      console.log(`📝 [REGEN] Expanding short scene summary (${inputDescription.length} chars) to full Art Director format...`);
+    if (shouldExpand) {
+      console.log(`📝 [REGEN] Expanding scene to full Art Director format (edited: ${sceneWasEdited}, length: ${inputDescription.length} chars)...`);
       // Use language code (e.g., 'de-ch', 'en') not name (e.g., 'English')
       const language = storyData.language || 'en';
       const expansionPrompt = buildSceneExpansionPrompt(inputDescription, storyData, sceneCharacters, visualBible, language);

@@ -69,8 +69,10 @@ interface StoryDisplayProps {
   onPrintBook?: () => void;
   onCreateAnother?: () => void;
   onDownloadTxt?: () => void;
-  onRegenerateImage?: (pageNumber: number, editedScene?: string) => Promise<void>;
+  onRegenerateImage?: (pageNumber: number, editedScene?: string, characterIds?: number[]) => Promise<void>;
   onRegenerateCover?: (coverType: 'front' | 'back' | 'initial') => Promise<void>;
+  // Characters for scene edit modal
+  characters?: Array<{ id: number; name: string; photoData?: string }>;
   onEditImage?: (pageNumber: number) => void;
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onRepairImage?: (pageNumber: number) => Promise<void>;
@@ -130,6 +132,7 @@ export function StoryDisplay({
   onDownloadTxt,
   onRegenerateImage,
   onRegenerateCover: _onRegenerateCover,
+  characters = [],
   onEditImage,
   onEditCover: _onEditCover,
   onRepairImage,
@@ -186,7 +189,7 @@ export function StoryDisplay({
   const [imageHistoryModal, setImageHistoryModal] = useState<{ pageNumber: number; versions: ImageVersion[] } | null>(null);
 
   // Scene edit modal state (for editing scene before regenerating)
-  const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string } | null>(null);
+  const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string; selectedCharacterIds: number[] } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Auto-repair state (dev mode only)
@@ -301,46 +304,58 @@ export function StoryDisplay({
   };
 
   // Extract just the Image Summary from a full scene description
+  // IMPORTANT: Always extract Section 6 (translated/localized) for user editing, NOT Section 1 (English)
   const extractImageSummary = (fullDescription: string): string => {
     if (!fullDescription) return '';
 
-    // NEW FORMAT: Look for section 6 "Image Summary (Language):" at the end
-    // This is the localized version for user editing
-    // Handles two formats from LLM:
+    // PRIORITY 1: Section 6 "Image Summary (Language)" - the TRANSLATED version for user editing
+    // Handles multiple formats from LLM:
     // Format 1: "6. **Image Summary (Deutsch)**\nSophie kniet..."
     // Format 2: "**6. Image Summary (Deutsch)**\nSophie kniet..."
+    // Format 3: "6. **Bildzusammenfassung (Deutsch)**\nSophie kniet..." (fully translated header)
     const section6Match = fullDescription.match(
-      /(?:\*\*)?6\.?\s*(?:\*\*)?\s*Image Summary\s*\([^)]+\)\s*\*\*\s*([\s\S]*?)(?=\n\s*(?:\*\*)?\d+\.|\n---|\n```|$)/i
+      /(?:\*\*)?6\.?\s*(?:\*\*)?\s*\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\([^)]+\)\s*\*?\*?\s*([\s\S]*?)(?=\n\s*(?:\*\*)?\d+\.|\n---|\n```|$)/i
     );
-    if (section6Match && section6Match[1] && section6Match[1].trim()) {
-      return section6Match[1].trim();
+    if (section6Match && section6Match[2] && section6Match[2].trim()) {
+      return section6Match[2].trim();
     }
 
-    // Try to extract just the Image Summary section (supports EN, DE, FR)
-    // Handles both newline and same-line formats:
-    // "1. **Bildzusammenfassung**\nSophie steht..." OR "1. **Bildzusammenfassung** Sophie steht..."
-    const summaryMatch = fullDescription.match(
-      /\*\*(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\*\*[\s\n]*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*|$)/i
+    // PRIORITY 2: Look for any "Image Summary (Language)" pattern anywhere (without section number)
+    // This catches variations like "**Image Summary (Deutsch):**\nContent..."
+    const localizedSummaryMatch = fullDescription.match(
+      /\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\([^)]+\)\s*:?\s*\*?\*?\s*\n([\s\S]*?)(?=\n\s*(?:\*\*)?\d+\.|\n\*\*|$)/i
     );
-    if (summaryMatch && summaryMatch[2] && summaryMatch[2].trim()) {
-      return summaryMatch[2].trim();
+    if (localizedSummaryMatch && localizedSummaryMatch[2] && localizedSummaryMatch[2].trim()) {
+      return localizedSummaryMatch[2].trim();
     }
 
-    // Fallback: if no Image Summary header found, check if it's a simple description
-    // (no markdown headers at all - just return as-is if short enough)
+    // PRIORITY 3: Fallback for simple descriptions (no markdown headers)
+    // Just return as-is if short enough (e.g., user-edited simple text)
     if (!fullDescription.includes('**') && fullDescription.length < 1000) {
       return fullDescription.trim();
     }
 
-    // Last fallback: strip leading header and take first paragraph
-    const firstParagraph = fullDescription.split(/\n\n/)[0];
-    if (firstParagraph && firstParagraph.length < 1000) {
-      // Strip any leading "1. **Header**" pattern
-      const cleaned = firstParagraph.replace(/^\d+\.\s*\*\*[^*]+\*\*\s*\n?/, '').trim();
-      return cleaned || firstParagraph.trim();
+    // PRIORITY 4: If description has headers but no Section 6, try to extract first meaningful content
+    // This handles edge cases where LLM didn't generate Section 6
+    // Look for content after any "Image Summary" type header
+    const anyImageSummaryMatch = fullDescription.match(
+      /\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\*?\*?\s*\n([\s\S]*?)(?=\n\s*(?:\*\*)?\d+\.\s*\*\*|\n\s*\*\*\d+\.|$)/i
+    );
+    if (anyImageSummaryMatch && anyImageSummaryMatch[2] && anyImageSummaryMatch[2].trim()) {
+      return anyImageSummaryMatch[2].trim();
     }
 
+    // Last fallback: return truncated description
     return fullDescription.substring(0, 500).trim() + '...';
+  };
+
+  // Detect which characters are mentioned in a scene description
+  const detectCharactersInScene = (sceneText: string): number[] => {
+    if (!sceneText || !characters.length) return characters.map(c => c.id); // Default to all
+    const lowerScene = sceneText.toLowerCase();
+    return characters
+      .filter(c => lowerScene.includes(c.name.toLowerCase()))
+      .map(c => c.id);
   };
 
   // Open scene edit modal for regeneration
@@ -350,7 +365,9 @@ export function StoryDisplay({
     const fullDescription = image?.description || sceneDesc?.description || '';
     // Extract just the summary for editing
     const summary = extractImageSummary(fullDescription);
-    setSceneEditModal({ pageNumber, scene: summary });
+    // Detect characters mentioned in the scene
+    const detectedCharacterIds = detectCharactersInScene(fullDescription);
+    setSceneEditModal({ pageNumber, scene: summary, selectedCharacterIds: detectedCharacterIds });
   };
 
   // Handle regenerate with edited scene
@@ -358,7 +375,7 @@ export function StoryDisplay({
     if (!sceneEditModal || !onRegenerateImage) return;
     setIsRegenerating(true);
     try {
-      await onRegenerateImage(sceneEditModal.pageNumber, sceneEditModal.scene);
+      await onRegenerateImage(sceneEditModal.pageNumber, sceneEditModal.scene, sceneEditModal.selectedCharacterIds);
       setSceneEditModal(null);
     } catch (err) {
       console.error('Failed to regenerate image:', err);
@@ -2817,6 +2834,9 @@ export function StoryDisplay({
           onRegenerate={handleRegenerateWithScene}
           isRegenerating={isRegenerating}
           imageRegenerationCost={imageRegenerationCost}
+          characters={characters.map(c => ({ id: c.id, name: c.name, photoUrl: c.photoData }))}
+          selectedCharacterIds={sceneEditModal.selectedCharacterIds}
+          onCharacterSelectionChange={(ids) => setSceneEditModal({ ...sceneEditModal, selectedCharacterIds: ids })}
         />
       )}
 
