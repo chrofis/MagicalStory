@@ -1055,8 +1055,9 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         if (physicalTraitsSection) {
           avatarPrompt += physicalTraitsSection;
         }
-        // Add user-specified clothing if provided (overrides default style)
-        if (userClothingSection) {
+        // Add user-specified clothing ONLY for standard avatar (not winter/summer)
+        // Winter and summer should use their seasonal clothing styles
+        if (userClothingSection && category === 'standard') {
           avatarPrompt += userClothingSection;
         }
 
