@@ -119,7 +119,7 @@ export function StoryDisplay({
   sceneImages,
   sceneDescriptions = [],
   coverImages,
-  languageLevel: _languageLevel = 'standard', // Kept for backward compatibility, layout now auto-detected
+  languageLevel = 'standard', // Used to determine layout: '1st-grade' = picture book, others = standard
   storyLanguage,
   isGenerating = false,
   onDownloadPdf,
@@ -435,19 +435,17 @@ export function StoryDisplay({
   const storyPages = parseStoryPages(displayStory);
   const hasImages = sceneImages.length > 0;
 
-  // Detect layout from actual data:
-  // - 1:1 layout (unified/storybook): 1 image per text page (sceneImages.length === storyPages.length)
-  // - 2:1 layout (outlineAndText): 1 image per 2 text pages (sceneImages.length === Math.ceil(storyPages.length / 2))
-  const isPictureBook = sceneImages.length === 0 ||
-    storyPages.length === 0 ||
-    sceneImages.length === storyPages.length; // Exact 1:1 match
+  // Determine layout from languageLevel:
+  // - Picture Book (1st-grade): 1 image + text combined on each page
+  // - Standard/Advanced: text page on left, image page on right (separate pages)
+  const isPictureBook = languageLevel === '1st-grade';
 
   // Debug layout detection
   console.log('[StoryDisplay] Layout detection:', {
-    sceneImagesLength: sceneImages.length,
-    storyPagesLength: storyPages.length,
+    languageLevel,
     isPictureBook,
-    sceneImagePageNumbers: sceneImages.map(img => img.pageNumber)
+    sceneImagesLength: sceneImages.length,
+    storyPagesLength: storyPages.length
   });
 
   // Progressive mode: Calculate max viewable page

@@ -1720,7 +1720,11 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     }
     const artStyle = storyData.artStyle || 'pixar';
     // Use detailed photo info (with names) for labeled reference images
-    const referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, clothingRequirements);
+    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, clothingRequirements);
+    // Apply styled avatars for non-costumed characters
+    if (effectiveClothing !== 'costumed') {
+      referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+    }
     log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}${pageClothingData ? ' (from outline)' : ' (parsed)'}`);
 
     // Build image prompt with scene-specific characters and visual bible
@@ -2030,6 +2034,10 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       // Initial/Back covers: use ALL characters
       coverCharacterPhotos = getCharacterPhotoDetails(storyData.characters || [], effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ALL ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
+    }
+    // Apply styled avatars for non-costumed characters
+    if (effectiveCoverClothing !== 'costumed') {
+      coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
     }
 
     // Build cover prompt
@@ -4947,7 +4955,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Use detailed photo info (with names) for labeled reference images
         // Pass artStyle and clothingRequirements for per-character costume lookup
-        const referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, streamingClothingRequirements);
+        let referencePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, artStyle, streamingClothingRequirements);
+        // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
+        if (clothingCategory !== 'costumed') {
+          referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+        }
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
         // Log with visual bible info if available
@@ -5093,6 +5105,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           // Initial page and back cover: ALL characters
           referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType, artStyleId, streamingClothingRequirements);
           log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
+        }
+        // Apply styled avatars for non-costumed characters
+        if (clothing !== 'costumed') {
+          referencePhotos = applyStyledAvatars(referencePhotos, artStyleId);
         }
 
         // Build the prompt
@@ -6974,7 +6990,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneClothingRequirements[char.name]._currentClothing = charClothing;
         }
 
-        const pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultCategory, defaultCostumeType, inputData.artStyle, sceneClothingRequirements);
+        let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultCategory, defaultCostumeType, inputData.artStyle, sceneClothingRequirements);
+        // Apply styled avatars for non-costumed characters
+        if (defaultCategory !== 'costumed') {
+          pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+        }
 
         // Log avatar selections for each character
         for (const photo of pagePhotos) {
