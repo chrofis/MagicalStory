@@ -1674,6 +1674,13 @@ class ProgressiveUnifiedParser {
         const sceneHint = hintMatch ? hintMatch[1].trim() : '';
 
         // Extract per-character clothing using shared helper
+        // Debug: log raw content to see what format AI is producing
+        const charSection = content.match(/Characters:[\s\S]{0,300}/i);
+        if (charSection) {
+          log.debug(`[PAGE-CLOTHING] Page ${pageNum} Characters section: "${charSection[0].replace(/\n/g, '\\n')}"`);
+        } else {
+          log.debug(`[PAGE-CLOTHING] Page ${pageNum} NO Characters section found. Content snippet: "${content.substring(0, 200).replace(/\n/g, '\\n')}..."`);
+        }
         const { characterClothing, characters } = parseCharacterClothingBlock(content);
 
         this.emitted.pages.add(pageNum);
