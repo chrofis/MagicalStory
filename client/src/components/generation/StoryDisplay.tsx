@@ -442,6 +442,14 @@ export function StoryDisplay({
     storyPages.length === 0 ||
     sceneImages.length === storyPages.length; // Exact 1:1 match
 
+  // Debug layout detection
+  console.log('[StoryDisplay] Layout detection:', {
+    sceneImagesLength: sceneImages.length,
+    storyPagesLength: storyPages.length,
+    isPictureBook,
+    sceneImagePageNumbers: sceneImages.map(img => img.pageNumber)
+  });
+
   // Progressive mode: Calculate max viewable page
   // For picture book: User can see page N if page N-1 has an image (1:1 text:image)
   // For normal story: User can see page N if scene ceil(N/2) has an image (2:1 text:image)
