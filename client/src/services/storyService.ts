@@ -338,6 +338,36 @@ export const storyService = {
       backCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
     } | null;
     generationLog?: GenerationLogEntry[];
+    styledAvatarGeneration?: Array<{
+      timestamp: string;
+      characterName: string;
+      artStyle: string;
+      durationMs: number;
+      success: boolean;
+      error?: string;
+      inputs: {
+        facePhoto: { identifier: string; sizeKB: number } | null;
+        originalAvatar: { identifier: string; sizeKB: number };
+      };
+      prompt?: string;
+      output?: { identifier: string; sizeKB: number };
+    }>;
+    costumedAvatarGeneration?: Array<{
+      timestamp: string;
+      characterName: string;
+      costumeType: string;
+      artStyle: string;
+      costumeDescription: string;
+      durationMs: number;
+      success: boolean;
+      error?: string;
+      inputs: {
+        facePhoto: { identifier: string; sizeKB: number; imageData?: string };
+        standardAvatar: { identifier: string; sizeKB: number; imageData?: string } | null;
+      };
+      prompt?: string;
+      output?: { identifier: string; sizeKB: number; imageData?: string };
+    }>;
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');
