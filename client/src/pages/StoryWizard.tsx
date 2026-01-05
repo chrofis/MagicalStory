@@ -191,6 +191,22 @@ export default function StoryWizard() {
     prompt?: string;
     output?: { identifier: string; sizeKB: number };
   }>>([]); // Styled avatar generation log (dev mode)
+  const [costumedAvatarGeneration, setCostumedAvatarGeneration] = useState<Array<{
+    timestamp: string;
+    characterName: string;
+    costumeType: string;
+    artStyle: string;
+    costumeDescription: string;
+    durationMs: number;
+    success: boolean;
+    error?: string;
+    inputs: {
+      facePhoto: { identifier: string; sizeKB: number; imageData?: string };
+      standardAvatar: { identifier: string; sizeKB: number; imageData?: string } | null;
+    };
+    prompt?: string;
+    output?: { identifier: string; sizeKB: number; imageData?: string };
+  }>>([]); // Costumed avatar generation log (dev mode)
   const [generationLog, setGenerationLog] = useState<GenerationLogEntry[]>([]); // Generation log (dev mode)
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
@@ -320,6 +336,7 @@ export default function StoryWizard() {
             setOutlineUsage(story.outlineUsage);
             setStoryTextPrompts(story.storyTextPrompts || []);
             setStyledAvatarGeneration(story.styledAvatarGeneration || []);
+            setCostumedAvatarGeneration(story.costumedAvatarGeneration || []);
             console.log('[StoryWizard] Loading story metadata, generationLog:', story.generationLog?.length || 0, 'entries');
             setGenerationLog(story.generationLog || []);
 
@@ -421,6 +438,16 @@ export default function StoryWizard() {
                   console.log('[StoryWizard] Dev metadata generationLog:', devMetadata.generationLog?.length || 0, 'entries');
                   if (devMetadata.generationLog?.length) {
                     setGenerationLog(devMetadata.generationLog);
+                  }
+                  // Load styled avatar generation log from dev metadata
+                  if (devMetadata.styledAvatarGeneration?.length) {
+                    console.log('[StoryWizard] Dev metadata styledAvatarGeneration:', devMetadata.styledAvatarGeneration.length, 'entries');
+                    setStyledAvatarGeneration(devMetadata.styledAvatarGeneration);
+                  }
+                  // Load costumed avatar generation log from dev metadata
+                  if (devMetadata.costumedAvatarGeneration?.length) {
+                    console.log('[StoryWizard] Dev metadata costumedAvatarGeneration:', devMetadata.costumedAvatarGeneration.length, 'entries');
+                    setCostumedAvatarGeneration(devMetadata.costumedAvatarGeneration);
                   }
                   log.debug('Dev metadata merged into story');
                 }
@@ -1916,6 +1943,7 @@ export default function StoryWizard() {
           setOutlineUsage(status.result.outlineUsage);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
           setStyledAvatarGeneration(status.result.styledAvatarGeneration || []);
+          setCostumedAvatarGeneration(status.result.costumedAvatarGeneration || []);
           setGenerationLog(status.result.generationLog || []);
           // Ensure visualBible has required fields (backward compatibility)
           if (status.result.visualBible) {
@@ -2225,6 +2253,7 @@ export default function StoryWizard() {
               isGenerating={isGenerating}
               developerMode={developerMode}
               styledAvatarGeneration={styledAvatarGeneration}
+              costumedAvatarGeneration={costumedAvatarGeneration}
               generationLog={generationLog}
               storyId={storyId}
               onVisualBibleChange={storyId ? async (updatedBible) => {

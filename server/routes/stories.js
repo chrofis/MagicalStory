@@ -370,10 +370,14 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         } : null
       } : null,
       // Generation log (avatar lookups, stage transitions, etc.)
-      generationLog: story.generationLog || []
+      generationLog: story.generationLog || [],
+      // Styled avatar generation log (for developer mode auditing)
+      styledAvatarGeneration: story.styledAvatarGeneration || [],
+      // Costumed avatar generation log (for developer mode auditing)
+      costumedAvatarGeneration: story.costumedAvatarGeneration || []
     };
 
-    console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries, generationLog: ${devMetadata.generationLog?.length || 0} entries`);
+    console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries, generationLog: ${devMetadata.generationLog?.length || 0} entries, styledAvatars: ${devMetadata.styledAvatarGeneration?.length || 0}, costumedAvatars: ${devMetadata.costumedAvatarGeneration?.length || 0}`);
     res.json(devMetadata);
   } catch (err) {
     console.error('❌ Error fetching dev metadata:', err);
