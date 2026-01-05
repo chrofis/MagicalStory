@@ -460,9 +460,8 @@ export function StoryDisplay({
 
     // Check each subsequent page
     for (let i = 2; i <= storyPages.length; i++) {
-      // For picture book: each text page has its own image (pageNumber matches)
-      // For normal story: each scene has 2 text pages, so scene number = ceil(textPage/2)
-      const imagePageNum = isPictureBook ? (i - 1) : Math.ceil((i - 1) / 2);
+      // All layouts now use 1:1 mapping - each text page needs its corresponding image
+      const imagePageNum = i - 1;
 
       // Check if the required image exists (from sceneImages or completedPageImages)
       const hasRequiredImage = sceneImages.some(img => img.pageNumber === imagePageNum && img.imageData) ||
@@ -1825,9 +1824,9 @@ export function StoryDisplay({
 
           {storyPages.slice(0, progressiveMode ? maxViewablePage : storyPages.length).map((pageText, index) => {
             const pageNumber = index + 1;
-            // For picture book: 1:1 mapping (text page = image page)
-            // For normal story: 2:1 mapping (2 text pages per scene, so scene = ceil(textPage/2))
-            const sceneNumber = isPictureBook ? pageNumber : Math.ceil(pageNumber / 2);
+            // All layouts now use 1:1 mapping (text page = image page)
+            // The difference is only in DISPLAY: Bilderbuch = combined, Kinderbuch = side-by-side
+            const sceneNumber = pageNumber;
             const image = sceneImages.find(img => img.pageNumber === sceneNumber);
             // In progressive mode, also check completedPageImages for the image
             const progressiveImageData = progressiveMode ? completedPageImages[sceneNumber] : undefined;
