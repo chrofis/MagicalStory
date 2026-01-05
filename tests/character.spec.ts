@@ -1,116 +1,25 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 /**
  * Authenticated user tests (requires TEST_EMAIL and TEST_PASSWORD in .env)
  *
- * IMPORTANT: Tests run serially to avoid rate limiting on login
+ * IMPORTANT: Uses Playwright auth state persistence - login happens once in setup,
+ * then auth state is reused for all tests. No need to login in each test!
  */
 
 const TEST_EMAIL = process.env.TEST_EMAIL;
 const TEST_PASSWORD = process.env.TEST_PASSWORD;
 
-// Run tests serially to avoid rate limiting
-test.describe.configure({ mode: 'serial' });
-
-/**
- * Helper function to login - handles rate limiting gracefully
- */
-async function login(page: Page) {
-  await page.goto('/');
-
-  // Check if already logged in (has auth token in localStorage)
-  const isLoggedIn = await page.evaluate(() => {
-    return !!localStorage.getItem('auth_token');
-  });
-
-  if (isLoggedIn) {
-    // Already logged in, just navigate
-    await page.goto('/create');
-    await page.waitForTimeout(1000);
-    return;
-  }
-
-  const ctaButton = page.getByRole('button', { name: /start|begin|create/i }).first();
-  await ctaButton.click();
-  await page.waitForSelector('.fixed.inset-0');
-
-  await page.getByPlaceholder('your@email.com').fill(TEST_EMAIL!);
-  await page.locator('input[type="password"]').first().fill(TEST_PASSWORD!);
-
-  const signInButton = page.getByRole('button', { name: /sign in|login|log in/i }).first();
-  await signInButton.click();
-
-  // Wait for either navigation or error message
-  await page.waitForTimeout(3000);
-
-  // Check for rate limit error
-  const bodyText = await page.textContent('body');
-  if (bodyText?.includes('Too many') || bodyText?.includes('rate limit')) {
-    console.log('Rate limited - waiting 10 seconds...');
-    await page.waitForTimeout(10000);
-    // Retry login
-    await signInButton.click();
-    await page.waitForTimeout(3000);
-  }
-
-  // Wait for navigation after login
-  try {
-    await page.waitForURL(/\/(create|welcome|stories)/, { timeout: 15000 });
-  } catch {
-    // If still on landing page, might be rate limited or wrong credentials
-    const currentUrl = page.url();
-    console.log('Login may have failed, current URL:', currentUrl);
-
-    // If rate limited, throw to fail test clearly
-    const bodyText = await page.textContent('body');
-    if (bodyText?.includes('Too many') || bodyText?.includes('rate limit')) {
-      throw new Error('Rate limited - please wait before running tests again');
-    }
-  }
-}
-
 test.describe('Character Creation', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
 
-  test('can login and access character creation', async ({ page }) => {
-    // Go to landing page
-    await page.goto('/');
+  test('can access character creation wizard', async ({ page }) => {
+    // Auth state is pre-loaded, just navigate directly
+    await page.goto('/create');
+    await page.waitForTimeout(2000);
 
-    // Click create button to open auth modal
-    const ctaButton = page.getByRole('button', { name: /start|begin|create/i }).first();
-    await ctaButton.click();
-
-    // Wait for auth modal
-    await page.waitForSelector('.fixed.inset-0');
-
-    // Fill login form (should be on login by default)
-    await page.getByPlaceholder('your@email.com').fill(TEST_EMAIL!);
-    await page.locator('input[type="password"]').first().fill(TEST_PASSWORD!);
-
-    // Click sign in button
-    const signInButton = page.getByRole('button', { name: /sign in|login|log in/i }).first();
-    await signInButton.click();
-
-    // Wait for navigation after login (should go to /create or /welcome or /stories)
-    await page.waitForURL(/\/(create|welcome|stories)/, { timeout: 10000 });
-
-    // If we're on welcome page, click to continue to create
-    if (page.url().includes('/welcome')) {
-      const continueButton = page.getByRole('button', { name: /create|start|begin/i }).first();
-      await continueButton.click();
-      await page.waitForURL(/\/create/, { timeout: 5000 });
-    }
-
-    // If we're on stories page, navigate to create
-    if (page.url().includes('/stories')) {
-      await page.goto('/create');
-    }
-
-    // Should now be on wizard/create page
+    // Should be on wizard/create page
     expect(page.url()).toContain('/create');
-
-    // Wait for wizard to fully load (loading spinner to disappear)
-    await page.waitForTimeout(3000);
 
     // Check that the wizard loaded - should see step indicator
     const stepIndicator = page.locator('text=1').or(page.locator('[class*="step"]')).first();
@@ -118,46 +27,18 @@ test.describe('Character Creation', () => {
   });
 
   test('can view character wizard step', async ({ page }) => {
-    // Login first
-    await page.goto('/');
-
-    const ctaButton = page.getByRole('button', { name: /start|begin|create/i }).first();
-    await ctaButton.click();
-    await page.waitForSelector('.fixed.inset-0');
-
-    await page.getByPlaceholder('your@email.com').fill(TEST_EMAIL!);
-    await page.locator('input[type="password"]').first().fill(TEST_PASSWORD!);
-
-    const signInButton = page.getByRole('button', { name: /sign in|login|log in/i }).first();
-    await signInButton.click();
-
-    // Wait and navigate to create
-    await page.waitForURL(/\/(create|welcome|stories)/, { timeout: 10000 });
-
-    if (!page.url().includes('/create')) {
-      await page.goto('/create');
-    }
-
-    // Wait for wizard to load
+    await page.goto('/create');
     await page.waitForTimeout(2000);
 
     // Take screenshot for debugging
     await page.screenshot({ path: 'test-results/wizard-step.png' });
 
-    // The wizard should show step 1 (Characters) or navigation
-    // Check for any of these indicators:
-    // - Step indicator showing "1" or "Characters"
-    // - Photo upload area
-    // - Character grid
-    const body = await page.textContent('body');
-
-    // Should have some wizard-related content
-    const isOnWizard = page.url().includes('/create');
-    expect(isOnWizard).toBe(true);
+    // Should be on wizard
+    expect(page.url()).toContain('/create');
 
     // Should not be showing an error
+    const body = await page.textContent('body');
     const hasError = body?.includes('error') || body?.includes('Error');
-    // This is a soft check - errors might be in console, not on page
     console.log('Page contains error text:', hasError);
   });
 });
@@ -166,14 +47,7 @@ test.describe('Wizard Navigation', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
 
   test('can navigate through wizard steps by clicking step indicators', async ({ page }) => {
-    await login(page);
-
-    // Navigate to create if not already there
-    if (!page.url().includes('/create')) {
-      await page.goto('/create');
-    }
-
-    // Wait for wizard to load
+    await page.goto('/create');
     await page.waitForTimeout(2000);
 
     // Should be on step 1 - verify step indicator shows 1 is active
@@ -208,12 +82,7 @@ test.describe('Wizard Navigation', () => {
   });
 
   test('can navigate back through wizard steps', async ({ page }) => {
-    await login(page);
-
-    if (!page.url().includes('/create')) {
-      await page.goto('/create');
-    }
-
+    await page.goto('/create');
     await page.waitForTimeout(2000);
 
     // Go forward a couple steps
@@ -240,9 +109,6 @@ test.describe('My Stories Page', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
 
   test('can access My Stories page', async ({ page }) => {
-    await login(page);
-
-    // Navigate to stories page
     await page.goto('/stories');
 
     // Wait for page to load
@@ -268,7 +134,6 @@ test.describe('My Stories Page', () => {
   });
 
   test('stories page shows content', async ({ page }) => {
-    await login(page);
     await page.goto('/stories');
     await page.waitForTimeout(2000);
 
@@ -288,8 +153,6 @@ test.describe('My Orders Page', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
 
   test('can access My Orders page', async ({ page }) => {
-    await login(page);
-
     await page.goto('/orders');
     await page.waitForTimeout(2000);
 
@@ -338,7 +201,9 @@ test.describe('Logout Flow', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
 
   test('can logout after login', async ({ page }) => {
-    await login(page);
+    // Navigate to a page where menu is accessible
+    await page.goto('/stories');
+    await page.waitForTimeout(1000);
 
     // Find and click menu button
     const menuButton = page.getByRole('button', { name: /menu/i }).or(page.locator('[class*="menu"]')).first();

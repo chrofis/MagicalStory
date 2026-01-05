@@ -8,6 +8,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
+// Auth state file path
+const authFile = path.join(__dirname, '.auth/user.json');
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -37,29 +40,68 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    // Setup project - runs once to authenticate
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+    },
+
+    // Chromium with auth (for tests requiring login)
     {
       name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authFile,
+      },
+      dependencies: ['setup'],
+      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/],
+    },
+
+    // Chromium without auth (for unauthenticated tests - auth flow tests and UX analysis)
+    {
+      name: 'chromium-noauth',
       use: { ...devices['Desktop Chrome'] },
+      testMatch: [/auth\.spec\.ts/, /analysis\.spec\.ts/],
     },
 
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        storageState: authFile,
+      },
+      dependencies: ['setup'],
+      testIgnore: /auth\.setup\.ts/,
     },
 
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      use: {
+        ...devices['Desktop Safari'],
+        storageState: authFile,
+      },
+      dependencies: ['setup'],
+      testIgnore: /auth\.setup\.ts/,
     },
 
     /* Test against mobile viewports */
     {
       name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
+      use: {
+        ...devices['Pixel 5'],
+        storageState: authFile,
+      },
+      dependencies: ['setup'],
+      testIgnore: /auth\.setup\.ts/,
     },
     {
       name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
+      use: {
+        ...devices['iPhone 12'],
+        storageState: authFile,
+      },
+      dependencies: ['setup'],
+      testIgnore: /auth\.setup\.ts/,
     },
   ],
 
