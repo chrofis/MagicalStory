@@ -435,7 +435,10 @@ export const characterService = {
 
       const response = await api.post<{
         success: boolean;
-        clothingAvatars?: CharacterAvatars;
+        clothingAvatars?: CharacterAvatars & {
+          extractedTraits?: ExtractedTraits;
+          structuredClothing?: Record<string, ExtractedClothing>;
+        };
         error?: string;
       }>('/api/generate-clothing-avatars', {
         characterId: character.id,
@@ -452,7 +455,24 @@ export const characterService = {
 
       if (response.success && response.clothingAvatars) {
         log.success(`Clothing avatars WITH TRAITS generated for ${character.name}`);
-        return { success: true, avatars: response.clothingAvatars };
+
+        // Extract traits and clothing from the response
+        const extractedTraits = response.clothingAvatars.extractedTraits;
+        const extractedClothing = response.clothingAvatars.structuredClothing?.standard;
+
+        if (extractedTraits) {
+          log.info(`Extracted traits: ${JSON.stringify(extractedTraits)}`);
+        }
+        if (extractedClothing) {
+          log.info(`Extracted clothing: ${JSON.stringify(extractedClothing)}`);
+        }
+
+        return {
+          success: true,
+          avatars: response.clothingAvatars,
+          extractedTraits,
+          extractedClothing,
+        };
       } else {
         log.error(`Failed to generate avatars with traits: ${response.error}`);
         return { success: false, error: response.error };

@@ -45,8 +45,9 @@ IDENTITY PERSISTENCE (CRITICAL):
 COSTUME - {COSTUME_TYPE}:
 {COSTUME_DESCRIPTION}
 
-This is a COMPLETE outfit change. The character wears this entire costume from head to toe.
-Include ALL costume elements: headwear, shirt/top, pants/skirt/dress, footwear, and any accessories.
+This is a COMPLETE outfit change from neck to toe.
+Include costume elements: shirt/top, pants/skirt/dress, footwear, and any accessories.
+CRITICAL: NO HATS, HELMETS, CROWNS, OR HEAD COVERINGS of any kind. The head and hair must remain completely uncovered so the character's face is fully visible and recognizable.
 The costume should look authentic and age-appropriate for a children's book illustration.
 PHYSICAL_TRAITS:
 {PHYSICAL_TRAITS}

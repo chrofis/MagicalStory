@@ -1214,14 +1214,55 @@ export default function StoryWizard() {
         // Update local state with new avatars (explicitly clear stale flag)
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
+        // Merge extracted traits with existing physical traits (don't overwrite user edits)
+        const mergedPhysical = result.extractedTraits ? {
+          ...currentCharacter.physical,
+          // Only fill in missing traits from extraction
+          eyeColor: currentCharacter.physical?.eyeColor || result.extractedTraits.eyeColor,
+          hairColor: currentCharacter.physical?.hairColor || result.extractedTraits.hairColor,
+          hairLength: currentCharacter.physical?.hairLength || result.extractedTraits.hairLength,
+          hairStyle: currentCharacter.physical?.hairStyle || result.extractedTraits.hairStyle,
+          build: currentCharacter.physical?.build || result.extractedTraits.build,
+          face: currentCharacter.physical?.face || result.extractedTraits.face,
+        } : currentCharacter.physical;
+
+        // Merge extracted clothing (filter out null values)
+        const mergedClothing = result.extractedClothing ? {
+          ...currentCharacter.clothing,
+          structured: {
+            ...currentCharacter.clothing?.structured,
+            // Only fill in missing clothing from extraction
+            upperBody: currentCharacter.clothing?.structured?.upperBody || result.extractedClothing.upperBody || undefined,
+            lowerBody: currentCharacter.clothing?.structured?.lowerBody || result.extractedClothing.lowerBody || undefined,
+            shoes: currentCharacter.clothing?.structured?.shoes || result.extractedClothing.shoes || undefined,
+            fullBody: currentCharacter.clothing?.structured?.fullBody || result.extractedClothing.fullBody || undefined,
+          }
+        } : currentCharacter.clothing;
+
         // Update state only - DO NOT save here
         // The user will click Save which triggers saveCharacter() with the updated state
-        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
+        setCurrentCharacter(prev => prev ? {
+          ...prev,
+          avatars: freshAvatars,
+          physical: mergedPhysical,
+          clothing: mergedClothing,
+        } : prev);
         setCharacters(prev => prev.map(c =>
-          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
+          c.id === currentCharacter.id ? {
+            ...c,
+            avatars: freshAvatars,
+            physical: mergedPhysical,
+            clothing: mergedClothing,
+          } : c
         ));
 
         log.success(`✅ Avatars WITH TRAITS regenerated for ${currentCharacter.name}`);
+        if (result.extractedTraits) {
+          log.info(`📋 Extracted traits saved: ${JSON.stringify(result.extractedTraits)}`);
+        }
+        if (result.extractedClothing) {
+          log.info(`👕 Extracted clothing saved: ${JSON.stringify(result.extractedClothing)}`);
+        }
       } else {
         log.error(`❌ Failed to regenerate avatars with traits: ${result.error}`);
         showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
@@ -1273,23 +1314,61 @@ export default function StoryWizard() {
         // Update local state with new avatars
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
+        // Merge extracted traits with existing physical traits (don't overwrite user edits)
+        const mergedPhysical = result.extractedTraits ? {
+          ...latestChar.physical,
+          eyeColor: latestChar.physical?.eyeColor || result.extractedTraits.eyeColor,
+          hairColor: latestChar.physical?.hairColor || result.extractedTraits.hairColor,
+          hairLength: latestChar.physical?.hairLength || result.extractedTraits.hairLength,
+          hairStyle: latestChar.physical?.hairStyle || result.extractedTraits.hairStyle,
+          build: latestChar.physical?.build || result.extractedTraits.build,
+          face: latestChar.physical?.face || result.extractedTraits.face,
+        } : latestChar.physical;
+
+        // Merge extracted clothing (filter out null values)
+        const mergedClothing = result.extractedClothing ? {
+          ...latestChar.clothing,
+          structured: {
+            ...latestChar.clothing?.structured,
+            upperBody: latestChar.clothing?.structured?.upperBody || result.extractedClothing.upperBody || undefined,
+            lowerBody: latestChar.clothing?.structured?.lowerBody || result.extractedClothing.lowerBody || undefined,
+            shoes: latestChar.clothing?.structured?.shoes || result.extractedClothing.shoes || undefined,
+            fullBody: latestChar.clothing?.structured?.fullBody || result.extractedClothing.fullBody || undefined,
+          }
+        } : latestChar.clothing;
+
         // Only update currentCharacter if it's still the same character (user might have switched)
-        setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: freshAvatars } : prev);
+        setCurrentCharacter(prev => prev && prev.id === charId ? {
+          ...prev,
+          avatars: freshAvatars,
+          physical: mergedPhysical,
+          clothing: mergedClothing,
+        } : prev);
         setCharacters(prev => prev.map(c =>
-          c.id === charId ? { ...c, avatars: freshAvatars } : c
+          c.id === charId ? {
+            ...c,
+            avatars: freshAvatars,
+            physical: mergedPhysical,
+            clothing: mergedClothing,
+          } : c
         ));
 
         log.success(`✅ Avatars regenerated for ${latestChar.name}`);
 
-        // Save again with the new avatars
-        const updatedChar = { ...latestChar, avatars: freshAvatars };
-        const latestCharacters = await new Promise<Character[]>(resolve => {
+        // Save again with the new avatars, traits, and clothing
+        const updatedChar = {
+          ...latestChar,
+          avatars: freshAvatars,
+          physical: mergedPhysical,
+          clothing: mergedClothing,
+        };
+        const latestCharacters2 = await new Promise<Character[]>(resolve => {
           setCharacters(prev => {
             resolve(prev);
             return prev;
           });
         });
-        const finalCharacters = latestCharacters.map(c =>
+        const finalCharacters = latestCharacters2.map(c =>
           c.id === charId ? updatedChar : c
         );
 
@@ -1303,7 +1382,7 @@ export default function StoryWizard() {
           customFears: [],
         });
 
-        log.success(`💾 Character saved with new avatars`);
+        log.success(`💾 Character saved with new avatars, traits, and clothing`);
         showSuccess(language === 'de' ? 'Charakter gespeichert und Avatar regeneriert' : 'Character saved and avatar regenerated');
       } else {
         log.error(`❌ Failed to regenerate avatars: ${result.error}`);

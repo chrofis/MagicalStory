@@ -578,7 +578,7 @@ export default function AdminDashboard() {
             {isLoadingStats ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                <span className="ml-3 text-gray-600">{texts.loading || 'Loading statistics...'}</span>
+                <span className="ml-3 text-gray-600">Loading statistics...</span>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
