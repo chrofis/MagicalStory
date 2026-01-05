@@ -6747,7 +6747,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const isPictureBook = inputData.languageLevel === '1st-grade';
     const printPageCount = isPictureBook ? storyPages.length : storyPages.length * 2;
 
-    // Frontend expects: { title, dedication, pageTexts, sceneDescriptions, totalPages }
+    // Frontend expects: { title, dedication, pageTexts, sceneDescriptions, totalPages, totalScenes }
     await saveCheckpoint(jobId, 'story_text', {
       title,
       dedication: inputData.dedication || '',
@@ -6757,7 +6757,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         description: page.sceneHint || '',
         characterClothing: page.characterClothing || {}
       })),
-      totalPages: printPageCount  // Use print page count for accurate display
+      totalPages: printPageCount,  // Print page count (text + image pages)
+      totalScenes: storyPages.length  // Scene count (= number of images to expect)
     });
     log.debug(`💾 [UNIFIED] Saved story text for progressive display (${storyPages.length} scenes = ${printPageCount} print pages)`);
 

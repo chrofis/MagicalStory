@@ -93,6 +93,7 @@ interface StoryDisplayProps {
     pageTexts: Record<number, string>;
     sceneDescriptions: SceneDescription[];
     totalPages: number;
+    totalScenes?: number;  // Number of images to expect (may differ from totalPages for 2:1 layouts)
   };
   completedPageImages?: Record<number, string>;
   // Story text editing
@@ -477,6 +478,8 @@ export function StoryDisplay({
 
   const maxViewablePage = getMaxViewablePage();
   const totalProgressivePages = progressiveData?.totalPages || storyPages.length;
+  // totalScenes = number of images to expect (different from totalPages for 2:1 layouts)
+  const totalScenes = progressiveData?.totalScenes || sceneImages.length || Math.ceil(totalProgressivePages / (isPictureBook ? 1 : 2));
 
   // Debug: Log progressive state (only when values change significantly, to avoid spam)
   // Removed excessive logging - use browser DevTools if needed
@@ -2521,25 +2524,26 @@ export function StoryDisplay({
             );
           })}
 
-          {/* Progressive mode: Show loading indicator for remaining pages */}
+          {/* Progressive mode: Show loading indicator for remaining scenes */}
           {/* Hide when all expected images are received, even if job isn't complete yet */}
-          {progressiveMode && maxViewablePage < totalProgressivePages && Object.keys(completedPageImages).length < totalProgressivePages && (
+          {/* Use totalScenes (image count) not totalPages (print pages) for comparison */}
+          {progressiveMode && Object.keys(completedPageImages).length < totalScenes && (
             <div className="p-6 text-center">
               <div className="inline-flex flex-col items-center bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 shadow-sm">
                 <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
                 <p className="text-indigo-700 font-semibold">
                   {storyLang === 'de'
-                    ? `Seite ${maxViewablePage} von ${totalProgressivePages}`
+                    ? `Bild ${Object.keys(completedPageImages).length} von ${totalScenes}`
                     : storyLang === 'fr'
-                    ? `Page ${maxViewablePage} sur ${totalProgressivePages}`
-                    : `Page ${maxViewablePage} of ${totalProgressivePages}`}
+                    ? `Image ${Object.keys(completedPageImages).length} sur ${totalScenes}`
+                    : `Image ${Object.keys(completedPageImages).length} of ${totalScenes}`}
                 </p>
                 <p className="text-indigo-500 text-sm mt-1">
                   {storyLang === 'de'
-                    ? 'Weitere Seiten werden geladen...'
+                    ? 'Weitere Bilder werden geladen...'
                     : storyLang === 'fr'
-                    ? 'Chargement des pages suivantes...'
-                    : 'Loading more pages...'}
+                    ? 'Chargement des images suivantes...'
+                    : 'Loading more images...'}
                 </p>
               </div>
             </div>
