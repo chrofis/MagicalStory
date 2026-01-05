@@ -86,6 +86,7 @@ export default function StoryWizard() {
     devSkipSceneDescriptions, setDevSkipSceneDescriptions,
     devSkipImages, setDevSkipImages,
     devSkipCovers, setDevSkipCovers,
+    enableAutoRepair, setEnableAutoRepair,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
 
@@ -1963,6 +1964,8 @@ export default function StoryWizard() {
         skipText: devSkipText,
         skipSceneDescriptions: devSkipSceneDescriptions,
         skipCovers: devSkipCovers,
+        // Developer feature options
+        enableAutoRepair: enableAutoRepair,
         // Developer model overrides (admin only)
         modelOverrides: user?.role === 'admin' ? {
           outlineModel: modelSelections.outlineModel,
@@ -2118,6 +2121,9 @@ export default function StoryWizard() {
           if (status.currentCredits !== null && status.currentCredits !== undefined) {
             updateCredits(status.currentCredits);
           }
+
+          // Ensure we're on step 6 (StoryDisplay) when generation completes
+          setStep(6);
 
           log.success('Story generation completed!');
         } else if (status.status === 'failed') {
@@ -3018,6 +3024,23 @@ export default function StoryWizard() {
                       </div>
                       <p className="text-xs text-orange-600 mt-2">
                         {language === 'de' ? 'Hinweis: Übersprungene Schritte verwenden Platzhalter/leere Daten' : language === 'fr' ? 'Note: Les étapes sautées utiliseront des données vides/provisoires' : 'Note: Skipped steps will use placeholder/empty data'}
+                      </p>
+
+                      {/* Feature Toggles */}
+                      <h3 className="text-sm font-semibold text-orange-700 mt-4 mb-2">
+                        🔧 {language === 'de' ? 'Feature-Optionen' : language === 'fr' ? 'Options de fonctionnalités' : 'Feature Options'}
+                      </h3>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={enableAutoRepair}
+                          onChange={(e) => setEnableAutoRepair(e.target.checked)}
+                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Auto-Reparatur aktivieren' : language === 'fr' ? 'Activer la réparation auto' : 'Enable auto-repair'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Versucht erkannte Bildfehler automatisch zu korrigieren (z.B. fehlende Finger)' : language === 'fr' ? 'Essaie de corriger automatiquement les erreurs d\'image détectées' : 'Attempts to automatically fix detected image issues (e.g., missing fingers)'}
                       </p>
                     </div>
                   )}
