@@ -6,7 +6,7 @@ import { useToast } from '@/context/ToastContext';
 import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 // Components
-import { Button, LoadingSpinner, Navigation } from '@/components/common';
+import { Button, LoadingSpinner, Navigation, WizardHelperText } from '@/components/common';
 import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
 import {
   WizardStep2Characters,
@@ -30,6 +30,31 @@ import { useDeveloperMode } from '@/hooks/useDeveloperMode';
 
 // Create namespaced logger
 const log = createLogger('StoryWizard');
+
+// Helper text for each wizard step
+const wizardHelperTexts: Record<string, Record<number, string>> = {
+  en: {
+    1: "Add photos of your characters - they'll appear consistently throughout your story!",
+    2: "Set the book length and reading level for your audience",
+    3: "Choose an adventure theme or describe your own story idea",
+    4: "Pick an illustration style for your book",
+    5: "Review your choices, add plot details, then generate your story!",
+  },
+  de: {
+    1: "Füge Fotos deiner Charaktere hinzu - sie erscheinen einheitlich in der gesamten Geschichte!",
+    2: "Lege die Buchlänge und das Leseniveau für dein Publikum fest",
+    3: "Wähle ein Abenteuer-Thema oder beschreibe deine eigene Story-Idee",
+    4: "Wähle einen Illustrationsstil für dein Buch",
+    5: "Überprüfe deine Auswahl, füge Handlungsdetails hinzu und generiere deine Geschichte!",
+  },
+  fr: {
+    1: "Ajoutez des photos de vos personnages - ils apparaîtront de manière cohérente dans toute votre histoire!",
+    2: "Définissez la longueur du livre et le niveau de lecture pour votre public",
+    3: "Choisissez un thème d'aventure ou décrivez votre propre idée d'histoire",
+    4: "Choisissez un style d'illustration pour votre livre",
+    5: "Vérifiez vos choix, ajoutez des détails de l'intrigue, puis générez votre histoire!",
+  },
+};
 
 export default function StoryWizard() {
   const navigate = useNavigate();
@@ -2743,7 +2768,16 @@ export default function StoryWizard() {
               )}
             </div>
           ) : (
-            renderStep()
+            <>
+              {/* Helper text for steps 1-5, hidden when editing character */}
+              {step >= 1 && step <= 5 && !currentCharacter && (
+                <WizardHelperText
+                  step={step}
+                  text={(wizardHelperTexts[language] || wizardHelperTexts.en)[step]}
+                />
+              )}
+              {renderStep()}
+            </>
           )}
 
           {/* Navigation buttons - inside the container */}

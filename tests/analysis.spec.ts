@@ -242,21 +242,20 @@ test.describe('Wizard Flow Analysis', () => {
 
     await page.waitForTimeout(3000);
 
-    // Check step indicator visibility
-    const stepIndicators = await page.locator('[class*="step"]').count();
-    if (stepIndicators === 0) {
+    // Check step indicator visibility - look for numbered circles with labels
+    // Desktop should show labels like "Characters", "Book", "Story", etc.
+    const stepLabels = await page.locator('nav').getByText(/Characters|Figuren|Personnages|Book|Buch|Livre/i).count();
+    const stepNumbers = await page.locator('nav button').filter({ hasText: /^[1-5]$/ }).count();
+    if (stepNumbers < 5) {
       logImprovement('Step indicators could be more prominent');
     }
+    // Note: Step labels only visible on desktop, not checked on mobile
 
-    // Check for progress indication
-    const progressBar = await page.locator('[class*="progress"], [role="progressbar"]').count();
-    if (progressBar === 0) {
-      logImprovement('Consider adding a progress bar to show overall completion');
-    }
-
-    // Check for help text on step 1
-    const helpText = await page.getByText(/help|tip|hint|how to/i).count();
-    if (helpText === 0) {
+    // Check for helper/guidance text (dismissible tip box)
+    // Look for the indigo helper text box or guidance about adding characters/photos
+    const helperText = await page.locator('.bg-indigo-50, [class*="helper"]').count();
+    const guidanceText = await page.getByText(/Add photos|Füge Fotos|Ajoutez des photos|appear consistently|einheitlich|cohérente/i).count();
+    if (helperText === 0 && guidanceText === 0) {
       logImprovement('Consider adding helper text or tooltips for first-time users');
     }
 

@@ -15,6 +15,13 @@ interface NavigationProps {
   onDeveloperModeChange?: (enabled: boolean) => void;
 }
 
+// Step labels for desktop view
+const stepLabels: Record<string, Record<number, string>> = {
+  en: { 1: 'Characters', 2: 'Book', 3: 'Story', 4: 'Style', 5: 'Summary' },
+  de: { 1: 'Figuren', 2: 'Buch', 3: 'Story', 4: 'Stil', 5: 'Übersicht' },
+  fr: { 1: 'Personnages', 2: 'Livre', 3: 'Histoire', 4: 'Style', 5: 'Résumé' },
+};
+
 export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange }: NavigationProps) {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
@@ -53,25 +60,35 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
 
         {/* Center: Step Navigation */}
         {currentStep > 0 && onStepClick && canAccessStep && (
-          <div className="flex items-center gap-0.5 md:gap-1 flex-1 justify-center">
+          <div className="flex items-center gap-0.5 md:gap-2 flex-1 justify-center">
             {[1, 2, 3, 4, 5].map(s => {
               const canAccess = canAccessStep(s);
+              const isActive = currentStep === s;
+              const labels = stepLabels[language] || stepLabels.en;
               return (
                 <div key={s} className="flex items-center">
-                  <button
-                    onClick={() => canAccess && onStepClick(s)}
-                    disabled={!canAccess}
-                    className={`w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold transition-all ${
-                      canAccess
-                        ? currentStep === s
-                          ? 'bg-indigo-600 text-white ring-1 ring-indigo-200'
-                          : 'bg-indigo-500 text-white hover:bg-indigo-600 cursor-pointer hover:scale-110'
-                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {s}
-                  </button>
-                  {s < 5 && <div className={`w-3 md:w-6 h-0.5 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />}
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={() => canAccess && onStepClick(s)}
+                      disabled={!canAccess}
+                      className={`w-5 h-5 md:w-7 md:h-7 rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold transition-all ${
+                        canAccess
+                          ? isActive
+                            ? 'bg-indigo-500 text-white ring-2 ring-white scale-110 shadow-lg shadow-indigo-500/50'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer hover:scale-110'
+                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                    {/* Desktop: show label below step */}
+                    <span className={`hidden md:block text-[10px] mt-0.5 transition-all ${
+                      isActive ? 'text-white font-semibold' : 'text-gray-400'
+                    }`}>
+                      {labels[s]}
+                    </span>
+                  </div>
+                  {s < 5 && <div className={`w-3 md:w-4 h-0.5 mb-4 md:mb-3 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />}
                 </div>
               );
             })}
