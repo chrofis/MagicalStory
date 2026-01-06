@@ -51,44 +51,52 @@ test('Setup test family with avatars', async ({ page }) => {
   console.log('Starting family setup...');
   console.log('This will create 5 characters and generate avatars (costs credits!)');
 
+  // First, check if any characters already exist
+  await page.screenshot({ path: 'test-results/setup-check-existing.png' });
+  const existingCharacters = page.locator('[class*="character-card"], [data-testid="character-card"]');
+  const existingCount = await existingCharacters.count().catch(() => 0);
+  console.log(`Found ${existingCount} existing character cards`);
+
   // Add each family member
   for (let i = 0; i < family.length; i++) {
     const member = family[i];
     console.log(`\n=== Adding ${member.name} (${i + 1}/${family.length}) ===`);
 
-    // For first character, may need to click "Create First Character" or it may auto-start
-    if (i === 0) {
-      // Check if we're already in photo upload mode (wizard auto-starts for new users)
-      const uploadBtn = page.locator('label:has-text("Upload")');
-      const fileInput = page.locator('input[type="file"]');
+    // Check if this character already exists by looking for their name
+    const existingChar = page.locator(`text="${member.name}"`).first();
+    if (await existingChar.isVisible({ timeout: 1000 }).catch(() => false)) {
+      console.log(`${member.name} already exists - skipping`);
+      continue;
+    }
 
-      if (await fileInput.count() === 0) {
-        // Not in photo upload mode yet, look for "Create First Character" button
-        const createFirstBtn = page.getByRole('button', { name: /create first|ersten charakter|premier personnage|create.*character/i });
-        if (await createFirstBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-          await createFirstBtn.click();
-          console.log('Clicked "Create First Character"');
-          await page.waitForTimeout(1000);
-        } else {
-          // Maybe there are existing characters - try the add card
-          const addBtn = page.locator('[class*="border-dashed"]').first();
-          if (await addBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await addBtn.click();
-            console.log('Clicked add character card');
-            await page.waitForTimeout(1000);
-          }
-        }
-      } else {
-        console.log('Already in photo upload mode (auto-started)');
-      }
+    // Navigate to add new character
+    // First ensure we're on the character list view (not editing another character)
+    const saveCharBtn = page.getByRole('button', { name: /save character|charakter speichern/i });
+    if (await saveCharBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await saveCharBtn.click();
+      console.log('Saved current character first');
+      await page.waitForTimeout(2000);
+    }
+
+    // Now click to add a new character
+    const addCardBtn = page.locator('[class*="border-dashed"]').first();
+    const createFirstBtn = page.getByRole('button', { name: /create first|ersten charakter|create.*character/i });
+
+    if (await addCardBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await addCardBtn.click();
+      console.log('Clicked add character card');
+      await page.waitForTimeout(1000);
+    } else if (await createFirstBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await createFirstBtn.click();
+      console.log('Clicked "Create First Character"');
+      await page.waitForTimeout(1000);
     } else {
-      // Additional characters - look for the add character card or button
-      // After saving a character, we should be back on the character list
-      const addCardBtn = page.locator('[class*="border-dashed"], button:has-text("Create Another"), button:has-text("Add")').first();
-      if (await addCardBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await addCardBtn.click();
-        console.log('Clicked "Add Character"');
-        await page.waitForTimeout(1000);
+      // Check if we're already in photo upload mode
+      const fileInput = page.locator('input[type="file"]');
+      if (await fileInput.count() === 0) {
+        console.log('Cannot find way to add character - taking screenshot');
+        await page.screenshot({ path: `test-results/setup-${member.name}-cant-add.png` });
+        continue;
       }
     }
 
@@ -144,42 +152,95 @@ test('Setup test family with avatars', async ({ page }) => {
       console.log(`Set name: ${member.name}`);
     }
 
-    // Click Continue/Next to proceed to traits
+    // Click Continue/Next to proceed to traits/characteristics
     const continueBtn = page.getByRole('button', { name: /continue|weiter|continuer|next/i });
     if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await continueBtn.click();
-      console.log('Proceeding to traits...');
-      await page.waitForTimeout(2000);
+      console.log('Proceeding to traits/characteristics...');
+      // Wait longer for page transition
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(3000);
     }
 
-    // On traits step - look for "Save & Generate Avatar" button
-    // This saves the traits and triggers avatar generation in the background
+    // Take a screenshot to see current state
+    await page.screenshot({ path: `test-results/setup-${member.name}-after-continue.png` });
+
+    // After name step, we should be on characteristics step (Strengths/Flaws/Conflicts)
+    // This step requires selecting: 3+ strengths, 2+ flaws before Continue is enabled
+    // The trait chips are button elements inside TraitSelector components
+
+    // First, check if we can find any trait chip button (like "Kind")
+    const kindButton = page.getByRole('button', { name: 'Kind' });
+    if (await kindButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      console.log('Found trait buttons - selecting strengths and flaws...');
+
+      // Select 3 strengths
+      const strengths = ['Kind', 'Caring', 'Funny'];
+      for (const strength of strengths) {
+        const chip = page.getByRole('button', { name: strength });
+        if (await chip.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await chip.click();
+          console.log(`Selected strength: ${strength}`);
+          await page.waitForTimeout(300);
+        }
+      }
+
+      // Select 2 flaws
+      const flaws = ['Impatient', 'Distracted'];
+      for (const flaw of flaws) {
+        const chip = page.getByRole('button', { name: flaw });
+        if (await chip.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await chip.click();
+          console.log(`Selected flaw: ${flaw}`);
+          await page.waitForTimeout(300);
+        }
+      }
+
+      await page.waitForTimeout(1000);
+      await page.screenshot({ path: `test-results/setup-${member.name}-characteristics.png` });
+    } else {
+      console.log('Trait buttons not found - checking page state');
+      await page.screenshot({ path: `test-results/setup-${member.name}-no-traits.png` });
+
+      // List all visible buttons for debugging
+      const buttons = page.getByRole('button');
+      const count = await buttons.count();
+      console.log(`Found ${count} buttons on page`);
+    }
+
+    // Now look for Continue/Save/Next button - should be enabled after selecting characteristics
     const saveGenerateBtn = page.getByRole('button', { name: /save.*generate|generate.*avatar|avatar.*generieren|speichern.*generieren/i });
     if (await saveGenerateBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await saveGenerateBtn.click();
       console.log('Clicked Save & Generate Avatar');
-      // Wait for avatar generation to start
       await page.waitForTimeout(5000);
     } else {
-      // Try just a "Continue" or "Next" button on traits step
-      const traitsNextBtn = page.getByRole('button', { name: /continue|weiter|next|save|speichern/i });
-      if (await traitsNextBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await traitsNextBtn.click();
-        console.log('Clicked Continue/Save on traits');
-        await page.waitForTimeout(3000);
+      // Try Continue or Next button
+      const nextBtn = page.getByRole('button', { name: /continue|weiter|next|save|speichern/i });
+      try {
+        await nextBtn.waitFor({ state: 'visible', timeout: 5000 });
+        const isDisabled = await nextBtn.isDisabled();
+        if (!isDisabled) {
+          await nextBtn.click();
+          console.log('Clicked Continue/Next after characteristics');
+          await page.waitForTimeout(2000);
+        } else {
+          console.log('Continue button is still disabled');
+          await page.screenshot({ path: `test-results/setup-${member.name}-button-disabled.png` });
+        }
+      } catch (e) {
+        console.log('Could not find Continue button');
       }
     }
 
-    // Check for characteristics step and handle it
-    const characteristicsSection = page.locator('text=/characteristics|eigenschaften|caracteristiques/i');
-    if (await characteristicsSection.isVisible({ timeout: 2000 }).catch(() => false)) {
-      console.log('On characteristics step');
-      // Look for skip or continue button
-      const skipBtn = page.getByRole('button', { name: /skip|überspringen|passer|continue|weiter/i });
-      if (await skipBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await skipBtn.click();
-        console.log('Skipped/continued past characteristics');
-        await page.waitForTimeout(1000);
+    // Check for "Hobbies, Interests" step (optional details) - just click Next
+    const hobbiesSection = page.locator('text=/Hobbies|Interests|Details/i');
+    if (await hobbiesSection.isVisible({ timeout: 3000 }).catch(() => false)) {
+      console.log('On hobbies/interests step - clicking Next');
+      const nextBtn = page.getByRole('button', { name: /next|weiter|continue/i });
+      if (await nextBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await nextBtn.click();
+        await page.waitForTimeout(2000);
       }
     }
 
@@ -187,23 +248,48 @@ test('Setup test family with avatars', async ({ page }) => {
     if (i > 0) {
       const relationshipsSection = page.locator('text=/relationship|beziehung|relation/i');
       if (await relationshipsSection.isVisible({ timeout: 2000 }).catch(() => false)) {
-        console.log('On relationships step');
-        // Just click save/done to accept defaults
-        const saveRelBtn = page.getByRole('button', { name: /save|done|fertig|speichern|continue|weiter/i });
+        console.log('On relationships step - clicking Save/Done');
+        const saveRelBtn = page.getByRole('button', { name: /save|done|fertig|speichern|continue|weiter|next/i });
         if (await saveRelBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
           await saveRelBtn.click();
           console.log('Saved relationships');
-          await page.waitForTimeout(1000);
+          await page.waitForTimeout(2000);
         }
       }
     }
 
-    // Look for a "Done" or "Finish" button to complete character creation
-    const doneBtn = page.getByRole('button', { name: /^done$|^fertig$|^finish$|^terminé$|^complete$/i });
-    if (await doneBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await doneBtn.click();
-      console.log('Completed character');
-      await page.waitForTimeout(2000);
+    // Keep clicking Next/Continue until we hit Save Character or are back at character list
+    for (let step = 0; step < 5; step++) {
+      // Check if we're on the final save screen
+      const saveCharBtn = page.getByRole('button', { name: /save character|charakter speichern/i });
+      if (await saveCharBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await saveCharBtn.click();
+        console.log('Clicked Save Character - completing character creation');
+        await page.waitForTimeout(3000);
+        break;
+      }
+
+      // Check for add character card (means we're back on the list)
+      const addCard = page.locator('[class*="border-dashed"]').first();
+      if (await addCard.isVisible({ timeout: 1000 }).catch(() => false)) {
+        console.log('Back on character list');
+        break;
+      }
+
+      // Try clicking Next/Continue buttons
+      const anyNextBtn = page.getByRole('button', { name: /^next$|^weiter$|^continue$/i });
+      if (await anyNextBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const isDisabled = await anyNextBtn.isDisabled().catch(() => true);
+        if (!isDisabled) {
+          await anyNextBtn.click();
+          console.log(`Clicked Next/Continue (step ${step + 1})`);
+          await page.waitForTimeout(2000);
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
     }
 
     // Wait a bit for any background processing
