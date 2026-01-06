@@ -52,6 +52,15 @@ export interface PhysicalTraitsSource {
   other?: TraitSource;
 }
 
+// Tracks where each clothing value came from
+// Only 'user' source clothing is sent to generation (to avoid reinforcing extraction errors)
+export interface ClothingSource {
+  upperBody?: TraitSource;
+  lowerBody?: TraitSource;
+  shoes?: TraitSource;
+  fullBody?: TraitSource;
+}
+
 // Psychological traits
 export interface PsychologicalTraits {
   strengths: string[];
@@ -175,6 +184,8 @@ export interface Character {
 
   // Clothing (what they're wearing in reference photo)
   clothing?: CharacterClothing;
+  // Tracks the source of each clothing value (extracted, user)
+  clothingSource?: ClothingSource;
 
   // Generated outfits per page (during story generation)
   generatedOutfits?: Record<number, GeneratedOutfit>;

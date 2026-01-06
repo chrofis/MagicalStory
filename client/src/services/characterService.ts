@@ -475,6 +475,27 @@ export const characterService = {
       const hasUserTraits = Object.keys(userTraits).length > 0;
       log.info(`Physical traits to send (user-edited only): ${hasUserTraits ? JSON.stringify(userTraits) : 'none'}`);
 
+      // Filter clothing to only include user-edited items (not AI-extracted)
+      // This prevents reinforcing extraction errors during regeneration
+      const clothingSource = character.clothingSource || {};
+      const userClothing: { upperBody?: string; lowerBody?: string; shoes?: string; fullBody?: string } = {};
+      if (character.clothing?.structured) {
+        if (clothingSource.upperBody === 'user' && character.clothing.structured.upperBody) {
+          userClothing.upperBody = character.clothing.structured.upperBody;
+        }
+        if (clothingSource.lowerBody === 'user' && character.clothing.structured.lowerBody) {
+          userClothing.lowerBody = character.clothing.structured.lowerBody;
+        }
+        if (clothingSource.shoes === 'user' && character.clothing.structured.shoes) {
+          userClothing.shoes = character.clothing.structured.shoes;
+        }
+        if (clothingSource.fullBody === 'user' && character.clothing.structured.fullBody) {
+          userClothing.fullBody = character.clothing.structured.fullBody;
+        }
+      }
+      const hasUserClothing = Object.keys(userClothing).length > 0;
+      log.info(`Clothing to send (user-edited only): ${hasUserClothing ? JSON.stringify(userClothing) : 'none'}`);
+
       const response = await api.post<{
         success: boolean;
         clothingAvatars?: CharacterAvatars & {
@@ -493,8 +514,8 @@ export const characterService = {
         build: userTraits.build || 'average',
         // Only pass user-edited physical traits (not extracted ones)
         physicalTraits: hasUserTraits ? userTraits : undefined,
-        // Pass user-entered clothing to override defaults
-        clothing: character.clothing?.structured,
+        // Only pass user-edited clothing (not AI-extracted)
+        clothing: hasUserClothing ? userClothing : undefined,
       });
 
       if (response.success && response.clothingAvatars) {

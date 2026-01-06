@@ -150,7 +150,7 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
 
 /**
  * Evaluate face match between original photo and generated avatar
- * Also extracts physical traits from reference photo and clothing from avatar
+ * Also extracts physical traits and clothing from the generated avatar
  * Returns { score, details, physicalTraits, clothing } or null on error
  */
 async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey) {
@@ -220,7 +220,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       const faceMatch = evalResult.faceMatch || evalResult;
       const score = faceMatch.finalScore || evalResult.finalScore;
 
-      // Extract physical traits (from reference photo)
+      // Extract physical traits (from generated avatar)
       const physicalTraits = evalResult.physicalTraits || null;
 
       // Extract structured clothing (from generated avatar)
@@ -918,7 +918,7 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       faceMatch: {},
       clothing: {},           // Legacy: text clothing per category
       structuredClothing: {}, // New: structured clothing from evaluation
-      extractedTraits: null,  // Physical traits extracted from reference photo
+      extractedTraits: null,  // Physical traits extracted from generated avatar
       rawEvaluation: null,    // Full unfiltered API response (for dev mode)
       prompts: {}
     };
@@ -1173,10 +1173,10 @@ These corrections OVERRIDE what is visible in the reference photo.
             results.rawEvaluation = faceMatchResult.raw;
           }
 
-          // Store extracted physical traits (from reference photo)
+          // Store extracted physical traits (from generated avatar - reflects user corrections)
           if (faceMatchResult.physicalTraits && !results.extractedTraits) {
             results.extractedTraits = faceMatchResult.physicalTraits;
-            log.debug(`📋 [AVATAR EVAL] Extracted traits: age=${faceMatchResult.physicalTraits.age}, gender=${faceMatchResult.physicalTraits.gender}, build=${faceMatchResult.physicalTraits.build}`);
+            log.debug(`📋 [AVATAR EVAL] Extracted traits from avatar: age=${faceMatchResult.physicalTraits.age}, gender=${faceMatchResult.physicalTraits.gender}, build=${faceMatchResult.physicalTraits.build}`);
           }
 
           // Store structured clothing (from generated avatar)

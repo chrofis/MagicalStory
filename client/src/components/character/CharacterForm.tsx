@@ -1636,6 +1636,13 @@ export function CharacterForm({
                                   ...(e.target.value ? { upperBody: '', lowerBody: '' } : {}),
                                 },
                               },
+                              // Mark clothing as user-edited
+                              clothingSource: {
+                                ...character.clothingSource,
+                                fullBody: 'user' as const,
+                                // Clear upper/lower source if full body is entered
+                                ...(e.target.value ? { upperBody: undefined, lowerBody: undefined } : {}),
+                              },
                             })}
                             placeholder={language === 'de' ? 'z.B. rotes Sommerkleid' : language === 'fr' ? 'ex. robe d\'été rouge' : 'e.g. red summer dress'}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:outline-none"
@@ -1659,6 +1666,11 @@ export function CharacterForm({
                                 ...character.clothing?.structured,
                                 upperBody: e.target.value,
                               },
+                            },
+                            // Mark clothing as user-edited
+                            clothingSource: {
+                              ...character.clothingSource,
+                              upperBody: 'user' as const,
                             },
                           })}
                           disabled={!!character.clothing?.structured?.fullBody}
@@ -1684,6 +1696,11 @@ export function CharacterForm({
                                 lowerBody: e.target.value,
                               },
                             },
+                            // Mark clothing as user-edited
+                            clothingSource: {
+                              ...character.clothingSource,
+                              lowerBody: 'user' as const,
+                            },
                           })}
                           disabled={!!character.clothing?.structured?.fullBody}
                           placeholder={language === 'de' ? 'z.B. dunkle Jeans' : language === 'fr' ? 'ex. jeans foncé' : 'e.g. dark jeans'}
@@ -1707,6 +1724,11 @@ export function CharacterForm({
                                 ...character.clothing?.structured,
                                 shoes: e.target.value,
                               },
+                            },
+                            // Mark clothing as user-edited
+                            clothingSource: {
+                              ...character.clothingSource,
+                              shoes: 'user' as const,
                             },
                           })}
                           placeholder={language === 'de' ? 'z.B. weiße Turnschuhe' : language === 'fr' ? 'ex. baskets blanches' : 'e.g. white sneakers'}

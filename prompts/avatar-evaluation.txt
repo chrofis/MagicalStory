@@ -7,9 +7,9 @@ TASK 1: FACE MATCH EVALUATION
 Compare facial features between IMAGE 1 and IMAGE 2. Score each feature 1-10 (10 = perfect match).
 IGNORE when scoring: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts.
 
-TASK 2: PHYSICAL TRAITS EXTRACTION (from IMAGE 1 - the reference photo)
-Extract the person's permanent physical characteristics from the ORIGINAL reference photo.
-Focus on features that remain constant (not expressions or temporary states).
+TASK 2: PHYSICAL TRAITS EXTRACTION (from IMAGE 2 - the generated avatar)
+Extract the person's physical characteristics as shown in the GENERATED AVATAR.
+This captures user corrections (e.g., changed hair color) that were applied during generation.
 
 TASK 3: CLOTHING EXTRACTION (from IMAGE 2 - the generated avatar)
 Describe the EXACT clothing visible on the AI-generated avatar.
