@@ -10,7 +10,7 @@
  */
 
 const crypto = require('crypto');
-const log = require('./logger')('runware');
+const { log } = require('../utils/logger');
 
 const RUNWARE_API_KEY = process.env.RUNWARE_API_KEY;
 const RUNWARE_API_URL = 'https://api.runware.ai/v1';
