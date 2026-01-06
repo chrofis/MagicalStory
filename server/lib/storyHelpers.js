@@ -59,6 +59,13 @@ function stripSceneMetadata(sceneDescription) {
     .replace(/```json[\s\S]*?```\n*/gi, '')
     .trim();
 
+  // Clean up malformed markdown at the start (e.g., ")**" from partial section headers)
+  // This can happen when scene descriptions are incorrectly parsed or generated
+  stripped = stripped
+    .replace(/^[\s\n]*\)*\*{1,2}\s*/g, '') // Remove leading )** or )* with whitespace
+    .replace(/^[\s\n]*\*{1,2}\)*\s*/g, '') // Remove leading **) or *)
+    .trim();
+
   return stripped;
 }
 
@@ -1457,6 +1464,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
 
   // Use template from file if available
   if (PROMPT_TEMPLATES.sceneDescriptions) {
+    // Convert language code to proper language name (e.g., 'de-ch' -> 'German (Switzerland)')
+    const languageName = getLanguageNameEnglish(language);
     return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
       PREVIOUS_SCENES: previousScenesText,
       SCENE_SUMMARY: shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : '',
@@ -1465,7 +1474,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
       CHARACTER_CLOTHING: characterClothingText,
-      LANGUAGE: language,
+      LANGUAGE: languageName,
       LANGUAGE_NOTE: getLanguageNote(language)
     });
   }

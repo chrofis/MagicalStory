@@ -890,7 +890,8 @@ export const storyService = {
         outlinePrompt?: string;
         outlineModelId?: string;
         outlineUsage?: { input_tokens: number; output_tokens: number };
-        storyText?: string; // Server uses storyText
+        storyText?: string; // Legacy: Server uses storyText
+        story?: string; // Unified: Server sends story directly
         storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
         visualBible?: VisualBible;
         styledAvatarGeneration?: Array<{
@@ -939,10 +940,66 @@ export const storyService = {
       };
       partialPages?: Array<{ pageNumber: number; imageData: string; text?: string }>;  // Completed page images
       currentCredits?: number | null;  // User's updated credits after job completion
+      result?: {  // Backend sends 'result' not 'resultData'
+        storyId?: string;
+        title?: string;
+        outline?: string;
+        outlinePrompt?: string;
+        outlineModelId?: string;
+        outlineUsage?: { input_tokens: number; output_tokens: number };
+        storyText?: string;
+        story?: string;
+        storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
+        visualBible?: VisualBible;
+        styledAvatarGeneration?: Array<{
+          timestamp: string;
+          characterName: string;
+          artStyle: string;
+          durationMs: number;
+          success: boolean;
+          error?: string;
+          inputs: {
+            facePhoto: { identifier: string; sizeKB: number } | null;
+            originalAvatar: { identifier: string; sizeKB: number };
+          };
+          prompt?: string;
+          output?: { identifier: string; sizeKB: number };
+        }>;
+        costumedAvatarGeneration?: Array<{
+          timestamp: string;
+          characterName: string;
+          costumeType: string;
+          artStyle: string;
+          costumeDescription: string;
+          durationMs: number;
+          success: boolean;
+          error?: string;
+          inputs: {
+            facePhoto: { identifier: string; sizeKB: number };
+            standardAvatar: { identifier: string; sizeKB: number } | null;
+          };
+          prompt?: string;
+          output?: { identifier: string; sizeKB: number };
+        }>;
+        generationLog?: GenerationLogEntry[];
+        sceneDescriptions?: SceneDescription[];
+        sceneImages?: SceneImage[];
+        coverImages?: CoverImages;
+      };
     }>(`/api/jobs/${jobId}/status`);
 
+    // Debug: Log raw API response
+    console.log('[storyService.getJobStatus] Raw response:', {
+      status: response.status,
+      hasResult: !!response.result,
+      hasResultData: !!response.resultData,
+      resultKeys: response.result ? Object.keys(response.result) : response.resultData ? Object.keys(response.resultData) : [],
+      progress: response.progress
+    });
+
     // Map server response to client format
-    const resultData = response.resultData;
+    // Backend sends 'result' (not 'resultData') - support both for backwards compatibility
+    const resultData = response.result || response.resultData;
     return {
       status: response.status as 'pending' | 'processing' | 'completed' | 'failed',
       progress: {
@@ -957,7 +1014,7 @@ export const storyService = {
         outlinePrompt: resultData.outlinePrompt,
         outlineModelId: resultData.outlineModelId,
         outlineUsage: resultData.outlineUsage,
-        story: resultData.storyText || '', // Map storyText -> story
+        story: resultData.story || resultData.storyText || '', // Backend sends 'story' (unified) or 'storyText' (legacy)
         storyTextPrompts: resultData.storyTextPrompts,
         visualBible: resultData.visualBible,
         styledAvatarGeneration: resultData.styledAvatarGeneration,

@@ -6401,7 +6401,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (!char.avatars.clothing) char.avatars.clothing = {};
       if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
 
+      log.debug(`⚡ [STREAM-AVATAR] Processing ${char.name} with ${Object.keys(requirements).length} categories: ${Object.keys(requirements).join(', ')}`);
       for (const [category, config] of Object.entries(requirements)) {
+        log.debug(`⚡ [STREAM-AVATAR] ${char.name} category=${category}, config.used=${config?.used}, config.costume=${config?.costume}`);
         if (!config || !config.used) continue;
 
         // Check if avatar already exists
@@ -6411,12 +6413,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
           if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
           avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
+          log.debug(`⚡ [STREAM-AVATAR] ${char.name} costumed:${costumeKey} exists=${avatarExists}`);
         } else {
           avatarExists = !!char.avatars[category];
+          log.debug(`⚡ [STREAM-AVATAR] ${char.name} ${category} exists=${avatarExists}`);
         }
 
         if (avatarExists) {
-          log.debug(`⚡ [STREAM-AVATAR] ${char.name} ${category} avatar already exists`);
+          log.debug(`⚡ [STREAM-AVATAR] ${char.name} ${category} avatar already exists, skipping`);
           continue;
         }
 
