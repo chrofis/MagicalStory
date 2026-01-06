@@ -194,6 +194,7 @@ export default function StoryWizard() {
   // Step 7: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
   const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
+  const [isProgressMinimized, setIsProgressMinimized] = useState(false); // Track if progress modal is minimized
   const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
   const [imageLoadProgress, setImageLoadProgress] = useState<{ loaded: number; total: number } | null>(null); // Progressive image loading
@@ -1881,6 +1882,7 @@ export default function StoryWizard() {
 
     console.log('[generateStory] Starting generation, setting step to 6');
     setIsGenerating(true);
+    setIsProgressMinimized(false); // Reset minimized state for new generation
     setStep(6);
     // Reset ALL story state for new generation - must clear old story to show popup
     setGeneratedStory('');
@@ -3117,8 +3119,8 @@ export default function StoryWizard() {
       </div>
 
       {/* Generation Progress Modal - Full story generation */}
-      {/* Show until we have content to display (front cover, story data, or final story) */}
-      {isGenerating && !generatedStory && !progressiveStoryData && !coverImages.frontCover && (
+      {/* Show until we have content to display (front cover, story data, or final story), or user minimizes */}
+      {isGenerating && !generatedStory && !progressiveStoryData && !coverImages.frontCover && !isProgressMinimized && (
         <GenerationProgress
           current={generationProgress.current}
           total={generationProgress.total}
@@ -3128,6 +3130,7 @@ export default function StoryWizard() {
           jobId={jobId || undefined}
           isStalled={isProgressStalled}
           onDismissStalled={() => setIsProgressStalled(false)}
+          onMinimize={() => setIsProgressMinimized(true)}
           onCancel={jobId ? async () => {
             try {
               await storyService.cancelJob(jobId);

@@ -14,6 +14,7 @@ interface GenerationProgressProps {
   coverImages?: CoverImages;  // Optional partial cover images to display
   jobId?: string;  // Job ID for cancellation
   onCancel?: () => void;  // Callback when job is cancelled
+  onMinimize?: () => void;  // Callback to minimize and continue in background
   characters?: Character[];  // Characters to show avatars from
   isStalled?: boolean;  // Whether progress appears stalled
   onDismissStalled?: () => void;  // Callback to dismiss stalled warning and continue waiting
@@ -27,6 +28,7 @@ export function GenerationProgress({
   coverImages,
   jobId,
   onCancel,
+  onMinimize,
   characters = [],
   isStalled = false,
   onDismissStalled,
@@ -233,6 +235,7 @@ export function GenerationProgress({
       stalled: 'Generation seems stuck',
       stalledDesc: 'No progress for a while. This can happen due to high server load.',
       continueWaiting: 'Keep Waiting',
+      continueInBackground: 'Continue in Background',
     },
     de: {
       title: 'Geschichte wird erstellt!',
@@ -252,6 +255,7 @@ export function GenerationProgress({
       stalled: 'Generierung scheint hängen zu bleiben',
       stalledDesc: 'Seit einer Weile kein Fortschritt. Dies kann bei hoher Serverlast passieren.',
       continueWaiting: 'Weiter warten',
+      continueInBackground: 'Im Hintergrund fortsetzen',
     },
     fr: {
       title: 'Création de votre histoire!',
@@ -271,6 +275,7 @@ export function GenerationProgress({
       stalled: 'La génération semble bloquée',
       stalledDesc: 'Aucun progrès depuis un moment. Cela peut arriver en cas de forte charge serveur.',
       continueWaiting: 'Continuer à attendre',
+      continueInBackground: 'Continuer en arrière-plan',
     },
   };
 
@@ -395,6 +400,16 @@ export function GenerationProgress({
             size="lg"
           />
         </div>
+
+        {/* Continue in background button */}
+        {onMinimize && (
+          <button
+            onClick={onMinimize}
+            className="w-full mb-4 px-4 py-2.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg font-medium transition-colors text-sm"
+          >
+            {t.continueInBackground}
+          </button>
+        )}
 
         {/* Stalled warning */}
         {isStalled && (

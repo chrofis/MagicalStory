@@ -669,7 +669,9 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
       const characterNames = sceneCharacters.map(c => c.name);
 
       // Get clothing for this page
-      const clothingCategory = pageClothing[pageNum] || parseClothingCategory(description) || defaultClothing;
+      // pageClothing[pageNum] can be a string ('standard') or object (per-character) - only use if string
+      const pageClothingValue = pageClothing[pageNum];
+      const clothingCategory = (typeof pageClothingValue === 'string' ? pageClothingValue : null) || parseClothingCategory(description) || defaultClothing;
 
       requirements.push({
         pageNumber: pageNum,

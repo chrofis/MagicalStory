@@ -1740,7 +1740,12 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     // Get clothing category - prefer outline pageClothing, then parse from description
     const pageClothingData = storyData.pageClothing || null;
     const clothingRequirements = storyData.clothingRequirements || null;
-    let clothingCategory = pageClothingData?.pageClothing?.[pageNumber] || null;
+    // pageClothing[pageNumber] can be a string ('standard', 'costumed:Cowboy') or an object (per-character clothing)
+    // Only use it as category if it's a string; objects are per-character data, not a category
+    let clothingCategory = pageClothingData?.pageClothing?.[pageNumber];
+    if (typeof clothingCategory !== 'string') {
+      clothingCategory = null;
+    }
     if (!clothingCategory) {
       clothingCategory = parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
     }
@@ -6537,7 +6542,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           await Promise.all(streamingAvatarPromises);
         }
 
-        const clothingCategory = hint.clothing || 'standard';
+        // hint.clothing can be a string ('standard', 'costumed:Cowboy') or object (per-character) - only use if string
+        const clothingCategory = typeof hint.clothing === 'string' ? hint.clothing : 'standard';
         const sceneDescription = hint.hint || hint.scene || '';
         const coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
 
