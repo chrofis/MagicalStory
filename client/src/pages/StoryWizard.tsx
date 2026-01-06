@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useGeneration } from '@/context/GenerationContext';
 import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 // Components
@@ -62,6 +63,7 @@ export default function StoryWizard() {
   const { t, language } = useLanguage();
   const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
+  const { startTracking, stopTracking } = useGeneration();
 
   // Wizard state - start at step 6 with loading if we have a storyId in URL
   // Otherwise restore from localStorage to preserve step when navigating away and back
@@ -848,6 +850,8 @@ export default function StoryWizard() {
     if (categoryChanged || topicChanged || themeChanged) {
       setStoryDetails('');
       localStorage.removeItem('story_details');
+      // Clear generated story ideas when topic/theme changes to avoid confusion
+      setGeneratedIdeas([]);
     }
 
     // Update refs
@@ -859,6 +863,29 @@ export default function StoryWizard() {
   useEffect(() => {
     localStorage.setItem('story_art_style', artStyle);
   }, [artStyle]);
+
+  // Pre-generate story ideas when user reaches step 4 (art style) if we have enough info
+  // This way ideas are ready by the time they reach step 5 (summary)
+  const preGenerateIdeasRef = useRef(false);
+  useEffect(() => {
+    // Only trigger once per session when conditions are met
+    if (step === 4 && !preGenerateIdeasRef.current && !isGeneratingIdeas && generatedIdeas.length === 0) {
+      // Check if we have enough data to generate ideas
+      const hasCategory = !!storyCategory;
+      const hasThemeOrTopic = !!storyTheme || !!storyTopic;
+      const hasCharacters = characters.length > 0;
+
+      if (hasCategory && hasThemeOrTopic && hasCharacters) {
+        preGenerateIdeasRef.current = true;
+        log.info('[StoryWizard] Pre-generating story ideas while user selects art style');
+        generateIdeas();
+      }
+    }
+    // Reset the ref when category/topic/theme changes
+    if (preGenerateIdeasRef.current && generatedIdeas.length === 0) {
+      preGenerateIdeasRef.current = false;
+    }
+  }, [step, storyCategory, storyTheme, storyTopic, characters.length, isGeneratingIdeas, generatedIdeas.length]);
 
   // Persist wizard step to localStorage (so navigating away and back preserves position)
   useEffect(() => {
@@ -1969,6 +1996,9 @@ export default function StoryWizard() {
       setJobId(newJobId);
       log.info('Story job created:', newJobId);
 
+      // Start tracking in global context for background progress visibility
+      startTracking(newJobId, getStoryTypeName() || 'New Story');
+
       // Update credits immediately when job starts (credits are reserved/deducted at job creation)
       if (creditsRemaining !== undefined && creditsRemaining !== null) {
         updateCredits(creditsRemaining);
@@ -2123,6 +2153,9 @@ export default function StoryWizard() {
           setStep(6);
 
           log.success('Story generation completed!');
+
+          // Stop tracking in global context
+          stopTracking();
         } else if (status.status === 'failed') {
           throw new Error(status.error || 'Story generation failed');
         }
@@ -2177,6 +2210,7 @@ export default function StoryWizard() {
       }
     } finally {
       setIsProgressStalled(false); // Reset stalled state
+      stopTracking(); // Ensure global tracking is stopped
       setTimeout(() => setIsGenerating(false), 500);
     }
   };
