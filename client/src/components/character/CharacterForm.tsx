@@ -734,34 +734,35 @@ export function CharacterForm({
           />
         </div>
 
-        {/* Next/Cancel Buttons */}
-        <div className="flex gap-3 pt-4">
-          {onCancel && (
-            <button
-              onClick={onCancel}
-              className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-            >
-              {t.cancel}
-            </button>
+        {/* Next/Cancel Buttons - Sticky on mobile */}
+        <div className="sticky bottom-0 left-0 right-0 bg-white pt-4 pb-2 -mx-4 px-4 md:relative md:mx-0 md:px-0 md:bg-transparent border-t border-gray-200 md:border-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:shadow-none">
+          {!canSaveCharacter && (
+            <p className="text-sm text-red-500 text-center mb-3">
+              {t.selectStrengthsFlaws}
+            </p>
           )}
-          <Button
-            onClick={onContinueToCharacteristics}
-            disabled={!canSaveCharacter || isLoading}
-            loading={isLoading}
-            icon={ArrowRight}
-            className={onCancel ? "flex-1" : "w-full"}
-          >
-            {language === 'de' ? 'Weiter' :
-             language === 'fr' ? 'Suivant' :
-             'Next'}
-          </Button>
+          <div className="flex gap-3">
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+              >
+                {t.cancel}
+              </button>
+            )}
+            <Button
+              onClick={onContinueToCharacteristics}
+              disabled={!canSaveCharacter || isLoading}
+              loading={isLoading}
+              icon={ArrowRight}
+              className={onCancel ? "flex-1" : "w-full"}
+            >
+              {language === 'de' ? 'Weiter' :
+               language === 'fr' ? 'Suivant' :
+               'Next'}
+            </Button>
+          </div>
         </div>
-
-        {!canSaveCharacter && (
-          <p className="text-sm text-red-500 text-center">
-            {t.selectStrengthsFlaws}
-          </p>
-        )}
       </div>
     );
   }
