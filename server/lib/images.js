@@ -1782,15 +1782,17 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
  * @param {string} fixPrompt - Instruction for what to fix
  * @param {string} maskImage - Optional mask image (required for Runware, optional for Gemini)
  * @param {Object} options - Additional options
- * @param {string} options.backend - 'gemini' or 'runware' (default: env INPAINT_BACKEND or 'gemini')
+ * @param {string} options.backend - 'gemini' or 'runware' (default: MODEL_DEFAULTS.inpaintBackend)
  * @param {string} options.runwareModel - Runware model to use (default: 'runware:100@1' SD 1.5)
  * @returns {Promise<{imageData: string, usage?: Object, modelId?: string}|null>}
  */
 async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImage = null, options = {}) {
   const {
-    backend = process.env.INPAINT_BACKEND || 'gemini',
+    backend = MODEL_DEFAULTS.inpaintBackend || 'runware',
     runwareModel = 'runware:100@1'
   } = options;
+
+  log.debug(`🔧 [INPAINT] Using backend: ${backend}`);
 
   // Route to Runware if configured
   if (backend === 'runware') {

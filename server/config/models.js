@@ -61,7 +61,24 @@ const MODEL_DEFAULTS = {
   qualityEval: 'gemini-2.5-flash',     // Image quality evaluation
 
   // Utility models (inspection, visual bible, etc.)
-  utility: 'gemini-2.0-flash'          // Fast utility tasks
+  utility: 'gemini-2.0-flash',         // Fast utility tasks
+
+  // Inpainting backend for auto-repair
+  inpaintBackend: 'runware'            // 'gemini' or 'runware' (runware is 50x cheaper)
+};
+
+// Available inpaint backends
+const INPAINT_BACKENDS = {
+  'gemini': {
+    name: 'Gemini',
+    description: 'Gemini 2.5 Flash Image - High quality, more expensive (~$0.03/image)',
+    costPerImage: 0.03
+  },
+  'runware': {
+    name: 'Runware',
+    description: 'Runware SD 1.5 - Fast and cheap (~$0.0006/image)',
+    costPerImage: 0.0006
+  }
 };
 
 // Image model configurations
@@ -90,5 +107,6 @@ module.exports = {
   TEXT_MODELS,
   MODEL_DEFAULTS,
   IMAGE_MODELS,
-  MODEL_PRICING
+  MODEL_PRICING,
+  INPAINT_BACKENDS
 };
