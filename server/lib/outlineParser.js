@@ -1674,7 +1674,13 @@ class ProgressiveUnifiedParser {
       // Only emit if we're confident the page is complete
       // Either there's a next page, or we have both TEXT and SCENE HINT plus at least one character with clothing
       const hasCharacterClothing = /Characters:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\n]*:\s*(?:standard|winter|summer|costumed:[^\n]+))/mi.test(content);
-      if (nextPageIndex > match.index || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
+
+      // IMPORTANT: Check if Characters block is fully received (ends with blank line or is followed by next page)
+      // This prevents emitting incomplete character clothing when next page header appears mid-stream
+      const charactersBlockComplete = /Characters:\s*(?:[\s\S]*?\n[-*]\s*[^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n]+))+\s*\n\s*\n/mi.test(content) ||
+        /Characters:\s*(?:[\s\S]*?\n[-*]\s*[^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n]+))+\s*$/mi.test(content);
+
+      if ((nextPageIndex > match.index && charactersBlockComplete) || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
         // Extract page data
         const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
         const text = textMatch ? textMatch[1].trim() : '';
