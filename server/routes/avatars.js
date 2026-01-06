@@ -527,11 +527,19 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
     return { success: false, error: 'Avatar generation service unavailable' };
   }
 
-  // Get standard avatar as the only reference image (it already has correct face + proportions)
-  const standardAvatar = character.avatars?.standard;
+  // Get standard avatar as primary reference (has correct face + proportions)
+  // Fall back to face photo if standard avatar isn't available
+  let standardAvatar = character.avatars?.standard;
   if (!standardAvatar) {
-    log.error(`[STYLED COSTUME] No standard avatar for ${character.name}`);
-    return { success: false, error: 'No standard avatar available - generate clothing avatars first' };
+    // Fallback: use face photo if standard avatar doesn't exist
+    const facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
+    if (facePhoto) {
+      log.debug(`[STYLED COSTUME] ${character.name}: No standard avatar, using face photo as fallback`);
+      standardAvatar = facePhoto;
+    } else {
+      log.error(`[STYLED COSTUME] No standard avatar or face photo for ${character.name}`);
+      return { success: false, error: 'No reference image available - generate clothing avatars or upload photo first' };
+    }
   }
 
   const costumeType = (config.costume || 'costume').toLowerCase();
