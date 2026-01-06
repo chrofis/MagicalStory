@@ -6,9 +6,13 @@ interface CooldownInfo {
   attempts: number;
 }
 
+// Reset cooldown counter after 24 hours of inactivity
+const RESET_AFTER_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 /**
  * Get avatar regeneration cooldown info for a character
  * Cooldown schedule: First 2 attempts no delay, then progressive delays
+ * Resets to 0 after 24 hours of inactivity
  */
 function getAvatarCooldown(characterId: number): CooldownInfo {
   const key = `avatar_regen_${characterId}`;
@@ -21,6 +25,12 @@ function getAvatarCooldown(characterId: number): CooldownInfo {
 
   try {
     const { attempts, lastAttempt } = JSON.parse(data);
+
+    // Reset counter after 24 hours of inactivity
+    if (now - lastAttempt > RESET_AFTER_MS) {
+      localStorage.removeItem(key);
+      return { canRegenerate: true, waitSeconds: 0, attempts: 0 };
+    }
 
     // Calculate required delay based on attempts
     let requiredDelay = 0;
@@ -97,4 +107,6 @@ export function useAvatarCooldown(characterId: number) {
   };
 }
 
+// Export utility functions for use outside hooks (e.g., in event handlers)
+export { getAvatarCooldown, recordAvatarRegeneration };
 export type { CooldownInfo };

@@ -1,4 +1,4 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useState, useEffect } from 'react';
 import { Upload, Save, RefreshCw, Pencil, X, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
@@ -462,6 +462,18 @@ export function CharacterForm({
   const [enlargedAvatar, setEnlargedAvatar] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isModifyingAvatar, setIsModifyingAvatar] = useState(false);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isModifyingAvatar) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isModifyingAvatar]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1107,17 +1119,6 @@ export function CharacterForm({
                 </div>
               </details>
             )}
-            {/* Developer mode: show full raw API response */}
-            {developerMode && character.avatars?.rawEvaluation && (
-              <details className="mt-1 text-left">
-                <summary className="text-[10px] font-medium cursor-pointer text-purple-600">
-                  Full API Response
-                </summary>
-                <pre className="mt-1 p-2 rounded text-[8px] whitespace-pre-wrap overflow-auto max-h-64 border bg-gray-100 border-gray-200">
-                  {JSON.stringify(character.avatars.rawEvaluation, null, 2)}
-                </pre>
-              </details>
-            )}
           </div>
           </div>
         </div>
@@ -1516,6 +1517,21 @@ export function CharacterForm({
         </div>
       )}
 
+      {/* Developer Mode: Full API Response (readable, full-width) */}
+      {developerMode && character.avatars?.rawEvaluation && (
+        <details className="bg-purple-50 border border-purple-300 rounded-lg p-4">
+          <summary className="text-sm font-semibold text-purple-700 cursor-pointer flex items-center gap-2">
+            <span>📊 Full API Response (Avatar Evaluation)</span>
+            <span className="text-xs font-normal text-purple-500">
+              Click to expand
+            </span>
+          </summary>
+          <pre className="mt-3 p-4 bg-white rounded-lg text-xs whitespace-pre-wrap overflow-auto max-h-[600px] border border-purple-200 font-mono leading-relaxed">
+            {JSON.stringify(character.avatars.rawEvaluation, null, 2)}
+          </pre>
+        </details>
+      )}
+
       {/* Save/Cancel Buttons */}
       <div className="flex gap-3 max-w-md">
         {onCancel && (
@@ -1759,13 +1775,19 @@ export function CharacterForm({
                     onRegenerateAvatarsWithTraits();
                   }
                 }}
-                disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
+                disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating' || (!developerMode && !canRegenerate)}
                 className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+                title={!developerMode && !canRegenerate ? (language === 'de' ? `Warten Sie ${waitSeconds}s` : `Wait ${waitSeconds}s`) : undefined}
               >
                 {isRegeneratingAvatarsWithTraits ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     {language === 'de' ? 'Generiere...' : 'Generating...'}
+                  </>
+                ) : !developerMode && !canRegenerate ? (
+                  <>
+                    <Save size={16} />
+                    {language === 'de' ? `Warten (${waitSeconds}s)` : `Wait (${waitSeconds}s)`}
                   </>
                 ) : (
                   <>

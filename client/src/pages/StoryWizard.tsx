@@ -28,6 +28,7 @@ import { storyTypes } from '@/constants/storyTypes';
 import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
 import { createLogger } from '@/services/logger';
 import { useDeveloperMode } from '@/hooks/useDeveloperMode';
+import { getAvatarCooldown, recordAvatarRegeneration } from '@/hooks/useAvatarCooldown';
 
 // Create namespaced logger
 const log = createLogger('StoryWizard');
@@ -1032,6 +1033,23 @@ export default function StoryWizard() {
   };
 
   const handlePhotoSelect = async (file: File) => {
+    // Check cooldown for existing characters with avatars (developers exempt)
+    if (currentCharacter && !developerMode) {
+      const hasAvatars = !!(currentCharacter.avatars?.winter || currentCharacter.avatars?.standard || currentCharacter.avatars?.summer);
+      if (hasAvatars) {
+        const cooldown = getAvatarCooldown(currentCharacter.id);
+        if (!cooldown.canRegenerate) {
+          const waitMsg = language === 'de'
+            ? `Bitte warten Sie ${cooldown.waitSeconds} Sekunden, bevor Sie ein neues Foto hochladen.`
+            : `Please wait ${cooldown.waitSeconds} seconds before uploading a new photo.`;
+          showError(waitMsg);
+          return;
+        }
+        // Record this attempt (will trigger cooldown for next upload)
+        recordAvatarRegeneration(currentCharacter.id);
+      }
+    }
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       const originalPhotoUrl = e.target?.result as string;
