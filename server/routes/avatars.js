@@ -947,6 +947,32 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       }
     }
 
+    // Build user physical traits section if provided (user-edited traits that must be applied)
+    let userTraitsSection = '';
+    if (physicalTraits && Object.keys(physicalTraits).length > 0) {
+      const traitLines = [];
+      if (physicalTraits.hairColor) traitLines.push(`- Hair color: ${physicalTraits.hairColor}`);
+      if (physicalTraits.eyeColor) traitLines.push(`- Eye color: ${physicalTraits.eyeColor}`);
+      if (physicalTraits.hairLength) traitLines.push(`- Hair length: ${physicalTraits.hairLength}`);
+      if (physicalTraits.hairStyle) traitLines.push(`- Hair style: ${physicalTraits.hairStyle}`);
+      if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
+      if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
+      if (physicalTraits.facialHair) traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
+      if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
+
+      if (traitLines.length > 0) {
+        userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):
+The user has specified the following traits that MUST be applied to the output:
+${traitLines.join('\n')}
+
+These corrections OVERRIDE what is visible in the reference photo.
+- If hair color is specified, the output MUST show that exact hair color
+- If eye color is specified, the output MUST show that exact eye color
+- Apply these traits while preserving the person's facial identity from the reference.`;
+        log.info(`🎨 [CLOTHING AVATARS] Using user-specified physical traits: ${traitLines.join(', ')}`);
+      }
+    }
+
     // Helper function to generate a single avatar
     const generateSingleAvatar = async (category, config) => {
       try {
@@ -963,6 +989,12 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         // Winter and summer should use their seasonal clothing styles
         if (userClothingSection && category === 'standard') {
           avatarPrompt += userClothingSection;
+        }
+
+        // Add user-specified physical traits to ALL avatar categories
+        // Physical traits (hair color, eye color, etc.) should be consistent across all outfits
+        if (userTraitsSection) {
+          avatarPrompt += userTraitsSection;
         }
 
         const requestBody = {
