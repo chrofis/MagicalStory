@@ -77,6 +77,13 @@ For each main character ({CHARACTER_NAMES}), specify which clothing variations a
 - For `costumed`: Provide **complete outfit description** (full transformation)
 - Only mark variations as `used: true` if they actually appear in the story
 
+**CRITICAL - Distinct Costume Colors:**
+When multiple characters wear costumes, each character MUST have a **different primary color** to make them easily recognizable:
+- Use contrasting colors: red, blue, green, yellow, purple, orange, pink, turquoise
+- The PRIMARY color should be prominent (shirt, dress, main garment)
+- Example: If 3 pirates → one has RED shirt, one has BLUE shirt, one has GREEN shirt
+- This is essential for visual storytelling - readers identify characters by color
+
 **Output as JSON:**
 
 ```json
@@ -86,13 +93,13 @@ For each main character ({CHARACTER_NAMES}), specify which clothing variations a
       "standard": { "used": true, "signature": "brown cowboy boots, leather belt with silver buckle" },
       "winter": { "used": false },
       "summer": { "used": true, "signature": "straw sun hat, open-toe sandals" },
-      "costumed": { "used": true, "costume": "Pirate", "description": "Tricorn hat with red feather, striped red-white shirt, brown leather vest with gold buttons, black pants tucked into tall boots, red sash belt, gold hoop earring" }
+      "costumed": { "used": true, "costume": "Pirate", "description": "Tricorn hat with red feather, striped RED-white shirt, brown leather vest with gold buttons, black pants tucked into tall boots, red sash belt, gold hoop earring" }
     },
     "Max": {
       "standard": { "used": true },
       "winter": { "used": true, "signature": "thick wool scarf, fur-lined boots, knit beanie" },
       "summer": { "used": false },
-      "costumed": { "used": false }
+      "costumed": { "used": true, "costume": "Pirate", "description": "Tricorn hat with blue feather, striped BLUE-white shirt, black leather vest with silver buttons, dark pants tucked into tall boots, blue sash belt" }
     }
   }
 }
