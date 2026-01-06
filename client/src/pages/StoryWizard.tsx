@@ -1221,8 +1221,10 @@ export default function StoryWizard() {
 
         // OVERWRITE physical traits with extracted values from new avatar
         // The avatar is the source of truth - extracted traits should replace existing data
+        // BUT preserve fields that aren't extracted (like height, which isn't visible in avatar)
         const updatedPhysical = result.extractedTraits ? {
-          ...result.extractedTraits, // Use extracted traits as base (overwrites all existing)
+          height: currentCharacter.physical?.height, // Preserve height (not extracted from avatar)
+          ...result.extractedTraits, // Overwrite extracted fields
         } : currentCharacter.physical;
 
         // All traits now come from extraction (overwrite existing source tracking)
@@ -1326,8 +1328,10 @@ export default function StoryWizard() {
 
         // OVERWRITE physical traits with extracted values from new avatar
         // The avatar is the source of truth - extracted traits should replace existing data
+        // BUT preserve fields that aren't extracted (like height, which isn't visible in avatar)
         const updatedPhysical2 = result.extractedTraits ? {
-          ...result.extractedTraits, // Use extracted traits as base (overwrites all existing)
+          height: latestChar.physical?.height, // Preserve height (not extracted from avatar)
+          ...result.extractedTraits, // Overwrite extracted fields
         } : latestChar.physical;
 
         // All traits now come from extraction (overwrite existing source tracking)
