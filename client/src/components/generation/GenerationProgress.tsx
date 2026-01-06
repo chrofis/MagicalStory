@@ -19,91 +19,10 @@ interface GenerationProgressProps {
   onDismissStalled?: () => void;  // Callback to dismiss stalled warning and continue waiting
 }
 
-// Translate server messages to user language
-function translateMessage(message: string, language: string): string {
-  if (!message) return '';
-
-  // Handle "Image X/Y..." pattern
-  const imageMatch = message.match(/^Image (\d+)\/(\d+)\.\.\.$/);
-  if (imageMatch) {
-    const [, current, total] = imageMatch;
-    if (language === 'de') return `Bild ${current}/${total}...`;
-    if (language === 'fr') return `Image ${current}/${total}...`;
-    return message;
-  }
-
-  // Handle "Generating illustration X/Y..." pattern
-  const illustrationMatch = message.match(/^Generating illustration (\d+)\/(\d+)\.\.\.$/);
-  if (illustrationMatch) {
-    const [, current, total] = illustrationMatch;
-    if (language === 'de') return `Illustration ${current}/${total} wird erstellt...`;
-    if (language === 'fr') return `Création de l'illustration ${current}/${total}...`;
-    return message;
-  }
-
-  // Handle "Generating X avatar for Y..." pattern
-  const avatarMatch = message.match(/^Generating (\w+) avatar for (.+)\.\.\.$/);
-  if (avatarMatch) {
-    const [, category, name] = avatarMatch;
-    if (language === 'de') return `${name}: ${category}-Avatar wird erstellt...`;
-    if (language === 'fr') return `Création de l'avatar ${category} pour ${name}...`;
-    return message;
-  }
-
-  // Handle "X cover images ready. Generating remaining covers..." pattern
-  const coverReadyMatch = message.match(/^(\d+) cover images? ready\. Generating remaining covers\.\.\.$/);
-  if (coverReadyMatch) {
-    const [, count] = coverReadyMatch;
-    if (language === 'de') return `${count} Cover fertig. Weitere Cover werden erstellt...`;
-    if (language === 'fr') return `${count} couverture(s) prête(s). Création des couvertures restantes...`;
-    return message;
-  }
-
-  const translations: Record<string, Record<string, string>> = {
-    'Writing story...': {
-      de: 'Geschichte wird geschrieben...',
-      fr: 'Écriture de l\'histoire...',
-    },
-    'Creating covers...': {
-      de: 'Cover werden erstellt...',
-      fr: 'Création des couvertures...',
-    },
-    'Generating cover images...': {
-      de: 'Cover werden erstellt...',
-      fr: 'Création des couvertures...',
-    },
-    'Generating page illustrations...': {
-      de: 'Seitenbilder werden erstellt...',
-      fr: 'Création des illustrations...',
-    },
-    'Generating picture book story and scenes...': {
-      de: 'Geschichte und Szenen werden erstellt...',
-      fr: 'Création de l\'histoire et des scènes...',
-    },
-    'Picture book complete!': {
-      de: 'Bilderbuch fertig!',
-      fr: 'Livre d\'images terminé!',
-    },
-    'Complete!': {
-      de: 'Fertig!',
-      fr: 'Terminé!',
-    },
-  };
-
-  if (language === 'en') return message;
-
-  // Check for exact match first
-  if (translations[message]?.[language]) {
-    return translations[message][language];
-  }
-
-  return message;
-}
-
 export function GenerationProgress({
   current,
   total,
-  message,
+  message: _message,
   isGenerating = true,
   coverImages,
   jobId,

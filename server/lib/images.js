@@ -1701,18 +1701,103 @@ async function createCombinedMask(width, height, boundingBoxes) {
 }
 
 /**
+ * Inpaint using Runware API backend
+ * Uses actual mask images (white=replace, black=preserve) instead of text coordinates.
+ * Much cheaper than Gemini: ~$0.0006/image vs ~$0.03/image
+ *
+ * @param {string} originalImage - Base64 original image
+ * @param {Array} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0-1 coordinates
+ * @param {string} fixPrompt - Instruction for what to fix
+ * @param {string} existingMask - Optional pre-generated mask image
+ * @param {Object} options - Runware options
+ * @returns {Promise<{imageData: string, usage: Object, modelId: string}|null>}
+ */
+async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt, existingMask = null, options = {}) {
+  try {
+    const { inpaintWithRunware, downloadRunwareImage, isRunwareConfigured } = require('./runware');
+
+    if (!isRunwareConfigured()) {
+      throw new Error('Runware API key not configured. Set RUNWARE_API_KEY in environment or use INPAINT_BACKEND=gemini');
+    }
+
+    // Get image dimensions for mask generation
+    const dimensions = await getImageDimensions(originalImage);
+    const { width, height } = dimensions;
+
+    // Generate mask if not provided
+    let mask = existingMask;
+    if (!mask) {
+      log.debug(`🎭 [INPAINT-RUNWARE] Generating mask for ${boundingBoxes.length} region(s)`);
+      mask = await createCombinedMask(width, height, boundingBoxes);
+    }
+
+    log.info(`🎨 [INPAINT-RUNWARE] Starting inpaint with model ${options.model || 'runware:100@1'}`);
+
+    // Call Runware API
+    const result = await inpaintWithRunware(originalImage, mask, fixPrompt, {
+      model: options.model || 'runware:100@1',
+      strength: 0.85,
+      steps: 20,
+      width: width,
+      height: height
+    });
+
+    // If Runware returns a URL, download and convert to base64
+    let imageData = result.imageData;
+    if (imageData && !imageData.startsWith('data:')) {
+      log.debug(`📥 [INPAINT-RUNWARE] Downloading result from URL...`);
+      imageData = await downloadRunwareImage(imageData);
+    }
+
+    // Compress to JPEG for consistency with Gemini output
+    log.debug('🗜️ [INPAINT-RUNWARE] Compressing to JPEG...');
+    const compressedImageData = await compressImageToJPEG(imageData);
+
+    log.info(`✅ [INPAINT-RUNWARE] Complete. Cost: $${result.usage?.cost?.toFixed(6) || '0.000600'}`);
+
+    return {
+      imageData: compressedImageData,
+      usage: result.usage,
+      modelId: result.modelId
+    };
+
+  } catch (error) {
+    log.error(`❌ [INPAINT-RUNWARE] Error: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
  * Inpaint an image using TEXT-BASED region coordinates (semantic masking)
  * NOTE: Gemini 2.5 Flash Image uses natural language to identify regions.
  * We pass coordinates as text in the prompt instead of as a mask image,
  * which is more reliable when there are multiple similar elements (e.g., multiple hands).
  *
+ * Supports multiple backends:
+ * - 'gemini' (default): Uses text-based coordinates with Gemini API
+ * - 'runware': Uses mask images with Runware API (much cheaper)
+ *
  * @param {string} originalImage - Base64 original image
  * @param {Array} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0-1 coordinates
  * @param {string} fixPrompt - Instruction for what to fix
- * @param {string} maskImage - Optional mask image for dev view only (not sent to API)
- * @returns {Promise<{imageData: string}|null>}
+ * @param {string} maskImage - Optional mask image (required for Runware, optional for Gemini)
+ * @param {Object} options - Additional options
+ * @param {string} options.backend - 'gemini' or 'runware' (default: env INPAINT_BACKEND or 'gemini')
+ * @param {string} options.runwareModel - Runware model to use (default: 'runware:100@1' SD 1.5)
+ * @returns {Promise<{imageData: string, usage?: Object, modelId?: string}|null>}
  */
-async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImage = null) {
+async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImage = null, options = {}) {
+  const {
+    backend = process.env.INPAINT_BACKEND || 'gemini',
+    runwareModel = 'runware:100@1'
+  } = options;
+
+  // Route to Runware if configured
+  if (backend === 'runware') {
+    return inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt, maskImage, { model: runwareModel });
+  }
+
+  // Default: Gemini backend
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
