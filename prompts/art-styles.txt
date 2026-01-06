@@ -4,6 +4,7 @@
 #
 # NOTE: After editing this file, update client/src/constants/artStyles.ts and server/lib/storyHelpers.js to match.
 
+# SCENE ART STYLES (for story images with backgrounds)
 pixar: 3D render, Pixar cinematic style, natural eye proportion, subtle expression, highly detailed textures, octane render, volumetric lighting, vibrant colors, smooth shading, family-friendly
 
 cartoon: 2D cartoon style, bold black outlines, vibrant flat colors (minimal shading/cel-shading), smooth vector quality, classic Saturday morning animation aesthetic
@@ -29,3 +30,31 @@ concept: Highly detailed digital concept art, dramatic lighting, epic compositio
 pixel: 16-bit pixel art style, low resolution, limited color palette, detailed sprite work, retro video game aesthetic, style of Final Fantasy VI
 
 cyber: Cyberpunk aesthetic, neon reflections, rainy streets, chrome, dense complexity, high contrast, dark atmosphere, volumetric fog, graphic novel illustration
+
+# CHARACTER/AVATAR ART STYLES (for character reference sheets on plain backgrounds)
+# These focus on rendering style without environmental elements
+pixar-character: 3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading
+
+cartoon-character: 2D cartoon style, bold black outlines, vibrant flat colors, minimal shading, smooth vector quality, clean linework
+
+anime-character: Modern anime art style, expressive eyes, detailed cel-shading, vibrant colors, clean linework, soft studio lighting
+
+chibi-character: Chibi style, super deformed proportions, large head, small body, kawaii aesthetic, adorable, clean illustration
+
+steampunk-character: Steampunk illustration style, Victorian aesthetic, detailed costume rendering, brass and copper accents, sepia tones
+
+comic-character: American comic book art, bold ink lines, dynamic pose, halftone shading, vibrant colors, heroic proportions
+
+manga-character: Japanese manga style, detailed linework, expressive features, clean shading, dramatic pose
+
+watercolor-character: Watercolor painting style, soft color washes, gentle edges, artistic brushwork, textured appearance
+
+oil-character: Oil painting style, visible brushstrokes, rich textures, warm lighting, classic portrait aesthetic
+
+lowpoly-character: Low poly 3D style, geometric shapes, flat colors, clean edges, stylized proportions
+
+concept-character: Digital concept art, detailed rendering, clean studio lighting, professional character design
+
+pixel-character: Pixel art style, limited palette, detailed sprite work, retro aesthetic, clean edges
+
+cyber-character: Cyberpunk character style, neon accents, chrome details, high contrast lighting, graphic novel aesthetic

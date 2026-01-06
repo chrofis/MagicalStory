@@ -117,11 +117,14 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
   log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style (${hasMultipleRefs ? '2 reference images' : 'single image'})...`);
 
   // Get art style prompt from loaded prompts
-  const artStylePrompt = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS.pixar;
+  // Use character-specific art style (without scene elements like "rainy streets")
+  const characterArtStyle = `${artStyle}-character`;
+  const artStylePrompt = ART_STYLE_PROMPTS[characterArtStyle] || ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS['pixar-character'];
   if (!artStylePrompt) {
     log.error(`[STYLED AVATAR] No art style prompt found for "${artStyle}"`);
     return originalAvatar;
   }
+  log.debug(`[STYLED AVATAR] Using art style: ${ART_STYLE_PROMPTS[characterArtStyle] ? characterArtStyle : artStyle}`);
 
   try {
     // Build full prompt using template

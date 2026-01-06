@@ -554,7 +554,11 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
   }
 
   const costumeType = (config.costume || 'costume').toLowerCase();
-  const artStylePrompt = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS.pixar || '';
+  // Use character-specific art style (without scene elements like "rainy streets")
+  // Fall back to scene art style if character version doesn't exist
+  const characterArtStyle = `${artStyle}-character`;
+  const artStylePrompt = ART_STYLE_PROMPTS[characterArtStyle] || ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS['pixar-character'] || '';
+  log.debug(`[STYLED COSTUME] Using art style: ${ART_STYLE_PROMPTS[characterArtStyle] ? characterArtStyle : artStyle}`);
 
   log.debug(`🎨 [STYLED COSTUME] Generating ${costumeType} avatar in ${artStyle} style for ${character.name}`);
 
