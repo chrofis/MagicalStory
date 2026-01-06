@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Code } from 'lucide-react';
+import { Menu, Code, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { useGenerationOptional } from '@/context/GenerationContext';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from './CreditsModal';
 import { UserMenu } from './UserMenu';
@@ -26,10 +27,19 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const { isAuthenticated, user, isImpersonating } = useAuth();
+  const generation = useGenerationOptional();
   const [showMenu, setShowMenu] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Handle viewing completed story
+  const handleViewCompletedStory = () => {
+    if (generation?.completedStoryId) {
+      generation.markCompletionViewed();
+      navigate(`/create?storyId=${generation.completedStoryId}`);
+    }
+  };
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -110,6 +120,20 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
             >
               <Code size={14} />
               <span className="hidden md:inline">DEV</span>
+            </button>
+          )}
+
+          {/* Story Ready Badge */}
+          {generation?.hasUnviewedCompletion && (
+            <button
+              onClick={handleViewCompletedStory}
+              className="bg-green-500 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-green-600 flex items-center gap-2 animate-pulse"
+              title={language === 'de' ? 'Geschichte fertig!' : language === 'fr' ? 'Histoire terminée!' : 'Story ready!'}
+            >
+              <Sparkles size={14} />
+              <span className="hidden md:inline">
+                {language === 'de' ? 'Fertig!' : language === 'fr' ? 'Terminé!' : 'Ready!'}
+              </span>
             </button>
           )}
 
