@@ -292,6 +292,8 @@ router.post('/', authenticateToken, async (req, res) => {
       };
 
       const jsonData = JSON.stringify(characterData);
+      const jsonSizeMB = (jsonData.length / 1024 / 1024).toFixed(2);
+      console.log(`[Characters] POST - JSON data size: ${jsonSizeMB} MB`);
 
       const upsertQuery = `
         INSERT INTO characters (id, user_id, data, created_at)
@@ -300,7 +302,14 @@ router.post('/', authenticateToken, async (req, res) => {
           data = EXCLUDED.data,
           created_at = CURRENT_TIMESTAMP
       `;
-      await dbQuery(upsertQuery, [characterId, req.user.id, jsonData]);
+
+      try {
+        await dbQuery(upsertQuery, [characterId, req.user.id, jsonData]);
+        console.log(`[Characters] POST - Database upsert successful`);
+      } catch (dbErr) {
+        console.error(`[Characters] POST - Database upsert FAILED:`, dbErr.message);
+        throw dbErr;
+      }
 
       // Clean up legacy rows with old ID format (characters_{user_id}_{timestamp})
       const cleanupQuery = `
