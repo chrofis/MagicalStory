@@ -529,17 +529,28 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
 
   // Get standard avatar as primary reference (has correct face + proportions)
   // Fall back to face photo if standard avatar isn't available
+  const hasAvatars = !!character.avatars;
+  const hasStandard = !!character.avatars?.standard;
+  const hasPhotos = !!character.photos;
+  const hasFace = !!character.photos?.face;
+  const hasOriginal = !!character.photos?.original;
+  const hasPhotoUrl = !!character.photoUrl;
+
+  log.debug(`[STYLED COSTUME] ${character.name} data check: avatars=${hasAvatars}, standard=${hasStandard}, photos=${hasPhotos}, face=${hasFace}, original=${hasOriginal}, photoUrl=${hasPhotoUrl}`);
+
   let standardAvatar = character.avatars?.standard;
   if (!standardAvatar) {
     // Fallback: use face photo if standard avatar doesn't exist
     const facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
     if (facePhoto) {
-      log.debug(`[STYLED COSTUME] ${character.name}: No standard avatar, using face photo as fallback`);
+      log.warn(`[STYLED COSTUME] ${character.name}: No standard avatar found, using face photo as fallback`);
       standardAvatar = facePhoto;
     } else {
       log.error(`[STYLED COSTUME] No standard avatar or face photo for ${character.name}`);
       return { success: false, error: 'No reference image available - generate clothing avatars or upload photo first' };
     }
+  } else {
+    log.debug(`[STYLED COSTUME] ${character.name}: Using standard avatar (${Math.round(standardAvatar.length / 1024)}KB)`);
   }
 
   const costumeType = (config.costume || 'costume').toLowerCase();
