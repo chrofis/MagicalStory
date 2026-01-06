@@ -64,6 +64,17 @@ export default defineConfig({
       testMatch: [/auth\.spec\.ts/, /analysis\.spec\.ts/],
     },
 
+    // One-time family setup (run manually with --project=family-setup)
+    {
+      name: 'family-setup',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: authFile,
+      },
+      dependencies: ['setup'],
+      testMatch: /setup-test-family\.spec\.ts/,
+    },
+
     {
       name: 'firefox',
       use: {

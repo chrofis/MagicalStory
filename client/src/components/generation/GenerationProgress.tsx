@@ -278,7 +278,6 @@ export function GenerationProgress({
 
   // Use server progress directly (0-100 scale)
   const progressPercent = total === 100 ? current : Math.round((current / total) * 100);
-  const translatedMessage = translateMessage(message || '', language);
 
   // Helper to extract imageData from cover (can be string or object with imageData)
   const getImageData = (cover: string | { imageData?: string } | null | undefined): string | undefined => {
@@ -477,11 +476,6 @@ export function GenerationProgress({
             size="lg"
           />
         </div>
-
-        {/* Current step message */}
-        {translatedMessage && (
-          <p className="text-indigo-600 text-sm text-center font-medium mb-4">{translatedMessage}</p>
-        )}
 
         {/* Stalled warning */}
         {isStalled && (

@@ -38,7 +38,15 @@ test('Setup test family with avatars', async ({ page }) => {
 
   // Go to create page (auth state should be loaded)
   await page.goto('/create');
+
+  // Wait for page to fully load
+  console.log('Waiting for page to load...');
+  await page.waitForLoadState('networkidle');
   await page.waitForTimeout(3000);
+
+  // Take initial screenshot to see page state
+  await page.screenshot({ path: 'test-results/setup-initial-state.png' });
+  console.log('Screenshot saved: setup-initial-state.png');
 
   console.log('Starting family setup...');
   console.log('This will create 5 characters and generate avatars (costs credits!)');
@@ -48,41 +56,90 @@ test('Setup test family with avatars', async ({ page }) => {
     const member = family[i];
     console.log(`\n=== Adding ${member.name} (${i + 1}/${family.length}) ===`);
 
-    // Click "Create First Character" or "Create Another Character" button
+    // For first character, may need to click "Create First Character" or it may auto-start
     if (i === 0) {
-      // First character - look for "Create First Character" button
-      const createFirstBtn = page.getByRole('button', { name: /create first|ersten charakter|premier personnage/i });
-      if (await createFirstBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await createFirstBtn.click();
-        console.log('Clicked "Create First Character"');
+      // Check if we're already in photo upload mode (wizard auto-starts for new users)
+      const uploadBtn = page.locator('label:has-text("Upload")');
+      const fileInput = page.locator('input[type="file"]');
+
+      if (await fileInput.count() === 0) {
+        // Not in photo upload mode yet, look for "Create First Character" button
+        const createFirstBtn = page.getByRole('button', { name: /create first|ersten charakter|premier personnage|create.*character/i });
+        if (await createFirstBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+          await createFirstBtn.click();
+          console.log('Clicked "Create First Character"');
+          await page.waitForTimeout(1000);
+        } else {
+          // Maybe there are existing characters - try the add card
+          const addBtn = page.locator('[class*="border-dashed"]').first();
+          if (await addBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await addBtn.click();
+            console.log('Clicked add character card');
+            await page.waitForTimeout(1000);
+          }
+        }
+      } else {
+        console.log('Already in photo upload mode (auto-started)');
       }
     } else {
-      // Additional characters - look for the dashed border add card
-      const addCardBtn = page.locator('button.border-dashed, button:has-text("Create Another"), button:has-text("Weiteren")');
-      if (await addCardBtn.first().isVisible({ timeout: 5000 }).catch(() => false)) {
-        await addCardBtn.first().click();
-        console.log('Clicked "Create Another Character"');
+      // Additional characters - look for the add character card or button
+      // After saving a character, we should be back on the character list
+      const addCardBtn = page.locator('[class*="border-dashed"], button:has-text("Create Another"), button:has-text("Add")').first();
+      if (await addCardBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await addCardBtn.click();
+        console.log('Clicked "Add Character"');
+        await page.waitForTimeout(1000);
       }
     }
 
-    await page.waitForTimeout(1000);
+    // Take screenshot before photo upload
+    await page.screenshot({ path: `test-results/setup-${member.name}-before-upload.png` });
+    console.log(`Screenshot saved: setup-${member.name}-before-upload.png`);
 
     // Step 1: Upload photo
     console.log(`Uploading photo: ${member.photo}`);
     const photoPath = path.join(PHOTOS_DIR, member.photo);
 
-    // Find the file input (may be hidden) or the upload area
+    // Check if consent checkboxes exist (only for first-time users who haven't consented)
+    const consentCheckbox1 = page.locator('text=/I confirm I have the right|Ich bestätige/').first();
+    const consentCheckbox2 = page.locator('text=/I agree to the|Ich stimme den/').first();
+
+    if (await consentCheckbox1.isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.log('Found consent checkboxes, clicking them...');
+      // Click the parent clickable div for each checkbox
+      await consentCheckbox1.locator('..').click();
+      await page.waitForTimeout(300);
+      await consentCheckbox2.locator('..').click();
+      await page.waitForTimeout(300);
+      console.log('Consent checkboxes clicked');
+    }
+
+    // Find the file input and set files (it's hidden but Playwright can still interact)
     const fileInput = page.locator('input[type="file"]');
+    const inputCount = await fileInput.count();
+    console.log(`Found ${inputCount} file input(s)`);
+
+    if (inputCount === 0) {
+      console.error('ERROR: No file input found on page!');
+      await page.screenshot({ path: `test-results/setup-${member.name}-no-input-error.png` });
+      throw new Error('No file input found');
+    }
+
     await fileInput.setInputFiles(photoPath);
+    console.log('Photo file set');
 
-    console.log('Photo uploaded, waiting for analysis...');
     // Wait for photo analysis (AI detects traits from photo)
-    await page.waitForTimeout(5000);
+    console.log('Waiting for photo analysis...');
+    await page.waitForTimeout(8000); // Give more time for analysis
 
-    // Check if we're now on the name step
-    const nameInput = page.locator('input[type="text"]').first();
+    // Take screenshot after upload
+    await page.screenshot({ path: `test-results/setup-${member.name}-after-upload.png` });
+
+    // Check if we're now on the name step - look for name input
+    const nameInput = page.locator('input[placeholder*="name" i], input[type="text"]').first();
     if (await nameInput.isVisible({ timeout: 10000 })) {
       // Clear and fill name
+      await nameInput.clear();
       await nameInput.fill(member.name);
       console.log(`Set name: ${member.name}`);
     }
@@ -95,116 +152,95 @@ test('Setup test family with avatars', async ({ page }) => {
       await page.waitForTimeout(2000);
     }
 
-    // On traits step - just accept the AI-detected traits
-    // Click "Save & Generate Avatar" or similar
-    const generateAvatarBtn = page.getByRole('button', { name: /save.*avatar|generate avatar|avatar.*generi|speichern/i });
-    if (await generateAvatarBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await generateAvatarBtn.click();
-      console.log('Clicked Generate Avatar');
-      // Wait for avatar generation (this takes time!)
-      console.log('Waiting for avatar generation...');
-      await page.waitForTimeout(30000); // 30 seconds per avatar
+    // On traits step - look for "Save & Generate Avatar" button
+    // This saves the traits and triggers avatar generation in the background
+    const saveGenerateBtn = page.getByRole('button', { name: /save.*generate|generate.*avatar|avatar.*generieren|speichern.*generieren/i });
+    if (await saveGenerateBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await saveGenerateBtn.click();
+      console.log('Clicked Save & Generate Avatar');
+      // Wait for avatar generation to start
+      await page.waitForTimeout(5000);
     } else {
-      // Try just saving
-      const saveBtn = page.getByRole('button', { name: /save|speichern|enregistrer/i });
-      if (await saveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await saveBtn.click();
-        console.log('Saved character');
-        await page.waitForTimeout(5000);
+      // Try just a "Continue" or "Next" button on traits step
+      const traitsNextBtn = page.getByRole('button', { name: /continue|weiter|next|save|speichern/i });
+      if (await traitsNextBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await traitsNextBtn.click();
+        console.log('Clicked Continue/Save on traits');
+        await page.waitForTimeout(3000);
       }
     }
 
-    // If there's a characteristics step, skip through it
-    const skipBtn = page.getByRole('button', { name: /skip|überspringen|passer/i });
-    if (await skipBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await skipBtn.click();
-      console.log('Skipped characteristics');
-      await page.waitForTimeout(1000);
+    // Check for characteristics step and handle it
+    const characteristicsSection = page.locator('text=/characteristics|eigenschaften|caracteristiques/i');
+    if (await characteristicsSection.isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.log('On characteristics step');
+      // Look for skip or continue button
+      const skipBtn = page.getByRole('button', { name: /skip|überspringen|passer|continue|weiter/i });
+      if (await skipBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await skipBtn.click();
+        console.log('Skipped/continued past characteristics');
+        await page.waitForTimeout(1000);
+      }
     }
 
-    // If there's a relationships step, handle it
-    if (member.relationship) {
-      const relationshipSelect = page.locator('select, [role="combobox"]').first();
-      if (await relationshipSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-        // Try to find and click the relationship option
-        const relationshipOption = page.getByText(new RegExp(member.relationship, 'i')).first();
-        if (await relationshipOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await relationshipOption.click();
-          console.log(`Set relationship: ${member.relationship}`);
+    // Check for relationships step (only appears if there are multiple characters)
+    if (i > 0) {
+      const relationshipsSection = page.locator('text=/relationship|beziehung|relation/i');
+      if (await relationshipsSection.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('On relationships step');
+        // Just click save/done to accept defaults
+        const saveRelBtn = page.getByRole('button', { name: /save|done|fertig|speichern|continue|weiter/i });
+        if (await saveRelBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await saveRelBtn.click();
+          console.log('Saved relationships');
+          await page.waitForTimeout(1000);
         }
       }
     }
 
-    // Complete character creation
-    const doneBtn = page.getByRole('button', { name: /done|fertig|terminé|complete|finish/i });
-    if (await doneBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    // Look for a "Done" or "Finish" button to complete character creation
+    const doneBtn = page.getByRole('button', { name: /^done$|^fertig$|^finish$|^terminé$|^complete$/i });
+    if (await doneBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await doneBtn.click();
       console.log('Completed character');
       await page.waitForTimeout(2000);
     }
 
-    await page.screenshot({ path: `test-results/setup-${member.name}.png` });
+    // Wait a bit for any background processing
+    await page.waitForTimeout(3000);
+
+    // Take screenshot after completing character
+    await page.screenshot({ path: `test-results/setup-${member.name}-complete.png` });
     console.log(`Completed ${member.name}`);
   }
 
   console.log('\n=== All characters created ===');
   await page.screenshot({ path: 'test-results/setup-all-characters.png' });
 
-  // Now proceed through the wizard to story selection
-  console.log('\nProceeding through wizard steps...');
+  // Now proceed through the wizard to summary but DON'T generate story
+  console.log('\nProceeding through wizard steps to summary...');
 
-  // Click Next to go to book settings
-  const nextBtn = page.getByRole('button', { name: /next|weiter|suivant/i });
-  if (await nextBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await nextBtn.click();
-    console.log('Step 1 -> Step 2 (Book Settings)');
-    await page.waitForTimeout(2000);
+  // Click Next to go to next steps
+  const nextBtn = page.getByRole('button', { name: /^next$|^weiter$|^suivant$/i });
+
+  // Step through remaining wizard steps
+  for (let step = 2; step <= 5; step++) {
+    if (await nextBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await nextBtn.click();
+      console.log(`Advanced to step ${step}`);
+      await page.waitForTimeout(2000);
+      await page.screenshot({ path: `test-results/setup-step-${step}.png` });
+    }
   }
 
-  // Step 2: Book settings - just proceed
-  if (await nextBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await nextBtn.click();
-    console.log('Step 2 -> Step 3 (Story Type)');
-    await page.waitForTimeout(2000);
-  }
-
-  // Step 3: Select a story type
-  // Click first adventure option
-  const adventureCard = page.locator('[class*="card"], button').filter({ hasText: /adventure|abenteuer|aventure/i }).first();
-  if (await adventureCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await adventureCard.click();
-    console.log('Selected Adventure story type');
-    await page.waitForTimeout(1000);
-  }
-
-  if (await nextBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await nextBtn.click();
-    console.log('Step 3 -> Step 4 (Art Style)');
-    await page.waitForTimeout(2000);
-  }
-
-  // Step 4: Select an art style
-  const watercolorStyle = page.locator('[class*="card"], button').filter({ hasText: /watercolor|aquarell/i }).first();
-  if (await watercolorStyle.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await watercolorStyle.click();
-    console.log('Selected Watercolor style');
-    await page.waitForTimeout(1000);
-  }
-
-  if (await nextBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await nextBtn.click();
-    console.log('Step 4 -> Step 5 (Summary)');
-    await page.waitForTimeout(2000);
-  }
-
-  // Step 5: Summary - STOP HERE
+  // Final state
   console.log('\n=== Reached Summary Step ===');
   console.log('Setup complete! DO NOT click Generate Story.');
   console.log('You can now manually generate a story from the browser.');
 
   await page.screenshot({ path: 'test-results/setup-final.png' });
 
-  // Keep browser open for 30 seconds so user can see
-  console.log('\nBrowser will stay open for 30 seconds...');
-  await page.waitForTimeout(30000);
+  // Keep browser open for 60 seconds so user can see and take over if needed
+  console.log('\nBrowser will stay open for 60 seconds...');
+  await page.waitForTimeout(60000);
 });
