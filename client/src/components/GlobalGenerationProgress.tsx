@@ -19,8 +19,8 @@ export function GlobalGenerationProgress() {
   const percentage = Math.round((progress.current / progress.total) * 100);
 
   const handleClick = () => {
-    // Navigate to wizard to see full progress
-    navigate('/wizard');
+    // Navigate to create page to see full progress
+    navigate('/create');
   };
 
   // Don't show if complete (badge will show instead)

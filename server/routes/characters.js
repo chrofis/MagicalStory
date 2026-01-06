@@ -218,6 +218,30 @@ router.post('/', authenticateToken, async (req, res) => {
 
         const mergedAvatars = { ...newChar.avatars };
 
+        // Preserve basic avatar variants (winter, summer, formal) from database
+        // These get stripped for non-dev users on GET, so we must preserve them on save
+        const basicVariants = ['winter', 'summer', 'formal'];
+        for (const variant of basicVariants) {
+          if (existingChar.avatars[variant] && !newChar.avatars?.[variant]) {
+            mergedAvatars[variant] = existingChar.avatars[variant];
+            hasChanges = true;
+          }
+        }
+
+        // Preserve avatar metadata (faceMatch, clothing, prompts, rawEvaluation)
+        if (existingChar.avatars.faceMatch && !newChar.avatars?.faceMatch) {
+          mergedAvatars.faceMatch = existingChar.avatars.faceMatch;
+        }
+        if (existingChar.avatars.clothing && !newChar.avatars?.clothing) {
+          mergedAvatars.clothing = existingChar.avatars.clothing;
+        }
+        if (existingChar.avatars.prompts && !newChar.avatars?.prompts) {
+          mergedAvatars.prompts = existingChar.avatars.prompts;
+        }
+        if (existingChar.avatars.rawEvaluation && !newChar.avatars?.rawEvaluation) {
+          mergedAvatars.rawEvaluation = existingChar.avatars.rawEvaluation;
+        }
+
         // Preserve styledAvatars from database
         if (existingChar.avatars.styledAvatars) {
           const styles = Object.keys(existingChar.avatars.styledAvatars);

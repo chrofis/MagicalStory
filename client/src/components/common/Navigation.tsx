@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Code, Sparkles } from 'lucide-react';
+import { Menu, Code, Sparkles, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useGenerationOptional } from '@/context/GenerationContext';
@@ -40,6 +40,14 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
       navigate(`/create?storyId=${generation.completedStoryId}`);
     }
   };
+
+  // Handle clicking on generation progress indicator
+  const handleViewProgress = () => {
+    navigate('/create');
+  };
+
+  // Check if generation is in progress (has active job and not complete)
+  const isGenerationInProgress = generation?.activeJob && !generation?.isComplete && !generation?.error;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -120,6 +128,20 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
             >
               <Code size={14} />
               <span className="hidden md:inline">DEV</span>
+            </button>
+          )}
+
+          {/* Generation In Progress Indicator */}
+          {isGenerationInProgress && (
+            <button
+              onClick={handleViewProgress}
+              className="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-indigo-700 flex items-center gap-2"
+              title={language === 'de' ? 'Geschichte wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Creating story...'}
+            >
+              <Loader2 size={14} className="animate-spin" />
+              <span className="hidden md:inline">
+                {generation?.progress ? `${Math.round((generation.progress.current / generation.progress.total) * 100)}%` : '...'}
+              </span>
             </button>
           )}
 
