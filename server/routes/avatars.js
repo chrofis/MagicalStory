@@ -672,8 +672,9 @@ Your task is to create a new avatar in ${artStyle} style that:
     const finalImageData = compressed || imageData;
 
     // Evaluate face match to get clothing description
+    // Use standardAvatar as reference (it contains the face we're matching against)
     let clothingDescription = null;
-    const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, finalImageData, geminiApiKey);
+    const faceMatchResult = await evaluateAvatarFaceMatch(standardAvatar, finalImageData, geminiApiKey);
     if (faceMatchResult?.clothing) {
       clothingDescription = faceMatchResult.clothing;
       log.debug(`👕 [STYLED COSTUME] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
@@ -692,16 +693,12 @@ Your task is to create a new avatar in ${artStyle} style that:
       durationMs: duration,
       success: true,
       inputs: {
-        facePhoto: {
-          identifier: getImageIdentifier(facePhoto),
-          sizeKB: getImageSizeKB(facePhoto),
-          imageData: facePhoto
-        },
-        standardAvatar: standardAvatar ? {
+        // standardAvatar is used as the reference image (contains face + body)
+        referenceAvatar: {
           identifier: getImageIdentifier(standardAvatar),
           sizeKB: getImageSizeKB(standardAvatar),
           imageData: standardAvatar
-        } : null
+        }
       },
       prompt: avatarPrompt,
       output: {
@@ -734,12 +731,8 @@ Your task is to create a new avatar in ${artStyle} style that:
       success: false,
       error: err.message,
       inputs: {
-        facePhoto: {
-          identifier: getImageIdentifier(facePhoto),
-          sizeKB: getImageSizeKB(facePhoto),
-          imageData: facePhoto
-        },
-        standardAvatar: standardAvatar ? {
+        // standardAvatar is used as the reference image (contains face + body)
+        referenceAvatar: standardAvatar ? {
           identifier: getImageIdentifier(standardAvatar),
           sizeKB: getImageSizeKB(standardAvatar),
           imageData: standardAvatar
