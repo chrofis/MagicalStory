@@ -130,9 +130,17 @@ interface InlineEditFieldProps {
   onChange: (value: string) => void;
   isChanged?: boolean;  // Highlight if trait changed from previous photo
   isAiExtracted?: boolean;  // Style as AI-extracted (grayed)
+  isUserEdited?: boolean;  // User has manually edited this field (will be enforced)
+  language?: string;  // For tooltip translation
 }
 
-function InlineEditField({ label, value, placeholder, onChange, isChanged, isAiExtracted }: InlineEditFieldProps) {
+function InlineEditField({ label, value, placeholder, onChange, isChanged, isAiExtracted, isUserEdited, language }: InlineEditFieldProps) {
+  const userEditedTooltip = language === 'de'
+    ? 'Von dir bearbeitet - wird bei Neugenerierung beibehalten'
+    : language === 'fr'
+      ? 'Modifié par vous - sera conservé lors de la régénération'
+      : 'Edited by you - will be enforced on regeneration';
+
   return (
     <div className="flex items-center gap-2">
       <span className={`font-medium text-xs whitespace-nowrap ${isAiExtracted ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -143,15 +151,20 @@ function InlineEditField({ label, value, placeholder, onChange, isChanged, isAiE
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
-          isChanged
-            ? 'border-amber-400 bg-amber-50 text-amber-800'
-            : isAiExtracted
-              ? 'border-gray-200 bg-gray-50 text-gray-500'
-              : 'border-gray-200 bg-white'
+          isUserEdited
+            ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
+            : isChanged
+              ? 'border-amber-400 bg-amber-50 text-amber-800'
+              : isAiExtracted
+                ? 'border-gray-200 bg-gray-50 text-gray-500'
+                : 'border-gray-200 bg-white'
         }`}
         placeholder={placeholder}
       />
-      {isChanged && (
+      {isUserEdited && (
+        <span className="text-blue-500 text-xs cursor-help" title={userEditedTooltip}>✎</span>
+      )}
+      {isChanged && !isUserEdited && (
         <span className="text-amber-500 text-xs" title="Changed from previous photo">●</span>
       )}
     </div>
@@ -170,13 +183,41 @@ interface PhysicalTraitsGridProps {
 
 function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparentAge, changedTraits, isAiExtracted }: PhysicalTraitsGridProps) {
   const labelClass = isAiExtracted ? 'text-gray-400' : 'text-gray-600';
-  const selectClass = (isChanged?: boolean) => `flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
-    isChanged
-      ? 'border-amber-400 bg-amber-50'
-      : isAiExtracted
-        ? 'border-gray-200 bg-gray-50 text-gray-500'
-        : 'border-gray-200 bg-white'
-  }`;
+
+  // Check if a trait is user-edited (will be enforced during regeneration)
+  const isUserEdited = (field: keyof PhysicalTraitsSource) =>
+    character.physicalTraitsSource?.[field] === 'user';
+
+  const selectClass = (isChanged?: boolean, field?: keyof PhysicalTraitsSource) => {
+    const userEdited = field && isUserEdited(field);
+    return `flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
+      userEdited
+        ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
+        : isChanged
+          ? 'border-amber-400 bg-amber-50'
+          : isAiExtracted
+            ? 'border-gray-200 bg-gray-50 text-gray-500'
+            : 'border-gray-200 bg-white'
+    }`;
+  };
+
+  // User-edited indicator (blue dot with tooltip)
+  const UserEditedIndicator = ({ field }: { field: keyof PhysicalTraitsSource }) => {
+    if (!isUserEdited(field)) return null;
+    const tooltip = language === 'de'
+      ? 'Von dir bearbeitet - wird bei Neugenerierung beibehalten'
+      : language === 'fr'
+        ? 'Modifié par vous - sera conservé lors de la régénération'
+        : 'Edited by you - will be enforced on regeneration';
+    return (
+      <span
+        className="text-blue-500 text-xs cursor-help"
+        title={tooltip}
+      >
+        ✎
+      </span>
+    );
+  };
 
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
@@ -188,6 +229,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         onChange={(v) => updatePhysical('eyeColor', v)}
         isAiExtracted={isAiExtracted}
         isChanged={changedTraits?.eyeColor}
+        isUserEdited={isUserEdited('eyeColor')}
+        language={language}
       />
       <div className="flex items-center gap-2">
         <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
@@ -216,7 +259,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         <select
           value={character.physical?.hairColor || ''}
           onChange={(e) => updatePhysical('hairColor', e.target.value)}
-          className={selectClass(changedTraits?.hairColor)}
+          className={selectClass(changedTraits?.hairColor, 'hairColor')}
         >
           <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
           {HAIR_COLOR_OPTIONS.map((opt) => (
@@ -225,7 +268,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
             </option>
           ))}
         </select>
-        {changedTraits?.hairColor && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+        <UserEditedIndicator field="hairColor" />
+        {changedTraits?.hairColor && !isUserEdited('hairColor') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
       <div className="flex items-center gap-2">
         <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
@@ -234,7 +278,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         <select
           value={character.physical?.hairLength || ''}
           onChange={(e) => updatePhysical('hairLength', e.target.value)}
-          className={selectClass(changedTraits?.hairLength)}
+          className={selectClass(changedTraits?.hairLength, 'hairLength')}
         >
           <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
           {HAIR_LENGTH_OPTIONS.map((opt) => (
@@ -243,7 +287,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
             </option>
           ))}
         </select>
-        {changedTraits?.hairLength && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+        <UserEditedIndicator field="hairLength" />
+        {changedTraits?.hairLength && !isUserEdited('hairLength') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
 
       {/* Row 3: Hair Style | Build */}
@@ -254,7 +299,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         <select
           value={character.physical?.hairStyle || ''}
           onChange={(e) => updatePhysical('hairStyle', e.target.value)}
-          className={selectClass(changedTraits?.hairStyle)}
+          className={selectClass(changedTraits?.hairStyle, 'hairStyle')}
         >
           <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
           {HAIR_STYLE_OPTIONS.map((opt) => (
@@ -263,7 +308,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
             </option>
           ))}
         </select>
-        {changedTraits?.hairStyle && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+        <UserEditedIndicator field="hairStyle" />
+        {changedTraits?.hairStyle && !isUserEdited('hairStyle') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
       <div className="flex items-center gap-2">
         <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
@@ -272,7 +318,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         <select
           value={character.physical?.build || ''}
           onChange={(e) => updatePhysical('build', e.target.value)}
-          className={selectClass(changedTraits?.build)}
+          className={selectClass(changedTraits?.build, 'build')}
         >
           <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
           {BUILD_OPTIONS.map((opt) => (
@@ -281,7 +327,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
             </option>
           ))}
         </select>
-        {changedTraits?.build && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+        <UserEditedIndicator field="build" />
+        {changedTraits?.build && !isUserEdited('build') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
 
       {/* Row 4: Face | Facial Hair (non-females) or Other (females) */}
@@ -292,6 +339,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         onChange={(v) => updatePhysical('face', v)}
         isAiExtracted={isAiExtracted}
         isChanged={changedTraits?.face}
+        isUserEdited={isUserEdited('face')}
+        language={language}
       />
       {character.gender !== 'female' ? (
         <div className="flex items-center gap-2">
@@ -301,7 +350,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           <select
             value={character.physical?.facialHair || ''}
             onChange={(e) => updatePhysical('facialHair', e.target.value)}
-            className={selectClass(changedTraits?.facialHair)}
+            className={selectClass(changedTraits?.facialHair, 'facialHair')}
           >
             <option value="">{language === 'de' ? '— Wählen —' : language === 'fr' ? '— Choisir —' : '— Select —'}</option>
             {FACIAL_HAIR_OPTIONS.map((opt) => (
@@ -310,7 +359,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
               </option>
             ))}
           </select>
-          {changedTraits?.facialHair && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+          <UserEditedIndicator field="facialHair" />
+          {changedTraits?.facialHair && !isUserEdited('facialHair') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
         </div>
       ) : (
         <InlineEditField
@@ -320,6 +370,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           onChange={(v) => updatePhysical('other', v)}
           isAiExtracted={isAiExtracted}
           isChanged={changedTraits?.other}
+          isUserEdited={isUserEdited('other')}
+          language={language}
         />
       )}
 
@@ -333,6 +385,8 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
             onChange={(v) => updatePhysical('other', v)}
             isAiExtracted={isAiExtracted}
             isChanged={changedTraits?.other}
+            isUserEdited={isUserEdited('other')}
+            language={language}
           />
         </div>
       )}
