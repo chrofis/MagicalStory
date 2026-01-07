@@ -15,6 +15,13 @@ const { log } = require('../utils/logger');
 const RUNWARE_API_KEY = process.env.RUNWARE_API_KEY;
 const RUNWARE_API_URL = 'https://api.runware.ai/v1';
 
+// Log Runware configuration status at startup
+if (RUNWARE_API_KEY) {
+  log.info(`🎨 Runware API: ✅ Configured (key: ${RUNWARE_API_KEY.substring(0, 8)}...)`);
+} else {
+  log.warn(`🎨 Runware API: ❌ Not configured (RUNWARE_API_KEY not set)`);
+}
+
 // Available inpainting models
 const RUNWARE_MODELS = {
   SD15: 'runware:100@1',      // SD 1.5 Inpaint - $0.0006/image, fastest
