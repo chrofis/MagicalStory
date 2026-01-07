@@ -188,9 +188,10 @@ async function generateWithRunware(prompt, options = {}) {
   const taskUUID = crypto.randomUUID();
   log.info(`🎨 [RUNWARE] Starting generation task ${taskUUID.slice(0, 8)}...`);
   log.debug(`🎨 [RUNWARE] Model: ${model}, Size: ${width}x${height}, Steps: ${steps}`);
-  log.debug(`🎨 [RUNWARE] Prompt: ${prompt.substring(0, 100)}...`);
+  log.debug(`🎨 [RUNWARE] Prompt (${prompt.length} chars): ${prompt.substring(0, 100)}...`);
 
   // Build the task payload
+  // Note: Prompt should already be truncated by caller based on IMAGE_MODELS config
   const task = {
     taskType: 'imageInference',
     taskUUID: taskUUID,

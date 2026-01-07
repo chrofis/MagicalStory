@@ -925,6 +925,17 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Check if the selected model is a Runware model (flux-schnell, flux-dev)
   const modelConfig = IMAGE_MODELS[modelId];
+
+  // Truncate prompt if needed based on model's maxPromptLength
+  const maxPromptLength = modelConfig?.maxPromptLength || 30000;
+  let effectivePrompt = prompt;
+  if (prompt.length > maxPromptLength) {
+    log.warn(`✂️ [IMAGE GEN] Prompt too long (${prompt.length} chars), truncating to ${maxPromptLength} for ${modelId}`);
+    effectivePrompt = prompt.substring(0, maxPromptLength - 3) + '...';
+    // Update parts array with truncated prompt for Gemini path
+    parts[0] = { text: effectivePrompt };
+  }
+
   if (modelConfig?.backend === 'runware' && isRunwareConfigured()) {
     log.info(`🎨 [IMAGE GEN] Model ${modelId} uses Runware backend - routing to Runware`);
 
@@ -943,7 +954,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         }
       }
 
-      const result = await generateWithRunware(prompt, {
+      const result = await generateWithRunware(effectivePrompt, {
         model: runwareModel,
         width: 1024,
         height: 1024,
