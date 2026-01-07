@@ -589,11 +589,12 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
 
     // System instruction for single reference image
     const systemText = `You are an expert character artist creating stylized avatar illustrations for children's books.
-You are given a reference avatar showing the person's face and body proportions.
+You are given a reference avatar for FACIAL IDENTITY ONLY.
 Your task is to create a new avatar in ${artStyle} style that:
 - Preserves the EXACT facial identity from the reference avatar
-- Uses the same body proportions from the reference avatar
-- Applies the specified costume`;
+- IGNORES the reference clothing completely - apply the new costume instead
+- IGNORES the reference body shape - generate a new body fitting the costume
+- Creates all 4 grid quadrants with the SAME costume`;
 
     const requestBody = {
       systemInstruction: {
@@ -606,7 +607,7 @@ Your task is to create a new avatar in ${artStyle} style that:
         ]
       }],
       generationConfig: {
-        temperature: 0.4,
+        temperature: 0.2,  // Lower temperature for consistent costume application across all 4 quadrants
         responseModalities: ["TEXT", "IMAGE"],
         imageConfig: {
           aspectRatio: "9:16"
