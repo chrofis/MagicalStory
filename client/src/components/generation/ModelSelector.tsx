@@ -259,9 +259,9 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           language={language}
         />
 
-        {/* Image Generation Backend */}
+        {/* Image Repair Backend (inpainting) */}
         <ModelDropdown
-          label={language === 'de' ? 'Bild-Backend' : language === 'fr' ? 'Backend d\'image' : 'Image Backend'}
+          label={language === 'de' ? 'Bild-Reparatur' : language === 'fr' ? 'Réparation d\'image' : 'Image Repair'}
           icon={<Server size={12} />}
           value={selections.imageBackend}
           options={IMAGE_BACKENDS}
