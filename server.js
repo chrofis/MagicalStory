@@ -1717,8 +1717,8 @@ ${adventureGuideContent}`
       }
     }
 
-    // Send completion
-    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    // Send completion with full response for dev mode
+    res.write(`data: ${JSON.stringify({ done: true, fullResponse: accumulatedText })}\n\n`);
     res.end();
 
   } catch (err) {

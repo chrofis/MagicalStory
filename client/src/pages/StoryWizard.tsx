@@ -191,6 +191,7 @@ export default function StoryWizard() {
   const [isGeneratingIdea1, setIsGeneratingIdea1] = useState(false);
   const [isGeneratingIdea2, setIsGeneratingIdea2] = useState(false);
   const [lastIdeaPrompt, setLastIdeaPrompt] = useState<{ prompt: string; model: string } | null>(null);
+  const [lastIdeaFullResponse, setLastIdeaFullResponse] = useState<string>('');
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([]);
   const streamAbortRef = useRef<{ abort: () => void } | null>(null);
   // User's location from IP (for story setting personalization)
@@ -1819,6 +1820,7 @@ export default function StoryWizard() {
     setIsGeneratingIdea2(true);
     setGeneratedIdeas([]);
     setLastIdeaPrompt(null);
+    setLastIdeaFullResponse('');
 
     // Get characters in story (not excluded)
     const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
@@ -1888,10 +1890,13 @@ export default function StoryWizard() {
           setIsGeneratingIdea1(false);
           setIsGeneratingIdea2(false);
         },
-        onDone: () => {
+        onDone: (fullResponse) => {
           setIsGeneratingIdeas(false);
           setIsGeneratingIdea1(false);
           setIsGeneratingIdea2(false);
+          if (fullResponse) {
+            setLastIdeaFullResponse(fullResponse);
+          }
           streamAbortRef.current = null;
         },
       }
@@ -2417,6 +2422,7 @@ export default function StoryWizard() {
             isGeneratingIdea1={isGeneratingIdea1}
             isGeneratingIdea2={isGeneratingIdea2}
             ideaPrompt={lastIdeaPrompt}
+            ideaFullResponse={lastIdeaFullResponse}
             generatedIdeas={generatedIdeas}
             onSelectIdea={handleSelectIdea}
             onEditStep={safeSetStep}

@@ -228,6 +228,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       // Extract structured clothing (from generated avatar)
       const clothing = evalResult.clothing || null;
 
+      // Extract detailed hair analysis (from generated avatar)
+      const detailedHairAnalysis = evalResult.detailedHairAnalysis || null;
+
       if (typeof score === 'number' && score >= 1 && score <= 10) {
         const fm = faceMatch;
         const details = [
@@ -246,8 +249,11 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
         if (clothing) {
           log.debug(`🔍 [AVATAR EVAL] Extracted clothing: ${JSON.stringify(clothing)}`);
         }
+        if (detailedHairAnalysis) {
+          log.debug(`💇 [AVATAR EVAL] Detailed hair: ${JSON.stringify(detailedHairAnalysis)}`);
+        }
 
-        return { score, details, physicalTraits, clothing, raw: evalResult };
+        return { score, details, physicalTraits, clothing, detailedHairAnalysis, raw: evalResult };
       }
     } catch (parseErr) {
       log.warn(`[AVATAR EVAL] JSON parse failed, trying text fallback: ${parseErr.message}`);

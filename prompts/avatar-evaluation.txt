@@ -18,6 +18,10 @@ IMPORTANT - Choose ONE of these two options:
   Option B: Separate top + bottom → set "upperBody" and "lowerBody", set "fullBody" to null
 Never fill both fullBody AND upperBody/lowerBody - they are mutually exclusive!
 
+TASK 4: DETAILED HAIR ANALYSIS (from IMAGE 2 - the generated avatar)
+Extract detailed hair characteristics for better consistency across scenes.
+This provides more precise hair descriptions than the simple hairStyle field.
+
 IMPORTANT: For fields marked "MUST be one of:", use the EXACT English values listed.
 
 Return a JSON object with this EXACT structure:
@@ -46,5 +50,14 @@ Return a JSON object with this EXACT structure:
     "lowerBody": "<e.g. 'dark blue jeans', 'black skirt' - OR null if fullBody is set>",
     "shoes": "<e.g. 'white sneakers', 'brown boots'>",
     "fullBody": "<e.g. 'floral summer dress', 'black jumpsuit' - OR null if upperBody/lowerBody are set>"
+  },
+  "detailedHairAnalysis": {
+    "texture": "<MUST be one of: fine | medium | thick | coarse>",
+    "type": "<MUST be one of: straight | wavy | curly | coily>",
+    "lengthTop": "<length of hair on top, e.g. '5cm', '15cm', '30cm'>",
+    "lengthSides": "<length of hair on sides, e.g. '2cm', '10cm', '25cm' - same as top if uniform length>",
+    "bangsEndAt": "<MUST be one of: above eyebrows | at eyebrows | below eyebrows | no bangs>",
+    "styling": "<MUST be one of: messy | slicked | natural | styled | tousled>",
+    "direction": "<MUST be one of: left | right | back | forward | center part | side part left | side part right>"
   }
 }

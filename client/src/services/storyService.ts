@@ -778,7 +778,7 @@ export const storyService = {
       onStory2?: (story: string) => void;
       onStatus?: (status: string, prompt?: string, model?: string) => void;
       onError?: (error: string) => void;
-      onDone?: () => void;
+      onDone?: (fullResponse?: string) => void;
     }
   ): { abort: () => void } {
     const controller = new AbortController();
@@ -838,7 +838,7 @@ export const storyService = {
                   callbacks.onError?.(eventData.error);
                 }
                 if (eventData.done) {
-                  callbacks.onDone?.();
+                  callbacks.onDone?.(eventData.fullResponse);
                 }
               } catch {
                 // Ignore parse errors for incomplete data

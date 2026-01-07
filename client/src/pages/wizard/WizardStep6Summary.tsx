@@ -38,6 +38,7 @@ interface WizardStep6Props {
   isGeneratingIdea1?: boolean;
   isGeneratingIdea2?: boolean;
   ideaPrompt: { prompt: string; model: string } | null;
+  ideaFullResponse?: string;
   generatedIdeas: string[];
   onSelectIdea: (idea: string) => void;
   // Navigation
@@ -74,6 +75,7 @@ export function WizardStep6Summary({
   isGeneratingIdea1 = false,
   isGeneratingIdea2 = false,
   ideaPrompt,
+  ideaFullResponse,
   generatedIdeas,
   onSelectIdea,
   onEditStep,
@@ -266,16 +268,28 @@ export function WizardStep6Summary({
           </button>
         </div>
 
-        {/* Developer mode: Show idea generator prompt */}
+        {/* Developer mode: Show idea generator prompt and response */}
         {developerMode && ideaPrompt && (
-          <details className="mt-2 text-left">
-            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-              Show idea generator prompt ({ideaPrompt.model})
-            </summary>
-            <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-64 border bg-gray-100 border-gray-200">
-              {ideaPrompt.prompt}
-            </pre>
-          </details>
+          <div className="space-y-2 mt-2 text-left">
+            <details>
+              <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+                Show idea generator prompt ({ideaPrompt.model})
+              </summary>
+              <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-64 border bg-gray-100 border-gray-200">
+                {ideaPrompt.prompt}
+              </pre>
+            </details>
+            {ideaFullResponse && (
+              <details>
+                <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+                  Show full LLM response
+                </summary>
+                <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-64 border bg-blue-50 border-blue-200">
+                  {ideaFullResponse}
+                </pre>
+              </details>
+            )}
+          </div>
         )}
 
         {/* Two-idea selection UI - show grid as soon as we have any ideas or are generating */}
@@ -285,8 +299,9 @@ export function WizardStep6Summary({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[0, 1].map((index) => {
                 const idea = editableIdeas[index] || '';
-                const isLoading = index === 0 ? isGeneratingIdea1 : isGeneratingIdea2;
                 const hasIdea = !!idea;
+                // Show loading if we're generating and don't have this story yet
+                const isLoading = isGeneratingIdeas && !hasIdea;
                 const isSelected = selectedOption === index;
                 const optionTitle = index === 0 ? t.option1 : t.option2;
 
@@ -309,10 +324,7 @@ export function WizardStep6Summary({
                         ? 'bg-green-500 text-white'
                         : 'bg-gray-100 text-gray-700'
                     }`}>
-                      <span className="flex items-center gap-2">
-                        {optionTitle}
-                        {isLoading && <Loader2 size={16} className="animate-spin" />}
-                      </span>
+                      <span>{optionTitle}</span>
                       {isSelected && !isLoading && (
                         <span className="flex items-center gap-1 text-sm">
                           <Check size={16} />
