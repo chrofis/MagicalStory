@@ -106,7 +106,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                       {labels[s]}
                     </span>
                   </div>
-                  {s < 5 && <div className={`w-3 md:w-4 h-0.5 mb-4 md:mb-3 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />}
+                  {s < 5 && <div className={`w-3 md:w-4 h-0.5 self-start mt-2.5 md:mt-3.5 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />}
                 </div>
               );
             })}

@@ -9,6 +9,8 @@ const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
+const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
+const { MODEL_DEFAULTS: CONFIG_DEFAULTS } = require('../config/models');
 
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
@@ -737,6 +739,69 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   }
 
   log.debug(`🆕 [IMAGE CACHE] MISS - key: ${cacheKey.substring(0, 16)}...`);
+
+  // Check if we should use Runware backend (for cheap testing with FLUX Schnell)
+  const imageBackend = CONFIG_DEFAULTS?.imageBackend || 'gemini';
+  if (imageBackend === 'runware' && isRunwareConfigured()) {
+    log.info(`🎨 [IMAGE GEN] Using Runware FLUX Schnell backend (cheap testing mode)`);
+
+    try {
+      // Extract photo URLs for reference images
+      const referenceImages = [];
+      if (characterPhotos && characterPhotos.length > 0) {
+        for (const photoData of characterPhotos) {
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            referenceImages.push(photoUrl);
+          }
+        }
+      }
+
+      const result = await generateWithRunware(prompt, {
+        model: RUNWARE_MODELS.FLUX_SCHNELL,
+        width: 1024,
+        height: 1024,
+        steps: 4,
+        referenceImages: referenceImages.slice(0, 3) // Limit to 3 refs for cost
+      });
+
+      // Call onImageReady callback for progressive display
+      if (onImageReady && result.imageData) {
+        try {
+          await onImageReady(result.imageData, result.modelId);
+        } catch (callbackError) {
+          log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
+        }
+      }
+
+      // Evaluate quality using Gemini (still needed for consistency checking)
+      const qualityResult = await evaluateImageQuality(
+        result.imageData,
+        characterPhotos,
+        prompt,
+        evaluationType,
+        qualityModelOverride
+      );
+
+      const finalResult = {
+        imageData: result.imageData,
+        modelId: result.modelId,
+        score: qualityResult.score,
+        reasoning: qualityResult.reasoning,
+        detectedProblems: qualityResult.detectedProblems || [],
+        usage: result.usage
+      };
+
+      // Cache the result
+      imageCache.set(cacheKey, finalResult);
+      log.debug(`💾 [IMAGE CACHE] Stored (${imageCache.size}/${IMAGE_CACHE_MAX_SIZE})`);
+
+      return finalResult;
+    } catch (runwareError) {
+      log.error(`❌ [RUNWARE] Generation failed, falling back to Gemini: ${runwareError.message}`);
+      // Fall through to Gemini
+    }
+  }
 
   // Call Gemini API for image generation with optional character reference images
   const apiKey = process.env.GEMINI_API_KEY;

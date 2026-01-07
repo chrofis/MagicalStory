@@ -148,6 +148,130 @@ async function inpaintWithRunware(seedImage, maskImage, prompt, options = {}) {
 }
 
 /**
+ * Generate image from text prompt using Runware API
+ *
+ * @param {string} prompt - Text prompt for image generation
+ * @param {Object} options - Generation options
+ * @param {string} options.model - Model to use (default: FLUX Schnell)
+ * @param {number} options.width - Output width (default: 1024)
+ * @param {number} options.height - Output height (default: 1024)
+ * @param {number} options.steps - Inference steps (default: 4 for Schnell)
+ * @param {string[]} options.referenceImages - Optional reference images for character consistency
+ * @returns {Promise<{imageData: string, usage: Object, modelId: string}>}
+ */
+async function generateWithRunware(prompt, options = {}) {
+  const {
+    model = RUNWARE_MODELS.FLUX_SCHNELL,
+    width = 1024,
+    height = 1024,
+    steps = 4,  // FLUX Schnell works best with 4 steps
+    referenceImages = []
+  } = options;
+
+  if (!RUNWARE_API_KEY) {
+    throw new Error('RUNWARE_API_KEY not configured');
+  }
+
+  const taskUUID = crypto.randomUUID();
+  log.info(`🎨 [RUNWARE] Starting generation task ${taskUUID.slice(0, 8)}...`);
+  log.debug(`🎨 [RUNWARE] Model: ${model}, Size: ${width}x${height}, Steps: ${steps}`);
+  log.debug(`🎨 [RUNWARE] Prompt: ${prompt.substring(0, 100)}...`);
+
+  // Build the task payload
+  const task = {
+    taskType: 'imageInference',
+    taskUUID: taskUUID,
+    positivePrompt: prompt,
+    model: model,
+    width: width,
+    height: height,
+    steps: steps,
+    outputFormat: 'PNG',
+    numberResults: 1
+  };
+
+  // Add reference images for character consistency if provided
+  if (referenceImages.length > 0) {
+    log.debug(`🎨 [RUNWARE] Adding ${referenceImages.length} reference images`);
+    task.controlNet = referenceImages.map((img, idx) => ({
+      model: 'runware:107@1', // IP-Adapter for reference images
+      guideImage: img,
+      weight: 0.8
+    }));
+  }
+
+  const payload = [task];
+  const startTime = Date.now();
+
+  try {
+    const response = await fetch(RUNWARE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RUNWARE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error(`❌ [RUNWARE] API error ${response.status}: ${errorText}`);
+      throw new Error(`Runware API error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const elapsed = Date.now() - startTime;
+
+    // Handle errors in response
+    if (data.errors && data.errors.length > 0) {
+      const error = data.errors[0];
+      log.error(`❌ [RUNWARE] Task error: ${error.message || JSON.stringify(error)}`);
+      throw new Error(`Runware task error: ${error.message || 'Unknown error'}`);
+    }
+
+    // Response is array of results
+    const result = data.data?.find(d => d.taskUUID === taskUUID);
+    if (!result) {
+      log.error(`❌ [RUNWARE] No result for task ${taskUUID}`);
+      throw new Error('No result in Runware response');
+    }
+
+    // Get the image - could be URL or base64
+    let imageData = result.imageURL;
+    if (!imageData && result.imageBase64) {
+      imageData = `data:image/png;base64,${result.imageBase64}`;
+    }
+
+    // If we got a URL, download and convert to base64
+    if (imageData && !imageData.startsWith('data:')) {
+      imageData = await downloadRunwareImage(imageData);
+    }
+
+    if (!imageData) {
+      throw new Error('No image data in Runware response');
+    }
+
+    const cost = result.cost || 0.0006;
+    log.info(`✅ [RUNWARE] Generation complete in ${elapsed}ms. Cost: $${cost.toFixed(6)}`);
+
+    return {
+      imageData: imageData,
+      imageBase64: result.imageBase64,
+      usage: {
+        cost: cost,
+        inferenceTime: result.inferenceTime || elapsed
+      },
+      modelId: model
+    };
+
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    log.error(`❌ [RUNWARE] Generation failed after ${elapsed}ms: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
  * Download image from URL and convert to base64 data URI
  * Useful when Runware returns a URL instead of base64
  *
@@ -183,6 +307,7 @@ function isRunwareConfigured() {
 
 module.exports = {
   inpaintWithRunware,
+  generateWithRunware,
   downloadRunwareImage,
   isRunwareConfigured,
   RUNWARE_MODELS

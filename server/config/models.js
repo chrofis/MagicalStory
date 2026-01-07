@@ -64,7 +64,12 @@ const MODEL_DEFAULTS = {
   utility: 'gemini-2.0-flash',         // Fast utility tasks
 
   // Inpainting backend for auto-repair
-  inpaintBackend: 'runware'            // 'gemini' or 'runware' (runware is 50x cheaper)
+  inpaintBackend: 'runware',           // 'gemini' or 'runware' (runware is 50x cheaper)
+
+  // Image generation backend (for testing cheaper alternatives)
+  // 'gemini' = Gemini API (default, best quality)
+  // 'runware' = Runware FLUX Schnell (super cheap, good for testing)
+  imageBackend: 'runware'              // TESTING: Using FLUX Schnell via Runware ($0.0006/image)
 };
 
 // Available inpaint backends
@@ -81,15 +86,41 @@ const INPAINT_BACKENDS = {
   }
 };
 
+// Image generation backends
+const IMAGE_BACKENDS = {
+  'gemini': {
+    name: 'Gemini',
+    description: 'Google Gemini - Best quality, higher cost (~$0.03-0.04/image)',
+    costPerImage: 0.035
+  },
+  'runware': {
+    name: 'Runware FLUX Schnell',
+    description: 'FLUX Schnell via Runware - Ultra cheap ($0.0006/image), good for testing',
+    costPerImage: 0.0006
+  }
+};
+
 // Image model configurations
 const IMAGE_MODELS = {
   'gemini-2.5-flash-image': {
     modelId: 'gemini-2.5-flash-preview-05-20',
-    description: 'Gemini 2.5 Flash Image - Fast image generation'
+    description: 'Gemini 2.5 Flash Image - Fast image generation',
+    backend: 'gemini'
   },
   'gemini-3-pro-image-preview': {
     modelId: 'gemini-3-pro-image-preview',
-    description: 'Gemini 3 Pro Image Preview - Higher quality images'
+    description: 'Gemini 3 Pro Image Preview - Higher quality images',
+    backend: 'gemini'
+  },
+  'flux-schnell': {
+    modelId: 'runware:5@1',
+    description: 'FLUX Schnell via Runware - Ultra fast, cheap ($0.0006/image)',
+    backend: 'runware'
+  },
+  'flux-dev': {
+    modelId: 'runware:6@1',
+    description: 'FLUX Dev via Runware - Better quality ($0.004/image)',
+    backend: 'runware'
   }
 };
 
@@ -107,6 +138,7 @@ module.exports = {
   TEXT_MODELS,
   MODEL_DEFAULTS,
   IMAGE_MODELS,
+  IMAGE_BACKENDS,
   MODEL_PRICING,
   INPAINT_BACKENDS
 };
