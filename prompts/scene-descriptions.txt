@@ -68,9 +68,10 @@ Spatial clarity examples:
 - ✅ GOOD: "Bottom left, facing right, arm extended pointing at the dog in the upper right"
 
 **4. Objects & Animals**
-For any RECURRING ELEMENTS in the scene:
-- Copy description VERBATIM including identifier [ART001], [ANI001], etc.
-- Describe position in scene
+For any RECURRING ELEMENTS in the scene, list ONLY identifier and POSITION:
+- Format: "* [Name] [ID]: [position in scene]"
+- Do NOT repeat the full description (provided separately to the image generator)
+- Example: "* Eli [ANI001]: On the bench, next to Lukas"
 
 **5. METADATA (JSON)**
 ```json
@@ -109,18 +110,10 @@ Camera: Medium shot from slightly elevated perspective (adult eye level). Sophie
   - EXPRESSION: Mouth open, eyes wide, head tilted upward
 
 4. **Objects & Animals**
-
-* Lasso [ART001]: Braided brown leather, 3 meters, metal ring at end, signs of use
-  - POSITION: Coiled beside Sophie in grass, partially visible
-
-* Cowboy Hat [CLO001]: Beige felt, wide brim, brown leather band with turquoise bead
-  - POSITION: On Sophie's head, casting light shadow on face
-
-* Backpack [ART002]: Red with black straps, multiple pockets, water bottle on side
-  - POSITION: On Sophie's back, side pocket slightly open
-
-* Eli [ART003]: Gray stuffed elephant, pink inner ears, 25cm, worn spot on right ear
-  - POSITION: Peeking from open backpack pocket, one ear and head visible
+* Lasso [ART001]: Coiled beside Sophie in grass, partially visible
+* Cowboy Hat [CLO001]: On Sophie's head, casting light shadow on face
+* Backpack [ART002]: On Sophie's back, side pocket slightly open
+* Eli [ART003]: Peeking from open backpack pocket, one ear and head visible
 
 5. **METADATA (JSON)**
 ```json
