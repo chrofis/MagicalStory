@@ -201,6 +201,8 @@ export default function StoryWizard() {
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
   const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
   const [isProgressMinimized, setIsProgressMinimized] = useState(false); // Track if progress modal is minimized
+  const [showMinimizeDialog, setShowMinimizeDialog] = useState(false); // Show dialog when user clicks minimize
+  const [userHasStories, setUserHasStories] = useState(false); // Track if user has existing stories
   const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
   const [imageLoadProgress, setImageLoadProgress] = useState<{ loaded: number; total: number } | null>(null); // Progressive image loading
@@ -294,6 +296,15 @@ export default function StoryWizard() {
   useEffect(() => {
     storyService.getUserLocation().then(setUserLocation);
   }, []);
+
+  // Check if user has existing stories (for minimize dialog options)
+  useEffect(() => {
+    if (isAuthenticated) {
+      storyService.getStories({ limit: 1 }).then(({ pagination }) => {
+        setUserHasStories(pagination.total > 0);
+      }).catch(() => setUserHasStories(false));
+    }
+  }, [isAuthenticated]);
 
   // Reset story settings when ?new=true is present (from "Create New Story" button)
   useEffect(() => {
@@ -3181,7 +3192,7 @@ export default function StoryWizard() {
           jobId={jobId || undefined}
           isStalled={isProgressStalled}
           onDismissStalled={() => setIsProgressStalled(false)}
-          onMinimize={() => setIsProgressMinimized(true)}
+          onMinimize={() => setShowMinimizeDialog(true)}
           onCancel={jobId ? async () => {
             try {
               await storyService.cancelJob(jobId);
@@ -3205,6 +3216,45 @@ export default function StoryWizard() {
             }
           } : undefined}
         />
+      )}
+
+      {/* Minimize Choice Dialog - shown when user clicks "Continue in Background" */}
+      {showMinimizeDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">
+              {language === 'de' ? 'Geschichte wird im Hintergrund generiert' : language === 'fr' ? 'Histoire en cours de génération' : 'Story generating in background'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {language === 'de' ? 'Was möchtest du tun?' : language === 'fr' ? 'Que voulez-vous faire?' : 'What would you like to do?'}
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setIsProgressMinimized(true);
+                  setShowMinimizeDialog(false);
+                  navigate('/create?new=true');
+                }}
+                className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-medium"
+              >
+                {language === 'de' ? 'Neue Geschichte erstellen' : language === 'fr' ? 'Créer une autre histoire' : 'Create another story'}
+              </button>
+
+              {userHasStories && (
+                <button
+                  onClick={() => {
+                    setIsProgressMinimized(true);
+                    setShowMinimizeDialog(false);
+                    navigate('/my-stories');
+                  }}
+                  className="w-full py-3 px-4 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+                >
+                  {language === 'de' ? 'Meine Geschichten lesen' : language === 'fr' ? 'Lire mes histoires' : 'Read my stories'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Simple Regeneration Overlay - Single image/cover */}
