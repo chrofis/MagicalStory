@@ -742,6 +742,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Check if we should use Runware backend (for cheap testing with FLUX Schnell)
   const imageBackend = CONFIG_DEFAULTS?.imageBackend || 'gemini';
+  log.debug(`🎨 [IMAGE GEN] imageBackend=${imageBackend}, runwareConfigured=${isRunwareConfigured()}`);
   if (imageBackend === 'runware' && isRunwareConfigured()) {
     log.info(`🎨 [IMAGE GEN] Using Runware FLUX Schnell backend (cheap testing mode)`);
 
