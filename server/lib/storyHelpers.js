@@ -39,6 +39,61 @@ function formatClothingObject(clothingObj) {
   return parts.join(', ');
 }
 
+/**
+ * Build detailed hair description using both simple fields and detailedHairAnalysis
+ * Uses detailed analysis when available for better consistency across scenes
+ * @param {Object} physical - Physical traits object containing hair fields
+ * @returns {string} Formatted hair description (without "Hair:" prefix)
+ */
+function buildHairDescription(physical) {
+  if (!physical) return '';
+
+  const parts = [];
+  const detailed = physical.detailedHairAnalysis;
+
+  // Color (always use if available)
+  if (physical.hairColor) parts.push(physical.hairColor);
+
+  // Type/texture from detailed analysis (wavy, curly, straight)
+  if (detailed?.type) {
+    parts.push(detailed.type);
+  } else if (physical.hairStyle && !['messy', 'natural', 'tousled', 'styled'].includes(physical.hairStyle?.toLowerCase())) {
+    // Only use simple hairStyle if it's specific (ponytail, braids, etc), not vague (messy)
+    parts.push(physical.hairStyle);
+  }
+
+  // Length - prefer detailed analysis for different top/sides lengths
+  if (detailed?.lengthTop && detailed?.lengthSides) {
+    // If sides are shorter than top, describe it
+    const topCm = parseInt(detailed.lengthTop) || 0;
+    const sidesCm = parseInt(detailed.lengthSides) || 0;
+    if (topCm > 0 && sidesCm > 0 && sidesCm < topCm * 0.7) {
+      parts.push('short sides, longer on top');
+    } else if (physical.hairLength) {
+      parts.push(physical.hairLength);
+    }
+  } else if (physical.hairLength) {
+    parts.push(physical.hairLength);
+  }
+
+  // Bangs from detailed analysis
+  if (detailed?.bangsEndAt && detailed.bangsEndAt !== 'no bangs') {
+    parts.push(`bangs ${detailed.bangsEndAt}`);
+  }
+
+  // Parting/direction from detailed analysis (if specific)
+  if (detailed?.direction && !['natural', 'back', 'forward'].includes(detailed.direction)) {
+    parts.push(detailed.direction);
+  }
+
+  // If no detailed parts, fall back to legacy hair field
+  if (parts.length === 0 && physical.hair) {
+    return physical.hair;
+  }
+
+  return parts.join(', ');
+}
+
 // ============================================================================
 // JSON METADATA EXTRACTION - Parse structured data from scene descriptions
 // ============================================================================
@@ -895,12 +950,6 @@ function buildCharacterPhysicalDescription(char) {
   const other = char.physical?.other;
   const clothing = char.clothing?.current || char.clothing;
 
-  // Hair: prefer new separate fields, fall back to legacy combined field
-  const hairColor = char.physical?.hairColor;
-  const hairLength = char.physical?.hairLength;
-  const hairStyle = char.physical?.hairStyle;
-  const legacyHair = char.physical?.hair || char.hairColor;
-
   if (height) {
     description += `, ${height} cm tall`;
   }
@@ -908,15 +957,10 @@ function buildCharacterPhysicalDescription(char) {
     description += `, ${build} build`;
   }
 
-  // Build hair description from separate fields or use legacy
-  if (hairColor || hairLength || hairStyle) {
-    const hairParts = [];
-    if (hairLength) hairParts.push(hairLength);
-    if (hairColor) hairParts.push(hairColor);
-    if (hairStyle) hairParts.push(hairStyle);
-    description += `. Hair: ${hairParts.join(', ')}`;
-  } else if (legacyHair) {
-    description += `, with ${legacyHair} hair`;
+  // Build hair description using detailed analysis helper
+  const hairDesc = buildHairDescription(char.physical);
+  if (hairDesc) {
+    description += `. Hair: ${hairDesc}`;
   }
   if (face) {
     description += `, ${face}`;
@@ -1043,21 +1087,13 @@ function buildCharacterReferenceList(photos, characters = null) {
     // Include physical traits with labels
     const physical = char?.physical;
 
-    // Build hair description from separate fields or legacy field
-    let hairDesc = '';
-    if (physical?.hairColor || physical?.hairLength || physical?.hairStyle) {
-      const hairParts = [];
-      if (physical?.hairLength) hairParts.push(physical.hairLength);
-      if (physical?.hairColor) hairParts.push(physical.hairColor);
-      if (physical?.hairStyle) hairParts.push(physical.hairStyle);
-      hairDesc = `Hair: ${hairParts.join(', ')}`;
-    } else if (physical?.hair) {
-      hairDesc = `Hair: ${physical.hair}`;
-    }
+    // Build hair description using detailed analysis helper
+    const hairDescText = buildHairDescription(physical);
+    const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
 
     const physicalParts = [
       physical?.build ? `Build: ${physical.build}` : '',
-      physical?.face ? `Face: ${physical.face}` : '',
+      // Face shape removed - let reference image handle facial geometry
       physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
       hairDesc,
       physical?.other ? `Other: ${physical.other}` : '',
@@ -1659,21 +1695,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       if (avatarClothing) {
         log.debug(`[IMAGE PROMPT] ${char.name} avatar clothing: "${avatarClothing}"`);
       }
-      // Build hair description from separate fields or legacy field
-      let hairDesc = '';
-      if (physical?.hairColor || physical?.hairLength || physical?.hairStyle) {
-        const hairParts = [];
-        if (physical?.hairLength) hairParts.push(physical.hairLength);
-        if (physical?.hairColor) hairParts.push(physical.hairColor);
-        if (physical?.hairStyle) hairParts.push(physical.hairStyle);
-        hairDesc = `Hair: ${hairParts.join(', ')}`;
-      } else if (physical?.hair) {
-        hairDesc = `Hair: ${physical.hair}`;
-      }
+      // Build hair description using detailed analysis helper
+      const hairDescText = buildHairDescription(physical);
+      const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
 
       const physicalParts = [
         physical?.build ? `Build: ${physical.build}` : '',
-        physical?.face ? `Face: ${physical.face}` : '',
+        // Face shape removed - let reference image handle facial geometry
         physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
         hairDesc,
         physical?.other ? `Other: ${physical.other}` : '',

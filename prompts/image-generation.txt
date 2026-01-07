@@ -13,6 +13,11 @@ Safe, family-friendly content only.
 
 {CHARACTER_REFERENCE_LIST}
 
+**IDENTITY PRESERVATION (CRITICAL):**
+Each character MUST be the SAME PERSON as shown in their reference image.
+Preserve exact: eye shape, nose, jawline, and facial proportions from reference.
+Do not average or blend features - replicate the exact face.
+
 **SCENE:** {SCENE_DESCRIPTION}
 
 {REQUIRED_OBJECTS}
