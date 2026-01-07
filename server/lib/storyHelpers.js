@@ -662,42 +662,61 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         }
 
         if (costumeKey) {
+          // Helper: find costume key by prefix match (handles truncated names from streaming)
+          const findCostumeByPrefix = (costumeObj, prefix) => {
+            if (!costumeObj || !prefix) return null;
+            // First try exact match
+            if (costumeObj[prefix]) return prefix;
+            // Then try prefix match (e.g., "gla" matches "gladiator")
+            const matchingKey = Object.keys(costumeObj).find(key => key.startsWith(prefix));
+            if (matchingKey) {
+              log.debug(`[AVATAR LOOKUP] Prefix match: "${prefix}" -> "${matchingKey}"`);
+            }
+            return matchingKey;
+          };
+
           // First priority: styled costumed avatar (already in target art style)
-          if (artStyle && avatars?.styledAvatars?.[artStyle]?.costumed?.[costumeKey]) {
-            photoUrl = avatars.styledAvatars[artStyle].costumed[costumeKey];
-            photoType = `styled-costumed-${costumeKey}`;
-            usedClothingCategory = `costumed:${costumeKey}`;
-            log.debug(`[AVATAR STYLED] ${char.name}: using styled ${costumeKey}@${artStyle}`);
+          const styledCostumeKey = artStyle && avatars?.styledAvatars?.[artStyle]?.costumed
+            ? findCostumeByPrefix(avatars.styledAvatars[artStyle].costumed, costumeKey)
+            : null;
+          if (styledCostumeKey) {
+            photoUrl = avatars.styledAvatars[artStyle].costumed[styledCostumeKey];
+            photoType = `styled-costumed-${styledCostumeKey}`;
+            usedClothingCategory = `costumed:${styledCostumeKey}`;
+            log.debug(`[AVATAR STYLED] ${char.name}: using styled ${styledCostumeKey}@${artStyle}`);
             // Get clothing description
-            if (avatars?.clothing?.costumed?.[costumeKey]) {
-              const clothingData = avatars.clothing.costumed[costumeKey];
+            if (avatars?.clothing?.costumed?.[styledCostumeKey]) {
+              const clothingData = avatars.clothing.costumed[styledCostumeKey];
               clothingDescription = typeof clothingData === 'string'
                 ? clothingData
                 : formatClothingObject(clothingData);
             }
           }
           // Second priority: regular costumed avatar
-          else if (avatars?.costumed?.[costumeKey]) {
-            let avatarData = avatars.costumed[costumeKey];
-            if (typeof avatarData === 'object' && avatarData.imageData) {
-              photoUrl = avatarData.imageData;
-              if (avatarData.clothing) {
-                clothingDescription = typeof avatarData.clothing === 'string'
-                  ? avatarData.clothing
-                  : formatClothingObject(avatarData.clothing);
+          else {
+            const regularCostumeKey = findCostumeByPrefix(avatars?.costumed, costumeKey);
+            if (regularCostumeKey) {
+              let avatarData = avatars.costumed[regularCostumeKey];
+              if (typeof avatarData === 'object' && avatarData.imageData) {
+                photoUrl = avatarData.imageData;
+                if (avatarData.clothing) {
+                  clothingDescription = typeof avatarData.clothing === 'string'
+                    ? avatarData.clothing
+                    : formatClothingObject(avatarData.clothing);
+                }
+              } else {
+                photoUrl = avatarData;
               }
-            } else {
-              photoUrl = avatarData;
-            }
-            photoType = `costumed-${costumeKey}`;
-            usedClothingCategory = `costumed:${costumeKey}`;
+              photoType = `costumed-${regularCostumeKey}`;
+              usedClothingCategory = `costumed:${regularCostumeKey}`;
 
-            // Get clothing description from separate clothing object if not already set
-            if (!clothingDescription && avatars?.clothing?.costumed?.[costumeKey]) {
-              const clothingData = avatars.clothing.costumed[costumeKey];
-              clothingDescription = typeof clothingData === 'string'
-                ? clothingData
-                : formatClothingObject(clothingData);
+              // Get clothing description from separate clothing object if not already set
+              if (!clothingDescription && avatars?.clothing?.costumed?.[regularCostumeKey]) {
+                const clothingData = avatars.clothing.costumed[regularCostumeKey];
+                clothingDescription = typeof clothingData === 'string'
+                  ? clothingData
+                  : formatClothingObject(clothingData);
+              }
             }
           }
         }
