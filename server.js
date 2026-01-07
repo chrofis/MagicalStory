@@ -1404,10 +1404,14 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
 // Generate story ideas endpoint - FREE, no credits
 app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10 } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
-    log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}`);
+    log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
+
+    // Calculate scene count based on reading level
+    const sceneCount = languageLevel === '1st-grade' ? pages : Math.floor(pages / 2);
+    log.debug(`  Scene count: ${sceneCount} (${languageLevel})`);
 
     // Build character descriptions
     const characterDescriptions = characters.map(c => {
@@ -1456,11 +1460,21 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
     }
 
     // Get teaching guide for the topic if available
-    const { getTeachingGuide } = require('./server/lib/storyHelpers');
+    const { getTeachingGuide, getSceneComplexityGuide, getAdventureGuide } = require('./server/lib/storyHelpers');
     const teachingGuide = getTeachingGuide(effectiveCategory, storyTopic);
     const topicGuideText = teachingGuide
       ? `**TOPIC GUIDE for "${storyTopic}":**
 ${teachingGuide}`
+      : '';
+
+    // Get scene complexity guide based on page count
+    const sceneComplexityGuide = getSceneComplexityGuide(sceneCount);
+
+    // Always get adventure guide for setting/costume context
+    const adventureGuideContent = getAdventureGuide(effectiveTheme);
+    const adventureSettingGuide = adventureGuideContent
+      ? `**ADVENTURE SETTING GUIDE for "${effectiveTheme}":**
+${adventureGuideContent}`
       : '';
 
     // Load prompt from file and replace placeholders
@@ -1472,8 +1486,10 @@ ${teachingGuide}`
       .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
       .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
       .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
+      .replace('{SCENE_COMPLEXITY_GUIDE}', sceneComplexityGuide)
       .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
       .replace('{TOPIC_GUIDE}', topicGuideText)
+      .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Call the text model (using the imported function)
@@ -1486,10 +1502,10 @@ ${teachingGuide}`
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
     const result = await callTextModel(prompt, 1200, modelToUse);
 
-    // Parse the response to extract 2 ideas
+    // Parse the response to extract 2 ideas (supports both old [IDEA_X] and new [STORY_X] format)
     const responseText = result.text.trim();
-    const idea1Match = responseText.match(/\[IDEA_1\]\s*([\s\S]*?)(?=\[IDEA_2\]|$)/);
-    const idea2Match = responseText.match(/\[IDEA_2\]\s*([\s\S]*?)$/);
+    const idea1Match = responseText.match(/\[(?:IDEA|STORY)_1\]\s*([\s\S]*?)(?=\[(?:IDEA|STORY)_2\]|$)/);
+    const idea2Match = responseText.match(/\[(?:IDEA|STORY)_2\]\s*([\s\S]*?)$/);
 
     const idea1 = idea1Match ? idea1Match[1].trim() : '';
     const idea2 = idea2Match ? idea2Match[1].trim() : '';

@@ -738,6 +738,8 @@ export const storyService = {
     }>;
     // Developer model override (admin only)
     ideaModel?: string | null;
+    // User's location for personalized story settings
+    userLocation?: { city: string | null; region: string | null; country: string | null };
   }): Promise<{ storyIdeas: string[]; storyIdea: string; prompt?: string; model?: string }> {
     const response = await api.post<{ storyIdeas: string[]; storyIdea: string; prompt?: string; model?: string }>('/api/generate-story-ideas', data);
     return response;

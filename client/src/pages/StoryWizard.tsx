@@ -188,8 +188,11 @@ export default function StoryWizard() {
     return localStorage.getItem('story_details') || '';
   });
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
+  const [isGeneratingIdea1, setIsGeneratingIdea1] = useState(false);
+  const [isGeneratingIdea2, setIsGeneratingIdea2] = useState(false);
   const [lastIdeaPrompt, setLastIdeaPrompt] = useState<{ prompt: string; model: string } | null>(null);
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([]);
+  const streamAbortRef = useRef<{ abort: () => void } | null>(null);
 
   // Step 7: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
@@ -1798,12 +1801,24 @@ export default function StoryWizard() {
   };
 
   const generateIdeas = async () => {
-    setIsGeneratingIdeas(true);
-    try {
-      // Get characters in story (not excluded)
-      const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
+    // Abort any existing stream
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+    }
 
-      const result = await storyService.generateStoryIdeas({
+    // Reset state for new generation
+    setIsGeneratingIdeas(true);
+    setIsGeneratingIdea1(true);
+    setIsGeneratingIdea2(true);
+    setGeneratedIdeas([]);
+    setLastIdeaPrompt(null);
+
+    // Get characters in story (not excluded)
+    const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
+
+    // Use streaming API
+    streamAbortRef.current = storyService.generateStoryIdeasStream(
+      {
         storyType,
         storyTypeName: getStoryTypeName(),
         storyCategory: storyCategory || undefined,
@@ -1812,6 +1827,7 @@ export default function StoryWizard() {
         customThemeText: storyTheme === 'custom' ? customThemeText : undefined,
         language: storyLanguage,
         languageLevel,
+        pages,
         characters: charactersInStory.map(c => ({
           name: c.name,
           age: c.age,
@@ -1829,31 +1845,49 @@ export default function StoryWizard() {
             relationship: rel,
           };
         }).filter(r => r.character1 && r.character2),
-        // Developer model override (admin only)
         ideaModel: user?.role === 'admin' ? modelSelections.ideaModel : undefined,
-      });
-
-      // Set generated ideas for selection UI
-      if (result.storyIdeas && result.storyIdeas.length > 0) {
-        setGeneratedIdeas(result.storyIdeas);
-      } else if (result.storyIdea) {
-        // Fallback for single idea
-        setGeneratedIdeas([result.storyIdea]);
+      },
+      {
+        onStatus: (_status, prompt, model) => {
+          if (prompt && model) {
+            setLastIdeaPrompt({ prompt, model });
+          }
+        },
+        onStory1: (story1) => {
+          setGeneratedIdeas(prev => {
+            const newIdeas = [...prev];
+            newIdeas[0] = story1;
+            return newIdeas;
+          });
+          setIsGeneratingIdea1(false);
+        },
+        onStory2: (story2) => {
+          setGeneratedIdeas(prev => {
+            const newIdeas = [...prev];
+            newIdeas[1] = story2;
+            return newIdeas;
+          });
+          setIsGeneratingIdea2(false);
+        },
+        onError: (error) => {
+          log.error('Failed to generate story ideas:', error);
+          showError(language === 'de'
+            ? 'Fehler beim Generieren von Ideen. Bitte versuchen Sie es erneut.'
+            : language === 'fr'
+            ? 'Erreur lors de la génération d\'idées. Veuillez réessayer.'
+            : 'Failed to generate ideas. Please try again.');
+          setIsGeneratingIdeas(false);
+          setIsGeneratingIdea1(false);
+          setIsGeneratingIdea2(false);
+        },
+        onDone: () => {
+          setIsGeneratingIdeas(false);
+          setIsGeneratingIdea1(false);
+          setIsGeneratingIdea2(false);
+          streamAbortRef.current = null;
+        },
       }
-      // Store prompt and model for dev mode display
-      if (result.prompt && result.model) {
-        setLastIdeaPrompt({ prompt: result.prompt, model: result.model });
-      }
-    } catch (error) {
-      log.error('Failed to generate story ideas:', error);
-      showError(language === 'de'
-        ? 'Fehler beim Generieren von Ideen. Bitte versuchen Sie es erneut.'
-        : language === 'fr'
-        ? 'Erreur lors de la génération d\'idées. Veuillez réessayer.'
-        : 'Failed to generate ideas. Please try again.');
-    } finally {
-      setIsGeneratingIdeas(false);
-    }
+    );
   };
 
   // Get story type name for display
@@ -2372,6 +2406,8 @@ export default function StoryWizard() {
             onDedicationChange={setDedication}
             onGenerateIdeas={generateIdeas}
             isGeneratingIdeas={isGeneratingIdeas}
+            isGeneratingIdea1={isGeneratingIdea1}
+            isGeneratingIdea2={isGeneratingIdea2}
             ideaPrompt={lastIdeaPrompt}
             generatedIdeas={generatedIdeas}
             onSelectIdea={handleSelectIdea}
