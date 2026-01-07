@@ -50,10 +50,12 @@ function parseCharacterClothingBlock(content) {
 
   // Debug: log content length and Characters section existence
   const hasChars = content.includes('Characters:');
-  log.debug(`[PARSE-CLOTHING] Content length: ${content.length}, has "Characters:": ${hasChars}`);
   if (hasChars) {
     const idx = content.indexOf('Characters:');
-    log.debug(`[PARSE-CLOTHING] Characters section: "${content.substring(idx, idx + 150).replace(/\n/g, '\\n')}"`);
+    // Log the FULL Characters section to diagnose truncation
+    const endIdx = content.indexOf('\n\n', idx);
+    const fullSection = endIdx > idx ? content.substring(idx, endIdx) : content.substring(idx);
+    log.debug(`[PARSE-CLOTHING] Characters section (full): "${fullSection.replace(/\n/g, '\\n')}"`);
   }
 
   // Try new per-character format first:
@@ -75,6 +77,7 @@ function parseCharacterClothingBlock(content) {
       const baseName = rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
       characters.push(rawName);
       characterClothing[baseName] = clothing;
+      log.debug(`[PARSE-CLOTHING] Parsed: "${baseName}" -> "${clothing}"`);
     }
     // Debug: log if Characters block found but no per-character clothing parsed
     if (characters.length === 0 && block.trim()) {
