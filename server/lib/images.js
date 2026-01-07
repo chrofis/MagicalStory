@@ -12,6 +12,9 @@ const { MODEL_DEFAULTS } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS } = require('../config/models');
 
+// Log image generation configuration at startup
+console.log(`🎨 [IMAGES] Config loaded - imageBackend: ${CONFIG_DEFAULTS?.imageBackend || 'undefined'}, runwareConfigured: ${isRunwareConfigured()}`);
+
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
 // Prevents memory leaks by limiting cache size and implementing eviction
