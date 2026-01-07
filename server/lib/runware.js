@@ -203,14 +203,10 @@ async function generateWithRunware(prompt, options = {}) {
     numberResults: 1
   };
 
-  // Add reference images for character consistency if provided
+  // Note: FLUX models don't support IP-Adapter/ControlNet for face reference
+  // Avatar generation with Runware will be text-only (no face preservation)
   if (referenceImages.length > 0) {
-    log.debug(`🎨 [RUNWARE] Adding ${referenceImages.length} reference images`);
-    task.controlNet = referenceImages.map((img, idx) => ({
-      model: 'runware:107@1', // IP-Adapter for reference images
-      guideImage: img,
-      weight: 0.8
-    }));
+    log.warn(`🎨 [RUNWARE] Reference images provided but FLUX doesn't support IP-Adapter - generating without face reference`);
   }
 
   const payload = [task];
