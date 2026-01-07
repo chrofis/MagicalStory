@@ -1514,10 +1514,10 @@ ${adventureGuideContent}`
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
     const result = await callTextModel(prompt, 1200, modelToUse);
 
-    // Parse the response to extract 2 ideas (supports both old [IDEA_X] and new [STORY_X] format)
+    // Parse the response to extract 2 ideas from FINAL markers (ignoring DRAFT and REVIEW)
     const responseText = result.text.trim();
-    const idea1Match = responseText.match(/\[(?:IDEA|STORY)_1\]\s*([\s\S]*?)(?=\[(?:IDEA|STORY)_2\]|$)/);
-    const idea2Match = responseText.match(/\[(?:IDEA|STORY)_2\]\s*([\s\S]*?)$/);
+    const idea1Match = responseText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\]|$)/);
+    const idea2Match = responseText.match(/\[FINAL_2\]\s*([\s\S]*?)$/);
 
     const idea1 = idea1Match ? idea1Match[1].trim() : '';
     const idea2 = idea2Match ? idea2Match[1].trim() : '';
@@ -1674,9 +1674,9 @@ ${adventureGuideContent}`
     await callTextModelStreaming(prompt, 1500, (delta, fullText) => {
       accumulatedText = fullText;
 
-      // Check if we have a complete STORY_1
+      // Check if we have a complete FINAL_1 (ignoring DRAFT_1 and REVIEW_1)
       if (!story1Sent) {
-        const story1Match = accumulatedText.match(/\[STORY_1\]\s*([\s\S]*?)(?=\[STORY_2\])/);
+        const story1Match = accumulatedText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\])/);
         if (story1Match) {
           const story1 = story1Match[1].trim();
           res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
@@ -1685,9 +1685,9 @@ ${adventureGuideContent}`
         }
       }
 
-      // Check if we have a complete STORY_2 (after the marker and some content)
+      // Check if we have a complete FINAL_2 (after the marker and some content)
       if (!story2Sent && story1Sent) {
-        const story2Match = accumulatedText.match(/\[STORY_2\]\s*([\s\S]+?)$/);
+        const story2Match = accumulatedText.match(/\[FINAL_2\]\s*([\s\S]+?)$/);
         if (story2Match && story2Match[1].trim().length > 50) {
           // Wait a bit more to ensure we have the full story
           // We'll send it at the end
@@ -1697,7 +1697,7 @@ ${adventureGuideContent}`
 
     // Parse final result and send story 2 if not already sent
     if (!story2Sent) {
-      const story2Match = accumulatedText.match(/\[STORY_2\]\s*([\s\S]+?)$/);
+      const story2Match = accumulatedText.match(/\[FINAL_2\]\s*([\s\S]+?)$/);
       if (story2Match) {
         const story2 = story2Match[1].trim();
         res.write(`data: ${JSON.stringify({ story2 })}\n\n`);
@@ -1707,7 +1707,7 @@ ${adventureGuideContent}`
 
     // If story1 wasn't parsed correctly, try to extract it now
     if (!story1Sent) {
-      const story1Match = accumulatedText.match(/\[STORY_1\]\s*([\s\S]*?)(?=\[STORY_2\]|$)/);
+      const story1Match = accumulatedText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\]|$)/);
       if (story1Match) {
         const story1 = story1Match[1].trim();
         res.write(`data: ${JSON.stringify({ story1 })}\n\n`);

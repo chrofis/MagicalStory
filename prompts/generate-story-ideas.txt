@@ -63,28 +63,34 @@ Example 3: "In a forest where animals can talk, a rabbit loses her way home. She
 
 ## GENERATION PROCESS:
 
-For EACH story idea, follow this internal process:
-1. DRAFT: Create an initial story outline following all guidelines above
-2. REVIEW: Check your draft for:
-   - Logical inconsistencies or plot holes
-   - Missing characters (all must appear)
-   - Age-appropriateness issues
-   - Complexity matching the scene count guide
-3. CORRECT: Fix any issues found
-4. OUTPUT: Only the corrected, final version
+For EACH story idea, you MUST output ALL three stages:
 
-OUTPUT FORMAT - Generate exactly TWO different story ideas, one at a time:
+[DRAFT_1]
+Create your initial story outline following all guidelines above.
 
-[STORY_1]
-<first corrected story idea here>
+[REVIEW_1]
+Check your draft for:
+- Logical inconsistencies or plot holes
+- Missing characters (all must appear)
+- Age-appropriateness issues
+- Complexity matching the scene count guide
+List any issues found.
 
-[STORY_2]
-<second corrected story idea here>
+[FINAL_1]
+The corrected, final version of story 1.
+
+[DRAFT_2]
+Create your initial story outline for a DIFFERENT story.
+
+[REVIEW_2]
+Check your draft for the same criteria. List any issues found.
+
+[FINAL_2]
+The corrected, final version of story 2.
 
 IMPORTANT:
-- The two ideas must be DIFFERENT - different plots, different locations, or different approaches
-- For adventure themes: one idea can start IN the adventure world, the other can start in normal life and transition to adventure (via dream, play, time travel, magic portal, etc.)
-- Both ideas must use the same characters
-- Output STORY_1 first, completely, then STORY_2
-- Write ONLY the two ideas in the format above, nothing else
+- The two stories must be DIFFERENT - different plots, locations, or approaches
+- For adventure themes: one can start IN the adventure world, the other can start in normal life and transition
+- Both must use the same characters
+- You MUST output all 6 sections in order: DRAFT_1, REVIEW_1, FINAL_1, DRAFT_2, REVIEW_2, FINAL_2
 
