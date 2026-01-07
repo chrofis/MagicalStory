@@ -6890,6 +6890,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const expandedScenes = sceneResults.sort((a, b) => a.pageNumber - b.pageNumber);
     log.debug(`✅ [UNIFIED] All ${expandedScenes.length} scene expansions complete`);
 
+    // FIX: Update characterClothing from full re-parse to fix truncated costume names from streaming
+    // Streaming can truncate costume names (e.g., "costumed:gla" instead of "costumed:gladiator")
+    // The full re-parse in storyPages has complete data
+    for (const scene of expandedScenes) {
+      const fullParsePage = storyPages.find(p => p.pageNumber === scene.pageNumber);
+      if (fullParsePage?.characterClothing && Object.keys(fullParsePage.characterClothing).length > 0) {
+        // Check if streaming truncated any costume names
+        const streamingClothing = scene.characterClothing || {};
+        const fullClothing = fullParsePage.characterClothing;
+        let updated = false;
+        for (const [charName, fullValue] of Object.entries(fullClothing)) {
+          const streamingValue = streamingClothing[charName];
+          if (streamingValue && fullValue && streamingValue !== fullValue) {
+            log.debug(`[CLOTHING FIX] Page ${scene.pageNumber} ${charName}: "${streamingValue}" -> "${fullValue}"`);
+            updated = true;
+          }
+        }
+        // Always use the full parse data
+        scene.characterClothing = fullClothing;
+      }
+    }
+
     // Log streaming efficiency
     const pagesFromStreaming = streamingExpandedPages.size;
     log.debug(`📊 [UNIFIED] Streaming efficiency: ${pagesFromStreaming}/${storyPages.length} pages started during streaming`);
