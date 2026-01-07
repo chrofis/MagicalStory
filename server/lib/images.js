@@ -12,9 +12,6 @@ const { MODEL_DEFAULTS } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS } = require('../config/models');
 
-// Log image generation configuration at startup
-console.log(`🎨 [IMAGES] Config loaded - imageBackend: ${CONFIG_DEFAULTS?.imageBackend || 'undefined'}, runwareConfigured: ${isRunwareConfigured()}`);
-
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
 // Prevents memory leaks by limiting cache size and implementing eviction
@@ -1166,7 +1163,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @param {Function|null} onImageReady - Optional callback called immediately when image is generated (before quality eval)
  * @param {Function|null} usageTracker - Optional callback to track token usage: (imageUsage, qualityUsage) => void
  * @param {Function|null} callTextModel - Function to call text model for scene rewriting
- * @param {Object|null} modelOverrides - Model overrides: { imageModel, qualityModel }
+ * @param {Object|null} modelOverrides - Model overrides: { imageModel, qualityModel, imageBackend }
  * @param {string} pageContext - Context label for logging
  * @param {Object} options - Additional options: { isAdmin }
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}

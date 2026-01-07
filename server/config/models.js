@@ -66,10 +66,10 @@ const MODEL_DEFAULTS = {
   // Inpainting backend for auto-repair
   inpaintBackend: 'runware',           // 'gemini' or 'runware' (runware is 50x cheaper)
 
-  // Image generation backend (for testing cheaper alternatives)
+  // Image generation backend (can be overridden in dev mode)
   // 'gemini' = Gemini API (default, best quality)
   // 'runware' = Runware FLUX Schnell (super cheap, good for testing)
-  imageBackend: 'runware'              // TESTING: Using FLUX Schnell via Runware ($0.0006/image)
+  imageBackend: 'gemini'               // Default: Gemini for production quality
 };
 
 // Available inpaint backends
