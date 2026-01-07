@@ -197,6 +197,37 @@ class GenerationLogger {
   }
 
   /**
+   * Log API usage (tokens and cost) for tracking
+   * @param {string} functionName - e.g., 'outline', 'story_text', 'page_image', 'avatar_costumed'
+   * @param {string} model - Model ID used (e.g., 'claude-sonnet-4-5', 'gemini-2.5-flash-image')
+   * @param {object} usage - Token counts or direct cost
+   * @param {number} [usage.inputTokens] - Input tokens
+   * @param {number} [usage.outputTokens] - Output tokens
+   * @param {number} [usage.thinkingTokens] - Thinking tokens (Gemini 2.5)
+   * @param {number} [usage.directCost] - Direct cost in USD (for Runware)
+   * @param {number} estimatedCost - Total estimated cost in USD
+   */
+  apiUsage(functionName, model, usage, estimatedCost) {
+    const tokens = usage.inputTokens || usage.outputTokens
+      ? `${(usage.inputTokens || 0).toLocaleString()} in / ${(usage.outputTokens || 0).toLocaleString()} out${usage.thinkingTokens ? ` / ${usage.thinkingTokens.toLocaleString()} think` : ''}`
+      : null;
+    const costStr = `$${estimatedCost.toFixed(4)}`;
+    const message = tokens
+      ? `${functionName}: ${model} (${tokens}) ${costStr}`
+      : `${functionName}: ${model} ${costStr}`;
+
+    this._log('info', 'api_usage', message, null, {
+      function: functionName,
+      model,
+      inputTokens: usage.inputTokens || 0,
+      outputTokens: usage.outputTokens || 0,
+      thinkingTokens: usage.thinkingTokens || 0,
+      directCost: usage.directCost || 0,
+      estimatedCost
+    });
+  }
+
+  /**
    * Finalize and get timing summary
    */
   finalize() {

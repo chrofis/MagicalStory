@@ -10,7 +10,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { MODEL_DEFAULTS: CONFIG_DEFAULTS } = require('../config/models');
+const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
@@ -921,6 +921,70 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   const modelId = imageModelOverride || defaultModel;
   if (imageModelOverride) {
     log.debug(`🔧 [IMAGE GEN] Using model override: ${modelId}`);
+  }
+
+  // Check if the selected model is a Runware model (flux-schnell, flux-dev)
+  const modelConfig = IMAGE_MODELS[modelId];
+  if (modelConfig?.backend === 'runware' && isRunwareConfigured()) {
+    log.info(`🎨 [IMAGE GEN] Model ${modelId} uses Runware backend - routing to Runware`);
+
+    try {
+      // Determine which Runware model to use
+      const runwareModel = modelId === 'flux-dev' ? RUNWARE_MODELS.FLUX_DEV : RUNWARE_MODELS.FLUX_SCHNELL;
+
+      // Extract photo URLs for reference images
+      const referenceImages = [];
+      if (characterPhotos && characterPhotos.length > 0) {
+        for (const photoData of characterPhotos) {
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            referenceImages.push(photoUrl);
+          }
+        }
+      }
+
+      const result = await generateWithRunware(prompt, {
+        model: runwareModel,
+        width: 1024,
+        height: 1024,
+        steps: modelId === 'flux-dev' ? 30 : 4,
+        referenceImages: referenceImages.slice(0, 3)
+      });
+
+      // Call onImageReady callback for progressive display
+      if (onImageReady && result.imageData) {
+        try {
+          await onImageReady(result.imageData, result.modelId);
+        } catch (callbackError) {
+          log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
+        }
+      }
+
+      // Evaluate quality using Gemini
+      const qualityResult = await evaluateImageQuality(
+        result.imageData,
+        characterPhotos,
+        prompt,
+        evaluationType,
+        qualityModelOverride
+      );
+
+      return {
+        imageData: result.imageData,
+        modelId: result.modelId,
+        score: qualityResult.score,
+        numericScore: qualityResult.numericScore,
+        reasoning: qualityResult.reasoning,
+        verdict: qualityResult.verdict,
+        fixTargets: qualityResult.fixTargets,
+        qualityModelId: qualityResult.qualityModelId,
+        imageUsage: result.usage,
+        qualityUsage: qualityResult.usage
+      };
+    } catch (runwareError) {
+      log.error('❌ [IMAGE GEN] Runware generation failed:', runwareError.message);
+      throw runwareError;
+    }
   }
 
   const requestBody = {

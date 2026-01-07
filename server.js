@@ -4998,6 +4998,10 @@ class ProgressiveStoryPageParser {
 async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false) {
   log.debug(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
+  // Generation logger for tracking API usage and debugging
+  const genLog = new GenerationLogger();
+  genLog.setStage('outline');
+
   // Clear avatar generation logs for fresh tracking
   clearStyledAvatarGenerationLog();
   clearCostumedAvatarGenerationLog();
@@ -5009,6 +5013,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    // Runware uses direct cost instead of tokens
+    runware: { direct_cost: 0, calls: 0 },
     // By function (for detailed breakdown)
     byFunction: {
       outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
@@ -5018,7 +5024,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() }
+      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      // Avatar generation tracking
+      avatar_styled: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() }
     }
   };
 
@@ -5046,23 +5055,31 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     gemini_text: { input: 0.30, output: 2.50 }
   };
 
-  // Helper to add usage - now supports function-level tracking with model names and thinking tokens
+  // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
     if (usage && tokenUsage[provider]) {
-      tokenUsage[provider].input_tokens += usage.input_tokens || 0;
-      tokenUsage[provider].output_tokens += usage.output_tokens || 0;
-      tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
-      tokenUsage[provider].calls += 1;
+      // Handle Runware (direct cost) vs token-based providers
+      if (provider === 'runware') {
+        tokenUsage.runware.direct_cost += usage.direct_cost || 0;
+        tokenUsage.runware.calls += 1;
+      } else {
+        tokenUsage[provider].input_tokens += usage.input_tokens || 0;
+        tokenUsage[provider].output_tokens += usage.output_tokens || 0;
+        tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
+        tokenUsage[provider].calls += 1;
+      }
     }
     // Also track by function if specified
     if (functionName && tokenUsage.byFunction[functionName]) {
-      tokenUsage.byFunction[functionName].input_tokens += usage.input_tokens || 0;
-      tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
-      tokenUsage.byFunction[functionName].thinking_tokens += usage.thinking_tokens || 0;
-      tokenUsage.byFunction[functionName].calls += 1;
-      tokenUsage.byFunction[functionName].provider = provider; // Track actual provider used
+      const func = tokenUsage.byFunction[functionName];
+      func.input_tokens += usage.input_tokens || 0;
+      func.output_tokens += usage.output_tokens || 0;
+      func.thinking_tokens += usage.thinking_tokens || 0;
+      func.direct_cost = (func.direct_cost || 0) + (usage.direct_cost || 0);
+      func.calls += 1;
+      func.provider = provider; // Track actual provider used
       if (modelName) {
-        tokenUsage.byFunction[functionName].models.add(modelName);
+        func.models.add(modelName);
       }
     }
   };
@@ -6279,6 +6296,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       pageClothing: pageClothing, // Clothing per page
       clothingRequirements: streamingClothingRequirements, // Per-character clothing requirements
       tokenUsage: tokenUsage, // Token usage statistics for cost tracking
+      generationLog: [], // Will be populated after apiUsage logging
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -6306,6 +6324,30 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
     // Use first model for cost calculation (model-specific pricing), fall back to provider
     const getCostModel = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models)[0] : funcData.provider;
+
+    // Log API usage to generationLog for dev mode visibility
+    genLog.setStage('finalize');
+    for (const [funcName, funcData] of Object.entries(byFunc)) {
+      if (funcData.calls > 0) {
+        const model = getModels(funcData);
+        const directCost = funcData.direct_cost || 0;
+        const cost = directCost > 0
+          ? directCost
+          : calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        genLog.apiUsage(funcName, model, {
+          inputTokens: funcData.input_tokens,
+          outputTokens: funcData.output_tokens,
+          thinkingTokens: funcData.thinking_tokens,
+          directCost: directCost
+        }, cost);
+      }
+    }
+
+    // Finalize and populate generationLog for storage
+    genLog.finalize();
+    storyData.generationLog = genLog.getEntries();
+    log.debug(`📊 [STORYBOOK] Generation log has ${storyData.generationLog.length} entries`);
+
     if (byFunc.outline.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.outline), byFunc.outline.input_tokens, byFunc.outline.output_tokens, byFunc.outline.thinking_tokens);
       log.debug(`   Outline:       ${byFunc.outline.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.outline.output_tokens.toLocaleString().padStart(8)} out (${byFunc.outline.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.outline)}]`);
@@ -6335,8 +6377,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       log.debug(`   Page Quality:  ${byFunc.page_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_quality)}]`);
     }
     if (byFunc.inpaint.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
-      log.debug(`   Inpaint:       ${byFunc.inpaint.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.inpaint.output_tokens.toLocaleString().padStart(8)} out (${byFunc.inpaint.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.inpaint)}]`);
+      const directCost = byFunc.inpaint.direct_cost || 0;
+      const cost = directCost > 0
+        ? { total: directCost }
+        : calculateCost(getCostModel(byFunc.inpaint), byFunc.inpaint.input_tokens, byFunc.inpaint.output_tokens, byFunc.inpaint.thinking_tokens);
+      log.debug(`   Inpaint:       ${byFunc.inpaint.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.inpaint.output_tokens.toLocaleString().padStart(8)} out${directCost > 0 ? ` + $${directCost.toFixed(4)} direct` : ''} (${byFunc.inpaint.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.inpaint)}]`);
     }
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     const thinkingTotal = totalThinkingTokens > 0 ? `, ${totalThinkingTokens.toLocaleString()} thinking` : '';
@@ -6499,6 +6544,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    // Runware uses direct cost instead of tokens
+    runware: { direct_cost: 0, calls: 0 },
     byFunction: {
       unified_story: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
       scene_expansion: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
@@ -6506,7 +6553,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() }
+      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      // Avatar generation tracking
+      avatar_styled: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() }
     }
   };
 
@@ -7642,6 +7692,8 @@ async function processStoryJob(jobId) {
     gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+    // Runware uses direct cost instead of tokens
+    runware: { direct_cost: 0, calls: 0 },
     // By function (for detailed breakdown)
     byFunction: {
       outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
@@ -7651,7 +7703,10 @@ async function processStoryJob(jobId) {
       cover_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
       page_images: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() },
       page_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_image', models: new Set() }
+      inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      // Avatar generation tracking
+      avatar_styled: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() }
     }
   };
 
@@ -7679,23 +7734,31 @@ async function processStoryJob(jobId) {
     gemini_text: { input: 0.30, output: 2.50 }
   };
 
-  // Helper to add usage - now supports function-level tracking with model names and thinking tokens
+  // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
     if (usage && tokenUsage[provider]) {
-      tokenUsage[provider].input_tokens += usage.input_tokens || 0;
-      tokenUsage[provider].output_tokens += usage.output_tokens || 0;
-      tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
-      tokenUsage[provider].calls += 1;
+      // Handle Runware (direct cost) vs token-based providers
+      if (provider === 'runware') {
+        tokenUsage.runware.direct_cost += usage.direct_cost || 0;
+        tokenUsage.runware.calls += 1;
+      } else {
+        tokenUsage[provider].input_tokens += usage.input_tokens || 0;
+        tokenUsage[provider].output_tokens += usage.output_tokens || 0;
+        tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
+        tokenUsage[provider].calls += 1;
+      }
     }
     // Also track by function if specified
     if (functionName && tokenUsage.byFunction[functionName]) {
-      tokenUsage.byFunction[functionName].input_tokens += usage.input_tokens || 0;
-      tokenUsage.byFunction[functionName].output_tokens += usage.output_tokens || 0;
-      tokenUsage.byFunction[functionName].thinking_tokens += usage.thinking_tokens || 0;
-      tokenUsage.byFunction[functionName].calls += 1;
-      tokenUsage.byFunction[functionName].provider = provider; // Track actual provider used
+      const func = tokenUsage.byFunction[functionName];
+      func.input_tokens += usage.input_tokens || 0;
+      func.output_tokens += usage.output_tokens || 0;
+      func.thinking_tokens += usage.thinking_tokens || 0;
+      func.direct_cost = (func.direct_cost || 0) + (usage.direct_cost || 0);
+      func.calls += 1;
+      func.provider = provider; // Track actual provider used
       if (modelName) {
-        tokenUsage.byFunction[functionName].models.add(modelName);
+        func.models.add(modelName);
       }
     }
   };

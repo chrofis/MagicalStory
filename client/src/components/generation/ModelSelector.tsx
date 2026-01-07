@@ -46,6 +46,16 @@ export const IMAGE_MODELS = {
     description: 'Gemini 3 Pro Image - Higher quality (preview)',
     descriptionDe: 'Gemini 3 Pro Image - Höhere Qualität (Vorschau)',
     descriptionFr: 'Gemini 3 Pro Image - Qualité supérieure (aperçu)'
+  },
+  'flux-schnell': {
+    description: 'FLUX Schnell (Runware) - Ultra cheap ($0.0006/image)',
+    descriptionDe: 'FLUX Schnell (Runware) - Ultra günstig ($0.0006/Bild)',
+    descriptionFr: 'FLUX Schnell (Runware) - Ultra économique ($0.0006/image)'
+  },
+  'flux-dev': {
+    description: 'FLUX Dev (Runware) - Better quality ($0.004/image)',
+    descriptionDe: 'FLUX Dev (Runware) - Bessere Qualität ($0.004/Bild)',
+    descriptionFr: 'FLUX Dev (Runware) - Meilleure qualité ($0.004/image)'
   }
 } as const;
 
