@@ -770,6 +770,8 @@ export const storyService = {
         relationship: string;
       }>;
       ideaModel?: string | null;
+      // User's location for personalized story settings
+      userLocation?: { city: string | null; region: string | null; country: string | null };
     },
     callbacks: {
       onStory1?: (story: string) => void;

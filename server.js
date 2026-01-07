@@ -1404,9 +1404,12 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
 // Generate story ideas endpoint - FREE, no credits
 app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10 } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
+    if (userLocation?.city) {
+      log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
+    }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
     // Calculate scene count based on reading level
@@ -1477,6 +1480,14 @@ ${teachingGuide}`
 ${adventureGuideContent}`
       : '';
 
+    // Build user location instruction for personalized settings
+    let userLocationInstruction = '';
+    if (userLocation?.city) {
+      const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
+      const locationStr = locationParts.join(', ');
+      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
+    }
+
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
@@ -1490,6 +1501,7 @@ ${adventureGuideContent}`
       .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
       .replace('{TOPIC_GUIDE}', topicGuideText)
       .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
+      .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Call the text model (using the imported function)
@@ -1542,9 +1554,12 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
   res.flushHeaders();
 
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10 } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation } = req.body;
 
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
+    if (userLocation?.city) {
+      log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
+    }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
     // Calculate scene count based on reading level
@@ -1616,6 +1631,14 @@ ${teachingGuide}`
 ${adventureGuideContent}`
       : '';
 
+    // Build user location instruction for personalized settings
+    let userLocationInstruction = '';
+    if (userLocation?.city) {
+      const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
+      const locationStr = locationParts.join(', ');
+      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
+    }
+
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
@@ -1629,6 +1652,7 @@ ${adventureGuideContent}`
       .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
       .replace('{TOPIC_GUIDE}', topicGuideText)
       .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
+      .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Get model to use

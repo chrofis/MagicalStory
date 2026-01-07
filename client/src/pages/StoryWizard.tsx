@@ -193,6 +193,8 @@ export default function StoryWizard() {
   const [lastIdeaPrompt, setLastIdeaPrompt] = useState<{ prompt: string; model: string } | null>(null);
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([]);
   const streamAbortRef = useRef<{ abort: () => void } | null>(null);
+  // User's location from IP (for story setting personalization)
+  const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null } | null>(null);
 
   // Step 7: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
@@ -286,6 +288,11 @@ export default function StoryWizard() {
       navigate(`/?login=true&redirect=${redirectParam}`);
     }
   }, [isAuthenticated, isAuthLoading, navigate]);
+
+  // Fetch user's location from IP for story personalization
+  useEffect(() => {
+    storyService.getUserLocation().then(setUserLocation);
+  }, []);
 
   // Reset story settings when ?new=true is present (from "Create New Story" button)
   useEffect(() => {
@@ -1846,6 +1853,7 @@ export default function StoryWizard() {
           };
         }).filter(r => r.character1 && r.character2),
         ideaModel: user?.role === 'admin' ? modelSelections.ideaModel : undefined,
+        userLocation: userLocation || undefined,
       },
       {
         onStatus: (_status, prompt, model) => {
