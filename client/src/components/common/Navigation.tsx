@@ -78,7 +78,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
 
         {/* Center: Step Navigation */}
         {currentStep > 0 && onStepClick && canAccessStep && (
-          <div className="flex items-center gap-0.5 md:gap-2 flex-1 justify-center">
+          <div className="flex items-center flex-1 justify-center">
             {[1, 2, 3, 4, 5].map(s => {
               const canAccess = canAccessStep(s);
               const isActive = currentStep === s;
@@ -106,7 +106,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                       {labels[s]}
                     </span>
                   </div>
-                  {s < 5 && <div className={`w-3 md:w-4 h-0.5 self-start mt-2.5 md:mt-3.5 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />}
+                  {s < 5 && <div className={`w-3 md:w-4 h-0.5 self-start mt-2.5 md:mt-3.5 mx-0.5 md:mx-1 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />}
                 </div>
               );
             })}

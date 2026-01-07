@@ -607,7 +607,7 @@ Your task is to create a new avatar in ${artStyle} style that:
         ]
       }],
       generationConfig: {
-        temperature: 0.2,  // Lower temperature for consistent costume application across all 4 quadrants
+        temperature: 0.4,
         responseModalities: ["TEXT", "IMAGE"],
         imageConfig: {
           aspectRatio: "9:16"
