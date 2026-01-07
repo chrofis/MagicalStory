@@ -906,7 +906,7 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     const selectedModel = avatarModel || 'gemini-2.5-flash-image';
     const modelConfig = IMAGE_MODELS[selectedModel];
     const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
-    const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-preview-05-20';
+    const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
 
     log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId}), model: ${selectedModel}, backend: ${useRunware ? 'runware' : 'gemini'}`);
 

@@ -103,7 +103,7 @@ const IMAGE_BACKENDS = {
 // Image model configurations
 const IMAGE_MODELS = {
   'gemini-2.5-flash-image': {
-    modelId: 'gemini-2.5-flash-preview-05-20',
+    modelId: 'gemini-2.5-flash-image',
     description: 'Gemini 2.5 Flash Image - Fast image generation',
     backend: 'gemini'
   },
