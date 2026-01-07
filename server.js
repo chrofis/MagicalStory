@@ -5550,13 +5550,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                     log.debug(`✅ [STORYBOOK] Generated ${category} avatar for ${char.name}`);
                   }
                   // Also store clothing description if available
-                  if (result.clothingDescription) {
+                  if (result.clothing) {
                     if (!char.avatars.clothing) char.avatars.clothing = {};
                     if (category === 'costumed') {
                       if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-                      char.avatars.clothing.costumed[result.costumeType] = result.clothingDescription;
+                      char.avatars.clothing.costumed[result.costumeType] = result.clothing;
                     } else {
-                      char.avatars.clothing[category] = result.clothingDescription;
+                      char.avatars.clothing[category] = result.clothing;
                     }
                   }
                 }
@@ -6699,6 +6699,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
                 if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
                 char.avatars.styledAvatars[artStyle].costumed[config.costume.toLowerCase()] = result.imageData;
+                // Store clothing description for image prompt
+                if (result.clothing) {
+                  if (!char.avatars.clothing) char.avatars.clothing = {};
+                  if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+                  char.avatars.clothing.costumed[config.costume.toLowerCase()] = result.clothing;
+                }
                 log.debug(`✅ [STREAM-AVATAR] ${char.name} costumed:${config.costume} complete`);
                 genLog.costumeGenerated(char.name, config.costume, true, { artStyle });
               } else {
