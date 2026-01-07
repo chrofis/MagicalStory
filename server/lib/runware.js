@@ -16,6 +16,12 @@ const RUNWARE_API_KEY = process.env.RUNWARE_API_KEY;
 const RUNWARE_API_URL = 'https://api.runware.ai/v1';
 
 // Log Runware configuration status at startup
+// Debug: Check for env vars containing RUNWARE (to detect whitespace issues)
+const runwareEnvVars = Object.keys(process.env).filter(k => k.includes('RUNWARE'));
+if (runwareEnvVars.length > 0) {
+  log.info(`🔍 Found env vars with 'RUNWARE': ${runwareEnvVars.map(k => `"${k}"`).join(', ')}`);
+}
+
 if (RUNWARE_API_KEY) {
   log.info(`🎨 Runware API: ✅ Configured (key: ${RUNWARE_API_KEY.substring(0, 8)}...)`);
 } else {
