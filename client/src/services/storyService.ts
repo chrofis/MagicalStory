@@ -780,6 +780,7 @@ export const storyService = {
       imageModel?: string | null;
       coverImageModel?: string | null;
       qualityModel?: string | null;
+      imageBackend?: string | null;  // 'gemini' or 'runware'
     };
   }): Promise<{ jobId: string; creditsRemaining?: number }> {
     // Generate idempotency key to prevent duplicate job creation on retries

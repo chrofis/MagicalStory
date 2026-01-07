@@ -31,14 +31,43 @@ interface DeveloperModeState {
   setModelSelections: React.Dispatch<React.SetStateAction<ModelSelections>>;
 }
 
+// Default model selections for developers (cheap/fast models to save credits)
+const DEV_MODEL_DEFAULTS: ModelSelections = {
+  ideaModel: 'gemini-2.0-flash',
+  outlineModel: 'gemini-2.0-flash',
+  textModel: 'claude-haiku',
+  sceneDescriptionModel: 'gemini-2.0-flash',
+  imageModel: null,  // Server default
+  coverImageModel: null,
+  qualityModel: 'gemini-2.0-flash',
+  imageBackend: 'runware',  // Cheapest image backend ($0.0006/image)
+};
+
+// Default model selections for production (null = server defaults = best quality)
+const PROD_MODEL_DEFAULTS: ModelSelections = {
+  ideaModel: null,
+  outlineModel: null,
+  textModel: null,
+  sceneDescriptionModel: null,
+  imageModel: null,
+  coverImageModel: null,
+  qualityModel: null,
+  imageBackend: null,
+};
+
 /**
  * Hook to manage developer mode state for story wizard
  * Persists developer mode setting in localStorage for admins
+ *
+ * When developer mode is enabled:
+ * - Skip cover images by default (saves credits)
+ * - Use cheapest models by default (haiku for text, runware for images)
  */
 export function useDeveloperMode(): DeveloperModeState {
-  const [developerMode, setDeveloperMode] = useState(() => {
-    return localStorage.getItem('developer_mode') === 'true';
-  });
+  // Check if dev mode was previously enabled
+  const wasDevMode = localStorage.getItem('developer_mode') === 'true';
+
+  const [developerMode, setDeveloperModeInternal] = useState(wasDevMode);
   const [imageGenMode, setImageGenMode] = useState<'parallel' | 'sequential' | null>(null);
 
   // Generation pipeline mode (override reading level behavior)
@@ -49,21 +78,31 @@ export function useDeveloperMode(): DeveloperModeState {
   const [devSkipText, setDevSkipText] = useState(false);
   const [devSkipSceneDescriptions, setDevSkipSceneDescriptions] = useState(false);
   const [devSkipImages, setDevSkipImages] = useState(false);
-  const [devSkipCovers, setDevSkipCovers] = useState(false);
+  // Skip covers by default in dev mode
+  const [devSkipCovers, setDevSkipCovers] = useState(wasDevMode);
 
   // Auto-repair: automatically fix detected issues in generated images (default: OFF)
   const [enableAutoRepair, setEnableAutoRepair] = useState(false);
 
-  // Developer model selection (admin only)
-  const [modelSelections, setModelSelections] = useState<ModelSelections>({
-    ideaModel: null,
-    outlineModel: null,
-    textModel: null,
-    sceneDescriptionModel: null,
-    imageModel: null,
-    coverImageModel: null,
-    qualityModel: null,
-  });
+  // Developer model selection - initialize based on dev mode
+  const [modelSelections, setModelSelections] = useState<ModelSelections>(
+    wasDevMode ? { ...DEV_MODEL_DEFAULTS } : { ...PROD_MODEL_DEFAULTS }
+  );
+
+  // Custom setter that also updates defaults when toggling dev mode
+  const setDeveloperMode = (enabled: boolean) => {
+    setDeveloperModeInternal(enabled);
+
+    if (enabled) {
+      // Switching TO developer mode: set cheap defaults
+      setDevSkipCovers(true);
+      setModelSelections({ ...DEV_MODEL_DEFAULTS });
+    } else {
+      // Switching FROM developer mode: reset to production defaults
+      setDevSkipCovers(false);
+      setModelSelections({ ...PROD_MODEL_DEFAULTS });
+    }
+  };
 
   // Persist developer mode changes
   useEffect(() => {

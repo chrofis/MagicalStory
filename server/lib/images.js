@@ -721,9 +721,10 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {Function|null} onImageReady - Callback when image is ready
  * @param {string|null} imageModelOverride - Override image model (e.g., 'gemini-2.5-flash-image' or 'gemini-3-pro-image-preview')
  * @param {string|null} qualityModelOverride - Override quality evaluation model
+ * @param {string|null} imageBackendOverride - Override image backend ('gemini' or 'runware')
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '') {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null) {
   // Check cache first (include previousImage presence in cache key for sequential mode)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
@@ -744,8 +745,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   log.debug(`🆕 [IMAGE CACHE] MISS - key: ${cacheKey.substring(0, 16)}...`);
 
   // Check if we should use Runware backend (for cheap testing with FLUX Schnell)
-  const imageBackend = CONFIG_DEFAULTS?.imageBackend || 'gemini';
-  log.info(`🎨 [IMAGE GEN] Backend check: imageBackend=${imageBackend}, runwareConfigured=${isRunwareConfigured()}, CONFIG_DEFAULTS=${JSON.stringify(CONFIG_DEFAULTS || 'undefined')}`);
+  // Priority: override param > CONFIG_DEFAULTS > 'gemini'
+  const imageBackend = imageBackendOverride || CONFIG_DEFAULTS?.imageBackend || 'gemini';
+  log.info(`🎨 [IMAGE GEN] Backend: ${imageBackend} (override=${imageBackendOverride || 'none'}, default=${CONFIG_DEFAULTS?.imageBackend || 'gemini'})`);
   if (imageBackend === 'runware' && isRunwareConfigured()) {
     log.info(`🎨 [IMAGE GEN] Using Runware FLUX Schnell backend (cheap testing mode)`);
 
@@ -1197,7 +1199,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     try {
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext);
+      const imageBackendOverride = modelOverrides?.imageBackend || null;
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);

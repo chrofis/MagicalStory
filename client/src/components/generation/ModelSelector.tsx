@@ -1,4 +1,4 @@
-import { ChevronDown, Cpu, Sparkles, Image, Palette, Star, Eye, Lightbulb } from 'lucide-react';
+import { ChevronDown, Cpu, Sparkles, Image, Palette, Star, Eye, Lightbulb, Server } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 // Available text models (matches server/lib/textModels.js)
@@ -63,9 +63,24 @@ export const QUALITY_MODELS = {
   }
 } as const;
 
+// Available image generation backends
+export const IMAGE_BACKENDS = {
+  'gemini': {
+    description: 'Google Gemini - Best quality (~$0.035/image)',
+    descriptionDe: 'Google Gemini - Beste Qualität (~$0.035/Bild)',
+    descriptionFr: 'Google Gemini - Meilleure qualité (~$0.035/image)'
+  },
+  'runware': {
+    description: 'FLUX Schnell - Ultra cheap for testing ($0.0006/image)',
+    descriptionDe: 'FLUX Schnell - Ultra günstig zum Testen ($0.0006/Bild)',
+    descriptionFr: 'FLUX Schnell - Ultra économique pour tests ($0.0006/image)'
+  }
+} as const;
+
 export type TextModelKey = keyof typeof TEXT_MODELS;
 export type ImageModelKey = keyof typeof IMAGE_MODELS;
 export type QualityModelKey = keyof typeof QUALITY_MODELS;
+export type ImageBackendKey = keyof typeof IMAGE_BACKENDS;
 
 export interface ModelSelections {
   ideaModel: TextModelKey | null;  // null = use server default
@@ -75,6 +90,7 @@ export interface ModelSelections {
   imageModel: ImageModelKey | null;
   coverImageModel: ImageModelKey | null;
   qualityModel: QualityModelKey | null;
+  imageBackend: ImageBackendKey | null;  // gemini or runware
 }
 
 interface ModelSelectorProps {
@@ -208,6 +224,16 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           value={selections.qualityModel}
           options={QUALITY_MODELS}
           onChange={(v) => updateSelection('qualityModel', v)}
+          language={language}
+        />
+
+        {/* Image Generation Backend */}
+        <ModelDropdown
+          label={language === 'de' ? 'Bild-Backend' : language === 'fr' ? 'Backend d\'image' : 'Image Backend'}
+          icon={<Server size={12} />}
+          value={selections.imageBackend}
+          options={IMAGE_BACKENDS}
+          onChange={(v) => updateSelection('imageBackend', v)}
           language={language}
         />
       </div>
