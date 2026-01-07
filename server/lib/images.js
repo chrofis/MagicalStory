@@ -585,7 +585,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const score = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
       const verdict = parsedJson.verdict || parsedJson.final_verdict || 'UNKNOWN';
       // Support both old 'issues' and new 'issues_summary' field
-      const issuesSummary = parsedJson.issues_summary || parsedJson.issues || '';
+      // Handle case where issues might be an array (convert to string)
+      let issuesSummary = parsedJson.issues_summary || parsedJson.issues || '';
+      if (Array.isArray(issuesSummary)) {
+        issuesSummary = issuesSummary.join('. ');
+      } else if (typeof issuesSummary !== 'string') {
+        issuesSummary = String(issuesSummary);
+      }
 
       log.info(`⭐ [QUALITY] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
       const hasRealIssues = issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none';

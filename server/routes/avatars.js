@@ -1229,6 +1229,11 @@ These corrections OVERRIDE what is visible in the reference photo.
           // Store extracted physical traits (from generated avatar - reflects user corrections)
           if (faceMatchResult.physicalTraits && !results.extractedTraits) {
             results.extractedTraits = faceMatchResult.physicalTraits;
+            // Include detailed hair analysis if available
+            if (faceMatchResult.detailedHairAnalysis) {
+              results.extractedTraits.detailedHairAnalysis = faceMatchResult.detailedHairAnalysis;
+              log.debug(`💇 [AVATAR EVAL] Stored detailed hair: lengthTop=${faceMatchResult.detailedHairAnalysis.lengthTop}, lengthSides=${faceMatchResult.detailedHairAnalysis.lengthSides}, bangs=${faceMatchResult.detailedHairAnalysis.bangsEndAt}`);
+            }
             log.debug(`📋 [AVATAR EVAL] Extracted traits from avatar: age=${faceMatchResult.physicalTraits.age}, gender=${faceMatchResult.physicalTraits.gender}, build=${faceMatchResult.physicalTraits.build}`);
           }
 
