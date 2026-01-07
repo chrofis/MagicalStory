@@ -1275,6 +1275,24 @@ These corrections OVERRIDE what is visible in the reference photo.
     results.status = 'complete';
     results.generatedAt = new Date().toISOString();
 
+    // Log avatar generation to activity log
+    const avatarsGenerated = Object.keys(clothingCategories).filter(cat => results[cat]).length;
+    const evaluationsRun = Object.keys(results.faceMatch).length;
+    try {
+      await logActivity(req.user.id, req.user.username, 'AVATAR_GENERATED', {
+        characterId,
+        characterName: name,
+        model: selectedModel,
+        backend: useRunware ? 'runware' : 'gemini',
+        avatarsGenerated,
+        evaluationsRun,
+        // Runware cost: $0.0006 per image
+        estimatedCost: useRunware ? avatarsGenerated * 0.0006 : null
+      });
+    } catch (activityErr) {
+      log.warn('Failed to log avatar generation activity:', activityErr.message);
+    }
+
     log.debug(`✅ [CLOTHING AVATARS] Generated standard avatar for ${name}`);
     res.json({ success: true, clothingAvatars: results });
 

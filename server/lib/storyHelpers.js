@@ -99,19 +99,25 @@ function buildHairDescription(physical) {
 // ============================================================================
 
 /**
- * Strip JSON metadata block from scene description (for image prompts)
- * Removes the ```json ... ``` block so it doesn't go to the image API
+ * Strip JSON metadata block and translated summary from scene description (for image prompts)
+ * Removes the ```json ... ``` block and section 6 (translated summary) - both are redundant for image generation
  * @param {string} sceneDescription - The scene description text
- * @returns {string} Scene description without JSON metadata block
+ * @returns {string} Scene description without JSON metadata block or translated summary
  */
 function stripSceneMetadata(sceneDescription) {
   if (!sceneDescription) return sceneDescription;
 
-  // Remove section header and JSON block: "7. **METADATA (JSON):**\n```json\n...\n```" or just "```json\n...\n```"
+  // Remove section header and JSON block: "5. **METADATA (JSON):**\n```json\n...\n```" or just "```json\n...\n```"
   // Also handle variations like "**METADATA:**" or just the JSON block
   let stripped = sceneDescription
     .replace(/\n*\d*\.?\s*\*{0,2}METADATA\s*\(?JSON\)?\*{0,2}:?\s*\n*```json[\s\S]*?```\n*/gi, '\n')
     .replace(/```json[\s\S]*?```\n*/gi, '')
+    .trim();
+
+  // Remove section 6 (translated summary) - redundant for image generation
+  // Matches: "6. **Image Summary (Deutsch)**\n..." or "6. **Image Summary (French)**\n..." etc.
+  stripped = stripped
+    .replace(/\n*\d+\.?\s*\*{0,2}Image Summary\s*\([^)]+\)\*{0,2}:?\s*\n[\s\S]*$/gi, '')
     .trim();
 
   // Clean up malformed markdown at the start (e.g., ")**" from partial section headers)
@@ -1747,7 +1753,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       // Match by name (exact, contains, or contained)
       if (nameLower === searchLower) return true;
       if (nameLower.includes(searchLower)) return true;
-      if (searchLower.includes(nameLower) && nameLower.length > 3) return true;
+      if (searchLower.includes(nameLower) && nameLower.length >= 3) return true;
 
       return false;
     };
