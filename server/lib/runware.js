@@ -30,10 +30,11 @@ if (RUNWARE_API_KEY) {
 
 // Available inpainting models
 const RUNWARE_MODELS = {
-  SD15: 'runware:100@1',      // SD 1.5 Inpaint - $0.0006/image, fastest
-  SDXL: 'runware:101@1',      // SDXL Inpaint - $0.002/image, better quality
-  FLUX_SCHNELL: 'runware:5@1', // FLUX Schnell - $0.0006/image
-  FLUX_DEV: 'runware:6@1'     // FLUX Dev - $0.004/image, best quality
+  SD15: 'runware:100@1',       // SD 1.5 Inpaint - $0.0006/image, fastest but low quality
+  SDXL: 'runware:101@1',       // SDXL Inpaint - $0.002/image, better quality
+  FLUX_FILL: 'runware:102@1',  // FLUX Fill - best inpainting, auto-optimal settings
+  FLUX_SCHNELL: 'runware:5@1', // FLUX Schnell - $0.0006/image (text-to-image only)
+  FLUX_DEV: 'runware:6@1'      // FLUX Dev - $0.004/image, best quality (text-to-image only)
 };
 
 /**
@@ -52,7 +53,7 @@ const RUNWARE_MODELS = {
  */
 async function inpaintWithRunware(seedImage, maskImage, prompt, options = {}) {
   const {
-    model = RUNWARE_MODELS.SD15,
+    model = RUNWARE_MODELS.FLUX_FILL,  // Use FLUX Fill for best quality inpainting
     strength = 0.85,
     steps = 20,
     width = 1024,

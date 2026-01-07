@@ -1,11 +1,180 @@
 import { useState } from 'react';
-import { History } from 'lucide-react';
+import { History, ChevronRight, ChevronDown } from 'lucide-react';
 import type { RetryAttempt } from '@/types/story';
 
 interface RetryHistoryDisplayProps {
   retryHistory: RetryAttempt[];
   totalAttempts: number;
   language: string;
+}
+
+/**
+ * Format and display evaluation data with expandable sections
+ */
+function EvaluationDisplay({ data, language }: { data: unknown; language: string }) {
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  if (!data) {
+    return <div className="text-gray-400 italic text-xs">{language === 'de' ? 'Keine Daten' : 'No data'}</div>;
+  }
+
+  // Parse string data if needed
+  let parsed = data;
+  if (typeof data === 'string') {
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      // If it's not JSON, show as text
+      return <pre className="text-[11px] whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-60 overflow-auto">{data}</pre>;
+    }
+  }
+
+  const toggleSection = (key: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedSections(newExpanded);
+  };
+
+  // Render evaluation object with nice formatting
+  const renderValue = (key: string, value: unknown, depth = 0): JSX.Element => {
+    const isExpanded = expandedSections.has(key);
+
+    if (value === null || value === undefined) {
+      return <span className="text-gray-400">null</span>;
+    }
+
+    if (typeof value === 'boolean') {
+      return <span className={value ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>{value ? '✓' : '✗'}</span>;
+    }
+
+    if (typeof value === 'number') {
+      // Color-code scores
+      const color = value >= 70 ? 'text-green-600' : value >= 50 ? 'text-yellow-600' : 'text-red-600';
+      return <span className={`font-bold ${color}`}>{value}</span>;
+    }
+
+    if (typeof value === 'string') {
+      // Truncate long strings
+      if (value.length > 100) {
+        return (
+          <div>
+            <button
+              onClick={() => toggleSection(key)}
+              className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {isExpanded ? 'Collapse' : `Show (${value.length} chars)`}
+            </button>
+            {isExpanded && (
+              <div className="mt-1 p-2 bg-gray-100 rounded text-[11px] whitespace-pre-wrap">{value}</div>
+            )}
+          </div>
+        );
+      }
+      return <span className="text-gray-700">{value}</span>;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) return <span className="text-gray-400">[]</span>;
+      return (
+        <div className="ml-2 border-l-2 border-gray-200 pl-2">
+          {value.map((item, idx) => (
+            <div key={idx} className="mb-1">
+              <span className="text-gray-400 text-[10px]">[{idx}]</span> {renderValue(`${key}.${idx}`, item, depth + 1)}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (typeof value === 'object') {
+      const entries = Object.entries(value as Record<string, unknown>);
+      if (entries.length === 0) return <span className="text-gray-400">{'{}'}</span>;
+
+      // For nested objects, make them collapsible
+      if (depth > 0) {
+        return (
+          <div>
+            <button
+              onClick={() => toggleSection(key)}
+              className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {isExpanded ? 'Collapse' : `{${entries.length} fields}`}
+            </button>
+            {isExpanded && (
+              <div className="ml-2 mt-1 border-l-2 border-gray-200 pl-2">
+                {entries.map(([k, v]) => (
+                  <div key={k} className="mb-1">
+                    <span className="font-medium text-gray-600">{k}:</span> {renderValue(`${key}.${k}`, v, depth + 1)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-1">
+          {entries.map(([k, v]) => (
+            <div key={k} className="flex gap-2">
+              <span className="font-medium text-gray-600 min-w-[100px]">{k}:</span>
+              <div className="flex-1">{renderValue(`${key}.${k}`, v, depth + 1)}</div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return <span>{String(value)}</span>;
+  };
+
+  return (
+    <div className="text-[11px] space-y-1 max-h-80 overflow-auto">
+      {renderValue('root', parsed)}
+    </div>
+  );
+}
+
+/**
+ * Component to show mask overlay on an image
+ */
+function MaskOverlayImage({
+  beforeImage,
+  maskImage,
+  onEnlarge
+}: {
+  beforeImage: string;
+  maskImage: string;
+  onEnlarge: (src: string, title: string) => void;
+}) {
+  return (
+    <div
+      className="relative w-32 h-32 cursor-pointer hover:ring-2 hover:ring-amber-400 rounded overflow-hidden"
+      onClick={() => onEnlarge(beforeImage, 'Before with Mask')}
+    >
+      <img
+        src={beforeImage}
+        alt="Before"
+        className="w-full h-full object-contain"
+      />
+      {/* Mask overlay - blend mode to show white areas */}
+      <img
+        src={maskImage}
+        alt="Mask overlay"
+        className="absolute inset-0 w-full h-full object-contain mix-blend-screen opacity-60"
+        style={{ filter: 'invert(1)' }}
+      />
+      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center py-0.5">
+        Before + Mask
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -139,23 +308,31 @@ export function RetryHistoryDisplay({
 
                 {/* Before/After Evaluations */}
                 <details className="text-xs">
-                  <summary className="cursor-pointer text-amber-700 font-medium">
+                  <summary className="cursor-pointer text-amber-700 font-medium hover:text-amber-900">
                     📊 {language === 'de' ? 'Bewertungen anzeigen' : 'View Evaluations'}
                   </summary>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Before evaluation */}
-                    <div className="bg-white p-2 rounded border border-red-200">
-                      <div className="font-medium text-red-700 mb-1">Before ({attempt.preRepairScore}%)</div>
-                      <pre className="text-[10px] whitespace-pre-wrap overflow-auto max-h-40 bg-gray-50 p-1 rounded">
-                        {attempt.preRepairEval ? JSON.stringify(attempt.preRepairEval, null, 2) : attempt.reasoning || 'No data'}
-                      </pre>
+                    <div className="bg-white p-3 rounded-lg border-2 border-red-200 shadow-sm">
+                      <div className="font-bold text-red-700 mb-2 text-sm flex items-center gap-2">
+                        <span className="bg-red-100 px-2 py-0.5 rounded">Before</span>
+                        <span className="text-red-600">{attempt.preRepairScore}%</span>
+                      </div>
+                      <EvaluationDisplay
+                        data={attempt.preRepairEval || attempt.reasoning}
+                        language={language}
+                      />
                     </div>
                     {/* After evaluation */}
-                    <div className="bg-white p-2 rounded border border-green-200">
-                      <div className="font-medium text-green-700 mb-1">After ({attempt.postRepairScore}%)</div>
-                      <pre className="text-[10px] whitespace-pre-wrap overflow-auto max-h-40 bg-gray-50 p-1 rounded">
-                        {attempt.postRepairEval ? JSON.stringify(attempt.postRepairEval, null, 2) : 'No data'}
-                      </pre>
+                    <div className="bg-white p-3 rounded-lg border-2 border-green-200 shadow-sm">
+                      <div className="font-bold text-green-700 mb-2 text-sm flex items-center gap-2">
+                        <span className="bg-green-100 px-2 py-0.5 rounded">After</span>
+                        <span className="text-green-600">{attempt.postRepairScore}%</span>
+                      </div>
+                      <EvaluationDisplay
+                        data={attempt.postRepairEval}
+                        language={language}
+                      />
                     </div>
                   </div>
                 </details>
@@ -163,18 +340,33 @@ export function RetryHistoryDisplay({
                 {/* Repair Details with images */}
                 {attempt.repairDetails && attempt.repairDetails.length > 0 && (
                   <details className="text-xs">
-                    <summary className="cursor-pointer text-amber-700 font-medium">
+                    <summary className="cursor-pointer text-amber-700 font-medium hover:text-amber-900">
                       🖼️ {language === 'de' ? 'Reparatur-Details' : 'Repair Details'} ({attempt.repairDetails.length})
                     </summary>
-                    <div className="mt-2 space-y-2">
+                    <div className="mt-3 space-y-3">
                       {attempt.repairDetails.map((repair, rIdx) => (
-                        <div key={rIdx} className="bg-white p-2 rounded border">
-                          <div className="font-medium mb-1">{repair.description}</div>
-                          <div className="text-gray-600 mb-2">{repair.fixPrompt}</div>
-                          <div className="flex gap-2 flex-wrap">
-                            {repair.beforeImage && (
+                        <div key={rIdx} className="bg-white p-3 rounded-lg border shadow-sm">
+                          <div className="font-medium text-amber-800 mb-1">{repair.description}</div>
+                          <details className="mb-2">
+                            <summary className="text-gray-500 cursor-pointer hover:text-gray-700 text-[11px]">
+                              Show fix prompt
+                            </summary>
+                            <div className="mt-1 p-2 bg-gray-50 rounded text-[11px] text-gray-600">{repair.fixPrompt}</div>
+                          </details>
+                          <div className="flex gap-4 items-start">
+                            {/* Before with Mask Overlay */}
+                            {repair.beforeImage && repair.maskImage ? (
                               <div>
-                                <div className="text-[10px] text-gray-500 mb-1">Before</div>
+                                <div className="text-[10px] text-gray-500 mb-1 font-medium">Before + Mask</div>
+                                <MaskOverlayImage
+                                  beforeImage={repair.beforeImage}
+                                  maskImage={repair.maskImage}
+                                  onEnlarge={(src, title) => setEnlargedImg({ src, title })}
+                                />
+                              </div>
+                            ) : repair.beforeImage && (
+                              <div>
+                                <div className="text-[10px] text-gray-500 mb-1 font-medium">Before</div>
                                 <img
                                   src={repair.beforeImage}
                                   alt="Before"
@@ -183,24 +375,16 @@ export function RetryHistoryDisplay({
                                 />
                               </div>
                             )}
-                            {repair.maskImage && (
-                              <div>
-                                <div className="text-[10px] text-gray-500 mb-1">Mask</div>
-                                <img
-                                  src={repair.maskImage}
-                                  alt="Mask"
-                                  className="w-32 h-32 object-contain border rounded bg-black cursor-pointer hover:ring-2 hover:ring-gray-400"
-                                  onClick={() => setEnlargedImg({ src: repair.maskImage!, title: 'Repair Mask' })}
-                                />
-                              </div>
-                            )}
+                            {/* Arrow */}
+                            <div className="flex items-center h-32 text-gray-400 text-2xl">→</div>
+                            {/* After */}
                             {repair.afterImage && (
                               <div>
-                                <div className="text-[10px] text-gray-500 mb-1">After</div>
+                                <div className="text-[10px] text-gray-500 mb-1 font-medium">After</div>
                                 <img
                                   src={repair.afterImage}
                                   alt="After"
-                                  className="w-32 h-32 object-contain border rounded cursor-pointer hover:ring-2 hover:ring-green-400"
+                                  className="w-32 h-32 object-contain border-2 border-green-300 rounded cursor-pointer hover:ring-2 hover:ring-green-400"
                                   onClick={() => setEnlargedImg({ src: repair.afterImage!, title: 'After Repair' })}
                                 />
                               </div>
