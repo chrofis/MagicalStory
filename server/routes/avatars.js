@@ -12,6 +12,8 @@ const { log } = require('../utils/logger');
 const { logActivity } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
+const { IMAGE_MODELS } = require('../config/models');
+const { generateWithRunware, isRunwareConfigured } = require('../lib/runware');
 
 // ============================================================================
 // COSTUMED AVATAR GENERATION LOG (for developer mode auditing)
@@ -883,7 +885,7 @@ router.get('/avatar-prompt', authenticateToken, async (req, res) => {
  */
 router.post('/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
-    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing } = req.body;
+    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = req.body;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
@@ -894,7 +896,13 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       return res.status(503).json({ error: 'Avatar generation service unavailable' });
     }
 
-    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId})`);
+    // Determine which model to use
+    const selectedModel = avatarModel || 'gemini-2.5-flash-image';
+    const modelConfig = IMAGE_MODELS[selectedModel];
+    const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
+    const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-preview-05-20';
+
+    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId}), model: ${selectedModel}, backend: ${useRunware ? 'runware' : 'gemini'}`);
 
     const isFemale = gender === 'female';
 
@@ -967,10 +975,42 @@ These corrections OVERRIDE what is visible in the reference photo.
       }
     }
 
+    // Helper function to generate a single avatar using Runware (FLUX)
+    const generateAvatarWithRunware = async (category, avatarPrompt) => {
+      try {
+        if (!isRunwareConfigured()) {
+          log.error(`❌ [CLOTHING AVATARS] Runware not configured`);
+          return null;
+        }
+
+        // For FLUX, we need to include the reference image as IP-Adapter input
+        // Build a simpler prompt since FLUX handles things differently
+        const fluxPrompt = `Portrait illustration of a person, full body standing pose, facing forward, ${avatarPrompt}. Children's book illustration style, clean background, high quality.`;
+
+        const result = await generateWithRunware(fluxPrompt, {
+          model: 'runware:5@1',  // FLUX Schnell
+          width: 576,  // 9:16 aspect ratio
+          height: 1024,
+          steps: 4,
+          referenceImages: [facePhoto]  // Use face photo as reference
+        });
+
+        if (result?.imageData) {
+          // Compress the result
+          const compressed = await compressImageToJPEG(result.imageData, 85, 768);
+          return compressed || result.imageData;
+        }
+        return null;
+      } catch (err) {
+        log.error(`❌ [CLOTHING AVATARS] Runware generation failed for ${category}:`, err.message);
+        return null;
+      }
+    };
+
     // Helper function to generate a single avatar
     const generateSingleAvatar = async (category, config) => {
       try {
-        log.debug(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'})...`);
+        log.debug(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'}), model: ${selectedModel}...`);
 
         // Build the prompt from template
         const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
@@ -991,6 +1031,19 @@ These corrections OVERRIDE what is visible in the reference photo.
           avatarPrompt += userTraitsSection;
         }
 
+        // Use Runware for FLUX models
+        if (useRunware) {
+          const imageData = await generateAvatarWithRunware(category, clothingStylePrompt);
+          if (imageData) {
+            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Runware`);
+            return { category, prompt: avatarPrompt, imageData };
+          } else {
+            log.warn(`[CLOTHING AVATARS] Runware generation failed for ${category}`);
+            return { category, prompt: avatarPrompt, imageData: null };
+          }
+        }
+
+        // Use Gemini for Gemini models
         const requestBody = {
           systemInstruction: {
             parts: [{
@@ -1024,7 +1077,7 @@ These corrections OVERRIDE what is visible in the reference photo.
         };
 
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1041,7 +1094,7 @@ These corrections OVERRIDE what is visible in the reference photo.
         let data = await response.json();
 
         // Log token usage
-        const avatarModelId = 'gemini-2.5-flash-image';
+        const avatarModelId = selectedModel;
         const avatarInputTokens = data.usageMetadata?.promptTokenCount || 0;
         const avatarOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
         if (avatarInputTokens > 0 || avatarOutputTokens > 0) {
@@ -1069,7 +1122,7 @@ These corrections OVERRIDE what is visible in the reference photo.
           };
 
           const retryResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

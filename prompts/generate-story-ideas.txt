@@ -20,9 +20,13 @@ RELATIONSHIPS:
 
 READING LEVEL: {READING_LEVEL_DESCRIPTION}
 
+{SCENE_COMPLEXITY_GUIDE}
+
 {CATEGORY_INSTRUCTIONS}
 
 {TOPIC_GUIDE}
+
+{ADVENTURE_SETTING_GUIDE}
 
 OUTPUT LANGUAGE:
 {LANGUAGE_INSTRUCTION}
@@ -43,6 +47,7 @@ IMPORTANT RULES:
 - Be specific about locations and time periods.
 - The outline should focus on the main characters
 - All the characters must be mentioned
+- Follow the SCENE COMPLEXITY guide above - match story complexity to the number of scenes
 
 EXAMPLES of good story ideas:
 
@@ -54,18 +59,30 @@ Example 3: "In a forest where animals can talk, a rabbit loses her way home. She
 
 ---
 
-OUTPUT FORMAT - Generate exactly TWO different story ideas:
+## GENERATION PROCESS:
 
-[IDEA_1]
-<first story idea here>
+For EACH story idea, follow this internal process:
+1. DRAFT: Create an initial story outline following all guidelines above
+2. REVIEW: Check your draft for:
+   - Logical inconsistencies or plot holes
+   - Missing characters (all must appear)
+   - Age-appropriateness issues
+   - Complexity matching the scene count guide
+3. CORRECT: Fix any issues found
+4. OUTPUT: Only the corrected, final version
 
-[IDEA_2]
-<second story idea here>
+OUTPUT FORMAT - Generate exactly TWO different story ideas, one at a time:
+
+[STORY_1]
+<first corrected story idea here>
+
+[STORY_2]
+<second corrected story idea here>
 
 IMPORTANT:
 - The two ideas must be DIFFERENT - different plots, different locations, or different approaches
 - For adventure themes: one idea can start IN the adventure world, the other can start in normal life and transition to adventure (via dream, play, time travel, magic portal, etc.)
 - Both ideas must use the same characters
+- Output STORY_1 first, completely, then STORY_2
 - Write ONLY the two ideas in the format above, nothing else
-
 

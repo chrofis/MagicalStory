@@ -236,6 +236,52 @@ function getTeachingGuide(category, topicId) {
   return null;
 }
 
+/**
+ * Get adventure theme guide directly (for always including in story ideas)
+ * @param {string} themeId - The adventure theme ID (e.g., 'pirate', 'knight', 'wizard')
+ * @returns {string|null} The adventure guide content or null if not found
+ */
+function getAdventureGuide(themeId) {
+  if (!themeId) return null;
+  const normalizedId = themeId.toLowerCase().replace(/\s+/g, '-');
+  return ADVENTURE_GUIDES.get(normalizedId) || null;
+}
+
+/**
+ * Get scene complexity guide based on number of scenes
+ * Provides guidance on story complexity for different scene counts
+ * @param {number} sceneCount - Number of scenes/illustrations in the story
+ * @returns {string} Complexity guide text
+ */
+function getSceneComplexityGuide(sceneCount) {
+  if (sceneCount <= 5) {
+    return `STORY COMPLEXITY (${sceneCount} scenes):
+- SUPER SIMPLE - one clear problem, one solution
+- Single storyline only, no subplots
+- 2-3 main events maximum
+- Very straightforward cause-and-effect`;
+  } else if (sceneCount <= 10) {
+    return `STORY COMPLEXITY (${sceneCount} scenes):
+- Simple but engaging story
+- One main storyline with 1-2 obstacles
+- 4-5 key events
+- Can include a small twist or surprise`;
+  } else if (sceneCount <= 20) {
+    return `STORY COMPLEXITY (${sceneCount} scenes):
+- Moderate complexity
+- Main storyline PLUS one secondary element or subplot
+- At least 2 interwoven themes or character developments
+- 6-8 key events with meaningful progression`;
+  } else {
+    return `STORY COMPLEXITY (${sceneCount} scenes):
+- Rich, multi-layered story
+- Main storyline PLUS 2-3 secondary elements
+- At least 3 interwoven themes, subplots, or character arcs
+- Multiple character developments and interactions
+- 10+ key events with twists and emotional beats`;
+  }
+}
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -2135,5 +2181,7 @@ module.exports = {
   buildUnifiedStoryPrompt,
 
   // Teaching guides
-  getTeachingGuide
+  getTeachingGuide,
+  getAdventureGuide,
+  getSceneComplexityGuide
 };

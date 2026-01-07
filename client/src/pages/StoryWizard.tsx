@@ -1138,7 +1138,7 @@ export default function StoryWizard() {
           // If no name yet (user uploads photo first), generation will run when character is saved
           if (charForGeneration && charForGeneration.name && charForGeneration.name.trim()) {
             // Run avatar generation in background (don't await)
-            characterService.generateAndSaveAvatarForCharacter(charForGeneration)
+            characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
               .then(result => {
                 if (result.success && result.character) {
                   // Merge result with current state to preserve user's trait selections
@@ -1222,7 +1222,8 @@ export default function StoryWizard() {
       // Use the robust service function that handles generation + saving
       const result = await characterService.regenerateAvatarsForCharacter(
         currentCharacter.id,
-        (status, message) => log.info(`[${status}] ${message}`)
+        (status, message) => log.info(`[${status}] ${message}`),
+        { avatarModel: modelSelections.avatarModel || undefined }
       );
 
       if (result.success && result.avatars) {
@@ -1567,7 +1568,7 @@ export default function StoryWizard() {
       if (savedChar && characterService.needsAvatars(savedChar)) {
         // Fire and forget - the service handles generation + saving
         log.info(`🎨 Starting background avatar generation for ${savedChar.name}...`);
-        characterService.generateAndSaveAvatarForCharacter(savedChar).then(result => {
+        characterService.generateAndSaveAvatarForCharacter(savedChar, undefined, { avatarModel: modelSelections.avatarModel || undefined }).then(result => {
           if (result.success && result.avatars) {
             // Update local state with new avatars
             setCharacters(prev => prev.map(c =>

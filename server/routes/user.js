@@ -11,6 +11,40 @@ const { dbQuery, isDatabaseMode, logActivity } = require('../services/database')
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 
+// GET /api/user/location - Get user's location from IP (no auth required)
+// Uses ip-api.com free service for geolocation
+router.get('/location', async (req, res) => {
+  try {
+    // Get client IP (handle proxies like Railway, Cloudflare)
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : req.ip;
+
+    // Skip for localhost/private IPs
+    if (!ip || ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+      return res.json({ city: null, region: null, country: null });
+    }
+
+    // Call ip-api.com (free, no API key needed, 45 req/min limit)
+    const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,city,regionName,country`);
+    const data = await response.json();
+
+    if (data.status === 'fail') {
+      log.debug(`📍 [LOCATION] IP lookup failed for ${ip}`);
+      return res.json({ city: null, region: null, country: null });
+    }
+
+    log.debug(`📍 [LOCATION] Detected: ${data.city}, ${data.regionName}, ${data.country} (IP: ${ip})`);
+    res.json({
+      city: data.city || null,
+      region: data.regionName || null,
+      country: data.country || null
+    });
+  } catch (error) {
+    log.error(`📍 [LOCATION] Error: ${error.message}`);
+    res.json({ city: null, region: null, country: null });
+  }
+});
+
 // GET /api/user/quota - Get user's credits and quota
 router.get('/quota', authenticateToken, async (req, res) => {
   try {

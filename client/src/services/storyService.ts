@@ -743,6 +743,119 @@ export const storyService = {
     return response;
   },
 
+  // Streaming version of generateStoryIdeas - streams stories as they're generated
+  generateStoryIdeasStream(
+    data: {
+      storyType: string;
+      storyTypeName: string;
+      storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
+      storyTopic?: string;
+      storyTheme?: string;
+      customThemeText?: string;
+      language: StoryLanguageCode;
+      languageLevel: LanguageLevel;
+      pages: number;
+      characters: Array<{
+        name: string;
+        age: string;
+        gender: string;
+        traits?: { strengths?: string[]; flaws?: string[]; challenges?: string[]; specialDetails?: string };
+        isMain: boolean;
+      }>;
+      relationships: Array<{
+        character1: string;
+        character2: string;
+        relationship: string;
+      }>;
+      ideaModel?: string | null;
+    },
+    callbacks: {
+      onStory1?: (story: string) => void;
+      onStory2?: (story: string) => void;
+      onStatus?: (status: string, prompt?: string, model?: string) => void;
+      onError?: (error: string) => void;
+      onDone?: () => void;
+    }
+  ): { abort: () => void } {
+    const controller = new AbortController();
+    const token = localStorage.getItem('auth_token');
+
+    const fetchStream = async () => {
+      try {
+        const response = await fetch('/api/generate-story-ideas-stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(data),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          callbacks.onError?.(errorText || 'Failed to generate story ideas');
+          return;
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          callbacks.onError?.('No response body');
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Parse SSE events
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const eventData = JSON.parse(line.slice(6));
+                if (eventData.status) {
+                  callbacks.onStatus?.(eventData.status, eventData.prompt, eventData.model);
+                }
+                if (eventData.story1) {
+                  callbacks.onStory1?.(eventData.story1);
+                }
+                if (eventData.story2) {
+                  callbacks.onStory2?.(eventData.story2);
+                }
+                if (eventData.error) {
+                  callbacks.onError?.(eventData.error);
+                }
+                if (eventData.done) {
+                  callbacks.onDone?.();
+                }
+              } catch {
+                // Ignore parse errors for incomplete data
+              }
+            }
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          callbacks.onError?.((err as Error).message || 'Stream error');
+        }
+      }
+    };
+
+    fetchStream();
+
+    return {
+      abort: () => controller.abort(),
+    };
+  },
+
   // Job-based story generation
   async createStoryJob(data: {
     storyType: string;
@@ -1183,6 +1296,16 @@ export const storyService = {
       pageNumber: number;
     }>(`/api/stories/${storyId}/pages/${pageNumber}/active-image`, { versionIndex });
     return response;
+  },
+
+  // Get user's location from IP for story personalization
+  async getUserLocation(): Promise<{ city: string | null; region: string | null; country: string | null }> {
+    try {
+      const response = await api.get<{ city: string | null; region: string | null; country: string | null }>('/api/user/location');
+      return response;
+    } catch {
+      return { city: null, region: null, country: null };
+    }
   },
 
 };

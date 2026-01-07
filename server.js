@@ -1516,7 +1516,177 @@ ${teachingGuide}`
   }
 });
 
+// SSE Streaming endpoint for story ideas - streams each story as it completes
+app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res) => {
+  // Set up SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+  res.flushHeaders();
 
+  try {
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10 } = req.body;
+
+    log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
+    log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
+
+    // Calculate scene count based on reading level
+    const sceneCount = languageLevel === '1st-grade' ? pages : Math.floor(pages / 2);
+    log.debug(`  Scene count: ${sceneCount} (${languageLevel})`);
+
+    // Build character descriptions
+    const characterDescriptions = characters.map(c => {
+      const role = c.isMain ? 'main character' : 'side character';
+      const traits = [];
+      if (c.traits?.strengths?.length) traits.push(`strengths: ${c.traits.strengths.join(', ')}`);
+      if (c.traits?.flaws?.length) traits.push(`flaws: ${c.traits.flaws.join(', ')}`);
+      if (c.traits?.challenges?.length) traits.push(`challenges: ${c.traits.challenges.join(', ')}`);
+      if (c.traits?.specialDetails) traits.push(`special: ${c.traits.specialDetails}`);
+      const traitsStr = traits.length ? ` (${traits.join('; ')})` : '';
+      return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
+    }).join('\n');
+
+    // Build relationship descriptions
+    const relationshipDescriptions = relationships.map(r =>
+      `- ${r.character1} and ${r.character2}: ${r.relationship}`
+    ).join('\n');
+
+    // Get language instruction from centralized config
+    const { getLanguageInstruction } = require('./server/lib/languages');
+
+    // Determine reading level description
+    const readingLevelDescriptions = {
+      '1st-grade': 'Early reader (simple sentences, 6-7 year olds)',
+      'advanced': 'Advanced (older children 10+)',
+      'standard': 'Standard (7-9 year olds)'
+    };
+
+    // Get scene complexity guide based on page count
+    const { getSceneComplexityGuide, getAdventureGuide } = require('./server/lib/storyHelpers');
+    const sceneComplexityGuide = getSceneComplexityGuide(sceneCount);
+
+    // Build category-specific instructions
+    let categoryInstructions = '';
+    const effectiveCategory = storyCategory || 'adventure';
+    const effectiveTheme = storyTheme || storyTypeName || 'adventure';
+
+    if (effectiveCategory === 'life-challenge') {
+      categoryInstructions = `IMPORTANT: This is a LIFE SKILLS story about "${storyTopic}".
+The story should help children understand and cope with this topic.
+Show the characters facing this challenge and learning to handle it.
+${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Keep the setting realistic and relatable.'}`;
+    } else if (effectiveCategory === 'educational') {
+      categoryInstructions = `IMPORTANT: This is an EDUCATIONAL story teaching about "${storyTopic}".
+Weave learning about ${storyTopic} naturally into the plot.
+Make the educational content fun and part of the adventure.
+${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Use everyday situations to explore the topic.'}`;
+    } else {
+      categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
+    }
+
+    // Get teaching guide for the topic if available
+    const { getTeachingGuide } = require('./server/lib/storyHelpers');
+    const teachingGuide = getTeachingGuide(effectiveCategory, storyTopic);
+    const topicGuideText = teachingGuide
+      ? `**TOPIC GUIDE for "${storyTopic}":**
+${teachingGuide}`
+      : '';
+
+    // Always get adventure guide for setting/costume context
+    const adventureGuideContent = getAdventureGuide(effectiveTheme);
+    const adventureSettingGuide = adventureGuideContent
+      ? `**ADVENTURE SETTING GUIDE for "${effectiveTheme}":**
+${adventureGuideContent}`
+      : '';
+
+    // Load prompt from file and replace placeholders
+    const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
+    const prompt = promptTemplate
+      .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : 'Adventure')
+      .replace('{STORY_TYPE_NAME}', effectiveTheme)
+      .replace('{STORY_TOPIC}', storyTopic || 'None')
+      .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
+      .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
+      .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
+      .replace('{SCENE_COMPLEXITY_GUIDE}', sceneComplexityGuide)
+      .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
+      .replace('{TOPIC_GUIDE}', topicGuideText)
+      .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
+      .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
+
+    // Get model to use
+    const { callTextModelStreaming, getModelDefaults } = require('./server/lib/textModels');
+    const modelDefaults = getModelDefaults();
+    const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
+
+    log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
+
+    // Track accumulated text and which stories we've sent
+    let accumulatedText = '';
+    let story1Sent = false;
+    let story2Sent = false;
+
+    // Send initial event
+    res.write(`data: ${JSON.stringify({ status: 'generating', prompt, model: modelToUse })}\n\n`);
+
+    // Stream from LLM and parse for story markers
+    await callTextModelStreaming(prompt, 1500, (delta, fullText) => {
+      accumulatedText = fullText;
+
+      // Check if we have a complete STORY_1
+      if (!story1Sent) {
+        const story1Match = accumulatedText.match(/\[STORY_1\]\s*([\s\S]*?)(?=\[STORY_2\])/);
+        if (story1Match) {
+          const story1 = story1Match[1].trim();
+          res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
+          story1Sent = true;
+          log.debug('  Story 1 sent to client');
+        }
+      }
+
+      // Check if we have a complete STORY_2 (after the marker and some content)
+      if (!story2Sent && story1Sent) {
+        const story2Match = accumulatedText.match(/\[STORY_2\]\s*([\s\S]+?)$/);
+        if (story2Match && story2Match[1].trim().length > 50) {
+          // Wait a bit more to ensure we have the full story
+          // We'll send it at the end
+        }
+      }
+    }, modelToUse);
+
+    // Parse final result and send story 2 if not already sent
+    if (!story2Sent) {
+      const story2Match = accumulatedText.match(/\[STORY_2\]\s*([\s\S]+?)$/);
+      if (story2Match) {
+        const story2 = story2Match[1].trim();
+        res.write(`data: ${JSON.stringify({ story2 })}\n\n`);
+        log.debug('  Story 2 sent to client');
+      }
+    }
+
+    // If story1 wasn't parsed correctly, try to extract it now
+    if (!story1Sent) {
+      const story1Match = accumulatedText.match(/\[STORY_1\]\s*([\s\S]*?)(?=\[STORY_2\]|$)/);
+      if (story1Match) {
+        const story1 = story1Match[1].trim();
+        res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
+      } else {
+        // Fallback: use the whole response as story1
+        res.write(`data: ${JSON.stringify({ story1: accumulatedText.trim() })}\n\n`);
+      }
+    }
+
+    // Send completion
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+
+  } catch (err) {
+    log.error('Generate story ideas stream error:', err);
+    res.write(`data: ${JSON.stringify({ error: err.message || 'Failed to generate story ideas' })}\n\n`);
+    res.end();
+  }
+});
 
 
 

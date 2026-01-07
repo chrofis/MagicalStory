@@ -320,7 +320,7 @@ export const characterService = {
     await api.post('/api/characters', apiData);
   },
 
-  async generateClothingAvatars(character: Character): Promise<{
+  async generateClothingAvatars(character: Character, options?: { avatarModel?: string }): Promise<{
     success: boolean;
     avatars?: CharacterAvatars;
     extractedTraits?: ExtractedTraits;
@@ -371,6 +371,8 @@ export const characterService = {
         build: character.physical?.build,  // Don't send default - server will default to 'athletic'
         // Pass user-entered clothing to override defaults
         clothing: character.clothing?.structured,
+        // Avatar model override (dev mode)
+        avatarModel: options?.avatarModel,
       });
 
       if (response.success && response.clothingAvatars) {
@@ -689,7 +691,8 @@ export const characterService = {
    */
   async generateAndSaveAvatarForCharacter(
     character: Character,
-    onProgress?: (status: 'starting' | 'generating' | 'saving' | 'complete' | 'error', message: string) => void
+    onProgress?: (status: 'starting' | 'generating' | 'saving' | 'complete' | 'error', message: string) => void,
+    options?: { avatarModel?: string }
   ): Promise<AvatarGenerationResult> {
     const result: AvatarGenerationResult = {
       characterId: character.id,
@@ -707,10 +710,10 @@ export const characterService = {
       }
 
       onProgress?.('generating', `Generating avatars for ${character.name}...`);
-      log.info(`🎨 Generating avatars for ${character.name} (id: ${character.id})`);
+      log.info(`🎨 Generating avatars for ${character.name} (id: ${character.id})${options?.avatarModel ? `, model: ${options.avatarModel}` : ''}`);
 
       // Generate avatars
-      const genResult = await characterService.generateClothingAvatars(character);
+      const genResult = await characterService.generateClothingAvatars(character, options);
 
       if (!genResult.success || !genResult.avatars) {
         result.error = genResult.error || 'Avatar generation failed';
@@ -946,7 +949,8 @@ export const characterService = {
    */
   async regenerateAvatarsForCharacter(
     characterId: number,
-    onProgress?: (status: string, message: string) => void
+    onProgress?: (status: string, message: string) => void,
+    options?: { avatarModel?: string }
   ): Promise<AvatarGenerationResult> {
     log.info(`🔄 Regenerating avatars for character ${characterId}...`);
 
@@ -972,7 +976,8 @@ export const characterService = {
     // Generate and save
     return characterService.generateAndSaveAvatarForCharacter(
       characterWithClearedAvatars,
-      onProgress ? (status, msg) => onProgress(status, msg) : undefined
+      onProgress ? (status, msg) => onProgress(status, msg) : undefined,
+      options
     );
   },
 };

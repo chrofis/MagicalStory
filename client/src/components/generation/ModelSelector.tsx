@@ -82,6 +82,27 @@ export type ImageModelKey = keyof typeof IMAGE_MODELS;
 export type QualityModelKey = keyof typeof QUALITY_MODELS;
 export type ImageBackendKey = keyof typeof IMAGE_BACKENDS;
 
+// Available avatar models
+export const AVATAR_MODELS = {
+  'gemini-2.5-flash-image': {
+    description: 'Gemini 2.5 Flash Image - Fast avatar generation',
+    descriptionDe: 'Gemini 2.5 Flash Image - Schnelle Avatar-Generierung',
+    descriptionFr: 'Gemini 2.5 Flash Image - Génération rapide d\'avatars'
+  },
+  'gemini-3-pro-image-preview': {
+    description: 'Gemini 3 Pro Image - Higher quality (preview)',
+    descriptionDe: 'Gemini 3 Pro Image - Höhere Qualität (Vorschau)',
+    descriptionFr: 'Gemini 3 Pro Image - Qualité supérieure (aperçu)'
+  },
+  'flux-schnell': {
+    description: 'FLUX Schnell - Ultra cheap ($0.0006/image)',
+    descriptionDe: 'FLUX Schnell - Ultra günstig ($0.0006/Bild)',
+    descriptionFr: 'FLUX Schnell - Ultra économique ($0.0006/image)'
+  }
+} as const;
+
+export type AvatarModelKey = keyof typeof AVATAR_MODELS;
+
 export interface ModelSelections {
   ideaModel: TextModelKey | null;  // null = use server default
   outlineModel: TextModelKey | null;
@@ -91,6 +112,7 @@ export interface ModelSelections {
   coverImageModel: ImageModelKey | null;
   qualityModel: QualityModelKey | null;
   imageBackend: ImageBackendKey | null;  // gemini or runware
+  avatarModel: AvatarModelKey | null;  // Avatar generation model
 }
 
 interface ModelSelectorProps {
@@ -234,6 +256,16 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           value={selections.imageBackend}
           options={IMAGE_BACKENDS}
           onChange={(v) => updateSelection('imageBackend', v)}
+          language={language}
+        />
+
+        {/* Avatar Generation Model */}
+        <ModelDropdown
+          label={language === 'de' ? 'Avatar-Modell' : language === 'fr' ? 'Modèle d\'avatar' : 'Avatar Model'}
+          icon={<Image size={12} />}
+          value={selections.avatarModel}
+          options={AVATAR_MODELS}
+          onChange={(v) => updateSelection('avatarModel', v)}
           language={language}
         />
       </div>
