@@ -400,7 +400,7 @@ interface CharacterFormProps {
   onChange: (character: Character) => void;
   onSave: () => void;
   onCancel?: () => void;
-  onPhotoChange: (file: File) => void;
+  onPhotoChange: (file: File, keepOldClothing?: boolean) => void;
   onContinueToTraits?: () => void;
   onContinueToCharacteristics?: () => void;
   onContinueToRelationships?: () => void;
@@ -462,10 +462,13 @@ export function CharacterForm({
   const [enlargedAvatar, setEnlargedAvatar] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isModifyingAvatar, setIsModifyingAvatar] = useState(false);
+  // Clothing choice modal state
+  const [showClothingChoiceModal, setShowClothingChoiceModal] = useState(false);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
 
   // Lock body scroll when modal is open
   useEffect(() => {
-    if (isModifyingAvatar) {
+    if (isModifyingAvatar || showClothingChoiceModal) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -473,13 +476,46 @@ export function CharacterForm({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isModifyingAvatar]);
+  }, [isModifyingAvatar, showClothingChoiceModal]);
+
+  // Check if character has existing clothing data
+  const hasExistingClothing = !!(
+    character.clothing?.structured?.upperBody ||
+    character.clothing?.structured?.lowerBody ||
+    character.clothing?.structured?.shoes ||
+    character.clothing?.structured?.fullBody
+  );
+
+  // Check if character already has avatars (meaning this is a photo change, not initial upload)
+  const hasExistingAvatars = !!(
+    character.avatars?.winter ||
+    character.avatars?.standard ||
+    character.avatars?.summer
+  );
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onPhotoChange(file);
+      // If character has existing clothing AND avatars, show choice modal
+      if (hasExistingClothing && hasExistingAvatars) {
+        setPendingPhotoFile(file);
+        setShowClothingChoiceModal(true);
+      } else {
+        // No existing clothing or first photo - just proceed
+        onPhotoChange(file, false);
+      }
     }
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
+  };
+
+  // Handle clothing choice from modal
+  const handleClothingChoice = (keepOldClothing: boolean) => {
+    if (pendingPhotoFile) {
+      onPhotoChange(pendingPhotoFile, keepOldClothing);
+    }
+    setShowClothingChoiceModal(false);
+    setPendingPhotoFile(null);
   };
 
   // Update top-level character fields
@@ -1796,6 +1832,79 @@ export function CharacterForm({
                     {language === 'de' ? 'Speichern & Neu generieren' : language === 'fr' ? 'Enregistrer et régénérer' : 'Save & Regenerate'}
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clothing Choice Modal - shown when changing photo for character with existing clothing */}
+      {showClothingChoiceModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              {language === 'de' ? 'Kleidung für neues Foto' : language === 'fr' ? 'Vêtements pour la nouvelle photo' : 'Clothing for New Photo'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {language === 'de'
+                ? 'Möchten Sie die aktuelle Kleidung beibehalten oder die Kleidung aus dem neuen Foto verwenden?'
+                : language === 'fr'
+                  ? 'Voulez-vous garder les vêtements actuels ou utiliser ceux de la nouvelle photo?'
+                  : 'Do you want to keep the current clothing or use the clothing from the new photo?'}
+            </p>
+
+            {/* Current clothing preview */}
+            {character.clothing?.structured && (
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+                <div className="font-medium text-gray-700 mb-1">
+                  {language === 'de' ? 'Aktuelle Kleidung:' : language === 'fr' ? 'Vêtements actuels:' : 'Current clothing:'}
+                </div>
+                <div className="text-gray-600 space-y-0.5">
+                  {character.clothing.structured.upperBody && (
+                    <div>{language === 'de' ? 'Oberteil' : 'Top'}: {character.clothing.structured.upperBody}</div>
+                  )}
+                  {character.clothing.structured.lowerBody && (
+                    <div>{language === 'de' ? 'Unterteil' : 'Bottom'}: {character.clothing.structured.lowerBody}</div>
+                  )}
+                  {character.clothing.structured.shoes && (
+                    <div>{language === 'de' ? 'Schuhe' : 'Shoes'}: {character.clothing.structured.shoes}</div>
+                  )}
+                  {character.clothing.structured.fullBody && (
+                    <div>{language === 'de' ? 'Ganzkörper' : 'Full outfit'}: {character.clothing.structured.fullBody}</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+              {/* Use new photo's clothing - DEFAULT */}
+              <button
+                onClick={() => handleClothingChoice(false)}
+                className="w-full px-4 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+              >
+                {language === 'de' ? 'Kleidung aus neuem Foto verwenden' : language === 'fr' ? 'Utiliser les vêtements de la nouvelle photo' : 'Use clothing from new photo'}
+                <span className="text-xs bg-indigo-500 px-2 py-0.5 rounded">
+                  {language === 'de' ? 'Empfohlen' : language === 'fr' ? 'Recommandé' : 'Default'}
+                </span>
+              </button>
+
+              {/* Keep old clothing */}
+              <button
+                onClick={() => handleClothingChoice(true)}
+                className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+              >
+                {language === 'de' ? 'Aktuelle Kleidung beibehalten' : language === 'fr' ? 'Garder les vêtements actuels' : 'Keep current clothing'}
+              </button>
+
+              {/* Cancel */}
+              <button
+                onClick={() => {
+                  setShowClothingChoiceModal(false);
+                  setPendingPhotoFile(null);
+                }}
+                className="w-full px-4 py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
+              >
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
               </button>
             </div>
           </div>

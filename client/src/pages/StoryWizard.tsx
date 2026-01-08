@@ -1055,7 +1055,7 @@ export default function StoryWizard() {
     });
   };
 
-  const handlePhotoSelect = async (file: File) => {
+  const handlePhotoSelect = async (file: File, keepOldClothing?: boolean) => {
     // Check cooldown for existing characters with avatars (developers exempt)
     if (currentCharacter && !developerMode) {
       const hasAvatars = !!(currentCharacter.avatars?.winter || currentCharacter.avatars?.standard || currentCharacter.avatars?.summer);
@@ -1072,6 +1072,11 @@ export default function StoryWizard() {
         recordAvatarRegeneration(currentCharacter.id);
       }
     }
+
+    // Store clothing preference for use after photo analysis
+    const clothingToKeep = keepOldClothing && currentCharacter?.clothing?.structured
+      ? { ...currentCharacter.clothing.structured }
+      : null;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -1127,6 +1132,27 @@ export default function StoryWizard() {
           setCurrentCharacter(prev => {
             if (!prev) return null;
 
+            // Handle clothing based on user's choice
+            let updatedClothing = prev.clothing;
+            let updatedClothingSource = prev.clothingSource;
+
+            if (clothingToKeep) {
+              // User chose to keep old clothing - mark as user-edited so it gets sent to API
+              updatedClothing = { structured: clothingToKeep };
+              updatedClothingSource = {
+                upperBody: clothingToKeep.upperBody ? 'user' : undefined,
+                lowerBody: clothingToKeep.lowerBody ? 'user' : undefined,
+                shoes: clothingToKeep.shoes ? 'user' : undefined,
+                fullBody: clothingToKeep.fullBody ? 'user' : undefined,
+              };
+              log.info(`👕 Keeping old clothing (marked as user-edited): ${JSON.stringify(clothingToKeep)}`);
+            } else {
+              // User chose new photo's clothing - clear existing so it gets extracted from new photo
+              updatedClothing = undefined;
+              updatedClothingSource = undefined;
+              log.info(`👕 Using new photo's clothing (cleared existing)`);
+            }
+
             return {
               ...prev,
               // Photos from face/body detection
@@ -1140,6 +1166,9 @@ export default function StoryWizard() {
               },
               // Clear avatars - will regenerate with new face
               avatars: { status: 'generating' as const },
+              // Update clothing based on user's choice
+              clothing: updatedClothing,
+              clothingSource: updatedClothingSource,
             };
           });
 

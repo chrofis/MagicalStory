@@ -27,7 +27,7 @@ interface WizardStep2Props {
   onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   onCharacterChange: (character: Character | null) => void;
   onCharacterStepChange: (step: 'photo' | 'name' | 'traits' | 'characteristics' | 'relationships') => void;
-  onPhotoSelect: (file: File) => void;
+  onPhotoSelect: (file: File, keepOldClothing?: boolean) => void;
   onSaveAndGenerateAvatar: () => void;  // Save traits and trigger avatar generation
   onSaveCharacter: () => void;
   onEditCharacter: (character: Character) => void;
