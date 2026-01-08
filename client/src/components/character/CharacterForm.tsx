@@ -1794,7 +1794,9 @@ export function CharacterForm({
               <div className="mt-4 pt-3 border-t border-gray-200">
                 <span className="text-gray-500 text-xs block mb-1">Detailed Hair Analysis:</span>
                 <p className="text-sm bg-white border border-gray-200 rounded p-2 italic text-gray-700">
-                  {character.physical.detailedHairAnalysis}
+                  {typeof character.physical.detailedHairAnalysis === 'object'
+                    ? JSON.stringify(character.physical.detailedHairAnalysis, null, 2)
+                    : character.physical.detailedHairAnalysis}
                 </p>
               </div>
             )}
