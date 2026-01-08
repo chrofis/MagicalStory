@@ -39,7 +39,7 @@ const DEV_MODEL_DEFAULTS: ModelSelections = {
   sceneDescriptionModel: 'gemini-2.0-flash',
   imageModel: null,  // Server default
   coverImageModel: null,
-  qualityModel: 'gemini-2.0-flash',
+  qualityModel: 'gemini-2.5-flash',  // 2.5 needed for fix_targets (spatial reasoning)
   imageBackend: 'runware',  // Cheapest image backend ($0.0006/image)
   avatarModel: 'ace-plus-plus',  // Cheap face-consistent avatar model (~$0.005/image)
 };
