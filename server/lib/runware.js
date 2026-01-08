@@ -320,6 +320,7 @@ async function generateAvatarWithACE(referenceImage, prompt, options = {}) {
   }
 
   // ACE++ uses FLUX Fill model with acePlusPlus configuration
+  // referenceImages must be at ROOT level, not inside acePlusPlus
   const payload = [{
     taskType: 'imageInference',
     taskUUID: taskUUID,
@@ -329,11 +330,11 @@ async function generateAvatarWithACE(referenceImage, prompt, options = {}) {
     height: height,
     outputFormat: 'PNG',
     numberResults: 1,
+    referenceImages: [refDataUri],  // Reference face image at ROOT level
     // ACE++ specific configuration
     acePlusPlus: {
       type: 'portrait',  // 'subject', 'portrait', or 'local_editing'
-      inputImages: [refDataUri],  // Reference face image
-      identityStrength: identityStrength  // How much to preserve identity
+      identityStrength: identityStrength  // How much to preserve identity (0-1)
     }
   }];
 
