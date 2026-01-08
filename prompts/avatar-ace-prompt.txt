@@ -1,0 +1,34 @@
+Full body portrait of a person standing facing forward, looking at camera.
+
+POSE: Standing upright, relaxed natural pose, arms at sides or slightly bent, feet shoulder-width apart.
+
+CLOTHING: {CLOTHING_STYLE}
+
+BODY: Athletic, fit body proportions. Age-appropriate physique matching the reference face.
+
+STYLE: Children's book illustration, clean and appealing, high quality render.
+
+BACKGROUND: Pure clean white studio background, even lighting.
+
+FRAMING: Full body visible from head to toe, centered in frame, shoes clearly visible.
+
+---
+CLOTHING_STYLES:
+
+[WINTER_FEMALE]
+Heavy winter coat or parka, warm pants or leggings, winter boots, gloves. Colors and patterns matching reference clothing.
+
+[WINTER_MALE]
+Heavy winter coat or parka, warm pants or jeans, winter boots, gloves. Colors and patterns matching reference clothing.
+
+[STANDARD_FEMALE]
+Long-sleeved top or cozy sweater, jeans or leggings, casual shoes. Colors and patterns matching reference clothing.
+
+[STANDARD_MALE]
+Long-sleeved T-shirt, casual hoodie, or sweater, jeans or casual trousers, casual shoes. Colors and patterns matching reference clothing.
+
+[SUMMER_FEMALE]
+Short-sleeved T-shirt or tank top, shorts or skirt, sandals or flip-flops. Colors and patterns matching reference clothing.
+
+[SUMMER_MALE]
+Short-sleeved T-shirt or tank top, shorts, sandals or flip-flops. Colors and patterns matching reference clothing.

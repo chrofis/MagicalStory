@@ -369,6 +369,35 @@ function getClothingStylePrompt(category, isFemale) {
 }
 
 /**
+ * Get clothing style prompt from ACE++ template (shorter, optimized version)
+ */
+function getClothingStylePromptFromAce(category, isFemale, aceTemplate) {
+  const styleSection = aceTemplate.split('CLOTHING_STYLES:')[1] || '';
+
+  let tag;
+  if (category === 'winter') {
+    tag = isFemale ? '[WINTER_FEMALE]' : '[WINTER_MALE]';
+  } else if (category === 'standard') {
+    tag = isFemale ? '[STANDARD_FEMALE]' : '[STANDARD_MALE]';
+  } else if (category === 'summer') {
+    tag = isFemale ? '[SUMMER_FEMALE]' : '[SUMMER_MALE]';
+  } else {
+    return 'Casual comfortable outfit matching reference clothing style.';
+  }
+
+  const tagIndex = styleSection.indexOf(tag);
+  if (tagIndex === -1) {
+    return 'Casual comfortable outfit matching reference clothing style.';
+  }
+
+  const afterTag = styleSection.substring(tagIndex + tag.length);
+  const nextTagIndex = afterTag.search(/\n\[/);
+  const styleText = nextTagIndex === -1 ? afterTag : afterTag.substring(0, nextTagIndex);
+
+  return styleText.trim();
+}
+
+/**
  * Build clothing prompt for dynamic avatar generation
  * Handles signature items (additions to base) and full costume descriptions
  *
@@ -1050,17 +1079,29 @@ These corrections OVERRIDE what is visible in the reference photo.
     const useACEPlusPlus = selectedModel === 'ace-plus-plus';
 
     // Helper function to generate avatar using ACE++ (face-consistent)
-    const generateAvatarWithACEPlusPlus = async (category, clothingDescription) => {
+    // Uses optimized shorter prompt - ACE++ gets face from reference image
+    const generateAvatarWithACEPlusPlus = async (category, userTraits) => {
       try {
         if (!isRunwareConfigured()) {
           log.error(`❌ [CLOTHING AVATARS] Runware not configured`);
           return null;
         }
 
-        // Build prompt for ACE++ - focuses on clothing and pose
-        const acePrompt = `Full body portrait of a person standing facing forward, ${clothingDescription}. Children's book illustration style, clean white background, high quality, detailed clothing.`;
+        // Build ACE++ prompt from optimized template
+        const aceTemplate = PROMPT_TEMPLATES.avatarAcePrompt || '';
+        const clothingStylePrompt = getClothingStylePromptFromAce(category, isFemale, aceTemplate);
+
+        // Build final prompt: base template + clothing + user traits
+        const basePrompt = aceTemplate.split('---')[0].trim();
+        let acePrompt = fillTemplate(basePrompt, { 'CLOTHING_STYLE': clothingStylePrompt });
+
+        // Add user traits (hair color, build, etc.) - ACE++ won't get these from face reference
+        if (userTraits) {
+          acePrompt += '\n\n' + userTraits;
+        }
 
         log.debug(`🎨 [ACE++] Generating ${category} avatar with face reference`);
+        log.debug(`🎨 [ACE++] Prompt length: ${acePrompt.length} chars`);
 
         const result = await generateAvatarWithACE(facePhoto, acePrompt, {
           width: 768,
@@ -1137,8 +1178,9 @@ These corrections OVERRIDE what is visible in the reference photo.
         }
 
         // Use ACE++ for face-consistent avatar generation
+        // Uses optimized shorter prompt from avatar-ace-prompt.txt
         if (useACEPlusPlus) {
-          const imageData = await generateAvatarWithACEPlusPlus(category, clothingStylePrompt);
+          const imageData = await generateAvatarWithACEPlusPlus(category, userTraitsSection);
           if (imageData) {
             log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via ACE++`);
             return { category, prompt: avatarPrompt, imageData };
