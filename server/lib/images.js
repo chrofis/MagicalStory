@@ -1881,11 +1881,11 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
       mask = await createCombinedMask(width, height, boundingBoxes);
     }
 
-    log.info(`🎨 [INPAINT-RUNWARE] Starting inpaint with model ${options.model || 'runware:100@1'}`);
+    log.info(`🎨 [INPAINT-RUNWARE] Starting inpaint with model ${options.model || 'runware:101@1'}`);
 
     // Call Runware API
     const result = await inpaintWithRunware(originalImage, mask, fixPrompt, {
-      model: options.model || 'runware:100@1',
+      model: options.model || 'runware:101@1',
       strength: 0.85,
       steps: 20,
       width: width,
@@ -1933,13 +1933,13 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
  * @param {string} maskImage - Optional mask image (required for Runware, optional for Gemini)
  * @param {Object} options - Additional options
  * @param {string} options.backend - 'gemini' or 'runware' (default: MODEL_DEFAULTS.inpaintBackend)
- * @param {string} options.runwareModel - Runware model to use (default: 'runware:100@1' SD 1.5)
+ * @param {string} options.runwareModel - Runware model to use (default: 'runware:101@1' SDXL)
  * @returns {Promise<{imageData: string, usage?: Object, modelId?: string}|null>}
  */
 async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImage = null, options = {}) {
   const {
     backend = MODEL_DEFAULTS.inpaintBackend || 'runware',
-    runwareModel = 'runware:100@1'
+    runwareModel = 'runware:101@1'
   } = options;
 
   log.debug(`🔧 [INPAINT] Using backend: ${backend}`);
