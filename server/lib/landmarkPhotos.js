@@ -6,6 +6,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { compressImageToJPEG } = require('./images');
 
 // Simple in-memory cache (24-hour TTL)
 const photoCache = new Map();
@@ -18,8 +19,9 @@ const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
  */
 async function fetchFromWikimedia(query) {
   try {
-    // Search for images in File namespace (namespace 6)
-    const searchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query + ' landmark')}&srnamespace=6&srlimit=5&format=json&origin=*`;
+    // Search for images in File namespace (namespace 6), filter to common image types
+    // Exclude PDFs and other documents by adding filetype filter
+    const searchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query + ' landmark filetype:jpg|jpeg|png|webp')}&srnamespace=6&srlimit=10&format=json&origin=*`;
 
     log.debug(`[LANDMARK] Wikimedia search: ${query}`);
     const searchRes = await fetch(searchUrl);
@@ -30,33 +32,52 @@ async function fetchFromWikimedia(query) {
       return null;
     }
 
-    // Get first image result
-    const fileName = searchData.query.search[0].title;
-    log.debug(`[LANDMARK] Wikimedia found: ${fileName}`);
+    // Loop through results to find first actual image (not PDF/video)
+    for (const result of searchData.query.search) {
+      const fileName = result.title;
 
-    // Get image URL and metadata
-    const infoUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(fileName)}&prop=imageinfo&iiprop=url|user|extmetadata&iiurlwidth=1024&format=json&origin=*`;
-    const infoRes = await fetch(infoUrl);
-    const infoData = await infoRes.json();
+      // Skip non-image files by extension
+      const lowerName = fileName.toLowerCase();
+      if (lowerName.endsWith('.pdf') || lowerName.endsWith('.svg') ||
+          lowerName.endsWith('.webm') || lowerName.endsWith('.ogv') ||
+          lowerName.endsWith('.ogg') || lowerName.endsWith('.djvu')) {
+        log.debug(`[LANDMARK] Skipping non-image: ${fileName}`);
+        continue;
+      }
 
-    const pages = infoData.query?.pages;
-    const page = pages ? Object.values(pages)[0] : null;
-    const imageInfo = page?.imageinfo?.[0];
+      log.debug(`[LANDMARK] Wikimedia found: ${fileName}`);
 
-    if (!imageInfo?.url) {
-      log.debug(`[LANDMARK] Wikimedia: no image URL for "${fileName}"`);
-      return null;
+      // Get image URL and metadata
+      const infoUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(fileName)}&prop=imageinfo&iiprop=url|user|extmetadata|mime&format=json&origin=*`;
+      const infoRes = await fetch(infoUrl);
+      const infoData = await infoRes.json();
+
+      const pages = infoData.query?.pages;
+      const page = pages ? Object.values(pages)[0] : null;
+      const imageInfo = page?.imageinfo?.[0];
+
+      if (!imageInfo?.url) {
+        continue;
+      }
+
+      // Verify it's an actual image MIME type
+      const mime = imageInfo.mime || '';
+      if (!mime.startsWith('image/')) {
+        log.debug(`[LANDMARK] Skipping non-image MIME: ${mime}`);
+        continue;
+      }
+
+      // Use original URL - Wikimedia rate-limits thumbnail URLs (429 error)
+      return {
+        url: imageInfo.url,
+        originalUrl: imageInfo.url,
+        attribution: `Photo by ${imageInfo.user || 'Unknown'} via Wikimedia Commons`,
+        license: imageInfo.extmetadata?.LicenseShortName?.value || 'CC'
+      };
     }
 
-    // Use thumbnail URL if available (smaller, faster to download)
-    const imageUrl = imageInfo.thumburl || imageInfo.url;
-
-    return {
-      url: imageUrl,
-      originalUrl: imageInfo.url,
-      attribution: `Photo by ${imageInfo.user || 'Unknown'} via Wikimedia Commons`,
-      license: imageInfo.extmetadata?.LicenseShortName?.value || 'CC'
-    };
+    log.debug(`[LANDMARK] Wikimedia: no valid images found for "${query}"`);
+    return null;
   } catch (err) {
     log.error(`[LANDMARK] Wikimedia API error:`, err.message);
     return null;
@@ -183,7 +204,12 @@ async function fetchLandmarkPhoto(landmarkQuery) {
 
   try {
     // Download and convert to base64
-    const photoData = await downloadAsBase64(result.url);
+    const rawPhotoData = await downloadAsBase64(result.url);
+
+    // Compress to reasonable size for API (768px max, 80% quality)
+    const photoData = await compressImageToJPEG(rawPhotoData, 80, 768);
+    const compressedSizeKB = Math.round(photoData.length * 0.75 / 1024);
+    log.debug(`[LANDMARK] Compressed to ${compressedSizeKB}KB`);
 
     const photoResult = {
       photoUrl: result.url,
@@ -196,7 +222,7 @@ async function fetchLandmarkPhoto(landmarkQuery) {
     // Cache the successful result
     photoCache.set(cacheKey, { data: photoResult, timestamp: Date.now() });
 
-    log.info(`[LANDMARK] ✅ Fetched photo for "${landmarkQuery}" from ${source}`);
+    log.info(`[LANDMARK] ✅ Fetched photo for "${landmarkQuery}" from ${source} (${compressedSizeKB}KB)`);
     return photoResult;
   } catch (err) {
     log.error(`[LANDMARK] Failed to download photo for "${landmarkQuery}":`, err.message);
