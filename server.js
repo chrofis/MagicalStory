@@ -1431,8 +1431,9 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
     }).join('\n');
 
     // Build relationship descriptions
+    // Format: "Lukas is younger sibling of Manuel" (more readable than "Lukas and Manuel: younger sibling")
     const relationshipDescriptions = relationships.map(r =>
-      `- ${r.character1} and ${r.character2}: ${r.relationship}`
+      `- ${r.character1} ${r.relationship} ${r.character2}`
     ).join('\n');
 
     // Get language instruction from centralized config
@@ -1514,7 +1515,7 @@ ${adventureGuideContent}`
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
-    const result = await callTextModel(prompt, 4000, modelToUse);
+    const result = await callTextModel(prompt, 6000, modelToUse);
 
     // Parse the response to extract 2 ideas from FINAL markers (ignoring DRAFT and REVIEW)
     const responseText = result.text.trim();
@@ -1581,8 +1582,9 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
     }).join('\n');
 
     // Build relationship descriptions
+    // Format: "Lukas is younger sibling of Manuel" (more readable than "Lukas and Manuel: younger sibling")
     const relationshipDescriptions = relationships.map(r =>
-      `- ${r.character1} and ${r.character2}: ${r.relationship}`
+      `- ${r.character1} ${r.relationship} ${r.character2}`
     ).join('\n');
 
     // Get language instruction from centralized config
@@ -1673,7 +1675,7 @@ ${adventureGuideContent}`
     res.write(`data: ${JSON.stringify({ status: 'generating', prompt, model: modelToUse })}\n\n`);
 
     // Stream from LLM and parse for story markers
-    await callTextModelStreaming(prompt, 4000, (delta, fullText) => {
+    await callTextModelStreaming(prompt, 6000, (delta, fullText) => {
       accumulatedText = fullText;
 
       // Check if we have a complete FINAL_1 (ignoring DRAFT_1 and REVIEW_1)
