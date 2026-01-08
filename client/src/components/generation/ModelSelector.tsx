@@ -92,7 +92,7 @@ export type ImageModelKey = keyof typeof IMAGE_MODELS;
 export type QualityModelKey = keyof typeof QUALITY_MODELS;
 export type ImageBackendKey = keyof typeof IMAGE_BACKENDS;
 
-// Available avatar models
+// Available avatar models (only Gemini - FLUX doesn't support image-to-image with face reference)
 export const AVATAR_MODELS = {
   'gemini-2.5-flash-image': {
     description: 'Gemini 2.5 Flash Image - Fast avatar generation',
@@ -103,11 +103,6 @@ export const AVATAR_MODELS = {
     description: 'Gemini 3 Pro Image - Higher quality (preview)',
     descriptionDe: 'Gemini 3 Pro Image - Höhere Qualität (Vorschau)',
     descriptionFr: 'Gemini 3 Pro Image - Qualité supérieure (aperçu)'
-  },
-  'flux-schnell': {
-    description: 'FLUX Schnell - Ultra cheap ($0.0006/image)',
-    descriptionDe: 'FLUX Schnell - Ultra günstig ($0.0006/Bild)',
-    descriptionFr: 'FLUX Schnell - Ultra économique ($0.0006/image)'
   }
 } as const;
 
