@@ -1271,6 +1271,54 @@ export function CharacterForm({
                 </div>
               </details>
             )}
+            {/* Developer mode: show avatar generation input (source photo + user traits) */}
+            {developerMode && (
+              <details className="mt-1 text-left">
+                <summary className="text-[10px] font-medium cursor-pointer text-purple-600">
+                  Avatar Gen Input
+                </summary>
+                <div className="mt-1 p-2 rounded text-[9px] border bg-purple-50 border-purple-200 space-y-2">
+                  <div className="flex gap-2">
+                    <div>
+                      <span className="font-semibold block mb-1">Source Photo:</span>
+                      {(character.photoUrl || character.photos?.face || character.photos?.original) ? (
+                        <img
+                          src={character.photos?.face || character.photoUrl || character.photos?.original}
+                          alt="Source"
+                          className="w-16 h-16 object-cover rounded border"
+                        />
+                      ) : (
+                        <span className="text-red-500">No photo</span>
+                      )}
+                      <span className="block text-[8px] text-gray-500 mt-0.5">
+                        {character.photos?.face ? 'face crop' : character.photoUrl ? 'photoUrl' : character.photos?.original ? 'original' : 'none'}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-semibold block mb-1">User Trait Edits (sent to API):</span>
+                      {(() => {
+                        const source = character.physicalTraitsSource || {};
+                        const userTraits = Object.entries(source)
+                          .filter(([_, v]) => v === 'user')
+                          .map(([k]) => k);
+                        if (userTraits.length === 0) {
+                          return <span className="text-gray-400">None (using extracted)</span>;
+                        }
+                        return (
+                          <ul className="space-y-0.5">
+                            {userTraits.map(trait => (
+                              <li key={trait} className="text-purple-700">
+                                <span className="font-medium">{trait}:</span> {character.physical?.[trait as keyof typeof character.physical] || '?'}
+                              </li>
+                            ))}
+                          </ul>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </details>
+            )}
           </div>
           </div>
         </div>

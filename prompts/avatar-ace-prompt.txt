@@ -1,16 +1,42 @@
-Full body portrait of a person standing facing forward, looking at camera.
+TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference photos.
 
-POSE: Standing upright, relaxed natural pose, arms at sides or slightly bent, feet shoulder-width apart.
+OUTPUT STYLE: PHOTOREALISTIC - This must look like a professional fashion photograph, NOT a cartoon, NOT animated, NOT Pixar style.
 
-CLOTHING: {CLOTHING_STYLE}
+GRID LAYOUT (with clear black dividing lines between quadrants):
+- TOP LEFT: Face - Front (looking at camera)
+- TOP RIGHT: Face - 3/4 Profile (75° looking RIGHT)
+- BOTTOM LEFT: Full Body - Front View (facing camera)
+- BOTTOM RIGHT: Full Body - Profile View (facing RIGHT)
 
-BODY: Athletic, fit body proportions. Age-appropriate physique matching the reference face.
+GRID REQUIREMENTS:
+- Clean 2x2 collage layout with a thin neutral divider.
+- Both profile views (top right and bottom right) face towards the RIGHT
+- Each quadrant has solid light grey (off-white) studio background
+- All 4 quadrants show the SAME outfit. Patterns/logos must be identical in size, color, and placement.
 
-STYLE: Children's book illustration, clean and appealing, high quality render.
+VISUAL REQUIREMENTS:
+- Face: 100% identical to reference photo. Direct replication, not averaged.
+- Body: Generate age-appropriate body proportions based on apparent age in reference.
+- Setting: Pure clean white background (#FFFFFF) in each quadrant.
+- Lighting: Natural, even, studio-style diffused light.
+- Top quadrants: Head and shoulders, face clearly visible
+- Bottom quadrants: Full body, head to toe. Shoes visible.
 
-BACKGROUND: Pure clean white studio background, even lighting.
+BODY TRANSFORMATION:
+- Generate the person with an ATHLETIC, FIT body type by default
+- Do NOT preserve overweight or heavy body proportions from the reference photo
+- Keep the EXACT same face and identity, but transform the body to be slim and athletic
+- For children: fit and healthy, age-appropriate athletic proportions
 
-FRAMING: Full body visible from head to toe, centered in frame, shoes clearly visible.
+IDENTITY PERSISTENCE:
+- Hair and face must be fully visible. Avoid hats and hoods.
+- Biometric precision: The face must not be averaged or replaced.
+- Focus: Ultra-sharp focus on facial features.
+- Enforce age-accurate head-to-body ratio (Infant=4, Child=6, Teen=7, Adult=8)
+
+WARDROBE: {CLOTHING_STYLE}
+
+Output Quality: 4k, Photorealistic.
 
 ---
 CLOTHING_STYLES:
@@ -22,13 +48,13 @@ Heavy winter coat or parka, warm pants or leggings, winter boots, gloves. Colors
 Heavy winter coat or parka, warm pants or jeans, winter boots, gloves. Colors and patterns matching reference clothing.
 
 [STANDARD_FEMALE]
-Long-sleeved top or cozy sweater, jeans or leggings, casual shoes. Colors and patterns matching reference clothing.
+Long-sleeved dress, T-shirt, or cozy sweater, jeans or leggings, casual shoes. Colors and patterns matching reference clothing.
 
 [STANDARD_MALE]
 Long-sleeved T-shirt, casual hoodie, or sweater, jeans or casual trousers, casual shoes. Colors and patterns matching reference clothing.
 
 [SUMMER_FEMALE]
-Short-sleeved T-shirt or tank top, shorts or skirt, sandals or flip-flops. Colors and patterns matching reference clothing.
+Short-sleeved T-shirt, sundress, or tank top, shorts or skirt, sandals or flip-flops. Colors and patterns matching reference clothing.
 
 [SUMMER_MALE]
 Short-sleeved T-shirt or tank top, shorts, sandals or flip-flops. Colors and patterns matching reference clothing.

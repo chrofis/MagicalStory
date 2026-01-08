@@ -1321,22 +1321,33 @@ export default function StoryWizard() {
         // Update local state with new avatars (explicitly clear stale flag)
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-        // OVERWRITE physical traits with extracted values from new avatar
-        // The avatar is the source of truth - extracted traits should replace existing data
-        // BUT preserve fields that aren't extracted (like height, which isn't visible in avatar)
+        // MERGE physical traits - preserve USER edits, use extracted for non-user traits
+        // This allows multiple trait modifications to accumulate across regenerations
+        const currentSource = currentCharacter.physicalTraitsSource || {};
         const updatedPhysical = result.extractedTraits ? {
           height: currentCharacter.physical?.height, // Preserve height (not extracted from avatar)
-          ...result.extractedTraits, // Overwrite extracted fields
+          // Preserve user-edited values, use extracted for non-user traits
+          eyeColor: currentSource.eyeColor === 'user' ? currentCharacter.physical?.eyeColor : result.extractedTraits.eyeColor,
+          hairColor: currentSource.hairColor === 'user' ? currentCharacter.physical?.hairColor : result.extractedTraits.hairColor,
+          hairLength: currentSource.hairLength === 'user' ? currentCharacter.physical?.hairLength : result.extractedTraits.hairLength,
+          hairStyle: currentSource.hairStyle === 'user' ? currentCharacter.physical?.hairStyle : result.extractedTraits.hairStyle,
+          build: currentSource.build === 'user' ? currentCharacter.physical?.build : result.extractedTraits.build,
+          face: currentSource.face === 'user' ? currentCharacter.physical?.face : result.extractedTraits.face,
+          facialHair: currentSource.facialHair === 'user' ? currentCharacter.physical?.facialHair : result.extractedTraits.facialHair,
+          other: currentSource.other === 'user' ? currentCharacter.physical?.other : result.extractedTraits.other,
         } : currentCharacter.physical;
 
-        // All traits now come from extraction (overwrite existing source tracking)
+        // PRESERVE 'user' source - only set 'extracted' for non-user traits
+        // This allows subsequent edits to accumulate without losing previous user edits
         const updatedTraitsSource = result.extractedTraits ? {
-          eyeColor: result.extractedTraits.eyeColor ? 'extracted' as const : undefined,
-          hairColor: result.extractedTraits.hairColor ? 'extracted' as const : undefined,
-          hairLength: result.extractedTraits.hairLength ? 'extracted' as const : undefined,
-          hairStyle: result.extractedTraits.hairStyle ? 'extracted' as const : undefined,
-          build: result.extractedTraits.build ? 'extracted' as const : undefined,
-          face: result.extractedTraits.face ? 'extracted' as const : undefined,
+          eyeColor: currentSource.eyeColor === 'user' ? 'user' as const : (result.extractedTraits.eyeColor ? 'extracted' as const : undefined),
+          hairColor: currentSource.hairColor === 'user' ? 'user' as const : (result.extractedTraits.hairColor ? 'extracted' as const : undefined),
+          hairLength: currentSource.hairLength === 'user' ? 'user' as const : (result.extractedTraits.hairLength ? 'extracted' as const : undefined),
+          hairStyle: currentSource.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
+          build: currentSource.build === 'user' ? 'user' as const : (result.extractedTraits.build ? 'extracted' as const : undefined),
+          face: currentSource.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
+          facialHair: currentSource.facialHair === 'user' ? 'user' as const : undefined,
+          other: currentSource.other === 'user' ? 'user' as const : undefined,
         } : currentCharacter.physicalTraitsSource;
 
         // OVERWRITE clothing with extracted values from new avatar
@@ -1428,22 +1439,33 @@ export default function StoryWizard() {
         // Update local state with new avatars
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-        // OVERWRITE physical traits with extracted values from new avatar
-        // The avatar is the source of truth - extracted traits should replace existing data
-        // BUT preserve fields that aren't extracted (like height, which isn't visible in avatar)
+        // MERGE physical traits - preserve USER edits, use extracted for non-user traits
+        // This allows multiple trait modifications to accumulate across regenerations
+        const currentSource2 = latestChar.physicalTraitsSource || {};
         const updatedPhysical2 = result.extractedTraits ? {
           height: latestChar.physical?.height, // Preserve height (not extracted from avatar)
-          ...result.extractedTraits, // Overwrite extracted fields
+          // Preserve user-edited values, use extracted for non-user traits
+          eyeColor: currentSource2.eyeColor === 'user' ? latestChar.physical?.eyeColor : result.extractedTraits.eyeColor,
+          hairColor: currentSource2.hairColor === 'user' ? latestChar.physical?.hairColor : result.extractedTraits.hairColor,
+          hairLength: currentSource2.hairLength === 'user' ? latestChar.physical?.hairLength : result.extractedTraits.hairLength,
+          hairStyle: currentSource2.hairStyle === 'user' ? latestChar.physical?.hairStyle : result.extractedTraits.hairStyle,
+          build: currentSource2.build === 'user' ? latestChar.physical?.build : result.extractedTraits.build,
+          face: currentSource2.face === 'user' ? latestChar.physical?.face : result.extractedTraits.face,
+          facialHair: currentSource2.facialHair === 'user' ? latestChar.physical?.facialHair : result.extractedTraits.facialHair,
+          other: currentSource2.other === 'user' ? latestChar.physical?.other : result.extractedTraits.other,
         } : latestChar.physical;
 
-        // All traits now come from extraction (overwrite existing source tracking)
+        // PRESERVE 'user' source - only set 'extracted' for non-user traits
+        // This allows subsequent edits to accumulate without losing previous user edits
         const updatedTraitsSource2 = result.extractedTraits ? {
-          eyeColor: result.extractedTraits.eyeColor ? 'extracted' as const : undefined,
-          hairColor: result.extractedTraits.hairColor ? 'extracted' as const : undefined,
-          hairLength: result.extractedTraits.hairLength ? 'extracted' as const : undefined,
-          hairStyle: result.extractedTraits.hairStyle ? 'extracted' as const : undefined,
-          build: result.extractedTraits.build ? 'extracted' as const : undefined,
-          face: result.extractedTraits.face ? 'extracted' as const : undefined,
+          eyeColor: currentSource2.eyeColor === 'user' ? 'user' as const : (result.extractedTraits.eyeColor ? 'extracted' as const : undefined),
+          hairColor: currentSource2.hairColor === 'user' ? 'user' as const : (result.extractedTraits.hairColor ? 'extracted' as const : undefined),
+          hairLength: currentSource2.hairLength === 'user' ? 'user' as const : (result.extractedTraits.hairLength ? 'extracted' as const : undefined),
+          hairStyle: currentSource2.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
+          build: currentSource2.build === 'user' ? 'user' as const : (result.extractedTraits.build ? 'extracted' as const : undefined),
+          face: currentSource2.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
+          facialHair: currentSource2.facialHair === 'user' ? 'user' as const : undefined,
+          other: currentSource2.other === 'user' ? 'user' as const : undefined,
         } : latestChar.physicalTraitsSource;
 
         // OVERWRITE clothing with extracted values from new avatar
