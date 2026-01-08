@@ -143,6 +143,7 @@ function EvaluationDisplay({ data, language }: { data: unknown; language: string
 
 /**
  * Component to show mask overlay on an image
+ * Mask: white = area to edit, black = area to preserve
  */
 function MaskOverlayImage({
   beforeImage,
@@ -155,7 +156,7 @@ function MaskOverlayImage({
 }) {
   return (
     <div
-      className="relative w-32 h-32 cursor-pointer hover:ring-2 hover:ring-amber-400 rounded overflow-hidden"
+      className="relative w-40 h-40 cursor-pointer hover:ring-2 hover:ring-amber-400 rounded overflow-hidden border"
       onClick={() => onEnlarge(beforeImage, 'Before with Mask')}
     >
       <img
@@ -163,15 +164,31 @@ function MaskOverlayImage({
         alt="Before"
         className="w-full h-full object-contain"
       />
-      {/* Mask overlay - blend mode to show white areas */}
+      {/* Mask overlay - white areas (edit regions) shown as red tint */}
+      <div
+        className="absolute inset-0 w-full h-full"
+        style={{
+          backgroundImage: `url(${maskImage})`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          mixBlendMode: 'multiply',
+          opacity: 0.5
+        }}
+      />
+      {/* Red tint for white mask areas */}
       <img
         src={maskImage}
         alt="Mask overlay"
-        className="absolute inset-0 w-full h-full object-contain mix-blend-screen opacity-60"
-        style={{ filter: 'invert(1)' }}
+        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+        style={{
+          mixBlendMode: 'screen',
+          opacity: 0.7,
+          filter: 'sepia(1) saturate(5) hue-rotate(-50deg)'
+        }}
       />
-      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center py-0.5">
-        Before + Mask
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent text-white text-[10px] text-center py-1 font-medium">
+        🎯 Edit Area
       </div>
     </div>
   );
