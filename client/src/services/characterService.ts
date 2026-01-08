@@ -751,6 +751,7 @@ export const characterService = {
             facialHair: traits.facialHair || updatedCharacter.physical?.facialHair,
             face: traits.face || updatedCharacter.physical?.face,
             other: traits.other || updatedCharacter.physical?.other,
+            detailedHairAnalysis: traits.detailedHairAnalysis || updatedCharacter.physical?.detailedHairAnalysis,
           },
         };
         log.info(`📋 Populated physical traits from extraction for ${character.name}`);
