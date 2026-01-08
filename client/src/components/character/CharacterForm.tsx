@@ -1281,9 +1281,9 @@ export function CharacterForm({
                   <div className="flex gap-2">
                     <div>
                       <span className="font-semibold block mb-1">Source Photo:</span>
-                      {(character.photoUrl || character.photos?.face || character.photos?.original) ? (
+                      {(character.photos?.face || character.photos?.original) ? (
                         <img
-                          src={character.photos?.face || character.photoUrl || character.photos?.original}
+                          src={character.photos?.face || character.photos?.original}
                           alt="Source"
                           className="w-16 h-16 object-cover rounded border"
                         />
@@ -1291,7 +1291,7 @@ export function CharacterForm({
                         <span className="text-red-500">No photo</span>
                       )}
                       <span className="block text-[8px] text-gray-500 mt-0.5">
-                        {character.photos?.face ? 'face crop' : character.photoUrl ? 'photoUrl' : character.photos?.original ? 'original' : 'none'}
+                        {character.photos?.face ? 'face crop' : character.photos?.original ? 'original' : 'none'}
                       </span>
                     </div>
                     <div className="flex-1">
