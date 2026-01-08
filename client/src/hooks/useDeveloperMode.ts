@@ -41,7 +41,7 @@ const DEV_MODEL_DEFAULTS: ModelSelections = {
   coverImageModel: null,
   qualityModel: 'gemini-2.0-flash',
   imageBackend: 'runware',  // Cheapest image backend ($0.0006/image)
-  avatarModel: 'flux-schnell',  // Cheapest avatar model ($0.0006/image)
+  avatarModel: 'ace-plus-plus',  // Cheap face-consistent avatar model (~$0.005/image)
 };
 
 // Default model selections for production (null = server defaults = best quality)

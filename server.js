@@ -5266,7 +5266,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
         const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, isInpaint ? 'inpaint' : 'page_images', imgModel);
+          if (imgUsage) {
+            // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+            const isRunware = imgModel && imgModel.startsWith('runware:');
+            const provider = isRunware ? 'runware' : 'gemini_image';
+            const funcName = isInpaint ? 'inpaint' : 'page_images';
+            addUsage(provider, imgUsage, funcName, imgModel);
+          }
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
         };
 
@@ -5881,9 +5887,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const imagePrompt = buildImagePrompt(scene.description, inputData, sceneCharacters, isSequential, vBible, pageNum, true, referencePhotos); // isStorybook = true
           imagePrompts[pageNum] = imagePrompt;
 
-          // Usage tracker for page images
-          const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-            if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+          // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
+          const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
+            if (imgUsage) {
+              // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+              const isRunware = imgModel && imgModel.startsWith('runware:');
+              const provider = isRunware ? 'runware' : 'gemini_image';
+              const funcName = isInpaint ? 'inpaint' : 'page_images';
+              addUsage(provider, imgUsage, funcName, imgModel);
+            }
             if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
           };
 
@@ -7386,9 +7398,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         const pageModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
 
-        // Usage tracker for page images
-        const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+        // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
+        const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
+          if (imgUsage) {
+            // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+            const isRunware = imgModel && imgModel.startsWith('runware:');
+            const provider = isRunware ? 'runware' : 'gemini_image';
+            const funcName = isInpaint ? 'inpaint' : 'page_images';
+            addUsage(provider, imgUsage, funcName, imgModel);
+          }
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
         };
 
@@ -8552,9 +8570,15 @@ Output Format:
               log.debug(`💾 [PARTIAL] Saved partial result for page ${pageNum} (immediate, quality pending)`);
             };
 
-            // Usage tracker for page images
-            const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-              if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+            // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
+            const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
+              if (imgUsage) {
+                // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+                const isRunware = imgModel && imgModel.startsWith('runware:');
+                const provider = isRunware ? 'runware' : 'gemini_image';
+                const funcName = isInpaint ? 'inpaint' : 'page_images';
+                addUsage(provider, imgUsage, funcName, imgModel);
+              }
               if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
             };
 
@@ -9015,9 +9039,15 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               log.debug(`💾 [PARTIAL] Saved partial result for page ${pageNum} (immediate, quality pending)`);
             };
 
-            // Usage tracker for page images
-            const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-              if (imgUsage) addUsage('gemini_image', imgUsage, 'page_images', imgModel);
+            // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
+            const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
+              if (imgUsage) {
+                // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+                const isRunware = imgModel && imgModel.startsWith('runware:');
+                const provider = isRunware ? 'runware' : 'gemini_image';
+                const funcName = isInpaint ? 'inpaint' : 'page_images';
+                addUsage(provider, imgUsage, funcName, imgModel);
+              }
               if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
             };
 
