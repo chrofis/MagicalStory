@@ -6327,7 +6327,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
     // Log API usage to generationLog for dev mode visibility
     genLog.setStage('finalize');
+    log.debug(`📊 [STORYBOOK] Logging API usage to generationLog. Functions with calls:`);
     for (const [funcName, funcData] of Object.entries(byFunc)) {
+      log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out`);
       if (funcData.calls > 0) {
         const model = getModels(funcData);
         const directCost = funcData.direct_cost || 0;
