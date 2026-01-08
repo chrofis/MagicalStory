@@ -22,7 +22,10 @@ Return a JSON object with this EXACT structure:
     "gender": "<male, female, or other>",
     "height": "<height in cm as a number (e.g. 120 for child, 170 for adult)>",
     "build": "<slim, average, athletic, stocky>",
-    "face": "<PERMANENT facial structure: bone structure, face shape, skin tone - NO expressions>",
+    "skinTone": "<MUST be one of: porcelain | fair | light | medium | olive | tan | caramel | brown | dark brown | deep>",
+    "skinUndertone": "<MUST be one of: warm | cool | neutral>",
+    "skinToneHex": "<skin tone as HEX code, e.g. '#E8BEAC'>",
+    "face": "<PERMANENT facial structure: bone structure, face shape - NO expressions>",
     "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
     "hairLength": "<MUST be one of: bald | balding | thinning | buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
@@ -46,6 +49,8 @@ Return a JSON object with this EXACT structure:
     "eyes": {
       "shape": "<almond | hooded | round | monolid | downturned | upturned>",
       "canthalTilt": "<upturned | neutral | downturned>",
+      "spacing": "<close-set | average | wide-set>",
+      "size": "<small | medium | large>",
       "irisColorHex": "<exact iris color as HEX code, e.g. '#6B4423'>"
     },
     "nose": {
@@ -74,6 +79,11 @@ Return a JSON object with this EXACT structure:
       "skinTexture": "<smooth | textured | weathered>",
       "nasolabialFolds": "<none | subtle | moderate | pronounced>"
     }
+  },
+  "confidence": {
+    "overallConfidence": "<high | medium | low - based on image quality, angle, and visibility>",
+    "lowConfidenceFields": ["<list any fields where analysis is uncertain due to image quality, angle, or occlusion>"],
+    "analysisNotes": "<any caveats about image quality, lighting, angle, or partial visibility that may affect accuracy>"
   }
 }
 

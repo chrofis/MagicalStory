@@ -62,6 +62,62 @@ function clearCostumedAvatarGenerationLog() {
 // ============================================================================
 
 /**
+ * Compare two images using LPIPS perceptual similarity (via Python service)
+ * LPIPS score: 0 = identical, 1 = very different
+ * Returns { success, lpips_score, interpretation, region } or null on error
+ */
+async function compareLPIPS(image1, image2, bbox = null) {
+  try {
+    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+
+    const requestBody = {
+      image1,
+      image2,
+      resize_to: 256  // Faster comparison
+    };
+
+    // Optionally crop to bounding box for targeted comparison
+    if (bbox && Array.isArray(bbox) && bbox.length === 4) {
+      requestBody.bbox = bbox;
+    }
+
+    const response = await fetch(`${photoAnalyzerUrl}/lpips`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!response.ok) {
+      log.warn('[LPIPS] Service returned error:', response.status);
+      return null;
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      log.debug(`[LPIPS] Score: ${result.lpips_score?.toFixed(4)} (${result.interpretation})`);
+      return {
+        success: true,
+        lpipsScore: result.lpips_score,
+        interpretation: result.interpretation,
+        region: result.region
+      };
+    } else {
+      log.warn('[LPIPS] Comparison failed:', result.error);
+      return null;
+    }
+  } catch (err) {
+    if (err.cause?.code === 'ECONNREFUSED') {
+      log.debug('[LPIPS] Service not available (offline)');
+    } else {
+      log.warn('[LPIPS] Error:', err.message);
+    }
+    return null;
+  }
+}
+
+/**
  * Extract physical traits from a photo using Gemini vision
  */
 async function extractTraitsWithGemini(imageData, languageInstruction = '') {
@@ -77,7 +133,7 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,7 +169,7 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
     const data = await response.json();
 
     // Log token usage
-    const modelId = 'gemini-2.0-flash-exp';
+    const modelId = 'gemini-2.5-flash';
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     if (inputTokens > 0 || outputTokens > 0) {

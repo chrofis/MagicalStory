@@ -37,12 +37,16 @@ Return a JSON object with this EXACT structure:
   },
   "physicalTraits": {
     "build": "<MUST be one of: slim | average | athletic | stocky>",
+    "skinTone": "<MUST be one of: porcelain | fair | light | medium | olive | tan | caramel | brown | dark brown | deep>",
+    "skinToneHex": "<skin tone as HEX code, e.g. '#E8BEAC'>",
     "eyeColor": "<MUST be one of: blue | green | brown | hazel | gray | amber>",
+    "eyeColorHex": "<iris color as HEX code, e.g. '#6B4423'>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
+    "hairColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
     "hairLength": "<MUST be one of: bald | balding | buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
     "hairStyle": "<MUST be one of: straight | wavy | curly | coily | messy | spiky | layered | slicked back | loose | ponytail | braids | bun | pigtails | bob | afro | mohawk | mullet | undercut | bangs | side bangs>",
     "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (use 'none' for females/children)",
-    "face": "<brief description of face shape, skin tone, distinguishing features>",
+    "face": "<brief description of face shape, distinguishing features>",
     "other": "<glasses, scars, moles, freckles, piercings, or 'none'>"
   },
   "clothing": {
@@ -58,6 +62,8 @@ Return a JSON object with this EXACT structure:
     "lengthSides": "<length of hair on sides, e.g. '2cm', '10cm', '25cm' - same as top if uniform length>",
     "bangsEndAt": "<MUST be one of: above eyebrows | at eyebrows | below eyebrows | no bangs>",
     "styling": "<MUST be one of: messy | slicked | natural | styled | tousled>",
-    "direction": "<MUST be one of: left | right | back | forward | center part | side part left | side part right>"
+    "direction": "<MUST be one of: left | right | back | forward | center part | side part left | side part right>",
+    "baseColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
+    "highlightsHex": "<highlight color as HEX code if visible, e.g. '#C4A77D', or 'none'>"
   }
 }

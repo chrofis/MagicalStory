@@ -390,16 +390,188 @@ def test():
     try:
         import cv2
         import mediapipe
+        lpips_available = False
+        try:
+            import lpips
+            lpips_available = True
+        except ImportError:
+            pass
         return jsonify({
             "success": True,
             "mediapipe_version": mediapipe.__version__,
             "opencv_installed": True,
+            "lpips_available": lpips_available,
             "note": "DeepFace removed - age/gender from Gemini"
         })
     except Exception as e:
         return jsonify({
             "success": False,
             "error": str(e)
+        }), 500
+
+
+# LPIPS model (lazy loaded)
+_lpips_model = None
+
+def get_lpips_model():
+    """Lazy load LPIPS model to avoid startup delay"""
+    global _lpips_model
+    if _lpips_model is None:
+        try:
+            import lpips
+            print("🧠 Loading LPIPS model (AlexNet)...")
+            _lpips_model = lpips.LPIPS(net='alex')
+            print("   LPIPS model loaded")
+        except ImportError:
+            print("⚠️ LPIPS not available - install with: pip install lpips")
+            return None
+    return _lpips_model
+
+
+def decode_image_to_tensor(image_data):
+    """Decode base64 image to normalized tensor for LPIPS"""
+    import torch
+
+    # Remove data URL prefix if present
+    if ',' in image_data:
+        image_data = image_data.split(',')[1]
+
+    # Decode base64
+    image_bytes = base64.b64decode(image_data)
+    img_pil = Image.open(BytesIO(image_bytes)).convert('RGB')
+
+    # Convert to numpy, then to tensor
+    img_np = np.array(img_pil).astype(np.float32) / 255.0
+
+    # Normalize to [-1, 1] range (LPIPS requirement)
+    img_np = img_np * 2 - 1
+
+    # Convert to tensor: [H, W, C] -> [1, C, H, W]
+    img_tensor = torch.from_numpy(img_np).permute(2, 0, 1).unsqueeze(0)
+
+    return img_tensor, img_pil.size
+
+
+def crop_tensor_to_bbox(img_tensor, bbox, img_size):
+    """
+    Crop tensor to bounding box region
+    bbox: [ymin, xmin, ymax, xmax] normalized 0.0-1.0
+    img_size: (width, height)
+    """
+    import torch
+
+    width, height = img_size
+    ymin, xmin, ymax, xmax = bbox
+
+    # Convert normalized coords to pixels
+    y1 = int(ymin * height)
+    x1 = int(xmin * width)
+    y2 = int(ymax * height)
+    x2 = int(xmax * width)
+
+    # Ensure valid bounds
+    y1 = max(0, y1)
+    x1 = max(0, x1)
+    y2 = min(height, y2)
+    x2 = min(width, x2)
+
+    # Crop: tensor is [1, C, H, W]
+    cropped = img_tensor[:, :, y1:y2, x1:x2]
+
+    return cropped
+
+
+@app.route('/lpips', methods=['POST'])
+def compare_lpips():
+    """
+    Compare two images using LPIPS perceptual similarity.
+
+    Expected JSON:
+    {
+        "image1": "data:image/jpeg;base64,...",  # Original/reference image
+        "image2": "data:image/jpeg;base64,...",  # Generated/modified image
+        "bbox": [ymin, xmin, ymax, xmax],        # Optional: compare only this region (0.0-1.0)
+        "resize_to": 256                          # Optional: resize for faster comparison
+    }
+
+    Returns:
+    {
+        "success": true,
+        "lpips_score": 0.123,      # 0 = identical, 1 = very different
+        "interpretation": "very_similar",
+        "region": "full" or "cropped"
+    }
+    """
+    try:
+        model = get_lpips_model()
+        if model is None:
+            return jsonify({
+                "success": False,
+                "error": "LPIPS not available. Install with: pip install lpips torch torchvision"
+            }), 503
+
+        import torch
+
+        data = request.get_json()
+        if not data or 'image1' not in data or 'image2' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'image1' or 'image2' in request"
+            }), 400
+
+        # Decode images
+        img1_tensor, img1_size = decode_image_to_tensor(data['image1'])
+        img2_tensor, img2_size = decode_image_to_tensor(data['image2'])
+
+        region = "full"
+
+        # Optional: crop to bounding box
+        bbox = data.get('bbox')
+        if bbox and len(bbox) == 4:
+            img1_tensor = crop_tensor_to_bbox(img1_tensor, bbox, img1_size)
+            img2_tensor = crop_tensor_to_bbox(img2_tensor, bbox, img2_size)
+            region = "cropped"
+
+        # Optional: resize for faster comparison
+        resize_to = data.get('resize_to')
+        if resize_to:
+            import torch.nn.functional as F
+            img1_tensor = F.interpolate(img1_tensor, size=(resize_to, resize_to), mode='bilinear', align_corners=False)
+            img2_tensor = F.interpolate(img2_tensor, size=(resize_to, resize_to), mode='bilinear', align_corners=False)
+
+        # Ensure same size (resize img2 to match img1 if needed)
+        if img1_tensor.shape != img2_tensor.shape:
+            import torch.nn.functional as F
+            img2_tensor = F.interpolate(img2_tensor, size=img1_tensor.shape[2:], mode='bilinear', align_corners=False)
+
+        # Compute LPIPS
+        with torch.no_grad():
+            lpips_score = model(img1_tensor, img2_tensor).item()
+
+        # Interpret score
+        if lpips_score < 0.05:
+            interpretation = "nearly_identical"
+        elif lpips_score < 0.15:
+            interpretation = "very_similar"
+        elif lpips_score < 0.30:
+            interpretation = "somewhat_similar"
+        else:
+            interpretation = "different"
+
+        return jsonify({
+            "success": True,
+            "lpips_score": round(lpips_score, 4),
+            "interpretation": interpretation,
+            "region": region,
+            "image1_size": list(img1_size),
+            "image2_size": list(img2_size)
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
         }), 500
 
 
