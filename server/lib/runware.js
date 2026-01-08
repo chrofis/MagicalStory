@@ -150,6 +150,7 @@ async function inpaintWithRunware(seedImage, maskImage, prompt, options = {}) {
       imageBase64: result.imageBase64,
       usage: {
         cost: cost,
+        direct_cost: cost,  // For addUsage compatibility
         inferenceTime: result.inferenceTime || elapsed
       },
       modelId: model
@@ -271,6 +272,7 @@ async function generateWithRunware(prompt, options = {}) {
       imageBase64: result.imageBase64,
       usage: {
         cost: cost,
+        direct_cost: cost,  // For addUsage compatibility
         inferenceTime: result.inferenceTime || elapsed
       },
       modelId: model
@@ -392,6 +394,7 @@ async function generateAvatarWithACE(referenceImage, prompt, options = {}) {
       imageBase64: result.imageBase64,
       usage: {
         cost: cost,
+        direct_cost: cost,  // For addUsage compatibility
         inferenceTime: result.inferenceTime || elapsed
       },
       modelId: 'ace-plus-plus'

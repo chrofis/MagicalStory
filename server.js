@@ -6359,6 +6359,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       }
     }
 
+    // Add total cost summary to generation log
+    genLog.info('total_cost', `💰 Total API cost: $${totalCost.toFixed(4)}`, null, {
+      totalCost: totalCost,
+      totalInputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].input_tokens || 0), 0),
+      totalOutputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0),
+      runwareCost: tokenUsage.runware?.direct_cost || 0
+    });
+
     // Finalize and populate generationLog for storage
     genLog.finalize();
     storyData.generationLog = genLog.getEntries();
@@ -7631,6 +7639,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }, cost);
       }
     }
+    // Add total cost summary to generation log
+    genLog.info('total_cost', `💰 Total API cost: $${totalCost.toFixed(4)}`, null, {
+      totalCost: totalCost,
+      totalInputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].input_tokens || 0), 0),
+      totalOutputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0),
+      runwareCost: tokenUsage.runware?.direct_cost || 0
+    });
     log.debug(`📊 [UNIFIED] genLog now has ${genLog.getEntries().length} entries`);
     genLog.finalize();
 
