@@ -2163,7 +2163,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       inputDescription,  // What user provided (before expansion)
       prompt: imagePrompt,
       sceneWasEdited,
-      sceneWasExpanded: isShortSummary,  // Flag if expansion was done
+      sceneWasExpanded: shouldExpand,  // Flag if expansion was done
       // All image versions
       imageVersions: sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions || []
     });
