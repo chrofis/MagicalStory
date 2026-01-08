@@ -185,6 +185,28 @@ export function WizardStep2Characters({
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           <Users size={24} /> {t.charactersStepTitle}
         </h2>
+        {/* Main character requirement message */}
+        {mainCharacters.length === 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+            <span className="text-amber-500 text-xl">⭐</span>
+            <div>
+              <p className="text-amber-800 font-medium">
+                {language === 'de'
+                  ? 'Wähle mindestens einen Hauptcharakter aus'
+                  : language === 'fr'
+                  ? 'Sélectionnez au moins un personnage principal'
+                  : 'Select at least one main character'}
+              </p>
+              <p className="text-amber-600 text-sm mt-1">
+                {language === 'de'
+                  ? 'Klicke auf den Stern ⭐ neben einem Charakter, um ihn zum Hauptcharakter zu machen.'
+                  : language === 'fr'
+                  ? 'Cliquez sur l\'étoile ⭐ à côté d\'un personnage pour en faire le personnage principal.'
+                  : 'Click the star ⭐ next to a character to make them the main character.'}
+              </p>
+            </div>
+          </div>
+        )}
         <CharacterList
           characters={characters}
           showSuccessMessage={showCharacterCreated}

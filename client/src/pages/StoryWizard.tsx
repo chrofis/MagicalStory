@@ -1741,8 +1741,8 @@ export default function StoryWizard() {
   const canGoNext = (): boolean => {
     // NEW ORDER: 1=Characters, 2=BookSettings, 3=StoryType, 4=ArtStyle, 5=Summary
     if (step === 1) {
-      // Step 1: Characters - must have at least one character AND all relationships defined
-      return characters.length > 0 && areAllRelationshipsDefined();
+      // Step 1: Characters - must have at least one character, one main character, AND all relationships defined
+      return characters.length > 0 && mainCharacters.length > 0 && areAllRelationshipsDefined();
     }
     if (step === 2) {
       // Step 2: Book Settings - always can proceed (languageLevel has default)
