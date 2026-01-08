@@ -77,12 +77,27 @@ const INPAINT_BACKENDS = {
   'gemini': {
     name: 'Gemini',
     description: 'Gemini 2.5 Flash Image - High quality, more expensive (~$0.03/image)',
-    costPerImage: 0.03
+    costPerImage: 0.03,
+    model: 'gemini-2.5-flash-image'
   },
+  'runware-sdxl': {
+    name: 'Runware SDXL',
+    description: 'Runware SDXL - Good quality for objects/backgrounds (~$0.002/image)',
+    costPerImage: 0.002,
+    model: 'runware:101@1'
+  },
+  'runware-flux-fill': {
+    name: 'Runware FLUX Fill',
+    description: 'FLUX Fill - Best quality for face repair (~$0.05/image)',
+    costPerImage: 0.05,
+    model: 'runware:102@1'
+  },
+  // Legacy alias
   'runware': {
     name: 'Runware SDXL',
     description: 'Runware SDXL - Good quality, cheap (~$0.002/image)',
-    costPerImage: 0.002
+    costPerImage: 0.002,
+    model: 'runware:101@1'
   }
 };
 

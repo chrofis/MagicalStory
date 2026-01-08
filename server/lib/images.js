@@ -1810,6 +1810,111 @@ function calculateMaskCoverage(boundingBoxes) {
 }
 
 /**
+ * Classify issue type from issue description text
+ * Used to determine appropriate padding and model selection
+ * @param {string} issue - Issue description text
+ * @returns {string} Issue type: 'face', 'hand', 'anatomy', 'object', or 'default'
+ */
+function classifyIssueType(issue) {
+  if (!issue || typeof issue !== 'string') return 'default';
+  const lower = issue.toLowerCase();
+
+  // Face/identity issues - need high-quality model + face reference
+  if (lower.match(/\b(face|facial|eye|eyes|nose|mouth|expression|identity|portrait)\b/)) {
+    return 'face';
+  }
+
+  // Hand issues - common AI artifact
+  if (lower.match(/\b(hand|hands|finger|fingers|thumb|palm|grip|holding)\b/)) {
+    return 'hand';
+  }
+
+  // Other anatomy issues
+  if (lower.match(/\b(arm|arms|leg|legs|foot|feet|limb|limbs|body|torso|anatomy|anatomical)\b/)) {
+    return 'anatomy';
+  }
+
+  // Object issues - props, items, weapons, etc.
+  if (lower.match(/\b(object|sword|shield|weapon|item|prop|tool|hat|clothing|accessory|artifact|broken|fragmented|duplicate)\b/)) {
+    return 'object';
+  }
+
+  return 'default';
+}
+
+/**
+ * Apply adaptive padding to bounding box based on issue type
+ * Research shows: high padding preserves context, low padding = more creativity
+ * @param {number[]} bbox - [ymin, xmin, ymax, xmax] normalized 0.0-1.0
+ * @param {string} issueType - Type of issue (face, hand, anatomy, object, default)
+ * @returns {number[]} Padded bounding box
+ */
+function padBoundingBox(bbox, issueType) {
+  // Padding values based on research:
+  // - Face: 10% (preserve identity, don't alter too much context)
+  // - Hand: 15% (need some context for fingers)
+  // - Anatomy: 15% (body parts need context)
+  // - Object: 25% (more context needed for object coherence)
+  // - Default: 20% (balanced approach)
+  const padding = {
+    'face': 0.10,
+    'hand': 0.15,
+    'anatomy': 0.15,
+    'object': 0.25,
+    'default': 0.20
+  };
+
+  const pad = padding[issueType] || padding.default;
+  const [ymin, xmin, ymax, xmax] = bbox;
+
+  return [
+    Math.max(0, ymin - pad),  // ymin
+    Math.max(0, xmin - pad),  // xmin
+    Math.min(1, ymax + pad),  // ymax
+    Math.min(1, xmax + pad)   // xmax
+  ];
+}
+
+/**
+ * Group fix targets by issue type for smart inpainting
+ * Research: Combining unrelated regions in one mask causes artifacts
+ * Face issues need high-quality model + reference, objects can use cheaper model
+ * @param {Array} fixTargets - Array of {boundingBox, issue, fixPrompt}
+ * @returns {Object} Grouped targets: { faceTargets, anatomyTargets, objectTargets }
+ */
+function groupFixTargetsForInpainting(fixTargets) {
+  const faceTargets = [];
+  const anatomyTargets = [];
+  const objectTargets = [];
+
+  for (const target of fixTargets) {
+    const issueType = classifyIssueType(target.issue);
+
+    // Apply adaptive padding to bounding box
+    const paddedBbox = padBoundingBox(target.boundingBox, issueType);
+    const paddedTarget = { ...target, boundingBox: paddedBbox, issueType };
+
+    switch (issueType) {
+      case 'face':
+        faceTargets.push(paddedTarget);
+        break;
+      case 'hand':
+      case 'anatomy':
+        anatomyTargets.push(paddedTarget);
+        break;
+      case 'object':
+      default:
+        objectTargets.push(paddedTarget);
+        break;
+    }
+  }
+
+  log.debug(`🔧 [GROUPING] Grouped ${fixTargets.length} targets: ${faceTargets.length} face, ${anatomyTargets.length} anatomy, ${objectTargets.length} object`);
+
+  return { faceTargets, anatomyTargets, objectTargets };
+}
+
+/**
  * Create a combined mask from multiple bounding boxes
  * @param {number} width - Image width in pixels
  * @param {number} height - Image height in pixels
@@ -2118,12 +2223,17 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
     };
   }
 
-  // Collect all bounding boxes
-  const boundingBoxes = fixTargets.map(t => t.boundingBox);
+  // Group fix targets by issue type and apply adaptive padding
+  // Research: Combining unrelated regions (face vs objects) causes artifacts
+  const { faceTargets, anatomyTargets, objectTargets } = groupFixTargetsForInpainting(fixTargets);
+
+  // Collect all padded bounding boxes for coverage check
+  const allTargets = [...faceTargets, ...anatomyTargets, ...objectTargets];
+  const boundingBoxes = allTargets.map(t => t.boundingBox);
 
   // Check mask coverage before attempting repair
   const maskCoverage = calculateMaskCoverage(boundingBoxes);
-  log.info(`🔄 [AUTO-REPAIR] ${fixTargets.length} fix targets covering ${maskCoverage.toFixed(1)}% of image`);
+  log.info(`🔄 [AUTO-REPAIR] ${fixTargets.length} fix targets covering ${maskCoverage.toFixed(1)}% of image (with padding)`);
 
   if (maskCoverage > MAX_MASK_COVERAGE_PERCENT) {
     log.warn(`⚠️ [AUTO-REPAIR] Mask covers ${maskCoverage.toFixed(1)}% of image (>${MAX_MASK_COVERAGE_PERCENT}%) - too large for inpainting, skipping repair`);
@@ -2149,91 +2259,104 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
     };
   }
 
-  try {
-    // Get image dimensions
-    const dimensions = await getImageDimensions(currentImage);
+  // Helper function to repair a group of targets
+  const repairGroup = async (targets, groupName, modelId, passNumber) => {
+    if (targets.length === 0) return { success: true, skipped: true };
 
-    // Create combined mask with ALL regions
-    const combinedMask = await createCombinedMask(
-      dimensions.width,
-      dimensions.height,
-      boundingBoxes
-    );
+    const groupBboxes = targets.map(t => t.boundingBox);
+    const groupPrompt = targets.length === 1
+      ? targets[0].fixPrompt
+      : `Fix the following issues:\n${targets.map((t, i) => `${i + 1}. ${t.fixPrompt}`).join('\n')}`;
 
-    // Build combined fix prompt with numbered issues
-    const combinedPrompt = fixTargets.length === 1
-      ? fixTargets[0].fixPrompt
-      : `Fix the following issues in the masked areas:\n${fixTargets.map((t, i) => `${i + 1}. ${t.fixPrompt}`).join('\n')}`;
+    log.info(`🔄 [AUTO-REPAIR] Pass ${passNumber}: ${groupName} (${targets.length} targets) using ${modelId}`);
 
-    log.debug(`🔄 [AUTO-REPAIR] Combined prompt: ${combinedPrompt}`);
+    try {
+      const dimensions = await getImageDimensions(currentImage);
+      const mask = await createCombinedMask(dimensions.width, dimensions.height, groupBboxes);
 
-    // Single inpaint call for ALL fixes
-    // NOTE: We pass bounding boxes as TEXT coordinates (not mask image) to avoid confusing
-    // the model when there are multiple similar elements (e.g., multiple characters/hands)
-    // The combinedMask is still generated for dev view in repairHistory
-    const repaired = await inpaintWithMask(
-      currentImage,
-      boundingBoxes,  // Pass coordinates as array, not mask image
-      combinedPrompt,
-      combinedMask    // Mask is kept for dev view only, not sent to API
-    );
+      const repaired = await inpaintWithMask(
+        currentImage,
+        groupBboxes,
+        groupPrompt,
+        mask,
+        { runwareModel: modelId }
+      );
 
-    if (!repaired || !repaired.imageData) {
-      log.warn(`⚠️ [AUTO-REPAIR] Combined inpainting failed for ${fixTargets.length} targets`);
-      const historyEntry = {
-        attempt: 1,
-        errorType: 'combined-pre-computed',
-        description: fixTargets.map(t => t.issue).join('; '),
-        boundingBoxes: boundingBoxes,
-        fixPrompt: combinedPrompt,
+      if (repaired?.imageData) {
+        const historyEntry = {
+          attempt: passNumber,
+          errorType: groupName,
+          description: targets.map(t => t.issue).join('; '),
+          boundingBoxes: groupBboxes,
+          fixPrompt: groupPrompt,
+          success: true,
+          targetCount: targets.length,
+          modelId: repaired.modelId || modelId,
+          usage: repaired.usage,
+          timestamp: new Date().toISOString()
+        };
+        if (includeDebugImages) {
+          historyEntry.maskImage = mask;
+          historyEntry.beforeImage = currentImage;
+          historyEntry.afterImage = repaired.imageData;
+        }
+        repairHistory.push(historyEntry);
+        currentImage = repaired.imageData;
+        return { success: true };
+      }
+      return { success: false, error: 'No image returned' };
+    } catch (err) {
+      log.error(`❌ [AUTO-REPAIR] ${groupName} repair failed:`, err.message);
+      repairHistory.push({
+        attempt: passNumber,
+        errorType: groupName,
+        description: `Error: ${err.message}`,
         success: false,
-        skippedInspection: true,
-        targetCount: fixTargets.length,
+        targetCount: targets.length,
         timestamp: new Date().toISOString()
-      };
-      // Include debug images for admin users
-      if (includeDebugImages) {
-        historyEntry.maskImage = combinedMask;
-        historyEntry.beforeImage = currentImage;
-      }
-      repairHistory.push(historyEntry);
-    } else {
-      // Record successful combined repair with usage
-      const historyEntry = {
-        attempt: 1,
-        errorType: 'combined-pre-computed',
-        description: fixTargets.map(t => t.issue).join('; '),
-        boundingBoxes: boundingBoxes,
-        fixPrompt: combinedPrompt,
-        success: true,
-        skippedInspection: true,
-        targetCount: fixTargets.length,
-        usage: repaired.usage,
-        modelId: repaired.modelId,
-        timestamp: new Date().toISOString()
-      };
-      // Include debug images for admin users
-      if (includeDebugImages) {
-        historyEntry.maskImage = combinedMask;
-        historyEntry.beforeImage = currentImage;
-        historyEntry.afterImage = repaired.imageData;
-      }
-      repairHistory.push(historyEntry);
-
-      currentImage = repaired.imageData;
-
-      // Log token usage for repair
-      if (repaired.usage) {
-        log.info(`✅ [AUTO-REPAIR] Fixed ${fixTargets.length} targets (tokens: ${repaired.usage.input_tokens} in, ${repaired.usage.output_tokens} out) [${repaired.modelId}]`);
-      } else {
-        log.info(`✅ [AUTO-REPAIR] Fixed ${fixTargets.length} targets in ONE API call`);
-      }
+      });
+      return { success: false, error: err.message };
     }
+  };
+
+  try {
+    let passNumber = 1;
+    let anyRepaired = false;
+
+    // Pass 1: Face issues (highest priority, needs high-quality model)
+    // Use FLUX Fill for face repair - best quality for identity preservation
+    if (faceTargets.length > 0) {
+      const result = await repairGroup(faceTargets, 'face-repair', 'runware:102@1', passNumber++);
+      if (result.success && !result.skipped) anyRepaired = true;
+    }
+
+    // Pass 2: Anatomy issues (hands, limbs)
+    // Use SDXL - good quality, more affordable
+    if (anatomyTargets.length > 0) {
+      const result = await repairGroup(anatomyTargets, 'anatomy-repair', 'runware:101@1', passNumber++);
+      if (result.success && !result.skipped) anyRepaired = true;
+    }
+
+    // Pass 3: Object issues (props, items, backgrounds)
+    // Use SDXL - good enough for objects
+    if (objectTargets.length > 0) {
+      const result = await repairGroup(objectTargets, 'object-repair', 'runware:101@1', passNumber++);
+      if (result.success && !result.skipped) anyRepaired = true;
+    }
+
+    // Log summary
+    const totalPasses = passNumber - 1;
+    if (anyRepaired) {
+      log.info(`✅ [AUTO-REPAIR] Completed ${totalPasses} repair pass(es) for ${fixTargets.length} targets`);
+    }
+
+    // All repairs recorded in repairHistory by repairGroup
+    // No additional logging needed here
   } catch (error) {
-    log.error(`❌ [AUTO-REPAIR] Combined repair failed:`, error.message);
+    log.error(`❌ [AUTO-REPAIR] Grouped repair failed:`, error.message);
     repairHistory.push({
-      attempt: 1,
-      errorType: 'combined-pre-computed',
+      attempt: 0,
+      errorType: 'grouped-repair-error',
       description: `Error: ${error.message}`,
       success: false,
       targetCount: fixTargets.length,

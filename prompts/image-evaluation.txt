@@ -73,7 +73,32 @@ ENVIRONMENTAL LOGIC:
 
 ---
 
-**STEP 4: SCENE REQUIREMENT CHECK**
+**STEP 4: OBJECT INTEGRITY SCAN (Props & Items Audit)**
+
+Check all held/worn objects and scene props for consistency and structural integrity.
+
+OBJECT COUNT MATCH:
+- Parse USER_PROMPT for expected objects (sword, shield, hat, wand, etc.)
+- Count each object type in generated image
+- Flag: Duplicated objects (e.g., 2 shields instead of sword+shield)
+- Flag: Missing objects (e.g., character should hold sword but doesn't)
+- Flag: Wrong objects (e.g., holding torch instead of sword)
+
+OBJECT STRUCTURAL INTEGRITY:
+- Each object should be ONE continuous piece (not split/fragmented)
+- Sword = single blade from hilt to tip (NOT two separate blade halves)
+- Shield = one complete piece (NOT two half-shields)
+- Wand = continuous piece (NOT broken in middle)
+- Flag fragmented objects with bounding box
+
+OBJECT-CHARACTER RELATIONSHIP:
+- Held objects should connect logically to hands (not floating)
+- Worn items (hat, cape, armor) should attach properly to body
+- Straps/belts should be continuous, not broken
+
+---
+
+**STEP 5: SCENE REQUIREMENT CHECK**
 
 1. Presence: Are all prompt-requested characters visible?
 2. Style Unity: Is the rendering style consistent across all figures?
@@ -132,6 +157,12 @@ Output your COMPLETE analysis as JSON (no other text):
     ],
     "anatomy": ["All proportions correct", "No clipping issues"],
     "environment": ["Shadows consistent", "Background perspective correct"]
+  },
+  "object_integrity": {
+    "expected_from_prompt": ["stuffed elephant"],
+    "found_objects": [{"object": "stuffed elephant", "count": 1, "status": "OK"}],
+    "structural_issues": [],
+    "relationship_issues": []
   },
   "scene_check": {
     "characters_present": ["Lukas (yes)", "Eli elephant (yes)", "Manuel (missing)"],
