@@ -7008,7 +7008,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const unifiedResponse = unifiedResult.text;
     const unifiedModelId = unifiedResult.modelId;
     const unifiedUsage = unifiedResult.usage || { input_tokens: 0, output_tokens: 0 };
-    const unifiedProvider = unifiedResult.provider === 'google' ? 'gemini_text' : 'anthropic';
+    // Determine provider from model ID since streaming doesn't return provider
+    const isGeminiModel = unifiedModelId?.startsWith('gemini') || false;
+    const unifiedProvider = isGeminiModel ? 'gemini_text' : 'anthropic';
+    log.debug(`📊 [UNIFIED] Story usage - model: ${unifiedModelId}, provider: ${unifiedProvider}, input: ${unifiedUsage.input_tokens}, output: ${unifiedUsage.output_tokens}`);
     addUsage(unifiedProvider, unifiedUsage, 'unified_story', unifiedModelId);
     log.debug(`⏱️ [UNIFIED] Story generation: ${((timing.storyGenEnd - timing.storyGenStart) / 1000).toFixed(1)}s`);
 
@@ -7598,13 +7601,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     genLog.setStage('finalize');
     log.debug(`📊 [UNIFIED] Logging API usage to generationLog. Functions with calls:`);
     for (const [funcName, funcData] of Object.entries(byFunc)) {
-      log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out`);
+      log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out, thinking: ${funcData.thinking_tokens || 0}`);
       if (funcData.calls > 0) {
         const model = getModels(funcData);
         const directCost = funcData.direct_cost || 0;
         const cost = directCost > 0
           ? directCost
           : calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        log.debug(`   >>> genLog.apiUsage('${funcName}', '${model}', {in: ${funcData.input_tokens}, out: ${funcData.output_tokens}}, cost: $${cost.toFixed(4)})`);
         genLog.apiUsage(funcName, model, {
           inputTokens: funcData.input_tokens,
           outputTokens: funcData.output_tokens,
@@ -7613,6 +7617,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }, cost);
       }
     }
+    log.debug(`📊 [UNIFIED] genLog now has ${genLog.getEntries().length} entries`);
     genLog.finalize();
 
     // Build final result

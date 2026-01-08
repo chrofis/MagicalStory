@@ -208,6 +208,9 @@ class GenerationLogger {
    * @param {number} estimatedCost - Total estimated cost in USD
    */
   apiUsage(functionName, model, usage, estimatedCost) {
+    // Debug: Log the raw usage values
+    log.debug(`📊 [GENLOG] apiUsage called: ${functionName}, model=${model}, inputTokens=${usage.inputTokens}, outputTokens=${usage.outputTokens}`);
+
     const tokens = usage.inputTokens || usage.outputTokens
       ? `${(usage.inputTokens || 0).toLocaleString()} in / ${(usage.outputTokens || 0).toLocaleString()} out${usage.thinkingTokens ? ` / ${usage.thinkingTokens.toLocaleString()} think` : ''}`
       : null;
@@ -215,6 +218,8 @@ class GenerationLogger {
     const message = tokens
       ? `${functionName}: ${model} (${tokens}) ${costStr}`
       : `${functionName}: ${model} ${costStr}`;
+
+    log.debug(`📊 [GENLOG] Generated message: "${message}"`);
 
     this._log('info', 'api_usage', message, null, {
       function: functionName,

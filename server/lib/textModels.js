@@ -207,8 +207,10 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     reader.releaseLock();
   }
 
-  if (inputTokens > 0 || outputTokens > 0) {
-    log.debug(`📊 [ANTHROPIC STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  // Always log token usage for debugging, even if 0
+  log.debug(`📊 [ANTHROPIC STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  if (inputTokens === 0 && outputTokens === 0) {
+    log.warn(`⚠️ [ANTHROPIC STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
   }
 
   return {
@@ -319,9 +321,11 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     reader.releaseLock();
   }
 
-  if (inputTokens > 0 || outputTokens > 0) {
-    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
-    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
+  // Always log token usage for debugging, even if 0
+  const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
+  log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
+  if (inputTokens === 0 && outputTokens === 0) {
+    log.warn(`⚠️ [GEMINI STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
   }
 
   return {
