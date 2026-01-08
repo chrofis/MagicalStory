@@ -331,6 +331,7 @@ async function generateAvatarWithACE(referenceImage, prompt, options = {}) {
     numberResults: 1,
     // ACE++ specific configuration
     acePlusPlus: {
+      type: 'portrait',  // 'subject', 'portrait', or 'local_editing'
       inputImages: [refDataUri],  // Reference face image
       identityStrength: identityStrength  // How much to preserve identity
     }
