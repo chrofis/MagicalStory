@@ -118,7 +118,7 @@ export default function StoryWizard() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
-  const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits' | 'characteristics' | 'relationships'>('photo');
+  const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits' | 'characteristics' | 'relationships' | 'avatar'>('photo');
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);  // Background avatar generation
   const [isRegeneratingAvatars, setIsRegeneratingAvatars] = useState(false);
@@ -1095,8 +1095,12 @@ export default function StoryWizard() {
 
       // Start analyzing - don't show photo yet
       setIsAnalyzingPhoto(true);
-      // Always go to name step when new photo is uploaded (forces Save & Generate Avatar before traits)
-      setCharacterStep('name');
+      // Only go to name step if character doesn't have a name yet
+      // If character already has a name, stay on current step (photo re-upload case)
+      if (!currentCharacter?.name || currentCharacter.name.trim().length < 2) {
+        setCharacterStep('name');
+      }
+      // Otherwise stay on current step, avatar regenerates in background
 
       // Run photo analysis
       try {
@@ -2382,6 +2386,7 @@ export default function StoryWizard() {
             onCharacterRoleChange={handleCharacterRoleChange}
             onCharacterChange={setCurrentCharacter}
             onCharacterStepChange={setCharacterStep}
+            onContinueToAvatar={() => setCharacterStep('avatar')}
             onPhotoSelect={handlePhotoSelect}
             onSaveAndGenerateAvatar={handleSaveAndGenerateAvatar}
             onSaveCharacter={saveCharacter}

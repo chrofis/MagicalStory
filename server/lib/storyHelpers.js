@@ -2169,6 +2169,35 @@ Output: Title, clothing requirements, character arcs, plot structure, visual bib
 }
 
 // ============================================================================
+// LANDMARK PHOTO HELPERS
+// ============================================================================
+
+/**
+ * Get landmark reference photos for a specific page
+ * Returns photos for real-world landmarks that appear on the given page
+ * @param {Object} visualBible - Visual Bible object with locations
+ * @param {number} pageNumber - The page number to get landmarks for
+ * @returns {Array<{name: string, photoData: string, attribution: string}>} Landmark photos
+ */
+function getLandmarkPhotosForPage(visualBible, pageNumber) {
+  if (!visualBible?.locations) return [];
+
+  return visualBible.locations
+    .filter(loc =>
+      loc.isRealLandmark &&
+      loc.referencePhotoData &&
+      loc.photoFetchStatus === 'success' &&
+      loc.appearsInPages?.includes(pageNumber)
+    )
+    .map(loc => ({
+      name: loc.name,
+      photoData: loc.referencePhotoData,
+      attribution: loc.photoAttribution,
+      source: loc.photoSource
+    }));
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -2217,5 +2246,8 @@ module.exports = {
   // Teaching guides
   getTeachingGuide,
   getAdventureGuide,
-  getSceneComplexityGuide
+  getSceneComplexityGuide,
+
+  // Landmark helpers
+  getLandmarkPhotosForPage
 };

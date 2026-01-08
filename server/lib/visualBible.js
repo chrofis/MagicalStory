@@ -146,7 +146,15 @@ function tryParseVisualBibleJSON(outline) {
         signatureElement: loc.signatureElement,
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
-        source: 'outline'
+        source: 'outline',
+        // Landmark photo fields
+        isRealLandmark: loc.isRealLandmark || false,
+        landmarkQuery: loc.landmarkQuery || null,
+        referencePhotoUrl: null,
+        referencePhotoData: null,
+        photoAttribution: null,
+        photoSource: null,
+        photoFetchStatus: loc.isRealLandmark ? 'pending' : 'not_applicable'
       }));
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.locations.length} locations from JSON`);
     }

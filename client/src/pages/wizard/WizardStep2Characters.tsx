@@ -11,7 +11,7 @@ type CharacterRole = 'out' | 'in' | 'main';
 interface WizardStep2Props {
   characters: Character[];
   currentCharacter: Character | null;
-  characterStep: 'photo' | 'name' | 'traits' | 'characteristics' | 'relationships';
+  characterStep: 'photo' | 'name' | 'traits' | 'characteristics' | 'relationships' | 'avatar';
   showCharacterCreated: boolean;
   isLoading: boolean;
   isAnalyzingPhoto: boolean;
@@ -26,7 +26,8 @@ interface WizardStep2Props {
   excludedCharacters: number[];
   onCharacterRoleChange: (charId: number, role: CharacterRole) => void;
   onCharacterChange: (character: Character | null) => void;
-  onCharacterStepChange: (step: 'photo' | 'name' | 'traits' | 'characteristics' | 'relationships') => void;
+  onCharacterStepChange: (step: 'photo' | 'name' | 'traits' | 'characteristics' | 'relationships' | 'avatar') => void;
+  onContinueToAvatar?: () => void;
   onPhotoSelect: (file: File, keepOldClothing?: boolean) => void;
   onSaveAndGenerateAvatar: () => void;  // Save traits and trigger avatar generation
   onSaveCharacter: () => void;
@@ -67,6 +68,7 @@ export function WizardStep2Characters({
   onCharacterRoleChange,
   onCharacterChange,
   onCharacterStepChange,
+  onContinueToAvatar,
   onPhotoSelect,
   onSaveAndGenerateAvatar,
   onSaveCharacter,
@@ -154,6 +156,7 @@ export function WizardStep2Characters({
           onPhotoChange={onPhotoSelect}
           onContinueToCharacteristics={() => onCharacterStepChange('characteristics')}
           onContinueToRelationships={() => onCharacterStepChange('relationships')}
+          onContinueToAvatar={onContinueToAvatar}
           onRegenerateAvatars={onRegenerateAvatars}
           onRegenerateAvatarsWithTraits={onRegenerateAvatarsWithTraits}
           onSaveAndRegenerateWithTraits={onSaveAndRegenerateWithTraits}
@@ -162,7 +165,7 @@ export function WizardStep2Characters({
           isGeneratingAvatar={isGeneratingAvatar}
           isRegeneratingAvatars={isRegeneratingAvatars}
           isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
-          step={characterStep as 'traits' | 'characteristics' | 'relationships'}
+          step={characterStep as 'traits' | 'characteristics' | 'relationships' | 'avatar'}
           developerMode={developerMode}
           changedTraits={changedTraits}
           photoAnalysisDebug={photoAnalysisDebug}

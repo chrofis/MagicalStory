@@ -156,6 +156,15 @@ List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensu
 - colors: Specific building/place colors
 - features: Architectural details, distinctive elements
 - signatureElement: ONE unique visual detail for instant recognition
+- isRealLandmark: true if this is a REAL-WORLD famous building, monument, or landmark
+- landmarkQuery: Search query for photo lookup (e.g., "Eiffel Tower Paris France")
+
+**REAL-WORLD LANDMARKS:**
+For famous buildings, monuments, or natural wonders that exist in reality:
+- Set "isRealLandmark": true
+- Add "landmarkQuery" with landmark name + city/country for photo search
+- Examples: "Big Ben London England", "Grand Canyon Arizona USA", "Sydney Opera House Australia", "Colosseum Rome Italy"
+- This helps us fetch reference photos to ensure accurate landmark depiction in illustrations
 
 **Vehicles** - Any vehicle appearing in 2+ scenes:
 - name: What it is (e.g., "Dad's car")
@@ -366,6 +375,17 @@ Title: [Story title]
       "colors": "pale blue walls with white trim",
       "features": "two-story Victorian style, wraparound porch",
       "signatureElement": "bright red front door with brass knocker"
+    },
+    {
+      "id": "LOC002",
+      "name": "Eiffel Tower",
+      "pages": [4, 7],
+      "setting": "famous landmark, outdoor plaza",
+      "colors": "iron grey lattice structure against blue sky",
+      "features": "iconic iron tower with observation decks, gardens below",
+      "signatureElement": "distinctive iron lattice pattern",
+      "isRealLandmark": true,
+      "landmarkQuery": "Eiffel Tower Paris France"
     }
   ],
   "vehicles": [

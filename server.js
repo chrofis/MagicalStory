@@ -166,6 +166,7 @@ const {
   mergeNewVisualBibleEntries,
   extractStoryTextFromOutput
 } = require('./server/lib/visualBible');
+const { prefetchLandmarkPhotos } = require('./server/lib/landmarkPhotos');
 const {
   ART_STYLES,
   LANGUAGE_LEVELS,
@@ -191,7 +192,8 @@ const {
   buildSceneDescriptionPrompt,
   buildImagePrompt,
   buildSceneExpansionPrompt,
-  buildUnifiedStoryPrompt
+  buildUnifiedStoryPrompt,
+  getLandmarkPhotosForPage
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { GenerationLogger } = require('./server/lib/generationLogger');
@@ -5268,11 +5270,17 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
         };
 
+        // Get landmark photos for this page
+        const pageLandmarkPhotos = vBible ? getLandmarkPhotosForPage(vBible, pageNum) : [];
+        if (pageLandmarkPhotos.length > 0) {
+          log.debug(`🌍 [STREAM-IMG] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+        }
+
         while (retries <= MAX_RETRIES && !imageResult) {
           try {
             // Use quality retry with labeled character photos (name + photoUrl)
             const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair });
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos });
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -5879,6 +5887,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
           };
 
+          // Get landmark photos for this page
+          const pageLandmarkPhotos = vBible ? getLandmarkPhotosForPage(vBible, pageNum) : [];
+          if (pageLandmarkPhotos.length > 0) {
+            log.debug(`🌍 [STORYBOOK] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+          }
+
           let imageResult = null;
           let retries = 0;
 
@@ -5888,7 +5902,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               // In sequential mode, also pass previous image for consistency
               // Use quality retry to regenerate if score is below threshold
               const seqSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair });
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos });
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -7981,6 +7995,15 @@ async function processStoryJob(jobId) {
     // Save checkpoint: scene hints and visual bible
     await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions, visualBible });
 
+    // Start background fetch for landmark reference photos
+    // This runs in parallel while avatars are generated
+    let landmarkFetchPromise = null;
+    const landmarkCount = (visualBible.locations || []).filter(l => l.isRealLandmark).length;
+    if (landmarkCount > 0 && !skipImages) {
+      log.info(`🌍 [PIPELINE] Starting background fetch for ${landmarkCount} landmark photo(s)`);
+      landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
+    }
+
     // Extract title from outline using unified OutlineParser
     const outlineParser = new OutlineParser(outline);
     const extractedTitle = outlineParser.extractTitle();
@@ -8293,6 +8316,13 @@ async function processStoryJob(jobId) {
       [10, 'Writing story...', jobId]
     );
 
+    // Wait for landmark photos before generating page images
+    if (landmarkFetchPromise) {
+      await landmarkFetchPromise;
+      const successCount = (visualBible.locations || []).filter(l => l.photoFetchStatus === 'success').length;
+      log.info(`🌍 [PIPELINE] Landmark photos ready: ${successCount}/${landmarkCount} fetched successfully`);
+    }
+
     // STREAMING PIPELINE: Generate story in batches, immediately generate images as pages complete
     // Use STORY_BATCH_SIZE env var: 0 = auto-calculate based on model limits, >0 = fixed batch size
     let BATCH_SIZE;
@@ -8513,10 +8543,16 @@ Output Format:
               if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
             };
 
+            // Get landmark photos for this page
+            const pageLandmarkPhotos = getLandmarkPhotosForPage(visualBible, pageNum);
+            if (pageLandmarkPhotos.length > 0) {
+              log.debug(`🌍 [PAGE ${pageNum}] Has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+            }
+
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair });
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos });
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -8970,12 +9006,18 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
             };
 
+            // Get landmark photos for this page
+            const pageLandmarkPhotos = getLandmarkPhotosForPage(visualBible, pageNum);
+            if (pageLandmarkPhotos.length > 0) {
+              log.debug(`🌍 [PAGE ${pageNum}] Has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+            }
+
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
                 // Use quality retry to regenerate if score is below threshold
                 const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair });
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos });
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);

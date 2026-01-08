@@ -404,6 +404,7 @@ interface CharacterFormProps {
   onContinueToTraits?: () => void;
   onContinueToCharacteristics?: () => void;
   onContinueToRelationships?: () => void;
+  onContinueToAvatar?: () => void;
   isNewCharacter?: boolean;  // Show simplified traits view for new characters
   onSaveAndGenerateAvatar?: () => void;  // New: triggers avatar generation
   onSaveAndRegenerateWithTraits?: () => void;  // Combined save + regenerate with traits
@@ -414,7 +415,7 @@ interface CharacterFormProps {
   isGeneratingAvatar?: boolean;  // New: background avatar generation in progress
   isRegeneratingAvatars?: boolean;
   isRegeneratingAvatarsWithTraits?: boolean;
-  step: 'name' | 'traits' | 'characteristics' | 'relationships';
+  step: 'name' | 'traits' | 'characteristics' | 'relationships' | 'avatar';
   developerMode?: boolean;
   changedTraits?: ChangedTraits;  // New: which traits changed from previous photo
   photoAnalysisDebug?: { rawResponse?: string; error?: string };  // Debug info for dev mode
@@ -437,6 +438,7 @@ export function CharacterForm({
   onContinueToTraits,
   onContinueToCharacteristics,
   onContinueToRelationships,
+  onContinueToAvatar,
   isNewCharacter = false,
   onSaveAndGenerateAvatar: _onSaveAndGenerateAvatar,  // No longer used - avatar auto-generates on photo upload
   onSaveAndRegenerateWithTraits,
@@ -462,6 +464,7 @@ export function CharacterForm({
   const [enlargedAvatar, setEnlargedAvatar] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isModifyingAvatar, setIsModifyingAvatar] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
   // Clothing choice modal state
   const [showClothingChoiceModal, setShowClothingChoiceModal] = useState(false);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
@@ -856,15 +859,13 @@ export function CharacterForm({
             </button>
           )}
           <Button
-            onClick={allCharacters.length > 0 ? onContinueToRelationships : onSave}
+            onClick={allCharacters.length > 0 ? onContinueToRelationships : onContinueToAvatar}
             disabled={isLoading}
             loading={isLoading}
-            icon={allCharacters.length > 0 ? ArrowRight : Save}
+            icon={ArrowRight}
             className={onCancel ? "flex-1" : "w-full"}
           >
-            {allCharacters.length > 0
-              ? (language === 'de' ? 'Weiter' : language === 'fr' ? 'Suivant' : 'Next')
-              : t.saveCharacter}
+            {language === 'de' ? 'Weiter' : language === 'fr' ? 'Suivant' : 'Next'}
           </Button>
         </div>
       </div>
@@ -927,14 +928,113 @@ export function CharacterForm({
             </button>
           )}
           <Button
-            onClick={onSave}
+            onClick={onContinueToAvatar}
             disabled={isLoading}
             loading={isLoading}
-            icon={Save}
+            icon={ArrowRight}
             className={onCancel ? "flex-1" : "w-full"}
           >
-            {t.saveCharacter}
+            {language === 'de' ? 'Weiter' : language === 'fr' ? 'Suivant' : 'Next'}
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 5: Avatar Review for NEW characters
+  if (isNewCharacter && step === 'avatar') {
+    const avatarStatus = character.avatars?.status;
+    const hasAvatar = !!(character.avatars?.standard || character.avatars?.winter || character.avatars?.summer);
+    const isStillGenerating = isGeneratingAvatar || isRegeneratingAvatarsWithTraits || avatarStatus === 'generating';
+    const hasFailed = avatarStatus === 'failed';
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <h3 className="text-2xl font-bold text-gray-800">
+            {isStillGenerating
+              ? (language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création de l\'avatar...' : 'Creating your avatar...')
+              : hasFailed
+              ? (language === 'de' ? 'Avatar konnte nicht erstellt werden' : language === 'fr' ? 'Échec de la création' : 'Avatar creation failed')
+              : (language === 'de' ? 'Dein Avatar ist fertig!' : language === 'fr' ? 'Votre avatar est prêt!' : 'Your Avatar is Ready!')
+            }
+          </h3>
+          <p className="text-gray-600 mt-2">{character.name}</p>
+        </div>
+
+        {/* Avatar Display - centered, prominent */}
+        <div className="flex justify-center">
+          {hasAvatar ? (
+            <div className="relative">
+              <img
+                src={character.avatars?.standard || character.avatars?.winter || character.avatars?.summer}
+                alt={`${character.name} avatar`}
+                className="w-64 h-80 object-contain rounded-lg bg-white shadow-lg border-2 border-indigo-200"
+              />
+              {isStillGenerating && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
+                  <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+          ) : isStillGenerating ? (
+            <div className="w-64 h-80 rounded-lg border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col items-center justify-center">
+              <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
+              <span className="text-indigo-600 font-medium">
+                {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création de l\'avatar...' : 'Creating avatar...'}
+              </span>
+              <span className="text-indigo-400 text-sm mt-1">
+                {language === 'de' ? 'Dies kann einen Moment dauern' : language === 'fr' ? 'Cela peut prendre un moment' : 'This may take a moment'}
+              </span>
+            </div>
+          ) : (
+            <div className="w-64 h-80 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
+              <span className="text-gray-400">
+                {hasFailed
+                  ? (language === 'de' ? 'Generierung fehlgeschlagen' : language === 'fr' ? 'Échec de génération' : 'Generation failed')
+                  : (language === 'de' ? 'Kein Avatar' : language === 'fr' ? 'Pas d\'avatar' : 'No avatar')
+                }
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-3 max-w-md mx-auto">
+          {/* Primary: Accept & Save */}
+          <Button
+            onClick={onSave}
+            disabled={isStillGenerating && !hasFailed}
+            loading={isLoading}
+            icon={Save}
+          >
+            {hasAvatar && !isStillGenerating
+              ? (language === 'de' ? 'Perfekt - Charakter speichern' : language === 'fr' ? 'Parfait - Enregistrer' : 'Perfect - Save Character')
+              : (language === 'de' ? 'Charakter speichern' : language === 'fr' ? 'Enregistrer le personnage' : 'Save Character')
+            }
+          </Button>
+
+          {/* Secondary: Modify Avatar */}
+          {hasAvatar && !isStillGenerating && (
+            <button
+              onClick={() => setIsModifyingAvatar(true)}
+              className="w-full px-4 py-3 text-sm font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 flex items-center justify-center gap-2"
+            >
+              <Pencil size={16} />
+              {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+            </button>
+          )}
+
+          {/* Tertiary: Cancel */}
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="w-full bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            >
+              {t.cancel}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -972,7 +1072,30 @@ export function CharacterForm({
               )}
             </div>
             <div className="flex flex-col gap-1">
-              <h3 className="text-xl font-bold text-gray-800">{character.name}</h3>
+              {/* Click-to-edit name */}
+              {isEditingName ? (
+                <input
+                  type="text"
+                  value={character.name}
+                  onChange={(e) => updateField('name', e.target.value)}
+                  onBlur={() => setIsEditingName(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') setIsEditingName(false);
+                    if (e.key === 'Escape') setIsEditingName(false);
+                  }}
+                  className="text-xl font-bold text-gray-800 border-b-2 border-indigo-500 bg-transparent focus:outline-none px-0 py-0"
+                  autoFocus
+                />
+              ) : (
+                <h3
+                  className="text-xl font-bold text-gray-800 cursor-pointer hover:text-indigo-600 flex items-center gap-1 group"
+                  onClick={() => setIsEditingName(true)}
+                  title={language === 'de' ? 'Klicken zum Bearbeiten' : 'Click to edit'}
+                >
+                  {character.name}
+                  <Pencil size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </h3>
+              )}
               {/* Change Photo button - always visible */}
               <label className="cursor-pointer bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs hover:bg-gray-200 flex items-center gap-1 w-fit transition-colors border border-gray-200">
                 <Upload size={10} />
@@ -1028,23 +1151,6 @@ export function CharacterForm({
               />
             </div>
           </div>
-
-          {/* Physical Features - Only in dev mode */}
-          {developerMode && (
-            <details className="bg-gray-50 border border-gray-200 rounded-lg mt-2">
-              <summary className="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded-lg text-xs font-medium text-gray-600">
-                {language === 'de' ? 'Physische Merkmale' : language === 'fr' ? 'Caractéristiques physiques' : 'Physical Features'}
-              </summary>
-              <div className="px-3 pb-3">
-                <PhysicalTraitsGrid
-                  character={character}
-                  language={language}
-                  updatePhysical={updatePhysical}
-                  updateApparentAge={(v) => updateField('apparentAge', v)}
-                />
-              </div>
-            </details>
-          )}
 
           {/* Avatar section - full width of left column */}
           <div>
@@ -1603,6 +1709,157 @@ export function CharacterForm({
         <p className="text-sm text-red-500 text-center">
           {t.selectStrengthsFlaws}
         </p>
+      )}
+
+      {/* Dev Mode: Full Character Data Section - Full Width */}
+      {developerMode && (
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">DEV</span>
+            Character Data (Database View)
+          </h3>
+
+          {/* Physical Traits Section */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+            <h4 className="font-semibold text-gray-700 mb-3">Physical Traits</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+              <div>
+                <span className="text-gray-500 text-xs">Eye Color:</span>
+                <div className="font-medium">{character.physical?.eyeColor || '—'}</div>
+                {character.physicalTraitsSource?.eyeColor && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.eyeColor}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Hair Color:</span>
+                <div className="font-medium">{character.physical?.hairColor || '—'}</div>
+                {character.physicalTraitsSource?.hairColor && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.hairColor}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Hair Length:</span>
+                <div className="font-medium">{character.physical?.hairLength || '—'}</div>
+                {character.physicalTraitsSource?.hairLength && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.hairLength}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Hair Style:</span>
+                <div className="font-medium">{character.physical?.hairStyle || '—'}</div>
+                {character.physicalTraitsSource?.hairStyle && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.hairStyle}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Build:</span>
+                <div className="font-medium">{character.physical?.build || '—'}</div>
+                {character.physicalTraitsSource?.build && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.build}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Face:</span>
+                <div className="font-medium">{character.physical?.face || '—'}</div>
+                {character.physicalTraitsSource?.face && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.face}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Facial Hair:</span>
+                <div className="font-medium">{character.physical?.facialHair || '—'}</div>
+                {character.physicalTraitsSource?.facialHair && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.facialHair}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Other:</span>
+                <div className="font-medium">{character.physical?.other || '—'}</div>
+                {character.physicalTraitsSource?.other && (
+                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.other}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Height:</span>
+                <div className="font-medium">{character.physical?.height || '—'}</div>
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Apparent Age:</span>
+                <div className="font-medium">{character.apparentAge || '—'}</div>
+              </div>
+            </div>
+
+            {/* Detailed Hair Analysis - Full width */}
+            {character.physical?.detailedHairAnalysis && (
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <span className="text-gray-500 text-xs block mb-1">Detailed Hair Analysis:</span>
+                <p className="text-sm bg-white border border-gray-200 rounded p-2 italic text-gray-700">
+                  {character.physical.detailedHairAnalysis}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Clothing Section */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-700 mb-3">Clothing</h4>
+
+            {/* Structured Clothing */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+              <div>
+                <span className="text-gray-500 text-xs">Upper Body:</span>
+                <div className="font-medium">{character.clothing?.structured?.upperBody || '—'}</div>
+                {character.clothingSource?.upperBody && (
+                  <span className="text-[10px] text-gray-400">[{character.clothingSource.upperBody}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Lower Body:</span>
+                <div className="font-medium">{character.clothing?.structured?.lowerBody || '—'}</div>
+                {character.clothingSource?.lowerBody && (
+                  <span className="text-[10px] text-gray-400">[{character.clothingSource.lowerBody}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Shoes:</span>
+                <div className="font-medium">{character.clothing?.structured?.shoes || '—'}</div>
+                {character.clothingSource?.shoes && (
+                  <span className="text-[10px] text-gray-400">[{character.clothingSource.shoes}]</span>
+                )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Full Body:</span>
+                <div className="font-medium">{character.clothing?.structured?.fullBody || '—'}</div>
+                {character.clothingSource?.fullBody && (
+                  <span className="text-[10px] text-gray-400">[{character.clothingSource.fullBody}]</span>
+                )}
+              </div>
+            </div>
+
+            {/* Legacy clothing if exists */}
+            {character.clothing?.current && (
+              <div className="mb-4">
+                <span className="text-gray-500 text-xs block mb-1">Legacy (current):</span>
+                <div className="text-sm font-medium">{character.clothing.current}</div>
+              </div>
+            )}
+
+            {/* Avatar Extracted Clothing */}
+            {character.avatars?.clothing && Object.keys(character.avatars.clothing).length > 0 && (
+              <div className="pt-3 border-t border-gray-200">
+                <span className="text-gray-500 text-xs block mb-2">Avatar Extracted Clothing:</span>
+                <div className="space-y-1 text-sm">
+                  {Object.entries(character.avatars.clothing).map(([category, description]) => (
+                    <div key={category} className="flex gap-2">
+                      <span className="text-gray-500 capitalize w-20">{category}:</span>
+                      <span className="text-gray-700">{description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Lightbox for enlarged styled avatars */}
