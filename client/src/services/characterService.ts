@@ -247,6 +247,7 @@ export interface ExtractedTraits {
   facialHair?: string;
   face?: string;
   other?: string;
+  detailedHairAnalysis?: string;
 }
 
 // Structured clothing from avatar evaluation

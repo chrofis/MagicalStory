@@ -17,6 +17,7 @@ export interface PhysicalTraits {
   hair?: string;         // Legacy: combined hair description (deprecated, use hairColor + hairLength + hairStyle)
   facialHair?: string;   // Facial hair for males (e.g., "none", "stubble", "beard", "mustache", "goatee")
   other?: string;        // Glasses, birthmarks, always-present accessories
+  detailedHairAnalysis?: string;  // Detailed hair analysis from avatar evaluation
 }
 
 // Tracks which physical traits changed from previous photo analysis

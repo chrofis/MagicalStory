@@ -89,8 +89,18 @@ Check your draft for the same criteria. List any issues found.
 The corrected, final version of story 2.
 
 IMPORTANT:
-- The two stories must be DIFFERENT - different plots, locations, or approaches
-- For adventure themes: one can start IN the adventure world, the other can start in normal life and transition
+- The two stories must be VERY DIFFERENT in structure and approach
 - Both must use the same characters
 - You MUST output all 6 sections in order: DRAFT_1, REVIEW_1, FINAL_1, DRAFT_2, REVIEW_2, FINAL_2
+
+STORY 1 REQUIREMENTS:
+- USE the user's location if provided (blend real-world setting into the adventure)
+- Start in NORMAL LIFE, then transition into the adventure world
+- Example: Characters are at home/school/park, then discover a portal/magic item/hidden entrance
+
+STORY 2 REQUIREMENTS:
+- IGNORE the user's location completely
+- Start DIRECTLY in the adventure world from the first sentence
+- No transition from real life - the adventure is already happening
+- Example: Characters wake up on a pirate ship, are already exploring a castle, find themselves in a jungle
 

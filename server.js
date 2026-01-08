@@ -1512,7 +1512,7 @@ ${adventureGuideContent}`
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
-    const result = await callTextModel(prompt, 1200, modelToUse);
+    const result = await callTextModel(prompt, 4000, modelToUse);
 
     // Parse the response to extract 2 ideas from FINAL markers (ignoring DRAFT and REVIEW)
     const responseText = result.text.trim();
@@ -1671,7 +1671,7 @@ ${adventureGuideContent}`
     res.write(`data: ${JSON.stringify({ status: 'generating', prompt, model: modelToUse })}\n\n`);
 
     // Stream from LLM and parse for story markers
-    await callTextModelStreaming(prompt, 1500, (delta, fullText) => {
+    await callTextModelStreaming(prompt, 4000, (delta, fullText) => {
       accumulatedText = fullText;
 
       // Check if we have a complete FINAL_1 (ignoring DRAFT_1 and REVIEW_1)
