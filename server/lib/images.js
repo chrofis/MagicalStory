@@ -1876,6 +1876,228 @@ function padBoundingBox(bbox, issueType) {
 }
 
 /**
+ * Verify inpaint results using LPIPS perceptual similarity
+ * Compares before/after images in the specific repaired region
+ * @param {string} beforeImage - Image before inpainting
+ * @param {string} afterImage - Image after inpainting
+ * @param {Array} bbox - Bounding box [ymin, xmin, ymax, xmax] normalized
+ * @returns {Object} { lpipsScore, interpretation, changed } or null if unavailable
+ */
+async function verifyInpaintWithLPIPS(beforeImage, afterImage, bbox = null) {
+  try {
+    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+
+    const requestBody = {
+      image1: beforeImage,
+      image2: afterImage,
+      resize_to: 256
+    };
+
+    // Crop to specific region if bbox provided
+    if (bbox && Array.isArray(bbox) && bbox.length === 4) {
+      requestBody.bbox = bbox;
+    }
+
+    const response = await fetch(`${photoAnalyzerUrl}/lpips`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      // LPIPS interpretation for inpaint verification:
+      // - Score near 0: Images nearly identical (inpaint may not have changed anything)
+      // - Score 0.05-0.20: Expected range for successful repair (visible change, similar style)
+      // - Score > 0.30: Significant change (could be good or bad depending on issue)
+      return {
+        lpipsScore: result.lpips_score,
+        interpretation: result.interpretation,
+        region: result.region,
+        changed: result.lpips_score > 0.02  // True if meaningful change detected
+      };
+    }
+    return null;
+  } catch (err) {
+    if (err.cause?.code === 'ECONNREFUSED') {
+      log.debug('[LPIPS VERIFY] Service not available');
+    } else {
+      log.debug(`[LPIPS VERIFY] Error: ${err.message}`);
+    }
+    return null;
+  }
+}
+
+/**
+ * Verify inpaint results using targeted LLM analysis
+ * Uses a focused prompt to check if the specific issue was fixed
+ * @param {string} beforeImage - Image before inpainting
+ * @param {string} afterImage - Image after inpainting
+ * @param {string} issueDescription - What the original issue was
+ * @param {string} fixDescription - What the fix was supposed to do
+ * @param {Array} bbox - Bounding box [ymin, xmin, ymax, xmax] normalized
+ * @returns {Object} { fixed, confidence, explanation } or null
+ */
+async function verifyInpaintWithLLM(beforeImage, afterImage, issueDescription, fixDescription, bbox = null) {
+  try {
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      return null;
+    }
+
+    const beforeBase64 = beforeImage.replace(/^data:image\/\w+;base64,/, '');
+    const beforeMime = beforeImage.match(/^data:(image\/\w+);base64,/) ?
+      beforeImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    const afterBase64 = afterImage.replace(/^data:image\/\w+;base64,/, '');
+    const afterMime = afterImage.match(/^data:(image\/\w+);base64,/) ?
+      afterImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Region hint for LLM
+    const regionHint = bbox
+      ? `Focus on the region at approximately: top ${Math.round(bbox[0] * 100)}%, left ${Math.round(bbox[1] * 100)}%, bottom ${Math.round(bbox[2] * 100)}%, right ${Math.round(bbox[3] * 100)}% of the image.`
+      : '';
+
+    const prompt = `You are verifying an image repair operation. Compare the BEFORE and AFTER images.
+
+ORIGINAL ISSUE: ${issueDescription}
+INTENDED FIX: ${fixDescription}
+${regionHint}
+
+Analyze whether the repair was successful. Consider:
+1. Was the original issue actually fixed?
+2. Did the fix introduce any new artifacts or problems?
+3. Does the repaired area blend naturally with surrounding content?
+
+Output JSON only:
+{
+  "fixed": true/false,
+  "confidence": 0.0-1.0,
+  "explanation": "Brief explanation of the repair result"
+}`;
+
+    const requestBody = {
+      contents: [{
+        parts: [
+          { text: "BEFORE image:" },
+          { inline_data: { mime_type: beforeMime, data: beforeBase64 } },
+          { text: "AFTER image:" },
+          { inline_data: { mime_type: afterMime, data: afterBase64 } },
+          { text: prompt }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 500,
+        responseMimeType: 'application/json'
+      }
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(30000)
+      }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    if (inputTokens > 0) {
+      console.log(`📊 [INPAINT VERIFY] model: gemini-2.0-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    }
+
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+
+    try {
+      const result = JSON.parse(responseText);
+      return {
+        fixed: result.fixed === true,
+        confidence: parseFloat(result.confidence) || 0.5,
+        explanation: result.explanation || 'No explanation provided'
+      };
+    } catch (parseErr) {
+      log.debug(`[INPAINT VERIFY] Failed to parse response: ${parseErr.message}`);
+      return null;
+    }
+  } catch (err) {
+    log.debug(`[INPAINT VERIFY] Error: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Comprehensive inpaint verification combining LPIPS and LLM
+ * Returns verification results for dev mode display
+ * @param {string} beforeImage - Image before inpainting
+ * @param {string} afterImage - Image after inpainting
+ * @param {Array} targets - Array of {boundingBox, issue, fixPrompt}
+ * @returns {Object} { lpips, llm, success }
+ */
+async function verifyInpaintResult(beforeImage, afterImage, targets) {
+  if (!targets || targets.length === 0) {
+    return { lpips: null, llm: null, success: true };
+  }
+
+  // Get combined bounding box from all targets
+  const allBboxes = targets.map(t => t.boundingBox).filter(Boolean);
+  const combinedBbox = allBboxes.length > 0 ? [
+    Math.min(...allBboxes.map(b => b[0])),  // ymin
+    Math.min(...allBboxes.map(b => b[1])),  // xmin
+    Math.max(...allBboxes.map(b => b[2])),  // ymax
+    Math.max(...allBboxes.map(b => b[3]))   // xmax
+  ] : null;
+
+  // Combine issue/fix descriptions
+  const issueDescription = targets.map(t => t.issue).join('; ');
+  const fixDescription = targets.map(t => t.fixPrompt).join('; ');
+
+  // Run LPIPS and LLM verification in parallel
+  const [lpipsResult, llmResult] = await Promise.all([
+    verifyInpaintWithLPIPS(beforeImage, afterImage, combinedBbox),
+    verifyInpaintWithLLM(beforeImage, afterImage, issueDescription, fixDescription, combinedBbox)
+  ]);
+
+  // Determine overall success
+  // - LPIPS: Image should have changed (score > 0.02)
+  // - LLM: Should confirm fix was applied (fixed === true)
+  const lpipsSuccess = lpipsResult ? lpipsResult.changed : null;
+  const llmSuccess = llmResult ? llmResult.fixed : null;
+
+  // If both available, require both to pass; otherwise use whichever is available
+  let success = true;
+  if (lpipsSuccess !== null && llmSuccess !== null) {
+    success = lpipsSuccess && llmSuccess;
+  } else if (llmSuccess !== null) {
+    success = llmSuccess;
+  } else if (lpipsSuccess !== null) {
+    success = lpipsSuccess;
+  }
+
+  return {
+    lpips: lpipsResult,
+    llm: llmResult,
+    success,
+    combinedBbox
+  };
+}
+
+/**
  * Group fix targets by issue type for smart inpainting
  * Research: Combining unrelated regions in one mask causes artifacts
  * Face issues need high-quality model + reference, objects can use cheaper model
@@ -2295,11 +2517,30 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
           usage: repaired.usage,
           timestamp: new Date().toISOString()
         };
+
+        // Run targeted verification in background (non-blocking for performance)
+        // Verification results stored for dev mode display
         if (includeDebugImages) {
           historyEntry.maskImage = mask;
           historyEntry.beforeImage = currentImage;
           historyEntry.afterImage = repaired.imageData;
+
+          // Run verification and add results to history entry
+          try {
+            const verification = await verifyInpaintResult(currentImage, repaired.imageData, targets);
+            historyEntry.verification = verification;
+            if (verification.lpips) {
+              log.info(`🔍 [REPAIR VERIFY] LPIPS: ${verification.lpips.lpipsScore?.toFixed(4)} (${verification.lpips.changed ? 'changed' : 'unchanged'})`);
+            }
+            if (verification.llm) {
+              log.info(`🔍 [REPAIR VERIFY] LLM: ${verification.llm.fixed ? '✅ Fixed' : '❌ Not fixed'} (${(verification.llm.confidence * 100).toFixed(0)}% confidence)`);
+            }
+          } catch (verifyErr) {
+            log.debug(`[REPAIR VERIFY] Verification failed: ${verifyErr.message}`);
+            historyEntry.verification = { error: verifyErr.message };
+          }
         }
+
         repairHistory.push(historyEntry);
         currentImage = repaired.imageData;
         return { success: true };

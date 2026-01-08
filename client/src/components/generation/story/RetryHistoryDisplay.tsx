@@ -407,6 +407,44 @@ export function RetryHistoryDisplay({
                               </div>
                             )}
                           </div>
+                          {/* Verification Results */}
+                          {repair.verification && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded border text-[11px]">
+                              <div className="font-medium text-gray-700 mb-1">🔍 Verification:</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {/* LPIPS Result */}
+                                {repair.verification.lpips && (
+                                  <div className={`p-1.5 rounded ${repair.verification.lpips.changed ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                                    <span className="font-medium">LPIPS: </span>
+                                    <span className={repair.verification.lpips.changed ? 'text-green-700' : 'text-yellow-700'}>
+                                      {repair.verification.lpips.lpipsScore?.toFixed(4)}
+                                    </span>
+                                    <span className="text-gray-500 ml-1">
+                                      ({repair.verification.lpips.changed ? '✓ changed' : '⚠ unchanged'})
+                                    </span>
+                                  </div>
+                                )}
+                                {/* LLM Result */}
+                                {repair.verification.llm && (
+                                  <div className={`p-1.5 rounded ${repair.verification.llm.fixed ? 'bg-green-100' : 'bg-red-100'}`}>
+                                    <span className="font-medium">LLM: </span>
+                                    <span className={repair.verification.llm.fixed ? 'text-green-700' : 'text-red-700'}>
+                                      {repair.verification.llm.fixed ? '✓ Fixed' : '✗ Not fixed'}
+                                    </span>
+                                    <span className="text-gray-500 ml-1">
+                                      ({Math.round(repair.verification.llm.confidence * 100)}%)
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              {/* LLM Explanation */}
+                              {repair.verification.llm?.explanation && (
+                                <div className="mt-1 text-gray-600 text-[10px] italic">
+                                  {repair.verification.llm.explanation}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

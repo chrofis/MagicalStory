@@ -209,7 +209,8 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
 /**
  * Evaluate face match between original photo and generated avatar
  * Also extracts physical traits and clothing from the generated avatar
- * Returns { score, details, physicalTraits, clothing } or null on error
+ * Runs both Gemini LLM evaluation AND LPIPS perceptual comparison
+ * Returns { score, details, physicalTraits, clothing, lpips } or null on error
  */
 async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey) {
   try {
@@ -244,21 +245,26 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       ]
     };
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(30000)
-      }
-    );
+    // Run Gemini evaluation and LPIPS comparison in parallel
+    const [geminiResponse, lpipsResult] = await Promise.all([
+      fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal: AbortSignal.timeout(30000)
+        }
+      ),
+      // LPIPS comparison (runs in parallel, gracefully fails if unavailable)
+      compareLPIPS(originalPhoto, generatedAvatar)
+    ]);
 
-    if (!response.ok) {
+    if (!geminiResponse.ok) {
       return null;
     }
 
-    const data = await response.json();
+    const data = await geminiResponse.json();
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
     // Log token usage
@@ -299,6 +305,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
         ].join('\n');
 
         log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10`);
+        if (lpipsResult) {
+          log.debug(`🔍 [AVATAR EVAL] LPIPS: ${lpipsResult.lpipsScore?.toFixed(4)} (${lpipsResult.interpretation})`);
+        }
         if (physicalTraits) {
           log.debug(`🔍 [AVATAR EVAL] Extracted traits: ${JSON.stringify(physicalTraits).substring(0, 100)}...`);
         }
@@ -309,14 +318,14 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
           log.debug(`💇 [AVATAR EVAL] Detailed hair: ${JSON.stringify(detailedHairAnalysis)}`);
         }
 
-        return { score, details, physicalTraits, clothing, detailedHairAnalysis, raw: evalResult };
+        return { score, details, physicalTraits, clothing, detailedHairAnalysis, lpips: lpipsResult, raw: evalResult };
       }
     } catch (parseErr) {
       log.warn(`[AVATAR EVAL] JSON parse failed, trying text fallback: ${parseErr.message}`);
       const scoreMatch = responseText.match(/finalScore["']?\s*:\s*(\d+)/i);
       if (scoreMatch) {
         const score = parseInt(scoreMatch[1], 10);
-        return { score, details: responseText, physicalTraits: null, clothing: null };
+        return { score, details: responseText, physicalTraits: null, clothing: null, lpips: lpipsResult };
       }
     }
 
@@ -1321,7 +1330,11 @@ These corrections OVERRIDE what is visible in the reference photo.
       // Store evaluation results
       for (const { category, faceMatchResult } of evalResults) {
         if (faceMatchResult) {
-          results.faceMatch[category] = { score: faceMatchResult.score, details: faceMatchResult.details };
+          results.faceMatch[category] = {
+            score: faceMatchResult.score,
+            details: faceMatchResult.details,
+            lpips: faceMatchResult.lpips || null  // LPIPS comparison result
+          };
 
           // Store full raw evaluation for dev mode (only from first result)
           if (faceMatchResult.raw && !results.rawEvaluation) {

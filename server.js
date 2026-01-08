@@ -1491,6 +1491,11 @@ ${adventureGuideContent}`
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
 
+    // Calculate story length category for output length limits
+    const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 4 sentences max per idea' :
+                                pages <= 20 ? 'MEDIUM (11-20 pages) - 6 sentences max per idea' :
+                                              'LONG (21+ pages) - 8 sentences max per idea';
+
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
@@ -1505,6 +1510,7 @@ ${adventureGuideContent}`
       .replace('{TOPIC_GUIDE}', topicGuideText)
       .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
       .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
+      .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Call the text model (using the imported function)
@@ -1643,6 +1649,11 @@ ${adventureGuideContent}`
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
 
+    // Calculate story length category for output length limits
+    const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 4 sentences max per idea' :
+                                pages <= 20 ? 'MEDIUM (11-20 pages) - 6 sentences max per idea' :
+                                              'LONG (21+ pages) - 8 sentences max per idea';
+
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
@@ -1657,6 +1668,7 @@ ${adventureGuideContent}`
       .replace('{TOPIC_GUIDE}', topicGuideText)
       .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
       .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
+      .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Get model to use

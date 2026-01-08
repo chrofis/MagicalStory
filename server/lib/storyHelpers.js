@@ -335,11 +335,10 @@ function getSceneComplexityGuide(sceneCount) {
 - 6-8 key events with meaningful progression`;
   } else {
     return `STORY COMPLEXITY (${sceneCount} scenes):
-- Rich, multi-layered story
-- Main storyline PLUS 2-3 secondary elements
-- At least 3 interwoven themes, subplots, or character arcs
-- Multiple character developments and interactions
-- 10+ key events with twists and emotional beats`;
+- Rich, multi-layered story told concisely
+- Main storyline with key turning points and resolution
+- 2-3 interwoven themes or character developments
+- Focus on main plot arc - describe in 8 sentences or less`;
   }
 }
 

@@ -1241,9 +1241,18 @@ export function CharacterForm({
                   character.avatars.faceMatch.standard.score >= 6 ? 'text-green-600' : 'text-red-600'
                 }`}>
                   Face eval: {character.avatars.faceMatch.standard.score}/10
+                  {character.avatars.faceMatch.standard.lpips && (
+                    <span className={`ml-2 ${
+                      character.avatars.faceMatch.standard.lpips.lpipsScore < 0.15 ? 'text-green-600' :
+                      character.avatars.faceMatch.standard.lpips.lpipsScore < 0.30 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      | LPIPS: {character.avatars.faceMatch.standard.lpips.lpipsScore?.toFixed(3)} ({character.avatars.faceMatch.standard.lpips.interpretation})
+                    </span>
+                  )}
                 </summary>
                 <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
                   {character.avatars.faceMatch.standard.details}
+                  {character.avatars.faceMatch.standard.lpips && `\n\nLPIPS Perceptual Similarity:\n- Score: ${character.avatars.faceMatch.standard.lpips.lpipsScore?.toFixed(4)}\n- Interpretation: ${character.avatars.faceMatch.standard.lpips.interpretation}\n- Note: 0 = identical, <0.15 = very similar, <0.30 = similar`}
                 </pre>
               </details>
             )}
@@ -1447,9 +1456,18 @@ export function CharacterForm({
                       <details className="mt-1 text-left">
                         <summary className="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">
                           Face eval ({character.avatars.faceMatch[category].score}/10)
+                          {character.avatars.faceMatch[category].lpips && (
+                            <span className={`ml-1 ${
+                              character.avatars.faceMatch[category].lpips.lpipsScore < 0.15 ? 'text-green-600' :
+                              character.avatars.faceMatch[category].lpips.lpipsScore < 0.30 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              LPIPS: {character.avatars.faceMatch[category].lpips.lpipsScore?.toFixed(3)}
+                            </span>
+                          )}
                         </summary>
                         <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
                           {character.avatars.faceMatch[category].details}
+                          {character.avatars.faceMatch[category].lpips && `\n\nLPIPS: ${character.avatars.faceMatch[category].lpips.lpipsScore?.toFixed(4)} (${character.avatars.faceMatch[category].lpips.interpretation})`}
                         </pre>
                       </details>
                     )}

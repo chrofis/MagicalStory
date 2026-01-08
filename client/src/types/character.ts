@@ -83,10 +83,18 @@ export interface CharacterPhotos {
 // Clothing categories for scene-appropriate avatars
 export type ClothingCategory = 'winter' | 'standard' | 'summer' | 'formal';
 
+// LPIPS perceptual similarity result
+export interface LpipsResult {
+  lpipsScore: number;       // 0 = identical, 1 = very different
+  interpretation: string;   // 'nearly_identical' | 'very_similar' | 'somewhat_similar' | 'different'
+  region?: string;          // 'full' or 'cropped'
+}
+
 // Face match evaluation result
 export interface FaceMatchResult {
-  score: number;    // 1-10 score
+  score: number;    // 1-10 score from Gemini
   details: string;  // Full evaluation text with feature breakdown
+  lpips?: LpipsResult | null;  // LPIPS perceptual similarity (optional, from Python service)
 }
 
 // Styled avatar set for a specific art style (includes standard clothing + costumed)

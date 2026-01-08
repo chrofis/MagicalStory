@@ -38,10 +38,15 @@ Generate a story idea that includes:
 2. ACTIONS: What happens? Who does what? Focus on the plot events.
 3. OUTLINE: The main conflict and how it gets resolved.
 
-STORY DEPTH (based on reading level):
-- Early readers: 3-4 sentences, simple plot with one problem and solution
-- Standard: 4-6 sentences, include a twist or obstacle, 2-3 key events
-- Advanced: 6-8 sentences, deeper plot with multiple challenges, subplots, character growth
+STORY LENGTH: {STORY_LENGTH_CATEGORY}
+
+MAXIMUM LENGTH PER STORY IDEA:
+- Short stories (1-10 pages): 4 sentences maximum
+- Medium stories (11-20 pages): 6 sentences maximum
+- Long stories (21+ pages): 8 sentences maximum
+
+Each sentence should describe ONE key event or plot point. Be concise.
+DO NOT exceed these limits - quality over quantity.
 
 IMPORTANT RULES:
 - NO adjectives allowed! Do not describe things as "magical", "brave", "beautiful", "exciting", etc.

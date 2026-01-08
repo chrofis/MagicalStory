@@ -105,6 +105,24 @@ export interface RetryAttempt {
   repairDetails?: RepairAttempt[];
 }
 
+// Inpaint verification result (LPIPS + LLM)
+export interface InpaintVerification {
+  lpips?: {
+    lpipsScore: number;       // 0 = identical, 1 = very different
+    interpretation: string;   // 'nearly_identical' | 'very_similar' | 'somewhat_similar' | 'different'
+    region?: string;          // 'full' or 'cropped'
+    changed: boolean;         // True if meaningful change detected
+  } | null;
+  llm?: {
+    fixed: boolean;           // Whether the issue was fixed
+    confidence: number;       // 0.0-1.0
+    explanation: string;      // Brief explanation
+  } | null;
+  success: boolean;           // Overall verification success
+  combinedBbox?: number[];    // Combined bounding box used for verification
+  error?: string;             // Error message if verification failed
+}
+
 export interface RepairAttempt {
   attempt: number;
   errorType: string;
@@ -116,6 +134,7 @@ export interface RepairAttempt {
   afterImage?: string | null;
   success: boolean;
   timestamp: string;
+  verification?: InpaintVerification;  // Targeted verification results (LPIPS + LLM)
 }
 
 // Generation log entry for debugging story generation
