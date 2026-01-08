@@ -80,9 +80,9 @@ const INPAINT_BACKENDS = {
     costPerImage: 0.03
   },
   'runware': {
-    name: 'Runware',
-    description: 'Runware SD 1.5 - Fast and cheap (~$0.0006/image)',
-    costPerImage: 0.0006
+    name: 'Runware SDXL',
+    description: 'Runware SDXL - Good quality, cheap (~$0.002/image)',
+    costPerImage: 0.002
   }
 };
 

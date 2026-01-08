@@ -3,8 +3,9 @@
  *
  * Provides cheap image inpainting via Runware's API.
  * Much cheaper than Gemini for inpainting tasks:
- * - SD 1.5: $0.0006/image (50x cheaper)
- * - SDXL: $0.002/image
+ * - SD 1.5: $0.0006/image (fastest, low quality)
+ * - SDXL: $0.002/image (default - good balance of quality/cost)
+ * - FLUX Fill: ~$0.05/image (best quality)
  *
  * @see https://runware.ai/docs/en/image-inference/inpainting
  */
@@ -141,7 +142,7 @@ async function inpaintWithRunware(seedImage, maskImage, prompt, options = {}) {
       throw new Error('No image data in Runware response');
     }
 
-    const cost = result.cost || 0.0006;
+    const cost = result.cost || 0.002;  // SDXL default cost
     log.info(`✅ [RUNWARE] Inpaint complete in ${elapsed}ms. Cost: $${cost.toFixed(6)}`);
 
     return {

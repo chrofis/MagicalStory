@@ -725,9 +725,10 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {string|null} imageModelOverride - Override image model (e.g., 'gemini-2.5-flash-image' or 'gemini-3-pro-image-preview')
  * @param {string|null} qualityModelOverride - Override quality evaluation model
  * @param {string|null} imageBackendOverride - Override image backend ('gemini' or 'runware')
+ * @param {Array<{name: string, photoData: string}>} landmarkPhotos - Landmark reference photos for real-world locations
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = []) {
   // Check cache first (include previousImage presence in cache key for sequential mode)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
@@ -911,6 +912,32 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
     if (skippedCount > 0) {
       log.warn(`[IMAGE GEN] WARNING: ${skippedCount} photos were SKIPPED (not base64 data URLs)`);
+    }
+  }
+
+  // Add landmark reference photos for real-world locations (e.g., Eiffel Tower, Big Ben)
+  if (landmarkPhotos && landmarkPhotos.length > 0) {
+    let landmarkAddedCount = 0;
+    for (const landmark of landmarkPhotos) {
+      if (landmark.photoData && landmark.photoData.startsWith('data:image')) {
+        const base64Data = landmark.photoData.replace(/^data:image\/\w+;base64,/, '');
+        const mimeType = landmark.photoData.match(/^data:(image\/\w+);base64,/) ?
+          landmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+        // Add label before the image
+        parts.push({ text: `[Reference photo of ${landmark.name} (real-world landmark)]:` });
+        parts.push({
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Data
+          }
+        });
+        landmarkAddedCount++;
+        log.debug(`🌍 [IMAGE GEN] Added landmark reference: ${landmark.name}`);
+      }
+    }
+    if (landmarkAddedCount > 0) {
+      log.info(`🌍 [IMAGE GEN] Added ${landmarkAddedCount} landmark reference photo(s)`);
     }
   }
 
@@ -1246,11 +1273,11 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @param {Function|null} callTextModel - Function to call text model for scene rewriting
  * @param {Object|null} modelOverrides - Model overrides: { imageModel, qualityModel, imageBackend }
  * @param {string} pageContext - Context label for logging
- * @param {Object} options - Additional options: { isAdmin }
+ * @param {Object} options - Additional options: { isAdmin, landmarkPhotos }
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '', options = {}) {
-  const { isAdmin = false, enableAutoRepair = false } = options;
+  const { isAdmin = false, enableAutoRepair = false, landmarkPhotos = [] } = options;
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
@@ -1278,7 +1305,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
       const imageBackendOverride = modelOverrides?.imageBackend || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);
@@ -1853,7 +1880,7 @@ async function createCombinedMask(width, height, boundingBoxes) {
 /**
  * Inpaint using Runware API backend
  * Uses actual mask images (white=replace, black=preserve) instead of text coordinates.
- * Much cheaper than Gemini: ~$0.0006/image vs ~$0.03/image
+ * Much cheaper than Gemini: ~$0.002/image (SDXL) vs ~$0.03/image
  *
  * @param {string} originalImage - Base64 original image
  * @param {Array} boundingBoxes - Array of [ymin, xmin, ymax, xmax] normalized 0-1 coordinates
@@ -1903,7 +1930,7 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
     log.debug('🗜️ [INPAINT-RUNWARE] Compressing to JPEG...');
     const compressedImageData = await compressImageToJPEG(imageData);
 
-    log.info(`✅ [INPAINT-RUNWARE] Complete. Cost: $${result.usage?.cost?.toFixed(6) || '0.000600'}`);
+    log.info(`✅ [INPAINT-RUNWARE] Complete. Cost: $${result.usage?.cost?.toFixed(6) || '0.002000'}`);
 
     return {
       imageData: compressedImageData,
