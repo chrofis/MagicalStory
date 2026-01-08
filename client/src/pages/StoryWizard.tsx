@@ -773,9 +773,40 @@ export default function StoryWizard() {
       setInitialCharacterLoadDone(true);
     }
     // Note: developerMode removed from deps to avoid reload on toggle
-    // Extra avatar data (includeAllAvatars) is nice-to-have, not critical
+    // A separate effect below handles reloading when dev mode is enabled
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isAuthLoading]);
+
+  // Reload characters with full avatar data when developer mode is enabled
+  // This ensures devs can see all avatar variants (winter, summer, formal)
+  useEffect(() => {
+    const reloadWithFullAvatars = async () => {
+      if (!developerMode || !isAuthenticated || characters.length === 0) return;
+
+      // Check if any character is missing winter/summer avatars (stripped for non-devs)
+      const needsReload = characters.some(c =>
+        c.avatars?.standard && (!c.avatars?.winter || !c.avatars?.summer)
+      );
+
+      if (!needsReload) return;
+
+      log.info('Developer mode enabled, reloading characters with full avatar data...');
+      try {
+        const data = await characterService.getCharacterData(true);
+        setCharacters(data.characters);
+        log.info('Reloaded characters with full avatar data:', {
+          characters: data.characters.length,
+          withWinterAvatars: data.characters.filter(c => c.avatars?.winter).length,
+        });
+      } catch (error) {
+        log.error('Failed to reload character data with avatars:', error);
+      }
+    };
+
+    reloadWithFullAvatars();
+    // Only react to developerMode changes after initial load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [developerMode, isAuthenticated]);
 
   // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh
@@ -1912,8 +1943,8 @@ export default function StoryWizard() {
         })),
         relationships: Object.entries(relationships).map(([key, rel]) => {
           const [id1, id2] = key.split('-').map(Number);
-          const char1 = characters.find(c => c.id === id1);
-          const char2 = characters.find(c => c.id === id2);
+          const char1 = charactersInStory.find(c => c.id === id1);
+          const char2 = charactersInStory.find(c => c.id === id2);
           return {
             character1: char1?.name || '',
             character2: char2?.name || '',
