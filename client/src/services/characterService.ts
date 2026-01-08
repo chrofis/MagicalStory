@@ -102,9 +102,15 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     face: api.other_features || api.otherFeatures,
     eyeColor: api.eye_color || api.eyeColor,
     hairColor: api.hair_color || api.hairColor,
+    hairLength: api.hair_length || api.hairLength,
     hairStyle: api.hair_style || api.hairStyle,
+    facialHair: api.facial_hair || api.facialHair,
+    skinTone: api.skin_tone || api.skinTone,
+    skinUndertone: api.skin_undertone || api.skinUndertone,
+    skinToneHex: api.skin_tone_hex || api.skinToneHex,
     hair: api.hair_color || api.hairColor,  // Legacy: combined hair field
     other: api.other,  // Glasses, birthmarks, always-present accessories
+    detailedHairAnalysis: api.detailed_hair_analysis || api.detailedHairAnalysis,
   };
 
   // Compute ageCategory from API or derive from age
@@ -120,7 +126,9 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     ageCategory,
     apparentAge,
 
-    physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairStyle || physical.hair || physical.other) ? physical : undefined,
+    physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairLength || physical.hairStyle || physical.facialHair || physical.skinTone || physical.hair || physical.other || physical.detailedHairAnalysis) ? physical : undefined,
+
+    physicalTraitsSource: api.physical_traits_source || api.physicalTraitsSource,
 
     traits: {
       strengths: api.strengths || [],
@@ -168,9 +176,16 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     build: char.physical?.build,
     eye_color: char.physical?.eyeColor,
     hair_color: char.physical?.hairColor,
+    hair_length: char.physical?.hairLength,
     hair_style: char.physical?.hairStyle,
+    facial_hair: char.physical?.facialHair,
+    skin_tone: char.physical?.skinTone,
+    skin_undertone: char.physical?.skinUndertone,
+    skin_tone_hex: char.physical?.skinToneHex,
     other_features: char.physical?.face,
     other: char.physical?.other,  // Glasses, birthmarks, always-present accessories
+    detailed_hair_analysis: char.physical?.detailedHairAnalysis,
+    physical_traits_source: char.physicalTraitsSource,
     // Photos
     photo_url: char.photos?.original,
     thumbnail_url: char.photos?.face,
