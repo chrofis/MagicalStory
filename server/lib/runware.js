@@ -283,6 +283,127 @@ async function generateWithRunware(prompt, options = {}) {
 }
 
 /**
+ * Generate character-consistent avatar using ACE++ framework
+ * ACE++ preserves facial identity from a reference photo
+ *
+ * @param {string} referenceImage - Reference photo (data URI or base64) with clear face
+ * @param {string} prompt - Description of desired avatar (pose, style, clothing)
+ * @param {Object} options - Generation options
+ * @param {number} options.width - Output width (default: 768)
+ * @param {number} options.height - Output height (default: 1024)
+ * @param {number} options.identityStrength - How strongly to preserve identity 0-1 (default: 0.8)
+ * @returns {Promise<{imageData: string, usage: Object, modelId: string}>}
+ */
+async function generateAvatarWithACE(referenceImage, prompt, options = {}) {
+  const {
+    width = 768,
+    height = 1024,
+    identityStrength = 0.8
+  } = options;
+
+  if (!RUNWARE_API_KEY) {
+    throw new Error('RUNWARE_API_KEY not configured');
+  }
+
+  const taskUUID = crypto.randomUUID();
+  log.info(`🎨 [RUNWARE ACE++] Starting avatar generation ${taskUUID.slice(0, 8)}...`);
+  log.debug(`🎨 [RUNWARE ACE++] Size: ${width}x${height}, Identity strength: ${identityStrength}`);
+  log.debug(`🎨 [RUNWARE ACE++] Prompt: ${prompt.substring(0, 100)}...`);
+
+  // Ensure reference image is in correct format
+  let refDataUri = referenceImage;
+  if (Buffer.isBuffer(referenceImage)) {
+    refDataUri = `data:image/png;base64,${referenceImage.toString('base64')}`;
+  }
+
+  // ACE++ uses FLUX Fill model with acePlusPlus configuration
+  const payload = [{
+    taskType: 'imageInference',
+    taskUUID: taskUUID,
+    positivePrompt: prompt,
+    model: RUNWARE_MODELS.FLUX_FILL,  // runware:102@1
+    width: width,
+    height: height,
+    outputFormat: 'PNG',
+    numberResults: 1,
+    // ACE++ specific configuration
+    acePlusPlus: {
+      inputImages: [refDataUri],  // Reference face image
+      identityStrength: identityStrength  // How much to preserve identity
+    }
+  }];
+
+  const startTime = Date.now();
+
+  try {
+    const response = await fetch(RUNWARE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RUNWARE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error(`❌ [RUNWARE ACE++] API error ${response.status}: ${errorText}`);
+      throw new Error(`Runware ACE++ API error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const elapsed = Date.now() - startTime;
+
+    // Handle errors in response
+    if (data.errors && data.errors.length > 0) {
+      const error = data.errors[0];
+      log.error(`❌ [RUNWARE ACE++] Task error: ${error.message || JSON.stringify(error)}`);
+      throw new Error(`Runware ACE++ error: ${error.message || 'Unknown error'}`);
+    }
+
+    // Response is array of results
+    const result = data.data?.find(d => d.taskUUID === taskUUID);
+    if (!result) {
+      log.error(`❌ [RUNWARE ACE++] No result for task ${taskUUID}`);
+      throw new Error('No result in Runware ACE++ response');
+    }
+
+    // Get the image - could be URL or base64
+    let imageData = result.imageURL;
+    if (!imageData && result.imageBase64) {
+      imageData = `data:image/png;base64,${result.imageBase64}`;
+    }
+
+    // If we got a URL, download and convert to base64
+    if (imageData && !imageData.startsWith('data:')) {
+      imageData = await downloadRunwareImage(imageData);
+    }
+
+    if (!imageData) {
+      throw new Error('No image data in Runware ACE++ response');
+    }
+
+    const cost = result.cost || 0.005;  // Estimate ~$0.005 for ACE++
+    log.info(`✅ [RUNWARE ACE++] Avatar complete in ${elapsed}ms. Cost: $${cost.toFixed(6)}`);
+
+    return {
+      imageData: imageData,
+      imageBase64: result.imageBase64,
+      usage: {
+        cost: cost,
+        inferenceTime: result.inferenceTime || elapsed
+      },
+      modelId: 'ace-plus-plus'
+    };
+
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    log.error(`❌ [RUNWARE ACE++] Failed after ${elapsed}ms: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
  * Download image from URL and convert to base64 data URI
  * Useful when Runware returns a URL instead of base64
  *
@@ -319,6 +440,7 @@ function isRunwareConfigured() {
 module.exports = {
   inpaintWithRunware,
   generateWithRunware,
+  generateAvatarWithACE,
   downloadRunwareImage,
   isRunwareConfigured,
   RUNWARE_MODELS

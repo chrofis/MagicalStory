@@ -126,6 +126,12 @@ const IMAGE_MODELS = {
     description: 'FLUX Dev via Runware - Better quality ($0.004/image)',
     backend: 'runware',
     maxPromptLength: 2900
+  },
+  'ace-plus-plus': {
+    modelId: 'ace-plus-plus',
+    description: 'ACE++ via Runware - Face-consistent avatar generation (~$0.005/image)',
+    backend: 'runware',
+    maxPromptLength: 2900
   }
 };
 

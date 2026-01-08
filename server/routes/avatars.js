@@ -13,7 +13,7 @@ const { logActivity } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS } = require('../config/models');
-const { generateWithRunware, isRunwareConfigured } = require('../lib/runware');
+const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
 
 // ============================================================================
 // COSTUMED AVATAR GENERATION LOG (for developer mode auditing)
@@ -981,8 +981,42 @@ These corrections OVERRIDE what is visible in the reference photo.
       }
     }
 
-    // Helper function to generate a single avatar using Runware (FLUX)
-    const generateAvatarWithRunware = async (category, avatarPrompt) => {
+    // Check if using ACE++ model (face-consistent avatar generation)
+    const useACEPlusPlus = selectedModel === 'ace-plus-plus';
+
+    // Helper function to generate avatar using ACE++ (face-consistent)
+    const generateAvatarWithACEPlusPlus = async (category, clothingDescription) => {
+      try {
+        if (!isRunwareConfigured()) {
+          log.error(`❌ [CLOTHING AVATARS] Runware not configured`);
+          return null;
+        }
+
+        // Build prompt for ACE++ - focuses on clothing and pose
+        const acePrompt = `Full body portrait of a person standing facing forward, ${clothingDescription}. Children's book illustration style, clean white background, high quality, detailed clothing.`;
+
+        log.debug(`🎨 [ACE++] Generating ${category} avatar with face reference`);
+
+        const result = await generateAvatarWithACE(facePhoto, acePrompt, {
+          width: 768,
+          height: 1024,
+          identityStrength: 0.8
+        });
+
+        if (result?.imageData) {
+          // Compress the result
+          const compressed = await compressImageToJPEG(result.imageData, 85, 768);
+          return compressed || result.imageData;
+        }
+        return null;
+      } catch (err) {
+        log.error(`❌ [CLOTHING AVATARS] ACE++ generation failed for ${category}:`, err.message);
+        return null;
+      }
+    };
+
+    // Helper function to generate a single avatar using Runware (FLUX) - text-to-image only
+    const generateAvatarWithRunwareFLUX = async (category, avatarPrompt) => {
       try {
         if (!isRunwareConfigured()) {
           log.error(`❌ [CLOTHING AVATARS] Runware not configured`);
@@ -1008,7 +1042,7 @@ These corrections OVERRIDE what is visible in the reference photo.
         }
         return null;
       } catch (err) {
-        log.error(`❌ [CLOTHING AVATARS] Runware generation failed for ${category}:`, err.message);
+        log.error(`❌ [CLOTHING AVATARS] Runware FLUX generation failed for ${category}:`, err.message);
         return null;
       }
     };
@@ -1037,14 +1071,26 @@ These corrections OVERRIDE what is visible in the reference photo.
           avatarPrompt += userTraitsSection;
         }
 
-        // Use Runware for FLUX models
-        if (useRunware) {
-          const imageData = await generateAvatarWithRunware(category, clothingStylePrompt);
+        // Use ACE++ for face-consistent avatar generation
+        if (useACEPlusPlus) {
+          const imageData = await generateAvatarWithACEPlusPlus(category, clothingStylePrompt);
           if (imageData) {
-            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Runware`);
+            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via ACE++`);
             return { category, prompt: avatarPrompt, imageData };
           } else {
-            log.warn(`[CLOTHING AVATARS] Runware generation failed for ${category}`);
+            log.warn(`[CLOTHING AVATARS] ACE++ generation failed for ${category}`);
+            return { category, prompt: avatarPrompt, imageData: null };
+          }
+        }
+
+        // Use Runware for other FLUX models (text-to-image only, no face consistency)
+        if (useRunware && !useACEPlusPlus) {
+          const imageData = await generateAvatarWithRunwareFLUX(category, clothingStylePrompt);
+          if (imageData) {
+            log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Runware FLUX`);
+            return { category, prompt: avatarPrompt, imageData };
+          } else {
+            log.warn(`[CLOTHING AVATARS] Runware FLUX generation failed for ${category}`);
             return { category, prompt: avatarPrompt, imageData: null };
           }
         }
