@@ -24,148 +24,111 @@ async function main() {
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(3000);
 
-  await page.screenshot({ path: 'test-results/regenerate-1-initial.png' });
+  await page.screenshot({ path: 'test-results/regen-1-initial.png' });
 
-  // Enable dev mode from menu
-  console.log('Enabling Dev Mode...');
-  await page.click('button:has-text("Menu")');
-  await page.waitForTimeout(500);
+  // Find Sophie's edit button (indigo button with no text, first one in Sophie's card)
+  console.log('Finding Sophie edit button...');
 
-  // Look for Dev Mode checkbox/toggle in the menu
-  const devToggle = page.locator('label:has-text("Dev"), button:has-text("Dev"), [class*="toggle"]:near(:text("Dev"))').first();
-  if (await devToggle.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await devToggle.click();
-    console.log('Clicked dev mode toggle');
-  }
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(1000);
+  // The edit button is bg-indigo-600 class, and Sophie is the first card
+  // Each card has: [edit button (indigo), delete button (red), Out, In, Main]
+  // Sophie is the first character, so her edit button is the first bg-indigo-600 button
 
-  await page.screenshot({ path: 'test-results/regenerate-2-after-dev.png' });
+  const editButton = await page.evaluate(() => {
+    // Find the Sophie text element
+    const sophieElements = Array.from(document.querySelectorAll('*')).filter(el =>
+      el.textContent.trim() === 'Sophie' && el.children.length === 0
+    );
 
-  // Find all character cards - they should have edit buttons (pencil icons)
-  console.log('Looking for Sophie card...');
+    if (sophieElements.length > 0) {
+      // Get the closest parent that contains the edit button
+      let container = sophieElements[0].parentElement;
+      while (container && !container.querySelector('.bg-indigo-600')) {
+        container = container.parentElement;
+      }
 
-  // Character cards have a specific structure - find the one with Sophie
-  // Each card has the character name, and edit/delete buttons
-  // Let's find the edit button that's associated with Sophie
-
-  // Get all card containers that have edit buttons
-  const cards = await page.locator('[class*="card"], [class*="character"]').all();
-  console.log(`Found ${cards.length} card-like elements`);
-
-  // Find Sophie by looking for text containing "Sophie" and "Female"
-  const sophieText = page.locator('text="Sophie"');
-  const sophieCount = await sophieText.count();
-  console.log(`Found ${sophieCount} elements with "Sophie" text`);
-
-  if (sophieCount > 0) {
-    // Get the parent card element that contains Sophie
-    // Then find the edit button (pencil) within it
-
-    // The card structure from the screenshot shows:
-    // - Avatar image
-    // - Name "Sophie"
-    // - Details "Female, 12 y"
-    // - Edit (pencil) and Delete (trash) buttons
-
-    // Try to find the edit button by looking for SVG pencil icon near Sophie
-    console.log('Trying to click edit button for Sophie...');
-
-    // Use XPath to find button near Sophie text
-    const editButton = page.locator('//text()[contains(.,"Sophie")]/ancestor::div[contains(@class,"card") or contains(@class,"character") or position()=1]//button[1] | //*[text()="Sophie"]/parent::*/parent::*//button[1]').first();
-
-    if (await editButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await editButton.click();
-      console.log('Clicked edit button via XPath');
-    } else {
-      // Alternative: find all buttons and click the one closest to Sophie text
-      console.log('XPath did not work, trying alternative...');
-
-      // Look for the card that has Sophie and click its first button (edit)
-      const sophieParent = page.locator('div:has(> div:has-text("Sophie"))').first();
-      const parentButtons = sophieParent.locator('button');
-      const btnCount = await parentButtons.count();
-      console.log(`Found ${btnCount} buttons in Sophie's parent container`);
-
-      if (btnCount > 0) {
-        // First button should be edit (pencil)
-        await parentButtons.first().click();
-        console.log('Clicked first button in Sophie container');
+      if (container) {
+        const btn = container.querySelector('.bg-indigo-600');
+        if (btn) {
+          // Return a way to identify this button
+          const rect = btn.getBoundingClientRect();
+          return { x: rect.x + rect.width/2, y: rect.y + rect.height/2 };
+        }
       }
     }
+    return null;
+  });
 
+  if (editButton) {
+    console.log(`Clicking at (${editButton.x}, ${editButton.y})`);
+    await page.mouse.click(editButton.x, editButton.y);
     await page.waitForTimeout(3000);
-    await page.screenshot({ path: 'test-results/regenerate-3-after-edit-click.png' });
+    await page.screenshot({ path: 'test-results/regen-2-after-edit.png' });
 
-    // Check if we're now on the character edit page
-    const currentUrl = page.url();
-    console.log(`Current URL: ${currentUrl}`);
+    const url = page.url();
+    console.log(`Current URL: ${url}`);
+
+    // Now we should be on the character edit page
+    // Look for the Regenerate Avatar button
+
+    // Scroll down to find the button
+    await page.evaluate(() => window.scrollBy(0, 500));
+    await page.waitForTimeout(1000);
 
     // Look for regenerate button
-    console.log('Looking for Regenerate button...');
+    console.log('Looking for Regenerate Avatar button...');
+    const regenerateBtn = page.locator('button:has-text("Regenerate")');
+    const regenerateCount = await regenerateBtn.count();
+    console.log(`Found ${regenerateCount} Regenerate buttons`);
 
-    // The regenerate button might have different text
-    const regenerateSelectors = [
-      'button:has-text("Regenerate")',
-      'button:has-text("Generate Avatar")',
-      'button:has-text("Re-generate")',
-      '[class*="regenerate"]',
-      'button:has-text("Avatar")'
-    ];
+    if (regenerateCount > 0) {
+      await regenerateBtn.first().scrollIntoViewIfNeeded();
+      await page.screenshot({ path: 'test-results/regen-3-found-button.png' });
 
-    let found = false;
-    for (const selector of regenerateSelectors) {
-      const btn = page.locator(selector).first();
-      if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        console.log(`Found button with selector: ${selector}`);
-        const btnText = await btn.textContent();
-        console.log(`Button text: "${btnText}"`);
+      console.log('Clicking Regenerate Avatar...');
+      await regenerateBtn.first().click();
 
-        if (btnText.toLowerCase().includes('regenerate') || btnText.toLowerCase().includes('generate')) {
-          console.log('Clicking regenerate button...');
-          await btn.click();
-          found = true;
+      console.log('Waiting for generation (this takes 30-90 seconds)...');
+      await page.waitForTimeout(10000);
+      await page.screenshot({ path: 'test-results/regen-4-generating.png' });
+
+      // Wait up to 2 minutes for generation
+      for (let i = 0; i < 12; i++) {
+        await page.waitForTimeout(10000);
+        console.log(`  ${(i+1)*10} seconds elapsed...`);
+
+        // Check if there's still a loading indicator
+        const isLoading = await page.evaluate(() => {
+          return !!document.querySelector('[class*="animate-spin"], [class*="loading"], [class*="generating"]');
+        });
+
+        if (!isLoading) {
+          console.log('Generation complete!');
           break;
         }
       }
-    }
 
-    if (!found) {
-      console.log('Regenerate button not found. Listing all buttons...');
-      const allBtns = await page.getByRole('button').all();
-      for (let i = 0; i < Math.min(allBtns.length, 15); i++) {
+      await page.screenshot({ path: 'test-results/regen-5-complete.png' });
+    } else {
+      console.log('Regenerate button not found');
+
+      // List all visible buttons
+      const allBtns = await page.locator('button:visible').all();
+      console.log(`Found ${allBtns.length} visible buttons:`);
+      for (let i = 0; i < Math.min(allBtns.length, 20); i++) {
         const text = await allBtns[i].textContent().catch(() => '');
-        const visible = await allBtns[i].isVisible().catch(() => false);
-        if (visible && text.trim()) {
-          console.log(`  Button: "${text.trim().substring(0, 60)}"`);
+        if (text.trim()) {
+          console.log(`  "${text.trim().substring(0, 50)}"`);
         }
       }
+
+      await page.screenshot({ path: 'test-results/regen-3-no-button.png' });
     }
-
-    if (found) {
-      console.log('Waiting for avatar generation (30-90 seconds)...');
-
-      // Wait for generation - look for loading indicator to appear and disappear
-      await page.waitForTimeout(5000);
-      await page.screenshot({ path: 'test-results/regenerate-4-generating.png' });
-
-      // Wait for completion
-      try {
-        await page.waitForFunction(() => {
-          // Check if any loading spinner is gone
-          const loading = document.querySelector('[class*="loading"], [class*="spinner"], [class*="generating"]');
-          return !loading;
-        }, { timeout: 120000 });
-        console.log('Generation appears complete!');
-      } catch (e) {
-        console.log('Timeout or error waiting for generation');
-      }
-
-      await page.screenshot({ path: 'test-results/regenerate-5-complete.png' });
-    }
+  } else {
+    console.log('Could not find Sophie edit button');
+    await page.screenshot({ path: 'test-results/regen-error.png' });
   }
 
-  console.log('\nKeeping browser open for 30 seconds...');
+  console.log('\nBrowser staying open for 30 seconds...');
   await page.waitForTimeout(30000);
 
   await browser.close();
