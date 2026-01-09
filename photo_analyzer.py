@@ -51,13 +51,53 @@ TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
+def detect_face_opencv(image):
+    """
+    Fallback face detection using OpenCV's Haar cascade.
+    Used when MediaPipe is not available (e.g., Python 3.14+).
+    Returns bounding box as percentage of image dimensions (0-100)
+    """
+    # Load the Haar cascade for face detection
+    cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+    face_cascade = cv2.CascadeClassifier(cascade_path)
+
+    # Convert to grayscale for detection
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Detect faces
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(30, 30)
+    )
+
+    if len(faces) > 0:
+        # Get the largest face (by area)
+        largest = max(faces, key=lambda f: f[2] * f[3])
+        x, y, w, h = largest
+        img_h, img_w = image.shape[:2]
+
+        return {
+            'x': (x / img_w) * 100,
+            'y': (y / img_h) * 100,
+            'width': (w / img_w) * 100,
+            'height': (h / img_h) * 100,
+            'confidence': 0.8  # Haar cascade doesn't provide confidence
+        }
+
+    return None
+
+
 def detect_face_mediapipe(image):
     """
-    Detect face using MediaPipe Face Detection
+    Detect face using MediaPipe Face Detection.
+    Falls back to OpenCV Haar cascade if MediaPipe is unavailable.
     Returns bounding box as percentage of image dimensions (0-100)
     """
     if not MEDIAPIPE_AVAILABLE:
-        return None
+        # Fallback to OpenCV when MediaPipe is not available (Python 3.14+)
+        return detect_face_opencv(image)
 
     with mp_face_detection.FaceDetection(
         model_selection=1,  # 0 for close faces, 1 for far faces
@@ -82,6 +122,187 @@ def detect_face_mediapipe(image):
             }
 
     return None
+
+
+def detect_all_faces_opencv(image):
+    """
+    Fallback to detect all faces using OpenCV's Haar cascade.
+    Returns list of faces sorted by size (largest first).
+    """
+    cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+    face_cascade = cv2.CascadeClassifier(cascade_path)
+
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces_detected = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(30, 30)
+    )
+
+    img_h, img_w = image.shape[:2]
+    faces = []
+
+    for idx, (x, y, w, h) in enumerate(faces_detected):
+        faces.append({
+            'id': idx,
+            'x': (x / img_w) * 100,
+            'y': (y / img_h) * 100,
+            'width': (w / img_w) * 100,
+            'height': (h / img_h) * 100,
+            'confidence': 0.8
+        })
+
+    # Sort by size (area) descending
+    faces.sort(key=lambda f: f['width'] * f['height'], reverse=True)
+    return faces
+
+
+def detect_all_faces_mediapipe(image, min_confidence=0.35):
+    """
+    Detect ALL faces using MediaPipe Face Detection.
+    Falls back to OpenCV Haar cascade if MediaPipe is unavailable.
+    Returns list of faces sorted by confidence (highest first).
+    Filters out faces below min_confidence threshold.
+
+    Returns: list of {id, x, y, width, height, confidence}
+    """
+    if not MEDIAPIPE_AVAILABLE:
+        # Fallback to OpenCV when MediaPipe is not available
+        return detect_all_faces_opencv(image)
+
+    faces = []
+    with mp_face_detection.FaceDetection(
+        model_selection=1,  # 0 for close faces, 1 for far faces
+        min_detection_confidence=0.3  # Lower threshold, we filter ourselves
+    ) as face_detection:
+        # Convert BGR to RGB
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        results = face_detection.process(rgb_image)
+
+        if results.detections:
+            for idx, detection in enumerate(results.detections):
+                confidence = detection.score[0]
+
+                # Filter by our threshold
+                if confidence < min_confidence:
+                    continue
+
+                bbox = detection.location_data.relative_bounding_box
+                faces.append({
+                    'id': idx,
+                    'x': bbox.xmin * 100,
+                    'y': bbox.ymin * 100,
+                    'width': bbox.width * 100,
+                    'height': bbox.height * 100,
+                    'confidence': confidence
+                })
+
+    # Sort by confidence (highest first)
+    faces.sort(key=lambda f: f['confidence'], reverse=True)
+
+    # Re-assign IDs after sorting (0 = highest confidence)
+    for i, face in enumerate(faces):
+        face['id'] = i
+
+    return faces
+
+
+def create_face_thumbnail(image, face_box, size=200):
+    """
+    Create a square thumbnail for a detected face.
+    Uses 15% padding around face, centers in square.
+
+    Args:
+        image: BGR or BGRA image (numpy array)
+        face_box: dict with x, y, width, height (percentages 0-100)
+        size: output thumbnail size (default 200x200)
+
+    Returns: base64-encoded JPEG string
+    """
+    # Add 15% padding around face
+    face_box_padded = add_padding_to_box(face_box, padding_percent=0.15)
+    face_img = crop_to_box(image, face_box_padded)
+
+    if face_img.size == 0:
+        return None
+
+    # Make it square with warm peach background
+    h, w = face_img.shape[:2]
+    max_dim = max(h, w)
+
+    # Create square canvas
+    if len(face_img.shape) == 3 and face_img.shape[2] == 4:
+        # BGRA image - composite with peach background
+        square = np.full((max_dim, max_dim, 4), [230, 240, 255, 255], dtype=np.uint8)
+        y_off = (max_dim - h) // 2
+        x_off = (max_dim - w) // 2
+
+        face_region = square[y_off:y_off+h, x_off:x_off+w]
+        alpha = face_img[:, :, 3:4] / 255.0
+        face_region[:, :, :3] = (face_img[:, :, :3] * alpha + face_region[:, :, :3] * (1 - alpha)).astype(np.uint8)
+        face_region[:, :, 3] = 255
+
+        # Convert to BGR for encoding
+        square_bgr = cv2.cvtColor(square, cv2.COLOR_BGRA2BGR)
+    else:
+        # BGR image - just place on background
+        square_bgr = np.full((max_dim, max_dim, 3), [230, 240, 255], dtype=np.uint8)
+        y_off = (max_dim - h) // 2
+        x_off = (max_dim - w) // 2
+        square_bgr[y_off:y_off+h, x_off:x_off+w] = face_img[:, :, :3] if len(face_img.shape) == 3 else cv2.cvtColor(face_img, cv2.COLOR_GRAY2BGR)
+
+    # Resize to target size
+    thumbnail = cv2.resize(square_bgr, (size, size), interpolation=cv2.INTER_LANCZOS4)
+
+    # Encode as JPEG
+    _, buffer = cv2.imencode('.jpg', thumbnail, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    return f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+
+def blur_faces_except(image, keep_face_id, all_faces, blur_kernel=51):
+    """
+    Apply Gaussian blur to all faces EXCEPT the selected one.
+    This prevents AI from using wrong faces during avatar generation.
+
+    Args:
+        image: BGR or BGRA numpy array
+        keep_face_id: ID of face to keep (0-indexed)
+        all_faces: list of face dicts with x, y, width, height (percentages 0-100)
+        blur_kernel: size of Gaussian blur kernel (odd number)
+
+    Returns: image with non-selected faces blurred
+    """
+    if not all_faces or len(all_faces) <= 1:
+        return image
+
+    result = image.copy()
+    h, w = image.shape[:2]
+
+    for face in all_faces:
+        if face['id'] == keep_face_id:
+            continue  # Skip the selected face
+
+        # Convert percentage to pixel coordinates
+        # Add 20% extra padding for thorough blurring
+        padding = 0.2
+        x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * padding)) * w)
+        y1 = int(max(0, (face['y'] / 100 - face['height'] / 100 * padding)) * h)
+        x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * padding) * w)
+        y2 = int(min(1.0, (face['y'] + face['height']) / 100 + face['height'] / 100 * padding) * h)
+
+        # Ensure valid region
+        if x2 <= x1 or y2 <= y1:
+            continue
+
+        # Extract region and blur it
+        face_region = result[y1:y2, x1:x2]
+        blurred = cv2.GaussianBlur(face_region, (blur_kernel, blur_kernel), 0)
+        result[y1:y2, x1:x2] = blurred
+
+        print(f"   Blurred face {face['id']} at ({x1},{y1})-({x2},{y2})")
+
+    return result
 
 
 def remove_background(image):
@@ -192,12 +413,19 @@ def crop_to_box(image, box, output_size=None):
     return cropped
 
 
-def process_photo(image_data, is_base64=True):
+def process_photo(image_data, is_base64=True, selected_face_id=None):
     """
-    Process uploaded photo - FAST version:
-    1. Detect face with MediaPipe (fast, no downloads)
-    2. Remove background with MediaPipe (fast, no downloads)
-    3. Create cropped face thumbnail and body image
+    Process uploaded photo - FAST version with multi-face support:
+
+    Two modes:
+    1. Initial analysis (selected_face_id=None):
+       - Detect ALL faces
+       - If multiple valid faces (>=35% confidence), return thumbnails for selection
+       - If single face, process normally
+
+    2. After selection (selected_face_id=N):
+       - Use the selected face
+       - Blur non-selected faces in body crop
 
     Returns dict with face_thumbnail, body_no_bg, and bounding boxes
     """
@@ -225,13 +453,13 @@ def process_photo(image_data, is_base64=True):
         img_h, img_w = img.shape[:2]
         print(f"📸 Processing image: {img_w}x{img_h}")
 
-        # 2. DETECT FACE (fast - ~50ms)
-        print("👤 Detecting face...")
-        face_box = detect_face_mediapipe(img)
-        print(f"   Face detected: {face_box is not None}")
+        # 2. DETECT ALL FACES (fast - ~50ms)
+        print("👤 Detecting faces...")
+        all_faces = detect_all_faces_mediapipe(img, min_confidence=0.35)
+        print(f"   Faces detected: {len(all_faces)}")
 
         # If no face detected, return error immediately
-        if face_box is None:
+        if len(all_faces) == 0:
             print("❌ No face detected in photo")
             # Clean up temp files
             if os.path.exists(temp_input) and is_base64:
@@ -242,7 +470,59 @@ def process_photo(image_data, is_base64=True):
                 "error_message": "No face was detected in the photo. Please upload a clear photo showing your face."
             }
 
-        # 3. REMOVE BACKGROUND (fast - ~100ms)
+        # 3. MULTI-FACE HANDLING
+        # If multiple faces and no selection made yet, return face thumbnails for selection
+        if len(all_faces) > 1 and selected_face_id is None:
+            print(f"🎭 Multiple faces detected ({len(all_faces)}), returning thumbnails for selection")
+
+            # Create thumbnails for each face (using original image for speed)
+            face_thumbnails = []
+            for face in all_faces:
+                thumbnail = create_face_thumbnail(img, face, size=200)
+                if thumbnail:
+                    face_thumbnails.append({
+                        'id': face['id'],
+                        'confidence': round(face['confidence'], 2),
+                        'face_box': {
+                            'x': face['x'],
+                            'y': face['y'],
+                            'width': face['width'],
+                            'height': face['height']
+                        },
+                        'thumbnail': thumbnail
+                    })
+
+            # Clean up temp files
+            if os.path.exists(temp_input) and is_base64:
+                os.remove(temp_input)
+
+            return {
+                "success": True,
+                "multiple_faces_detected": True,
+                "face_count": len(all_faces),
+                "faces": face_thumbnails,
+                # These are null until face is selected
+                "face_thumbnail": None,
+                "body_no_bg": None,
+                "body_crop": None,
+                "face_box": None,
+                "body_box": None,
+                "image_dimensions": {
+                    "width": img_w,
+                    "height": img_h
+                }
+            }
+
+        # 4. SINGLE FACE OR FACE SELECTED - continue with normal processing
+        # Determine which face to use
+        if selected_face_id is not None and selected_face_id < len(all_faces):
+            face_box = all_faces[selected_face_id]
+            print(f"   Using selected face {selected_face_id} (confidence: {face_box['confidence']:.2f})")
+        else:
+            face_box = all_faces[0]  # Use highest confidence face
+            print(f"   Using primary face (confidence: {face_box['confidence']:.2f})")
+
+        # 5. REMOVE BACKGROUND (fast - ~100ms)
         print("🎭 Removing background...")
         full_img_rgba = None
         body_mask = None
@@ -252,17 +532,24 @@ def process_photo(image_data, is_base64=True):
         except Exception as bg_error:
             print(f"   Background removal failed: {bg_error}")
 
-        # 4. GET BODY BOUNDS FROM MASK
+        # 6. BLUR NON-SELECTED FACES (if multiple faces and one was selected)
+        if len(all_faces) > 1 and selected_face_id is not None:
+            print(f"🔲 Blurring {len(all_faces) - 1} non-selected faces...")
+            img = blur_faces_except(img, selected_face_id, all_faces)
+            if full_img_rgba is not None:
+                full_img_rgba = blur_faces_except(full_img_rgba, selected_face_id, all_faces)
+
+        # 7. GET BODY BOUNDS FROM MASK
         body_box = None
         if body_mask is not None:
             body_box = get_body_bounds_from_mask(body_mask, padding_percent=0.05)
 
-        # 5. CREATE OUTPUTS
+        # 8. CREATE OUTPUTS
         face_thumbnail = None
         body_no_bg = None
         body_crop = None
 
-        # Face thumbnail with background removed
+        # Face thumbnail with background removed (768x768 for avatar generation)
         if face_box and full_img_rgba is not None:
             # Add 15% padding around face
             face_box_padded = add_padding_to_box(face_box, padding_percent=0.15)
@@ -289,7 +576,7 @@ def process_photo(image_data, is_base64=True):
                 face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
                 print("   Face thumbnail created (768x768)")
 
-        # Body with transparent background
+        # Body with transparent background (non-selected faces are blurred)
         if body_box and full_img_rgba is not None:
             body_img_rgba = crop_to_box(full_img_rgba, body_box)
             if body_img_rgba.size > 0:
@@ -304,7 +591,7 @@ def process_photo(image_data, is_base64=True):
                 body_no_bg = f"data:image/png;base64,{base64.b64encode(buffer_png).decode('utf-8')}"
                 print("   Body crop created")
 
-            # Also create body with background (for display)
+            # Also create body with background (for display) - also with blurred faces
             body_img = crop_to_box(img, body_box)
             if body_img.size > 0:
                 bh, bw = body_img.shape[:2]
@@ -322,6 +609,9 @@ def process_photo(image_data, is_base64=True):
 
         return {
             "success": True,
+            "multiple_faces_detected": False,
+            "face_count": len(all_faces),
+            "selected_face_id": selected_face_id,
             "attributes": {
                 # Age/gender now come from Gemini, not Python
                 "age": None,
@@ -374,16 +664,28 @@ def health_check():
 def analyze_photo():
     """
     Analyze uploaded photo - returns face thumbnail and body with background removed.
-    Age/gender analysis is done by Gemini on the server side.
+    Supports multi-face detection and selection.
 
     Expected JSON:
     {
-        "image": "data:image/jpeg;base64,..." or base64 string
+        "image": "data:image/jpeg;base64,..." or base64 string,
+        "selected_face_id": null (for initial) or 0/1/2... (after selection)
     }
 
-    Returns:
+    Returns (if multiple faces and no selection):
     {
         "success": true,
+        "multiple_faces_detected": true,
+        "faces": [
+            {"id": 0, "confidence": 0.95, "face_box": {...}, "thumbnail": "data:..."},
+            {"id": 1, "confidence": 0.72, "face_box": {...}, "thumbnail": "data:..."}
+        ]
+    }
+
+    Returns (single face or after selection):
+    {
+        "success": true,
+        "multiple_faces_detected": false,
         "face_thumbnail": "data:image/jpeg;base64,...",
         "body_no_bg": "data:image/png;base64,...",
         "face_box": {...},
@@ -400,7 +702,9 @@ def analyze_photo():
             }), 400
 
         image_data = data['image']
-        result = process_photo(image_data, is_base64=True)
+        selected_face_id = data.get('selected_face_id')  # None for initial, int after selection
+
+        result = process_photo(image_data, is_base64=True, selected_face_id=selected_face_id)
 
         if result['success']:
             return jsonify(result), 200

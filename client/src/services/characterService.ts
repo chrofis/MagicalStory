@@ -584,9 +584,19 @@ export const characterService = {
     }
   },
 
-  async analyzePhoto(imageData: string, language?: string): Promise<{
+  async analyzePhoto(imageData: string, language?: string, selectedFaceId?: number): Promise<{
     success: boolean;
     error?: string;  // Error code (e.g., 'no_face_detected')
+    // Multi-face detection fields
+    multipleFacesDetected?: boolean;
+    faceCount?: number;
+    faces?: Array<{
+      id: number;
+      confidence: number;
+      faceBox: { x: number; y: number; width: number; height: number };
+      thumbnail: string;
+    }>;
+    // Normal response fields (only when single face or face selected)
     photos?: {
       face?: string;
       body?: string;
@@ -622,6 +632,16 @@ export const characterService = {
     try {
       const response = await api.post<{
         success: boolean;
+        // Multi-face detection fields
+        multipleFacesDetected?: boolean;
+        faceCount?: number;
+        faces?: Array<{
+          id: number;
+          confidence: number;
+          faceBox: { x: number; y: number; width: number; height: number };
+          thumbnail: string;
+        }>;
+        // Normal response fields
         faceThumbnail?: string;
         bodyCrop?: string;
         bodyNoBg?: string;
@@ -650,7 +670,26 @@ export const characterService = {
         error?: string;
         fallback?: boolean;
         _debug?: { rawResponse?: string; error?: string };
-      }>('/api/analyze-photo', { imageData, language });
+      }>('/api/analyze-photo', { imageData, language, selectedFaceId });
+
+      // If analysis failed (e.g., no face detected), return error
+      if (!response.success) {
+        return {
+          success: false,
+          error: response.error,
+        };
+      }
+
+      // If multiple faces detected and no selection made, return faces for selection
+      if (response.multipleFacesDetected && response.faces) {
+        log.info(`Multiple faces detected (${response.faceCount}), showing selection UI`);
+        return {
+          success: true,
+          multipleFacesDetected: true,
+          faceCount: response.faceCount,
+          faces: response.faces,
+        };
+      }
 
       // Extract physical traits from attributes
       const physical = {
@@ -665,16 +704,10 @@ export const characterService = {
         other: response.attributes?.other_features,  // Distinctive markings
       };
 
-      // If analysis failed (e.g., no face detected), return error
-      if (!response.success) {
-        return {
-          success: false,
-          error: response.error,
-        };
-      }
-
       return {
         success: response.success,
+        multipleFacesDetected: false,
+        faceCount: response.faceCount,
         photos: {
           face: response.faceThumbnail,
           body: response.bodyCrop,

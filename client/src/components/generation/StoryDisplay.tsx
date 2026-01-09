@@ -5,7 +5,8 @@ import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
-import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal } from './story';
+import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, GenerationSettingsPanel } from './story';
+import type { GenerationSettings } from './story';
 
 interface StoryTextPrompt {
   batch: number;
@@ -108,6 +109,8 @@ interface StoryDisplayProps {
   imageRegenerationCost?: number;
   isImpersonating?: boolean;
   onSelectImageVersion?: (pageNumber: number, versionIndex: number) => Promise<void>;
+  // Generation settings for dev mode
+  generationSettings?: GenerationSettings;
 }
 
 export function StoryDisplay({
@@ -159,6 +162,7 @@ export function StoryDisplay({
   imageRegenerationCost = 5,
   isImpersonating = false,
   onSelectImageVersion,
+  generationSettings,
 }: StoryDisplayProps) {
   const { t, language } = useLanguage();
 
@@ -706,6 +710,13 @@ export function StoryDisplay({
               <BookOpen size={14} /> Print (DEV)
             </button>
           )}
+        </div>
+      )}
+
+      {/* Developer Mode: Generation Settings Panel */}
+      {developerMode && generationSettings && (
+        <div className="mt-4">
+          <GenerationSettingsPanel settings={generationSettings} language={language} />
         </div>
       )}
 

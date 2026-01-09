@@ -5,6 +5,14 @@ export interface BoundingBox {
   height: number;
 }
 
+// Detected face for multi-face selection UI
+export interface DetectedFace {
+  id: number;
+  confidence: number;
+  faceBox: BoundingBox;
+  thumbnail: string;  // Base64 200x200 image
+}
+
 // Physical traits from photo analysis
 export interface PhysicalTraits {
   height?: string;

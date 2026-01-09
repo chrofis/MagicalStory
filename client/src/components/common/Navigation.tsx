@@ -14,6 +14,7 @@ interface NavigationProps {
   canAccessStep?: (step: number) => boolean;
   developerMode?: boolean;
   onDeveloperModeChange?: (enabled: boolean) => void;
+  hideSteps?: boolean;  // Hide step navigation (e.g., when viewing a saved story)
 }
 
 // Step labels for desktop view
@@ -23,7 +24,7 @@ const stepLabels: Record<string, Record<number, string>> = {
   fr: { 1: 'Personnages', 2: 'Livre', 3: 'Histoire', 4: 'Style', 5: 'Résumé' },
 };
 
-export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange }: NavigationProps) {
+export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange, hideSteps = false }: NavigationProps) {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const { isAuthenticated, user, isImpersonating } = useAuth();
@@ -76,8 +77,8 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
           </button>
         </div>
 
-        {/* Center: Step Navigation */}
-        {currentStep > 0 && onStepClick && canAccessStep && (
+        {/* Center: Step Navigation (hidden when viewing saved story) */}
+        {!hideSteps && currentStep > 0 && onStepClick && canAccessStep && (
           <div className="flex items-center flex-1 justify-center">
             {[1, 2, 3, 4, 5].map(s => {
               const canAccess = canAccessStep(s);

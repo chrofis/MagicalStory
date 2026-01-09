@@ -854,11 +854,12 @@ Your task is to create a new avatar in ${artStyle} style that:
 /**
  * POST /api/analyze-photo
  * Analyze a photo to detect face and body (Python service)
+ * Supports multi-face detection - if multiple faces found, returns thumbnails for selection
  * Physical traits are now extracted during avatar evaluation, not here
  */
 router.post('/analyze-photo', authenticateToken, async (req, res) => {
   try {
-    const { imageData } = req.body;
+    const { imageData, selectedFaceId } = req.body;
 
     if (!imageData) {
       log.debug('📸 [PHOTO] Missing imageData in request');
@@ -867,7 +868,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
 
     const imageSize = imageData.length;
     const imageType = imageData.substring(0, 30);
-    log.debug(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}...`);
+    log.debug(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}..., selectedFaceId: ${selectedFaceId}`);
 
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
     log.debug(`📸 [PHOTO] Calling Python service at: ${photoAnalyzerUrl}/analyze`);
@@ -875,12 +876,14 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
     const startTime = Date.now();
 
     try {
-      // Only run Python analysis for face/body detection
-      // Physical traits are extracted during avatar evaluation
+      // Call Python service with optional selectedFaceId
       const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageData }),
+        body: JSON.stringify({
+          image: imageData,
+          selected_face_id: selectedFaceId !== undefined ? selectedFaceId : null
+        }),
         signal: AbortSignal.timeout(30000)
       });
       const analyzerData = await analyzerResponse.json();
@@ -891,6 +894,8 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         pythonSuccess: analyzerData.success,
         hasError: !!analyzerData.error,
         error: analyzerData.error || null,
+        multipleFacesDetected: analyzerData.multiple_faces_detected,
+        faceCount: analyzerData.face_count,
         hasFaceThumbnail: !!analyzerData.faceThumbnail || !!analyzerData.face_thumbnail,
         hasBodyCrop: !!analyzerData.bodyCrop || !!analyzerData.body_crop,
         hasBodyNoBg: !!analyzerData.bodyNoBg || !!analyzerData.body_no_bg,
@@ -913,15 +918,40 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         });
       }
 
+      // Handle multi-face response - return faces for selection
+      if (analyzerData.multiple_faces_detected && analyzerData.faces) {
+        log.info(`📸 [PHOTO] Multiple faces detected (${analyzerData.face_count}), returning for selection`);
+
+        // Convert faces to camelCase
+        const faces = analyzerData.faces.map(face => ({
+          id: face.id,
+          confidence: face.confidence,
+          faceBox: face.face_box,
+          thumbnail: face.thumbnail
+        }));
+
+        return res.json({
+          success: true,
+          multipleFacesDetected: true,
+          faceCount: analyzerData.face_count,
+          faces: faces
+        });
+      }
+
+      // Single face or face selected - return normal response
       await logActivity(req.user.id, req.user.username, 'PHOTO_ANALYZED', {
         hasFace: !!analyzerData.face_thumbnail || !!analyzerData.faceThumbnail,
-        hasBody: !!analyzerData.body_crop || !!analyzerData.bodyCrop
+        hasBody: !!analyzerData.body_crop || !!analyzerData.bodyCrop,
+        faceCount: analyzerData.face_count,
+        selectedFaceId: selectedFaceId
       });
 
       // Convert snake_case to camelCase for frontend compatibility
-      // Physical traits are now extracted during avatar evaluation, not here
       const response = {
         success: analyzerData.success,
+        multipleFacesDetected: false,
+        faceCount: analyzerData.face_count,
+        selectedFaceId: analyzerData.selected_face_id,
         faceThumbnail: analyzerData.face_thumbnail || analyzerData.faceThumbnail,
         bodyCrop: analyzerData.body_crop || analyzerData.bodyCrop,
         bodyNoBg: analyzerData.body_no_bg || analyzerData.bodyNoBg,
@@ -929,7 +959,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         bodyBox: analyzerData.body_box || analyzerData.bodyBox
       };
 
-      log.debug('📸 [PHOTO] Sending response (face/body detection only)');
+      log.debug('📸 [PHOTO] Sending response (face/body detection)');
       res.json(response);
 
     } catch (fetchErr) {

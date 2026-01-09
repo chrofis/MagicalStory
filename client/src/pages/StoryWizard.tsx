@@ -9,6 +9,7 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 // Components
 import { Button, LoadingSpinner, Navigation, WizardHelperText } from '@/components/common';
 import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
+import type { GenerationSettings } from '@/components/generation/story';
 import {
   WizardStep2Characters,
   WizardStep3BookSettings,
@@ -259,6 +260,9 @@ export default function StoryWizard() {
   const [generatedPages, setGeneratedPages] = useState<number | undefined>();
   const [totalPages, setTotalPages] = useState<number | undefined>();
 
+  // Saved generation settings (for dev mode - shows what settings were used to generate the story)
+  const [savedGenerationSettings, setSavedGenerationSettings] = useState<GenerationSettings | null>(null);
+
   // Progressive story display state (show story while images are generating)
   const [progressiveStoryData, setProgressiveStoryData] = useState<{
     title: string;
@@ -429,6 +433,28 @@ export default function StoryWizard() {
             // Story text
             setGeneratedStory(story.story || '');
             setOriginalStory(story.originalStory || story.story || '');
+
+            // Save generation settings for dev mode display
+            setSavedGenerationSettings({
+              storyCategory: story.storyCategory,
+              storyTopic: story.storyTopic,
+              storyTheme: story.storyTheme,
+              storyTypeName: story.storyTypeName,
+              storyDetails: story.storyDetails,
+              artStyle: story.artStyle,
+              language: story.language,
+              languageLevel: story.languageLevel,
+              pages: story.pages,
+              dedication: story.dedication,
+              characters: story.characters?.map(c => ({
+                id: c.id,
+                name: c.name,
+                isMain: story.mainCharacters?.includes(c.id)
+              })),
+              mainCharacters: story.mainCharacters,
+              relationships: story.relationships,
+              relationshipTexts: story.relationshipTexts,
+            });
 
             // Show the story view immediately - images will load progressively
             setStep(6);
@@ -3010,6 +3036,7 @@ export default function StoryWizard() {
               failureReason={failureReason}
               generatedPages={generatedPages}
               totalPages={totalPages}
+              generationSettings={savedGenerationSettings || undefined}
             />
             </>
           );
@@ -3066,13 +3093,14 @@ export default function StoryWizard() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Navigation with step indicators */}
+      {/* Navigation with step indicators (hidden when viewing a saved story) */}
       <Navigation
         currentStep={step}
         onStepClick={safeSetStep}
         canAccessStep={canAccessStep}
         developerMode={developerMode}
         onDeveloperModeChange={setDeveloperMode}
+        hideSteps={step === 6 && !!storyId}
       />
 
       {/* Main content - full width */}

@@ -16,7 +16,9 @@ const { authenticateToken } = require('../middleware/auth');
 //   By default, only returns 'standard' avatar to reduce payload size
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const includeAllAvatars = req.query.includeAllAvatars === 'true' && req.user.role === 'admin';
+    // Allow includeAllAvatars for admins OR when admin is impersonating a user
+    const includeAllAvatars = req.query.includeAllAvatars === 'true' &&
+      (req.user.role === 'admin' || req.user.impersonating);
 
     let characterData = {
       characters: [],

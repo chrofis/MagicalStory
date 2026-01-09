@@ -240,10 +240,12 @@ export interface SavedStory {
   id: string;
   title: string;
   storyType: string;  // Legacy: adventure theme (pirate, knight, etc.)
+  storyTypeName?: string;  // Display name for story type
   // New story structure
   storyCategory?: 'adventure' | 'life-challenge' | 'educational';  // What kind of story
   storyTopic?: string;  // Life challenge or educational topic ID
   storyTheme?: string;  // Adventure theme wrapper (or 'realistic' for no wrapper)
+  storyDetails?: string;  // User's custom story idea/description
   artStyle: string;
   language: StoryLanguageCode;
   languageLevel: LanguageLevel;
