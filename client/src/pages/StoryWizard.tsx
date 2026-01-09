@@ -440,8 +440,8 @@ export default function StoryWizard() {
               setImageLoadProgress({ loaded: 0, total: totalImages });
             }
 
-            // In developer mode, fetch additional dev metadata (prompts, quality reasoning, etc.)
-            if (developerMode) {
+            // In developer mode or when impersonating, fetch additional dev metadata (prompts, quality reasoning, etc.)
+            if (developerMode || isImpersonating) {
               storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
                 if (devMetadata) {
                   // Merge dev metadata into sceneImages

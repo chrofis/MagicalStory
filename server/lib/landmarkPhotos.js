@@ -303,9 +303,307 @@ function getCacheStats() {
   };
 }
 
+// ============================================================================
+// LANDMARK DISCOVERY - Location-First Approach
+// ============================================================================
+
+/**
+ * Extract clean landmark name from Wikimedia filename
+ * @param {string} filename - e.g., "File:Eiffel Tower from the Champ de Mars.jpg"
+ * @returns {string|null} - Clean name or null if invalid
+ */
+function extractLandmarkName(filename) {
+  if (!filename) return null;
+
+  let name = filename
+    .replace(/^File:/i, '')
+    .replace(/\.(jpg|jpeg|png|webp|gif|tif|tiff)$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\s*\(.*?\)\s*/g, ' ')     // Remove parentheticals
+    .replace(/\s*-\s*NOAA.*$/i, '')     // Remove "- NOAA" suffix
+    .replace(/\s*-\s*panoramio.*$/i, '') // Remove "- panoramio" suffix
+    .replace(/\s*-\s*\d+.*$/, '')       // Remove " - 1234" suffixes
+    .replace(/\s+\d{8}$/, '')           // Remove date suffixes like "20200702"
+    .replace(/\s+\d{5,}\s*$/, '')       // Remove number suffixes like "75005"
+    .replace(/\s*,\s*.*$/, '')          // Remove ", location" suffixes
+    .replace(/\s+by\s+.*$/i, '')        // Remove "by Author" suffixes
+    .replace(/\s+from\s+.*$/i, '')      // Remove "from Location" suffixes
+    .replace(/\s+view\s+.*$/i, '')      // Remove "view of..." suffixes
+    .replace(/\s+as seen\s+.*$/i, '')   // Remove "as seen..." suffixes
+    .replace(/\s+au\s+.*$/i, '')        // Remove French "au..." suffixes
+    .replace(/\s+striking\s+/i, ' ')    // "Lightning striking the Eiffel" -> "Eiffel"
+    .replace(/^(Lightning|Sunset|Sunrise|View|Photo|Image|Picture)\s+/i, '') // Remove prefixes
+    .replace(/\s+/g, ' ')               // Normalize whitespace
+    .trim();
+
+  // Extract main landmark name if there's a clear pattern
+  // "the Eiffel Tower" -> "Eiffel Tower"
+  name = name.replace(/^the\s+/i, '');
+
+  // Skip if too short, too long, or looks like a catalog ID
+  if (name.length < 4 || name.length > 50) return null;
+  if (/^\d+$/.test(name)) return null;
+  if (/^[A-Z]{2,5}\d+/.test(name)) return null; // Skip IDs like "IMG1234"
+  if (/^(ETH|LBS|SR)\s/i.test(name)) return null; // Skip archive IDs
+
+  return name;
+}
+
+/**
+ * Merge two landmark arrays, deduplicating by name
+ * @param {Array} primary - Primary results (higher priority)
+ * @param {Array} secondary - Secondary results to merge in
+ * @returns {Array} Merged and deduplicated landmarks
+ */
+function mergeLandmarks(primary, secondary) {
+  const merged = new Map();
+
+  // Add primary first
+  for (const landmark of primary) {
+    merged.set(landmark.name.toLowerCase(), landmark);
+  }
+
+  // Add secondary if not already present
+  for (const landmark of secondary) {
+    const key = landmark.name.toLowerCase();
+    if (!merged.has(key)) {
+      merged.set(key, landmark);
+    } else {
+      // Increment photo count if duplicate
+      merged.get(key).photoCount += landmark.photoCount;
+    }
+  }
+
+  return Array.from(merged.values());
+}
+
+/**
+ * Geocode city name to coordinates using Nominatim (OpenStreetMap)
+ * @param {string} city - City name
+ * @param {string} country - Country name
+ * @returns {Promise<{lat: number, lon: number}|null>}
+ */
+async function geocodeCity(city, country) {
+  const query = [city, country].filter(Boolean).join(', ');
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch; contact@magicalstory.ch)' }
+    });
+
+    if (!res.ok) {
+      log.debug(`[LANDMARK] Nominatim returned ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+
+    if (data.length > 0) {
+      const coords = {
+        lat: parseFloat(data[0].lat),
+        lon: parseFloat(data[0].lon)
+      };
+      log.debug(`[LANDMARK] Geocoded "${query}" to ${coords.lat}, ${coords.lon}`);
+      return coords;
+    }
+
+    log.debug(`[LANDMARK] Geocoding: no results for "${query}"`);
+    return null;
+  } catch (err) {
+    log.error(`[LANDMARK] Geocoding error for "${query}":`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Search Wikimedia Commons by geographic coordinates
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @param {number} radiusMeters - Search radius (10-10000)
+ * @returns {Promise<Array<{name, query, photoCount, coordinates, source}>>}
+ */
+async function searchLandmarksByCoordinates(lat, lon, radiusMeters = 10000) {
+  const url = `https://commons.wikimedia.org/w/api.php?` +
+    `action=query&list=geosearch` +
+    `&gscoord=${lat}|${lon}` +
+    `&gsradius=${Math.min(radiusMeters, 10000)}` +
+    `&gsnamespace=6` +
+    `&gslimit=50` +
+    `&format=json&origin=*`;
+
+  try {
+    log.debug(`[LANDMARK] Geosearch at ${lat}, ${lon} (radius ${radiusMeters}m)`);
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const landmarks = new Map();
+    for (const item of data.query?.geosearch || []) {
+      // Skip non-image files
+      const title = item.title || '';
+      if (title.match(/\.(pdf|svg|webm|ogv|ogg|djvu)$/i)) continue;
+
+      const name = extractLandmarkName(title);
+      if (!name) continue;
+
+      const key = name.toLowerCase();
+      if (!landmarks.has(key)) {
+        landmarks.set(key, {
+          name,
+          query: name,
+          photoCount: 1,
+          coordinates: { lat: item.lat, lon: item.lon },
+          source: 'geosearch'
+        });
+      } else {
+        landmarks.get(key).photoCount++;
+      }
+    }
+
+    const results = Array.from(landmarks.values());
+    log.debug(`[LANDMARK] Geosearch found ${results.length} unique landmarks`);
+    return results;
+  } catch (err) {
+    log.error(`[LANDMARK] Geosearch error:`, err.message);
+    return [];
+  }
+}
+
+/**
+ * Search Wikimedia Commons for landmarks by text query
+ * @param {string} city - City name
+ * @param {string} country - Country name
+ * @param {number} limit - Max results per query
+ * @returns {Promise<Array<{name, query, photoCount, source}>>}
+ */
+async function searchLandmarksByText(city, country, limit = 20) {
+  const location = [city, country].filter(Boolean).join(' ');
+  const queries = [
+    `landmarks ${location}`,
+    `monuments ${city}`,
+    `famous buildings ${city}`,
+    `${city} landmark`,
+    `${city} monument`
+  ];
+
+  const allResults = new Map();
+
+  for (const query of queries) {
+    const searchUrl = `https://commons.wikimedia.org/w/api.php?` +
+      `action=query&list=search` +
+      `&srsearch=${encodeURIComponent(query)}` +
+      `&srnamespace=6&srlimit=${limit}` +
+      `&format=json&origin=*`;
+
+    try {
+      const res = await fetch(searchUrl);
+      const data = await res.json();
+
+      for (const result of data.query?.search || []) {
+        // Skip non-image files
+        const title = result.title || '';
+        if (title.match(/\.(pdf|svg|webm|ogv|ogg|djvu)$/i)) continue;
+
+        const name = extractLandmarkName(title);
+        if (!name) continue;
+
+        const key = name.toLowerCase();
+        if (!allResults.has(key)) {
+          allResults.set(key, {
+            name,
+            query: `${name} ${city} ${country}`.trim(),
+            photoCount: 1,
+            source: 'text-search'
+          });
+        } else {
+          allResults.get(key).photoCount++;
+        }
+      }
+    } catch (err) {
+      log.debug(`[LANDMARK] Text search error for "${query}":`, err.message);
+    }
+  }
+
+  const results = Array.from(allResults.values());
+  log.debug(`[LANDMARK] Text search found ${results.length} unique landmarks for "${location}"`);
+  return results;
+}
+
+/**
+ * Discover landmarks near a location with photo availability
+ * This is the main function for location-first landmark discovery.
+ *
+ * @param {string} city - City name
+ * @param {string} country - Country name
+ * @param {number} limit - Max landmarks to return (default 10)
+ * @returns {Promise<Array<{name, query, photoCount, photoData, photoUrl, attribution, hasPhoto}>>}
+ */
+async function discoverLandmarksForLocation(city, country, limit = 10) {
+  const location = [city, country].filter(Boolean).join(', ');
+  log.info(`[LANDMARK] 🔍 Discovering landmarks near: ${location}`);
+  const startTime = Date.now();
+
+  let landmarks = [];
+
+  // Step 1: Text search for landmarks in the city
+  landmarks = await searchLandmarksByText(city, country, limit * 3);
+
+  // Step 2: If not enough results, try geocoordinate search as fallback
+  if (landmarks.length < limit) {
+    log.debug(`[LANDMARK] Text search found ${landmarks.length}, trying geosearch fallback...`);
+    const coords = await geocodeCity(city, country);
+    if (coords) {
+      const geoLandmarks = await searchLandmarksByCoordinates(coords.lat, coords.lon, 10000);
+      landmarks = mergeLandmarks(landmarks, geoLandmarks);
+    }
+  }
+
+  // Step 3: Sort by photo count (most photos first)
+  landmarks.sort((a, b) => b.photoCount - a.photoCount);
+
+  // Step 4: Take top N candidates
+  const topLandmarks = landmarks.slice(0, Math.min(limit * 2, landmarks.length));
+  log.debug(`[LANDMARK] Selected ${topLandmarks.length} candidates for photo fetch`);
+
+  // Step 5: Pre-fetch photos for top landmarks (in parallel)
+  await Promise.allSettled(topLandmarks.map(async (landmark) => {
+    try {
+      const photo = await fetchLandmarkPhoto(landmark.query);
+      if (photo) {
+        landmark.photoData = photo.photoData;
+        landmark.photoUrl = photo.photoUrl;
+        landmark.attribution = photo.attribution;
+        landmark.hasPhoto = true;
+      } else {
+        landmark.hasPhoto = false;
+      }
+    } catch (err) {
+      landmark.hasPhoto = false;
+      log.debug(`[LANDMARK] Photo fetch failed for "${landmark.name}":`, err.message);
+    }
+  }));
+
+  // Step 6: Filter to only landmarks with successful photo fetch, take top N
+  const validLandmarks = topLandmarks.filter(l => l.hasPhoto).slice(0, limit);
+
+  const elapsed = Date.now() - startTime;
+  log.info(`[LANDMARK] ✅ Discovered ${validLandmarks.length} landmarks for "${location}" in ${elapsed}ms`);
+
+  // Log the landmarks found
+  if (validLandmarks.length > 0) {
+    log.debug(`[LANDMARK] Available landmarks: ${validLandmarks.map(l => l.name).join(', ')}`);
+  }
+
+  return validLandmarks;
+}
+
 module.exports = {
   fetchLandmarkPhoto,
   prefetchLandmarkPhotos,
+  discoverLandmarksForLocation,
+  searchLandmarksByText,
+  searchLandmarksByCoordinates,
+  geocodeCity,
   clearCache,
   getCacheStats
 };

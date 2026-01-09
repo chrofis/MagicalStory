@@ -37,6 +37,7 @@ You MUST follow these text length guidelines strictly. Each page's story text mu
 
 # IMPORTANT: Character Portrayal Guidelines
 
+- **CRITICAL: ONLY use the character names listed in "Characters" above.** Do NOT invent new character names or use names from other stories. If a name is not in the character list, do NOT use it in the story.
 - Write in third person (he/she/they)
 
 When writing about characters' strengths and weaknesses:

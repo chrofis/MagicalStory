@@ -44,6 +44,7 @@ Create a simple story arc:
 
 
 # Character Guidelines
+- **CRITICAL: ONLY use the character names listed above in "Characters".** Do NOT invent new character names or use names from previous stories. If a character name is not in the list, do NOT use it.
 - Write in third person (he/she/they)
 - Show character traits through actions, not descriptions. (Trait: brave = Good example: Leo approached the dangerous looking animal. Bad example: Leo was brave.)
 - Keep interactions simple and positive
