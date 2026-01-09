@@ -42,6 +42,47 @@ function getImageSizeKB(imageData) {
 }
 
 /**
+ * Split a 2x2 grid image into 4 quadrants and extract face from top-left
+ * Calls the Python photo_analyzer service
+ * @param {string} imageData - base64 encoded 2x2 grid image
+ * @returns {Object} - { success, quadrants: { faceFront, faceProfile, bodyFront, bodyProfile }, faceThumbnail }
+ */
+async function splitGridAndExtractFace(imageData) {
+  try {
+    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+    log.debug(`🔪 [SPLIT-GRID] Calling Python service at ${photoAnalyzerUrl}/split-grid`);
+
+    const response = await fetch(`${photoAnalyzerUrl}/split-grid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData }),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!response.ok) {
+      log.error(`🔪 [SPLIT-GRID] Python service returned ${response.status}`);
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      log.debug(`🔪 [SPLIT-GRID] Successfully split grid into 4 quadrants`);
+      if (result.faceThumbnail) {
+        log.debug(`🔪 [SPLIT-GRID] Extracted face thumbnail: ${getImageSizeKB(result.faceThumbnail)}KB`);
+      }
+    } else {
+      log.error(`🔪 [SPLIT-GRID] Python service error: ${result.error}`);
+    }
+
+    return result;
+  } catch (err) {
+    log.error(`🔪 [SPLIT-GRID] Error calling Python service:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Get the costumed avatar generation log for developer mode auditing
  */
 function getCostumedAvatarGenerationLog() {
@@ -1371,21 +1412,22 @@ These corrections OVERRIDE what is visible in the reference photo.
             const compressedSize = Math.round(compressedImage.length / 1024);
             log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated and compressed (${originalSize}KB -> ${compressedSize}KB)`);
 
-            // Split 2x2 grid into quadrants and extract face thumbnail
-            const splitResult = await splitGridAndExtractFace(compressedImage);
-            if (splitResult.success) {
-              log.debug(`✅ [CLOTHING AVATARS] ${category} grid split into 4 quadrants`);
-              return {
-                category,
-                prompt: avatarPrompt,
-                quadrants: splitResult.quadrants,
-                faceThumbnail: splitResult.faceThumbnail,
-                imageData: null  // No longer store full grid
-              };
-            } else {
-              log.warn(`[CLOTHING AVATARS] Grid split failed for ${category}: ${splitResult.error}, using full grid as fallback`);
-              return { category, prompt: avatarPrompt, imageData: compressedImage };
+            // Extract face thumbnail from 2x2 grid for display (original image kept for generation)
+            let faceThumbnail = null;
+            try {
+              const splitResult = await splitGridAndExtractFace(compressedImage);
+              if (splitResult.success && splitResult.faceThumbnail) {
+                faceThumbnail = splitResult.faceThumbnail;
+                log.debug(`✅ [CLOTHING AVATARS] ${category} face thumbnail extracted`);
+              } else {
+                log.warn(`[CLOTHING AVATARS] Face thumbnail extraction failed for ${category}: ${splitResult.error || 'no thumbnail'}`);
+              }
+            } catch (splitErr) {
+              log.warn(`[CLOTHING AVATARS] Split failed for ${category}:`, splitErr.message);
             }
+
+            // Return original compressed image (unchanged) + optional face thumbnail
+            return { category, prompt: avatarPrompt, imageData: compressedImage, faceThumbnail };
           } catch (compressErr) {
             log.warn(`[CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
             return { category, prompt: avatarPrompt, imageData };
@@ -1411,35 +1453,29 @@ These corrections OVERRIDE what is visible in the reference photo.
     const generationTime = Date.now() - generationStart;
     log.debug(`⚡ [CLOTHING AVATARS] ${categoryCount} avatars generated in ${generationTime}ms (parallel)`);
 
-    // Store prompts, quadrants, and face thumbnails
-    for (const { category, prompt, imageData, quadrants, faceThumbnail } of generatedAvatars) {
+    // Store prompts, images, and face thumbnails
+    for (const { category, prompt, imageData, faceThumbnail } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
-      if (quadrants) {
-        // Store quadrants as the category data (new format)
-        results[category] = quadrants;
-        // Store face thumbnail for this category
-        if (faceThumbnail) {
-          if (!results.faceThumbnails) results.faceThumbnails = {};
-          results.faceThumbnails[category] = faceThumbnail;
-        }
-        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} with quadrants: ${Object.keys(quadrants).join(', ')}`);
-      } else if (imageData) {
-        // Fallback: store full grid if split failed
+      if (imageData) {
+        // Store original 2x2 grid image (unchanged - used for story generation)
         results[category] = imageData;
-        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} as full grid (fallback)`);
+        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} avatar`);
+      }
+      // Store face thumbnail separately (for display only)
+      if (faceThumbnail) {
+        if (!results.faceThumbnails) results.faceThumbnails = {};
+        results.faceThumbnails[category] = faceThumbnail;
+        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} face thumbnail`);
       }
     }
 
     // PHASE 2: Evaluate all generated avatars in parallel
-    // Use faceFront quadrant for evaluation (the face looking at camera)
-    const avatarsToEvaluate = generatedAvatars.filter(a => a.quadrants?.faceFront || a.imageData);
+    const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
     if (avatarsToEvaluate.length > 0) {
       log.debug(`🔍 [CLOTHING AVATARS] Starting PARALLEL evaluation of ${avatarsToEvaluate.length} avatars...`);
       const evalStart = Date.now();
-      const evalPromises = avatarsToEvaluate.map(async ({ category, imageData, quadrants }) => {
-        // Evaluate using faceFront quadrant if available, otherwise full grid
-        const imageToEvaluate = quadrants?.faceFront || imageData;
-        const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageToEvaluate, geminiApiKey);
+      const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
+        const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageData, geminiApiKey);
         return { category, faceMatchResult };
       });
       const evalResults = await Promise.all(evalPromises);

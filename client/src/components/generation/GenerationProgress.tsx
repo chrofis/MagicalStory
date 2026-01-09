@@ -4,16 +4,12 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
-import type { Character, AvatarData } from '@/types/character';
+import type { Character, ClothingCategory } from '@/types/character';
 
-// Helper function to extract displayable image from AvatarData (string or quadrants)
-function getAvatarDisplayImage(avatarData: AvatarData | undefined): string | undefined {
-  if (!avatarData) return undefined;
-  if (typeof avatarData === 'string') return avatarData;
-  if (typeof avatarData === 'object' && 'faceFront' in avatarData) {
-    return avatarData.faceFront;
-  }
-  return undefined;
+// Helper to get display image: prefer face thumbnail (extracted face), fall back to full 2x2 avatar grid
+function getDisplayImage(avatars: Character['avatars'], category: ClothingCategory): string | undefined {
+  if (!avatars) return undefined;
+  return avatars.faceThumbnails?.[category] || avatars[category];
 }
 
 interface GenerationProgressProps {
@@ -125,10 +121,10 @@ export function GenerationProgress({
     if (!avatars) return '';
 
     const available: string[] = [];
-    const standardImg = getAvatarDisplayImage(avatars.standard);
-    const summerImg = getAvatarDisplayImage(avatars.summer);
-    const winterImg = getAvatarDisplayImage(avatars.winter);
-    const formalImg = getAvatarDisplayImage(avatars.formal);
+    const standardImg = getDisplayImage(avatars, 'standard');
+    const summerImg = getDisplayImage(avatars, 'summer');
+    const winterImg = getDisplayImage(avatars, 'winter');
+    const formalImg = getDisplayImage(avatars, 'formal');
     if (standardImg) available.push(standardImg);
     if (summerImg) available.push(summerImg);
     if (winterImg) available.push(winterImg);

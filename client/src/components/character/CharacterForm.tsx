@@ -8,17 +8,13 @@ import CharacterRelationships from './CharacterRelationships';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
 import { getAgeCategory } from '@/services/characterService';
-import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap, AvatarData } from '@/types/character';
+import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap, ClothingCategory } from '@/types/character';
 import type { CustomRelationshipPair } from '@/constants/relationships';
 
-// Helper function to extract displayable image from AvatarData (string or quadrants)
-function getAvatarDisplayImage(avatarData: AvatarData | undefined): string | undefined {
-  if (!avatarData) return undefined;
-  if (typeof avatarData === 'string') return avatarData;
-  if (typeof avatarData === 'object' && 'faceFront' in avatarData) {
-    return avatarData.faceFront;
-  }
-  return undefined;
+// Helper to get display image: prefer face thumbnail (extracted face), fall back to full 2x2 avatar grid
+function getDisplayImage(avatars: Character['avatars'], category: ClothingCategory): string | undefined {
+  if (!avatars) return undefined;
+  return avatars.faceThumbnails?.[category] || avatars[category];
 }
 
 // Age category options for the dropdown (no age numbers - we already have real age field)
@@ -956,9 +952,9 @@ export function CharacterForm({
   // Step 5: Avatar Review for NEW characters
   if (isNewCharacter && step === 'avatar') {
     const avatarStatus = character.avatars?.status;
-    const displayAvatar = getAvatarDisplayImage(character.avatars?.standard) ||
-                          getAvatarDisplayImage(character.avatars?.winter) ||
-                          getAvatarDisplayImage(character.avatars?.summer);
+    const displayAvatar = getDisplayImage(character.avatars, 'standard') ||
+                          getDisplayImage(character.avatars, 'winter') ||
+                          getDisplayImage(character.avatars, 'summer');
     const hasAvatar = !!displayAvatar;
     const isStillGenerating = isGeneratingAvatar || isRegeneratingAvatarsWithTraits || avatarStatus === 'generating';
     const hasFailed = avatarStatus === 'failed';
@@ -1172,7 +1168,7 @@ export function CharacterForm({
             {character.avatars?.standard ? (
               <div className="relative">
                 <img
-                  src={getAvatarDisplayImage(character.avatars.standard)}
+                  src={getDisplayImage(character.avatars, 'standard')}
                   alt={`${character.name} avatar`}
                   className={`w-full object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
                   onClick={() => setEnlargedAvatar(true)}
@@ -1207,7 +1203,7 @@ export function CharacterForm({
                 onClick={() => setEnlargedAvatar(false)}
               >
                 <img
-                  src={getAvatarDisplayImage(character.avatars.standard)}
+                  src={getDisplayImage(character.avatars, 'standard')}
                   alt={`${character.name} avatar`}
                   className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
@@ -1464,11 +1460,11 @@ export function CharacterForm({
                 {character.avatars?.[category] ? (
                   <div
                     className="relative cursor-pointer group"
-                    onClick={() => setLightboxImage(getAvatarDisplayImage(character.avatars?.[category]) || null)}
+                    onClick={() => setLightboxImage(getDisplayImage(character.avatars, category) || null)}
                     title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                   >
                     <img
-                      src={getAvatarDisplayImage(character.avatars[category])}
+                      src={getDisplayImage(character.avatars, category)}
                       alt={`${character.name} - ${category}`}
                       className={`w-full h-40 object-contain rounded border bg-white transition-all group-hover:shadow-lg group-hover:scale-[1.02] ${character.avatars?.stale ? 'border-amber-400 opacity-75' : 'border-teal-200'}`}
                     />
@@ -1994,7 +1990,7 @@ export function CharacterForm({
                 <div className="flex-shrink-0 flex justify-center md:justify-start">
                   {character.avatars?.standard ? (
                     <img
-                      src={getAvatarDisplayImage(character.avatars.standard)}
+                      src={getDisplayImage(character.avatars, 'standard')}
                       alt={`${character.name} avatar`}
                       className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
                     />

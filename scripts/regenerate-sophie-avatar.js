@@ -74,40 +74,56 @@ async function main() {
     await page.evaluate(() => window.scrollBy(0, 500));
     await page.waitForTimeout(1000);
 
-    // Look for regenerate button
-    console.log('Looking for Regenerate Avatar button...');
-    const regenerateBtn = page.locator('button:has-text("Regenerate")');
-    const regenerateCount = await regenerateBtn.count();
-    console.log(`Found ${regenerateCount} Regenerate buttons`);
+    // Look for Modify Avatar button (it's called "Modify Avatar" not "Regenerate")
+    console.log('Looking for Modify Avatar button...');
+    const modifyBtn = page.locator('button:has-text("Modify Avatar")');
+    const regenerateCount = await modifyBtn.count();
+    console.log(`Found ${regenerateCount} Modify Avatar buttons`);
 
     if (regenerateCount > 0) {
-      await regenerateBtn.first().scrollIntoViewIfNeeded();
+      await modifyBtn.first().scrollIntoViewIfNeeded();
       await page.screenshot({ path: 'test-results/regen-3-found-button.png' });
 
-      console.log('Clicking Regenerate Avatar...');
-      await regenerateBtn.first().click();
+      console.log('Clicking Modify Avatar...');
+      await modifyBtn.first().click();
 
-      console.log('Waiting for generation (this takes 30-90 seconds)...');
-      await page.waitForTimeout(10000);
-      await page.screenshot({ path: 'test-results/regen-4-generating.png' });
+      // Wait for the modal to open
+      await page.waitForTimeout(2000);
+      await page.screenshot({ path: 'test-results/regen-4-modal.png' });
 
-      // Wait up to 2 minutes for generation
-      for (let i = 0; i < 12; i++) {
+      // Now click "Save & Regenerate" button
+      console.log('Looking for Save & Regenerate button...');
+      const saveRegenBtn = page.locator('button:has-text("Save & Regenerate")');
+      if (await saveRegenBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.log('Clicking Save & Regenerate...');
+        await saveRegenBtn.click();
+
+        console.log('Waiting for avatar generation (this takes 30-90 seconds)...');
         await page.waitForTimeout(10000);
-        console.log(`  ${(i+1)*10} seconds elapsed...`);
+        await page.screenshot({ path: 'test-results/regen-5-generating.png' });
 
-        // Check if there's still a loading indicator
-        const isLoading = await page.evaluate(() => {
-          return !!document.querySelector('[class*="animate-spin"], [class*="loading"], [class*="generating"]');
-        });
+        // Wait up to 2 minutes for generation
+        for (let i = 0; i < 12; i++) {
+          await page.waitForTimeout(10000);
+          console.log(`  ${(i+1)*10} seconds elapsed...`);
 
-        if (!isLoading) {
-          console.log('Generation complete!');
-          break;
+          // Check if modal is still open or if there's a loading indicator
+          const modalOpen = await page.locator('text="Modify Avatar"').isVisible().catch(() => false);
+          const isLoading = await page.evaluate(() => {
+            return !!document.querySelector('[class*="animate-spin"], [class*="loading"], [class*="generating"]');
+          });
+
+          if (!modalOpen && !isLoading) {
+            console.log('Generation complete!');
+            break;
+          }
         }
-      }
 
-      await page.screenshot({ path: 'test-results/regen-5-complete.png' });
+        await page.screenshot({ path: 'test-results/regen-6-complete.png' });
+      } else {
+        console.log('Save & Regenerate button not found');
+        await page.screenshot({ path: 'test-results/regen-5-no-save-btn.png' });
+      }
     } else {
       console.log('Regenerate button not found');
 
@@ -128,8 +144,8 @@ async function main() {
     await page.screenshot({ path: 'test-results/regen-error.png' });
   }
 
-  console.log('\nBrowser staying open for 30 seconds...');
-  await page.waitForTimeout(30000);
+  console.log('\nBrowser staying open for 5 minutes for observation...');
+  await page.waitForTimeout(300000);
 
   await browser.close();
 }

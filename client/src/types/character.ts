@@ -125,24 +125,13 @@ export interface CostumedAvatarData {
   clothing: string;   // Clothing description used
 }
 
-// Avatar quadrants from split 2x2 grid
-export interface AvatarQuadrants {
-  faceFront: string;     // Top-left: face looking at camera
-  faceProfile: string;   // Top-right: face 3/4 profile
-  bodyFront: string;     // Bottom-left: full body front
-  bodyProfile: string;   // Bottom-right: full body profile
-}
-
-// Avatar data can be either a single image (old format) or quadrants (new format)
-export type AvatarData = string | AvatarQuadrants;
-
 // Generated avatars for each clothing category
 export interface CharacterAvatars {
-  winter?: AvatarData;
-  standard?: AvatarData;
-  summer?: AvatarData;
-  formal?: AvatarData;
-  faceThumbnails?: Record<ClothingCategory, string>; // Extracted face thumbnails per category
+  winter?: string;
+  standard?: string;
+  summer?: string;
+  formal?: string;
+  faceThumbnails?: Record<ClothingCategory, string>; // Extracted face thumbnails for display
   generatedAt?: string;
   status?: 'pending' | 'generating' | 'complete' | 'failed';
   stale?: boolean; // True when avatars were generated from a previous photo
