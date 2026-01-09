@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Book, Trash2, Eye, AlertTriangle, BookOpen, Tag } from 'lucide-react';
+import { Book, Trash2, Eye, AlertTriangle, BookOpen, Tag, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useGenerationOptional } from '@/context/GenerationContext';
 import { storyService } from '@/services';
 import { LoadingSpinner, Navigation } from '@/components/common';
 import { MAX_BOOK_PAGES } from './Pricing';
@@ -35,6 +36,59 @@ interface StoryListItem {
   generatedPages?: number;
   totalPages?: number;
 }
+
+// Generating story card - shown at top of list when a story is being generated
+const GeneratingStoryCard = memo(function GeneratingStoryCard({
+  storyTitle,
+  progress,
+  language,
+  onView,
+}: {
+  storyTitle: string;
+  progress: { current: number; total: number; message: string };
+  language: string;
+  onView: () => void;
+}) {
+  const percentage = progress.total > 0
+    ? Math.round((progress.current / progress.total) * 100)
+    : 0;
+
+  return (
+    <div
+      onClick={onView}
+      className="bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ring-2 ring-indigo-400 cursor-pointer"
+    >
+      {/* Animated gradient thumbnail */}
+      <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+        <Loader2 size={48} className="animate-spin text-indigo-600" />
+      </div>
+
+      {/* Content */}
+      <div className="p-4 flex flex-col flex-1">
+        <div className="flex-1">
+          <h3 className="font-bold text-lg text-gray-800 mb-1 truncate">
+            {storyTitle || (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Generating...')}
+          </h3>
+          <p className="text-sm text-indigo-600 mb-3">
+            {progress.message || (language === 'de' ? 'Starte...' : language === 'fr' ? 'Démarrage...' : 'Starting...')}
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-auto">
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all duration-500"
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1 text-center">{percentage}%</p>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 // Story card component with lazy loading and individual image loading state
 // Wrapped with React.memo to prevent unnecessary re-renders when parent state changes
@@ -196,6 +250,8 @@ export default function MyStories() {
   const { language } = useLanguage();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
+  const generation = useGenerationOptional();
+  const isGeneratingStory = generation?.activeJob && !generation?.isComplete && !generation?.error;
   const [stories, setStories] = useState<StoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -676,6 +732,15 @@ export default function MyStories() {
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {/* Show generating card if there's an active job */}
+              {isGeneratingStory && generation?.activeJob && (
+                <GeneratingStoryCard
+                  storyTitle={generation.activeJob.storyTitle}
+                  progress={generation.progress}
+                  language={language}
+                  onView={() => navigate('/create')}
+                />
+              )}
               {stories.map((story) => (
                 <StoryCard
                   key={story.id}

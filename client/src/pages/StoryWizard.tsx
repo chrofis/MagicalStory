@@ -66,7 +66,7 @@ export default function StoryWizard() {
   const { t, language } = useLanguage();
   const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
-  const { startTracking, stopTracking } = useGeneration();
+  const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId } = useGeneration();
 
   // Wizard state - start at step 6 with loading if we have a storyId in URL
   // Otherwise restore from localStorage to preserve step when navigating away and back
@@ -316,6 +316,23 @@ export default function StoryWizard() {
       }).catch(() => setUserHasStories(false));
     }
   }, [isAuthenticated]);
+
+  // Handle returning during active generation or after completion
+  useEffect(() => {
+    const urlStoryId = searchParams.get('storyId');
+    // If there's an active job and we're not already showing generation, show it
+    if (activeJob && !urlStoryId && !isGenerating) {
+      log.info('Returning during active generation, showing progress');
+      setStep(6);
+      setIsGenerating(true);
+      setStoryTitle(activeJob.storyTitle);
+    }
+    // If generation completed and we have a story ID, navigate to it
+    if (generationComplete && completedStoryId && !urlStoryId) {
+      log.info('Generation completed, navigating to story:', completedStoryId);
+      setSearchParams({ storyId: completedStoryId }, { replace: true });
+    }
+  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, isGenerating]);
 
   // Reset story settings when ?new=true is present (from "Create New Story" button)
   useEffect(() => {
