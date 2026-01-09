@@ -1404,6 +1404,22 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
         }
 
+        // Check for IMAGE_OTHER finish reason - Gemini refused to transform real person photo
+        // Fall back to ACE++ which is designed for face-consistent avatar generation
+        if (!imageData && data.candidates?.[0]?.finishReason === 'IMAGE_OTHER') {
+          log.warn(`[CLOTHING AVATARS] Gemini refused to transform photo for ${category} (IMAGE_OTHER), falling back to ACE++...`);
+
+          try {
+            const aceResult = await generateAvatarWithACEPlusPlus(category, userTraitsSection);
+            if (aceResult && aceResult.imageData) {
+              log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via ACE++ fallback`);
+              imageData = aceResult.imageData;
+            }
+          } catch (aceErr) {
+            log.error(`❌ [CLOTHING AVATARS] ACE++ fallback failed for ${category}:`, aceErr.message);
+          }
+        }
+
         if (imageData) {
           // Compress avatar to JPEG
           try {
@@ -1564,6 +1580,13 @@ These corrections OVERRIDE what is visible in the reference photo.
     }
 
     log.debug(`✅ [CLOTHING AVATARS] Generated standard avatar for ${name}`);
+    // Log extracted traits for debugging
+    if (results.extractedTraits) {
+      log.debug(`📋 [CLOTHING AVATARS] Response extractedTraits: ${JSON.stringify(results.extractedTraits).substring(0, 200)}...`);
+      log.debug(`💇 [CLOTHING AVATARS] Response detailedHairAnalysis: ${results.extractedTraits.detailedHairAnalysis ? JSON.stringify(results.extractedTraits.detailedHairAnalysis) : 'NOT PRESENT'}`);
+    } else {
+      log.warn(`⚠️ [CLOTHING AVATARS] No extractedTraits in response!`);
+    }
     res.json({ success: true, clothingAvatars: results });
 
   } catch (err) {
