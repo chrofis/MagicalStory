@@ -100,7 +100,7 @@ Guidelines for clothing:
 - For standard/winter/summer: Only describe **signature elements** (hat, boots, scarf, vest)
 - For costumed: Provide **complete outfit description**
 - Only mark `used: true` for variations that actually appear
-- Costumes must NEVER include hats, helmets, crowns, or head coverings - faces must stay visible
+- **CRITICAL**: Costumes must NEVER include hats, helmets, crowns, head coverings, face masks, or anything that covers/obstructs the face. Faces must stay fully visible and unobstructed for character recognition. NO ninja masks, superhero masks, or any face coverings.
 
 ---CHARACTER ARCS---
 

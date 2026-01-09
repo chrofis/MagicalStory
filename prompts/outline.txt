@@ -85,7 +85,7 @@ When multiple characters wear costumes, each character MUST have a **different p
 - Example: If 3 pirates → one has RED shirt, one has BLUE shirt, one has GREEN shirt
 - This is essential for visual storytelling - readers identify characters by color
 
-**NO HATS:** Never include hats, helmets, or headwear in costume descriptions - they obscure character faces and make recognition difficult.
+**NO HATS OR FACE COVERINGS:** Never include hats, helmets, headwear, face masks, ninja masks, superhero masks, bandanas, or anything that covers/obstructs the face in costume descriptions - faces must stay fully visible for character recognition.
 
 **Output as JSON:**
 
