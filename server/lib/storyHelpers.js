@@ -974,6 +974,11 @@ function buildCharacterPhysicalDescription(char) {
   if (hairDesc) {
     description += `. Hair: ${hairDesc}`;
   }
+  // Facial hair for males (skip if "none")
+  const facialHair = char.physical?.facialHair;
+  if (gender === 'male' && facialHair && facialHair.toLowerCase() !== 'none') {
+    description += `. Facial hair: ${facialHair}`;
+  }
   if (face) {
     description += `, ${face}`;
   }
@@ -1108,6 +1113,8 @@ function buildCharacterReferenceList(photos, characters = null) {
       // Face shape removed - let reference image handle facial geometry
       physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
       hairDesc,
+      // Facial hair for males (skip if "none")
+      char?.gender === 'male' && physical?.facialHair && physical.facialHair.toLowerCase() !== 'none' ? `Facial hair: ${physical.facialHair}` : '',
       physical?.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
       // Include clothing description from avatar if available
       photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
@@ -1723,6 +1730,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         // Face shape removed - let reference image handle facial geometry
         physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
         hairDesc,
+        // Facial hair for males (skip if "none")
+        char.gender === 'male' && physical?.facialHair && physical.facialHair.toLowerCase() !== 'none' ? `Facial hair: ${physical.facialHair}` : '',
         physical?.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
         // Prefer avatar clothing description if available, otherwise use clothing style
         avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `CLOTHING STYLE (MUST MATCH - colors and patterns): ${clothingStyle}` : '')
