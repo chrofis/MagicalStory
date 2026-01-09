@@ -1392,6 +1392,12 @@ ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
 - Include challenges that the characters must overcome`;
   }
 
+  // Build available landmarks section if landmarks were pre-discovered
+  const availableLandmarksSection = buildAvailableLandmarksSection(inputData.availableLandmarks);
+  if (inputData.availableLandmarks?.length > 0) {
+    log.debug(`[PROMPT] Including ${inputData.availableLandmarks.length} pre-discovered landmarks in outline prompt`);
+  }
+
   // Use template if available, otherwise fall back to hardcoded prompt
   if (PROMPT_TEMPLATES.outline) {
     const prompt = fillTemplate(PROMPT_TEMPLATES.outline, {
@@ -1409,7 +1415,8 @@ ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
       STORY_TOPIC: storyTopic || 'None',
       CATEGORY_GUIDELINES: categoryGuidelines,
       STORY_DETAILS: inputData.storyDetails || 'None',
-      DEDICATION: inputData.dedication || 'None'
+      DEDICATION: inputData.dedication || 'None',
+      AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection
     });
     log.debug(`[PROMPT] Outline prompt length: ${prompt.length} chars`);
     return prompt;
@@ -2197,6 +2204,38 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
 }
 
 // ============================================================================
+// AVAILABLE LANDMARKS SECTION BUILDER
+// ============================================================================
+
+/**
+ * Build the available landmarks section for the outline prompt
+ * @param {Array} landmarks - Pre-discovered landmarks from userLandmarkCache
+ * @returns {string} - Prompt section with available landmarks, or empty string if none
+ */
+function buildAvailableLandmarksSection(landmarks) {
+  if (!landmarks || landmarks.length === 0) {
+    return '';
+  }
+
+  const landmarkList = landmarks
+    .map(l => `- ${l.name}`)
+    .join('\n');
+
+  return `**PRE-VALIDATED LANDMARKS (RECOMMENDED):**
+The following landmarks near the story location have verified reference photos available.
+Using these landmarks will produce MORE ACCURATE illustrations since we have real photos.
+
+${landmarkList}
+
+To use one of these landmarks in your story:
+1. Include it in the "locations" array
+2. Set "isRealLandmark": true
+3. Set "landmarkQuery" to the EXACT name from the list above
+4. You may use 0-3 of these landmarks if they fit the story naturally
+`;
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -2248,5 +2287,6 @@ module.exports = {
   getSceneComplexityGuide,
 
   // Landmark helpers
-  getLandmarkPhotosForPage
+  getLandmarkPhotosForPage,
+  buildAvailableLandmarksSection
 };

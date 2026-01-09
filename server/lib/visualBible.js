@@ -1473,6 +1473,57 @@ function extractStoryTextFromOutput(text) {
 }
 
 // ============================================================================
+// LANDMARK LINKING
+// ============================================================================
+
+/**
+ * Link pre-discovered landmarks to Visual Bible locations
+ * If a location references a pre-discovered landmark, copy the photo data directly
+ *
+ * @param {Object} visualBible - The parsed Visual Bible object
+ * @param {Array} availableLandmarks - Pre-discovered landmarks from userLandmarkCache
+ */
+function linkPreDiscoveredLandmarks(visualBible, availableLandmarks) {
+  if (!visualBible?.locations || !availableLandmarks?.length) {
+    return;
+  }
+
+  let linkedCount = 0;
+
+  for (const location of visualBible.locations) {
+    if (!location.isRealLandmark || !location.landmarkQuery) {
+      continue;
+    }
+
+    // Try to find a matching pre-discovered landmark
+    // Match by exact name or by landmarkQuery containing the landmark name
+    const query = location.landmarkQuery.toLowerCase();
+    const preDiscovered = availableLandmarks.find(landmark => {
+      const landmarkName = landmark.name.toLowerCase();
+      // Check if the query contains the landmark name or vice versa
+      return query.includes(landmarkName) || landmarkName.includes(query.split(' ')[0]);
+    });
+
+    if (preDiscovered && preDiscovered.photoData) {
+      // Link the pre-fetched photo data directly
+      location.referencePhotoData = preDiscovered.photoData;
+      location.referencePhotoUrl = preDiscovered.photoUrl;
+      location.photoAttribution = preDiscovered.attribution;
+      location.photoSource = 'wikimedia';
+      location.photoFetchStatus = 'success';
+      location.landmarkQuery = preDiscovered.name; // Use exact name for consistency
+      linkedCount++;
+
+      log.debug(`[VISUAL BIBLE] 🔗 Linked pre-discovered landmark: "${location.name}" → "${preDiscovered.name}"`);
+    }
+  }
+
+  if (linkedCount > 0) {
+    log.info(`[VISUAL BIBLE] 📍 Linked ${linkedCount} pre-discovered landmark(s) with photos`);
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1505,5 +1556,8 @@ module.exports = {
   formatVisualBibleForStoryText,
   parseNewVisualBibleEntries,
   mergeNewVisualBibleEntries,
-  extractStoryTextFromOutput
+  extractStoryTextFromOutput,
+
+  // Landmark linking
+  linkPreDiscoveredLandmarks
 };

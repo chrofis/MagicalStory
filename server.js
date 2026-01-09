@@ -164,9 +164,15 @@ const {
   formatVisualBibleForStoryText,
   parseNewVisualBibleEntries,
   mergeNewVisualBibleEntries,
-  extractStoryTextFromOutput
+  extractStoryTextFromOutput,
+  linkPreDiscoveredLandmarks
 } = require('./server/lib/visualBible');
-const { prefetchLandmarkPhotos } = require('./server/lib/landmarkPhotos');
+const { prefetchLandmarkPhotos, discoverLandmarksForLocation } = require('./server/lib/landmarkPhotos');
+
+// Landmark discovery cache - stores pre-discovered landmarks per user location
+// Key: `${city}_${country}` (normalized), Value: { landmarks: [], timestamp }
+const userLandmarkCache = new Map();
+const LANDMARK_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const {
   ART_STYLES,
   LANGUAGE_LEVELS,
@@ -1411,6 +1417,31 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
     if (userLocation?.city) {
       log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
+
+      // Trigger landmark discovery if not already cached for this location
+      const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
+      const cached = userLandmarkCache.get(cacheKey);
+
+      if (!cached || Date.now() - cached.timestamp > LANDMARK_CACHE_TTL) {
+        log.info(`[LANDMARK] 🔍 Starting background discovery for ${userLocation.city}, ${userLocation.country || ''}`);
+
+        // Fire and forget - discovery runs in background
+        discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10)
+          .then(landmarks => {
+            userLandmarkCache.set(cacheKey, {
+              landmarks,
+              city: userLocation.city,
+              country: userLocation.country || '',
+              timestamp: Date.now()
+            });
+            log.info(`[LANDMARK] ✅ Cached ${landmarks.length} landmarks for ${userLocation.city}`);
+          })
+          .catch(err => {
+            log.error(`[LANDMARK] Discovery failed for ${userLocation.city}: ${err.message}`);
+          });
+      } else {
+        log.debug(`[LANDMARK] Using cached ${cached.landmarks.length} landmarks for ${userLocation.city}`);
+      }
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
@@ -1568,6 +1599,31 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
     if (userLocation?.city) {
       log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
+
+      // Trigger landmark discovery if not already cached for this location
+      const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
+      const cached = userLandmarkCache.get(cacheKey);
+
+      if (!cached || Date.now() - cached.timestamp > LANDMARK_CACHE_TTL) {
+        log.info(`[LANDMARK] 🔍 Starting background discovery for ${userLocation.city}, ${userLocation.country || ''}`);
+
+        // Fire and forget - discovery runs in background
+        discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10)
+          .then(landmarks => {
+            userLandmarkCache.set(cacheKey, {
+              landmarks,
+              city: userLocation.city,
+              country: userLocation.country || '',
+              timestamp: Date.now()
+            });
+            log.info(`[LANDMARK] ✅ Cached ${landmarks.length} landmarks for ${userLocation.city}`);
+          })
+          .catch(err => {
+            log.error(`[LANDMARK] Discovery failed for ${userLocation.city}: ${err.message}`);
+          });
+      } else {
+        log.debug(`[LANDMARK] Using cached ${cached.landmarks.length} landmarks for ${userLocation.city}`);
+      }
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
@@ -7878,6 +7934,20 @@ async function processStoryJob(jobId) {
 
     const job = jobResult.rows[0];
     const inputData = job.input_data;
+
+    // Inject pre-discovered landmarks if available for this user's location
+    if (inputData.userLocation?.city) {
+      const cacheKey = `${inputData.userLocation.city}_${inputData.userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
+      const cachedLandmarks = userLandmarkCache.get(cacheKey);
+
+      if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
+        inputData.availableLandmarks = cachedLandmarks.landmarks;
+        log.info(`[LANDMARK] 📍 Injecting ${cachedLandmarks.landmarks.length} pre-discovered landmarks for ${inputData.userLocation.city}`);
+      } else {
+        log.debug(`[LANDMARK] No cached landmarks available for ${inputData.userLocation.city}`);
+      }
+    }
+
     const skipImages = inputData.skipImages === true; // Developer mode: text only
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
     const enableAutoRepair = inputData.enableAutoRepair === true; // Developer mode: auto-repair images (default: OFF)
@@ -8015,6 +8085,11 @@ async function processStoryJob(jobId) {
 
     // Initialize main characters from inputData.characters with their style analysis
     initializeVisualBibleMainCharacters(visualBible, inputData.characters);
+
+    // Link pre-discovered landmarks (if available) to skip fetching later
+    if (inputData.availableLandmarks?.length > 0) {
+      linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
+    }
 
     const visualBibleEntryCount = visualBible.secondaryCharacters.length +
                                    visualBible.animals.length +

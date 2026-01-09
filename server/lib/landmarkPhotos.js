@@ -241,17 +241,18 @@ async function prefetchLandmarkPhotos(visualBible) {
     return visualBible;
   }
 
-  // Find locations marked as real landmarks
+  // Find locations marked as real landmarks that don't already have photos
+  // (Skip landmarks that were already linked from pre-discovered cache)
   const landmarks = visualBible.locations.filter(
-    loc => loc.isRealLandmark && loc.landmarkQuery
+    loc => loc.isRealLandmark && loc.landmarkQuery && loc.photoFetchStatus !== 'success'
   );
 
   if (landmarks.length === 0) {
-    log.debug(`[LANDMARK] No real landmarks found in Visual Bible`);
+    log.debug(`[LANDMARK] No landmarks need photo fetching (all already linked or none found)`);
     return visualBible;
   }
 
-  log.info(`[LANDMARK] 🌍 Pre-fetching photos for ${landmarks.length} real landmark(s)`);
+  log.info(`[LANDMARK] 🌍 Pre-fetching photos for ${landmarks.length} landmark(s) (skipping pre-linked)`);
   const startTime = Date.now();
 
   // Fetch all in parallel with Promise.allSettled (don't fail on individual errors)
