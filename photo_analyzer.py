@@ -262,15 +262,16 @@ def create_face_thumbnail(image, face_box, size=200):
 
 def remove_faces_except(image, keep_face_id, all_faces):
     """
-    Remove all faces EXCEPT the selected one by making them transparent.
-    This prevents AI from using wrong faces during avatar generation.
+    Remove all faces AND bodies EXCEPT the selected one by making them transparent.
+    Uses midpoint approach: calculates midpoint between selected face and each other face,
+    removes everything on "their side" of the midpoint (below their face level).
 
     Args:
         image: BGRA numpy array (must have alpha channel)
         keep_face_id: ID of face to keep (0-indexed)
         all_faces: list of face dicts with x, y, width, height (percentages 0-100)
 
-    Returns: image with non-selected faces made transparent
+    Returns: image with non-selected faces and bodies made transparent
     """
     if not all_faces or len(all_faces) <= 1:
         return image
@@ -283,26 +284,56 @@ def remove_faces_except(image, keep_face_id, all_faces):
         # Convert BGR to BGRA
         result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)
 
+    # Find the selected face
+    selected_face = None
+    for face in all_faces:
+        if face['id'] == keep_face_id:
+            selected_face = face
+            break
+
+    if selected_face is None:
+        return result
+
+    # Calculate selected face center (in pixels)
+    selected_center_x = int((selected_face['x'] + selected_face['width'] / 2) / 100 * w)
+
     for face in all_faces:
         if face['id'] == keep_face_id:
             continue  # Skip the selected face
 
-        # Convert percentage to pixel coordinates
-        # Add 30% extra padding to ensure full face removal (head, hair, etc.)
-        padding = 0.3
-        x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * padding)) * w)
-        y1 = int(max(0, (face['y'] / 100 - face['height'] / 100 * padding)) * h)
-        x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * padding) * w)
-        y2 = int(min(1.0, (face['y'] + face['height']) / 100 + face['height'] / 100 * padding) * h)
+        # Calculate other face center (in pixels)
+        other_center_x = int((face['x'] + face['width'] / 2) / 100 * w)
 
-        # Ensure valid region
-        if x2 <= x1 or y2 <= y1:
-            continue
+        # Calculate midpoint X between selected and other face
+        midpoint_x = (selected_center_x + other_center_x) // 2
 
-        # Make face region transparent (set alpha to 0)
-        result[y1:y2, x1:x2, 3] = 0
+        # Determine which side to remove (left or right of midpoint)
+        remove_left = other_center_x < midpoint_x  # Other is to the left
 
-        print(f"   Removed face {face['id']} at ({x1},{y1})-({x2},{y2})")
+        # Calculate face top position (for face removal - with padding above)
+        face_padding = 0.3
+        face_top = int(max(0, (face['y'] / 100 - face['height'] / 100 * face_padding)) * h)
+        face_bottom = int(min(1.0, (face['y'] + face['height']) / 100 + face['height'] / 100 * face_padding) * h)
+
+        # Face X boundaries (with padding)
+        face_x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * face_padding)) * w)
+        face_x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * face_padding) * w)
+
+        # 1. Remove the face region (above doesn't matter for body)
+        if face_x2 > face_x1 and face_bottom > face_top:
+            result[face_top:face_bottom, face_x1:face_x2, 3] = 0
+            print(f"   Removed face {face['id']} at ({face_x1},{face_top})-({face_x2},{face_bottom})")
+
+        # 2. Remove body region: from face bottom to image bottom, on "their side" of midpoint
+        body_top = face_bottom  # Start from where face ends
+        if remove_left:
+            # Other person is to the left - remove from left edge to midpoint
+            result[body_top:h, 0:midpoint_x, 3] = 0
+            print(f"   Removed body {face['id']}: left side (0 to {midpoint_x}) below y={body_top}")
+        else:
+            # Other person is to the right - remove from midpoint to right edge
+            result[body_top:h, midpoint_x:w, 3] = 0
+            print(f"   Removed body {face['id']}: right side ({midpoint_x} to {w}) below y={body_top}")
 
     return result
 
@@ -905,6 +936,114 @@ def compare_lpips():
         }), 200
 
     except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@app.route('/split-grid', methods=['POST'])
+def split_grid():
+    """
+    Split a 2x2 grid image into 4 quadrants and extract face from top-left.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,..."  # 2x2 grid image from avatar generation
+    }
+
+    Returns:
+    {
+        "success": true,
+        "quadrants": {
+            "faceFront": "base64...",     # Top-left: face looking at camera
+            "faceProfile": "base64...",   # Top-right: face 3/4 profile
+            "bodyFront": "base64...",     # Bottom-left: full body front
+            "bodyProfile": "base64..."    # Bottom-right: full body profile
+        },
+        "faceThumbnail": "base64..."      # Extracted face from faceFront
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'image' in request body"
+            }), 400
+
+        # Decode base64 image
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return jsonify({
+                "success": False,
+                "error": "Failed to decode image"
+            }), 400
+
+        height, width = image.shape[:2]
+        print(f"[SPLIT-GRID] Input image size: {width}x{height}")
+
+        # Split into 4 quadrants
+        mid_h = height // 2
+        mid_w = width // 2
+
+        quadrants = {
+            'faceFront': image[0:mid_h, 0:mid_w],           # Top-left
+            'faceProfile': image[0:mid_h, mid_w:width],     # Top-right
+            'bodyFront': image[mid_h:height, 0:mid_w],      # Bottom-left
+            'bodyProfile': image[mid_h:height, mid_w:width] # Bottom-right
+        }
+
+        print(f"[SPLIT-GRID] Quadrant sizes: {mid_w}x{mid_h} each")
+
+        # Encode each quadrant as base64 JPEG
+        encoded_quadrants = {}
+        for name, quad in quadrants.items():
+            _, buffer = cv2.imencode('.jpg', quad, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            encoded_quadrants[name] = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+            print(f"[SPLIT-GRID] Encoded {name}: {len(encoded_quadrants[name])} bytes")
+
+        # Extract face from top-left quadrant (faceFront)
+        face_thumbnail = None
+        face_front = quadrants['faceFront']
+
+        # Try MediaPipe first, fall back to OpenCV
+        face_box = detect_face_mediapipe(face_front)
+
+        if face_box:
+            print(f"[SPLIT-GRID] Face detected at: x={face_box['x']:.1f}%, y={face_box['y']:.1f}%, w={face_box['width']:.1f}%, h={face_box['height']:.1f}%")
+            face_thumbnail = create_face_thumbnail(face_front, face_box, size=768)
+        else:
+            print("[SPLIT-GRID] No face detected in faceFront quadrant, using full quadrant as thumbnail")
+            # If no face detected, use the whole faceFront quadrant resized to square
+            h, w = face_front.shape[:2]
+            max_dim = max(h, w)
+            square = np.full((max_dim, max_dim, 3), [230, 240, 255], dtype=np.uint8)
+            y_off = (max_dim - h) // 2
+            x_off = (max_dim - w) // 2
+            square[y_off:y_off+h, x_off:x_off+w] = face_front
+            thumbnail = cv2.resize(square, (768, 768), interpolation=cv2.INTER_LANCZOS4)
+            _, buffer = cv2.imencode('.jpg', thumbnail, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+        print(f"[SPLIT-GRID] Face thumbnail generated: {len(face_thumbnail) if face_thumbnail else 0} bytes")
+
+        return jsonify({
+            "success": True,
+            "quadrants": encoded_quadrants,
+            "faceThumbnail": face_thumbnail
+        }), 200
+
+    except Exception as e:
+        print(f"[SPLIT-GRID] Error: {e}")
         return jsonify({
             "success": False,
             "error": str(e),
