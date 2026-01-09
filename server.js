@@ -6402,6 +6402,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       updatedAt: new Date().toISOString()
     };
 
+    // Debug: Log what's being saved for storyCategory/storyTheme
+    log.debug(`📝 [STORY SAVE] storyCategory: "${storyData.storyCategory}", storyTopic: "${storyData.storyTopic}", storyTheme: "${storyData.storyTheme}"`);
+    log.debug(`📝 [STORY SAVE] mainCharacters: ${JSON.stringify(storyData.mainCharacters)}, characters count: ${storyData.characters?.length || 0}`);
+
     // Log token usage summary with costs (including thinking tokens)
     const totalInputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].input_tokens, 0);
     const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].output_tokens, 0);
@@ -7952,6 +7956,10 @@ async function processStoryJob(jobId) {
 
     const job = jobResult.rows[0];
     const inputData = job.input_data;
+
+    // Debug: Log inputData values when job starts processing
+    log.debug(`📝 [JOB PROCESS] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
+    log.debug(`📝 [JOB PROCESS] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
 
     // Inject pre-discovered landmarks if available for this user's location
     if (inputData.userLocation?.city) {
@@ -10002,6 +10010,7 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
     delete inputData.idempotencyKey;
 
     log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}${idempotencyKey ? ` (idempotency: ${idempotencyKey})` : ''}`);
+    log.debug(`📝 [JOB INPUT] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
 
     // Check email verification (skip for admins and impersonating admins)
     const isImpersonating = req.user.impersonating === true;

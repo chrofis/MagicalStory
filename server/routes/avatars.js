@@ -105,9 +105,13 @@ function clearCostumedAvatarGenerationLog() {
 /**
  * Compare two images using LPIPS perceptual similarity (via Python service)
  * LPIPS score: 0 = identical, 1 = very different
+ * @param {string} image1 - First image (base64)
+ * @param {string} image2 - Second image (base64)
+ * @param {Array} bbox - Optional: crop only image2 to this region [ymin,xmin,ymax,xmax] (for face vs 2x2 grid)
+ * @param {Array} bboxBoth - Optional: crop BOTH images to this region (for comparing two 2x2 grids)
  * Returns { success, lpips_score, interpretation, region } or null on error
  */
-async function compareLPIPS(image1, image2, bbox = null) {
+async function compareLPIPS(image1, image2, bbox = null, bboxBoth = null) {
   try {
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 
@@ -117,8 +121,12 @@ async function compareLPIPS(image1, image2, bbox = null) {
       resize_to: 256  // Faster comparison
     };
 
-    // Optionally crop to bounding box for targeted comparison
-    if (bbox && Array.isArray(bbox) && bbox.length === 4) {
+    // Optionally crop both images to same region (for comparing two 2x2 grids)
+    if (bboxBoth && Array.isArray(bboxBoth) && bboxBoth.length === 4) {
+      requestBody.bbox_both = bboxBoth;
+    }
+    // Optionally crop only image2 (for comparing face photo vs 2x2 grid)
+    else if (bbox && Array.isArray(bbox) && bbox.length === 4) {
       requestBody.bbox = bbox;
     }
 
@@ -137,7 +145,7 @@ async function compareLPIPS(image1, image2, bbox = null) {
     const result = await response.json();
 
     if (result.success) {
-      log.debug(`[LPIPS] Score: ${result.lpips_score?.toFixed(4)} (${result.interpretation})`);
+      console.log(`📊 [LPIPS] Score: ${result.lpips_score?.toFixed(4)} (${result.interpretation}) region: ${result.region}`);
       return {
         success: true,
         lpipsScore: result.lpips_score,
@@ -287,6 +295,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     };
 
     // Run Gemini evaluation and LPIPS comparison in parallel
+    // For LPIPS: compare original face with top-left quadrant of 2x2 grid (face front view)
+    // bbox format: [ymin, xmin, ymax, xmax] normalized 0-1
+    const topLeftQuadrant = [0, 0, 0.5, 0.5];  // Top-left = face front view
     const [geminiResponse, lpipsResult] = await Promise.all([
       fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -297,8 +308,8 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
           signal: AbortSignal.timeout(30000)
         }
       ),
-      // LPIPS comparison (runs in parallel, gracefully fails if unavailable)
-      compareLPIPS(originalPhoto, generatedAvatar)
+      // LPIPS comparison - compare faces only (top-left quadrant of generated 2x2 grid)
+      compareLPIPS(originalPhoto, generatedAvatar, topLeftQuadrant)
     ]);
 
     if (!geminiResponse.ok) {
@@ -1515,6 +1526,36 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
 
           log.debug(`🔍 [AVATAR EVAL] ${category} score: ${faceMatchResult.score}/10`);
+        }
+      }
+
+      // PHASE 3: Cross-avatar LPIPS comparison (compare avatars against each other)
+      // This helps verify consistency - avatars of same person should be similar
+      const avatarImages = {};
+      for (const { category, imageData } of avatarsToEvaluate) {
+        if (imageData) avatarImages[category] = imageData;
+      }
+
+      const crossPairs = [
+        ['winter', 'standard'],
+        ['winter', 'summer'],
+        ['standard', 'summer']
+      ];
+
+      // bbox for top-left quadrant of 2x2 grid (face front view)
+      const faceQuadrantBbox = [0, 0, 0.5, 0.5];
+
+      results.crossLpips = {};
+      for (const [cat1, cat2] of crossPairs) {
+        if (avatarImages[cat1] && avatarImages[cat2]) {
+          // Compare top-left quadrants (face front view) of both avatars
+          // Use bboxBoth to crop BOTH images to the face quadrant
+          const crossResult = await compareLPIPS(avatarImages[cat1], avatarImages[cat2], null, faceQuadrantBbox);
+          if (crossResult?.success) {
+            const pairKey = `${cat1}_vs_${cat2}`;
+            results.crossLpips[pairKey] = crossResult.lpipsScore;
+            console.log(`📊 [LPIPS CROSS] ${cat1} vs ${cat2}: ${crossResult.lpipsScore?.toFixed(4)} (${crossResult.interpretation})`);
+          }
         }
       }
     }

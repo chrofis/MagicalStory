@@ -144,10 +144,9 @@ async function main() {
     await page.screenshot({ path: 'test-results/regen-error.png' });
   }
 
-  console.log('\nBrowser staying open for 5 minutes for observation...');
-  await page.waitForTimeout(300000);
-
-  await browser.close();
+  console.log('\nBrowser staying open indefinitely. Press Ctrl+C to close.');
+  // Keep open until manually closed
+  await new Promise(() => {});
 }
 
 main().catch(err => {

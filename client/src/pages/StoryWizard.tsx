@@ -327,19 +327,63 @@ export default function StoryWizard() {
       return;
     }
 
-    // If there's an active job and we're not already showing generation, show it
+    // If there's an active job and we're not already showing generation, restore progressive view
     if (activeJob && !urlStoryId && !isGenerating) {
-      log.info('Returning during active generation, showing progress');
+      log.info('Returning during active generation, restoring progress');
       setStep(6);
       setIsGenerating(true);
       setStoryTitle(activeJob.storyTitle);
+      setJobId(activeJob.jobId);
+
+      // Fetch current job status to restore partial results
+      storyService.getJobStatus(activeJob.jobId).then((status) => {
+        log.info('Restored job status:', { progress: status.progress, hasStoryText: !!status.storyText, partialPages: status.partialPages?.length || 0 });
+
+        // Update progress
+        if (status.progress) {
+          setGenerationProgress(status.progress);
+        }
+
+        // Restore story text for progressive display
+        if (status.storyText) {
+          setProgressiveStoryData({
+            title: status.storyText.title || activeJob.storyTitle,
+            dedication: status.storyText.dedication,
+            pageTexts: status.storyText.pageTexts || {},
+            sceneDescriptions: status.storyText.sceneDescriptions || [],
+            totalPages: status.storyText.totalPages || pages,
+          });
+        }
+
+        // Restore completed page images
+        if (status.partialPages && status.partialPages.length > 0) {
+          const pageImages: Record<number, string> = {};
+          status.partialPages.forEach((page: { pageNumber: number; imageData: string }) => {
+            if (page.pageNumber && page.imageData) {
+              pageImages[page.pageNumber] = page.imageData;
+            }
+          });
+          setCompletedPageImages(pageImages);
+        }
+
+        // Restore cover images
+        if (status.partialCovers) {
+          setCoverImages(prev => ({
+            frontCover: status.partialCovers?.frontCover || prev.frontCover,
+            initialPage: status.partialCovers?.initialPage || prev.initialPage,
+            backCover: status.partialCovers?.backCover || prev.backCover,
+          }));
+        }
+      }).catch((err) => {
+        log.error('Failed to restore job status:', err);
+      });
     }
     // If generation completed and we have a story ID, navigate to it
     if (generationComplete && completedStoryId && !urlStoryId) {
       log.info('Generation completed, navigating to story:', completedStoryId);
       setSearchParams({ storyId: completedStoryId }, { replace: true });
     }
-  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, isGenerating]);
+  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, isGenerating, pages]);
 
   // Reset story settings when ?new=true is present (from "Create New Story" button)
   useEffect(() => {

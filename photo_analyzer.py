@@ -852,6 +852,11 @@ def crop_tensor_to_bbox(img_tensor, bbox, img_size):
     # Crop: tensor is [1, C, H, W]
     cropped = img_tensor[:, :, y1:y2, x1:x2]
 
+    # Ensure we have a valid crop (at least 1x1)
+    if cropped.shape[2] == 0 or cropped.shape[3] == 0:
+        print(f"[LPIPS] Warning: crop resulted in empty tensor, using original")
+        return img_tensor
+
     return cropped
 
 
@@ -862,11 +867,14 @@ def compare_lpips():
 
     Expected JSON:
     {
-        "image1": "data:image/jpeg;base64,...",  # Original/reference image
-        "image2": "data:image/jpeg;base64,...",  # Generated/modified image
-        "bbox": [ymin, xmin, ymax, xmax],        # Optional: compare only this region (0.0-1.0)
+        "image1": "data:image/jpeg;base64,...",  # Original/reference image (face photo)
+        "image2": "data:image/jpeg;base64,...",  # Generated/modified image (e.g., 2x2 grid)
+        "bbox": [ymin, xmin, ymax, xmax],        # Optional: crop image2 to this region (0.0-1.0)
         "resize_to": 256                          # Optional: resize for faster comparison
     }
+
+    Note: bbox only applies to image2. This is useful when comparing a face photo (image1)
+    against a 2x2 grid avatar (image2) - use bbox=[0,0,0.5,0.5] to compare against top-left face.
 
     Returns:
     {
@@ -900,11 +908,20 @@ def compare_lpips():
         region = "full"
 
         # Optional: crop to bounding box
+        # bbox: crops only image2 (for comparing face photo vs 2x2 grid)
+        # bbox_both: crops both images (for comparing two 2x2 grids against each other)
         bbox = data.get('bbox')
-        if bbox and len(bbox) == 4:
-            img1_tensor = crop_tensor_to_bbox(img1_tensor, bbox, img1_size)
+        bbox_both = data.get('bbox_both')
+
+        if bbox_both and len(bbox_both) == 4:
+            # Crop BOTH images to the same region (e.g., compare faces from two 2x2 grids)
+            img1_tensor = crop_tensor_to_bbox(img1_tensor, bbox_both, img1_size)
+            img2_tensor = crop_tensor_to_bbox(img2_tensor, bbox_both, img2_size)
+            region = "cropped_both"
+        elif bbox and len(bbox) == 4:
+            # Crop only image2 (for comparing face photo vs 2x2 grid)
             img2_tensor = crop_tensor_to_bbox(img2_tensor, bbox, img2_size)
-            region = "cropped"
+            region = "cropped_img2"
 
         # Optional: resize for faster comparison
         resize_to = data.get('resize_to')
@@ -917,6 +934,16 @@ def compare_lpips():
         if img1_tensor.shape != img2_tensor.shape:
             import torch.nn.functional as F
             img2_tensor = F.interpolate(img2_tensor, size=img1_tensor.shape[2:], mode='bilinear', align_corners=False)
+
+        # DEBUG: Save images being compared
+        try:
+            from torchvision.utils import save_image
+            save_image(img1_tensor * 0.5 + 0.5, 'test-results/lpips_debug_img1.png')
+            save_image(img2_tensor * 0.5 + 0.5, 'test-results/lpips_debug_img2.png')
+            print(f"[LPIPS DEBUG] Saved comparison images to test-results/lpips_debug_img1.png and img2.png")
+            print(f"[LPIPS DEBUG] img1 shape: {img1_tensor.shape}, img2 shape: {img2_tensor.shape}")
+        except Exception as e:
+            print(f"[LPIPS DEBUG] Failed to save debug images: {e}")
 
         # Compute LPIPS
         with torch.no_grad():
