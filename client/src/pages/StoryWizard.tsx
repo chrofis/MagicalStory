@@ -827,6 +827,19 @@ export default function StoryWizard() {
     localStorage.setItem('story_excluded_characters', JSON.stringify(excludedCharacters));
   }, [excludedCharacters]);
 
+  // Clear generated ideas when character roles change (excluded/main)
+  // Ideas may reference characters that are no longer in the story
+  const prevExcludedRef = useRef<number[]>(excludedCharacters);
+  useEffect(() => {
+    // Only clear if excludedCharacters actually changed (not on initial mount)
+    if (prevExcludedRef.current !== excludedCharacters &&
+        JSON.stringify(prevExcludedRef.current) !== JSON.stringify(excludedCharacters)) {
+      setGeneratedIdeas([]);
+      setStoryDetails('');
+      prevExcludedRef.current = excludedCharacters;
+    }
+  }, [excludedCharacters]);
+
   useEffect(() => {
     localStorage.setItem('story_language_level', languageLevel);
   }, [languageLevel]);
