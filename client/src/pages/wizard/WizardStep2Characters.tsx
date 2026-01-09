@@ -120,7 +120,14 @@ export function WizardStep2Characters({
             onSave={onSaveCharacter}
             onCancel={() => onCharacterChange(null)}
             onPhotoChange={onPhotoSelect}
-            onContinueToTraits={() => onCharacterStepChange('traits')}
+            onContinueToTraits={() => {
+              // If avatar is pending and has photo, trigger avatar generation
+              if (currentCharacter?.avatars?.status === 'pending' && currentCharacter?.photos?.original) {
+                onSaveAndGenerateAvatar();  // This also moves to traits step
+              } else {
+                onCharacterStepChange('traits');
+              }
+            }}
             onSaveAndGenerateAvatar={onSaveAndGenerateAvatar}
             onRegenerateAvatars={onRegenerateAvatars}
             onRegenerateAvatarsWithTraits={onRegenerateAvatarsWithTraits}
