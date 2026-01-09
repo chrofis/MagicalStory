@@ -6370,6 +6370,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       id: storyId,
       title: storyTitle,
       storyType: inputData.storyType || 'picture-book',
+      storyTypeName: inputData.storyTypeName || '', // Display name for story type
+      storyCategory: inputData.storyCategory || '', // adventure, life-challenge, educational
+      storyTopic: inputData.storyTopic || '', // Specific topic within category
+      storyTheme: inputData.storyTheme || '', // Theme/setting for the story
+      storyDetails: inputData.storyDetails || '', // User's custom story idea
       artStyle: inputData.artStyle || 'pixar',
       language: lang,
       languageLevel: '1st-grade',
@@ -7615,6 +7620,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       id: storyId,
       title: title,
       storyType: inputData.storyType || '',
+      storyTypeName: inputData.storyTypeName || '', // Display name for story type
+      storyCategory: inputData.storyCategory || '', // adventure, life-challenge, educational
+      storyTopic: inputData.storyTopic || '', // Specific topic within category
+      storyTheme: inputData.storyTheme || '', // Theme/setting for the story
+      storyDetails: inputData.storyDetails || '', // User's custom story idea
       artStyle: inputData.artStyle || 'pixar',
       language: inputData.language || 'en',
       languageLevel: inputData.languageLevel || '1st-grade',
@@ -9432,6 +9442,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       id: storyId,
       title: storyTitle,
       storyType: inputData.storyType || '',
+      storyTypeName: inputData.storyTypeName || '', // Display name for story type
+      storyCategory: inputData.storyCategory || '', // adventure, life-challenge, educational
+      storyTopic: inputData.storyTopic || '', // Specific topic within category
+      storyTheme: inputData.storyTheme || '', // Theme/setting for the story
+      storyDetails: inputData.storyDetails || '', // User's custom story idea
       artStyle: inputData.artStyle || 'pixar',
       language: inputData.language || 'en',
       languageLevel: inputData.languageLevel || '1st-grade',
@@ -9772,6 +9787,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               id: jobId,
               title: storyTitle + ' [PARTIAL]',
               storyType: inputData?.storyType || 'unknown',
+              storyTypeName: inputData?.storyTypeName || '',
+              storyCategory: inputData?.storyCategory || '',
+              storyTopic: inputData?.storyTopic || '',
+              storyTheme: inputData?.storyTheme || '',
+              storyDetails: inputData?.storyDetails || '',
               artStyle: inputData?.artStyle || 'pixar',
               language: inputData?.language || 'en',
               languageLevel: inputData?.languageLevel || 'standard',

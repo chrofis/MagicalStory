@@ -1793,14 +1793,24 @@ export function CharacterForm({
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
               <div>
                 <span className="text-gray-500 text-xs">Eye Color:</span>
-                <div className="font-medium">{character.physical?.eyeColor || '—'}</div>
+                <div className="font-medium flex items-center gap-1">
+                  {character.physical?.eyeColor || '—'}
+                  {character.physical?.eyeColorHex && (
+                    <span className="inline-block w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: character.physical.eyeColorHex }} title={character.physical.eyeColorHex} />
+                  )}
+                </div>
                 {character.physicalTraitsSource?.eyeColor && (
                   <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.eyeColor}]</span>
                 )}
               </div>
               <div>
                 <span className="text-gray-500 text-xs">Hair Color:</span>
-                <div className="font-medium">{character.physical?.hairColor || '—'}</div>
+                <div className="font-medium flex items-center gap-1">
+                  {character.physical?.hairColor || '—'}
+                  {character.physical?.hairColorHex && (
+                    <span className="inline-block w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: character.physical.hairColorHex }} title={character.physical.hairColorHex} />
+                  )}
+                </div>
                 {character.physicalTraitsSource?.hairColor && (
                   <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.hairColor}]</span>
                 )}
@@ -1839,6 +1849,15 @@ export function CharacterForm({
                 {character.physicalTraitsSource?.facialHair && (
                   <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.facialHair}]</span>
                 )}
+              </div>
+              <div>
+                <span className="text-gray-500 text-xs">Skin Tone:</span>
+                <div className="font-medium flex items-center gap-1">
+                  {character.physical?.skinTone || '—'}
+                  {character.physical?.skinToneHex && (
+                    <span className="inline-block w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: character.physical.skinToneHex }} title={character.physical.skinToneHex} />
+                  )}
+                </div>
               </div>
               <div>
                 <span className="text-gray-500 text-xs">Other:</span>

@@ -270,10 +270,14 @@ export interface CharacterData {
 export interface ExtractedTraits {
   build?: string;
   eyeColor?: string;
+  eyeColorHex?: string;
   hairColor?: string;
+  hairColorHex?: string;
   hairLength?: string;
   hairStyle?: string;
   facialHair?: string;
+  skinTone?: string;
+  skinToneHex?: string;
   face?: string;
   other?: string;
   detailedHairAnalysis?: string;
@@ -775,10 +779,14 @@ export const characterService = {
             ...updatedCharacter.physical,
             build: traits.build || updatedCharacter.physical?.build,
             eyeColor: traits.eyeColor || updatedCharacter.physical?.eyeColor,
+            eyeColorHex: traits.eyeColorHex || updatedCharacter.physical?.eyeColorHex,
             hairColor: traits.hairColor || updatedCharacter.physical?.hairColor,
+            hairColorHex: traits.hairColorHex || updatedCharacter.physical?.hairColorHex,
             hairLength: traits.hairLength || updatedCharacter.physical?.hairLength,
             hairStyle: traits.hairStyle || updatedCharacter.physical?.hairStyle,
             facialHair: traits.facialHair || updatedCharacter.physical?.facialHair,
+            skinTone: traits.skinTone || updatedCharacter.physical?.skinTone,
+            skinToneHex: traits.skinToneHex || updatedCharacter.physical?.skinToneHex,
             face: traits.face || updatedCharacter.physical?.face,
             other: traits.other || updatedCharacter.physical?.other,
             detailedHairAnalysis: traits.detailedHairAnalysis || updatedCharacter.physical?.detailedHairAnalysis,

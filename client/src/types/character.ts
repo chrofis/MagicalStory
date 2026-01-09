@@ -11,7 +11,9 @@ export interface PhysicalTraits {
   build?: string;
   face?: string;
   eyeColor?: string;     // Eye color (e.g., "blue", "brown", "green")
+  eyeColorHex?: string;  // Hex color code for eye color (e.g., "#6B4423")
   hairColor?: string;    // Hair color (e.g., "blonde", "brown", "black")
+  hairColorHex?: string; // Hex color code for hair color (e.g., "#3B2314")
   hairLength?: string;   // Hair length (e.g., "shoulder-length", "chin-length", "mid-back")
   hairStyle?: string;    // Hair texture/style (e.g., "straight", "wavy", "curly ponytail")
   hair?: string;         // Legacy: combined hair description (deprecated, use hairColor + hairLength + hairStyle)
