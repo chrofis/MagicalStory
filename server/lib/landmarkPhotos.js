@@ -325,6 +325,7 @@ function extractLandmarkName(filename) {
     .replace(/\s*-\s*panoramio.*$/i, '') // Remove "- panoramio" suffix
     .replace(/\s*-\s*\d+.*$/, '')       // Remove " - 1234" suffixes
     .replace(/\s+\d{8}$/, '')           // Remove date suffixes like "20200702"
+    .replace(/\s+\d{4}$/, '')           // Remove year suffixes like "2010"
     .replace(/\s+\d{5,}\s*$/, '')       // Remove number suffixes like "75005"
     .replace(/\s*,\s*.*$/, '')          // Remove ", location" suffixes
     .replace(/\s+by\s+.*$/i, '')        // Remove "by Author" suffixes
@@ -347,7 +348,70 @@ function extractLandmarkName(filename) {
   if (/^[A-Z]{2,5}\d+/.test(name)) return null; // Skip IDs like "IMG1234"
   if (/^(ETH|LBS|SR)\s/i.test(name)) return null; // Skip archive IDs
 
+  // Skip generic/meaningless names
+  if (/^(GENERAL|DETAIL|OVERVIEW|INTERIOR|EXTERIOR)\s*\d*$/i.test(name)) return null;
+
+  // Skip filenames that look like street addresses or file naming conventions
+  // e.g., "Baden-Baden-Prinz-Weimar-Str-Nr4a"
+  if (/^[A-Za-z]+-[A-Za-z]+-[A-Za-z]+-[A-Za-z]+/.test(name)) return null;
+  if (/-Nr\d+[a-z]?$/i.test(name)) return null; // "-Nr4a" endings
+  if (/\b(Str|Nr|Weg|Platz|Gasse)\b.*\d/i.test(name)) return null; // Street+number patterns
+
   return name;
+}
+
+/**
+ * Search Wikipedia for landmarks/POIs near coordinates
+ * Wikipedia has clean article titles (actual landmark names)
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @param {number} radiusMeters - Search radius
+ * @param {string} excludePattern - Regex pattern to exclude (e.g., "Baden-Baden" when looking for "Baden Switzerland")
+ * @returns {Promise<Array<{name, query, source}>>}
+ */
+async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludePattern = null) {
+  // Use Wikipedia geosearch API - returns actual article titles
+  const url = `https://en.wikipedia.org/w/api.php?` +
+    `action=query&list=geosearch` +
+    `&gscoord=${lat}|${lon}` +
+    `&gsradius=${Math.min(radiusMeters, 10000)}` +
+    `&gslimit=50` +
+    `&format=json&origin=*`;
+
+  try {
+    log.debug(`[LANDMARK] Wikipedia geosearch at ${lat}, ${lon}`);
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const landmarks = [];
+    const excludeRegex = excludePattern ? new RegExp(excludePattern, 'i') : null;
+
+    for (const item of data.query?.geosearch || []) {
+      const name = item.title;
+
+      // Skip if matches exclude pattern
+      if (excludeRegex && excludeRegex.test(name)) {
+        log.debug(`[LANDMARK] Excluding "${name}" (matches exclude pattern)`);
+        continue;
+      }
+
+      // Skip generic Wikipedia articles
+      if (/^(List of|Category:|Template:|Wikipedia:)/i.test(name)) continue;
+
+      landmarks.push({
+        name,
+        query: name, // Wikipedia title is clean, use directly
+        source: 'wikipedia-geo',
+        distance: item.dist
+      });
+    }
+
+    log.debug(`[LANDMARK] Wikipedia found ${landmarks.length} landmarks`);
+    return landmarks;
+  } catch (err) {
+    log.error(`[LANDMARK] Wikipedia geosearch error:`, err.message);
+    return [];
+  }
 }
 
 /**
@@ -531,8 +595,32 @@ async function searchLandmarksByText(city, country, limit = 20) {
 }
 
 /**
+ * Build exclude pattern for geographic disambiguation
+ * e.g., "Baden" + "Switzerland" should exclude "Baden-Baden" (Germany)
+ * @param {string} city - City name
+ * @param {string} country - Country name
+ * @returns {string|null} - Regex pattern to exclude, or null
+ */
+function buildExcludePattern(city, country) {
+  // Known disambiguation cases
+  const disambiguations = {
+    // "Baden" in Switzerland should exclude "Baden-Baden" (Germany)
+    'baden': country?.toLowerCase()?.includes('switzerland') ? 'Baden-Baden' : null,
+    // Add more cases as needed
+  };
+
+  return disambiguations[city?.toLowerCase()] || null;
+}
+
+/**
  * Discover landmarks near a location with photo availability
  * This is the main function for location-first landmark discovery.
+ *
+ * Strategy:
+ * 1. Geocode the city to get coordinates (ensures correct location)
+ * 2. Use Wikipedia geosearch to get actual landmark names (clean titles)
+ * 3. Search Wikimedia Commons for photos of those landmarks
+ * 4. Fall back to text search if geosearch fails
  *
  * @param {string} city - City name
  * @param {string} country - Country name
@@ -546,27 +634,54 @@ async function discoverLandmarksForLocation(city, country, limit = 10) {
 
   let landmarks = [];
 
-  // Step 1: Text search for landmarks in the city
-  landmarks = await searchLandmarksByText(city, country, limit * 3);
+  // Build exclude pattern for geographic disambiguation
+  const excludePattern = buildExcludePattern(city, country);
+  if (excludePattern) {
+    log.debug(`[LANDMARK] Using exclude pattern: ${excludePattern}`);
+  }
 
-  // Step 2: If not enough results, try geocoordinate search as fallback
-  if (landmarks.length < limit) {
-    log.debug(`[LANDMARK] Text search found ${landmarks.length}, trying geosearch fallback...`);
-    const coords = await geocodeCity(city, country);
-    if (coords) {
-      const geoLandmarks = await searchLandmarksByCoordinates(coords.lat, coords.lon, 10000);
-      landmarks = mergeLandmarks(landmarks, geoLandmarks);
+  // Step 1: Geocode to get exact coordinates (this ensures we're in the right place)
+  const coords = await geocodeCity(city, country);
+
+  if (coords) {
+    // Step 2: Use Wikipedia geosearch (primary source - has clean names)
+    landmarks = await searchWikipediaLandmarks(coords.lat, coords.lon, 10000, excludePattern);
+    log.debug(`[LANDMARK] Wikipedia geosearch found ${landmarks.length} landmarks`);
+
+    // Step 3: If not enough from Wikipedia, also try Wikimedia Commons geosearch
+    if (landmarks.length < limit) {
+      const commonsLandmarks = await searchLandmarksByCoordinates(coords.lat, coords.lon, 10000);
+      // Filter with exclude pattern
+      const filtered = excludePattern
+        ? commonsLandmarks.filter(l => !new RegExp(excludePattern, 'i').test(l.name))
+        : commonsLandmarks;
+      landmarks = mergeLandmarks(landmarks, filtered);
     }
   }
 
-  // Step 3: Sort by photo count (most photos first)
-  landmarks.sort((a, b) => b.photoCount - a.photoCount);
+  // Step 4: If geosearch failed or returned too few, try text search as fallback
+  if (landmarks.length < limit) {
+    log.debug(`[LANDMARK] Geosearch found ${landmarks.length}, trying text search fallback...`);
+    let textLandmarks = await searchLandmarksByText(city, country, limit * 2);
+    // Filter with exclude pattern
+    if (excludePattern) {
+      textLandmarks = textLandmarks.filter(l => !new RegExp(excludePattern, 'i').test(l.name));
+    }
+    landmarks = mergeLandmarks(landmarks, textLandmarks);
+  }
 
-  // Step 4: Take top N candidates
+  // Step 5: Sort by photo count (most photos first), then by distance (closer first)
+  landmarks.sort((a, b) => {
+    const countDiff = (b.photoCount || 0) - (a.photoCount || 0);
+    if (countDiff !== 0) return countDiff;
+    return (a.distance || 99999) - (b.distance || 99999);
+  });
+
+  // Step 6: Take top N candidates
   const topLandmarks = landmarks.slice(0, Math.min(limit * 2, landmarks.length));
   log.debug(`[LANDMARK] Selected ${topLandmarks.length} candidates for photo fetch`);
 
-  // Step 5: Pre-fetch photos for top landmarks (in parallel)
+  // Step 7: Pre-fetch photos for top landmarks (in parallel)
   await Promise.allSettled(topLandmarks.map(async (landmark) => {
     try {
       const photo = await fetchLandmarkPhoto(landmark.query);
@@ -584,7 +699,7 @@ async function discoverLandmarksForLocation(city, country, limit = 10) {
     }
   }));
 
-  // Step 6: Filter to only landmarks with successful photo fetch, take top N
+  // Step 8: Filter to only landmarks with successful photo fetch, take top N
   const validLandmarks = topLandmarks.filter(l => l.hasPhoto).slice(0, limit);
 
   const elapsed = Date.now() - startTime;
