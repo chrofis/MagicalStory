@@ -16,6 +16,9 @@ export interface PhysicalTraits {
   hairStyle?: string;    // Hair texture/style (e.g., "straight", "wavy", "curly ponytail")
   hair?: string;         // Legacy: combined hair description (deprecated, use hairColor + hairLength + hairStyle)
   facialHair?: string;   // Facial hair for males (e.g., "none", "stubble", "beard", "mustache", "goatee")
+  skinTone?: string;     // Skin tone (e.g., "fair", "medium", "olive", "dark")
+  skinUndertone?: string; // Skin undertone (e.g., "warm", "cool", "neutral")
+  skinToneHex?: string;  // Hex color code for skin tone (e.g., "#E8BEAC")
   other?: string;        // Glasses, birthmarks, always-present accessories
   detailedHairAnalysis?: string;  // Detailed hair analysis from avatar evaluation
 }

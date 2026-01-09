@@ -1,5 +1,5 @@
 import api from './api';
-import type { Character, CharacterAvatars, GeneratedOutfit, AgeCategory, StructuredClothing } from '@/types/character';
+import type { Character, CharacterAvatars, GeneratedOutfit, AgeCategory, StructuredClothing, PhysicalTraitsSource } from '@/types/character';
 import { createLogger } from './logger';
 
 const log = createLogger('CharacterService');
@@ -51,9 +51,23 @@ interface CharacterApiResponse {
   hairColor?: string;
   hair_style?: string;
   hairStyle?: string;
+  hair_length?: string;
+  hairLength?: string;
+  facial_hair?: string;
+  facialHair?: string;
+  skin_tone?: string;
+  skinTone?: string;
+  skin_undertone?: string;
+  skinUndertone?: string;
+  skin_tone_hex?: string;
+  skinToneHex?: string;
   other_features?: string;
   otherFeatures?: string;
   other?: string;  // Glasses, birthmarks, always-present accessories
+  detailed_hair_analysis?: string;
+  detailedHairAnalysis?: string;
+  physical_traits_source?: PhysicalTraitsSource;
+  physicalTraitsSource?: PhysicalTraitsSource;
   // Photos (snake_case + camelCase legacy)
   photo_url?: string;
   photoUrl?: string;

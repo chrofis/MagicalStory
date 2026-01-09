@@ -1951,7 +1951,7 @@ export default function StoryWizard() {
             relationship: rel,
           };
         }).filter(r => r.character1 && r.character2),
-        ideaModel: user?.role === 'admin' ? modelSelections.ideaModel : undefined,
+        ideaModel: (user?.role === 'admin' || isImpersonating) ? modelSelections.ideaModel : undefined,
         userLocation: userLocation || undefined,
       },
       {
@@ -2148,7 +2148,7 @@ export default function StoryWizard() {
         // Developer feature options
         enableAutoRepair: enableAutoRepair,
         // Developer model overrides (admin only)
-        modelOverrides: user?.role === 'admin' ? {
+        modelOverrides: (user?.role === 'admin' || isImpersonating) ? {
           outlineModel: modelSelections.outlineModel,
           textModel: modelSelections.textModel,
           sceneDescriptionModel: modelSelections.sceneDescriptionModel,
@@ -2909,7 +2909,7 @@ export default function StoryWizard() {
                 setEditModalOpen(true);
               }}
               // Auto-repair image (dev mode only)
-              onRepairImage={storyId && user?.role === 'admin' ? async (pageNumber: number) => {
+              onRepairImage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number) => {
                 try {
                   log.info('Starting auto-repair for page:', pageNumber);
                   const result = await storyService.repairImage(storyId, pageNumber);
@@ -3279,6 +3279,7 @@ export default function StoryWizard() {
           jobId={jobId || undefined}
           isStalled={isProgressStalled}
           onDismissStalled={() => setIsProgressStalled(false)}
+          isImpersonating={isImpersonating}
           onMinimize={() => setShowMinimizeDialog(true)}
           onCancel={jobId ? async () => {
             try {

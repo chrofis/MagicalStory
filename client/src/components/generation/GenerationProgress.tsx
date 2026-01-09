@@ -18,6 +18,7 @@ interface GenerationProgressProps {
   characters?: Character[];  // Characters to show avatars from
   isStalled?: boolean;  // Whether progress appears stalled
   onDismissStalled?: () => void;  // Callback to dismiss stalled warning and continue waiting
+  isImpersonating?: boolean;  // Whether admin is impersonating a user
 }
 
 export function GenerationProgress({
@@ -32,10 +33,11 @@ export function GenerationProgress({
   characters = [],
   isStalled = false,
   onDismissStalled,
+  isImpersonating = false,
 }: GenerationProgressProps) {
   const { language } = useLanguage();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || isImpersonating;
   const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
 

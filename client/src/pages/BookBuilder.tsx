@@ -30,9 +30,9 @@ export default function BookBuilder() {
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
-  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated, user, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { showToast } = useToast();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || isImpersonating;
 
   const [stories, setStories] = useState<SelectedStory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
