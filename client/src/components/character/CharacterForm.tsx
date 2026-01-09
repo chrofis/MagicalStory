@@ -417,6 +417,7 @@ interface CharacterFormProps {
   isRegeneratingAvatarsWithTraits?: boolean;
   step: 'name' | 'traits' | 'characteristics' | 'relationships' | 'avatar';
   developerMode?: boolean;
+  isImpersonating?: boolean;  // Admin impersonating a user (should show dev features)
   changedTraits?: ChangedTraits;  // New: which traits changed from previous photo
   photoAnalysisDebug?: { rawResponse?: string; error?: string };  // Debug info for dev mode
   // Relationship props
@@ -451,6 +452,7 @@ export function CharacterForm({
   isRegeneratingAvatarsWithTraits,
   step,
   developerMode,
+  isImpersonating = false,
   changedTraits: _changedTraits,  // Unused but kept for future use
   photoAnalysisDebug,
   relationships = {},
@@ -1216,7 +1218,7 @@ export function CharacterForm({
                 {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
               </button>
               {/* Regenerate button - developer mode only */}
-              {developerMode && (
+              {(developerMode || isImpersonating) && (
                 <button
                   onClick={handleUserRegenerate}
                   disabled={!canRegenerate || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating'}
@@ -1235,7 +1237,7 @@ export function CharacterForm({
               )}
             </div>
             {/* Developer mode: show face match score with full details */}
-            {developerMode && character.avatars?.faceMatch?.standard && (
+            {(developerMode || isImpersonating) && character.avatars?.faceMatch?.standard && (
               <details className="mt-1 text-left">
                 <summary className={`text-[10px] font-medium cursor-pointer ${
                   character.avatars.faceMatch.standard.score >= 6 ? 'text-green-600' : 'text-red-600'
@@ -1257,7 +1259,7 @@ export function CharacterForm({
               </details>
             )}
             {/* Developer mode: show extracted clothing per avatar */}
-            {developerMode && character.avatars?.clothing && Object.keys(character.avatars.clothing).length > 0 && (
+            {(developerMode || isImpersonating) && character.avatars?.clothing && Object.keys(character.avatars.clothing).length > 0 && (
               <details className="mt-1 text-left">
                 <summary className="text-[10px] font-medium cursor-pointer text-blue-600">
                   Clothing ({Object.keys(character.avatars.clothing).length} avatars)
@@ -1272,7 +1274,7 @@ export function CharacterForm({
               </details>
             )}
             {/* Developer mode: show avatar generation input (source photo + user traits) */}
-            {developerMode && (
+            {(developerMode || isImpersonating) && (
               <details className="mt-1 text-left">
                 <summary className="text-[10px] font-medium cursor-pointer text-purple-600">
                   Avatar Gen Input
@@ -1378,7 +1380,7 @@ export function CharacterForm({
       </div>
 
       {/* Developer Mode: Show body crop with transparent background */}
-      {developerMode && character.photos?.bodyNoBg && (
+      {(developerMode || isImpersonating) && character.photos?.bodyNoBg && (
         <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3">
           <h4 className="text-xs font-semibold text-yellow-700 mb-2">
             Body Crop (No Background)
@@ -1395,7 +1397,7 @@ export function CharacterForm({
       )}
 
       {/* Developer Mode: Show raw Gemini response from photo analysis */}
-      {developerMode && photoAnalysisDebug?.rawResponse && (
+      {(developerMode || isImpersonating) && photoAnalysisDebug?.rawResponse && (
         <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
           <summary className="text-xs font-semibold text-purple-700 cursor-pointer">
             Raw Gemini Response (Photo Analysis)
@@ -1408,7 +1410,7 @@ export function CharacterForm({
       )}
 
       {/* Clothing Avatars (developer only - all 4 variants) */}
-      {developerMode && (
+      {(developerMode || isImpersonating) && (
         <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-teal-700 mb-3 flex items-center gap-2">
             {language === 'de' ? 'Kleidungs-Avatare' : language === 'fr' ? 'Avatars vestimentaires' : 'Clothing Avatars'}
@@ -1465,7 +1467,7 @@ export function CharacterForm({
                         {language === 'de' ? 'Alt' : 'Old'}
                       </div>
                     )}
-                    {developerMode && character.avatars?.faceMatch?.[category] && (
+                    {(developerMode || isImpersonating) && character.avatars?.faceMatch?.[category] && (
                       <div className={`absolute bottom-1 left-1 text-white text-[8px] px-1 py-0.5 rounded font-medium ${
                         character.avatars.faceMatch[category].score >= 6 ? 'bg-green-600' : 'bg-red-600'
                       }`}>
@@ -1479,18 +1481,18 @@ export function CharacterForm({
                   </div>
                 )}
                 {/* Dev mode: Always show clothing description below avatar */}
-                {developerMode && character.avatars?.clothing?.[category] && (
+                {(developerMode || isImpersonating) && character.avatars?.clothing?.[category] && (
                   <div className="mt-1 p-1.5 rounded text-[10px] text-left bg-blue-50 border border-blue-200 text-blue-700">
                     <span className="font-semibold">👕 </span>
                     {character.avatars.clothing[category]}
                   </div>
                 )}
-                {developerMode && character.avatars?.[category] && !character.avatars?.clothing?.[category] && (
+                {(developerMode || isImpersonating) && character.avatars?.[category] && !character.avatars?.clothing?.[category] && (
                   <div className="mt-1 p-1.5 rounded text-[10px] text-left bg-amber-50 border border-amber-200 text-amber-600">
                     ⚠️ No clothing data - regenerate avatar
                   </div>
                 )}
-                {developerMode && (
+                {(developerMode || isImpersonating) && (
                   <>
                     {character.avatars?.prompts?.[category] && (
                       <details className="mt-1 text-left">
@@ -1571,7 +1573,7 @@ export function CharacterForm({
       )}
 
       {/* Dynamic Costumed Avatars (developer only - from visual bible costumes) */}
-      {developerMode && character.avatars?.costumed && Object.keys(character.avatars.costumed).length > 0 && (
+      {(developerMode || isImpersonating) && character.avatars?.costumed && Object.keys(character.avatars.costumed).length > 0 && (
         <div className="bg-orange-50 border border-orange-300 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-orange-700 mb-3 flex items-center gap-2">
             🎭 {language === 'de' ? 'Kostümierte Avatare' : language === 'fr' ? 'Avatars costumés' : 'Costumed Avatars'}
@@ -1623,7 +1625,7 @@ export function CharacterForm({
       )}
 
       {/* Styled Avatars (developer only - pre-converted to art styles) */}
-      {developerMode && character.avatars?.styledAvatars && Object.keys(character.avatars.styledAvatars).length > 0 && (
+      {(developerMode || isImpersonating) && character.avatars?.styledAvatars && Object.keys(character.avatars.styledAvatars).length > 0 && (
         <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
             🎨 {language === 'de' ? 'Stilisierte Avatare' : language === 'fr' ? 'Avatars stylisés' : 'Styled Avatars'}
@@ -1727,7 +1729,7 @@ export function CharacterForm({
       )}
 
       {/* Developer Mode: Full API Response (readable, full-width) */}
-      {developerMode && character.avatars?.rawEvaluation && (
+      {(developerMode || isImpersonating) && character.avatars?.rawEvaluation && (
         <details className="bg-purple-50 border border-purple-300 rounded-lg p-4">
           <summary className="text-sm font-semibold text-purple-700 cursor-pointer flex items-center gap-2">
             <span>📊 Full API Response (Avatar Evaluation)</span>
@@ -1778,7 +1780,7 @@ export function CharacterForm({
       )}
 
       {/* Dev Mode: Full Character Data Section - Full Width */}
-      {developerMode && (
+      {(developerMode || isImpersonating) && (
         <div className="mt-6 pt-6 border-t border-gray-200">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">DEV</span>

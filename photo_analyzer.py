@@ -10,7 +10,6 @@ os.environ["MEDIAPIPE_DISABLE_GPU"] = "1"
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import mediapipe as mp
 import cv2
 import numpy as np
 import base64
@@ -29,9 +28,23 @@ logging.getLogger('werkzeug').setLevel(logging.ERROR)
 app = Flask(__name__)
 CORS(app)
 
-# Initialize MediaPipe (lightweight, no model downloads needed)
-mp_face_detection = mp.solutions.face_detection
-mp_selfie_segmentation = mp.solutions.selfie_segmentation
+# Try to initialize MediaPipe (may fail on newer Python versions)
+mp_face_detection = None
+mp_selfie_segmentation = None
+MEDIAPIPE_AVAILABLE = False
+
+try:
+    import mediapipe as mp
+    # Check if legacy solutions API is available
+    if hasattr(mp, 'solutions'):
+        mp_face_detection = mp.solutions.face_detection
+        mp_selfie_segmentation = mp.solutions.selfie_segmentation
+        MEDIAPIPE_AVAILABLE = True
+        print("[OK] MediaPipe legacy API available")
+    else:
+        print("[WARN] MediaPipe installed but legacy solutions API not available (Python 3.14+)")
+except ImportError:
+    print("[WARN] MediaPipe not installed - face detection disabled")
 
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
@@ -43,6 +56,9 @@ def detect_face_mediapipe(image):
     Detect face using MediaPipe Face Detection
     Returns bounding box as percentage of image dimensions (0-100)
     """
+    if not MEDIAPIPE_AVAILABLE:
+        return None
+
     with mp_face_detection.FaceDetection(
         model_selection=1,  # 0 for close faces, 1 for far faces
         min_detection_confidence=0.5
@@ -73,6 +89,9 @@ def remove_background(image):
     Remove background from image using MediaPipe Selfie Segmentation.
     Returns tuple: (image with transparent background (RGBA), binary mask)
     """
+    if not MEDIAPIPE_AVAILABLE:
+        return None, None
+
     with mp_selfie_segmentation.SelfieSegmentation(model_selection=1) as segmentation:
         # Convert BGR to RGB
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -299,7 +318,7 @@ def process_photo(image_data, is_base64=True):
         if os.path.exists(temp_input) and is_base64:
             os.remove(temp_input)
 
-        print("✅ Photo processing complete")
+        print("[OK] Photo processing complete")
 
         return {
             "success": True,
@@ -336,7 +355,19 @@ def process_photo(image_data, is_base64=True):
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({"status": "ok", "service": "photo-analyzer"})
+    # Check LPIPS availability
+    lpips_available = False
+    try:
+        import lpips
+        lpips_available = True
+    except ImportError:
+        pass
+    return jsonify({
+        "status": "ok",
+        "service": "photo-analyzer",
+        "mediapipe_available": MEDIAPIPE_AVAILABLE,
+        "lpips_available": lpips_available
+    })
 
 
 @app.route('/analyze', methods=['POST'])
@@ -419,11 +450,11 @@ def get_lpips_model():
     if _lpips_model is None:
         try:
             import lpips
-            print("🧠 Loading LPIPS model (AlexNet)...")
+            print("[LPIPS] Loading LPIPS model (AlexNet)...")
             _lpips_model = lpips.LPIPS(net='alex')
             print("   LPIPS model loaded")
         except ImportError:
-            print("⚠️ LPIPS not available - install with: pip install lpips")
+            print("[WARN] LPIPS not available - install with: pip install lpips")
             return None
     return _lpips_model
 
@@ -577,7 +608,7 @@ def compare_lpips():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PHOTO_ANALYZER_PORT', 5000))
-    print(f"🔍 Photo Analyzer API starting on port {port}")
-    print("   Using MediaPipe for face detection and background removal")
-    print("   No heavy model downloads required!")
+    print(f"[START] Photo Analyzer API starting on port {port}")
+    print(f"   MediaPipe available: {MEDIAPIPE_AVAILABLE}")
+    print("   LPIPS: checking on first request")
     app.run(host='0.0.0.0', port=port, debug=False)

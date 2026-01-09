@@ -19,6 +19,7 @@ interface WizardStep2Props {
   isRegeneratingAvatars: boolean;
   isRegeneratingAvatarsWithTraits: boolean;
   developerMode: boolean;
+  isImpersonating?: boolean;  // Admin impersonating a user
   changedTraits?: ChangedTraits;  // Which traits changed from previous photo
   photoAnalysisDebug?: { rawResponse?: string; error?: string };  // Debug info for dev mode
   // Character role selection
@@ -61,6 +62,7 @@ export function WizardStep2Characters({
   isRegeneratingAvatars,
   isRegeneratingAvatarsWithTraits,
   developerMode,
+  isImpersonating = false,
   changedTraits,
   photoAnalysisDebug,
   mainCharacters,
@@ -138,6 +140,7 @@ export function WizardStep2Characters({
             isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
             step="name"
             developerMode={developerMode}
+            isImpersonating={isImpersonating}
             changedTraits={changedTraits}
             photoAnalysisDebug={photoAnalysisDebug}
             isNewCharacter={true}
@@ -174,6 +177,7 @@ export function WizardStep2Characters({
           isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
           step={characterStep as 'traits' | 'characteristics' | 'relationships' | 'avatar'}
           developerMode={developerMode}
+          isImpersonating={isImpersonating}
           changedTraits={changedTraits}
           photoAnalysisDebug={photoAnalysisDebug}
           relationships={relationships}

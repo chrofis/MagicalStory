@@ -729,12 +729,13 @@ export default function StoryWizard() {
     const loadCharacterData = async () => {
       try {
         setIsLoading(true);
-        // Pass developerMode to load all avatar variants for admin users
-        const data = await characterService.getCharacterData(developerMode);
+        // Pass developerMode or isImpersonating to load all avatar variants for admin users
+        const loadAllAvatars = developerMode || isImpersonating;
+        const data = await characterService.getCharacterData(loadAllAvatars);
         log.info('Loaded character data from API:', {
           characters: data.characters.length,
           relationships: Object.keys(data.relationships).length,
-          includeAllAvatars: developerMode,
+          includeAllAvatars: loadAllAvatars,
         });
 
         setCharacters(data.characters);
@@ -2445,6 +2446,7 @@ export default function StoryWizard() {
             isRegeneratingAvatars={isRegeneratingAvatars}
             isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
             developerMode={developerMode}
+            isImpersonating={isImpersonating}
             changedTraits={changedTraits}
             photoAnalysisDebug={photoAnalysisDebug}
             mainCharacters={mainCharacters}
