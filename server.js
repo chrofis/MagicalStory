@@ -7832,6 +7832,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 async function processStoryJob(jobId) {
   console.log(`🎬 Starting processing for job ${jobId}`);
 
+  // Generation logger for tracking API usage and debugging
+  const genLog = new GenerationLogger();
+  genLog.setStage('outline');
+
+  // Clear avatar generation logs for fresh tracking
+  clearStyledAvatarGenerationLog();
+  clearCostumedAvatarGenerationLog();
+
   // Token usage tracker - accumulates usage from all API calls by provider and function
   const tokenUsage = {
     // By provider (for backwards compatibility) - includes thinking_tokens for Gemini 2.5
@@ -9510,6 +9518,38 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     log.debug(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output${thinkingTotal} tokens`);
     log.debug(`   💰 TOTAL COST: $${totalCost.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
+
+    // Log API usage to generationLog for dev mode visibility
+    genLog.setStage('finalize');
+    for (const [funcName, funcData] of Object.entries(byFunc)) {
+      if (funcData.calls > 0) {
+        const model = getModels(funcData);
+        const directCost = funcData.direct_cost || 0;
+        const cost = directCost > 0
+          ? directCost
+          : calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        genLog.apiUsage(funcName, model, {
+          inputTokens: funcData.input_tokens,
+          outputTokens: funcData.output_tokens,
+          thinkingTokens: funcData.thinking_tokens,
+          directCost: directCost
+        }, cost);
+      }
+    }
+
+    // Add total cost summary to generation log
+    genLog.info('total_cost', `💰 Total API cost: $${totalCost.toFixed(4)}`, null, {
+      totalCost: totalCost,
+      totalInputTokens,
+      totalOutputTokens,
+      runwareCost: tokenUsage.runware?.direct_cost || 0
+    });
+    genLog.finalize();
+
+    // Add generationLog to storyData
+    storyData.generationLog = genLog.getEntries();
+    storyData.styledAvatarGeneration = getStyledAvatarGenerationLog();
+    storyData.costumedAvatarGeneration = getCostumedAvatarGenerationLog();
 
     // Insert into stories table with metadata for fast list queries
     await upsertStory(storyId, job.user_id, storyData);
