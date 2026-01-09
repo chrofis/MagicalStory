@@ -19,6 +19,12 @@ import traceback
 import logging
 import sys
 
+# Fix Windows encoding issues - force UTF-8 for stdout/stderr
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 # Suppress Flask development server warning
 cli = sys.modules.get('flask.cli')
 if cli:

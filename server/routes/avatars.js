@@ -1323,22 +1323,6 @@ These corrections OVERRIDE what is visible in the reference photo.
 
         let data = await response.json();
 
-        // DEBUG: Log full response structure
-        console.log(`[DEBUG] ${category} response keys:`, Object.keys(data));
-        if (data.candidates) {
-          console.log(`[DEBUG] ${category} candidates:`, data.candidates.length);
-          if (data.candidates[0]?.content?.parts) {
-            const parts = data.candidates[0].content.parts;
-            console.log(`[DEBUG] ${category} parts:`, parts.map(p => p.text ? 'text' : p.inlineData ? 'image' : 'other'));
-          }
-          if (data.candidates[0]?.finishReason) {
-            console.log(`[DEBUG] ${category} finishReason:`, data.candidates[0].finishReason);
-          }
-        }
-        if (data.promptFeedback) {
-          console.log(`[DEBUG] ${category} promptFeedback:`, JSON.stringify(data.promptFeedback));
-        }
-
         // Log token usage
         const avatarModelId = selectedModel;
         const avatarInputTokens = data.usageMetadata?.promptTokenCount || 0;
@@ -1401,22 +1385,6 @@ These corrections OVERRIDE what is visible in the reference photo.
               imageData = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
               break;
             }
-          }
-        }
-
-        // Check for IMAGE_OTHER finish reason - Gemini refused to transform real person photo
-        // Fall back to ACE++ which is designed for face-consistent avatar generation
-        if (!imageData && data.candidates?.[0]?.finishReason === 'IMAGE_OTHER') {
-          log.warn(`[CLOTHING AVATARS] Gemini refused to transform photo for ${category} (IMAGE_OTHER), falling back to ACE++...`);
-
-          try {
-            const aceResult = await generateAvatarWithACEPlusPlus(category, userTraitsSection);
-            if (aceResult && aceResult.imageData) {
-              log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via ACE++ fallback`);
-              imageData = aceResult.imageData;
-            }
-          } catch (aceErr) {
-            log.error(`❌ [CLOTHING AVATARS] ACE++ fallback failed for ${category}:`, aceErr.message);
           }
         }
 
