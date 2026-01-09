@@ -1108,7 +1108,7 @@ function buildCharacterReferenceList(photos, characters = null) {
       // Face shape removed - let reference image handle facial geometry
       physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
       hairDesc,
-      physical?.other ? `Other: ${physical.other}` : '',
+      physical?.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
       // Include clothing description from avatar if available
       photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
     ].filter(Boolean);
@@ -1723,7 +1723,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         // Face shape removed - let reference image handle facial geometry
         physical?.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
         hairDesc,
-        physical?.other ? `Other: ${physical.other}` : '',
+        physical?.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
         // Prefer avatar clothing description if available, otherwise use clothing style
         avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `CLOTHING STYLE (MUST MATCH - colors and patterns): ${clothingStyle}` : '')
       ].filter(Boolean);
