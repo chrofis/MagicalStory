@@ -252,13 +252,23 @@ Add at least {PAGES} entries. Even if an element appears only once, add it for v
       "setting": "[indoor/outdoor, type]",
       "colors": "[specific colors]",
       "features": "[distinctive visual elements]",
-      "signatureElement": "[ONE unique detail]"
+      "signatureElement": "[ONE unique detail]",
+      "isRealLandmark": false,
+      "landmarkQuery": null
     }
   ],
   "vehicles": [],
   "clothing": []
 }
 ```
+
+**REAL-WORLD LANDMARKS:**
+For famous buildings, monuments, or locations that exist in reality:
+- Set `"isRealLandmark": true`
+- Set `"landmarkQuery"` to the EXACT landmark name for photo lookup
+- This helps us show accurate landmark photos in illustrations
+
+{AVAILABLE_LANDMARKS_SECTION}
 
 **Rules:**
 - Do NOT include main characters ({CHARACTER_NAMES}) - they have reference photos

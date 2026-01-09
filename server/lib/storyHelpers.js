@@ -2149,6 +2149,12 @@ ${adventureGuide}` : ''}`;
   // Build characters JSON with relationships
   const charactersJson = JSON.stringify(characterSummary, null, 2) + relationshipDescriptions;
 
+  // Build available landmarks section if landmarks were pre-discovered
+  const availableLandmarksSection = buildAvailableLandmarksSection(inputData.availableLandmarks);
+  if (inputData.availableLandmarks?.length > 0) {
+    log.debug(`[PROMPT] Including ${inputData.availableLandmarks.length} pre-discovered landmarks in unified prompt`);
+  }
+
   // Use template if available
   if (PROMPT_TEMPLATES.storyUnified) {
     const prompt = fillTemplate(PROMPT_TEMPLATES.storyUnified, {
@@ -2163,7 +2169,8 @@ ${adventureGuide}` : ''}`;
       STORY_DETAILS: inputData.storyDetails || 'None',
       CHARACTERS: charactersJson,
       CHARACTER_NAMES: characterNames,
-      CATEGORY_GUIDELINES: categoryGuidelines
+      CATEGORY_GUIDELINES: categoryGuidelines,
+      AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection
     });
     log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars`);
     return prompt;
