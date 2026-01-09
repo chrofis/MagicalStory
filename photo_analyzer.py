@@ -260,18 +260,17 @@ def create_face_thumbnail(image, face_box, size=200):
     return f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
 
-def blur_faces_except(image, keep_face_id, all_faces, blur_kernel=51):
+def remove_faces_except(image, keep_face_id, all_faces):
     """
-    Apply Gaussian blur to all faces EXCEPT the selected one.
+    Remove all faces EXCEPT the selected one by making them transparent.
     This prevents AI from using wrong faces during avatar generation.
 
     Args:
-        image: BGR or BGRA numpy array
+        image: BGRA numpy array (must have alpha channel)
         keep_face_id: ID of face to keep (0-indexed)
         all_faces: list of face dicts with x, y, width, height (percentages 0-100)
-        blur_kernel: size of Gaussian blur kernel (odd number)
 
-    Returns: image with non-selected faces blurred
+    Returns: image with non-selected faces made transparent
     """
     if not all_faces or len(all_faces) <= 1:
         return image
@@ -279,13 +278,18 @@ def blur_faces_except(image, keep_face_id, all_faces, blur_kernel=51):
     result = image.copy()
     h, w = image.shape[:2]
 
+    # Ensure image has alpha channel
+    if len(result.shape) == 2 or result.shape[2] == 3:
+        # Convert BGR to BGRA
+        result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)
+
     for face in all_faces:
         if face['id'] == keep_face_id:
             continue  # Skip the selected face
 
         # Convert percentage to pixel coordinates
-        # Add 20% extra padding for thorough blurring
-        padding = 0.2
+        # Add 30% extra padding to ensure full face removal (head, hair, etc.)
+        padding = 0.3
         x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * padding)) * w)
         y1 = int(max(0, (face['y'] / 100 - face['height'] / 100 * padding)) * h)
         x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * padding) * w)
@@ -295,12 +299,10 @@ def blur_faces_except(image, keep_face_id, all_faces, blur_kernel=51):
         if x2 <= x1 or y2 <= y1:
             continue
 
-        # Extract region and blur it
-        face_region = result[y1:y2, x1:x2]
-        blurred = cv2.GaussianBlur(face_region, (blur_kernel, blur_kernel), 0)
-        result[y1:y2, x1:x2] = blurred
+        # Make face region transparent (set alpha to 0)
+        result[y1:y2, x1:x2, 3] = 0
 
-        print(f"   Blurred face {face['id']} at ({x1},{y1})-({x2},{y2})")
+        print(f"   Removed face {face['id']} at ({x1},{y1})-({x2},{y2})")
 
     return result
 
@@ -451,16 +453,16 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
             raise ValueError("Failed to load image")
 
         img_h, img_w = img.shape[:2]
-        print(f"📸 Processing image: {img_w}x{img_h}")
+        print(f"[PHOTO] Processing image: {img_w}x{img_h}")
 
         # 2. DETECT ALL FACES (fast - ~50ms)
-        print("👤 Detecting faces...")
+        print("[FACE] Detecting faces...")
         all_faces = detect_all_faces_mediapipe(img, min_confidence=0.35)
         print(f"   Faces detected: {len(all_faces)}")
 
         # If no face detected, return error immediately
         if len(all_faces) == 0:
-            print("❌ No face detected in photo")
+            print("[ERROR] No face detected in photo")
             # Clean up temp files
             if os.path.exists(temp_input) and is_base64:
                 os.remove(temp_input)
@@ -473,7 +475,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
         # 3. MULTI-FACE HANDLING
         # If multiple faces and no selection made yet, return face thumbnails for selection
         if len(all_faces) > 1 and selected_face_id is None:
-            print(f"🎭 Multiple faces detected ({len(all_faces)}), returning thumbnails for selection")
+            print(f"[MULTI] Multiple faces detected ({len(all_faces)}), returning thumbnails for selection")
 
             # Create thumbnails for each face (using original image for speed)
             face_thumbnails = []
@@ -523,7 +525,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
             print(f"   Using primary face (confidence: {face_box['confidence']:.2f})")
 
         # 5. REMOVE BACKGROUND (fast - ~100ms)
-        print("🎭 Removing background...")
+        print("[BG] Removing background...")
         full_img_rgba = None
         body_mask = None
         try:
@@ -532,12 +534,12 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
         except Exception as bg_error:
             print(f"   Background removal failed: {bg_error}")
 
-        # 6. BLUR NON-SELECTED FACES (if multiple faces and one was selected)
+        # 6. REMOVE NON-SELECTED FACES (if multiple faces and one was selected)
+        # Make them transparent so AI can't use them for avatar generation
         if len(all_faces) > 1 and selected_face_id is not None:
-            print(f"🔲 Blurring {len(all_faces) - 1} non-selected faces...")
-            img = blur_faces_except(img, selected_face_id, all_faces)
+            print(f"[REMOVE] Removing {len(all_faces) - 1} non-selected faces...")
             if full_img_rgba is not None:
-                full_img_rgba = blur_faces_except(full_img_rgba, selected_face_id, all_faces)
+                full_img_rgba = remove_faces_except(full_img_rgba, selected_face_id, all_faces)
 
         # 7. GET BODY BOUNDS FROM MASK
         body_box = None
