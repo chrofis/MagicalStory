@@ -317,6 +317,9 @@ export default function StoryWizard() {
     }
   }, [isAuthenticated]);
 
+  // Track if we've already restored this job to avoid re-fetching
+  const restoredJobIdRef = useRef<string | null>(null);
+
   // Handle returning during active generation or after completion
   useEffect(() => {
     const urlStoryId = searchParams.get('storyId');
@@ -327,9 +330,10 @@ export default function StoryWizard() {
       return;
     }
 
-    // If there's an active job and we're not already showing generation, restore progressive view
-    if (activeJob && !urlStoryId && !isGenerating) {
-      log.info('Returning during active generation, restoring progress');
+    // If there's an active job and we haven't restored it yet, restore progressive view
+    if (activeJob && !urlStoryId && restoredJobIdRef.current !== activeJob.jobId) {
+      log.info('Returning during active generation, restoring progress for job:', activeJob.jobId);
+      restoredJobIdRef.current = activeJob.jobId;
       setStep(6);
       setIsGenerating(true);
       setStoryTitle(activeJob.storyTitle);
@@ -337,7 +341,13 @@ export default function StoryWizard() {
 
       // Fetch current job status to restore partial results
       storyService.getJobStatus(activeJob.jobId).then((status) => {
-        log.info('Restored job status:', { progress: status.progress, hasStoryText: !!status.storyText, partialPages: status.partialPages?.length || 0 });
+        log.info('Restored job status:', {
+          progress: status.progress,
+          hasStoryText: !!status.storyText,
+          storyTextKeys: status.storyText ? Object.keys(status.storyText) : [],
+          pageTextsCount: status.storyText?.pageTexts ? Object.keys(status.storyText.pageTexts).length : 0,
+          partialPages: status.partialPages?.length || 0
+        });
 
         // Update progress
         if (status.progress) {
@@ -346,13 +356,17 @@ export default function StoryWizard() {
 
         // Restore story text for progressive display
         if (status.storyText) {
+          const pageTexts = status.storyText.pageTexts || {};
+          log.info('Setting progressiveStoryData with', Object.keys(pageTexts).length, 'pages');
           setProgressiveStoryData({
             title: status.storyText.title || activeJob.storyTitle,
             dedication: status.storyText.dedication,
-            pageTexts: status.storyText.pageTexts || {},
+            pageTexts: pageTexts,
             sceneDescriptions: status.storyText.sceneDescriptions || [],
             totalPages: status.storyText.totalPages || pages,
           });
+        } else {
+          log.warn('No storyText in job status response');
         }
 
         // Restore completed page images
@@ -363,6 +377,7 @@ export default function StoryWizard() {
               pageImages[page.pageNumber] = page.imageData;
             }
           });
+          log.info('Restored', Object.keys(pageImages).length, 'page images');
           setCompletedPageImages(pageImages);
         }
 
@@ -383,7 +398,7 @@ export default function StoryWizard() {
       log.info('Generation completed, navigating to story:', completedStoryId);
       setSearchParams({ storyId: completedStoryId }, { replace: true });
     }
-  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, isGenerating, pages]);
+  }, [activeJob, generationComplete, completedStoryId, searchParams, setSearchParams, pages]);
 
   // Reset story settings when ?new=true is present (from "Create New Story" button)
   useEffect(() => {
@@ -3643,7 +3658,7 @@ export default function StoryWizard() {
                   onClick={() => {
                     setIsProgressMinimized(true);
                     setShowMinimizeDialog(false);
-                    navigate('/my-stories');
+                    navigate('/stories');
                   }}
                   className="w-full py-3 px-4 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 transition-colors font-medium"
                 >
