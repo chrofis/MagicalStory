@@ -18,9 +18,10 @@ import {
   WizardStep6Summary,
 } from './wizard';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
+import { FaceSelectionModal } from '@/components/character';
 
 // Types
-import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits } from '@/types/character';
+import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace } from '@/types/character';
 import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry } from '@/types/story';
 
 // Services & Helpers
@@ -127,6 +128,12 @@ export default function StoryWizard() {
   const [changedTraits, setChangedTraits] = useState<ChangedTraits | undefined>(undefined);
   const [photoAnalysisDebug, setPhotoAnalysisDebug] = useState<{ rawResponse?: string; error?: string } | undefined>(undefined);
   const previousTraitsRef = useRef<{ physical?: Character['physical']; gender?: string; age?: string } | null>(null);
+
+  // Multi-face selection state (when photo has multiple people)
+  const [showFaceSelectionModal, setShowFaceSelectionModal] = useState(false);
+  const [detectedFaces, setDetectedFaces] = useState<DetectedFace[]>([]);
+  const [pendingPhotoData, setPendingPhotoData] = useState<string | null>(null);
+  const [pendingClothingToKeep, setPendingClothingToKeep] = useState<Character['clothing'] | null>(null);
 
   // Relationships state (step 2) - loaded from API with characters
   const [relationships, setRelationships] = useState<RelationshipMap>({});
@@ -1183,6 +1190,17 @@ export default function StoryWizard() {
         const analysis = await characterService.analyzePhoto(resizedPhoto, language);
 
         if (analysis.success) {
+          // Check if multiple faces were detected - show selection modal
+          if (analysis.multipleFacesDetected && analysis.faces && analysis.faces.length > 1) {
+            log.info(`Multiple faces detected (${analysis.faces.length}), showing selection modal`);
+            setPendingPhotoData(resizedPhoto);
+            setPendingClothingToKeep(clothingToKeep ? { structured: clothingToKeep } : null);
+            setDetectedFaces(analysis.faces);
+            setShowFaceSelectionModal(true);
+            setIsAnalyzingPhoto(false);
+            return; // Wait for user to select a face
+          }
+
           log.info('Photo analysis complete:', {
             hasPhotos: !!analysis.photos,
             hasPhysical: !!analysis.physical,
@@ -1331,6 +1349,147 @@ export default function StoryWizard() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  // Handler for when user selects a face from the multi-face modal
+  const handleFaceSelection = async (faceId: number) => {
+    if (!pendingPhotoData) {
+      log.error('No pending photo data for face selection');
+      return;
+    }
+
+    setShowFaceSelectionModal(false);
+    setIsAnalyzingPhoto(true);
+
+    try {
+      log.info(`Re-analyzing photo with selected face ID: ${faceId}`);
+      const analysis = await characterService.analyzePhoto(pendingPhotoData, language, faceId);
+
+      if (analysis.success) {
+        log.info('Photo analysis complete with selected face:', {
+          hasPhotos: !!analysis.photos,
+          hasPhysical: !!analysis.physical,
+          hasClothing: !!analysis.clothing,
+          age: analysis.age,
+          gender: analysis.gender,
+        });
+
+        // Store debug info for UI display (dev mode)
+        if (analysis._debug) {
+          setPhotoAnalysisDebug(analysis._debug);
+        }
+
+        // Handle clothing based on user's choice
+        const clothingToKeep = pendingClothingToKeep?.structured;
+
+        // Update character with analysis results
+        setCurrentCharacter(prev => {
+          if (!prev) return null;
+
+          let updatedClothing = prev.clothing;
+          let updatedClothingSource = prev.clothingSource;
+
+          if (clothingToKeep) {
+            // User chose to keep old clothing
+            updatedClothing = { structured: clothingToKeep };
+            updatedClothingSource = {
+              upperBody: clothingToKeep.upperBody ? 'user' : undefined,
+              lowerBody: clothingToKeep.lowerBody ? 'user' : undefined,
+              shoes: clothingToKeep.shoes ? 'user' : undefined,
+              fullBody: clothingToKeep.fullBody ? 'user' : undefined,
+            };
+          } else {
+            // Clear existing so it gets extracted from new photo
+            updatedClothing = undefined;
+            updatedClothingSource = undefined;
+          }
+
+          return {
+            ...prev,
+            photos: {
+              original: analysis.photos?.face || pendingPhotoData,
+              face: analysis.photos?.face,
+              body: analysis.photos?.body || pendingPhotoData,
+              bodyNoBg: analysis.photos?.bodyNoBg,
+              faceBox: analysis.photos?.faceBox,
+              bodyBox: analysis.photos?.bodyBox,
+            },
+            avatars: { status: 'generating' as const },
+            clothing: updatedClothing,
+            clothingSource: updatedClothingSource,
+          };
+        });
+
+        // Auto-start avatar generation in background
+        log.info(`🎨 Auto-starting avatar generation in background after face selection...`);
+        setIsGeneratingAvatar(true);
+
+        // Get the updated character for avatar generation
+        const charForGeneration = await new Promise<Character | null>(resolve => {
+          setCurrentCharacter(prev => {
+            resolve(prev);
+            return prev;
+          });
+        });
+
+        if (charForGeneration && charForGeneration.name && charForGeneration.name.trim()) {
+          characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
+            .then(result => {
+              if (result.success && result.character) {
+                setCurrentCharacter(prev => {
+                  if (!prev) return result.character!;
+                  return {
+                    ...prev,
+                    avatars: result.character!.avatars,
+                    physical: result.character!.physical,
+                    clothing: result.character!.clothing,
+                  };
+                });
+                setCharacters(prev => prev.map(c =>
+                  c.id === result.character!.id ? result.character! : c
+                ));
+                log.success(`✅ Avatar generated for ${charForGeneration.name} (face selection)`);
+              } else {
+                log.error(`❌ Avatar generation failed: ${result.error}`);
+                setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+              }
+            })
+            .catch(error => {
+              log.error(`❌ Avatar generation error:`, error);
+              setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+            })
+            .finally(() => {
+              setIsGeneratingAvatar(false);
+            });
+        } else {
+          log.info(`⏭️ Skipping auto-generation: character has no name yet`);
+          setIsGeneratingAvatar(false);
+          setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'pending' } } : prev);
+        }
+      } else {
+        log.warn('Photo analysis failed after face selection');
+        showError(t.noFaceDetected);
+      }
+    } catch (error) {
+      log.error('Photo analysis error after face selection:', error);
+      showError('Failed to analyze photo. Please try again.');
+    } finally {
+      setIsAnalyzingPhoto(false);
+      // Clear pending data
+      setPendingPhotoData(null);
+      setPendingClothingToKeep(null);
+      setDetectedFaces([]);
+    }
+  };
+
+  // Handler for when user wants to upload a different photo from face selection modal
+  const handleFaceSelectionUploadNew = () => {
+    setShowFaceSelectionModal(false);
+    setPendingPhotoData(null);
+    setPendingClothingToKeep(null);
+    setDetectedFaces([]);
+    // Stay on photo step so user can upload a new photo
+    setCharacterStep('photo');
   };
 
   // Handler for regenerating avatars from developer mode
@@ -3515,6 +3674,15 @@ export default function StoryWizard() {
           </div>
         </div>
       )}
+
+      {/* Face Selection Modal - When photo has multiple people */}
+      <FaceSelectionModal
+        isOpen={showFaceSelectionModal}
+        faces={detectedFaces}
+        onSelect={handleFaceSelection}
+        onUploadNew={handleFaceSelectionUploadNew}
+        developerMode={developerMode}
+      />
 
       {/* Email Verification Modal */}
       <EmailVerificationModal
