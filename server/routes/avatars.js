@@ -1282,6 +1282,22 @@ These corrections OVERRIDE what is visible in the reference photo.
 
         let data = await response.json();
 
+        // DEBUG: Log full response structure
+        console.log(`[DEBUG] ${category} response keys:`, Object.keys(data));
+        if (data.candidates) {
+          console.log(`[DEBUG] ${category} candidates:`, data.candidates.length);
+          if (data.candidates[0]?.content?.parts) {
+            const parts = data.candidates[0].content.parts;
+            console.log(`[DEBUG] ${category} parts:`, parts.map(p => p.text ? 'text' : p.inlineData ? 'image' : 'other'));
+          }
+          if (data.candidates[0]?.finishReason) {
+            console.log(`[DEBUG] ${category} finishReason:`, data.candidates[0].finishReason);
+          }
+        }
+        if (data.promptFeedback) {
+          console.log(`[DEBUG] ${category} promptFeedback:`, JSON.stringify(data.promptFeedback));
+        }
+
         // Log token usage
         const avatarModelId = selectedModel;
         const avatarInputTokens = data.usageMetadata?.promptTokenCount || 0;
@@ -1354,7 +1370,22 @@ These corrections OVERRIDE what is visible in the reference photo.
             const compressedImage = await compressImageToJPEG(imageData);
             const compressedSize = Math.round(compressedImage.length / 1024);
             log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated and compressed (${originalSize}KB -> ${compressedSize}KB)`);
-            return { category, prompt: avatarPrompt, imageData: compressedImage };
+
+            // Split 2x2 grid into quadrants and extract face thumbnail
+            const splitResult = await splitGridAndExtractFace(compressedImage);
+            if (splitResult.success) {
+              log.debug(`✅ [CLOTHING AVATARS] ${category} grid split into 4 quadrants`);
+              return {
+                category,
+                prompt: avatarPrompt,
+                quadrants: splitResult.quadrants,
+                faceThumbnail: splitResult.faceThumbnail,
+                imageData: null  // No longer store full grid
+              };
+            } else {
+              log.warn(`[CLOTHING AVATARS] Grid split failed for ${category}: ${splitResult.error}, using full grid as fallback`);
+              return { category, prompt: avatarPrompt, imageData: compressedImage };
+            }
           } catch (compressErr) {
             log.warn(`[CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
             return { category, prompt: avatarPrompt, imageData };
@@ -1380,19 +1411,35 @@ These corrections OVERRIDE what is visible in the reference photo.
     const generationTime = Date.now() - generationStart;
     log.debug(`⚡ [CLOTHING AVATARS] ${categoryCount} avatars generated in ${generationTime}ms (parallel)`);
 
-    // Store prompts and images
-    for (const { category, prompt, imageData } of generatedAvatars) {
+    // Store prompts, quadrants, and face thumbnails
+    for (const { category, prompt, imageData, quadrants, faceThumbnail } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
-      if (imageData) results[category] = imageData;
+      if (quadrants) {
+        // Store quadrants as the category data (new format)
+        results[category] = quadrants;
+        // Store face thumbnail for this category
+        if (faceThumbnail) {
+          if (!results.faceThumbnails) results.faceThumbnails = {};
+          results.faceThumbnails[category] = faceThumbnail;
+        }
+        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} with quadrants: ${Object.keys(quadrants).join(', ')}`);
+      } else if (imageData) {
+        // Fallback: store full grid if split failed
+        results[category] = imageData;
+        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} as full grid (fallback)`);
+      }
     }
 
     // PHASE 2: Evaluate all generated avatars in parallel
-    const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
+    // Use faceFront quadrant for evaluation (the face looking at camera)
+    const avatarsToEvaluate = generatedAvatars.filter(a => a.quadrants?.faceFront || a.imageData);
     if (avatarsToEvaluate.length > 0) {
       log.debug(`🔍 [CLOTHING AVATARS] Starting PARALLEL evaluation of ${avatarsToEvaluate.length} avatars...`);
       const evalStart = Date.now();
-      const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-        const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageData, geminiApiKey);
+      const evalPromises = avatarsToEvaluate.map(async ({ category, imageData, quadrants }) => {
+        // Evaluate using faceFront quadrant if available, otherwise full grid
+        const imageToEvaluate = quadrants?.faceFront || imageData;
+        const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageToEvaluate, geminiApiKey);
         return { category, faceMatchResult };
       });
       const evalResults = await Promise.all(evalPromises);

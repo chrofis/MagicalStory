@@ -4,7 +4,17 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
-import type { Character } from '@/types/character';
+import type { Character, AvatarData } from '@/types/character';
+
+// Helper function to extract displayable image from AvatarData (string or quadrants)
+function getAvatarDisplayImage(avatarData: AvatarData | undefined): string | undefined {
+  if (!avatarData) return undefined;
+  if (typeof avatarData === 'string') return avatarData;
+  if (typeof avatarData === 'object' && 'faceFront' in avatarData) {
+    return avatarData.faceFront;
+  }
+  return undefined;
+}
 
 interface GenerationProgressProps {
   current: number;
@@ -115,10 +125,14 @@ export function GenerationProgress({
     if (!avatars) return '';
 
     const available: string[] = [];
-    if (avatars.standard) available.push(avatars.standard);
-    if (avatars.summer) available.push(avatars.summer);
-    if (avatars.winter) available.push(avatars.winter);
-    if (avatars.formal) available.push(avatars.formal);
+    const standardImg = getAvatarDisplayImage(avatars.standard);
+    const summerImg = getAvatarDisplayImage(avatars.summer);
+    const winterImg = getAvatarDisplayImage(avatars.winter);
+    const formalImg = getAvatarDisplayImage(avatars.formal);
+    if (standardImg) available.push(standardImg);
+    if (summerImg) available.push(summerImg);
+    if (winterImg) available.push(winterImg);
+    if (formalImg) available.push(formalImg);
 
     return available[Math.floor(Math.random() * available.length)] || '';
   };
