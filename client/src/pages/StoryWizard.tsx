@@ -1605,6 +1605,8 @@ export default function StoryWizard() {
           face: currentSource.face === 'user' ? currentCharacter.physical?.face : result.extractedTraits.face,
           facialHair: currentSource.facialHair === 'user' ? currentCharacter.physical?.facialHair : result.extractedTraits.facialHair,
           other: currentSource.other === 'user' ? currentCharacter.physical?.other : result.extractedTraits.other,
+          // Detailed hair analysis from avatar evaluation (always use latest)
+          detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || currentCharacter.physical?.detailedHairAnalysis,
         } : currentCharacter.physical;
 
         // PRESERVE 'user' source - only set 'extracted' for non-user traits
@@ -1723,6 +1725,8 @@ export default function StoryWizard() {
           face: currentSource2.face === 'user' ? latestChar.physical?.face : result.extractedTraits.face,
           facialHair: currentSource2.facialHair === 'user' ? latestChar.physical?.facialHair : result.extractedTraits.facialHair,
           other: currentSource2.other === 'user' ? latestChar.physical?.other : result.extractedTraits.other,
+          // Detailed hair analysis from avatar evaluation (always use latest)
+          detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || latestChar.physical?.detailedHairAnalysis,
         } : latestChar.physical;
 
         // PRESERVE 'user' source - only set 'extracted' for non-user traits
@@ -1836,10 +1840,16 @@ export default function StoryWizard() {
       if (result.success && result.avatars) {
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-        // Update local state with new avatars
-        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
+        // Update physical traits with detailedHairAnalysis if available
+        const updatedPhysical = result.extractedTraits?.detailedHairAnalysis ? {
+          ...currentCharacter.physical,
+          detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis,
+        } : currentCharacter.physical;
+
+        // Update local state with new avatars and physical traits
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars, physical: updatedPhysical } : prev);
         setCharacters(prev => prev.map(c =>
-          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
+          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical } : c
         ));
 
         log.success(`✅ Avatar generated for ${currentCharacter.name}`);
@@ -2313,17 +2323,22 @@ export default function StoryWizard() {
 
           if (result.success && result.avatars) {
             const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
+            // Update physical traits with detailedHairAnalysis if available
+            const updatedPhysical = result.extractedTraits?.detailedHairAnalysis ? {
+              ...char.physical,
+              detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis,
+            } : char.physical;
             // Update characters state
             setCharacters(prev => prev.map(c =>
-              c.id === char.id ? { ...c, avatars: freshAvatars } : c
+              c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical } : c
             ));
             // Also update currentCharacter if it matches
-            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars } : prev);
+            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: updatedPhysical } : prev);
             // Save to storage using local state to preserve any unsaved changes
             // Use functional update to get latest characters state
             setCharacters(prevChars => {
               const updatedCharsForSave = prevChars.map(c =>
-                c.id === char.id ? { ...c, avatars: freshAvatars } : c
+                c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical } : c
               );
               // Fire save in background (don't await to avoid blocking)
               characterService.saveCharacterData({
