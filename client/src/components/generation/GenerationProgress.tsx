@@ -4,13 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProgressBar } from '@/components/common/ProgressBar';
 import type { CoverImages } from '@/types/story';
-import type { Character, ClothingCategory } from '@/types/character';
-
-// Helper to get display image: prefer face thumbnail (extracted face), fall back to full 2x2 avatar grid
-function getDisplayImage(avatars: Character['avatars'], category: ClothingCategory): string | undefined {
-  if (!avatars) return undefined;
-  return avatars.faceThumbnails?.[category] || avatars[category];
-}
+import type { Character } from '@/types/character';
 
 interface GenerationProgressProps {
   current: number;
@@ -121,14 +115,10 @@ export function GenerationProgress({
     if (!avatars) return '';
 
     const available: string[] = [];
-    const standardImg = getDisplayImage(avatars, 'standard');
-    const summerImg = getDisplayImage(avatars, 'summer');
-    const winterImg = getDisplayImage(avatars, 'winter');
-    const formalImg = getDisplayImage(avatars, 'formal');
-    if (standardImg) available.push(standardImg);
-    if (summerImg) available.push(summerImg);
-    if (winterImg) available.push(winterImg);
-    if (formalImg) available.push(formalImg);
+    if (avatars.standard) available.push(avatars.standard);
+    if (avatars.summer) available.push(avatars.summer);
+    if (avatars.winter) available.push(avatars.winter);
+    if (avatars.formal) available.push(avatars.formal);
 
     return available[Math.floor(Math.random() * available.length)] || '';
   };

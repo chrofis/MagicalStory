@@ -89,8 +89,8 @@ export function CharacterRelationships({
     detailsPlaceholder: language === 'de' ? 'Details...' : language === 'fr' ? 'Détails...' : 'Details...',
   };
 
-  // Get photo for current character
-  const currentPhoto = character.photos?.face || character.photos?.original;
+  // Get photo for current character (prefer AI-extracted face thumbnail from avatars)
+  const currentPhoto = character.avatars?.faceThumbnails?.standard || character.photos?.face || character.photos?.original;
 
   return (
     <div className="space-y-3">
@@ -118,8 +118,8 @@ export function CharacterRelationships({
           const commentKey = getCommentKey(character.id, otherChar.id);
           const sharedComment = relationshipTexts[commentKey] || '';
 
-          // Get photo for other character
-          const otherPhoto = otherChar.photos?.face || otherChar.photos?.original;
+          // Get photo for other character (prefer AI-extracted face thumbnail from avatars)
+          const otherPhoto = otherChar.avatars?.faceThumbnails?.standard || otherChar.photos?.face || otherChar.photos?.original;
 
           return (
             <div

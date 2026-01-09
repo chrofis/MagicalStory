@@ -109,9 +109,9 @@ export function CharacterList({
                 {/* Top row: Photo/Name on left, Edit/Delete on right */}
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {(char.photos?.face || char.photos?.original) && (
+                    {(char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original) && (
                       <img
-                        src={char.photos?.face || char.photos?.original}
+                        src={char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original}
                         alt={char.name}
                         className={`w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0 ${isOut ? 'grayscale' : ''}`}
                       />
