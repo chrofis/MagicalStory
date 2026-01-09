@@ -2410,6 +2410,8 @@ export default function StoryWizard() {
           coverImageModel: modelSelections.coverImageModel,
           qualityModel: modelSelections.qualityModel,
         } : undefined,
+        // User location for landmark discovery
+        userLocation: userLocation || undefined,
       });
 
       setJobId(newJobId);

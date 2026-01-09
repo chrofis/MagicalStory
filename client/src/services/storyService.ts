@@ -899,6 +899,8 @@ export const storyService = {
       qualityModel?: string | null;
       imageBackend?: string | null;  // 'gemini' or 'runware'
     };
+    // User location for landmark discovery
+    userLocation?: { city: string | null; region: string | null; country: string | null };
   }): Promise<{ jobId: string; creditsRemaining?: number }> {
     // Generate idempotency key to prevent duplicate job creation on retries
     const idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -932,6 +934,8 @@ export const storyService = {
       enableAutoRepair: data.enableAutoRepair,
       // Developer model overrides
       modelOverrides: data.modelOverrides,
+      // User location for landmark discovery
+      userLocation: data.userLocation,
     });
     return { jobId: response.jobId, creditsRemaining: response.creditsRemaining };
   },
