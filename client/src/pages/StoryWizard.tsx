@@ -880,7 +880,7 @@ export default function StoryWizard() {
     };
     reloadForImpersonation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isImpersonating, isAuthenticated]);
+  }, [isImpersonating, isAuthenticated, characters.length]);
 
   // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh
