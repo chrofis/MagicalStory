@@ -859,6 +859,29 @@ export default function StoryWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [developerMode, isAuthenticated]);
 
+  // Reload characters with full avatar data when impersonating becomes true
+  // This handles the case where auth context restores isImpersonating after initial load
+  useEffect(() => {
+    const reloadForImpersonation = async () => {
+      if (!isImpersonating || !isAuthenticated || characters.length === 0) return;
+
+      const needsReload = characters.some(c =>
+        c.avatars?.standard && (!c.avatars?.winter || !c.avatars?.summer)
+      );
+      if (!needsReload) return;
+
+      log.info('Impersonation detected, reloading characters with full avatar data...');
+      try {
+        const data = await characterService.getCharacterData(true);
+        setCharacters(data.characters);
+      } catch (error) {
+        log.error('Failed to reload character data for impersonation:', error);
+      }
+    };
+    reloadForImpersonation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isImpersonating, isAuthenticated]);
+
   // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh
   useEffect(() => {
