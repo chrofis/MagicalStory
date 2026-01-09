@@ -42,10 +42,12 @@ function formatClothingObject(clothingObj) {
 /**
  * Build detailed hair description using both simple fields and detailedHairAnalysis
  * Uses detailed analysis when available for better consistency across scenes
+ * User-edited values (from physicalTraitsSource) take priority over auto-extracted values
  * @param {Object} physical - Physical traits object containing hair fields
+ * @param {Object} physicalTraitsSource - Optional object tracking source of each trait ('photo', 'extracted', 'user')
  * @returns {string} Formatted hair description (without "Hair:" prefix)
  */
-function buildHairDescription(physical) {
+function buildHairDescription(physical, physicalTraitsSource = null) {
   if (!physical) return '';
 
   const parts = [];
@@ -54,8 +56,13 @@ function buildHairDescription(physical) {
   // Color (always use if available)
   if (physical.hairColor) parts.push(physical.hairColor);
 
-  // Type/texture from detailed analysis (wavy, curly, straight)
-  if (detailed?.type) {
+  // Type/texture: User-edited hairStyle takes priority over detailed analysis
+  // This allows users to correct "wavy" -> "ponytail" even if AI extracted "wavy" from photo
+  if (physicalTraitsSource?.hairStyle === 'user' && physical.hairStyle) {
+    // User explicitly set hairStyle - use it
+    parts.push(physical.hairStyle);
+  } else if (detailed?.type) {
+    // Use detailed analysis type (wavy, curly, straight)
     parts.push(detailed.type);
   } else if (physical.hairStyle && !['messy', 'natural', 'tousled', 'styled'].includes(physical.hairStyle?.toLowerCase())) {
     // Only use simple hairStyle if it's specific (ponytail, braids, etc), not vague (messy)
@@ -962,8 +969,8 @@ function buildCharacterPhysicalDescription(char) {
     description += `, ${build} build`;
   }
 
-  // Build hair description using detailed analysis helper
-  const hairDesc = buildHairDescription(char.physical);
+  // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
+  const hairDesc = buildHairDescription(char.physical, char.physicalTraitsSource);
   if (hairDesc) {
     description += `. Hair: ${hairDesc}`;
   }
@@ -1092,8 +1099,8 @@ function buildCharacterReferenceList(photos, characters = null) {
     // Include physical traits with labels
     const physical = char?.physical;
 
-    // Build hair description using detailed analysis helper
-    const hairDescText = buildHairDescription(physical);
+    // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
+    const hairDescText = buildHairDescription(physical, char?.physicalTraitsSource);
     const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
 
     const physicalParts = [
@@ -1707,8 +1714,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       if (avatarClothing) {
         log.debug(`[IMAGE PROMPT] ${char.name} avatar clothing: "${avatarClothing}"`);
       }
-      // Build hair description using detailed analysis helper
-      const hairDescText = buildHairDescription(physical);
+      // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
+      const hairDescText = buildHairDescription(physical, char.physicalTraitsSource);
       const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
 
       const physicalParts = [

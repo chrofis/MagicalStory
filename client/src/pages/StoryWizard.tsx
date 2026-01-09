@@ -320,6 +320,13 @@ export default function StoryWizard() {
   // Handle returning during active generation or after completion
   useEffect(() => {
     const urlStoryId = searchParams.get('storyId');
+    const isNewStory = searchParams.get('new') === 'true';
+
+    // If user explicitly wants a new story, don't redirect them to completed/active story
+    if (isNewStory) {
+      return;
+    }
+
     // If there's an active job and we're not already showing generation, show it
     if (activeJob && !urlStoryId && !isGenerating) {
       log.info('Returning during active generation, showing progress');
