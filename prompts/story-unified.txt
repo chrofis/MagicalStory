@@ -100,13 +100,7 @@ Guidelines for clothing:
 - For standard/winter/summer: Only describe **signature elements** (hat, boots, scarf, vest)
 - For costumed: Provide **complete outfit description**
 - Only mark `used: true` for variations that actually appear
-
-**COSTUME RULES FOR ADVENTURES:**
-- Historical themes (pirate, knight, viking, roman, cowboy, ninja, egyptian, greek, caveman, samurai) MUST use `costumed:type`
-- Fantasy themes (wizard, superhero, mermaid, dragon) SHOULD use `costumed:type`
 - Costumes must NEVER include hats, helmets, crowns, or head coverings - faces must stay visible
-- Some scenes may use standard clothing (e.g., character at home before the adventure starts)
-- Adventure and action scenes MUST use themed costumes
 
 ---CHARACTER ARCS---
 

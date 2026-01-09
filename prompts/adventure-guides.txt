@@ -1,13 +1,25 @@
 # Adventure Theme Guides
 # Format: [theme-id] followed by content until next [theme-id]
-# These guides provide costume requirements and story guidance for adventure themes
+# These guides indicate costume requirements and story guidance for adventure themes
+# NOTE: Specific outfit details are NOT defined here - the AI creates distinct costumes per character
+# following the "Distinct Costume Colors" rule in the story generation prompt.
 
 [pirate]
-COSTUME: costumed:pirate
-Outfit: Striped sailor shirt (red/white or blue/white), leather vest, baggy pants tucked into tall boots, wide leather belt. NO HAT.
+COSTUME: costumed:pirate (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full pirate adventure from start to finish
+- Kids playing pirates in the backyard/park with makeshift props
+- Dress-up party or costume day at school
+- Dream sequence where kids become real pirates
+- Imagination play that comes to life
+- Time travel or magic portal to the golden age of piracy
+- A pirate-themed playground or attraction
+- Reading a pirate book that pulls them into the story
+- Finding a treasure map that starts the adventure
+- Museum exhibit that comes to life
 
 Story guidance:
-- Story can start as pirate or can start in normal cloathing and contain a dream or travel to pirat island
 - Set on ships, tropical islands, or coastal towns
 - Include treasure maps, sea voyages, friendly sea creatures (dolphins, parrots, crabs)
 - Pirates as fun adventurers, not scary villains
@@ -16,8 +28,18 @@ Story guidance:
 
 
 [knight]
-COSTUME: costumed:knight
-Outfit: Chainmail tunic over colored surcoat (blue, red, or green), leather belt with buckle, sturdy boots, wooden practice sword at hip. NO HELMET.
+COSTUME: costumed:knight (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full medieval adventure from the start
+- Kids playing knights with cardboard armor and wooden swords
+- Renaissance fair or medieval festival visit
+- Dream sequence in a castle
+- Imagination play in the backyard that becomes real
+- Magic book or painting that transports them to medieval times
+- School play about knights and dragons
+- Video game or VR experience that becomes real
+- Visiting a castle that holds secrets
 
 Story guidance:
 - Set in castles, enchanted forests, medieval villages
@@ -28,8 +50,17 @@ Story guidance:
 
 
 [viking]
-COSTUME: costumed:viking
-Outfit: Fur-trimmed wool tunic (brown or dark green), wide leather belt with metal buckle, sturdy boots, leather arm bands, braided hair. NO HELMET.
+COSTUME: costumed:viking (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full Norse adventure from the start
+- Kids playing Vikings with homemade shields
+- History class project that comes to life
+- Dream of sailing the northern seas
+- Finding an ancient Viking artifact that transports them
+- Visiting a Viking museum or ship replica
+- School play about Norse mythology
+- Imagination play with toy longship
 
 Story guidance:
 - Set in Nordic landscapes: fjords, pine forests, coastal villages, longships
@@ -40,8 +71,16 @@ Story guidance:
 - Avoid: Horned helmets (historically inaccurate), raids, violence
 
 [roman]
-COSTUME: costumed:roman
-Outfit: White tunic with colored trim (red or purple border), leather belt, leather sandals with straps, optional red cape for dramatic scenes. NO HELMET.
+COSTUME: costumed:roman (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full Roman adventure from the start
+- School project about ancient Rome that becomes real
+- Toga party or Roman-themed event
+- Dream of being in ancient Rome
+- Museum visit where statues come to life
+- Finding a Roman coin that transports them back in time
+- Reading about gladiators (athletes, not fighters) and entering the story
 
 Story guidance:
 - Set in ancient Rome: marble forums, villas with gardens, aqueducts, Colosseum (as arena for games, not fighting)
@@ -51,7 +90,14 @@ Story guidance:
 - Key props: laurel branch (held, not worn), scrolls, columns, mosaic tiles, Roman coins
 
 [detective]
-COSTUME: not needed, use standard, summer or winter avatar
+COSTUME: not needed - use standard, summer or winter avatar
+
+Story entry points:
+- Mystery appears in everyday life
+- Neighborhood mystery to solve
+- School mystery (missing item, secret message)
+- Family mystery or scavenger hunt
+- Detective club kids solve real cases
 
 Story guidance:
 - Mystery-solving adventures with age-appropriate puzzles
@@ -62,8 +108,18 @@ Story guidance:
 
 
 [cowboy]
-COSTUME: costumed:cowboy
-Outfit: Western plaid or denim shirt with snap buttons, leather vest, sturdy jeans, cowboy boots with slight heel, bandana around neck. NO HAT.
+COSTUME: costumed:cowboy (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full Wild West adventure from the start
+- Kids playing cowboys at the playground
+- Visiting a dude ranch or horse farm
+- Western-themed birthday party
+- Dream of being a cowboy
+- Watching a Western movie that pulls them in
+- School play or pageant
+- Costume day with cowboy theme
+- Finding old Western items in grandpa's attic
 
 Story guidance:
 - Set in the Wild West: ranches, prairies, frontier towns, desert mesas
@@ -74,8 +130,17 @@ Story guidance:
 
 
 [egyptian]
-COSTUME: costumed:egyptian
-Outfit: White or cream linen tunic/dress, gold-colored jewelry (wide collar necklace, bracelets), leather sandals with straps. NO HEADDRESS or crown.
+COSTUME: costumed:egyptian (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full ancient Egypt adventure from the start
+- Museum field trip where mummies wake up (friendly!)
+- Dream of being in ancient Egypt
+- School project about pyramids that becomes real
+- Finding a scarab or artifact that transports them
+- Egypt-themed escape room or party
+- Reading about pharaohs and entering the story
+- Sandbox archaeology dig that reveals a real tomb
 
 Story guidance:
 - Set in ancient Egypt: pyramids, Nile river with boats, desert oases, painted temples
@@ -86,8 +151,17 @@ Story guidance:
 
 
 [greek]
-COSTUME: costumed:greek
-Outfit: White toga or chiton (draped fabric), rope or leather belt, leather sandals with ankle straps. NO LAUREL WREATH on head.
+COSTUME: costumed:greek (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full ancient Greece adventure from the start
+- Reading Greek myths that come to life
+- Olympic-themed sports day at school
+- Dream of competing in ancient Olympics
+- Museum visit where Greek statues come to life
+- Finding an ancient Greek artifact
+- School play about Greek heroes
+- Philosophy club adventure
 
 Story guidance:
 - Set in ancient Greece: white marble temples, Olympic stadiums, bustling agora (marketplace), Mediterranean coastline
@@ -98,8 +172,17 @@ Story guidance:
 
 
 [caveman]
-COSTUME: costumed:caveman
-Outfit: Fur tunic or dress (brown/tan), leather wrap or belt, simple leather sandals or barefoot, bone or shell accessories (necklace, bracelet).
+COSTUME: costumed:caveman (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full prehistoric adventure from the start
+- Natural history museum where dinosaurs/cavemen exhibits come alive
+- Dream of living in prehistoric times
+- School project about early humans
+- Time machine takes them way back
+- Playing caveman in the backyard with stick tools
+- Camping trip that becomes a prehistoric adventure
+- Cave exploration that reveals ancient secrets
 
 Story guidance:
 - Set in prehistoric times: painted caves, grassy plains, forests, rivers
@@ -111,8 +194,17 @@ Story guidance:
 
 
 [samurai]
-COSTUME: costumed:samurai
-Outfit: Kimono-style robe in rich colors (blue, red, or green), hakama pants (wide flowing trousers), wide cloth belt (obi), wooden practice sword (bokken), sandals (geta or waraji). NO HELMET or kabuto.
+COSTUME: costumed:samurai (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full feudal Japan adventure from the start
+- Martial arts class that leads to adventure
+- Dream of training as a samurai
+- Japanese cultural festival or event
+- Finding a katana (wooden) that holds secrets
+- Museum with Japanese artifacts that come alive
+- Reading manga that pulls them into the story
+- Visiting a Japanese garden with hidden magic
 
 Story guidance:
 - Set in feudal Japan: cherry blossom gardens, wooden temples, peaceful villages, castle grounds
@@ -123,8 +215,17 @@ Story guidance:
 
 
 [ninja]
-COSTUME: costumed:ninja
-Outfit: Dark fitted tunic and pants (dark blue or black), cloth belt, soft-soled tabi boots. Face must be VISIBLE - NO MASK covering face, just dark clothing.
+COSTUME: costumed:ninja (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full ninja adventure from the start
+- Kids playing ninja in the backyard
+- Ninja obstacle course or parkour class
+- Dream of being a stealthy ninja
+- Ninja-themed birthday party that becomes real
+- Video game about ninjas that pulls them in
+- Finding ninja gear in a mysterious shop
+- Secret agent/spy mission at school
 
 Story guidance:
 - Stealth and agility adventures with clever escapes
@@ -135,8 +236,18 @@ Story guidance:
 
 
 [wizard]
-COSTUME: costumed:wizard
-Outfit: Long flowing robe (purple, blue, or starry pattern), rope or fabric belt, comfortable boots or slippers, optional cape. NO POINTED HAT.
+COSTUME: costumed:wizard (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full magical adventure from the start
+- Discovering they have magic powers
+- Wizard school or magic camp
+- Dream of being a powerful wizard
+- Finding a magic wand or spell book
+- Costume party where the magic becomes real
+- Halloween night when magic is strongest
+- Visiting a magic shop with real enchantments
+- Reading a spell book that activates
 
 Story guidance:
 - Set in magical realms: enchanted towers, mystical forests, floating islands
@@ -147,8 +258,18 @@ Story guidance:
 
 
 [superhero]
-COSTUME: costumed:superhero
-Outfit: Colorful bodysuit or leotard with cape (bright primary colors), boots, optional gloves, emblem on chest. NO MASK covering face - identity is known to friends.
+COSTUME: costumed:superhero (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full superhero adventure from the start
+- Kids playing superheroes with homemade capes
+- Discovering unexpected superpowers
+- Dream of being a superhero
+- Superhero-themed birthday party that becomes real
+- Comic book that pulls them into the story
+- Science experiment gone right (gives powers!)
+- Costume day at school where costumes give powers
+- Finding a mysterious emblem or gadget
 
 Story guidance:
 - Set in cities, neighborhoods, or imaginative worlds
@@ -159,8 +280,18 @@ Story guidance:
 
 
 [mermaid]
-COSTUME: costumed:mermaid
-Outfit: Sparkly or scale-patterned top, flowing fabric suggesting tail (for land scenes), or full mermaid tail (for water scenes), shell accessories. Hair loose and flowing.
+COSTUME: costumed:mermaid (mandatory for adventure scenes)
+
+Story entry points (pick one or combine):
+- Full underwater adventure from the start
+- Swimming lesson where they discover they can breathe underwater
+- Dream of being a mermaid
+- Beach vacation with magical discovery
+- Finding a magical shell or pearl
+- Aquarium visit where fish start talking
+- Pool party where the pool becomes an ocean
+- Reading a mermaid book that pulls them under the sea
+- Bath time imagination that becomes real
 
 Story guidance:
 - Set underwater: coral reefs, sunken ships, underwater kingdoms, beaches
@@ -168,4 +299,3 @@ Story guidance:
 - Mermaids as curious, kind, protective of ocean life
 - Focus on friendship, protecting nature, bridging land and sea worlds
 - Key props: seashells, pearls, coral, treasure from shipwrecks, sea glass
-
