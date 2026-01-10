@@ -2297,26 +2297,26 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
 }
 
 /**
- * Get landmark reference photos for a scene based on LOC IDs in scene metadata
- * Uses scene's objects array to find which landmarks appear in this scene
+ * Get landmark reference photos for a scene by matching landmark names in scene text
+ * Checks if any Visual Bible landmark name appears in the scene description
  * @param {Object} visualBible - Visual Bible object with locations
- * @param {Object} sceneMetadata - Scene metadata with objects array containing LOC IDs
+ * @param {string} sceneDescription - Full scene description text
  * @returns {Array<{name: string, photoData: string, attribution: string, source: string}>} Landmark photos
  */
-function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
-  if (!visualBible?.locations || !sceneMetadata?.objects) return [];
+function getLandmarkPhotosForScene(visualBible, sceneDescription) {
+  if (!visualBible?.locations || !sceneDescription) return [];
 
-  // Extract LOC IDs from scene metadata objects array
-  const locIds = sceneMetadata.objects.filter(id => id.startsWith('LOC'));
-  if (locIds.length === 0) return [];
+  const sceneTextLower = sceneDescription.toLowerCase();
 
   return visualBible.locations
-    .filter(loc =>
-      locIds.includes(loc.id) &&
-      loc.isRealLandmark &&
-      loc.referencePhotoData &&
-      loc.photoFetchStatus === 'success'
-    )
+    .filter(loc => {
+      if (!loc.isRealLandmark || !loc.referencePhotoData || loc.photoFetchStatus !== 'success') {
+        return false;
+      }
+      // Check if landmark name appears in scene description
+      const nameLower = loc.name.toLowerCase();
+      return sceneTextLower.includes(nameLower);
+    })
     .map(loc => ({
       name: loc.name,
       photoData: loc.referencePhotoData,
