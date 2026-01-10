@@ -610,32 +610,34 @@ export function StoryCategorySelector({
           </div>
         )}
 
-        {/* Theme */}
-        <div className="flex items-center justify-between border-t border-indigo-100 pt-3">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">
-              {storyTheme === 'realistic'
-                ? realisticSetting.emoji
-                : storyTypes.find(t => t.id === storyTheme)?.emoji}
-            </span>
-            <div>
-              <div className="text-xs text-gray-500">{t.selectedTheme}</div>
-              <div className="font-semibold">{getThemeName(storyTheme)}</div>
+        {/* Theme - hide for historical (fixed historical settings, user can't change) */}
+        {storyCategory !== 'historical' && (
+          <div className="flex items-center justify-between border-t border-indigo-100 pt-3">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">
+                {storyTheme === 'realistic'
+                  ? realisticSetting.emoji
+                  : storyTypes.find(t => t.id === storyTheme)?.emoji}
+              </span>
+              <div>
+                <div className="text-xs text-gray-500">{t.selectedTheme}</div>
+                <div className="font-semibold">{getThemeName(storyTheme)}</div>
+              </div>
             </div>
+            <button
+              onClick={() => {
+                if (storyCategory === 'adventure') {
+                  onThemeChange('');
+                } else {
+                  onThemeChange('realistic');
+                }
+              }}
+              className="text-indigo-600 hover:underline text-sm"
+            >
+              {t.change}
+            </button>
           </div>
-          <button
-            onClick={() => {
-              if (storyCategory === 'adventure') {
-                onThemeChange('');
-              } else {
-                onThemeChange('realistic');
-              }
-            }}
-            className="text-indigo-600 hover:underline text-sm"
-          >
-            {t.change}
-          </button>
-        </div>
+        )}
 
         {/* Custom theme input - shown when 'custom' is selected */}
         {storyTheme === 'custom' && (
