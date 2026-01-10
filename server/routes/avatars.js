@@ -268,6 +268,56 @@ async function compareFacesLPIPS(originalPhoto, avatarImage, avatarQuadrant = 't
 }
 
 /**
+ * Compare faces using ArcFace identity embeddings (style-invariant)
+ * Unlike LPIPS which measures visual similarity, ArcFace measures identity preservation
+ * Works across styles: photo → illustrated avatar → anime style
+ * @param {string} originalPhoto - Original face photo (base64)
+ * @param {string} avatarImage - Generated avatar (2x2 grid, base64)
+ * @param {string} avatarQuadrant - Quadrant to extract from avatar (default 'top-left')
+ * Returns { success, similarity, samePerson, confidence, interpretation } or null on error
+ */
+async function compareIdentityArcFace(originalPhoto, avatarImage, avatarQuadrant = 'top-left') {
+  try {
+    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+
+    const response = await fetch(`${photoAnalyzerUrl}/compare-identity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image1: originalPhoto,
+        image2: avatarImage,
+        quadrant2: avatarQuadrant
+      }),
+      signal: AbortSignal.timeout(60000)  // ArcFace can take longer on first load
+    });
+
+    if (!response.ok) {
+      log.warn(`[ARCFACE] Python service returned ${response.status}`);
+      return null;
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      console.log(`📊 [ARCFACE] Similarity: ${result.similarity?.toFixed(4)}, same_person: ${result.same_person}, confidence: ${result.confidence}`);
+      return {
+        success: true,
+        similarity: result.similarity,
+        samePerson: result.same_person,
+        confidence: result.confidence,
+        interpretation: result.interpretation
+      };
+    }
+
+    log.warn(`[ARCFACE] Comparison failed: ${result.error}`);
+    return null;
+  } catch (err) {
+    log.warn('[ARCFACE] Error:', err.message);
+    return null;
+  }
+}
+
+/**
  * Extract physical traits from a photo using Gemini vision
  */
 async function extractTraitsWithGemini(imageData, languageInstruction = '') {
@@ -395,9 +445,10 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       ]
     };
 
-    // Run Gemini evaluation and LPIPS face-to-face comparison in parallel
-    // LPIPS: extract faces from both images, then compare faces only (no clothing/background)
-    const [geminiResponse, lpipsResult] = await Promise.all([
+    // Run Gemini evaluation, LPIPS, and ArcFace in parallel
+    // LPIPS: measures visual similarity (style-sensitive)
+    // ArcFace: measures identity preservation (style-invariant - works photo→anime)
+    const [geminiResponse, lpipsResult, arcfaceResult] = await Promise.all([
       fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
         {
@@ -408,7 +459,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
         }
       ),
       // LPIPS comparison - extract faces from both images, then compare
-      compareFacesLPIPS(originalPhoto, generatedAvatar, 'top-left')
+      compareFacesLPIPS(originalPhoto, generatedAvatar, 'top-left'),
+      // ArcFace identity comparison - style-invariant face matching
+      compareIdentityArcFace(originalPhoto, generatedAvatar, 'top-left')
     ]);
 
     if (!geminiResponse.ok) {
@@ -459,6 +512,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
         if (lpipsResult) {
           log.debug(`🔍 [AVATAR EVAL] LPIPS: ${lpipsResult.lpipsScore?.toFixed(4)} (${lpipsResult.interpretation})`);
         }
+        if (arcfaceResult) {
+          log.debug(`🔍 [AVATAR EVAL] ArcFace: ${arcfaceResult.similarity?.toFixed(4)} (${arcfaceResult.interpretation}, same_person: ${arcfaceResult.samePerson})`);
+        }
         if (physicalTraits) {
           log.debug(`🔍 [AVATAR EVAL] Extracted traits: ${JSON.stringify(physicalTraits).substring(0, 100)}...`);
         }
@@ -469,14 +525,14 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
           log.debug(`💇 [AVATAR EVAL] Detailed hair: ${JSON.stringify(detailedHairAnalysis)}`);
         }
 
-        return { score, details, physicalTraits, clothing, detailedHairAnalysis, lpips: lpipsResult, raw: evalResult };
+        return { score, details, physicalTraits, clothing, detailedHairAnalysis, lpips: lpipsResult, arcface: arcfaceResult, raw: evalResult };
       }
     } catch (parseErr) {
       log.warn(`[AVATAR EVAL] JSON parse failed, trying text fallback: ${parseErr.message}`);
       const scoreMatch = responseText.match(/finalScore["']?\s*:\s*(\d+)/i);
       if (scoreMatch) {
         const score = parseInt(scoreMatch[1], 10);
-        return { score, details: responseText, physicalTraits: null, clothing: null, lpips: lpipsResult };
+        return { score, details: responseText, physicalTraits: null, clothing: null, lpips: lpipsResult, arcface: arcfaceResult };
       }
     }
 
