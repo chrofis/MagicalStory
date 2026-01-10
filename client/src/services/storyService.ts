@@ -1316,6 +1316,16 @@ export const storyService = {
     }
   },
 
+  // Trigger landmark discovery early (fire and forget)
+  // Called as soon as user location is known to give discovery time to complete
+  triggerLandmarkDiscovery(city: string | null, country: string | null): void {
+    if (!city) return;
+    // Fire and forget - don't await, just trigger
+    api.post('/api/landmarks/discover', { city, country }).catch(() => {
+      // Silently ignore errors - this is best-effort optimization
+    });
+  },
+
 };
 
 export default storyService;

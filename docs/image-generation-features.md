@@ -111,6 +111,53 @@ avatars: {
 }
 ```
 
+### Visual Bible Clothing Items (Accessories & Special Items)
+
+Visual Bible clothing entries (CLO001, CLO002, etc.) are **accessories and special items** like capes, masks, hats - NOT the main character outfit.
+
+**How VB Clothing Works:**
+
+| Aspect | Behavior |
+|--------|----------|
+| Storage | `visualBible.clothing[]` with `wornBy` field |
+| In prompts | Listed as "REQUIRED OBJECTS" when mentioned in scene |
+| Character "Wearing:" | NOT merged (intentional - see below) |
+
+**Why VB Clothing is NOT Merged into Character Descriptions:**
+
+1. **Avatars cannot have masks/helmets** - faces must stay visible for consistency
+2. **Scene context matters** - the item might be:
+   - Held in hands
+   - Found/discovered
+   - Being removed
+   - Being put on
+   - Lying on a surface
+
+**Example - Superhero Mask:**
+```
+VB Entry: { name: "Superhero Mask", id: "CLO001", wornBy: "Max", description: "red mask with gold trim" }
+```
+
+| Scene Context | How AI Should Render |
+|---------------|---------------------|
+| "Max finds the mask in the attic" | Mask on shelf/in box, Max looking at it |
+| "Max holds up his mask proudly" | Mask in Max's hands |
+| "Max puts on his mask" | Mask being worn (one scene only) |
+| "Max removes his mask dramatically" | Mask being taken off |
+
+The `wornBy` field indicates **ownership/association**, not "always wearing". The scene description determines how the item appears.
+
+**Prompt Output:**
+```
+REQUIRED OBJECTS IN THIS SCENE:
+* Superhero Mask [CLO001] (worn by Max): red mask with gold trim
+
+CHARACTER REFERENCE PHOTOS:
+1. Max, ... Wearing: blue t-shirt, jeans  ← Base outfit from avatar, no mask
+```
+
+---
+
 ### Per-Character Clothing (Different Characters, Different Outfits)
 
 Each character in a scene can have a **different clothing category**. This is fully supported.
