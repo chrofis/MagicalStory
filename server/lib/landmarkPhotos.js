@@ -1067,6 +1067,7 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   }
 
   // Filter to only those with photos, take up to limit
+  const withPhotos = topCandidates.filter(l => l.hasPhoto);
   const validLandmarks = withPhotos.slice(0, limit);
 
   const elapsed = Date.now() - startTime;
