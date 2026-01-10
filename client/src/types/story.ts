@@ -23,12 +23,28 @@ export interface AdventureThemeGroup {
   name: LocalizedString;
 }
 
-// Story category (Adventure, Life Challenge, Educational)
+// Story category (Adventure, Life Challenge, Educational, Historical)
 export interface StoryCategory {
-  id: 'adventure' | 'life-challenge' | 'educational';
+  id: 'adventure' | 'life-challenge' | 'educational' | 'historical';
   name: LocalizedString;
   description: LocalizedString;
   emoji: string;
+}
+
+// Historical event topic
+export interface HistoricalEvent {
+  id: string;
+  name: LocalizedString;
+  shortName: LocalizedString;
+  emoji: string;
+  year: number | string;
+  category: 'exploration' | 'science' | 'invention' | 'rights' | 'construction' | 'culture' | 'archaeology';
+}
+
+export interface HistoricalEventGroup {
+  id: string;
+  name: LocalizedString;
+  icon: string;
 }
 
 // Life challenge topic
@@ -173,6 +189,14 @@ export interface ImageVersion {
   isActive: boolean;
 }
 
+// Landmark reference photo for real-world locations
+export interface LandmarkPhoto {
+  name: string;
+  photoData: string;
+  attribution?: string;
+  source?: string;
+}
+
 export interface SceneImage {
   pageNumber: number;
   imageData: string;
@@ -191,6 +215,8 @@ export interface SceneImage {
   originalReasoning?: string;
   // Reference photos used (for dev mode)
   referencePhotos?: ReferencePhoto[];
+  // Landmark photos used (for dev mode)
+  landmarkPhotos?: LandmarkPhoto[];
   // API model used (for dev mode)
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)
@@ -218,6 +244,8 @@ export interface CoverImageData {
   originalScore?: number;
   // Reference photos used (for dev mode)
   referencePhotos?: ReferencePhoto[];
+  // Landmark photos used (for dev mode)
+  landmarkPhotos?: LandmarkPhoto[];
   // API model used (for dev mode)
   modelId?: string;
   // Story title (sent with frontCover during streaming for early display transition)
@@ -242,7 +270,7 @@ export interface SavedStory {
   storyType: string;  // Legacy: adventure theme (pirate, knight, etc.)
   storyTypeName?: string;  // Display name for story type
   // New story structure
-  storyCategory?: 'adventure' | 'life-challenge' | 'educational';  // What kind of story
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical';  // What kind of story
   storyTopic?: string;  // Life challenge or educational topic ID
   storyTheme?: string;  // Adventure theme wrapper (or 'realistic' for no wrapper)
   storyDetails?: string;  // User's custom story idea/description
