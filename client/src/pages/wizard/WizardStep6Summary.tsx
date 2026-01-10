@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Wand2, Sparkles, Loader2, Pencil, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { storyTypes, lifeChallenges, educationalTopics, realisticSetting } from '@/constants/storyTypes';
+import { storyTypes, lifeChallenges, educationalTopics, historicalEvents, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
 import type { StoryLanguageCode } from '@/types/story';
@@ -130,6 +130,8 @@ export function WizardStep6Summary({
     if (challenge) return challenge.name[lang] || challenge.name.en;
     const topic = educationalTopics.find(t => t.id === storyTopic);
     if (topic) return topic.name[lang] || topic.name.en;
+    const event = historicalEvents.find(e => e.id === storyTopic);
+    if (event) return event.name[lang] || event.name.en;
     return '';
   };
 
