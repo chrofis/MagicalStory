@@ -7485,7 +7485,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       `--- Page ${page.pageNumber} ---\n${page.text}`
     ).join('\n\n');
 
-    log.debug(`📖 [UNIFIED] Parsed: title="${title}", ${storyPages.length} pages, ${Object.keys(clothingRequirements).length} clothing reqs`);
+    log.debug(`📖 [UNIFIED] Parsed: title="${title}", ${storyPages.length} pages, ${Object.keys(clothingRequirements || {}).length} clothing reqs`);
     log.debug(`📖 [UNIFIED] Visual Bible: ${visualBible.secondaryCharacters?.length || 0} chars, ${visualBible.locations?.length || 0} locs, ${visualBible.animals?.length || 0} animals, ${visualBible.artifacts?.length || 0} artifacts`);
 
     // Compare streaming vs final parse results

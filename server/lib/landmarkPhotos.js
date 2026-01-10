@@ -85,7 +85,7 @@ const CATEGORY_TO_TYPE = [
   { pattern: /library|bibliothek|bibliothèque/i, type: 'Library' },
   { pattern: /ruin|ruine/i, type: 'Ruins' },
   { pattern: /roman|römisch|romain/i, type: 'Roman site' },
-  { pattern: /bath|bad|therme|bain/i, type: 'Baths' },
+  { pattern: /\bbaths?\b|\bbad\b|therme|thermalbad|\bbain/i, type: 'Baths' },
   { pattern: /lake|see|lac/i, type: 'Lake' },
   { pattern: /river|fluss|rivière/i, type: 'River' },
   { pattern: /mountain|berg|montagne/i, type: 'Mountain' },
