@@ -70,17 +70,31 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
     parts.push(physical.hairStyle);
   }
 
-  // Length - prefer detailed analysis for different top/sides lengths
-  if (detailed?.lengthTop && detailed?.lengthSides) {
-    // If sides are shorter than top, describe it
-    const topCm = parseInt(detailed.lengthTop) || 0;
-    const sidesCm = parseInt(detailed.lengthSides) || 0;
-    if (topCm > 0 && sidesCm > 0 && sidesCm < topCm * 0.7) {
-      parts.push('short sides, longer on top');
-    } else if (physical.hairLength) {
-      parts.push(physical.hairLength);
+  // Length - use detailed analysis with descriptive terms (short, ear-length, shoulder-length, etc.)
+  // Length scale: bald < buzz cut < short < ear-length < chin-length < neck-length < shoulder-length < mid-back < waist-length
+  const lengthOrder = ['bald', 'buzz cut', 'shaved', 'short', 'ear-length', 'chin-length', 'neck-length', 'shoulder-length', 'mid-back', 'waist-length'];
+
+  if (detailed?.lengthTop) {
+    const topLength = detailed.lengthTop?.toLowerCase();
+    const sidesLength = detailed.lengthSides?.toLowerCase();
+
+    // Check if sides are significantly shorter than top (fade/undercut style)
+    if (sidesLength && sidesLength !== 'same as top') {
+      const topIdx = lengthOrder.indexOf(topLength);
+      const sidesIdx = lengthOrder.indexOf(sidesLength);
+
+      // If sides are at least 2 steps shorter than top, describe the difference
+      if (topIdx >= 0 && sidesIdx >= 0 && topIdx - sidesIdx >= 2) {
+        parts.push(`${sidesLength} on sides, ${topLength} on top`);
+      } else if (topLength && topLength !== 'bald') {
+        parts.push(topLength);
+      }
+    } else if (topLength && topLength !== 'bald') {
+      // Uniform length - just use the top length
+      parts.push(topLength);
     }
   } else if (physical.hairLength) {
+    // Fall back to simple hairLength field
     parts.push(physical.hairLength);
   }
 

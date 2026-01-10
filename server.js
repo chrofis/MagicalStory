@@ -1752,7 +1752,8 @@ ${adventureGuideContent}`
       const locationStr = locationParts.join(', ');
       const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
-    } else if (seasonLabel) {
+    } else if (seasonLabel && effectiveCategory !== 'historical') {
+      // Skip season for historical stories - they have their own time period from the event
       userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
     }
 
@@ -2059,7 +2060,8 @@ ${adventureGuideContent}`
       const locationStr = locationParts.join(', ');
       const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
-    } else if (seasonLabel) {
+    } else if (seasonLabel && effectiveCategory !== 'historical') {
+      // Skip season for historical stories - they have their own time period from the event
       userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
     }
 
