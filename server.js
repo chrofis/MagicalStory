@@ -201,7 +201,8 @@ const {
   buildSceneExpansionPrompt,
   buildUnifiedStoryPrompt,
   getLandmarkPhotosForPage,
-  getLandmarkPhotosForScene
+  getLandmarkPhotosForScene,
+  extractSceneMetadata
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { GenerationLogger } = require('./server/lib/generationLogger');
@@ -7834,8 +7835,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
-        // Get landmark photos for this scene by matching landmark names in scene text
-        const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, scene.sceneDescription);
+        // Get landmark photos for this scene from metadata objects like "Burgruine Stein [LOC002]"
+        const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+        const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
         if (pageLandmarkPhotos.length > 0) {
           log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
         }

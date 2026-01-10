@@ -2297,26 +2297,38 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
 }
 
 /**
- * Get landmark reference photos for a scene by matching landmark names in scene text
- * Checks if any Visual Bible landmark name appears in the scene description
+ * Get landmark reference photos for a scene based on LOC IDs in scene metadata
+ * Parses objects like "Burgruine Stein [LOC002]" to extract LOC IDs
  * @param {Object} visualBible - Visual Bible object with locations
- * @param {string} sceneDescription - Full scene description text
+ * @param {Object} sceneMetadata - Scene metadata with objects array containing LOC IDs
  * @returns {Array<{name: string, photoData: string, attribution: string, source: string}>} Landmark photos
  */
-function getLandmarkPhotosForScene(visualBible, sceneDescription) {
-  if (!visualBible?.locations || !sceneDescription) return [];
+function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
+  if (!visualBible?.locations || !sceneMetadata?.objects) return [];
 
-  const sceneTextLower = sceneDescription.toLowerCase();
+  // Extract LOC IDs from objects like "Burgruine Stein [LOC002]" or just "LOC002"
+  const locIds = [];
+  for (const obj of sceneMetadata.objects) {
+    // Match [LOC###] pattern in string like "Burgruine Stein [LOC002]"
+    const bracketMatch = obj.match(/\[LOC(\d+)\]/i);
+    if (bracketMatch) {
+      locIds.push(`LOC${bracketMatch[1].padStart(3, '0')}`);
+    }
+    // Also match plain "LOC002" format
+    else if (obj.match(/^LOC\d+$/i)) {
+      locIds.push(obj.toUpperCase());
+    }
+  }
+
+  if (locIds.length === 0) return [];
 
   return visualBible.locations
-    .filter(loc => {
-      if (!loc.isRealLandmark || !loc.referencePhotoData || loc.photoFetchStatus !== 'success') {
-        return false;
-      }
-      // Check if landmark name appears in scene description
-      const nameLower = loc.name.toLowerCase();
-      return sceneTextLower.includes(nameLower);
-    })
+    .filter(loc =>
+      locIds.includes(loc.id) &&
+      loc.isRealLandmark &&
+      loc.referencePhotoData &&
+      loc.photoFetchStatus === 'success'
+    )
     .map(loc => ({
       name: loc.name,
       photoData: loc.referencePhotoData,
