@@ -1,0 +1,46 @@
+{
+  "temperature": 0.3,
+  "numAttempts": 3,
+  "scoreGrid": {
+    "top-left": [
+      0.6615,
+      0.6532,
+      0.7407
+    ],
+    "top-right": [
+      null,
+      null,
+      null
+    ],
+    "bottom-left": [
+      0.4881,
+      0.4608,
+      0.4865
+    ],
+    "bottom-right": [
+      null,
+      null,
+      0.0373
+    ]
+  },
+  "bestPerQuadrant": {
+    "top-left": {
+      "attempt": 3,
+      "similarity": 0.7407,
+      "samePerson": true,
+      "confidence": "high"
+    },
+    "bottom-left": {
+      "attempt": 1,
+      "similarity": 0.4881,
+      "samePerson": true,
+      "confidence": "medium"
+    },
+    "bottom-right": {
+      "attempt": 3,
+      "similarity": 0.0373,
+      "samePerson": false,
+      "confidence": "low"
+    }
+  }
+}

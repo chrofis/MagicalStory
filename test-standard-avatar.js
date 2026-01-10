@@ -12,7 +12,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 // Configuration - can override with command line args
 const CONFIG = {
   imagePath: process.argv[2] || null,  // Optional: path to image file
-  smiling: true  // Add smiling requirement to prompt
+  smiling: false  // No forced smiling - match production
 };
 
 // Load prompt templates
@@ -58,16 +58,7 @@ async function generateStandardAvatar(facePhoto, category, temperature, isFemale
     'CLOTHING_STYLE': clothingStyle
   });
 
-  // Remove ASCII grid art which causes IMAGE_OTHER errors
-  // Remove entire GRID LAYOUT section including the box drawing
-  avatarPrompt = avatarPrompt.replace(/GRID LAYOUT \(with clear black dividing lines between quadrants\):[\s\S]*?└[─┴┘]+\n\n/g,
-    `GRID LAYOUT:
-- TOP-LEFT: Face front view (looking at camera)
-- TOP-RIGHT: Face 3/4 profile (looking RIGHT)
-- BOTTOM-LEFT: Full body front view
-- BOTTOM-RIGHT: Full body side view (facing RIGHT)
-
-`);
+  // Use production prompt as-is (don't remove ASCII grid)
 
   // Add smiling requirement if configured
   if (CONFIG.smiling) {
@@ -76,6 +67,11 @@ async function generateStandardAvatar(facePhoto, category, temperature, isFemale
       'EXPRESSION:\n- The person must be SMILING with TEETH SHOWING in all 4 quadrants.\n- Natural, warm, genuine smile.\n\nIDENTITY PERSISTENCE:'
     );
   }
+
+  // Debug: save prompt
+  const debugDir = path.join(__dirname, 'test-output', 'debug');
+  if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir, { recursive: true });
+  fs.writeFileSync(path.join(debugDir, 'prompt.txt'), avatarPrompt);
 
   const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
   const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/png';
@@ -93,7 +89,7 @@ async function generateStandardAvatar(facePhoto, category, temperature, isFemale
     generationConfig: {
       temperature: temperature,
       responseModalities: ["TEXT", "IMAGE"],
-      imageConfig: { aspectRatio: "1:1" }  // Square for 2x2 grid
+      imageConfig: { aspectRatio: "9:16" }  // Match production
     },
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
@@ -216,7 +212,7 @@ async function main() {
   saveImage(facePhoto, baseOutputDir, '0-reference.png');
 
   // Generate 3 attempts
-  const temperature = 1.0;
+  const temperature = 0.3;  // Match production
   const numAttempts = 3;
   const category = 'standard';
 
@@ -256,12 +252,12 @@ async function main() {
   // Analyze each quadrant
   console.log('3. Finding best face for each quadrant...\n');
 
-  // 1:1 aspect ratio - 2x2 grid positions
+  // 9:16 aspect ratio - 2x2 grid positions
   const quadrants = [
-    { name: 'top-left', xRange: [0, 0.5], yRange: [0, 0.5] },
-    { name: 'top-right', xRange: [0.5, 1], yRange: [0, 0.5] },
-    { name: 'bottom-left', xRange: [0, 0.5], yRange: [0.5, 1] },
-    { name: 'bottom-right', xRange: [0.5, 1], yRange: [0.5, 1] }
+    { name: 'top-left', xRange: [0, 0.5], yRange: [0, 0.35] },
+    { name: 'top-right', xRange: [0.5, 1], yRange: [0, 0.35] },
+    { name: 'bottom-left', xRange: [0, 0.5], yRange: [0.35, 1] },
+    { name: 'bottom-right', xRange: [0.5, 1], yRange: [0.35, 1] }
   ];
 
   const bestPerQuadrant = {};
@@ -271,8 +267,8 @@ async function main() {
     let bestAttempt = null;
 
     for (const attempt of allAttempts) {
-      // Estimate image size (1:1 ratio, ~1024x1024)
-      const imageWidth = 1024;
+      // Estimate image size (9:16 ratio)
+      const imageWidth = 576;
       const imageHeight = 1024;
 
       for (const face of attempt.faces) {
@@ -309,11 +305,12 @@ async function main() {
   for (const quad of quadrants) {
     scoreGrid[quad.name] = [];
     for (const attempt of allAttempts) {
-      const imageSize = 1024;
+      const imageWidth = 576;
+      const imageHeight = 1024;
       let bestFaceInQuad = null;
       for (const face of attempt.faces) {
-        const normX = face.box.x / imageSize;
-        const normY = face.box.y / imageSize;
+        const normX = face.box.x / imageWidth;
+        const normY = face.box.y / imageHeight;
         if (normX >= quad.xRange[0] && normX < quad.xRange[1] &&
             normY >= quad.yRange[0] && normY < quad.yRange[1]) {
           if (!bestFaceInQuad || (face.similarity || 0) > (bestFaceInQuad.similarity || 0)) {
