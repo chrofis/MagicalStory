@@ -1741,17 +1741,18 @@ ${teachingGuide}`
 ${adventureGuideContent}`
       : '';
 
-    // Build user location instruction for personalized settings
+    // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
     let userLocationInstruction = '';
-    if (userLocation?.city) {
+    if (userLocation?.city && effectiveCategory !== 'historical') {
       const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
 
     // Build available landmarks section for the prompt (include photo descriptions if available)
+    // Skip for historical stories - they use historically accurate locations, not local landmarks
     let availableLandmarksSection = '';
-    if (availableLandmarks && availableLandmarks.length > 0) {
+    if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory !== 'historical') {
       const landmarkEntries = availableLandmarks
         .slice(0, 10) // Limit to top 10 landmarks
         .map(l => {
@@ -2025,17 +2026,18 @@ ${teachingGuide}`
 ${adventureGuideContent}`
       : '';
 
-    // Build user location instruction for personalized settings
+    // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
     let userLocationInstruction = '';
-    if (userLocation?.city) {
+    if (userLocation?.city && effectiveCategory !== 'historical') {
       const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
 
     // Build available landmarks section for the prompt (include photo descriptions if available)
+    // Skip for historical stories - they use historically accurate locations, not local landmarks
     let availableLandmarksSection = '';
-    if (availableLandmarks && availableLandmarks.length > 0) {
+    if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory !== 'historical') {
       const landmarkEntries = availableLandmarks
         .slice(0, 10) // Limit to top 10 landmarks
         .map(l => {
