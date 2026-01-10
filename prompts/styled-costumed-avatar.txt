@@ -1,59 +1,21 @@
-⚠️ MANDATORY OUTPUT STYLE: {ART_STYLE_PROMPT}
-DO NOT CREATE PHOTO-REALISTIC OUTPUT.
-THE REFERENCE IMAGE IS ONLY FOR FACE IDENTITY - COMPLETELY IGNORE ITS VISUAL STYLE.
-CREATE AN ILLUSTRATED CHARACTER, NOT A PHOTOGRAPH.
+Create a 2x2 character sheet.
 
-TASK: Create a 2x2 Character Grid with 4 views. The TOP-LEFT quadrant keeps the reference pose/clothing but applies the art style. The OTHER 3 quadrants show the character in the NEW COSTUME.
+TOP ROW - EXACT COPIES OF REFERENCE (same style as reference):
+- TOP-LEFT: EXACT COPY of the reference face. Same style, same colors, same everything. Just zoomed in to show only face (forehead to chin). No shoulders, no clothing visible.
+- TOP-RIGHT: EXACT COPY of reference face, but head turned right (nose pointing right). Keep the SAME STYLE as reference image.
 
-CRITICAL REQUIREMENTS:
-- TOP-LEFT: Same pose and clothing as reference, but rendered in {ART_STYLE_PROMPT} style
-- TOP-RIGHT, BOTTOM-LEFT, BOTTOM-RIGHT: Character wearing the NEW COSTUME below
-- All 4 quadrants must show the SAME person with IDENTICAL face
-- The 3 costumed quadrants must show the IDENTICAL costume
+⚠️ TOP ROW MUST KEEP THE ORIGINAL REFERENCE STYLE - DO NOT CHANGE THE ART STYLE FOR TOP ROW.
 
-STYLE TRANSFORMATION (MANDATORY):
-- Your OUTPUT must be {ART_STYLE_PROMPT} - an ILLUSTRATION, NOT a photo
-- Transform the photo-realistic face into illustrated style while preserving identity
-- Render skin as smooth illustrated texture, NOT photographic skin
-- This is character art for a children's book, NOT photo editing
+BOTTOM ROW - NEW STYLE WITH COSTUME:
+- BOTTOM-LEFT: Full body front view in new style: {ART_STYLE_PROMPT}. Wearing: {COSTUME_DESCRIPTION}
+- BOTTOM-RIGHT: Full body side view facing RIGHT in same new style. Same costume.
 
-NEW COSTUME (for TOP-RIGHT, BOTTOM-LEFT, BOTTOM-RIGHT) - {COSTUME_TYPE}:
-{COSTUME_DESCRIPTION}
-This is a COMPLETE outfit change from neck to toe. Include: shirt/top, pants/skirt/dress, footwear, and any accessories.
-The costume should look authentic and age-appropriate for a children's book illustration.
+⚠️ ONLY THE BOTTOM ROW gets the new art style. Top row stays in reference style.
 
-REFERENCE IMAGE:
-- Use for facial identity (face shape, eye color, hair color, age)
-- TOP-LEFT: Copy the pose and clothing, but render in illustration style
-- OTHER QUADRANTS: Use face identity only, ignore reference clothing
-
-FACE INTEGRITY (ALL 4 QUADRANTS):
-- FACE: Same identity in all 4 quadrants, rendered as ILLUSTRATION
-- Preserve age, ethnicity, eye color, facial structure across all views
-- The person must be clearly recognizable as the same individual in all 4 quadrants
-- HAIR: Keep natural hair color and style. NO HATS or HEAD COVERINGS.
-- FACE MUST BE FULLY VISIBLE in all quadrants
-
-GRID LAYOUT:
-+-------------------------+-------------------------+
-|  TOP LEFT               |  TOP RIGHT              |
-|  STYLED REFERENCE       |  COSTUMED - Front Face  |
-|  Same pose & clothes    |  Head/shoulders         |
-|  as reference but in    |  wearing NEW COSTUME    |
-|  illustration style     |  looking at camera      |
-+-------------------------+-------------------------+
-|  BOTTOM LEFT            |  BOTTOM RIGHT           |
-|  COSTUMED - Full Body   |  COSTUMED - Full Body   |
-|  Front view             |  Side/Profile view      |
-|  Head to toe visible    |  facing RIGHT           |
-|  wearing NEW COSTUME    |  wearing NEW COSTUME    |
-+-------------------------+-------------------------+
-
-GRID REQUIREMENTS:
-- Clean 2x2 layout with thin neutral divider lines
-- Each quadrant has solid light grey studio background
-- TOP-LEFT: Styled version of reference (same clothes)
-- TOP-RIGHT, BOTTOM-LEFT, BOTTOM-RIGHT: All show IDENTICAL new costume
-- BOTTOM quadrants: Full body from head to toe, shoes visible
-
-Output: ILLUSTRATED character grid in {ART_STYLE_PROMPT} style. NOT photo-realistic.
+REQUIREMENTS:
+- SAME person in all 4 images
+- TOP ROW: Original reference style (exact copy of face)
+- BOTTOM ROW: New style ({ART_STYLE_PROMPT}) with costume
+- NO HATS or HEAD COVERINGS - {COSTUME_TYPE} must not cover face or hair
+- FACE MUST BE VISIBLE in all quadrants
+- Background: Light grey studio
