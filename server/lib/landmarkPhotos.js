@@ -728,8 +728,9 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
 
   // Enrich with categories (type + boost flag) - one API call per language
   if (landmarks.length > 0) {
-    log.debug(`[LANDMARK] Fetching Wikipedia categories for ${landmarks.length} landmarks...`);
+    log.info(`[LANDMARK] 📂 CATEGORY ENRICHMENT START for ${landmarks.length} landmarks`);
     await enrichLandmarksWithCategories(landmarks);
+    log.info(`[LANDMARK] 📂 CATEGORY ENRICHMENT DONE`);
     const boostedCount = landmarks.filter(l => l.shouldBoost).length;
     const typedCount = landmarks.filter(l => l.type).length;
     log.debug(`[LANDMARK] Categories: ${typedCount}/${landmarks.length} typed, ${boostedCount} boosted`);

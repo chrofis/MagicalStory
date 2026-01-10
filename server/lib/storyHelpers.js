@@ -2296,6 +2296,35 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
     }));
 }
 
+/**
+ * Get landmark reference photos for a scene based on LOC IDs in scene metadata
+ * Uses scene's objects array to find which landmarks appear in this scene
+ * @param {Object} visualBible - Visual Bible object with locations
+ * @param {Object} sceneMetadata - Scene metadata with objects array containing LOC IDs
+ * @returns {Array<{name: string, photoData: string, attribution: string, source: string}>} Landmark photos
+ */
+function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
+  if (!visualBible?.locations || !sceneMetadata?.objects) return [];
+
+  // Extract LOC IDs from scene metadata objects array
+  const locIds = sceneMetadata.objects.filter(id => id.startsWith('LOC'));
+  if (locIds.length === 0) return [];
+
+  return visualBible.locations
+    .filter(loc =>
+      locIds.includes(loc.id) &&
+      loc.isRealLandmark &&
+      loc.referencePhotoData &&
+      loc.photoFetchStatus === 'success'
+    )
+    .map(loc => ({
+      name: loc.name,
+      photoData: loc.referencePhotoData,
+      attribution: loc.photoAttribution,
+      source: loc.photoSource
+    }));
+}
+
 // ============================================================================
 // AVAILABLE LANDMARKS SECTION BUILDER
 // ============================================================================
@@ -2387,5 +2416,6 @@ module.exports = {
 
   // Landmark helpers
   getLandmarkPhotosForPage,
+  getLandmarkPhotosForScene,
   buildAvailableLandmarksSection
 };

@@ -200,7 +200,9 @@ const {
   buildImagePrompt,
   buildSceneExpansionPrompt,
   buildUnifiedStoryPrompt,
-  getLandmarkPhotosForPage
+  getLandmarkPhotosForPage,
+  getLandmarkPhotosForScene,
+  extractSceneMetadata
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { GenerationLogger } = require('./server/lib/generationLogger');
@@ -1680,6 +1682,43 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
 Weave learning about ${storyTopic} naturally into the plot.
 Make the educational content fun and part of the adventure.
 ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Use everyday situations to explore the topic.'}`;
+    } else if (effectiveCategory === 'historical') {
+      // Get historical event data and guide
+      const { getEventById } = require('./server/lib/historicalEvents');
+      const { getTeachingGuide: getHistoricalGuide } = require('./server/lib/storyHelpers');
+      const historicalEvent = getEventById(storyTopic);
+      const historicalGuide = getHistoricalGuide('historical', storyTopic);
+
+      if (historicalEvent && historicalGuide) {
+        categoryInstructions = `IMPORTANT: This is a HISTORICAL story about "${historicalEvent.name}" (${historicalEvent.year}).
+
+**HISTORICAL ACCURACY REQUIRED**
+Use ONLY the verified information provided. Do NOT invent historical facts.
+
+${historicalGuide}
+
+**STORY 1 REQUIREMENTS - OBSERVER PERSPECTIVE:**
+The main characters OBSERVE or WITNESS the historical event. They do NOT take on the roles of famous historical figures.
+Examples:
+- A child watching the Moon landing on TV with their family
+- The son/daughter of a worker/engineer/scientist involved in the event
+- A local child who happens to see the event unfold
+- A family member of someone who participated
+The characters experience history from the sidelines, learning about it through observation.
+
+**STORY 2 REQUIREMENTS - PARTICIPANT PERSPECTIVE:**
+The main characters BECOME the heroes and take on main roles in the historical event (fantasy/imagination style).
+Examples:
+- The child IS the astronaut landing on the moon
+- The child IS the explorer discovering new lands
+- The child IS the scientist making the breakthrough
+This is a "what if YOU were there" fantasy where children imagine themselves as the key figures.
+Historical accuracy in setting/costumes still applies, but the child replaces the famous figure.
+
+CRITICAL: These two stories MUST have DIFFERENT perspectives as described above.`;
+      } else {
+        categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
+      }
     } else {
       categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
     }
@@ -1922,6 +1961,43 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
 Weave learning about ${storyTopic} naturally into the plot.
 Make the educational content fun and part of the adventure.
 ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Use everyday situations to explore the topic.'}`;
+    } else if (effectiveCategory === 'historical') {
+      // Get historical event data and guide
+      const { getEventById } = require('./server/lib/historicalEvents');
+      const { getTeachingGuide: getHistoricalGuide } = require('./server/lib/storyHelpers');
+      const historicalEvent = getEventById(storyTopic);
+      const historicalGuide = getHistoricalGuide('historical', storyTopic);
+
+      if (historicalEvent && historicalGuide) {
+        categoryInstructions = `IMPORTANT: This is a HISTORICAL story about "${historicalEvent.name}" (${historicalEvent.year}).
+
+**HISTORICAL ACCURACY REQUIRED**
+Use ONLY the verified information provided. Do NOT invent historical facts.
+
+${historicalGuide}
+
+**STORY 1 REQUIREMENTS - OBSERVER PERSPECTIVE:**
+The main characters OBSERVE or WITNESS the historical event. They do NOT take on the roles of famous historical figures.
+Examples:
+- A child watching the Moon landing on TV with their family
+- The son/daughter of a worker/engineer/scientist involved in the event
+- A local child who happens to see the event unfold
+- A family member of someone who participated
+The characters experience history from the sidelines, learning about it through observation.
+
+**STORY 2 REQUIREMENTS - PARTICIPANT PERSPECTIVE:**
+The main characters BECOME the heroes and take on main roles in the historical event (fantasy/imagination style).
+Examples:
+- The child IS the astronaut landing on the moon
+- The child IS the explorer discovering new lands
+- The child IS the scientist making the breakthrough
+This is a "what if YOU were there" fantasy where children imagine themselves as the key figures.
+Historical accuracy in setting/costumes still applies, but the child replaces the famous figure.
+
+CRITICAL: These two stories MUST have DIFFERENT perspectives as described above.`;
+      } else {
+        categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
+      }
     } else {
       categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
     }
@@ -7759,10 +7835,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
-        // Get landmark photos for this page and merge with character photos
-        const pageLandmarkPhotos = getLandmarkPhotosForPage(visualBible, pageNum);
+        // Get landmark photos for this scene using LOC IDs from scene metadata
+        const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+        const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
         if (pageLandmarkPhotos.length > 0) {
-          log.debug(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+          log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
         }
         const allReferencePhotos = [...pagePhotos, ...pageLandmarkPhotos];
 
@@ -7801,7 +7878,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           null,
           pageModelOverrides,
           `PAGE ${pageNum}`,
-          { isAdmin, enableAutoRepair }
+          { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos }
         );
 
         if (imageResult?.imageData) {
