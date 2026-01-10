@@ -576,21 +576,31 @@ export function CharacterForm({
 
   // Generate 3 avatar options for user to choose from
   const handleGenerateAvatarOptions = async () => {
+    console.log('[AVATAR OPTIONS] Button clicked!');
+    console.log('[AVATAR OPTIONS] character.photos:', character.photos);
+
     const facePhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
-    if (!facePhoto) return;
+    console.log('[AVATAR OPTIONS] facePhoto:', facePhoto ? facePhoto.substring(0, 50) + '...' : 'null');
+
+    if (!facePhoto) {
+      console.log('[AVATAR OPTIONS] No facePhoto, returning early');
+      return;
+    }
 
     setIsGeneratingOptions(true);
     setAvatarOptions(null);
     setSelectedOptionId(null);
 
     try {
+      console.log('[AVATAR OPTIONS] Calling characterService.generateAvatarOptions...');
       const result = await characterService.generateAvatarOptions(facePhoto, character.gender || 'child');
+      console.log('[AVATAR OPTIONS] Result:', result);
       if (result.success && result.options.length > 0) {
         setAvatarOptions(result.options);
         setSelectedOptionId(result.options[0].id); // Pre-select first option
       }
     } catch (error) {
-      console.error('Failed to generate avatar options:', error);
+      console.error('[AVATAR OPTIONS] Failed to generate avatar options:', error);
     } finally {
       setIsGeneratingOptions(false);
     }

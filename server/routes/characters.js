@@ -73,7 +73,8 @@ router.get('/', authenticateToken, async (req, res) => {
               standard: char.avatars.standard,
               status: char.avatars.status,
               stale: char.avatars.stale,
-              generatedAt: char.avatars.generatedAt
+              generatedAt: char.avatars.generatedAt,
+              faceThumbnails: char.avatars.faceThumbnails  // Keep face thumbnails for display
             };
 
             const lightAvatarsJson = JSON.stringify(lightAvatars);
@@ -290,6 +291,12 @@ router.post('/', authenticateToken, async (req, res) => {
             ...mergedAvatars.signatures,
             ...existingChar.avatars.signatures
           };
+          hasChanges = true;
+        }
+
+        // Preserve faceThumbnails (extracted face crops with padding for display)
+        if (existingChar.avatars.faceThumbnails && !newChar.avatars?.faceThumbnails) {
+          mergedAvatars.faceThumbnails = existingChar.avatars.faceThumbnails;
           hasChanges = true;
         }
 
