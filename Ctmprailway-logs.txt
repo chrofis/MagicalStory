@@ -1,0 +1,501 @@
+[DEBUG] ⚡ [STREAM-AVATAR] Roger category=costumed, config.used=true, config.costume=superhero
+[DEBUG] ⚡ [STREAM-AVATAR] Roger costumed:superhero exists=false
+[DEBUG] ⚡ [STREAM-AVATAR] Generating costumed avatar for Lukas: superhero
+[DEBUG] [STYLED COSTUME] Lukas data check: avatars=true, standard=true, photos=true, face=true, original=true, photoUrl=false
+[DEBUG] [STYLED COSTUME] Manuel: Using standard avatar (137KB)
+[DEBUG] [STYLED COSTUME] Using art style: oil-character
+[DEBUG] 🎨 [STYLED COSTUME] Generating superhero avatar in oil style for Manuel
+[DEBUG] ⚡ [STREAM-AVATAR] Generating costumed avatar for Franziska: superhero
+[DEBUG] [STYLED COSTUME] Franziska data check: avatars=true, standard=true, photos=true, face=true, original=true, photoUrl=false
+[DEBUG] [STYLED COSTUME] Franziska: Using standard avatar (191KB)
+[DEBUG] [STYLED COSTUME] Using art style: oil-character
+[DEBUG] 🎨 [STYLED COSTUME] Generating superhero avatar in oil style for Franziska
+[DEBUG] ⚡ [STREAM-AVATAR] Generating costumed avatar for Sophie: superhero
+[DEBUG] [STYLED COSTUME] Sophie data check: avatars=true, standard=true, photos=true, face=true, original=true, photoUrl=false
+[DEBUG] [STYLED COSTUME] Sophie: Using standard avatar (209KB)
+[DEBUG] [STYLED COSTUME] Using art style: oil-character
+[DEBUG] 🎨 [STYLED COSTUME] Generating superhero avatar in oil style for Sophie
+[DEBUG] ⚡ [STREAM-AVATAR] Generating costumed avatar for Roger: superhero
+[DEBUG] [STYLED COSTUME] Roger data check: avatars=true, standard=true, photos=true, face=true, original=true, photoUrl=false
+[DEBUG] [STYLED COSTUME] Roger: Using standard avatar (183KB)
+[DEBUG] [STYLED COSTUME] Using art style: oil-character
+[DEBUG] 🎨 [STYLED COSTUME] Generating superhero avatar in oil style for Roger
+[DEBUG] 🌊 [STREAM-UNIFIED] Character arcs section complete
+[DEBUG] 🌊 [STREAM-UNIFIED] Plot structure section complete
+📊 [STYLED COSTUME] superhero@oil - input: 1,095, output: 1,290
+[DEBUG] 🗜️  [COMPRESSION] PNG 1406.14 KB → JPEG 41.70 KB (97.0% reduction)
+[COMPARE-ID] Error: No module named 'torch'
+[WARN] [ARCFACE] Python service returned 500
+[EXTRACT-FACE] Input: 439x768, quadrant: top-left
+[EXTRACT-FACE] Cropped to top-left: 219x384
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+E0000 00:00:1768051300.838669     164 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051300.838722     164 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+[EXTRACT-FACE] Input: 768x1344, quadrant: None
+E0000 00:00:1768051300.857018     163 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051300.857100     163 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[EXTRACT-FACE] Face detected: x=20.8%, y=21.6%, w=61.0%, h=34.8%
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[EXTRACT-FACE] Face detected: x=13.3%, y=10.0%, w=24.2%, h=13.8%
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[DEBUG] [LPIPS FACES] Faces extracted - original: true, avatar: true
+[WARN] LPIPS not available - install with: pip install lpips
+[WARN] [LPIPS] Service returned error: 503
+📊 [STYLED COSTUME] superhero@oil - input: 1,099, output: 1,290
+[DEBUG] 🗜️  [COMPRESSION] PNG 1509.23 KB → JPEG 53.10 KB (96.5% reduction)
+[COMPARE-ID] Error: No module named 'torch'
+[EXTRACT-FACE] Input: 439x768, quadrant: top-left
+[EXTRACT-FACE] Cropped to top-left: 219x384
+E0000 00:00:1768051301.131031     213 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051301.131066     213 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[WARN] [ARCFACE] Python service returned 500
+[EXTRACT-FACE] Input: 768x1344, quadrant: None
+E0000 00:00:1768051301.145603     212 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051301.145643     212 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[EXTRACT-FACE] Face detected: x=26.7%, y=17.4%, w=50.7%, h=28.9%
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[EXTRACT-FACE] Face detected: x=14.3%, y=8.5%, w=23.4%, h=13.4%
+[EXTRACT-FACE] Face extracted: 256x256
+[WARN] [LPIPS] Service returned error: 503
+[EXTRACT-FACE] Face detected: x=13.3%, y=9.1%, w=22.2%, h=12.7%
+[DEBUG] 🗜️  [COMPRESSION] PNG 1470.79 KB → JPEG 52.07 KB (96.5% reduction)
+[COMPARE-ID] Error: No module named 'torch'
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[WARN] [ARCFACE] Python service returned 500
+📊 [STYLED COSTUME] superhero@oil - input: 1,094, output: 1,290
+[DEBUG] [LPIPS FACES] Faces extracted - original: true, avatar: true
+[EXTRACT-FACE] Input: 439x768, quadrant: top-left
+[EXTRACT-FACE] Cropped to top-left: 219x384
+[WARN] LPIPS not available - install with: pip install lpips
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[WARN] [LPIPS] Service returned error: 503
+[DEBUG] [LPIPS FACES] Faces extracted - original: true, avatar: true
+📊 [STYLED COSTUME] superhero@oil - input: 1,094, output: 1,290
+[WARN] LPIPS not available - install with: pip install lpips
+[DEBUG] 🗜️  [COMPRESSION] PNG 1399.80 KB → JPEG 45.13 KB (96.8% reduction)
+E0000 00:00:1768051301.633127     267 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[COMPARE-ID] Error: No module named 'torch'
+[WARN] [ARCFACE] Python service returned 500
+[EXTRACT-FACE] Input: 439x768, quadrant: top-left
+E0000 00:00:1768051301.633162     267 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[EXTRACT-FACE] Cropped to top-left: 219x384
+E0000 00:00:1768051301.311724     231 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051301.311754     231 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[EXTRACT-FACE] Input: 768x1344, quadrant: None
+E0000 00:00:1768051301.317382     230 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051301.317410     230 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[EXTRACT-FACE] Face detected: x=24.2%, y=19.1%, w=53.5%, h=30.5%
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[EXTRACT-FACE] Face detected: x=12.0%, y=10.6%, w=26.8%, h=15.3%
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[DEBUG] [LPIPS FACES] Faces extracted - original: true, avatar: true
+[WARN] LPIPS not available - install with: pip install lpips
+[WARN] [LPIPS] Service returned error: 503
+📊 [STYLED COSTUME] superhero@oil - input: 1,087, output: 1,290
+[DEBUG] 🗜️  [COMPRESSION] PNG 1436.38 KB → JPEG 45.23 KB (96.9% reduction)
+[COMPARE-ID] Error: No module named 'torch'
+[WARN] [ARCFACE] Python service returned 500
+[EXTRACT-FACE] Input: 439x768, quadrant: top-left
+[EXTRACT-FACE] Cropped to top-left: 219x384
+E0000 00:00:1768051301.521833     249 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051301.521867     249 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[EXTRACT-FACE] Input: 768x1344, quadrant: None
+E0000 00:00:1768051301.538521     248 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051301.538565     248 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[EXTRACT-FACE] Face detected: x=25.3%, y=20.5%, w=49.0%, h=28.0%
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[EXTRACT-FACE] Input: 768x1344, quadrant: None
+E0000 00:00:1768051301.640062     266 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+E0000 00:00:1768051301.640093     266 gl_context.cc:408] INTERNAL: ; RET_CHECK failure (mediapipe/gpu/gl_context_egl.cc:303) successeglMakeCurrent() returned error 0x3008;  (entering GL context)
+[EXTRACT-FACE] Face detected: x=23.7%, y=14.5%, w=52.7%, h=30.0%
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[EXTRACT-FACE] Face detected: x=13.3%, y=7.9%, w=23.9%, h=13.7%
+[EXTRACT-FACE] Face extracted: 256x256
+[DEBUG] [EXTRACT-FACE] Face extracted (detected: true)
+[DEBUG] [LPIPS FACES] Faces extracted - original: true, avatar: true
+[WARN] LPIPS not available - install with: pip install lpips
+[WARN] [LPIPS] Service returned error: 503
+[DEBUG] 🌊 [STREAM-UNIFIED] Visual Bible detected with 6 entries
+[DEBUG] ⚡ [STREAM] Visual Bible ready - scene expansions can now proceed
+[DEBUG] 🌊 [STREAM-UNIFIED] Cover hints section complete
+[DEBUG] [PAGE-CLOTHING] Page 1 Characters section: "Characters:\n- Lukas: costumed:superhero\n- Sophie: costumed:superhero\n- Manuel: costumed:superhero\n\n"
+[DEBUG] [PARSE-CLOTHING] Characters section (full): "Characters:\n- Lukas: costumed:superhero\n- Sophie: costumed:superhero\n- Manuel: costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Lukas" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Sophie" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Manuel" -> "costumed:superhero"
+[DEBUG] 🌊 [STREAM-UNIFIED] Page 1 complete (clothing: Lukas:costumed:superhero, Sophie:costumed:superhero, Manuel:costumed:superhero)
+[DEBUG] ⚡ [STREAM-SCENE] Started expansion for page 1
+[DEBUG] [SCENE-PARSER] Looking for Characters section in scene (148 chars)
+[DEBUG] [SCENE-PARSER] Section pattern match: NOT FOUND
+[DEBUG] [SCENE-PARSER] No Characters section found, using fallback pattern matching
+[DEBUG] ⚡ [STREAM-SCENE] Page 1 starting expansion (clothing: Lukas:costumed:superhero, Sophie:costumed:superhero, Manuel:costumed:superhero, prev: 0 pages)
+[DEBUG] [SCENE PROMPT P1] 3 chars (VB: none), 6 recurring elements
+[DEBUG] 🔧 [TEXT STREAM] Using model override: claude-sonnet
+[DEBUG] 🌊 [TEXT STREAM] Calling claude-sonnet (claude-sonnet-4-5-20250929) with max 2000 tokens
+🌊 [STREAM] Starting streaming request to Anthropic (2000 max tokens)...
+[DEBUG] [PAGE-CLOTHING] Page 2 Characters section: "Characters:\n- Lukas: costumed:superhero\n- Sophie:"
+[DEBUG] [PARSE-CLOTHING] Characters section (full): "Characters:\n- Lukas: costumed:superhero\n- Sophie:"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Lukas" -> "costumed:superhero"
+[DEBUG] 🌊 [STREAM-UNIFIED] Page 2 complete (clothing: Lukas:costumed:superhero)
+[DEBUG] ⚡ [STREAM-SCENE] Started expansion for page 2
+[DEBUG] [SCENE-PARSER] Looking for Characters section in scene (164 chars)
+[DEBUG] [SCENE-PARSER] Section pattern match: NOT FOUND
+[DEBUG] [SCENE-PARSER] No Characters section found, using fallback pattern matching
+[DEBUG] ⚡ [STREAM-SCENE] Page 2 starting expansion (clothing: Lukas:costumed:superhero, prev: 1 pages)
+[DEBUG] [SCENE PROMPT P2] 5 chars (VB: none), 6 recurring elements
+[DEBUG] 🔧 [TEXT STREAM] Using model override: claude-sonnet
+[DEBUG] 🌊 [TEXT STREAM] Calling claude-sonnet (claude-sonnet-4-5-20250929) with max 2000 tokens
+🌊 [STREAM] Starting streaming request to Anthropic (2000 max tokens)...
+[DEBUG] [PARSE-CLOTHING] Characters section (full): "Characters:\n- Lukas: standard\n- Sophie: standard\n- Manuel: standard\n- Franziska: standard\n- Roger: standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Lukas" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Sophie" -> "standard"
+[DEBUG] [UNIFIED-PARSER] Page 1: text=995 chars, hint=148 chars, clothing=Lukas,Sophie,Manuel
+[DEBUG] [PARSE-CLOTHING] Characters section (full): "Characters:\n- Lukas: costumed:superhero\n- Sophie: costumed:superhero\n- Manuel: costumed:superhero\n- Franziska: costumed:superhero\n- Roger: costumed:superhero\n- Lili: standard\n- Oreo: standard\n"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Franziska" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Roger" -> "costumed:superhero"
+[DEBUG] [UNIFIED-PARSER] Cover hints extracted: title=true, initial=true, back=true
+[DEBUG] [UNIFIED-PARSER] Found ---STORY PAGES--- section at position 8468
+[DEBUG] [PARSE-CLOTHING] Characters section (full): "Characters:\n- Lukas: costumed:superhero\n- Sophie: costumed:superhero\n- Manuel: costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Manuel" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Lukas" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Sophie" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Franziska" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Manuel" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Roger" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Lukas" -> "costumed:superhero"
+[DEBUG] 📖 [UNIFIED] Parsed: title="Das Geheimnis des Landvogteischlosses", 2 pages, 5 clothing reqs
+[DEBUG] [PARSE-CLOTHING] Parsed: "Franziska" -> "costumed:superhero"
+[DEBUG] [UNIFIED-PARSER] Page 2: text=1083 chars, hint=164 chars, clothing=Lukas,Sophie,Manuel,Franziska,Roger,Lili,Oreo
+[DEBUG] 💾 Checkpoint saved: unified_story (index: 0) for job job_1768051286753_ploc4whu6
+[DEBUG] 📖 [UNIFIED] Visual Bible: 1 chars, 2 locs, 2 animals, 1 artifacts
+[DEBUG] [PARSE-CLOTHING] Parsed: "Roger" -> "costumed:superhero"
+[DEBUG] [UNIFIED-PARSER] Extracted 2 pages (highest page number: 2)
+[DEBUG] 💾 Checkpoint saved: story_text (index: 0) for job job_1768051286753_ploc4whu6
+[DEBUG] [PARSE-CLOTHING] Parsed: "Lili" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Oreo" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Sophie" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Manuel" -> "costumed:superhero"
+[DEBUG] 🌊 [GEMINI STREAM] Stream complete
+[DEBUG] 📊 [GEMINI STREAM] Token usage - input: 5,608, output: 3,252
+[DEBUG] 📊 [UNIFIED] Story usage - model: gemini-2.0-flash, provider: gemini_text, input: 5608, output: 3252
+[DEBUG] ⏱️ [UNIFIED] Story generation: 18.4s
+[DEBUG] 🌊 [STREAM-UNIFIED] Finalized: 2 pages emitted
+[DEBUG] 📖 [UNIFIED] Response length: 11240 chars, 2 pages detected during streaming
+[DEBUG] [UNIFIED-PARSER] Title: "Das Geheimnis des Landvogteischlosses"
+[DEBUG] [UNIFIED-PARSER] Clothing requirements for 5 characters
+[DEBUG] [UNIFIED-PARSER] Visual Bible: 1 secondary chars, 2 animals, 1 artifacts, 2 locations
+[DEBUG] [PARSE-CLOTHING] Characters section (full): "Characters:\n- Lukas: standard\n- Sophie: standard\n- Manuel: standard\n"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Lukas" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Sophie" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Manuel" -> "standard"
+[DEBUG] [PARSE-CLOTHING] Characters section (full): "Characters:\n- Lukas: costumed:superhero\n- Sophie: costumed:superhero\n- Manuel: costumed:superhero\n- Franziska: costumed:superhero\n- Roger: costumed:superhero\n"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Lukas" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Sophie" -> "costumed:superhero"
+[DEBUG] [PARSE-CLOTHING] Parsed: "Manuel" -> "costumed:superhero"
+[DEBUG] 💾 [UNIFIED] Saved story text for progressive display (2 scenes = 4 print pages)
+[DEBUG] [GEN:avatars]  Starting avatars stage
+[DEBUG] ⏳ [UNIFIED] Waiting for 5 avatar generations started during streaming...
+      "reason": "The avatar maintains a similar oval face shape to the original."
+    },
+    "eyes": {
+      "score": 9,
+[DEBUG] 🔍 [AVATAR EVAL] Raw response: {
+  "faceMatch": {
+      "reason": "The eye shape, color, and spacing are very consistent with the original."
+    "faceShape": {
+    },
+      "score": 8,
+📊 [AVATAR EVAL] model: gemini-2.5-flash, input: 1,779, output: 538
+    "nose": {
+      "scor...
+[DEBUG] 🔍 [AVATAR EVAL] Score: 8/10
+[DEBUG] 🔍 [AVATAR EVAL] Extracted traits: {"build":"average","skinTone":"medium","skinToneHex":"#DDAE95","eyeColor":"brown","eyeColorHex":"#5E...
+[DEBUG] 🔍 [AVATAR EVAL] Extracted clothing: {"upperBody":null,"lowerBody":null,"shoes":"dark green knitted boots","fullBody":"dark green long-sleeved dress with colorful pom-poms (red, yellow, blue, green, purple, orange) and a dark green knitted scarf"}
+[DEBUG] 💇 [AVATAR EVAL] Detailed hair: {"texture":"medium","type":"straight","lengthTop":"30cm","lengthSides":"30cm","bangsEndAt":"no bangs","styling":"styled","direction":"back","baseColorHex":"#2D201A","highlightsHex":"none"}
+[DEBUG] 👕 [STYLED COSTUME] Clothing extracted: {"upperBody":null,"lowerBody":null,"shoes":"dark green knitted boots","fullBody":"dark green long-sleeved dress with colorful pom-poms (red, yellow, blue, green, purple, orange) and a dark green knitted scarf"}
+[DEBUG] ✅ [STYLED COSTUME] Generated superhero@oil avatar for Franziska in 16102ms
+[DEBUG] ✅ [STREAM-AVATAR] Franziska costumed:superhero complete
+[DEBUG] [GEN:avatars] [Franziska] Generated superhero costume
+📊 [AVATAR EVAL] model: gemini-2.5-flash, input: 1,779, output: 493
+[DEBUG] 🔍 [AVATAR EVAL] Raw response: {
+  "faceMatch": {
+    "faceShape": {
+      "score": 8,
+      "reason": "The oval face shape is consistent between the original and the avatar."
+    },
+    "eyes": {
+      "score": 9,
+      "reason": "The eye shape, spacing, and overall appearance are very well matched."
+    },
+    "nose": {
+      "...
+[DEBUG] 🔍 [AVATAR EVAL] Score: 8/10
+[DEBUG] 🔍 [AVATAR EVAL] Extracted traits: {"build":"slim","skinTone":"light","skinToneHex":"#E4C5B2","eyeColor":"brown","eyeColorHex":"#4D3120...
+[DEBUG] 🔍 [AVATAR EVAL] Extracted clothing: {"upperBody":"purple long-sleeved top with a textured pattern","lowerBody":"dark blue jeans","shoes":"purple boots","fullBody":null}
+[DEBUG] 💇 [AVATAR EVAL] Detailed hair: {"texture":"medium","type":"straight","lengthTop":"40cm","lengthSides":"40cm","bangsEndAt":"no bangs","styling":"natural","direction":"center part","baseColorHex":"#4E382F","highlightsHex":"none"}
+[DEBUG] 👕 [STYLED COSTUME] Clothing extracted: {"upperBody":"purple long-sleeved top with a textured pattern","lowerBody":"dark blue jeans","shoes":"purple boots","fullBody":null}
+[DEBUG] ✅ [STYLED COSTUME] Generated superhero@oil avatar for Sophie in 16510ms
+[DEBUG] ✅ [STREAM-AVATAR] Sophie costumed:superhero complete
+[DEBUG] [GEN:avatars] [Sophie] Generated superhero costume
+[DEBUG] 👕 [STYLED COSTUME] Clothing extracted: {"upperBody":"silver metallic long-sleeve top with padded shoulders","lowerBody":"dark blue jeans with black knee pads and a brown utility belt with pouches","shoes":"black boots","fullBody":null}
+    "nose": {
+📊 [AVATAR EVAL] model: gemini-2.5-flash, input: 1,779, output: 500
+[DEBUG] 🔍 [AVATAR EVAL] Raw response: {
+      "score": 8,
+  "faceMatch": {
+[DEBUG] 🔍 [AVATAR EVAL] Extracted traits: {"build":"slim","skinTone":"light","skinToneHex":"#E4C8B4","eyeColor":"green","eyeColorHex":"#6A7B62...
+    "faceShape": {
+      "reason": "Nose...
+[DEBUG] 🔍 [AVATAR EVAL] Extracted clothing: {"upperBody":"silver metallic long-sleeve top with padded shoulders","lowerBody":"dark blue jeans with black knee pads and a brown utility belt with pouches","shoes":"black boots","fullBody":null}
+      "score": 9,
+[DEBUG] 🔍 [AVATAR EVAL] Score: 9/10
+    "eyes": {
+[DEBUG] 💇 [AVATAR EVAL] Detailed hair: {"texture":"medium","type":"straight","lengthTop":"5cm","lengthSides":"2cm","bangsEndAt":"no bangs","styling":"styled","direction":"forward","baseColorHex":"#3A2B23","highlightsHex":"none"}
+      "reason": "The oval face shape is consistently maintained."
+    },
+      "score": 9,
+      "reason": "Eye shape, spacing, and general appearance are very similar."
+    },
+[DEBUG] ✅ [STYLED COSTUME] Generated superhero@oil avatar for Manuel in 16663ms
+[DEBUG] ✅ [STREAM-AVATAR] Manuel costumed:superhero complete
+[DEBUG] [GEN:avatars] [Manuel] Generated superhero costume
+[DEBUG] 👕 [STYLED COSTUME] Clothing extracted: {"upperBody":"blue long-sleeve shirt with a yellow 'L' on the front","lowerBody":"red pants","shoes":"yellow rain boots","fullBody":null}
+[DEBUG] ✅ [STYLED COSTUME] Generated superhero@oil avatar for Lukas in 16737ms
+      "reason": "The avatar has a similar oval face shape, though slightly softer in the jawline."
+    },
+📊 [AVATAR EVAL] model: gemini-2.5-flash, input: 1,779, output: 523
+    "eyes": {
+    "nose": ...
+      "score": 9,
+[DEBUG] 🔍 [AVATAR EVAL] Raw response: {
+      "reason": "Eye shape, color, and spacing are very consistent with the original."
+[DEBUG] 🔍 [AVATAR EVAL] Score: 8/10
+  "faceMatch": {
+    },
+    "faceShape": {
+[DEBUG] 🔍 [AVATAR EVAL] Extracted traits: {"build":"slim","skinTone":"light","skinToneHex":"#E8BEAC","eyeColor":"brown","eyeColorHex":"#6B4423...
+      "score": 8,
+[DEBUG] 🔍 [AVATAR EVAL] Extracted clothing: {"upperBody":"blue long-sleeve shirt with a yellow 'L' on the front","lowerBody":"red pants","shoes":"yellow rain boots","fullBody":null}
+[DEBUG] 💇 [AVATAR EVAL] Detailed hair: {"texture":"medium","type":"straight","lengthTop":"7cm","lengthSides":"3cm","bangsEndAt":"at eyebrows","styling":"natural","direction":"side part right","baseColorHex":"#3B2314","highlightsHex":"none"}
+[DEBUG] ✅ [STREAM-AVATAR] Lukas costumed:superhero complete
+[DEBUG] [GEN:avatars] [Lukas] Generated superhero costume
+📊 [AVATAR EVAL] model: gemini-2.5-flash, input: 1,779, output: 529
+[DEBUG] 🔍 [AVATAR EVAL] Raw response: {
+  "faceMatch": {
+    "faceShape": {
+      "score": 8,
+      "reason": "Similar oval shape, though the avatar's jawline is slightly softer."
+    },
+    "eyes": {
+      "score": 9,
+      "reason": "Eye shape, spacing, and brow line are very consistent."
+    },
+    "nose": {
+      "score": 7,
+      "...
+[DEBUG] 🔍 [AVATAR EVAL] Score: 8/10
+[DEBUG] 🔍 [AVATAR EVAL] Extracted traits: {"build":"average","skinTone":"light","skinToneHex":"#E8BEAC","eyeColor":"brown","eyeColorHex":"#6B4...
+[DEBUG] 🔍 [AVATAR EVAL] Extracted clothing: {"upperBody":null,"lowerBody":null,"shoes":"brown dress shoes","fullBody":"Brown, multi-pocketed suit adorned with various writing implements, envelopes, and books, resembling a postal or writer's uniform."}
+[DEBUG] 💇 [AVATAR EVAL] Detailed hair: {"texture":"medium","type":"straight","lengthTop":"25cm","lengthSides":"25cm","bangsEndAt":"no bangs","styling":"slicked","direction":"back","baseColorHex":"#3B2314","highlightsHex":"#8B6F4E"}
+[DEBUG] 👕 [STYLED COSTUME] Clothing extracted: {"upperBody":null,"lowerBody":null,"shoes":"brown dress shoes","fullBody":"Brown, multi-pocketed suit adorned with various writing implements, envelopes, and books, resembling a postal or writer's uniform."}
+[DEBUG] ♻️ [STYLED AVATARS] Preloaded 28 existing oil avatars from character data
+[DEBUG] ✅ [STYLED COSTUME] Generated superhero@oil avatar for Roger in 16742ms
+[DEBUG] ✅ [STYLED AVATARS] All needed avatars already cached
+[DEBUG] 🎨 [UNIFIED] Preparing 26 styled avatars for oil
+[DEBUG] ✅ [STREAM-AVATAR] Roger costumed:superhero complete
+[DEBUG] [GEN:scenes]  Starting scenes stage
+[DEBUG] 🎨 [STYLED AVATARS] Preparing styled avatars for 5 characters in oil style
+[DEBUG] [GEN:avatars] [Roger] Generated superhero costume
+[DEBUG] ✅ [UNIFIED] All streaming avatar generations complete
+[DEBUG] [SCENE-PARSER] No Characters section found, using fallback pattern matching
+[DEBUG] 🎨 [AVATAR REQS] Per-character clothing: {"Lukas":["standard","costumed:superhero"],"Manuel":["standard","costumed:superhero"],"Franziska":["standard","costumed:superhero"],"Sophie":["standard","costumed:superhero"],"Roger":["standard","costumed:superhero"]}
+[DEBUG] [SCENE-PARSER] Looking for Characters section in scene (148 chars)
+[DEBUG] [SCENE-PARSER] Looking for Characters section in scene (164 chars)
+[DEBUG] [SCENE-PARSER] Section pattern match: NOT FOUND
+[DEBUG] [SCENE-PARSER] Section pattern match: NOT FOUND
+[DEBUG] [SCENE-PARSER] No Characters section found, using fallback pattern matching
+[DEBUG] ⏳ [UNIFIED] Waiting for 2 scene expansions...
+[DEBUG] ✅ [STREAM-SCENE] Page 2 scene expanded
+[DEBUG] [GEN:images] [Manuel] Using styled-costumed-superhero
+[DEBUG] ✅ [UNIFIED] All 2 scene expansions complete
+[DEBUG] [GEN:images] [Sophie] Using styled-costumed-superhero
+[DEBUG] 📊 [UNIFIED] Streaming efficiency: 2/2 pages started during streaming
+[DEBUG] [GEN:covers]  Starting covers stage
+[DEBUG] 📖 [UNIFIED] No cover images to generate (skipCovers=true)
+[DEBUG] [GEN:images]  Starting images stage
+[DEBUG] [AVATAR LOOKUP] Lukas: per-scene clothing = costumed:superhero
+[DEBUG] [AVATAR STYLED] Lukas: using styled superhero@oil
+[DEBUG] [AVATAR LOOKUP] Manuel: per-scene clothing = costumed:superhero
+[DEBUG] [AVATAR STYLED] Manuel: using styled superhero@oil
+[DEBUG] [AVATAR LOOKUP] Sophie: per-scene clothing = costumed:superhero
+[DEBUG] [AVATAR STYLED] Sophie: using styled superhero@oil
+[DEBUG] [GEN:images] [Lukas] Using styled-costumed-superhero
+[DEBUG] 🌊 [STREAM] Stream complete
+[DEBUG] 📊 [ANTHROPIC STREAM] Token usage - input: 2,755, output: 866
+[DEBUG] ✅ [STREAM-SCENE] Page 1 scene expanded
+[DEBUG] 🌊 [STREAM] Stream complete
+[DEBUG] 📊 [ANTHROPIC STREAM] Token usage - input: 3,242, output: 1,006
+[DEBUG] [IMAGE PROMPT] Scene characters: Lukas, Manuel, Sophie
+[DEBUG] [IMAGE PROMPT] Lukas wearing: "blue long-sleeve shirt with a yellow 'L' on the front, red pants, yellow rain boots" (costumed:superhero)
+[DEBUG] [IMAGE PROMPT] Manuel wearing: "silver metallic long-sleeve top with padded shoulders, dark blue jeans with black knee pads and a brown utility belt with pouches, black boots" (costumed:superhero)
+[DEBUG] [IMAGE PROMPT] Sophie wearing: "purple long-sleeved top with a textured pattern, dark blue jeans, purple boots" (costumed:superhero)
+[DEBUG] [IMAGE PROMPT] Lukas avatar clothing: "blue long-sleeve shirt with a yellow 'L' on the front, red pants, yellow rain boots"
+[DEBUG] [IMAGE PROMPT] Manuel avatar clothing: "silver metallic long-sleeve top with padded shoulders, dark blue jeans with black knee pads and a brown utility belt with pouches, black boots"
+[DEBUG] [IMAGE PROMPT] Sophie avatar clothing: "purple long-sleeved top with a textured pattern, dark blue jeans, purple boots"
+[DEBUG] [IMAGE PROMPT] Added relative heights: **HEIGHT ORDER (shortest to tallest):** Lukas (shortest) -> Sophie (slightly taller) -> Manuel (much taller)
+[DEBUG] [IMAGE PROMPT] Added 2 required objects from metadata (skipping full Visual Bible)
+[IMAGE PROMPT] Using storybook template for language: de-ch
+[DEBUG] 🎨 [QUALITY RETRY] [PAGE 1] Attempt 1/3 (threshold: 50%)...
+[DEBUG] 🆕 [IMAGE CACHE] MISS - key: 49278819948fd8d9...
+🎨 [IMAGE GEN] Backend: gemini (override=none, default=gemini)
+[DEBUG] [GEN:images] [Lukas] Using styled-costumed-superhero
+[DEBUG] [GEN:images] [Roger] Using styled-costumed-superhero
+[DEBUG] 🗜️  [COMPRESSION] Skipping - image already small (41.70 KB < 100 KB)
+[DEBUG] [IMAGE PROMPT] Scene characters: Lukas, Roger
+[DEBUG] [IMAGE PROMPT] Lukas wearing: "blue long-sleeve shirt with a yellow 'L' on the front, red pants, yellow rain boots" (costumed:superhero)
+[DEBUG] 🗜️  [COMPRESSION] Skipping - image already small (45.13 KB < 100 KB)
+[DEBUG] [IMAGE PROMPT] Roger wearing: "Brown, multi-pocketed suit adorned with various writing implements, envelopes, and books, resembling a postal or writer's uniform., brown dress shoes" (costumed:superhero)
+[DEBUG] 🗜️  [COMPRESSION] Skipping - image already small (45.23 KB < 100 KB)
+[DEBUG] 🔐 [IMAGE GEN] API image hashes: Lukas:fad7f184, Manuel:fee09bed, Sophie:09c9f820
+[DEBUG] 🖼️  [IMAGE GEN] Added 3 LABELED reference images: Lukas, Manuel, Sophie (0 cached)
+[DEBUG] 🔧 [IMAGE GEN] Using model override: gemini-2.5-flash-image
+[DEBUG] 🖼️  [IMAGE GEN] Calling Gemini API with prompt: CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.  **STYLE: Classic oil painting style, ...
+[DEBUG] 🖼️  [IMAGE GEN] Model: gemini-2.5-flash-image, Aspect Ratio: 1:1, Temperature: 0.8
+[DEBUG] [AVATAR LOOKUP] Lukas: per-scene clothing = costumed:superhero
+[DEBUG] [AVATAR STYLED] Lukas: using styled superhero@oil
+[DEBUG] [AVATAR LOOKUP] Roger: per-scene clothing = costumed:superhero
+[DEBUG] [AVATAR STYLED] Roger: using styled superhero@oil
+[DEBUG] [IMAGE PROMPT] Lukas avatar clothing: "blue long-sleeve shirt with a yellow 'L' on the front, red pants, yellow rain boots"
+[DEBUG] [IMAGE PROMPT] Roger avatar clothing: "Brown, multi-pocketed suit adorned with various writing implements, envelopes, and books, resembling a postal or writer's uniform., brown dress shoes"
+[DEBUG] [IMAGE PROMPT] Added relative heights: **HEIGHT ORDER (shortest to tallest):** Lukas (shortest) -> Roger (a lot taller)
+[DEBUG] [IMAGE PROMPT] Added 2 required objects from metadata (skipping full Visual Bible)
+[IMAGE PROMPT] Using storybook template for language: de-ch
+[DEBUG] 🎨 [QUALITY RETRY] [PAGE 2] Attempt 1/3 (threshold: 50%)...
+[DEBUG] 🆕 [IMAGE CACHE] MISS - key: aa899a71cf33b0cc...
+🎨 [IMAGE GEN] Backend: gemini (override=none, default=gemini)
+[DEBUG] 🗜️  [COMPRESSION] Skipping - image already small (52.07 KB < 100 KB)
+[DEBUG] 🔐 [IMAGE GEN] API image hashes: Lukas:fad7f184, Roger:87b6f2d3
+[DEBUG] 🖼️  [IMAGE GEN] Added 2 LABELED reference images: Lukas, Roger (1 cached)
+[DEBUG] 🔧 [IMAGE GEN] Using model override: gemini-2.5-flash-image
+[DEBUG] 🖼️  [IMAGE GEN] Calling Gemini API with prompt: CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.  **STYLE: Classic oil painting style, ...
+[DEBUG] 🖼️  [IMAGE GEN] Model: gemini-2.5-flash-image, Aspect Ratio: 1:1, Temperature: 0.8
+[DEBUG] 🖼️  [IMAGE GEN] Response status: 200 OK
+[DEBUG] 📊 [IMAGE GEN] Token usage - input: 1,645, output: 1,290
+✅ [IMAGE GEN] Successfully extracted image data (2400.79 KB base64)
+[DEBUG] 🗜️  [COMPRESSION] Compressing image to JPEG...
+[DEBUG] 🗜️  [COMPRESSION] PNG 1800.59 KB → JPEG 199.04 KB (88.9% reduction)
+[DEBUG] ⭐ [QUALITY] Evaluating image quality (scene)... [model: gemini-2.5-flash]
+[DEBUG] ⭐ [QUALITY] Using SCENE evaluation (standard)
+[DEBUG] ⭐ [QUALITY] Added 2 reference images (2 cached, 0 compressed)
+[DEBUG] 🔧 [QUALITY] Using model override: gemini-2.5-flash
+[DEBUG] 🖼️  [IMAGE GEN] Response status: 200 OK
+[DEBUG] 📊 [IMAGE GEN] Token usage - input: 1,891, output: 1,290
+✅ [IMAGE GEN] Successfully extracted image data (2280.65 KB base64)
+[DEBUG] 🗜️  [COMPRESSION] Compressing image to JPEG...
+[DEBUG] 🗜️  [COMPRESSION] PNG 1710.49 KB → JPEG 175.93 KB (89.7% reduction)
+[DEBUG] ⭐ [QUALITY] Evaluating image quality (scene)... [model: gemini-2.5-flash]
+[DEBUG] ⭐ [QUALITY] Using SCENE evaluation (standard)
+[DEBUG] ⭐ [QUALITY] Added 3 reference images (3 cached, 0 compressed)
+[DEBUG] 🔧 [QUALITY] Using model override: gemini-2.5-flash
+[DEBUG] 💾 [UNIFIED] Saved page 2 for progressive display
+[DEBUG] 📊 [QUALITY] Token usage - input: 3,859, output: 2,160, thinking: 3,194
+⭐ [QUALITY] Score: 8/10 (80/100), Verdict: PASS
+[DEBUG] ⏭️ [QUALITY RETRY] [PAGE 1] Auto-repair skipped (disabled). Score 80%, 2 fix targets available.
+[DEBUG] ⏭️ [QUALITY RETRY] [PAGE 2] Auto-repair skipped (disabled). Score 80%, 1 fix targets available.
+✅ [QUALITY RETRY] Success on attempt 1! Score 80% >= 50%
+[DEBUG] 💾 Checkpoint saved: partial_page (index: 2) for job job_1768051286753_ploc4whu6
+⭐ [QUALITY] Issues: Roger's hair color is dark brown in the generated image, but the reference specifies 'dark blonde'. All other aspects are highly consistent with the prompt and references.
+⭐ [QUALITY] Parsed 1 fix targets from JSON
+[DEBUG] 📊 [QUALITY] Token usage - input: 4,099, output: 1,782, thinking: 2,726
+⭐ [QUALITY] Score: 8/10 (80/100), Verdict: PASS
+[DEBUG] 💾 [IMAGE CACHE] Stored in cache. Total cached: 1 images
+⭐ [QUALITY] Issues: Lukas and Manuel are wearing gloves that are not present in their respective reference images, which deviates from the 'EXACTLY what is shown in the reference images' instruction for attire.
+[DEBUG] ⭐ [QUALITY RETRY] [PAGE 2] Attempt 1 score: 80%
+⭐ [QUALITY] Parsed 2 fix targets from JSON
+[DEBUG] 💾 [IMAGE CACHE] Stored in cache. Total cached: 2 images
+[DEBUG] ⭐ [QUALITY RETRY] [PAGE 1] Attempt 1 score: 80%
+✅ [QUALITY RETRY] Success on attempt 1! Score 80% >= 50%
+[DEBUG] 💾 Checkpoint saved: partial_page (index: 1) for job job_1768051286753_ploc4whu6
+[DEBUG] 💾 [UNIFIED] Saved page 1 for progressive display
+[DEBUG] 📖 [UNIFIED] Generated 2/2 page images
+[DEBUG] ⏱️ [UNIFIED] Page images: 35.1s
+[DEBUG] ⏱️ [UNIFIED] Timing summary:
+[DEBUG]    Story generation: 18.4s
+[DEBUG]    Page images:      35.1s
+[DEBUG]    TOTAL:            75.9s
+[DEBUG] 📊 [UNIFIED] Token usage & cost summary:
+[DEBUG]    BY PROVIDER:
+[DEBUG]    Anthropic:         5,997 in /    1,872 out  $0.0461
+[DEBUG]    Gemini Text:       5,608 in /    3,252 out  $0.0098
+[DEBUG]    Gemini Image:      3,536 in /    2,580 out  $0.0785
+[DEBUG]    Gemini Quality:    7,958 in /    3,942 out + 5,920 think  $0.0047
+[DEBUG]    BY FUNCTION:
+[DEBUG]    Unified Story:    5,608 in /    3,252 out (1 calls)  $0.0098  [gemini-2.0-flash]
+[DEBUG]    Scene Expand:     5,997 in /    1,872 out (2 calls)  $0.0461  [claude-sonnet-4-5-20250929]
+[DEBUG]    Page Images:      3,536 in /    2,580 out (2 calls)  $0.0785  [gemini-2.5-flash-image]
+[DEBUG]    Page Quality:     7,958 in /    3,942 out (2 calls)  $0.0047  [gemini-2.5-flash]
+[DEBUG]    TOTAL: NaN input, NaN output tokens
+[DEBUG]    💰 TOTAL COST: $0.1391
+[DEBUG] 📝 [UNIFIED] Updating job status to 95% (finalizing)...
+[DEBUG] [GEN:finalize]  Starting finalize stage
+[DEBUG] 📊 [UNIFIED] Logging API usage to generationLog. Functions with calls:
+[DEBUG]    - unified_story: 1 calls, 5608 in, 3252 out, thinking: 0
+[DEBUG]    >>> genLog.apiUsage('unified_story', 'gemini-2.0-flash', {in: 5608, out: 3252}, cost: $0.0098)
+[DEBUG] 📊 [GENLOG] apiUsage called: unified_story, model=gemini-2.0-flash, inputTokens=5608, outputTokens=3252
+[DEBUG] 📊 [GENLOG] Generated message: "unified_story: gemini-2.0-flash (5,608 in / 3,252 out) $0.0098"
+[DEBUG] [GEN:finalize]  unified_story: gemini-2.0-flash (5,608 in / 3,252 out) $0.0098
+[DEBUG]    - scene_expansion: 2 calls, 5997 in, 1872 out, thinking: 0
+[DEBUG]    >>> genLog.apiUsage('scene_expansion', 'claude-sonnet-4-5-20250929', {in: 5997, out: 1872}, cost: $0.0461)
+[DEBUG] 📊 [GENLOG] apiUsage called: scene_expansion, model=claude-sonnet-4-5-20250929, inputTokens=5997, outputTokens=1872
+[DEBUG] 📊 [GENLOG] Generated message: "scene_expansion: claude-sonnet-4-5-20250929 (5,997 in / 1,872 out) $0.0461"
+[DEBUG] [GEN:finalize]  scene_expansion: claude-sonnet-4-5-20250929 (5,997 in / 1,872 out) $0.0461
+[DEBUG]    - cover_images: 0 calls, 0 in, 0 out, thinking: 0
+[DEBUG]    - cover_quality: 0 calls, 0 in, 0 out, thinking: 0
+[DEBUG]    - page_images: 2 calls, 3536 in, 2580 out, thinking: 0
+[DEBUG]    >>> genLog.apiUsage('page_images', 'gemini-2.5-flash-image', {in: 3536, out: 2580}, cost: $0.0785)
+[DEBUG] 📊 [GENLOG] apiUsage called: page_images, model=gemini-2.5-flash-image, inputTokens=3536, outputTokens=2580
+[DEBUG] 📊 [GENLOG] Generated message: "page_images: gemini-2.5-flash-image (3,536 in / 2,580 out) $0.0785"
+[DEBUG] [GEN:finalize]  💰 Total API cost: $0.1391
+[DEBUG] [GEN:finalize]  page_images: gemini-2.5-flash-image (3,536 in / 2,580 out) $0.0785
+[DEBUG] [GEN:finalize]  Generation complete
+[DEBUG]    - page_quality: 2 calls, 7958 in, 3942 out, thinking: 5920
+[DEBUG]    >>> genLog.apiUsage('page_quality', 'gemini-2.5-flash', {in: 7958, out: 3942}, cost: $0.0047)
+[DEBUG] 📊 [UNIFIED] genLog now has 22 entries (including API usage)
+[DEBUG] 📊 [GENLOG] apiUsage called: page_quality, model=gemini-2.5-flash, inputTokens=7958, outputTokens=3942
+[DEBUG] 📊 [GENLOG] Generated message: "page_quality: gemini-2.5-flash (7,958 in / 3,942 out / 5,920 think) $0.0047"
+[DEBUG] [GEN:finalize]  page_quality: gemini-2.5-flash (7,958 in / 3,942 out / 5,920 think) $0.0047
+[DEBUG]    - inpaint: 0 calls, 0 in, 0 out, thinking: 0
+[DEBUG]    - avatar_styled: 0 calls, 0 in, 0 out, thinking: 0
+[DEBUG]    - avatar_costumed: 0 calls, 0 in, 0 out, thinking: 0
+[DEBUG] 📝 [UNIFIED SAVE] storyCategory: "adventure", storyTopic: "", storyTheme: "superhero"
+[DEBUG] 📝 [UNIFIED SAVE] mainCharacters: [1765127099541], characters count: 5
+[DEBUG] 💾 [UNIFIED] Saving story to database... (generationLog has 22 entries)
+💾 [UPSERT] Saving story job_1768051286753_ploc4whu6 for user 1764881868108, title: "Das Geheimnis des Landvogteischlosses"
+✅ [UPSERT] Story saved successfully: id=job_1768051286753_ploc4whu6, user_id=1764881868108
+[DEBUG] 📚 [UNIFIED] Story job_1768051286753_ploc4whu6 saved to stories table
+[DEBUG] 💾 [UNIFIED] Persisting 5 styled avatar sets to characters table...
+[DEBUG]    ✓ Saved 2 oil avatars for "Lukas"
+[DEBUG]    ✓ Saved 2 oil avatars for "Manuel"
+[DEBUG]    ✓ Saved 2 oil avatars for "Franziska"
+[DEBUG]    ✓ Saved 2 oil avatars for "Sophie"
+[DEBUG]    ✓ Saved 2 oil avatars for "Roger"
+[DEBUG] 💾 [UNIFIED] Updated 5 characters in database with oil styled avatars
+[DEBUG] 📊 [UNIFIED] resultData generationLog has 22 entries
+[DEBUG] 🗑️ [STYLED AVATARS] Cache cleared (28 entries)
+✅ [UNIFIED] Job job_1768051286753_ploc4whu6 completed successfully
+📧 Story complete email sent to rogerfischer@hotmail.com (de-ch), id: b3de7c6d-d3d8-46dd-871d-37d895af04df
+📖 GET /api/stories/job_1768051286753_ploc4whu6/metadata - User: rogerfischer@hotmail.com
+🔧 GET /api/stories/job_1768051286753_ploc4whu6/dev-metadata - User: rogerfischer@hotmail.com
+📖 [SLOW] Returning story metadata: Das Geheimnis des Landvogteischlosses (5 images to load)
+📖 [SLOW] storyCategory: "adventure", storyTopic: "", storyTheme: "superhero"
+📖 [SLOW] mainCharacters: [1765127099541]
+🔧 Returning dev metadata: 2 scene entries, generationLog: 22 entries, styledAvatars: 0, costumedAvatars: 5

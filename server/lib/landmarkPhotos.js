@@ -987,33 +987,47 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   const candidates = landmarks.slice(0, Math.min(MAX_CANDIDATES, landmarks.length));
   log.debug(`[LANDMARK] Selected ${candidates.length} candidates for photo fetching`);
 
-  // Step 5: Get Commons photo counts + fetch photos in parallel
-  // This tells us how photogenic/popular each landmark is
-  await Promise.allSettled(candidates.map(async (landmark) => {
-    try {
-      // Get photo count from Commons (popularity metric)
-      landmark.commonsPhotoCount = await getCommonsPhotoCount(landmark.name);
+  // Step 5: Get Commons photo counts + fetch photos in BATCHES to avoid rate limiting
+  // Wikimedia returns HTML error pages when hammered with too many parallel requests
+  const BATCH_SIZE = 5;  // Process 5 landmarks at a time
+  const BATCH_DELAY_MS = 200;  // 200ms delay between batches
 
-      // Fetch actual photo
-      const photo = await fetchLandmarkPhoto(landmark.query);
-      if (photo) {
-        landmark.photoData = photo.photoData;
-        landmark.photoUrl = photo.photoUrl;
-        landmark.attribution = photo.attribution;
-        landmark.hasPhoto = true;
-        // Photo size in KB (quality metric)
-        landmark.photoSizeKB = Math.round(photo.photoData.length * 0.75 / 1024);
-      } else {
+  log.debug(`[LANDMARK] Fetching photos in batches of ${BATCH_SIZE} with ${BATCH_DELAY_MS}ms delay`);
+
+  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+    const batch = candidates.slice(i, i + BATCH_SIZE);
+
+    await Promise.allSettled(batch.map(async (landmark) => {
+      try {
+        // Get photo count from Commons (popularity metric)
+        landmark.commonsPhotoCount = await getCommonsPhotoCount(landmark.name);
+
+        // Fetch actual photo
+        const photo = await fetchLandmarkPhoto(landmark.query);
+        if (photo) {
+          landmark.photoData = photo.photoData;
+          landmark.photoUrl = photo.photoUrl;
+          landmark.attribution = photo.attribution;
+          landmark.hasPhoto = true;
+          // Photo size in KB (quality metric)
+          landmark.photoSizeKB = Math.round(photo.photoData.length * 0.75 / 1024);
+        } else {
+          landmark.hasPhoto = false;
+          landmark.photoSizeKB = 0;
+        }
+      } catch (err) {
         landmark.hasPhoto = false;
+        landmark.commonsPhotoCount = 0;
         landmark.photoSizeKB = 0;
+        log.debug(`[LANDMARK] Scoring failed for "${landmark.name}":`, err.message);
       }
-    } catch (err) {
-      landmark.hasPhoto = false;
-      landmark.commonsPhotoCount = 0;
-      landmark.photoSizeKB = 0;
-      log.debug(`[LANDMARK] Scoring failed for "${landmark.name}":`, err.message);
+    }));
+
+    // Delay between batches to avoid rate limiting (skip delay after last batch)
+    if (i + BATCH_SIZE < candidates.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
-  }));
+  }
 
   // Step 6: Score and sort by photogenic popularity with distance penalty + category boost
   // Base score = (commonsPhotoCount + photoSizeKB) / (1 + distance/1000)

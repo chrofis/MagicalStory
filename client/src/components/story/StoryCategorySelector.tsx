@@ -32,6 +32,8 @@ interface StoryCategorySelectorProps {
   onCustomThemeTextChange?: (text: string) => void;
   // For backwards compatibility - sets the legacy storyType
   onLegacyStoryTypeChange: (storyType: string) => void;
+  // Dev mode - enables historical category (hidden for normal users until tested)
+  developerMode?: boolean;
 }
 
 export function StoryCategorySelector({
@@ -44,6 +46,7 @@ export function StoryCategorySelector({
   onThemeChange,
   onCustomThemeTextChange,
   onLegacyStoryTypeChange,
+  developerMode = false,
 }: StoryCategorySelectorProps) {
   const { language } = useLanguage();
   const lang = language as Language;
@@ -214,7 +217,9 @@ export function StoryCategorySelector({
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {storyCategories.map((category) => (
+          {storyCategories
+            .filter(category => category.id !== 'historical' || developerMode)
+            .map((category) => (
             <button
               key={category.id}
               onClick={() => handleCategorySelect(category.id)}
