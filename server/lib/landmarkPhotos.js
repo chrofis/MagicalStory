@@ -23,10 +23,9 @@ const WIKI_HEADERS = {
 // ============================================================================
 
 /**
- * Categories that indicate tourist-worthy landmarks (get +40% score boost)
- * Patterns match against category names (case-insensitive)
+ * HIGH BOOST categories (+100 points) - Most tourist-worthy landmarks
  */
-const BOOST_CATEGORY_PATTERNS = [
+const HIGH_BOOST_PATTERNS = [
   // Tourist attractions
   /tourist.?attract/i, /visitor.?attract/i, /sehenswürdigkeit/i, /attraction.?touristique/i,
   // Castles & palaces
@@ -35,8 +34,14 @@ const BOOST_CATEGORY_PATTERNS = [
   /\bchurches?\b/i, /\bcathedrals?\b/i, /\babbeys?\b/i, /\bmonaster/i, /\bkirchen?\b/i, /\bdom\b/i, /église/i,
   // Bridges
   /\bbridges?\b/i, /\bbrücken?\b/i, /\bpont\b/i,
-  // Museums & cultural
-  /\bmuseums?\b/i, /\bmuseen\b/i, /\bmusée/i, /cultural.?heritage/i, /kulturerbe/i,
+  // Towers
+  /\btowers?\b/i, /\bturm\b/i, /\btürme\b/i, /\btour\b/i, /wahrzeichen/i
+];
+
+/**
+ * MEDIUM BOOST categories (+50 points) - Good landmarks
+ */
+const MEDIUM_BOOST_PATTERNS = [
   // Parks & gardens
   /\bparks?\b/i, /\bgardens?\b/i, /\bgärten\b/i, /\bjardin/i,
   // Monuments & memorials
@@ -45,17 +50,11 @@ const BOOST_CATEGORY_PATTERNS = [
   /historic.?(site|place|building|monument)/i, /historisch/i, /patrimoine/i,
   // UNESCO
   /unesco/i, /world.?heritage/i, /welterbe/i, /weltkulturerbe/i,
-  // Towers & landmarks
-  /\btowers?\b/i, /\bturm\b/i, /\btürme\b/i, /\btour\b/i, /landmark/i, /wahrzeichen/i,
-  // Railway stations (historic)
-  /railway.?station/i, /\bbahnhof\b/i, /\bgare\b/i,
-  // Roman/ancient
-  /roman.?(site|ruin|bath|remain)/i, /römisch/i, /romain/i, /ancient/i, /antik/i,
-  // Ruins
-  /\bruins?\b/i, /\bruine/i,
-  // Squares & plazas
-  /\bsquares?\b/i, /\bplazas?\b/i, /\bplatz\b/i, /\bplätze\b/i, /\bplace\b/i
+  // Landmarks (generic)
+  /landmark/i
 ];
+
+// NOT BOOSTED: museums, railway stations, roman/ancient, ruins, squares
 
 /**
  * Map category keywords to human-readable landmark types
@@ -149,19 +148,26 @@ async function fetchWikipediaCategories(lang, pageIds) {
 }
 
 /**
- * Parse categories to extract landmark type and check for boost eligibility
+ * Parse categories to extract landmark type and boost amount
  * @param {string[]} categories - Array of category names
- * @returns {{ type: string|null, shouldBoost: boolean }}
+ * @returns {{ type: string|null, boostAmount: number }}
  */
 function parseLandmarkCategories(categories) {
   if (!categories || categories.length === 0) {
-    return { type: null, shouldBoost: false };
+    return { type: null, boostAmount: 0 };
   }
 
-  // Check if any category matches boost patterns
-  const shouldBoost = categories.some(cat =>
-    BOOST_CATEGORY_PATTERNS.some(pattern => pattern.test(cat))
+  // Check for HIGH boost (+100): tourist, castles, religious, bridges, towers
+  const hasHighBoost = categories.some(cat =>
+    HIGH_BOOST_PATTERNS.some(pattern => pattern.test(cat))
   );
+
+  // Check for MEDIUM boost (+50): parks, monuments, historic, UNESCO
+  const hasMediumBoost = !hasHighBoost && categories.some(cat =>
+    MEDIUM_BOOST_PATTERNS.some(pattern => pattern.test(cat))
+  );
+
+  const boostAmount = hasHighBoost ? 100 : (hasMediumBoost ? 50 : 0);
 
   // Find landmark type from categories
   let type = null;
@@ -175,7 +181,7 @@ function parseLandmarkCategories(categories) {
     if (type) break;
   }
 
-  return { type, shouldBoost };
+  return { type, boostAmount };
 }
 
 /**
@@ -213,15 +219,16 @@ async function enrichLandmarksWithCategories(landmarks) {
     for (const landmark of langLandmarks) {
       const categories = categoryMap.get(landmark.pageId) || [];
       landmark.categories = categories;
-      const { type, shouldBoost } = parseLandmarkCategories(categories);
+      const { type, boostAmount } = parseLandmarkCategories(categories);
       landmark.type = type;
-      landmark.shouldBoost = shouldBoost;
+      landmark.boostAmount = boostAmount;
 
       // Log ALL landmarks with their categories to debug why types aren't being extracted
       if (categories.length > 0) {
         log.debug(`[LANDMARK-CAT] "${landmark.name}" (pageId=${landmark.pageId}) categories: ${categories.slice(0, 5).join(', ')}${categories.length > 5 ? '...' : ''}`);
         if (type) {
-          log.info(`[LANDMARK-CAT] ✓ "${landmark.name}" → ${type}${shouldBoost ? ' 🏆' : ''}`);
+          const boostLabel = boostAmount === 100 ? '🏆+100' : (boostAmount === 50 ? '⭐+50' : '');
+          log.info(`[LANDMARK-CAT] ✓ "${landmark.name}" → ${type} ${boostLabel}`);
         } else {
           log.debug(`[LANDMARK-CAT] ✗ "${landmark.name}" → NO TYPE MATCH`);
         }
@@ -786,9 +793,10 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
     log.info(`[LANDMARK] 📂 CATEGORY ENRICHMENT START for ${landmarks.length} landmarks`);
     await enrichLandmarksWithCategories(landmarks);
     log.info(`[LANDMARK] 📂 CATEGORY ENRICHMENT DONE`);
-    const boostedCount = landmarks.filter(l => l.shouldBoost).length;
+    const highBoostCount = landmarks.filter(l => l.boostAmount === 100).length;
+    const medBoostCount = landmarks.filter(l => l.boostAmount === 50).length;
     const typedCount = landmarks.filter(l => l.type).length;
-    log.debug(`[LANDMARK] Categories: ${typedCount}/${landmarks.length} typed, ${boostedCount} boosted`);
+    log.debug(`[LANDMARK] Categories: ${typedCount}/${landmarks.length} typed, ${highBoostCount} high boost, ${medBoostCount} med boost`);
   }
 
   return landmarks;
@@ -1045,9 +1053,8 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   // 4. Download photos only for those 30
   // ==========================================================================
 
-  // Scoring constants
-  const BOOST_BONUS = 100;    // Bonus for shouldBoost (tourist attractions, castles, etc.)
-  const TYPE_BONUS = 50;      // Bonus for having a type (Castle, Church, Museum, etc.)
+  // Scoring constants - boostAmount comes from categories (+100 high, +50 medium, 0 none)
+  const TYPE_BONUS = 30;      // Extra bonus for having a type (Castle, Church, Museum, etc.)
   const BATCH_SIZE = 10;      // Process 10 landmarks at a time for photo counts
   const BATCH_DELAY_MS = 100; // 100ms delay between batches
 
@@ -1070,12 +1077,16 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   }
 
   // Step 5: Score ALL landmarks with unified formula
-  // score = (photoCount + categoryBonus) / distancePenalty
+  // score = (photoCount + boostAmount + typeBonus) / distancePenalty
+  // boostAmount: +100 (high: tourist, castles, religious, bridges, towers)
+  //              +50 (medium: parks, monuments, historic, UNESCO)
+  //              +0 (none: museums, stations, ruins, squares)
   const scoredLandmarks = landmarks.map(l => {
     const photoCount = l.commonsPhotoCount || 0;
-    const categoryBonus = (l.shouldBoost ? BOOST_BONUS : 0) + (l.type ? TYPE_BONUS : 0);
+    const boostAmount = l.boostAmount || 0;
+    const typeBonus = l.type ? TYPE_BONUS : 0;
     const distancePenalty = 1 + (l.distance || 0) / 1000;
-    const score = (photoCount + categoryBonus) / distancePenalty;
+    const score = (photoCount + boostAmount + typeBonus) / distancePenalty;
     return {
       ...l,
       score: Math.round(score)
@@ -1083,12 +1094,14 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   }).sort((a, b) => b.score - a.score);
 
   // Log top ranked landmarks
-  const boostedCount = scoredLandmarks.filter(l => l.shouldBoost).length;
+  const highBoostCount = scoredLandmarks.filter(l => l.boostAmount === 100).length;
+  const medBoostCount = scoredLandmarks.filter(l => l.boostAmount === 50).length;
   const typedCount = scoredLandmarks.filter(l => l.type).length;
-  log.info(`[LANDMARK] 📊 Scored ${landmarks.length} landmarks (${boostedCount} boosted, ${typedCount} typed)`);
-  log.debug(`[LANDMARK] Top 5 by score: ${scoredLandmarks.slice(0, 5).map(l =>
-    `${l.name} [${l.type || '?'}]${l.shouldBoost ? '🏆' : ''} photos=${l.commonsPhotoCount} score=${l.score}`
-  ).join(', ')}`);
+  log.info(`[LANDMARK] 📊 Scored ${landmarks.length} landmarks (${highBoostCount} high boost, ${medBoostCount} med boost, ${typedCount} typed)`);
+  log.debug(`[LANDMARK] Top 5 by score: ${scoredLandmarks.slice(0, 5).map(l => {
+    const boostLabel = l.boostAmount === 100 ? '🏆' : (l.boostAmount === 50 ? '⭐' : '');
+    return `${l.name} [${l.type || '?'}]${boostLabel} photos=${l.commonsPhotoCount} boost=${l.boostAmount} score=${l.score}`;
+  }).join(', ')}`);
 
   // Step 6: Take top N and download photos ONLY for those
   const topCandidates = scoredLandmarks.slice(0, limit + 5); // +5 buffer for photo failures
@@ -1131,9 +1144,10 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
 
   // Log the final landmarks
   if (validLandmarks.length > 0) {
-    log.debug(`[LANDMARK] Final landmarks: ${validLandmarks.map(l =>
-      `${l.name} [${l.type || '?'}]${l.shouldBoost ? '🏆' : ''} score=${l.score}`
-    ).join(', ')}`);
+    log.debug(`[LANDMARK] Final landmarks: ${validLandmarks.map(l => {
+      const boostLabel = l.boostAmount === 100 ? '🏆' : (l.boostAmount === 50 ? '⭐' : '');
+      return `${l.name} [${l.type || '?'}]${boostLabel} score=${l.score}`;
+    }).join(', ')}`);
   }
 
   return validLandmarks;

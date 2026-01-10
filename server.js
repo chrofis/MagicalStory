@@ -1758,7 +1758,9 @@ ${adventureGuideContent}`
         .join('\n');
       availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
 ${landmarkNames}`;
-      log.debug(`[LANDMARK] Including ${availableLandmarks.length} landmarks in ideas prompt`);
+      log.info(`[LANDMARK] ✅ Including ${availableLandmarks.length} landmarks in ideas prompt: ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
+    } else {
+      log.info(`[LANDMARK] ⚠️ No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
     }
 
     // Calculate story length category for output length limits
@@ -2034,7 +2036,9 @@ ${adventureGuideContent}`
         .join('\n');
       availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
 ${landmarkNames}`;
-      log.debug(`[LANDMARK] [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt`);
+      log.info(`[LANDMARK] ✅ [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt: ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
+    } else {
+      log.info(`[LANDMARK] ⚠️ [STREAM] No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
     }
 
     // Calculate story length category for output length limits
