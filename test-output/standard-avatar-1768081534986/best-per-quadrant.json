@@ -1,0 +1,18 @@
+{
+  "temperature": 1,
+  "numAttempts": 3,
+  "bestPerQuadrant": {
+    "top-left": {
+      "attempt": 1,
+      "similarity": 0.499,
+      "samePerson": true,
+      "confidence": "medium"
+    },
+    "bottom-left": {
+      "attempt": 1,
+      "similarity": 0.819,
+      "samePerson": true,
+      "confidence": "high"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+Create a 2x2 character sheet.
+
+TOP ROW - EXACT COPIES OF REFERENCE (same style as reference):
+- TOP-LEFT: EXACT COPY of the reference face. Same style, same colors, same everything. Just zoomed in to show only face (forehead to chin). No shoulders, no clothing visible.
+- TOP-RIGHT: EXACT COPY of reference face, but head turned right (nose pointing right). Keep the SAME STYLE as reference image.
+
+⚠️ TOP ROW MUST KEEP THE ORIGINAL REFERENCE STYLE - DO NOT CHANGE THE ART STYLE FOR TOP ROW.
+
+BOTTOM ROW - NEW STYLE WITH COSTUME (watercolor):
+- BOTTOM-LEFT: Full body front view in watercolor style: Traditional watercolor painting, soft color washes, gentle edges, visible brushwork, textured paper look, delicate and dreamy. Wearing: A brave knight outfit: shiny silver armor chest plate over chainmail, red tunic underneath, leather gloves, sword at belt, brown leather boots. NO HELMET - hair visible and flowing freely.
+- BOTTOM-RIGHT: Full body side view facing RIGHT in watercolor style. Same costume.
+
+⚠️ ONLY THE BOTTOM ROW gets the new watercolor style. Top row stays in reference style.
+
+REQUIREMENTS:
+- SAME person in all 4 images
+- TOP ROW: Original reference style (exact copy)
+- BOTTOM ROW: New watercolor style with costume
+- NO HATS or HEAD COVERINGS
+- FACE MUST BE VISIBLE in all quadrants
+- Background: Light grey studio
