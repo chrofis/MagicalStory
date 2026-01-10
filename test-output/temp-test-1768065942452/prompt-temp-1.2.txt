@@ -1,0 +1,64 @@
+SYSTEM INSTRUCTION:
+You are an expert character artist creating stylized avatar illustrations for children's books.
+You are given a reference avatar for FACIAL IDENTITY ONLY.
+Your task is to TRANSFORM the avatar into: pixar style wearing a completely different costume.
+- Preserves the EXACT facial identity from the reference avatar
+- IGNORES the reference clothing completely - apply the new costume instead
+- IGNORES the reference body shape - generate a new body fitting the costume
+- Creates all 4 grid quadrants with the SAME costume
+
+USER PROMPT:
+TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference avatar.
+
+STYLE (apply to entire image):
+3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading
+
+SUBJECT & COSTUME (PRIORITY) - medieval peasant:
+A medieval peasant outfit: rough brown linen tunic with rope belt, simple cream-colored undershirt with loose sleeves, brown wool pants, and worn leather boots. No hat or head covering.
+CRITICAL: Change clothing COMPLETELY from reference. The character is wearing a historical/themed costume.
+This is a COMPLETE outfit change from neck to toe. Include: shirt/top, pants/skirt/dress, footwear, and any accessories.
+The costume should look authentic and age-appropriate for a children's book illustration.
+
+REFERENCE IMAGE PROVIDED:
+- Standard avatar reference for FACIAL IDENTITY ONLY
+- Ignore reference clothing
+- Ignore reference body shape
+
+REFERENCE INTEGRITY:
+- FACE: 100% identical to reference avatar. Preserve exact age, ethnicity, eye color, and facial features.
+- Direct replication, not averaged - same face shape, features, expression style
+- The person must be clearly recognizable as the same individual
+- If the subject is a child, they MUST remain a child with child-like proportions and features. Do not mature the face.
+- If the subject has specific facial markers (moles, scars, eye shape), these MUST be retained with 100% accuracy.
+- BODY: Ignore reference outfit. Generate new body fitting the costume.
+- Use age-appropriate head-to-body ratio (Reference: Infant=4, Child=6, Teen=7, Adult=8)
+- HAIR: Keep natural hair color and style from reference. NO HATS, HELMETS, CROWNS, OR HEAD COVERINGS of any kind.
+- FACE MUST BE FULLY VISIBLE: NO face masks, ninja masks, superhero masks, bandanas, veils, or anything covering/obstructing the face. The face must remain 100% visible for character recognition.
+- NO "BEAUTIFICATION". Do not apply "Standard Fashion Model" features. The face must be a literal duplicate of the reference.
+
+GRID LAYOUT (with clear black dividing lines between quadrants):
++-------------------+-------------------+
+|  TOP LEFT         |  TOP RIGHT        |
+|  Face - Front     |  Face - 3/4       |
+|  (looking at      |  Profile (75deg   |
+|   camera)         |   looking RIGHT)  |
++-------------------+-------------------+
+|  BOTTOM LEFT      |  BOTTOM RIGHT     |
+|  Full Body        |  Full Body        |
+|  Front View       |  Profile View     |
+|  (facing camera)  |  (facing RIGHT)   |
++-------------------+-------------------+
+
+GRID REQUIREMENTS:
+- Clean 2x2 collage layout with a thin neutral divider
+- Both profile views (top right and bottom right) MUST face the SAME direction (RIGHT)
+- Each quadrant has solid light grey (off-white) studio background
+- All 4 quadrants show the SAME costume
+- TOP QUADRANTS: Head and shoulders, face clearly visible
+- BOTTOM QUADRANTS: Full body from head to toe, shoes visible
+- Lighting: Natural, even, studio-style diffused light
+
+Output: High quality image in the specified art style.
+
+
+TEMPERATURE: 1.2

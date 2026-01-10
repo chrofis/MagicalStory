@@ -1516,9 +1516,18 @@ function linkPreDiscoveredLandmarks(visualBible, availableLandmarks) {
       location.photoSource = 'wikimedia';
       location.photoFetchStatus = 'success';
       location.landmarkQuery = preDiscovered.name; // Use exact name for consistency
+
+      // If we have an analyzed photo description, use it as the extracted description
+      // This makes image generation use the actual photo content instead of Claude's guess
+      if (preDiscovered.photoDescription) {
+        location.extractedDescription = preDiscovered.photoDescription;
+        location.firstAppearanceAnalyzed = true; // Mark as analyzed so it won't be overwritten
+        log.info(`[LANDMARK-LINK] 📝 Using photo description for "${location.name}"`);
+      }
+
       linkedCount++;
 
-      log.info(`[LANDMARK-LINK] ✅ Linked "${location.name}" → "${preDiscovered.name}" (${Math.round(preDiscovered.photoData.length/1024)}KB)`);
+      log.info(`[LANDMARK-LINK] ✅ Linked "${location.name}" → "${preDiscovered.name}" (${Math.round(preDiscovered.photoData.length/1024)}KB${preDiscovered.photoDescription ? ', +desc' : ''})`);
     } else if (preDiscovered) {
       log.warn(`[LANDMARK-LINK] ⚠️ Found "${preDiscovered.name}" but no photoData`);
     } else {

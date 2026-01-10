@@ -507,6 +507,91 @@ async function fetchLandmarkPhoto(landmarkQuery, pageId = null, lang = null) {
 }
 
 /**
+ * Analyze a landmark photo using Gemini vision to get an accurate description
+ * This runs during discovery and is cached with the landmark data
+ * Cost: ~$0.00012 per photo (basically free)
+ * @param {string} photoData - Base64 data URI of the photo
+ * @param {string} landmarkName - Name of the landmark for context
+ * @param {string} landmarkType - Type of landmark (Castle, Church, etc.)
+ * @returns {Promise<string|null>} - Description of what's in the photo, or null on error
+ */
+async function analyzeLandmarkPhoto(photoData, landmarkName, landmarkType) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    log.warn('[LANDMARK-ANALYZE] No Gemini API key, skipping photo analysis');
+    return null;
+  }
+
+  if (!photoData || !photoData.startsWith('data:image/')) {
+    return null;
+  }
+
+  try {
+    // Extract base64 data and mime type
+    const matches = photoData.match(/^data:(image\/\w+);base64,(.+)$/);
+    if (!matches) {
+      log.debug('[LANDMARK-ANALYZE] Invalid photo data format');
+      return null;
+    }
+    const [, mimeType, base64Data] = matches;
+
+    const prompt = `Describe this photo of "${landmarkName}"${landmarkType ? ` (a ${landmarkType})` : ''} for use in children's book illustration.
+
+Focus on:
+- The main architectural/natural features visible
+- Colors, materials, textures
+- Distinctive elements that make it recognizable
+- The setting/surroundings visible in the photo
+
+Write 2-3 sentences. Be specific and visual. Do NOT mention the photo itself or use phrases like "The image shows".`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType,
+                data: base64Data
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          maxOutputTokens: 200,
+          temperature: 0.3
+        }
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
+
+    if (!response.ok) {
+      log.debug(`[LANDMARK-ANALYZE] Gemini API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const description = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (!description) {
+      log.debug(`[LANDMARK-ANALYZE] No description returned for "${landmarkName}"`);
+      return null;
+    }
+
+    log.debug(`[LANDMARK-ANALYZE] ✅ "${landmarkName}": ${description.substring(0, 60)}...`);
+    return description;
+  } catch (err) {
+    log.debug(`[LANDMARK-ANALYZE] Error for "${landmarkName}": ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Pre-fetch photos for all landmarks in a Visual Bible
  * Designed to run in background as soon as landmarks are detected
  * @param {Object} visualBible - Parsed Visual Bible object
@@ -1138,9 +1223,33 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   const withPhotos = topCandidates.filter(l => l.hasPhoto);
   const validLandmarks = withPhotos.slice(0, limit);
 
+  // Step 7: Analyze photos to get accurate descriptions (runs in parallel, ~$0.0001 per photo)
+  log.info(`[LANDMARK] 🔍 Analyzing ${validLandmarks.length} landmark photos...`);
+  const ANALYZE_BATCH_SIZE = 5;
+  const ANALYZE_BATCH_DELAY_MS = 100;
+
+  for (let i = 0; i < validLandmarks.length; i += ANALYZE_BATCH_SIZE) {
+    const batch = validLandmarks.slice(i, i + ANALYZE_BATCH_SIZE);
+    await Promise.allSettled(batch.map(async (landmark) => {
+      if (landmark.photoData) {
+        const description = await analyzeLandmarkPhoto(landmark.photoData, landmark.name, landmark.type);
+        if (description) {
+          landmark.photoDescription = description;
+        }
+      }
+    }));
+    // Small delay between batches
+    if (i + ANALYZE_BATCH_SIZE < validLandmarks.length) {
+      await new Promise(resolve => setTimeout(resolve, ANALYZE_BATCH_DELAY_MS));
+    }
+  }
+
+  const analyzedCount = validLandmarks.filter(l => l.photoDescription).length;
+  log.info(`[LANDMARK] 🔍 Photo analysis: ${analyzedCount}/${validLandmarks.length} descriptions generated`);
+
   const elapsed = Date.now() - startTime;
   log.info(`[LANDMARK] ✅ Discovered ${validLandmarks.length} landmarks for "${location}" in ${elapsed}ms`);
-  log.info(`[LANDMARK] 📊 Stats: ${landmarks.length} from Wikipedia → ${withPhotos.length} with photos → ${validLandmarks.length} returned`);
+  log.info(`[LANDMARK] 📊 Stats: ${landmarks.length} from Wikipedia → ${withPhotos.length} with photos → ${validLandmarks.length} returned (${analyzedCount} analyzed)`);
 
   // Log the final landmarks
   if (validLandmarks.length > 0) {
