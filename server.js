@@ -7910,8 +7910,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           wasRegenerated: imageResult?.wasRegenerated,
           totalAttempts: imageResult?.totalAttempts,
           retryHistory: imageResult?.retryHistory,
-          // Dev mode: which reference photos/avatars were used (includes landmark photos)
-          referencePhotos: allReferencePhotos
+          // Dev mode: which reference photos/avatars were used
+          referencePhotos: pagePhotos,
+          // Landmark photos (separate for frontend display)
+          landmarkPhotos: pageLandmarkPhotos
         };
       }))
     );
