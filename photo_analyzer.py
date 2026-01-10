@@ -217,7 +217,7 @@ def detect_all_faces_mediapipe(image, min_confidence=0.35):
 def create_face_thumbnail(image, face_box, size=200):
     """
     Create a square thumbnail for a detected face.
-    Uses 15% padding around face, centers in square.
+    Uses 30% padding around face, centers in square.
 
     Args:
         image: BGR or BGRA image (numpy array)
@@ -226,8 +226,8 @@ def create_face_thumbnail(image, face_box, size=200):
 
     Returns: base64-encoded JPEG string
     """
-    # Add 15% padding around face
-    face_box_padded = add_padding_to_box(face_box, padding_percent=0.15)
+    # Add 30% padding around face (increased from 15% to show full head)
+    face_box_padded = add_padding_to_box(face_box, padding_percent=0.30)
     face_img = crop_to_box(image, face_box_padded)
 
     if face_img.size == 0:
@@ -590,8 +590,8 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
 
         # Face thumbnail with background removed (768x768 for avatar generation)
         if face_box and full_img_rgba is not None:
-            # Add 15% padding around face
-            face_box_padded = add_padding_to_box(face_box, padding_percent=0.15)
+            # Add 30% padding around face (increased from 15% to show full head)
+            face_box_padded = add_padding_to_box(face_box, padding_percent=0.30)
             face_img = crop_to_box(full_img_rgba, face_box_padded)
 
             if face_img.size > 0:
