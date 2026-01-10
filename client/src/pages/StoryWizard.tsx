@@ -2858,6 +2858,7 @@ export default function StoryWizard() {
             onThemeChange={handleThemeChange}
             onCustomThemeTextChange={setCustomThemeText}
             onLegacyStoryTypeChange={setStoryType}
+            developerMode={developerMode}
           />
         );
 

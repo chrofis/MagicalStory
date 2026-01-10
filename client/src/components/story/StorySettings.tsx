@@ -185,7 +185,7 @@ export function StorySettings({
       {/* Story Type Selection - Show inline when not complete */}
       {!isStoryTypeComplete && onCategoryChange && onTopicChange && onThemeChange && onLegacyStoryTypeChange && (
         <StoryCategorySelector
-          storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | ''}
+          storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | 'historical' | ''}
           storyTopic={storyTopic}
           storyTheme={storyTheme}
           customThemeText={customThemeText}
@@ -194,6 +194,7 @@ export function StorySettings({
           onThemeChange={onThemeChange}
           onCustomThemeTextChange={onCustomThemeTextChange}
           onLegacyStoryTypeChange={onLegacyStoryTypeChange}
+          developerMode={developerMode}
         />
       )}
 
@@ -546,13 +547,14 @@ export function StorySettings({
           <div className="space-y-6 max-h-[70vh] overflow-y-auto">
             {/* Story Category Selector */}
             <StoryCategorySelector
-              storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | ''}
+              storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | 'historical' | ''}
               storyTopic={storyTopic}
               storyTheme={storyTheme}
               onCategoryChange={onCategoryChange}
               onTopicChange={onTopicChange}
               onThemeChange={onThemeChange}
               onLegacyStoryTypeChange={onLegacyStoryTypeChange}
+              developerMode={developerMode}
             />
 
             {/* Done Button */}

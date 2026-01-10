@@ -981,11 +981,27 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
     log.warn(`[LANDMARK] Wikipedia geosearch found no landmarks for ${location}`);
   }
 
-  // Step 4: Process all landmarks (Wikipedia already limits to ~50 per language)
-  // We'll fetch photos for all and let the scoring decide
-  const MAX_CANDIDATES = 60;  // Safety limit to avoid API abuse
-  const candidates = landmarks.slice(0, Math.min(MAX_CANDIDATES, landmarks.length));
-  log.debug(`[LANDMARK] Selected ${candidates.length} candidates for photo fetching`);
+  // Step 4: Pre-filter candidates using category metadata BEFORE fetching photos
+  // Prioritize: boosted landmarks > landmarks with type > untyped
+  // This reduces API calls from 55 to ~30
+  const MAX_CANDIDATES = 35;  // Enough for variety after photo failures
+
+  // Sort by category priority: boosted first, then typed, then distance
+  const prioritized = [...landmarks].sort((a, b) => {
+    // Boosted landmarks first
+    if (a.shouldBoost && !b.shouldBoost) return -1;
+    if (!a.shouldBoost && b.shouldBoost) return 1;
+    // Then landmarks with types
+    if (a.type && !b.type) return -1;
+    if (!a.type && b.type) return 1;
+    // Then by distance (closer first)
+    return (a.distance || 0) - (b.distance || 0);
+  });
+
+  const candidates = prioritized.slice(0, MAX_CANDIDATES);
+  const boostedCount = candidates.filter(l => l.shouldBoost).length;
+  const typedCount = candidates.filter(l => l.type).length;
+  log.info(`[LANDMARK] Selected ${candidates.length}/${landmarks.length} candidates (${boostedCount} boosted, ${typedCount} typed)`);
 
   // Step 5: Get Commons photo counts + fetch photos in BATCHES to avoid rate limiting
   // Wikimedia returns HTML error pages when hammered with too many parallel requests
