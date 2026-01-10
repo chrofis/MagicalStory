@@ -2244,21 +2244,22 @@ function buildAvailableLandmarksSection(landmarks) {
     .map(l => `- ${l.name}`)
     .join('\n');
 
-  return `**REAL LANDMARKS WITH PHOTOS - STRONGLY ENCOURAGED:**
-We have HIGH-QUALITY reference photos for these real landmarks near the reader's location.
-Using them creates a PERSONAL connection and produces MUCH BETTER illustrations.
+  return `**REAL LANDMARKS - You must use at least 2 landmarks from below list:**
 
 ${landmarkList}
 
-⭐ IMPORTANT: Include AT LEAST 1-2 of these landmarks in your story!
-- They make the story feel personal and locally relevant to the reader
-- Our illustrations will be significantly more accurate with real reference photos
-- Adapt the landmark to fit your story (e.g., a castle can become enchanted, a station can be magical)
+When you use a landmark from the list (even if you rename it in your story):
+- Set "isRealLandmark": true
+- Set "landmarkQuery": copy-paste the EXACT name from the list above
 
-To use a landmark:
-1. Add it to the "locations" array with "isRealLandmark": true
-2. Set "landmarkQuery" to the EXACT name from the list above
-3. The landmark can be transformed/reimagined to fit any story theme
+EXAMPLE - Using "Ruine Stein" as "The Enchanted Castle" in your story:
+{
+  "name": "The Enchanted Castle",
+  "isRealLandmark": true,
+  "landmarkQuery": "Ruine Stein"
+}
+
+Your "name" can be creative, but "landmarkQuery" MUST match the list exactly!
 `;
 }
 

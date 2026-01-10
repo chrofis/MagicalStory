@@ -251,6 +251,8 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       };
 
       console.log(`📖 [FAST] Returning story metadata: ${metadata.title} (${metadata.totalImages} images to load)`);
+      console.log(`📖 [FAST] storyCategory: "${metadata.storyCategory}", storyTopic: "${metadata.storyTopic}", storyTheme: "${metadata.storyTheme}"`);
+      console.log(`📖 [FAST] mainCharacters: ${JSON.stringify(metadata.mainCharacters)}`);
     } else {
       // SLOW PATH: Load full data blob (for non-migrated stories)
       const rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
@@ -291,6 +293,8 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       };
 
       console.log(`📖 [SLOW] Returning story metadata: ${story.title} (${metadata.totalImages} images to load)`);
+      console.log(`📖 [SLOW] storyCategory: "${metadata.storyCategory}", storyTopic: "${metadata.storyTopic}", storyTheme: "${metadata.storyTheme}"`);
+      console.log(`📖 [SLOW] mainCharacters: ${JSON.stringify(metadata.mainCharacters)}`);
     }
 
     res.json(metadata);

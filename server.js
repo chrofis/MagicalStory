@@ -7768,6 +7768,36 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [95, 'Finalizing story...', jobId]
     );
 
+    // Log API usage to generationLog BEFORE saving story (so it's included in the saved data)
+    genLog.setStage('finalize');
+    log.debug(`📊 [UNIFIED] Logging API usage to generationLog. Functions with calls:`);
+    for (const [funcName, funcData] of Object.entries(byFunc)) {
+      log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out, thinking: ${funcData.thinking_tokens || 0}`);
+      if (funcData.calls > 0) {
+        const model = getModels(funcData);
+        const directCost = funcData.direct_cost || 0;
+        const cost = directCost > 0
+          ? directCost
+          : calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        log.debug(`   >>> genLog.apiUsage('${funcName}', '${model}', {in: ${funcData.input_tokens}, out: ${funcData.output_tokens}}, cost: $${cost.toFixed(4)})`);
+        genLog.apiUsage(funcName, model, {
+          inputTokens: funcData.input_tokens,
+          outputTokens: funcData.output_tokens,
+          thinkingTokens: funcData.thinking_tokens,
+          directCost: directCost
+        }, cost);
+      }
+    }
+    // Add total cost summary to generation log
+    genLog.info('total_cost', `💰 Total API cost: $${totalCost.toFixed(4)}`, null, {
+      totalCost: totalCost,
+      totalInputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].input_tokens || 0), 0),
+      totalOutputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0),
+      runwareCost: tokenUsage.runware?.direct_cost || 0
+    });
+    genLog.finalize();
+    log.debug(`📊 [UNIFIED] genLog now has ${genLog.getEntries().length} entries (including API usage)`);
+
     // Save story to stories table so it appears in My Stories
     const storyId = jobId; // Use jobId as storyId for consistency
     const storyData = {
@@ -7875,37 +7905,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.error('❌ [UNIFIED] Failed to log credit completion:', creditErr.message);
     }
 
-    // Log API usage to generationLog for dev mode visibility
-    genLog.setStage('finalize');
-    log.debug(`📊 [UNIFIED] Logging API usage to generationLog. Functions with calls:`);
-    for (const [funcName, funcData] of Object.entries(byFunc)) {
-      log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out, thinking: ${funcData.thinking_tokens || 0}`);
-      if (funcData.calls > 0) {
-        const model = getModels(funcData);
-        const directCost = funcData.direct_cost || 0;
-        const cost = directCost > 0
-          ? directCost
-          : calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
-        log.debug(`   >>> genLog.apiUsage('${funcName}', '${model}', {in: ${funcData.input_tokens}, out: ${funcData.output_tokens}}, cost: $${cost.toFixed(4)})`);
-        genLog.apiUsage(funcName, model, {
-          inputTokens: funcData.input_tokens,
-          outputTokens: funcData.output_tokens,
-          thinkingTokens: funcData.thinking_tokens,
-          directCost: directCost
-        }, cost);
-      }
-    }
-    // Add total cost summary to generation log
-    genLog.info('total_cost', `💰 Total API cost: $${totalCost.toFixed(4)}`, null, {
-      totalCost: totalCost,
-      totalInputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].input_tokens || 0), 0),
-      totalOutputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0),
-      runwareCost: tokenUsage.runware?.direct_cost || 0
-    });
-    log.debug(`📊 [UNIFIED] genLog now has ${genLog.getEntries().length} entries`);
-    genLog.finalize();
-
-    // Build final result
+    // Build final result (genLog already finalized before story save)
     const resultData = {
       storyId,
       title,
