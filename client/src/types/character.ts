@@ -154,6 +154,8 @@ export interface CharacterAvatars {
   costumed?: Record<string, CostumedAvatarData>;
   // Cross-avatar LPIPS similarity scores (dev mode only)
   crossLpips?: Record<string, number>;
+  // Cross-avatar ArcFace identity verification (dev mode only)
+  crossArcface?: Record<string, { similarity: number; samePerson: boolean; confidence: string }>;
 }
 
 // Structured clothing details
