@@ -982,106 +982,102 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
     log.warn(`[LANDMARK] Wikipedia geosearch found no landmarks for ${location}`);
   }
 
-  // Step 4: Pre-filter candidates using category metadata BEFORE fetching photos
-  // Prioritize: boosted landmarks > landmarks with type > untyped
-  // This reduces API calls from 55 to ~30
-  const MAX_CANDIDATES = 35;  // Enough for variety after photo failures
+  // ==========================================================================
+  // NEW SIMPLIFIED FLOW:
+  // 1. Get photo COUNT for ALL landmarks (fast API, no download)
+  // 2. Score ALL: (photoCount + categoryBonus) / distancePenalty
+  // 3. Take top 30
+  // 4. Download photos only for those 30
+  // ==========================================================================
 
-  // Sort by category priority: boosted first, then typed, then distance
-  const prioritized = [...landmarks].sort((a, b) => {
-    // Boosted landmarks first
-    if (a.shouldBoost && !b.shouldBoost) return -1;
-    if (!a.shouldBoost && b.shouldBoost) return 1;
-    // Then landmarks with types
-    if (a.type && !b.type) return -1;
-    if (!a.type && b.type) return 1;
-    // Then by distance (closer first)
-    return (a.distance || 0) - (b.distance || 0);
-  });
+  // Scoring constants
+  const BOOST_BONUS = 100;    // Bonus for shouldBoost (tourist attractions, castles, etc.)
+  const TYPE_BONUS = 50;      // Bonus for having a type (Castle, Church, Museum, etc.)
+  const BATCH_SIZE = 10;      // Process 10 landmarks at a time for photo counts
+  const BATCH_DELAY_MS = 100; // 100ms delay between batches
 
-  const candidates = prioritized.slice(0, MAX_CANDIDATES);
-  const boostedCount = candidates.filter(l => l.shouldBoost).length;
-  const typedCount = candidates.filter(l => l.type).length;
-  log.info(`[LANDMARK] Selected ${candidates.length}/${landmarks.length} candidates (${boostedCount} boosted, ${typedCount} typed)`);
+  // Step 4: Get photo COUNT for ALL landmarks (fast - no download)
+  log.info(`[LANDMARK] 📊 Getting photo counts for ${landmarks.length} landmarks...`);
 
-  // Step 5: Get Commons photo counts + fetch photos in BATCHES to avoid rate limiting
-  // Wikimedia returns HTML error pages when hammered with too many parallel requests
-  const BATCH_SIZE = 5;  // Process 5 landmarks at a time
-  const BATCH_DELAY_MS = 200;  // 200ms delay between batches
-
-  log.debug(`[LANDMARK] Fetching photos in batches of ${BATCH_SIZE} with ${BATCH_DELAY_MS}ms delay`);
-
-  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-    const batch = candidates.slice(i, i + BATCH_SIZE);
-
+  for (let i = 0; i < landmarks.length; i += BATCH_SIZE) {
+    const batch = landmarks.slice(i, i + BATCH_SIZE);
     await Promise.allSettled(batch.map(async (landmark) => {
       try {
-        // Get photo count from Commons (popularity metric)
         landmark.commonsPhotoCount = await getCommonsPhotoCount(landmark.name);
+      } catch (err) {
+        landmark.commonsPhotoCount = 0;
+      }
+    }));
+    // Small delay to avoid rate limiting
+    if (i + BATCH_SIZE < landmarks.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+    }
+  }
 
-        // Fetch actual photo
+  // Step 5: Score ALL landmarks with unified formula
+  // score = (photoCount + categoryBonus) / distancePenalty
+  const scoredLandmarks = landmarks.map(l => {
+    const photoCount = l.commonsPhotoCount || 0;
+    const categoryBonus = (l.shouldBoost ? BOOST_BONUS : 0) + (l.type ? TYPE_BONUS : 0);
+    const distancePenalty = 1 + (l.distance || 0) / 1000;
+    const score = (photoCount + categoryBonus) / distancePenalty;
+    return {
+      ...l,
+      score: Math.round(score)
+    };
+  }).sort((a, b) => b.score - a.score);
+
+  // Log top ranked landmarks
+  const boostedCount = scoredLandmarks.filter(l => l.shouldBoost).length;
+  const typedCount = scoredLandmarks.filter(l => l.type).length;
+  log.info(`[LANDMARK] 📊 Scored ${landmarks.length} landmarks (${boostedCount} boosted, ${typedCount} typed)`);
+  log.debug(`[LANDMARK] Top 5 by score: ${scoredLandmarks.slice(0, 5).map(l =>
+    `${l.name} [${l.type || '?'}]${l.shouldBoost ? '🏆' : ''} photos=${l.commonsPhotoCount} score=${l.score}`
+  ).join(', ')}`);
+
+  // Step 6: Take top N and download photos ONLY for those
+  const topCandidates = scoredLandmarks.slice(0, limit + 5); // +5 buffer for photo failures
+  log.info(`[LANDMARK] 📥 Downloading photos for top ${topCandidates.length} landmarks...`);
+
+  const PHOTO_BATCH_SIZE = 5;
+  const PHOTO_BATCH_DELAY_MS = 200;
+
+  for (let i = 0; i < topCandidates.length; i += PHOTO_BATCH_SIZE) {
+    const batch = topCandidates.slice(i, i + PHOTO_BATCH_SIZE);
+    await Promise.allSettled(batch.map(async (landmark) => {
+      try {
         const photo = await fetchLandmarkPhoto(landmark.query);
         if (photo) {
           landmark.photoData = photo.photoData;
           landmark.photoUrl = photo.photoUrl;
           landmark.attribution = photo.attribution;
           landmark.hasPhoto = true;
-          // Photo size in KB (quality metric)
-          landmark.photoSizeKB = Math.round(photo.photoData.length * 0.75 / 1024);
         } else {
           landmark.hasPhoto = false;
-          landmark.photoSizeKB = 0;
         }
       } catch (err) {
         landmark.hasPhoto = false;
-        landmark.commonsPhotoCount = 0;
-        landmark.photoSizeKB = 0;
-        log.debug(`[LANDMARK] Scoring failed for "${landmark.name}":`, err.message);
+        log.debug(`[LANDMARK] Photo fetch failed for "${landmark.name}":`, err.message);
       }
     }));
-
-    // Delay between batches to avoid rate limiting (skip delay after last batch)
-    if (i + BATCH_SIZE < candidates.length) {
-      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+    // Delay between batches to avoid rate limiting
+    if (i + PHOTO_BATCH_SIZE < topCandidates.length) {
+      await new Promise(resolve => setTimeout(resolve, PHOTO_BATCH_DELAY_MS));
     }
   }
 
-  // Step 6: Score and sort by photogenic popularity with distance penalty + category boost
-  // Base score = (commonsPhotoCount + photoSizeKB) / (1 + distance/1000)
-  // +40% boost for tourist attractions, castles, churches, bridges, museums, etc.
-  const CATEGORY_BOOST = 1.4;  // +40%
-
-  const scoredLandmarks = candidates
-    .filter(l => l.hasPhoto)
-    .map(l => {
-      const rawScore = (l.commonsPhotoCount || 0) + (l.photoSizeKB || 0);
-      const distancePenalty = 1 + (l.distance || 0) / 1000;
-      const baseScore = rawScore / distancePenalty;
-      const boostedScore = l.shouldBoost ? baseScore * CATEGORY_BOOST : baseScore;
-      return {
-        ...l,
-        rawScore,
-        score: Math.round(boostedScore)
-      };
-    })
-    .sort((a, b) => b.score - a.score);
-
-  // Step 7: Return top N landmarks by score (default 30 - enough variety without overwhelming)
-  const validLandmarks = scoredLandmarks.slice(0, limit);
-
-  // Log scoring results with type info
-  if (validLandmarks.length > 0) {
-    log.debug(`[LANDMARK] Top landmarks by score: ${validLandmarks.slice(0, 5).map(l =>
-      `${l.name} [${l.type || '?'}]${l.shouldBoost ? '🏆' : ''} (${l.score})`
-    ).join(', ')}`);
-  }
+  // Filter to only those with photos, take up to limit
+  const validLandmarks = withPhotos.slice(0, limit);
 
   const elapsed = Date.now() - startTime;
   log.info(`[LANDMARK] ✅ Discovered ${validLandmarks.length} landmarks for "${location}" in ${elapsed}ms`);
+  log.info(`[LANDMARK] 📊 Stats: ${landmarks.length} from Wikipedia → ${withPhotos.length} with photos → ${validLandmarks.length} returned`);
 
-  // Log the landmarks found
+  // Log the final landmarks
   if (validLandmarks.length > 0) {
-    log.debug(`[LANDMARK] Available landmarks: ${validLandmarks.map(l => l.name).join(', ')}`);
+    log.debug(`[LANDMARK] Final landmarks: ${validLandmarks.map(l =>
+      `${l.name} [${l.type || '?'}]${l.shouldBoost ? '🏆' : ''} score=${l.score}`
+    ).join(', ')}`);
   }
 
   return validLandmarks;
