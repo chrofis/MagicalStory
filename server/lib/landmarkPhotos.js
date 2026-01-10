@@ -363,79 +363,117 @@ function extractLandmarkName(filename) {
 /**
  * Search Wikipedia for landmarks/POIs near coordinates
  * Wikipedia has clean article titles (actual landmark names)
+ * Searches multiple language Wikipedias for better coverage
  * @param {number} lat - Latitude
  * @param {number} lon - Longitude
  * @param {number} radiusMeters - Search radius
  * @param {string} excludePattern - Regex pattern to exclude (e.g., "Baden-Baden" when looking for "Baden Switzerland")
+ * @param {string} country - Country name (used to select which Wikipedias to search)
  * @returns {Promise<Array<{name, query, source}>>}
  */
-async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludePattern = null) {
-  // Use Wikipedia geosearch API - returns actual article titles
-  const url = `https://en.wikipedia.org/w/api.php?` +
-    `action=query&list=geosearch` +
-    `&gscoord=${lat}|${lon}` +
-    `&gsradius=${Math.min(radiusMeters, 10000)}` +
-    `&gslimit=50` +
-    `&format=json&origin=*`;
+async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludePattern = null, country = null) {
+  // Determine which Wikipedia languages to search based on country
+  // German-speaking countries get German Wikipedia for better local coverage
+  const defaultLangs = ['en'];
+  const countryLower = (country || '').toLowerCase();
 
-  try {
-    log.debug(`[LANDMARK] Wikipedia geosearch at ${lat}, ${lon}`);
-    const res = await fetch(url);
-    const data = await res.json();
-
-    const landmarks = [];
-    const excludeRegex = excludePattern ? new RegExp(excludePattern, 'i') : null;
-
-    for (const item of data.query?.geosearch || []) {
-      const name = item.title;
-
-      // Skip if matches exclude pattern
-      if (excludeRegex && excludeRegex.test(name)) {
-        log.debug(`[LANDMARK] Excluding "${name}" (matches exclude pattern)`);
-        continue;
-      }
-
-      // Skip generic Wikipedia articles
-      if (/^(List of|Category:|Template:|Wikipedia:)/i.test(name)) continue;
-
-      // Check if name contains landmark indicators (buildings, structures, natural features)
-      const hasLandmarkIndicator = /\b(castle|church|cathedral|abbey|monastery|bridge|tower|museum|park|garden|palace|fountain|monument|statue|station|theater|theatre|hall|plaza|square|market|gate|wall|ruin|bath|spa|temple|chapel|shrine|library|university|school|hospital|synagogue|mosque|tunnel|pass|stadium|arena|aquae|thermae|mill|dam|lake|river|falls|waterfall|cave|hill|mountain|peak|island|lighthouse)\b/i.test(name);
-
-      // Skip administrative divisions (not actual landmarks)
-      if (/^(Canton of|County of|District of|Municipality of|Province of|Region of|Department of)/i.test(name)) {
-        log.debug(`[LANDMARK] Skipping administrative: "${name}"`);
-        continue;
-      }
-
-      // Skip entries that are just city/municipality names (end with ", Country/Region")
-      // BUT keep them if they have landmark indicators (e.g., "Stein Castle, Aargau")
-      if (!hasLandmarkIndicator && /,\s*(Switzerland|Germany|Austria|France|Italy|Aargau|Canton|Zurich|Bern|Basel)$/i.test(name)) {
-        log.debug(`[LANDMARK] Skipping city/region article: "${name}"`);
-        continue;
-      }
-
-      // Skip pure municipality names - short names without descriptive words
-      // If it's a very short name (1-2 words) without landmark indicators, it's probably just a place name
-      const wordCount = name.split(/\s+/).length;
-      if (wordCount <= 2 && !hasLandmarkIndicator) {
-        log.debug(`[LANDMARK] Skipping probable municipality: "${name}"`);
-        continue;
-      }
-
-      landmarks.push({
-        name,
-        query: name, // Wikipedia title is clean, use directly
-        source: 'wikipedia-geo',
-        distance: item.dist
-      });
-    }
-
-    log.debug(`[LANDMARK] Wikipedia found ${landmarks.length} landmarks`);
-    return landmarks;
-  } catch (err) {
-    log.error(`[LANDMARK] Wikipedia geosearch error:`, err.message);
-    return [];
+  let languages = defaultLangs;
+  if (/switzerland|schweiz|suisse|svizzera/i.test(countryLower)) {
+    languages = ['de', 'en', 'fr']; // Swiss: German, English, French
+  } else if (/germany|deutschland/i.test(countryLower)) {
+    languages = ['de', 'en']; // Germany: German, English
+  } else if (/austria|österreich/i.test(countryLower)) {
+    languages = ['de', 'en']; // Austria: German, English
+  } else if (/france|frankreich/i.test(countryLower)) {
+    languages = ['fr', 'en']; // France: French, English
+  } else if (/italy|italien|italia/i.test(countryLower)) {
+    languages = ['it', 'en']; // Italy: Italian, English
+  } else if (/spain|spanien|españa/i.test(countryLower)) {
+    languages = ['es', 'en']; // Spain: Spanish, English
   }
+
+  const allLandmarks = new Map(); // Dedupe by name across languages
+  const excludeRegex = excludePattern ? new RegExp(excludePattern, 'i') : null;
+
+  // German landmark indicators (for de.wikipedia)
+  // Note: No word boundaries - German compounds like "Holzbrücke" need substring matching
+  const germanLandmarkIndicator = /(burg|schloss|kirche|dom|kathedrale|abtei|kloster|brücke|turm|museum|park|garten|palast|brunnen|denkmal|statue|bahnhof|theater|halle|platz|markt|tor|mauer|ruine|bad|therme|tempel|kapelle|bibliothek|universität|schule|spital|synagoge|moschee|tunnel|pass|stadion|arena|mühle|damm|see|fluss|wasserfall|höhle|berg|gipfel|insel|leuchtturm)/i;
+
+  // French landmark indicators (for fr.wikipedia)
+  const frenchLandmarkIndicator = /(château|église|cathédrale|abbaye|monastère|pont|tour|musée|parc|jardin|palais|fontaine|monument|statue|gare|théâtre|place|marché|porte|mur|ruine|bain|therme|temple|chapelle|bibliothèque|université|école|hôpital|synagogue|mosquée|tunnel|col|stade|moulin|barrage|lac|rivière|cascade|grotte|montagne|île|phare)/i;
+
+  for (const lang of languages) {
+    const url = `https://${lang}.wikipedia.org/w/api.php?` +
+      `action=query&list=geosearch` +
+      `&gscoord=${lat}|${lon}` +
+      `&gsradius=${Math.min(radiusMeters, 10000)}` +
+      `&gslimit=50` +
+      `&format=json&origin=*`;
+
+    try {
+      log.debug(`[LANDMARK] Wikipedia (${lang}) geosearch at ${lat}, ${lon}`);
+      const res = await fetch(url);
+      const data = await res.json();
+
+      for (const item of data.query?.geosearch || []) {
+        const name = item.title;
+
+        // Skip if matches exclude pattern
+        if (excludeRegex && excludeRegex.test(name)) {
+          continue;
+        }
+
+        // Skip generic Wikipedia articles
+        if (/^(List of|Category:|Template:|Wikipedia:|Liste |Kategorie:)/i.test(name)) continue;
+
+        // Check if name contains landmark indicators (buildings, structures, natural features)
+        // Use language-appropriate patterns
+        let hasLandmarkIndicator = /\b(castle|church|cathedral|abbey|monastery|bridge|tower|museum|park|garden|palace|fountain|monument|statue|station|theater|theatre|hall|plaza|square|market|gate|wall|ruin|bath|spa|temple|chapel|shrine|library|university|school|hospital|synagogue|mosque|tunnel|pass|stadium|arena|aquae|thermae|mill|dam|lake|river|falls|waterfall|cave|hill|mountain|peak|island|lighthouse)\b/i.test(name);
+
+        if (lang === 'de') {
+          hasLandmarkIndicator = hasLandmarkIndicator || germanLandmarkIndicator.test(name);
+        } else if (lang === 'fr') {
+          hasLandmarkIndicator = hasLandmarkIndicator || frenchLandmarkIndicator.test(name);
+        }
+
+        // Skip administrative divisions (not actual landmarks)
+        if (/^(Canton of|County of|District of|Municipality of|Province of|Region of|Department of|Kanton |Bezirk |Gemeinde |Canton de|Département)/i.test(name)) {
+          continue;
+        }
+
+        // Skip entries that are just city/municipality names (end with ", Country/Region")
+        // BUT keep them if they have landmark indicators (e.g., "Stein Castle, Aargau")
+        if (!hasLandmarkIndicator && /,\s*(Switzerland|Germany|Austria|France|Italy|Aargau|Canton|Zurich|Bern|Basel|Schweiz|Deutschland|Österreich|Frankreich|Italien)$/i.test(name)) {
+          continue;
+        }
+
+        // Skip pure municipality names - short names without descriptive words
+        const wordCount = name.split(/[\s\-]+/).length;
+        if (wordCount <= 2 && !hasLandmarkIndicator) {
+          continue;
+        }
+
+        // Dedupe by lowercase name - keep the one with shortest distance
+        const key = name.toLowerCase();
+        if (!allLandmarks.has(key) || item.dist < allLandmarks.get(key).distance) {
+          allLandmarks.set(key, {
+            name,
+            query: name,
+            source: `wikipedia-${lang}`,
+            distance: item.dist
+          });
+        }
+      }
+
+      log.debug(`[LANDMARK] Wikipedia (${lang}) found ${data.query?.geosearch?.length || 0} articles, ${allLandmarks.size} unique landmarks total`);
+    } catch (err) {
+      log.error(`[LANDMARK] Wikipedia (${lang}) geosearch error:`, err.message);
+    }
+  }
+
+  const landmarks = Array.from(allLandmarks.values());
+  log.debug(`[LANDMARK] Wikipedia found ${landmarks.length} landmarks across ${languages.length} languages`);
+  return landmarks;
 }
 
 /**
@@ -670,7 +708,7 @@ async function discoverLandmarksForLocation(city, country, limit = 10) {
   if (coords) {
     // Step 2: Use Wikipedia geosearch ONLY (clean article titles = real landmarks)
     // Don't use Wikimedia Commons geosearch - it returns messy photo filenames, not landmarks
-    landmarks = await searchWikipediaLandmarks(coords.lat, coords.lon, 10000, excludePattern);
+    landmarks = await searchWikipediaLandmarks(coords.lat, coords.lon, 10000, excludePattern, country);
     log.debug(`[LANDMARK] Wikipedia geosearch found ${landmarks.length} landmarks`);
   }
 
