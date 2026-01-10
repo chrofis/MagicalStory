@@ -287,6 +287,28 @@ async function prefetchLandmarkPhotos(visualBible) {
 }
 
 /**
+ * Get photo count from Wikimedia Commons for a landmark
+ * More photos = more photogenic/popular landmark
+ * @param {string} landmarkName - Exact landmark name
+ * @returns {Promise<number>} Number of photos on Commons
+ */
+async function getCommonsPhotoCount(landmarkName) {
+  try {
+    // Search Commons for exact landmark name in File namespace
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&list=search` +
+      `&srsearch=${encodeURIComponent('"' + landmarkName + '"')}` +
+      `&srnamespace=6&srlimit=1&format=json&origin=*`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+    return data.query?.searchinfo?.totalhits || 0;
+  } catch (err) {
+    log.debug(`[LANDMARK] Commons count error for "${landmarkName}":`, err.message);
+    return 0;
+  }
+}
+
+/**
  * Clear the photo cache (useful for testing)
  */
 function clearCache() {
@@ -397,7 +419,8 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
 
   // German landmark indicators (for de.wikipedia)
   // Note: No word boundaries - German compounds like "Holzbrücke" need substring matching
-  const germanLandmarkIndicator = /(burg|schloss|kirche|dom|kathedrale|abtei|kloster|brücke|turm|museum|park|garten|palast|brunnen|denkmal|statue|bahnhof|theater|halle|platz|markt|tor|mauer|ruine|bad|therme|tempel|kapelle|bibliothek|universität|schule|spital|synagoge|moschee|tunnel|pass|stadion|arena|mühle|damm|see|fluss|wasserfall|höhle|berg|gipfel|insel|leuchtturm)/i;
+  // "bad" only at end (Thermalbad) to avoid matching city names like "Ennetbaden"
+  const germanLandmarkIndicator = /(burg|schloss|kirche|dom|kathedrale|abtei|kloster|brücke|turm|museum|park|garten|palast|brunnen|denkmal|statue|bahnhof|theater|halle|platz|markt|tor|mauer|ruine|bad$|therme|tempel|kapelle|bibliothek|universität|schule|spital|synagoge|moschee|tunnel|pass|stadion|arena|mühle|damm|see|fluss|wasserfall|höhle|berg|gipfel|insel|leuchtturm)/i;
 
   // French landmark indicators (for fr.wikipedia)
   const frenchLandmarkIndicator = /(château|église|cathédrale|abbaye|monastère|pont|tour|musée|parc|jardin|palais|fontaine|monument|statue|gare|théâtre|place|marché|porte|mur|ruine|bain|therme|temple|chapelle|bibliothèque|université|école|hôpital|synagogue|mosquée|tunnel|col|stade|moulin|barrage|lac|rivière|cascade|grotte|montagne|île|phare)/i;
@@ -441,6 +464,12 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
           continue;
         }
 
+        // Skip Swiss city articles (e.g., "Baden AG", "Zürich ZH")
+        if (/^[A-ZÄÖÜ][a-zäöü]+\s+(AG|ZH|BE|LU|SG|BL|BS|SO|TG|GR|VS|NE|GE|VD|TI|FR|JU|SH|AR|AI|OW|NW|GL|ZG|SZ|UR)$/i.test(name)) {
+          log.debug(`[LANDMARK] Skipping Swiss city article: "${name}"`);
+          continue;
+        }
+
         // Skip entries that are just city/municipality names (end with ", Country/Region")
         // BUT keep them if they have landmark indicators (e.g., "Stein Castle, Aargau")
         if (!hasLandmarkIndicator && /,\s*(Switzerland|Germany|Austria|France|Italy|Aargau|Canton|Zurich|Bern|Basel|Schweiz|Deutschland|Österreich|Frankreich|Italien)$/i.test(name)) {
@@ -450,6 +479,13 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
         // Skip pure municipality names - short names without descriptive words
         const wordCount = name.split(/[\s\-]+/).length;
         if (wordCount <= 2 && !hasLandmarkIndicator) {
+          log.debug(`[LANDMARK] Skipping short non-landmark: "${name}"`);
+          continue;
+        }
+
+        // Skip single-word names that look like place names (capitalized, no indicator)
+        if (wordCount === 1 && /^[A-ZÄÖÜ][a-zäöüß]+$/.test(name) && !hasLandmarkIndicator) {
+          log.debug(`[LANDMARK] Skipping single-word place name: "${name}"`);
           continue;
         }
 
@@ -718,33 +754,64 @@ async function discoverLandmarksForLocation(city, country, limit = 10) {
     log.warn(`[LANDMARK] Wikipedia geosearch found no landmarks for ${location}`);
   }
 
-  // Step 4: Sort by distance (closer landmarks first - they're more relevant to the reader's location)
-  landmarks.sort((a, b) => (a.distance || 99999) - (b.distance || 99999));
+  // Step 4: Take candidates within reasonable distance (10km already filtered by Wikipedia)
+  // Don't sort by distance - we'll sort by photo popularity instead
+  const candidates = landmarks.slice(0, Math.min(limit * 3, landmarks.length));
+  log.debug(`[LANDMARK] Selected ${candidates.length} candidates for scoring`);
 
-  // Step 5: Take top N candidates for photo fetching
-  const topLandmarks = landmarks.slice(0, Math.min(limit * 2, landmarks.length));
-  log.debug(`[LANDMARK] Selected ${topLandmarks.length} candidates for photo fetch`);
-
-  // Step 6: Pre-fetch photos for top landmarks (in parallel)
-  await Promise.allSettled(topLandmarks.map(async (landmark) => {
+  // Step 5: Get Commons photo counts + fetch photos in parallel
+  // This tells us how photogenic/popular each landmark is
+  await Promise.allSettled(candidates.map(async (landmark) => {
     try {
+      // Get photo count from Commons (popularity metric)
+      landmark.commonsPhotoCount = await getCommonsPhotoCount(landmark.name);
+
+      // Fetch actual photo
       const photo = await fetchLandmarkPhoto(landmark.query);
       if (photo) {
         landmark.photoData = photo.photoData;
         landmark.photoUrl = photo.photoUrl;
         landmark.attribution = photo.attribution;
         landmark.hasPhoto = true;
+        // Photo size in KB (quality metric)
+        landmark.photoSizeKB = Math.round(photo.photoData.length * 0.75 / 1024);
       } else {
         landmark.hasPhoto = false;
+        landmark.photoSizeKB = 0;
       }
     } catch (err) {
       landmark.hasPhoto = false;
-      log.debug(`[LANDMARK] Photo fetch failed for "${landmark.name}":`, err.message);
+      landmark.commonsPhotoCount = 0;
+      landmark.photoSizeKB = 0;
+      log.debug(`[LANDMARK] Scoring failed for "${landmark.name}":`, err.message);
     }
   }));
 
-  // Step 7: Filter to only landmarks with successful photo fetch, take top N
-  const validLandmarks = topLandmarks.filter(l => l.hasPhoto).slice(0, limit);
+  // Step 6: Score and sort by photogenic popularity with distance penalty
+  // Score = (commonsPhotoCount + photoSizeKB) / (1 + distance/1000)
+  // This penalizes far-away landmarks (e.g., 6km away = score divided by 7)
+  const scoredLandmarks = candidates
+    .filter(l => l.hasPhoto)
+    .map(l => {
+      const rawScore = (l.commonsPhotoCount || 0) + (l.photoSizeKB || 0);
+      const distancePenalty = 1 + (l.distance || 0) / 1000;
+      return {
+        ...l,
+        rawScore,
+        score: Math.round(rawScore / distancePenalty)
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  // Step 7: Take top N by score
+  const validLandmarks = scoredLandmarks.slice(0, limit);
+
+  // Log scoring results
+  if (validLandmarks.length > 0) {
+    log.debug(`[LANDMARK] Top landmarks by score: ${validLandmarks.slice(0, 5).map(l =>
+      l.name + '(' + l.commonsPhotoCount + ' photos, ' + l.photoSizeKB + 'KB)'
+    ).join(', ')}`);
+  }
 
   const elapsed = Date.now() - startTime;
   log.info(`[LANDMARK] ✅ Discovered ${validLandmarks.length} landmarks for "${location}" in ${elapsed}ms`);
