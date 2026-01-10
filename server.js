@@ -1749,16 +1749,22 @@ ${adventureGuideContent}`
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
 
-    // Build available landmarks section for the prompt
+    // Build available landmarks section for the prompt (include photo descriptions if available)
     let availableLandmarksSection = '';
     if (availableLandmarks && availableLandmarks.length > 0) {
-      const landmarkNames = availableLandmarks
+      const landmarkEntries = availableLandmarks
         .slice(0, 10) // Limit to top 10 landmarks
-        .map(l => `- ${l.name}${l.type ? ` (${l.type})` : ''}`)
+        .map(l => {
+          let entry = `- ${l.name}`;
+          if (l.type) entry += ` (${l.type})`;
+          if (l.photoDescription) entry += `: ${l.photoDescription}`;
+          return entry;
+        })
         .join('\n');
       availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
-${landmarkNames}`;
-      log.info(`[LANDMARK] ✅ Including ${availableLandmarks.length} landmarks in ideas prompt: ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
+${landmarkEntries}`;
+      const withDesc = availableLandmarks.filter(l => l.photoDescription).length;
+      log.info(`[LANDMARK] ✅ Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
       log.info(`[LANDMARK] ⚠️ No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
     }
@@ -2027,16 +2033,22 @@ ${adventureGuideContent}`
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
 
-    // Build available landmarks section for the prompt
+    // Build available landmarks section for the prompt (include photo descriptions if available)
     let availableLandmarksSection = '';
     if (availableLandmarks && availableLandmarks.length > 0) {
-      const landmarkNames = availableLandmarks
+      const landmarkEntries = availableLandmarks
         .slice(0, 10) // Limit to top 10 landmarks
-        .map(l => `- ${l.name}${l.type ? ` (${l.type})` : ''}`)
+        .map(l => {
+          let entry = `- ${l.name}`;
+          if (l.type) entry += ` (${l.type})`;
+          if (l.photoDescription) entry += `: ${l.photoDescription}`;
+          return entry;
+        })
         .join('\n');
       availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
-${landmarkNames}`;
-      log.info(`[LANDMARK] ✅ [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt: ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
+${landmarkEntries}`;
+      const withDesc = availableLandmarks.filter(l => l.photoDescription).length;
+      log.info(`[LANDMARK] ✅ [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
       log.info(`[LANDMARK] ⚠️ [STREAM] No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
     }

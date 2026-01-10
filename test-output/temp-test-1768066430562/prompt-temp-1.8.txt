@@ -1,15 +1,29 @@
+SYSTEM INSTRUCTION:
+You are an expert character artist creating stylized avatar illustrations for children's books.
+You are given a reference avatar for FACIAL IDENTITY ONLY.
+Your task is to TRANSFORM the avatar into: pixar style wearing a completely different costume.
+- The OUTPUT must be pixar STYLE illustration - NOT photo-realistic
+- The reference image is ONLY for facial identity extraction
+- Do NOT copy the visual style of the reference image
+- Render the character as a pixar illustration, not a photograph
+- Preserves the EXACT facial identity from the reference avatar
+- IGNORES the reference clothing completely - apply the new costume instead
+- IGNORES the reference body shape - generate a new body fitting the costume
+- Creates all 4 grid quadrants with the SAME costume - IDENTICAL outfit in all 4 views
+
+USER PROMPT:
 TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference avatar.
 
 CRITICAL REQUIREMENT: All 4 quadrants must show the IDENTICAL character wearing the IDENTICAL costume. Do not vary the outfit between quadrants.
 
 IMPORTANT - STYLE TRANSFORMATION:
-- The reference image is photo-realistic but your OUTPUT must be {ART_STYLE_PROMPT} illustration
+- The reference image is photo-realistic but your OUTPUT must be 3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading illustration
 - Transform the photo-realistic face into this art style while preserving identity
 - This is NOT a photo edit - create a NEW illustration in the specified art style
 - Do NOT copy the visual style of the reference image
 
-SUBJECT & COSTUME (PRIORITY) - {COSTUME_TYPE}:
-{COSTUME_DESCRIPTION}
+SUBJECT & COSTUME (PRIORITY) - medieval peasant:
+A medieval peasant outfit: rough brown linen tunic with rope belt, simple cream-colored undershirt with loose sleeves, brown wool pants, and worn leather boots. No hat or head covering.
 CRITICAL: Change clothing COMPLETELY from reference. The character is wearing a historical/themed costume.
 This is a COMPLETE outfit change from neck to toe. Include: shirt/top, pants/skirt/dress, footwear, and any accessories.
 The costume should look authentic and age-appropriate for a children's book illustration.
@@ -55,3 +69,6 @@ GRID REQUIREMENTS:
 - Lighting: Natural, even, studio-style diffused light
 
 Output: High quality illustration in the specified art style (NOT photo-realistic).
+
+
+TEMPERATURE: 1.8

@@ -2351,10 +2351,18 @@ function buildAvailableLandmarksSection(landmarks) {
     return '';
   }
 
-  // Format: "- Kurpark (Baden) [Park]" or "- Ruine Stein [Ruins]"
+  // Format with photo descriptions if available:
+  // "- Kurpark (Baden) [Park]: A beautiful public park with manicured lawns..."
   const landmarkList = landmarks
-    .map(l => l.type ? `- ${l.name} [${l.type}]` : `- ${l.name}`)
+    .map(l => {
+      let entry = `- ${l.name}`;
+      if (l.type) entry += ` [${l.type}]`;
+      if (l.photoDescription) entry += `\n  PHOTO DESCRIPTION: ${l.photoDescription}`;
+      return entry;
+    })
     .join('\n');
+
+  const hasDescriptions = landmarks.some(l => l.photoDescription);
 
   return `**REAL LANDMARKS - You must use at least 2 landmarks from below list:**
 
@@ -2363,12 +2371,14 @@ ${landmarkList}
 When you use a landmark from the list (even if you rename it in your story):
 - Set "isRealLandmark": true
 - Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
+${hasDescriptions ? `- IMPORTANT: If the landmark has a PHOTO DESCRIPTION above, copy it EXACTLY to "description" - do NOT invent your own!` : ''}
 
 EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 {
   "name": "The Enchanted Castle",
   "isRealLandmark": true,
-  "landmarkQuery": "Ruine Stein"
+  "landmarkQuery": "Ruine Stein",
+  "description": "<copy the PHOTO DESCRIPTION if provided, otherwise write your own>"
 }
 
 Your "name" can be creative, but "landmarkQuery" MUST match the original name exactly (without the [type] suffix)!

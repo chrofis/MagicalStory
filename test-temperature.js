@@ -69,14 +69,18 @@ async function generateWithTemperature(character, costume, temperature, outputDi
   const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
   const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
-  // MODIFIED system instruction per user request
+  // MODIFIED system instruction with anti-photorealism emphasis
   const systemText = `You are an expert character artist creating stylized avatar illustrations for children's books.
 You are given a reference avatar for FACIAL IDENTITY ONLY.
 Your task is to TRANSFORM the avatar into: ${artStyle} style wearing a completely different costume.
+- The OUTPUT must be ${artStyle} STYLE illustration - NOT photo-realistic
+- The reference image is ONLY for facial identity extraction
+- Do NOT copy the visual style of the reference image
+- Render the character as a ${artStyle} illustration, not a photograph
 - Preserves the EXACT facial identity from the reference avatar
 - IGNORES the reference clothing completely - apply the new costume instead
 - IGNORES the reference body shape - generate a new body fitting the costume
-- Creates all 4 grid quadrants with the SAME costume`;
+- Creates all 4 grid quadrants with the SAME costume - IDENTICAL outfit in all 4 views`;
 
   const requestBody = {
     systemInstruction: {
