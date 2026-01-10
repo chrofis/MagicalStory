@@ -204,7 +204,7 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
         />
 
         <ModelDropdown
-          label={language === 'de' ? 'Outline-Modell' : language === 'fr' ? 'Modèle de plan' : 'Outline Model'}
+          label={language === 'de' ? 'Geschichte (Kombiniert)' : language === 'fr' ? 'Histoire (Combiné)' : 'Story (Combined)'}
           icon={<Sparkles size={12} />}
           value={selections.outlineModel}
           options={TEXT_MODELS}
