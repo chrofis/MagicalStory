@@ -1568,6 +1568,23 @@ export function CharacterForm({
                 </div>
               </div>
             )}
+            {/* Cross-avatar ArcFace identity scores in developer mode */}
+            {(developerMode || isImpersonating) && character.avatars?.crossArcface && (
+              <div className="text-[10px] text-gray-500 bg-blue-50 border border-blue-200 rounded p-2">
+                <div className="font-medium mb-1">Cross-Avatar ArcFace ID:</div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(character.avatars.crossArcface as Record<string, { similarity: number; samePerson: boolean; confidence: string }>).map(([pair, data]) => {
+                    const [cat1, cat2] = pair.split('_vs_');
+                    const color = data.samePerson ? 'text-green-600' : 'text-red-600';
+                    return (
+                      <span key={pair} className={color}>
+                        {cat1} ↔ {cat2}: {((data.similarity ?? 0) * 100).toFixed(0)}% ({data.confidence})
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               {onRegenerateAvatarsWithTraits && (
                 <button

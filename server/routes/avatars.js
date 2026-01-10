@@ -1724,6 +1724,37 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
         }
       }
+
+      // Cross-avatar ArcFace identity comparison (style-invariant)
+      results.crossArcface = {};
+      const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+      for (const [cat1, cat2] of crossPairs) {
+        if (avatarFaces[cat1] && avatarFaces[cat2]) {
+          try {
+            const response = await fetch(`${photoAnalyzerUrl}/compare-identity`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                image1: avatarFaces[cat1],
+                image2: avatarFaces[cat2]
+              }),
+              signal: AbortSignal.timeout(30000)
+            });
+            const arcResult = await response.json();
+            if (arcResult?.success) {
+              const pairKey = `${cat1}_vs_${cat2}`;
+              results.crossArcface[pairKey] = {
+                similarity: arcResult.similarity,
+                samePerson: arcResult.same_person,
+                confidence: arcResult.confidence
+              };
+              console.log(`📊 [ARCFACE CROSS] ${cat1} vs ${cat2}: ${arcResult.similarity?.toFixed(4)} (${arcResult.confidence}, same_person: ${arcResult.same_person})`);
+            }
+          } catch (err) {
+            log.warn(`[ARCFACE CROSS] Failed ${cat1} vs ${cat2}:`, err.message);
+          }
+        }
+      }
     }
 
     log.debug(`✅ [CLOTHING AVATARS] Total time: ${Date.now() - generationStart}ms`)
