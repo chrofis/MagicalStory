@@ -35,8 +35,8 @@ Return a JSON object with this EXACT structure:
   "detailedHairAnalysis": {
     "texture": "<fine | medium | thick | coarse>",
     "type": "<straight | wavy | curly | coily>",
-    "lengthTop": "<length of hair on top in cm, e.g. '5cm', '15cm', '30cm'>",
-    "lengthSides": "<length of hair on sides in cm, e.g. '2cm', '10cm', '25cm'>",
+    "lengthTop": "<MUST be one of: scalp-close | very short | short | medium | long | very long> - scalp-close=buzz cut, very short=finger length, short=2 inches, medium=covers forehead, long=past ears, very long=past shoulders",
+    "lengthSides": "<MUST be one of: shaved | scalp-close | very short | short | medium | long> - shaved=skin visible, scalp-close=stubble, very short=above ears, short=covers top of ears, medium=covers ears fully, long=past earlobes",
     "bangsEndAt": "<where fringe/bangs end - 'above eyebrows' | 'at eyebrows' | 'below eyebrows' | 'no bangs'>",
     "styling": "<messy | slicked | natural | styled | tousled>",
     "direction": "<which way hair sweeps - 'left' | 'right' | 'back' | 'forward' | 'center part' | 'side part left' | 'side part right'>",

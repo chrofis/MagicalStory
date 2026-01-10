@@ -44,16 +44,71 @@ Priority order:
 | Parameter | Source | Example | Priority |
 |-----------|--------|---------|----------|
 | **Avatar Clothing** | `photo.clothingDescription` | "red winter parka, blue jeans" | **Primary** |
+| **Costumed Clothing** | `avatars.costumed[type].clothing` | "pirate vest, striped pants, bandana" | **For costumes** |
 | **Clothing Style** | `char.clothingStyle` | "blue and white striped" | **Fallback** |
 | **Clothing Category** | `photo.clothingCategory` | "winter", "standard", "costumed:pirate" | Selects avatar |
+
+### Clothing Categories
+
+| Category | Source | Example |
+|----------|--------|---------|
+| `standard` | `avatars.standard` + `avatars.clothing.standard` | Everyday clothes |
+| `winter` | `avatars.winter` + `avatars.clothing.winter` | Winter jacket, boots |
+| `summer` | `avatars.summer` + `avatars.clothing.summer` | T-shirt, shorts |
+| `costumed:pirate` | `avatars.costumed.pirate` + clothing | Full pirate outfit |
+| `costumed:knight` | `avatars.costumed.knight` + clothing | Knight armor |
+| `costumed:superhero` | `avatars.costumed.superhero` + clothing | Superhero costume |
 
 ### Clothing Flow
 
 ```
-1. Avatar selected based on scene (winter/summer/standard/costumed)
-2. clothingDescription extracted from avatar evaluation
+Standard/Winter/Summer:
+1. Avatar selected based on scene requirements
+2. clothingDescription from avatars.clothing[category]
 3. Passed as: "Wearing: ${clothingDescription}"
-4. Fallback: "CLOTHING STYLE (MUST MATCH): ${clothingStyle}"
+
+Costumed (e.g., costumed:pirate):
+1. Costume type extracted from scene (e.g., "pirate")
+2. Avatar from: avatars.costumed[costumeKey] or avatars.styledAvatars[style].costumed[costumeKey]
+3. Clothing from: avatars.costumed[costumeKey].clothing OR avatars.clothing.costumed[costumeKey]
+4. Passed as: "Wearing: ${costumeClothingDescription}"
+
+Fallback:
+- If no avatar clothing: "CLOTHING STYLE (MUST MATCH): ${clothingStyle}"
+```
+
+### Costumed Avatar Data Structure
+
+```typescript
+avatars: {
+  // Regular seasonal avatars
+  standard: "base64...",
+  winter: "base64...",
+  summer: "base64...",
+
+  // Costumed avatars (per costume type)
+  costumed: {
+    pirate: {
+      imageData: "base64...",
+      clothing: "striped vest, brown pants, red bandana, black boots"
+    },
+    knight: {
+      imageData: "base64...",
+      clothing: "silver armor, blue cape, leather boots"
+    }
+  },
+
+  // Clothing descriptions per category
+  clothing: {
+    standard: "blue t-shirt, jeans",
+    winter: "red parka, dark jeans, snow boots",
+    summer: "yellow sundress, sandals",
+    costumed: {
+      pirate: "striped vest, brown pants, red bandana",
+      knight: "silver armor, blue cape"
+    }
+  }
+}
 ```
 
 ---
@@ -97,6 +152,7 @@ Priority order:
 
 ## Example Character Reference Output
 
+### Standard Clothing Example
 ```
 **CHARACTER REFERENCE PHOTOS (in order):**
 1. Roger, Looks: adult, 45 years old, man, Build: athletic. Eyes: brown.
@@ -105,6 +161,19 @@ Priority order:
 2. Sophie, Looks: young-school-age, 7 years old, girl, Build: slim.
    Eyes: blue. Hair: blonde, wavy, long.
    Wearing: pink sweater, purple leggings
+
+HEIGHT ORDER: Sophie (shortest) -> Roger (much taller)
+```
+
+### Costumed Example (Pirate Adventure)
+```
+**CHARACTER REFERENCE PHOTOS (in order):**
+1. Roger, Looks: adult, 45 years old, man, Build: athletic. Eyes: brown.
+   Hair: dark blonde, ponytail, shoulder-length. Facial hair: clean-shaven.
+   Wearing: brown leather vest, white puffy shirt, black pants, red sash, boots
+2. Sophie, Looks: young-school-age, 7 years old, girl, Build: slim.
+   Eyes: blue. Hair: blonde, wavy, long.
+   Wearing: striped blue/white shirt, brown pants, red bandana, black boots
 
 HEIGHT ORDER: Sophie (shortest) -> Roger (much taller)
 ```
