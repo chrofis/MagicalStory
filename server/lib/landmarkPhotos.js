@@ -114,7 +114,7 @@ async function fetchWikipediaCategories(lang, pageIds) {
     const batch = pageIds.slice(i, i + batchSize);
     const url = `https://${lang}.wikipedia.org/w/api.php?` +
       `action=query&pageids=${batch.join('|')}` +
-      `&prop=categories&cllimit=10&clshow=!hidden` +
+      `&prop=categories&cllimit=500&clshow=!hidden` +
       `&format=json&origin=*`;
 
     try {
