@@ -346,6 +346,42 @@ async function fetchFromOpenverse(query) {
 }
 
 /**
+ * Fetch the main image from a Wikipedia article using pageimages API
+ * This is more accurate than searching by name because we use the exact pageId
+ * @param {string} lang - Wikipedia language code (e.g., 'de', 'en')
+ * @param {number} pageId - Wikipedia page ID
+ * @returns {Promise<{url: string, attribution: string, license: string} | null>}
+ */
+async function fetchWikipediaArticleImage(lang, pageId) {
+  try {
+    const url = `https://${lang}.wikipedia.org/w/api.php?` +
+      `action=query&pageids=${pageId}` +
+      `&prop=pageimages&piprop=original` +
+      `&format=json&origin=*`;
+
+    log.debug(`[LANDMARK] Wikipedia article image: ${lang}:${pageId}`);
+    const res = await fetch(url, { headers: WIKI_HEADERS });
+    const data = await res.json();
+
+    const page = data.query?.pages?.[pageId];
+    if (!page?.original?.source) {
+      log.debug(`[LANDMARK] Wikipedia article has no image: ${lang}:${pageId}`);
+      return null;
+    }
+
+    log.debug(`[LANDMARK] Wikipedia article image found: ${page.original.source.substring(0, 80)}...`);
+    return {
+      url: page.original.source,
+      attribution: `Image from Wikipedia (${lang})`,
+      license: 'CC'
+    };
+  } catch (err) {
+    log.error(`[LANDMARK] Wikipedia article image error:`, err.message);
+    return null;
+  }
+}
+
+/**
  * Download image and convert to base64
  * @param {string} imageUrl - URL of image to download
  * @returns {Promise<string>} Base64 data URI
@@ -387,28 +423,41 @@ async function downloadAsBase64(imageUrl) {
 /**
  * Fetch landmark photo with caching and fallback
  * @param {string} landmarkQuery - Search query for the landmark
+ * @param {number} [pageId] - Wikipedia page ID (for accurate article image lookup)
+ * @param {string} [lang] - Wikipedia language code (e.g., 'de', 'en')
  * @returns {Promise<{photoUrl: string, photoData: string, attribution: string, source: string} | null>}
  */
-async function fetchLandmarkPhoto(landmarkQuery) {
+async function fetchLandmarkPhoto(landmarkQuery, pageId = null, lang = null) {
   if (!landmarkQuery || typeof landmarkQuery !== 'string') {
     return null;
   }
 
-  // Check cache first
-  const cacheKey = landmarkQuery.toLowerCase().trim();
+  // Check cache first (include pageId in cache key if available for specificity)
+  const cacheKey = pageId ? `${lang}:${pageId}` : landmarkQuery.toLowerCase().trim();
   const cached = photoCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     log.debug(`[LANDMARK] Cache hit for: "${landmarkQuery}"`);
     return cached.data;
   }
 
-  log.info(`[LANDMARK] Fetching photo for: "${landmarkQuery}"`);
+  log.info(`[LANDMARK] Fetching photo for: "${landmarkQuery}"${pageId ? ` (${lang}:${pageId})` : ''}`);
 
-  // Try Wikimedia Commons first (best for landmarks)
-  let result = await fetchFromWikimedia(landmarkQuery);
-  let source = 'wikimedia';
+  let result = null;
+  let source = null;
 
-  // Fallback to Openverse if Wikimedia fails
+  // PRIORITY 1: Try Wikipedia article image (most accurate - uses exact pageId)
+  if (pageId && lang) {
+    result = await fetchWikipediaArticleImage(lang, pageId);
+    source = 'wikipedia-article';
+  }
+
+  // PRIORITY 2: Fallback to Wikimedia Commons search
+  if (!result) {
+    result = await fetchFromWikimedia(landmarkQuery);
+    source = 'wikimedia';
+  }
+
+  // PRIORITY 3: Fallback to Openverse
   if (!result) {
     log.debug(`[LANDMARK] Trying Openverse fallback...`);
     result = await fetchFromOpenverse(landmarkQuery);
@@ -1052,7 +1101,7 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
     const batch = topCandidates.slice(i, i + PHOTO_BATCH_SIZE);
     await Promise.allSettled(batch.map(async (landmark) => {
       try {
-        const photo = await fetchLandmarkPhoto(landmark.query);
+        const photo = await fetchLandmarkPhoto(landmark.query, landmark.pageId, landmark.lang);
         if (photo) {
           landmark.photoData = photo.photoData;
           landmark.photoUrl = photo.photoUrl;
