@@ -1397,16 +1397,34 @@ def get_face_embedding():
 
             height, width = image.shape[:2]
 
-            # Crop to quadrant if specified
+            # Crop to quadrant if specified (supports 2x2 and 3x3 grids)
             if quadrant:
-                mid_h = height // 2
-                mid_w = width // 2
-                quadrant_map = {
-                    'top-left': (0, mid_h, 0, mid_w),
-                    'top-right': (0, mid_h, mid_w, width),
-                    'bottom-left': (mid_h, height, 0, mid_w),
-                    'bottom-right': (mid_h, height, mid_w, width)
-                }
+                grid_size = data.get('grid_size', 2)
+                
+                if grid_size == 3:
+                    third_h = height // 3
+                    third_w = width // 3
+                    quadrant_map = {
+                        'top-left': (0, third_h, 0, third_w),
+                        'top-center': (0, third_h, third_w, 2*third_w),
+                        'top-right': (0, third_h, 2*third_w, width),
+                        'middle-left': (third_h, 2*third_h, 0, third_w),
+                        'middle-center': (third_h, 2*third_h, third_w, 2*third_w),
+                        'middle-right': (third_h, 2*third_h, 2*third_w, width),
+                        'bottom-left': (2*third_h, height, 0, third_w),
+                        'bottom-center': (2*third_h, height, third_w, 2*third_w),
+                        'bottom-right': (2*third_h, height, 2*third_w, width)
+                    }
+                else:
+                    mid_h = height // 2
+                    mid_w = width // 2
+                    quadrant_map = {
+                        'top-left': (0, mid_h, 0, mid_w),
+                        'top-right': (0, mid_h, mid_w, width),
+                        'bottom-left': (mid_h, height, 0, mid_w),
+                        'bottom-right': (mid_h, height, mid_w, width)
+                    }
+                    
                 if quadrant in quadrant_map:
                     y1, y2, x1, x2 = quadrant_map[quadrant]
                     image = image[y1:y2, x1:x2]

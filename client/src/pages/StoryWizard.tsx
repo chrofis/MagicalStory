@@ -17,6 +17,7 @@ import {
   WizardStep5ArtStyle,
   WizardStep6Summary,
 } from './wizard';
+import { getCurrentSeason } from './wizard/WizardStep3BookSettings';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 import { FaceSelectionModal } from '@/components/character';
 
@@ -206,6 +207,8 @@ export default function StoryWizard() {
   const streamAbortRef = useRef<{ abort: () => void } | null>(null);
   // User's location from IP (for story setting personalization)
   const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null } | null>(null);
+  // Season for story setting (auto-calculated from current date, user can override)
+  const [season, setSeason] = useState<string>(() => getCurrentSeason());
 
   // Step 7: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
@@ -2853,7 +2856,7 @@ export default function StoryWizard() {
         );
 
       case 2:
-        // Step 2: Book Settings (reading level + pages)
+        // Step 2: Book Settings (reading level + pages + location + season)
         return (
           <WizardStep3BookSettings
             languageLevel={languageLevel}
@@ -2863,6 +2866,10 @@ export default function StoryWizard() {
             storyLanguage={storyLanguage}
             onStoryLanguageChange={setStoryLanguage}
             developerMode={developerMode}
+            userLocation={userLocation}
+            onLocationChange={setUserLocation}
+            season={season}
+            onSeasonChange={setSeason}
           />
         );
 

@@ -50,39 +50,53 @@ async function generate3x3Grid(character, costume, temperature, outputDir) {
   const artStyle = 'pixar';
   const artStylePrompt = '3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading';
 
-  // Special prompt for 3x3 grid
+  // Special prompt for 3x3 grid with anchor and variations
   const gridPrompt = `⚠️ MANDATORY OUTPUT STYLE: ${artStylePrompt}
 DO NOT CREATE PHOTO-REALISTIC OUTPUT. CREATE AN ILLUSTRATION.
 
-TASK: Create a 3x3 grid (9 images) showing the SAME character in different poses/angles, ALL wearing the SAME costume.
+TASK: Create a 3x3 grid (9 images) of the SAME character. 8 images show the NEW COSTUME, 1 image (middle-center) shows the ORIGINAL clothing styled.
 
-COSTUME - ${costume.costume}:
+NEW COSTUME - ${costume.costume}:
 ${costume.description}
 
-ALL 9 IMAGES MUST SHOW:
-- The EXACT same person (identical face from reference)
-- The EXACT same costume (described above)
-- ${artStyle} illustration style (NOT photo-realistic)
-
 GRID LAYOUT (3 rows x 3 columns):
-Row 1: Face close-ups (front, 3/4 left, 3/4 right)
-Row 2: Head & shoulders (front, 3/4 left, 3/4 right)
-Row 3: Full body (front, 3/4 left, side profile)
+
+TOP ROW - All 3 faces looking FORWARD at camera, wearing NEW COSTUME:
+| Top-Left: Face front, costumed | Top-Center: Face front, costumed | Top-Right: Face front, costumed |
+
+MIDDLE ROW - Faces looking RIGHT, except middle-center ANCHOR looks FORWARD:
+| Middle-Left: Face right, costumed | Middle-Center: ANCHOR - Face FRONT, Original clothes, styled (NO costume) | Middle-Right: Face right, costumed |
+
+BOTTOM ROW - Full body views, wearing NEW COSTUME:
+| Bottom-Left: Full body front | Bottom-Center: Full body front | Bottom-Right: Full body facing right |
+
+IMPORTANT - SLIGHT FACE VARIATIONS:
+- Add SLIGHT natural variations between faces (subtle expression changes, minor angle shifts)
+- This helps test which variation best preserves identity
+- Variations should be subtle - still clearly the same person
+- The ANCHOR (middle-center) should match reference most closely
 
 CRITICAL:
-- Same face identity in ALL 9 images
-- Same costume in ALL 9 images
-- ${artStyle} illustrated style throughout
+- ALL 9 images show the SAME PERSON (same identity from reference)
+- 8 images wear the NEW COSTUME
+- 1 image (middle-center) wears ORIGINAL CLOTHES from reference - this is the styled ANCHOR
+- ${artStyle} illustrated style throughout (NOT photo-realistic)
 - Light grey studio background in each cell
 
-REFERENCE IMAGE: Use ONLY for facial identity. IGNORE reference clothing.`;
+REFERENCE IMAGE: Extract facial identity. Middle-center copies the pose/clothes but in illustration style.`;
 
   const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
   const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
   const systemText = `You create character illustration grids for children's books.
-Generate a 3x3 grid showing the same character in 9 different poses/angles.
-All 9 cells must show the IDENTICAL person wearing the IDENTICAL costume.
+
+Generate a 3x3 grid showing the same character with SLIGHT VARIATIONS in each cell.
+- TOP ROW: 3 faces looking forward, all in costume
+- MIDDLE ROW: 3 faces looking right, but MIDDLE-CENTER shows original clothes (anchor)
+- BOTTOM ROW: 3 full body views in costume
+
+Add subtle natural variations to help identify which face best matches the reference.
+The middle-center cell is the ANCHOR - same pose/clothes as reference, just styled.
 Output must be ${artStyle} illustration style, NOT photo-realistic.`;
 
   const requestBody = {

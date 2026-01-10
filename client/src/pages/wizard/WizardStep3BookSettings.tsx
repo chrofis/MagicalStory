@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { BookOpen } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BookOpen, MapPin, Sun, Snowflake, Leaf, Flower2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
@@ -11,6 +11,29 @@ const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[]
   { code: 'en', name: 'English', flag: '🇬🇧' },
 ];
 
+// Season options
+const SEASONS = [
+  { value: 'spring', icon: Flower2, color: 'text-pink-500' },
+  { value: 'summer', icon: Sun, color: 'text-yellow-500' },
+  { value: 'autumn', icon: Leaf, color: 'text-orange-500' },
+  { value: 'winter', icon: Snowflake, color: 'text-blue-500' },
+];
+
+// Calculate current season based on date (Northern Hemisphere)
+function getCurrentSeason(): string {
+  const month = new Date().getMonth(); // 0-11
+  if (month >= 2 && month <= 4) return 'spring';   // Mar-May
+  if (month >= 5 && month <= 7) return 'summer';   // Jun-Aug
+  if (month >= 8 && month <= 10) return 'autumn';  // Sep-Nov
+  return 'winter'; // Dec-Feb
+}
+
+interface UserLocation {
+  city: string | null;
+  region: string | null;
+  country: string | null;
+}
+
 interface WizardStep3Props {
   languageLevel: LanguageLevel;
   onLanguageLevelChange: (level: LanguageLevel) => void;
@@ -19,12 +42,19 @@ interface WizardStep3Props {
   storyLanguage: StoryLanguageCode;
   onStoryLanguageChange: (lang: StoryLanguageCode) => void;
   developerMode: boolean;
+  userLocation: UserLocation | null;
+  onLocationChange: (location: UserLocation) => void;
+  season: string;
+  onSeasonChange: (season: string) => void;
 }
 
 /**
  * Step 3: Book Settings
  * Handles book type (reading level) and page count selection
  */
+// Export getCurrentSeason for use in parent
+export { getCurrentSeason };
+
 export function WizardStep3BookSettings({
   languageLevel,
   onLanguageLevelChange,
@@ -33,8 +63,40 @@ export function WizardStep3BookSettings({
   storyLanguage,
   onStoryLanguageChange,
   developerMode,
+  userLocation,
+  onLocationChange,
+  season,
+  onSeasonChange,
 }: WizardStep3Props) {
   const { t, language } = useLanguage();
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [editCity, setEditCity] = useState(userLocation?.city || '');
+  const [editCountry, setEditCountry] = useState(userLocation?.country || '');
+
+  // Update edit fields when userLocation changes
+  useEffect(() => {
+    if (userLocation) {
+      setEditCity(userLocation.city || '');
+      setEditCountry(userLocation.country || '');
+    }
+  }, [userLocation]);
+
+  const handleSaveLocation = () => {
+    onLocationChange({
+      city: editCity || null,
+      region: null,
+      country: editCountry || null,
+    });
+    setIsEditingLocation(false);
+  };
+
+  // Season labels
+  const seasonLabels: Record<string, Record<string, string>> = {
+    spring: { de: 'Frühling', fr: 'Printemps', en: 'Spring' },
+    summer: { de: 'Sommer', fr: 'Été', en: 'Summer' },
+    autumn: { de: 'Herbst', fr: 'Automne', en: 'Autumn' },
+    winter: { de: 'Winter', fr: 'Hiver', en: 'Winter' },
+  };
 
   // Available page options based on developer mode
   const availablePageOptions = developerMode
@@ -124,6 +186,86 @@ export function WizardStep3BookSettings({
               </svg>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Location and Season Row */}
+      <div className="flex flex-wrap gap-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+        {/* Location */}
+        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+          <MapPin className="text-indigo-500" size={20} />
+          <span className="text-sm text-gray-600">
+            {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu:' : 'Location:'}
+          </span>
+          {isEditingLocation ? (
+            <div className="flex items-center gap-2 flex-1">
+              <input
+                type="text"
+                value={editCity}
+                onChange={(e) => setEditCity(e.target.value)}
+                placeholder={language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : 'City'}
+                className="px-2 py-1 border border-indigo-300 rounded text-sm w-24 focus:outline-none focus:border-indigo-500"
+              />
+              <input
+                type="text"
+                value={editCountry}
+                onChange={(e) => setEditCountry(e.target.value)}
+                placeholder={language === 'de' ? 'Land' : language === 'fr' ? 'Pays' : 'Country'}
+                className="px-2 py-1 border border-indigo-300 rounded text-sm w-24 focus:outline-none focus:border-indigo-500"
+              />
+              <button
+                onClick={handleSaveLocation}
+                className="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+              >
+                OK
+              </button>
+              <button
+                onClick={() => setIsEditingLocation(false)}
+                className="px-2 py-1 text-gray-600 text-sm hover:text-gray-800"
+              >
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsEditingLocation(true)}
+              className="font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
+            >
+              {userLocation?.city
+                ? `${userLocation.city}${userLocation.country ? `, ${userLocation.country}` : ''}`
+                : (language === 'de' ? 'Nicht festgelegt' : language === 'fr' ? 'Non défini' : 'Not set')}
+            </button>
+          )}
+        </div>
+
+        {/* Season */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">
+            {language === 'de' ? 'Jahreszeit:' : language === 'fr' ? 'Saison:' : 'Season:'}
+          </span>
+          <div className="flex gap-1">
+            {SEASONS.map((s) => {
+              const Icon = s.icon;
+              const isSelected = season === s.value;
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => onSeasonChange(s.value)}
+                  title={seasonLabels[s.value][language] || seasonLabels[s.value].en}
+                  className={`p-2 rounded-lg transition-all ${
+                    isSelected
+                      ? `bg-white shadow-md ring-2 ring-indigo-400 ${s.color}`
+                      : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
+                  }`}
+                >
+                  <Icon size={20} />
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-sm font-medium text-gray-700 ml-1">
+            {seasonLabels[season]?.[language] || seasonLabels[season]?.en || season}
+          </span>
         </div>
       </div>
 
