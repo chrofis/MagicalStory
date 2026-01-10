@@ -1,0 +1,11 @@
+{
+  "temperature": 1,
+  "numAttempts": 3,
+  "scoreGrid": {
+    "top-left": [],
+    "top-right": [],
+    "bottom-left": [],
+    "bottom-right": []
+  },
+  "bestPerQuadrant": {}
+}

@@ -9,6 +9,12 @@ const path = require('path');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// Configuration - can override with command line args
+const CONFIG = {
+  imagePath: process.argv[2] || null,  // Optional: path to image file
+  smiling: true  // Add smiling requirement to prompt
+};
+
 // Load prompt templates
 const PROMPT_TEMPLATES = {};
 const promptsDir = path.join(__dirname, 'prompts');
@@ -36,12 +42,11 @@ function saveImage(base64Data, outputDir, filename) {
   return filepath;
 }
 
-async function generateStandardAvatar(facePhoto, category, temperature) {
+async function generateStandardAvatar(facePhoto, category, temperature, isFemale = true) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
 
   // Get clothing style from template
   const mainPrompt = PROMPT_TEMPLATES.avatarMainPrompt || '';
-  const isFemale = true; // Sophie is female
   const clothingKey = `[${category.toUpperCase()}_${isFemale ? 'FEMALE' : 'MALE'}]`;
 
   // Extract clothing style from template
@@ -49,9 +54,28 @@ async function generateStandardAvatar(facePhoto, category, temperature) {
   const clothingMatch = clothingSection.match(new RegExp(`\\[${category.toUpperCase()}_${isFemale ? 'FEMALE' : 'MALE'}\\]\\s*([^\\[]+)`));
   const clothingStyle = clothingMatch ? clothingMatch[1].trim() : 'Casual everyday clothes';
 
-  const avatarPrompt = fillTemplate(mainPrompt.split('---')[0], {
+  let avatarPrompt = fillTemplate(mainPrompt.split('---')[0], {
     'CLOTHING_STYLE': clothingStyle
   });
+
+  // Remove ASCII grid art which causes IMAGE_OTHER errors
+  // Remove entire GRID LAYOUT section including the box drawing
+  avatarPrompt = avatarPrompt.replace(/GRID LAYOUT \(with clear black dividing lines between quadrants\):[\s\S]*?└[─┴┘]+\n\n/g,
+    `GRID LAYOUT:
+- TOP-LEFT: Face front view (looking at camera)
+- TOP-RIGHT: Face 3/4 profile (looking RIGHT)
+- BOTTOM-LEFT: Full body front view
+- BOTTOM-RIGHT: Full body side view (facing RIGHT)
+
+`);
+
+  // Add smiling requirement if configured
+  if (CONFIG.smiling) {
+    avatarPrompt = avatarPrompt.replace(
+      'IDENTITY PERSISTENCE:',
+      'EXPRESSION:\n- The person must be SMILING with TEETH SHOWING in all 4 quadrants.\n- Natural, warm, genuine smile.\n\nIDENTITY PERSISTENCE:'
+    );
+  }
 
   const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
   const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/png';
@@ -95,10 +119,23 @@ async function generateStandardAvatar(facePhoto, category, temperature) {
     }
 
     const data = await response.json();
+
+    // Debug: log response structure
+    if (data.promptFeedback?.blockReason) {
+      return { success: false, error: `Blocked: ${data.promptFeedback.blockReason}` };
+    }
+    if (!data.candidates || data.candidates.length === 0) {
+      console.log(`   API response: ${JSON.stringify(data).substring(0, 300)}`);
+      return { success: false, error: 'No candidates in response' };
+    }
+
     const parts = data.candidates?.[0]?.content?.parts || [];
     const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
 
     if (!imagePart) {
+      const textPart = parts.find(p => p.text);
+      console.log(`   Finish reason: ${data.candidates[0].finishReason}`);
+      if (textPart) console.log(`   Text response: ${textPart.text.substring(0, 200)}`);
       return { success: false, error: 'No image in response' };
     }
 
@@ -132,26 +169,48 @@ async function detectAndCompareAllFaces(referenceImage, generatedImage) {
 
 async function main() {
   console.log('🎭 Standard Avatar Test - Generate 3x, pick best per quadrant\n');
+  if (CONFIG.smiling) console.log('📸 SMILING mode enabled - teeth showing\n');
 
   const baseOutputDir = path.join(__dirname, 'test-output', `standard-avatar-${Date.now()}`);
   console.log(`Output: ${baseOutputDir}\n`);
 
-  // Get character with body-no-bg photo
-  console.log('1. Fetching character...');
-  const result = await pool.query(`SELECT data FROM characters WHERE user_id = $1`, ['1767568240635']);
-  const data = JSON.parse(result.rows[0].data);
-  const sophie = data.characters.find(c => c.name?.includes('Sophie'));
-  console.log(`   Found: ${sophie.name}`);
+  let facePhoto;
+  let imageName;
 
-  // Get the body-no-bg photo - this is the INPUT for standard avatar generation
-  const bodyPhoto = sophie.body_photo_url;
-  if (!bodyPhoto) {
-    console.log('   ❌ No body_photo_url found');
-    await pool.end();
-    return;
+  // Load from file or database
+  if (CONFIG.imagePath) {
+    console.log('1. Loading image from file...');
+    const imagePath = CONFIG.imagePath;
+    if (!fs.existsSync(imagePath)) {
+      console.log(`   ❌ File not found: ${imagePath}`);
+      await pool.end();
+      return;
+    }
+    const imageBuffer = fs.readFileSync(imagePath);
+    const ext = path.extname(imagePath).toLowerCase();
+    const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
+    facePhoto = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
+    imageName = path.basename(imagePath);
+    console.log(`   Loaded: ${imageName}\n`);
+  } else {
+    // Get character from database
+    console.log('1. Fetching character from database...');
+    const result = await pool.query(`SELECT data FROM characters WHERE user_id = $1`, ['1767568240635']);
+    const data = JSON.parse(result.rows[0].data);
+    const sophie = data.characters.find(c => c.name?.includes('Sophie'));
+    console.log(`   Found: ${sophie.name}`);
+
+    // Get the body-no-bg photo - this is the INPUT for standard avatar generation
+    const bodyPhoto = sophie.body_photo_url;
+    if (!bodyPhoto) {
+      console.log('   ❌ No body_photo_url found');
+      await pool.end();
+      return;
+    }
+    facePhoto = bodyPhoto;
+    imageName = sophie.name;
+    console.log(`   Using body_photo_url as input\n`);
   }
-  const facePhoto = bodyPhoto;
-  console.log(`   Using body_photo_url as input (what would be used to generate avatar)\n`);
 
   // Save reference
   saveImage(facePhoto, baseOutputDir, '0-reference.png');
@@ -245,20 +304,45 @@ async function main() {
     }
   }
 
-  // Summary
-  console.log('\n4. Summary:\n');
-  console.log('   Quadrant      | Best Attempt | Score  | Pass');
-  console.log('   --------------|--------------|--------|-----');
-  for (const [quad, data] of Object.entries(bestPerQuadrant)) {
-    const score = ((data.similarity || 0) * 100).toFixed(1).padStart(5);
-    const pass = data.samePerson ? '✅' : '❌';
-    console.log(`   ${quad.padEnd(13)} | Attempt ${data.attempt}    | ${score}% | ${pass}`);
+  // Build full score grid (4 quadrants x 3 attempts = 12 scores)
+  const scoreGrid = {};
+  for (const quad of quadrants) {
+    scoreGrid[quad.name] = [];
+    for (const attempt of allAttempts) {
+      const imageSize = 1024;
+      let bestFaceInQuad = null;
+      for (const face of attempt.faces) {
+        const normX = face.box.x / imageSize;
+        const normY = face.box.y / imageSize;
+        if (normX >= quad.xRange[0] && normX < quad.xRange[1] &&
+            normY >= quad.yRange[0] && normY < quad.yRange[1]) {
+          if (!bestFaceInQuad || (face.similarity || 0) > (bestFaceInQuad.similarity || 0)) {
+            bestFaceInQuad = face;
+          }
+        }
+      }
+      scoreGrid[quad.name].push(bestFaceInQuad ? bestFaceInQuad.similarity : null);
+    }
+  }
+
+  // Summary - ALL 12 scores
+  console.log('\n4. ALL SCORES (4 quadrants x 3 attempts):\n');
+  console.log('   Quadrant      | Attempt 1 | Attempt 2 | Attempt 3 | BEST');
+  console.log('   --------------|-----------|-----------|-----------|------');
+  for (const quad of quadrants) {
+    const scores = scoreGrid[quad.name];
+    const formatted = scores.map(s => s !== null ? `${(s * 100).toFixed(1).padStart(5)}%` : '   N/A ');
+    const best = scores.filter(s => s !== null);
+    const bestScore = best.length > 0 ? Math.max(...best) : null;
+    const bestStr = bestScore !== null ? `${(bestScore * 100).toFixed(1)}%` : 'N/A';
+    const pass = bestScore !== null && bestScore >= 0.45 ? '✅' : '❌';
+    console.log(`   ${quad.name.padEnd(13)} | ${formatted[0]} | ${formatted[1]} | ${formatted[2]} | ${bestStr} ${pass}`);
   }
 
   // Save results
   fs.writeFileSync(
-    path.join(baseOutputDir, 'best-per-quadrant.json'),
-    JSON.stringify({ temperature, numAttempts, bestPerQuadrant }, null, 2)
+    path.join(baseOutputDir, 'all-scores.json'),
+    JSON.stringify({ temperature, numAttempts, scoreGrid, bestPerQuadrant }, null, 2)
   );
 
   await pool.end();
