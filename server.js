@@ -6777,6 +6777,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
+  // Debug: Log inputData values at start of unified processing
+  log.debug(`📝 [UNIFIED INPUT] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
+  log.debug(`📝 [UNIFIED INPUT] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
+
   // Timing tracker for all stages
   const timing = {
     start: timingStart,
@@ -7802,6 +7806,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+
+    // Debug: Log what's being saved for storyCategory/storyTheme in unified mode
+    log.debug(`📝 [UNIFIED SAVE] storyCategory: "${storyData.storyCategory}", storyTopic: "${storyData.storyTopic}", storyTheme: "${storyData.storyTheme}"`);
+    log.debug(`📝 [UNIFIED SAVE] mainCharacters: ${JSON.stringify(storyData.mainCharacters)}, characters count: ${storyData.characters?.length || 0}`);
 
     log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
     await upsertStory(storyId, userId, storyData);
