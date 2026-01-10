@@ -1668,7 +1668,7 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {(frontCoverObj.referencePhotos?.length > 0 || frontCoverObj.landmarkPhotos?.length > 0) && (
+                {((frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0) && (
                   <ReferencePhotosDisplay
                     referencePhotos={frontCoverObj.referencePhotos || []}
                     landmarkPhotos={frontCoverObj.landmarkPhotos}
@@ -1793,7 +1793,7 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {(initialPageObj.referencePhotos?.length > 0 || initialPageObj.landmarkPhotos?.length > 0) && (
+                {((initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0) && (
                   <ReferencePhotosDisplay
                     referencePhotos={initialPageObj.referencePhotos || []}
                     landmarkPhotos={initialPageObj.landmarkPhotos}
@@ -2117,7 +2117,7 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {(image?.referencePhotos?.length > 0 || image?.landmarkPhotos?.length > 0) && (
+                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0) && image && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
@@ -2450,7 +2450,7 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {(image.referencePhotos?.length > 0 || image.landmarkPhotos?.length > 0) && (
+                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0) && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
@@ -2694,7 +2694,7 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {(backCoverObj.referencePhotos?.length > 0 || backCoverObj.landmarkPhotos?.length > 0) && (
+                {((backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0) && (
                   <ReferencePhotosDisplay
                     referencePhotos={backCoverObj.referencePhotos || []}
                     landmarkPhotos={backCoverObj.landmarkPhotos}
