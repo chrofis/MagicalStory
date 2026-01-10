@@ -1258,14 +1258,14 @@ export function CharacterForm({
                     <span className={`ml-2 ${
                       character.avatars.faceMatch.standard.arcface.samePerson ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      | ID: {character.avatars.faceMatch.standard.arcface.similarity?.toFixed(2)} ({character.avatars.faceMatch.standard.arcface.confidence})
+                      | ID: {((character.avatars.faceMatch.standard.arcface.similarity ?? 0) * 100).toFixed(0)}% ({character.avatars.faceMatch.standard.arcface.confidence})
                     </span>
                   )}
                 </summary>
                 <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
                   {character.avatars.faceMatch.standard.details}
                   {character.avatars.faceMatch.standard.lpips && `\n\nLPIPS Perceptual Similarity:\n- Score: ${character.avatars.faceMatch.standard.lpips.lpipsScore?.toFixed(4)}\n- Interpretation: ${character.avatars.faceMatch.standard.lpips.interpretation}\n- Note: 0 = identical, <0.15 = very similar, <0.30 = similar`}
-                  {character.avatars.faceMatch.standard.arcface && `\n\nArcFace Identity (style-invariant):\n- Similarity: ${character.avatars.faceMatch.standard.arcface.similarity?.toFixed(4)}\n- Same Person: ${character.avatars.faceMatch.standard.arcface.samePerson ? 'Yes' : 'No'}\n- Confidence: ${character.avatars.faceMatch.standard.arcface.confidence}\n- Note: Works photo→anime, >0.6 = high confidence same person`}
+                  {character.avatars.faceMatch.standard.arcface && `\n\nArcFace Identity (style-invariant):\n- Similarity: ${((character.avatars.faceMatch.standard.arcface.similarity ?? 0) * 100).toFixed(1)}%\n- Same Person: ${character.avatars.faceMatch.standard.arcface.samePerson ? 'Yes' : 'No'}\n- Confidence: ${character.avatars.faceMatch.standard.arcface.confidence}\n- Note: Works photo→anime, >60% = high confidence same person`}
                 </pre>
               </details>
             )}
@@ -1529,14 +1529,14 @@ export function CharacterForm({
                             <span className={`ml-1 ${
                               character.avatars.faceMatch[category].arcface.samePerson ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              ID: {character.avatars.faceMatch[category].arcface.similarity?.toFixed(2)}
+                              ID: {((character.avatars.faceMatch[category].arcface.similarity ?? 0) * 100).toFixed(0)}%
                             </span>
                           )}
                         </summary>
                         <pre className="mt-1 p-2 rounded text-[9px] whitespace-pre-wrap overflow-auto max-h-48 border bg-gray-100 border-gray-200">
                           {character.avatars.faceMatch[category].details}
                           {character.avatars.faceMatch[category].lpips && `\n\nLPIPS: ${character.avatars.faceMatch[category].lpips.lpipsScore?.toFixed(4)} (${character.avatars.faceMatch[category].lpips.interpretation})`}
-                          {character.avatars.faceMatch[category].arcface && `\n\nArcFace ID: ${character.avatars.faceMatch[category].arcface.similarity?.toFixed(4)} (${character.avatars.faceMatch[category].arcface.confidence}, same_person: ${character.avatars.faceMatch[category].arcface.samePerson})`}
+                          {character.avatars.faceMatch[category].arcface && `\n\nArcFace ID: ${((character.avatars.faceMatch[category].arcface.similarity ?? 0) * 100).toFixed(1)}% (${character.avatars.faceMatch[category].arcface.confidence}, same_person: ${character.avatars.faceMatch[category].arcface.samePerson})`}
                         </pre>
                       </details>
                     )}
