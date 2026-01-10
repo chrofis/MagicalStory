@@ -173,7 +173,7 @@ const { prefetchLandmarkPhotos, discoverLandmarksForLocation } = require('./serv
 // Landmark discovery cache - stores pre-discovered landmarks per user location
 // Key: `${city}_${country}` (normalized), Value: { landmarks: [], timestamp }
 const userLandmarkCache = new Map();
-const LANDMARK_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const LANDMARK_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
 const {
   ART_STYLES,
   LANGUAGE_LEVELS,
