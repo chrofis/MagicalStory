@@ -1668,9 +1668,10 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {frontCoverObj.referencePhotos && frontCoverObj.referencePhotos.length > 0 && (
+                {(frontCoverObj.referencePhotos?.length > 0 || frontCoverObj.landmarkPhotos?.length > 0) && (
                   <ReferencePhotosDisplay
-                    referencePhotos={frontCoverObj.referencePhotos}
+                    referencePhotos={frontCoverObj.referencePhotos || []}
+                    landmarkPhotos={frontCoverObj.landmarkPhotos}
                     language={language}
                   />
                 )}
@@ -1792,9 +1793,10 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {initialPageObj.referencePhotos && initialPageObj.referencePhotos.length > 0 && (
+                {(initialPageObj.referencePhotos?.length > 0 || initialPageObj.landmarkPhotos?.length > 0) && (
                   <ReferencePhotosDisplay
-                    referencePhotos={initialPageObj.referencePhotos}
+                    referencePhotos={initialPageObj.referencePhotos || []}
+                    landmarkPhotos={initialPageObj.landmarkPhotos}
                     language={language}
                   />
                 )}
@@ -2115,9 +2117,10 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {image?.referencePhotos && image.referencePhotos.length > 0 && (
+                            {(image?.referencePhotos?.length > 0 || image?.landmarkPhotos?.length > 0) && (
                               <ReferencePhotosDisplay
-                                referencePhotos={image.referencePhotos}
+                                referencePhotos={image.referencePhotos || []}
+                                landmarkPhotos={image.landmarkPhotos}
                                 language={language}
                               />
                             )}
@@ -2447,9 +2450,10 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {image.referencePhotos && image.referencePhotos.length > 0 && (
+                            {(image.referencePhotos?.length > 0 || image.landmarkPhotos?.length > 0) && (
                               <ReferencePhotosDisplay
-                                referencePhotos={image.referencePhotos}
+                                referencePhotos={image.referencePhotos || []}
+                                landmarkPhotos={image.landmarkPhotos}
                                 language={language}
                               />
                             )}
@@ -2690,9 +2694,10 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {backCoverObj.referencePhotos && backCoverObj.referencePhotos.length > 0 && (
+                {(backCoverObj.referencePhotos?.length > 0 || backCoverObj.landmarkPhotos?.length > 0) && (
                   <ReferencePhotosDisplay
-                    referencePhotos={backCoverObj.referencePhotos}
+                    referencePhotos={backCoverObj.referencePhotos || []}
+                    landmarkPhotos={backCoverObj.landmarkPhotos}
                     language={language}
                   />
                 )}

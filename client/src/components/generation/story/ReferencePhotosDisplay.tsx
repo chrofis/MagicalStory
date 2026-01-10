@@ -2,8 +2,16 @@ import { useState } from 'react';
 import type { ReferencePhoto } from '@/types/story';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 
+interface LandmarkPhoto {
+  name: string;
+  photoData: string;
+  attribution?: string;
+  source?: string;
+}
+
 interface ReferencePhotosDisplayProps {
   referencePhotos: ReferencePhoto[];
+  landmarkPhotos?: LandmarkPhoto[];
   language: string;
 }
 
@@ -12,11 +20,17 @@ interface ReferencePhotosDisplayProps {
  */
 export function ReferencePhotosDisplay({
   referencePhotos,
+  landmarkPhotos,
   language
 }: ReferencePhotosDisplayProps) {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
-  if (!referencePhotos || referencePhotos.length === 0) return null;
+  const hasCharacterPhotos = referencePhotos && referencePhotos.length > 0;
+  const hasLandmarkPhotos = landmarkPhotos && landmarkPhotos.length > 0;
+
+  if (!hasCharacterPhotos && !hasLandmarkPhotos) return null;
+
+  const totalCount = (referencePhotos?.length || 0) + (landmarkPhotos?.length || 0);
 
   const getPhotoTypeLabel = (photoType: string) => {
     switch (photoType) {
@@ -67,48 +81,101 @@ export function ReferencePhotosDisplay({
       <summary className="cursor-pointer text-sm font-semibold text-pink-700 hover:text-pink-900 flex items-center gap-2">
         <span>📸</span>
         {language === 'de' ? 'Referenzfotos' : language === 'fr' ? 'Photos de référence' : 'Reference Photos'}
-        <span className="text-xs text-pink-600">({referencePhotos.length})</span>
+        <span className="text-xs text-pink-600">({totalCount})</span>
         {clothingCategory && (
           <span className="ml-2 px-2 py-0.5 bg-pink-200 text-pink-800 text-xs rounded">
             👕 {getClothingLabel(clothingCategory)}
           </span>
         )}
+        {hasLandmarkPhotos && (
+          <span className="ml-2 px-2 py-0.5 bg-amber-200 text-amber-800 text-xs rounded">
+            📍 {landmarkPhotos!.length} {language === 'de' ? 'Wahrzeichen' : 'Landmark'}
+          </span>
+        )}
       </summary>
-      <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {referencePhotos.map((photo, idx) => (
-          <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold text-xs text-gray-800 truncate">{photo.name}</span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${getPhotoTypeColor(photo.photoType)}`}>
-                {getPhotoTypeLabel(photo.photoType)}
-              </span>
-            </div>
-            {photo.photoUrl && (
-              <>
-                <div className="relative">
-                  <img
-                    src={photo.photoUrl}
-                    alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
-                    className={`w-full max-h-32 object-contain rounded border bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity ${photo.isStyled ? 'border-purple-400 ring-2 ring-purple-200' : 'border-gray-200'}`}
-                    onClick={() => setLightboxImage(photo.photoUrl)}
-                    title="Click to enlarge"
-                  />
-                  {photo.isStyled && (
-                    <span className="absolute top-1 right-1 px-1 py-0.5 text-[9px] font-bold bg-purple-500 text-white rounded">
-                      🎨 STYLED
-                    </span>
-                  )}
-                </div>
-                {photo.photoHash && (
-                  <div className="mt-1 text-[9px] font-mono text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-center">
-                    🔐 {photo.photoHash}
+
+      {/* Character photos */}
+      {hasCharacterPhotos && (
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {referencePhotos.map((photo, idx) => (
+            <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-xs text-gray-800 truncate">{photo.name}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${getPhotoTypeColor(photo.photoType)}`}>
+                  {getPhotoTypeLabel(photo.photoType)}
+                </span>
+              </div>
+              {photo.photoUrl && (
+                <>
+                  <div className="relative">
+                    <img
+                      src={photo.photoUrl}
+                      alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
+                      className={`w-full max-h-32 object-contain rounded border bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity ${photo.isStyled ? 'border-purple-400 ring-2 ring-purple-200' : 'border-gray-200'}`}
+                      onClick={() => setLightboxImage(photo.photoUrl)}
+                      title="Click to enlarge"
+                    />
+                    {photo.isStyled && (
+                      <span className="absolute top-1 right-1 px-1 py-0.5 text-[9px] font-bold bg-purple-500 text-white rounded">
+                        🎨 STYLED
+                      </span>
+                    )}
                   </div>
-                )}
-              </>
-            )}
+                  {photo.photoHash && (
+                    <div className="mt-1 text-[9px] font-mono text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-center">
+                      🔐 {photo.photoHash}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Landmark photos */}
+      {hasLandmarkPhotos && (
+        <div className={hasCharacterPhotos ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
+          <div className="text-xs font-semibold text-amber-700 mb-2 flex items-center gap-1">
+            📍 {language === 'de' ? 'Wahrzeichen-Referenzfotos' : language === 'fr' ? 'Photos de monuments' : 'Landmark Reference Photos'}
           </div>
-        ))}
-      </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {landmarkPhotos!.map((landmark, idx) => (
+              <div key={idx} className="bg-amber-50 rounded-lg p-2 border border-amber-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-xs text-gray-800 truncate">{landmark.name}</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap bg-amber-100 text-amber-700 border-amber-300">
+                    📍 LANDMARK
+                  </span>
+                </div>
+                {landmark.photoData && (
+                  <>
+                    <div className="relative">
+                      <img
+                        src={landmark.photoData}
+                        alt={`${landmark.name} landmark`}
+                        className="w-full max-h-32 object-contain rounded border border-amber-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => setLightboxImage(landmark.photoData)}
+                        title="Click to enlarge"
+                      />
+                    </div>
+                    {landmark.attribution && (
+                      <div className="mt-1 text-[9px] text-gray-500 bg-gray-100 px-1 py-0.5 rounded truncate" title={landmark.attribution}>
+                        📷 {landmark.attribution}
+                      </div>
+                    )}
+                    {landmark.source && (
+                      <div className="mt-0.5 text-[9px] text-gray-400">
+                        Source: {landmark.source}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Lightbox for enlarged view */}
       <ImageLightbox

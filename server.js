@@ -5587,7 +5587,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalImage: imageResult.originalImage || null,
           originalScore: imageResult.originalScore || null,
           originalReasoning: imageResult.originalReasoning || null,
-          referencePhotos,  // Dev mode: which photos were used
+          referencePhotos,  // Dev mode: which character photos were used
+          landmarkPhotos: pageLandmarkPhotos,  // Dev mode: which landmark photos were used
           modelId: imageResult.modelId || null
         };
 
@@ -5603,6 +5604,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           imageData: null,
           description: sceneDesc,
           text: pageText || pageTexts[pageNum] || '',
+          landmarkPhotos: pageLandmarkPhotos,  // Include even on error for debugging
           error: error.message
         };
       }
@@ -8984,6 +8986,7 @@ Output Format:
               originalScore: imageResult.originalScore || null,
               originalReasoning: imageResult.originalReasoning || null,
               referencePhotos: referencePhotos,
+              landmarkPhotos: pageLandmarkPhotos,  // Dev mode: which landmark photos were used
               modelId: imageResult.modelId || null
             };
 
