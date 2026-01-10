@@ -252,6 +252,13 @@ export interface VisualBibleEntry {
   extractedDescription: string | null;
   firstAppearanceAnalyzed: boolean;
   source?: 'outline' | 'story_text';  // Where this entry was added from
+  // Landmark-related properties (for locations)
+  isRealLandmark?: boolean;
+  landmarkQuery?: string;  // Exact name to search for landmark photo
+  photoFetchStatus?: 'pending' | 'success' | 'failed';
+  referencePhotoUrl?: string;
+  referencePhotoData?: string;  // Base64 photo data
+  photoAttribution?: string;
 }
 
 export interface VisualBibleClothingEntry extends VisualBibleEntry {

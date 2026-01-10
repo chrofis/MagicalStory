@@ -1065,7 +1065,7 @@ export function StoryDisplay({
                     <div className="space-y-2">
                       {visualBible.locations.map((entry) => (
                         <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800 flex items-center gap-2">
+                          <div className="font-semibold text-rose-800 flex items-center gap-2 flex-wrap">
                             {entry.name}
                             {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
                             {entry.source && (
@@ -1073,8 +1073,23 @@ export function StoryDisplay({
                                 {entry.source === 'outline' ? 'Outline' : 'Story'}
                               </span>
                             )}
+                            {entry.isRealLandmark && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
+                                📍 LANDMARK
+                              </span>
+                            )}
+                            {entry.photoFetchStatus === 'success' && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                                📷 Photo
+                              </span>
+                            )}
                             {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
                           </div>
+                          {entry.isRealLandmark && entry.landmarkQuery && (
+                            <div className="text-amber-700 text-xs mt-1">
+                              Landmark: <span className="font-mono bg-amber-50 px-1 rounded">{entry.landmarkQuery}</span>
+                            </div>
+                          )}
                           {editingEntry?.type === 'location' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
                             <div className="mt-1">
                               <textarea

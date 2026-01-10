@@ -1238,9 +1238,393 @@ def extract_face():
         }), 500
 
 
+# DeepFace for ArcFace embeddings (lazy loaded)
+_deepface_loaded = False
+
+def get_arcface_embedding(image_path_or_array):
+    """
+    Extract 512-D ArcFace embedding using DeepFace.
+    ArcFace is style-invariant - can match photo to cartoon.
+
+    Args:
+        image_path_or_array: Either a file path or numpy array (BGR)
+
+    Returns:
+        512-dimensional normalized embedding or None on error
+    """
+    global _deepface_loaded
+
+    try:
+        from deepface import DeepFace
+
+        if not _deepface_loaded:
+            print("[ARCFACE] Loading ArcFace model via DeepFace...")
+            _deepface_loaded = True
+
+        # DeepFace.represent returns list of dicts with 'embedding' key
+        result = DeepFace.represent(
+            img_path=image_path_or_array,
+            model_name='ArcFace',
+            enforce_detection=False,  # Don't fail if no face detected
+            detector_backend='opencv'  # Fast detection
+        )
+
+        if result and len(result) > 0:
+            embedding = np.array(result[0]['embedding'])
+            # Normalize for cosine similarity
+            embedding = embedding / np.linalg.norm(embedding)
+            return embedding
+
+        return None
+
+    except Exception as e:
+        print(f"[ARCFACE] Error: {e}")
+        return None
+
+
+def extract_embedding_from_image(image_data):
+    """
+    Extract face embedding from image data (base64, PIL Image, or numpy array).
+    Returns 512-dimensional normalized ArcFace embedding.
+    """
+    # Handle base64 input
+    if isinstance(image_data, str):
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        img_pil = Image.open(BytesIO(image_bytes)).convert('RGB')
+        img_np = np.array(img_pil)
+        # Convert RGB to BGR for OpenCV/DeepFace
+        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+    elif hasattr(image_data, 'convert'):
+        # PIL Image
+        img_pil = image_data.convert('RGB')
+        img_np = np.array(img_pil)
+        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+    else:
+        # Assume numpy array (BGR)
+        img_np = image_data
+
+    return get_arcface_embedding(img_np)
+
+
+@app.route('/face-embedding', methods=['POST'])
+def get_face_embedding():
+    """
+    Extract face embedding from an image.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",
+        "quadrant": "top-left" | null,  # Optional: crop to quadrant first
+        "extract_face": true            # Optional: detect and crop to face first
+    }
+
+    Returns:
+    {
+        "success": true,
+        "embedding": [0.123, 0.456, ...],  # 2048-D normalized vector
+        "dimensions": 2048,
+        "faceDetected": true/false          # If extract_face was requested
+    }
+    """
+    try:
+        import torch
+
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'image' in request body"
+            }), 400
+
+        image_data = data['image']
+        quadrant = data.get('quadrant')
+        extract_face_flag = data.get('extract_face', True)
+
+        face_detected = False
+
+        # If we need to extract face first, use the /extract-face logic
+        if extract_face_flag or quadrant:
+            # Decode image
+            if ',' in image_data:
+                image_data_clean = image_data.split(',')[1]
+            else:
+                image_data_clean = image_data
+
+            image_bytes = base64.b64decode(image_data_clean)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            if image is None:
+                return jsonify({
+                    "success": False,
+                    "error": "Failed to decode image"
+                }), 400
+
+            height, width = image.shape[:2]
+
+            # Crop to quadrant if specified
+            if quadrant:
+                mid_h = height // 2
+                mid_w = width // 2
+                quadrant_map = {
+                    'top-left': (0, mid_h, 0, mid_w),
+                    'top-right': (0, mid_h, mid_w, width),
+                    'bottom-left': (mid_h, height, 0, mid_w),
+                    'bottom-right': (mid_h, height, mid_w, width)
+                }
+                if quadrant in quadrant_map:
+                    y1, y2, x1, x2 = quadrant_map[quadrant]
+                    image = image[y1:y2, x1:x2]
+                    height, width = image.shape[:2]
+
+            # Detect and crop face
+            if extract_face_flag:
+                face_box = detect_face_mediapipe(image)
+                if face_box:
+                    face_detected = True
+                    # Add padding and crop
+                    padding = 0.15
+                    x = face_box['x'] / 100
+                    y = face_box['y'] / 100
+                    w = face_box['width'] / 100
+                    h = face_box['height'] / 100
+
+                    y1 = int(max(0, y - h * padding) * height)
+                    x1 = int(max(0, x - w * padding) * width)
+                    y2 = int(min(1, y + h * (1 + padding)) * height)
+                    x2 = int(min(1, x + w * (1 + padding)) * width)
+
+                    image = image[y1:y2, x1:x2]
+
+            # Convert to PIL for embedding extraction
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            img_pil = Image.fromarray(image_rgb)
+
+            embedding = extract_embedding_from_image(img_pil)
+        else:
+            embedding = extract_embedding_from_image(image_data)
+
+        if embedding is None:
+            return jsonify({
+                "success": False,
+                "error": "Failed to extract embedding"
+            }), 500
+
+        print(f"[FACE-EMBED] Extracted {len(embedding)}-D embedding, face_detected: {face_detected}")
+
+        return jsonify({
+            "success": True,
+            "embedding": embedding.tolist(),
+            "dimensions": len(embedding),
+            "faceDetected": face_detected
+        }), 200
+
+    except Exception as e:
+        print(f"[FACE-EMBED] Error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@app.route('/compare-identity', methods=['POST'])
+def compare_identity():
+    """
+    Compare two face embeddings for identity match using cosine similarity.
+
+    Expected JSON (option 1 - pre-computed embeddings):
+    {
+        "embedding1": [0.123, 0.456, ...],
+        "embedding2": [0.123, 0.456, ...]
+    }
+
+    Expected JSON (option 2 - images):
+    {
+        "image1": "data:image/jpeg;base64,...",
+        "image2": "data:image/jpeg;base64,...",
+        "quadrant1": null,       # Optional: crop image1 to quadrant
+        "quadrant2": "top-left"  # Optional: crop image2 to quadrant
+    }
+
+    Returns:
+    {
+        "success": true,
+        "similarity": 0.85,           # Cosine similarity (-1 to 1)
+        "same_person": true,          # similarity > threshold
+        "confidence": "high",         # high/medium/low
+        "interpretation": "very_similar"
+    }
+    """
+    try:
+        import torch
+
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "Missing request body"
+            }), 400
+
+        # Option 1: Pre-computed embeddings
+        if 'embedding1' in data and 'embedding2' in data:
+            emb1 = np.array(data['embedding1'])
+            emb2 = np.array(data['embedding2'])
+
+        # Option 2: Extract from images
+        elif 'image1' in data and 'image2' in data:
+            # Get embeddings using the /face-embedding logic
+            emb1 = None
+            emb2 = None
+
+            # Process image1
+            img1_data = data['image1']
+            q1 = data.get('quadrant1')
+
+            if ',' in img1_data:
+                img1_clean = img1_data.split(',')[1]
+            else:
+                img1_clean = img1_data
+
+            image_bytes = base64.b64decode(img1_clean)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            image1 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            if q1:
+                h, w = image1.shape[:2]
+                mid_h, mid_w = h // 2, w // 2
+                qmap = {
+                    'top-left': (0, mid_h, 0, mid_w),
+                    'top-right': (0, mid_h, mid_w, w),
+                    'bottom-left': (mid_h, h, 0, mid_w),
+                    'bottom-right': (mid_h, h, mid_w, w)
+                }
+                if q1 in qmap:
+                    y1, y2, x1, x2 = qmap[q1]
+                    image1 = image1[y1:y2, x1:x2]
+
+            # Detect face in image1
+            face_box1 = detect_face_mediapipe(image1)
+            if face_box1:
+                h, w = image1.shape[:2]
+                padding = 0.15
+                x, y = face_box1['x'] / 100, face_box1['y'] / 100
+                fw, fh = face_box1['width'] / 100, face_box1['height'] / 100
+                y1 = int(max(0, y - fh * padding) * h)
+                x1 = int(max(0, x - fw * padding) * w)
+                y2 = int(min(1, y + fh * (1 + padding)) * h)
+                x2 = int(min(1, x + fw * (1 + padding)) * w)
+                image1 = image1[y1:y2, x1:x2]
+
+            img1_rgb = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
+            img1_pil = Image.fromarray(img1_rgb)
+            emb1 = extract_embedding_from_image(img1_pil)
+
+            # Process image2 similarly
+            img2_data = data['image2']
+            q2 = data.get('quadrant2')
+
+            if ',' in img2_data:
+                img2_clean = img2_data.split(',')[1]
+            else:
+                img2_clean = img2_data
+
+            image_bytes = base64.b64decode(img2_clean)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            image2 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            if q2:
+                h, w = image2.shape[:2]
+                mid_h, mid_w = h // 2, w // 2
+                qmap = {
+                    'top-left': (0, mid_h, 0, mid_w),
+                    'top-right': (0, mid_h, mid_w, w),
+                    'bottom-left': (mid_h, h, 0, mid_w),
+                    'bottom-right': (mid_h, h, mid_w, w)
+                }
+                if q2 in qmap:
+                    y1, y2, x1, x2 = qmap[q2]
+                    image2 = image2[y1:y2, x1:x2]
+
+            face_box2 = detect_face_mediapipe(image2)
+            if face_box2:
+                h, w = image2.shape[:2]
+                padding = 0.15
+                x, y = face_box2['x'] / 100, face_box2['y'] / 100
+                fw, fh = face_box2['width'] / 100, face_box2['height'] / 100
+                y1 = int(max(0, y - fh * padding) * h)
+                x1 = int(max(0, x - fw * padding) * w)
+                y2 = int(min(1, y + fh * (1 + padding)) * h)
+                x2 = int(min(1, x + fw * (1 + padding)) * w)
+                image2 = image2[y1:y2, x1:x2]
+
+            img2_rgb = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
+            img2_pil = Image.fromarray(img2_rgb)
+            emb2 = extract_embedding_from_image(img2_pil)
+
+            if emb1 is None or emb2 is None:
+                return jsonify({
+                    "success": False,
+                    "error": "Failed to extract embeddings from images"
+                }), 500
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Must provide either (embedding1, embedding2) or (image1, image2)"
+            }), 400
+
+        # Normalize embeddings (should already be normalized, but ensure)
+        emb1 = emb1 / np.linalg.norm(emb1)
+        emb2 = emb2 / np.linalg.norm(emb2)
+
+        # Compute cosine similarity
+        similarity = float(np.dot(emb1, emb2))
+
+        # Determine if same person and confidence
+        # Thresholds tuned for ArcFace 512-D embeddings
+        # ArcFace is style-invariant: photo vs anime can still match!
+        if similarity > 0.60:
+            same_person = True
+            confidence = "high"
+            interpretation = "very_similar"
+        elif similarity > 0.45:
+            same_person = True
+            confidence = "medium"
+            interpretation = "similar"
+        elif similarity > 0.30:
+            same_person = False
+            confidence = "low"
+            interpretation = "somewhat_similar"
+        else:
+            same_person = False
+            confidence = "high"
+            interpretation = "different"
+
+        print(f"[COMPARE-ID] Similarity: {similarity:.4f}, same_person: {same_person}, confidence: {confidence}")
+
+        return jsonify({
+            "success": True,
+            "similarity": round(similarity, 4),
+            "same_person": same_person,
+            "confidence": confidence,
+            "interpretation": interpretation
+        }), 200
+
+    except Exception as e:
+        print(f"[COMPARE-ID] Error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PHOTO_ANALYZER_PORT', 5000))
     print(f"[START] Photo Analyzer API starting on port {port}")
     print(f"   MediaPipe available: {MEDIAPIPE_AVAILABLE}")
     print("   LPIPS: checking on first request")
+    print("   Face embeddings: ArcFace via DeepFace (512-D, style-invariant)")
     app.run(host='0.0.0.0', port=port, debug=False)
