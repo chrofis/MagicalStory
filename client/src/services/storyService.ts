@@ -65,6 +65,11 @@ interface StoryDetailsServer {
   id: string;
   title: string;
   storyType: string;
+  storyTypeName?: string;  // Display name for story type
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical';  // Story category
+  storyTopic?: string;  // Life challenge or educational topic
+  storyTheme?: string;  // Adventure theme
+  storyDetails?: string;  // User's custom story idea
   artStyle: string;
   language: StoryLanguageCode;
   languageLevel: LanguageLevel;
@@ -268,6 +273,11 @@ export const storyService = {
       id: s.id,
       title: s.title,
       storyType: s.storyType,
+      storyTypeName: s.storyTypeName,
+      storyCategory: s.storyCategory,
+      storyTopic: s.storyTopic,
+      storyTheme: s.storyTheme,
+      storyDetails: s.storyDetails,
       artStyle: s.artStyle,
       language: s.language,
       languageLevel: s.languageLevel,
