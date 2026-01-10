@@ -69,10 +69,12 @@ export default function StoryWizard() {
   const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId } = useGeneration();
 
   // Wizard state - start at step 6 with loading if we have a storyId in URL
+  // Start at step 1 if ?new=true (creating new story)
   // Otherwise restore from localStorage to preserve step when navigating away and back
   const [step, setStep] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('storyId')) return 6;
+    if (params.get('new') === 'true') return 1;  // New story starts at step 1
     const savedStep = localStorage.getItem('wizard_step');
     return savedStep ? parseInt(savedStep, 10) : 1;
   });
@@ -3427,6 +3429,11 @@ export default function StoryWizard() {
         developerMode={developerMode}
         onDeveloperModeChange={setDeveloperMode}
         hideSteps={step === 6 && !!storyId}
+        onShowGenerationProgress={() => {
+          // Show the generation progress modal when clicking nav progress indicator
+          setIsProgressMinimized(false);
+          setStep(6);
+        }}
       />
 
       {/* Main content - full width */}

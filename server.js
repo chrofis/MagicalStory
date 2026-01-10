@@ -7298,6 +7298,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📖 [UNIFIED] Parsed: title="${title}", ${storyPages.length} pages, ${Object.keys(clothingRequirements).length} clothing reqs`);
     log.debug(`📖 [UNIFIED] Visual Bible: ${visualBible.secondaryCharacters?.length || 0} chars, ${visualBible.locations?.length || 0} locs, ${visualBible.animals?.length || 0} animals, ${visualBible.artifacts?.length || 0} artifacts`);
 
+    // Compare streaming vs final parse results
+    if (streamingPagesDetected !== storyPages.length) {
+      log.warn(`⚠️ [UNIFIED] Page count mismatch: streaming detected ${streamingPagesDetected} pages, final parse found ${storyPages.length} pages`);
+      log.warn(`⚠️ [UNIFIED] Pages from final parse: ${storyPages.map(p => p.pageNumber).join(', ')}`);
+    }
+
+    // Check if we got the requested number of pages
+    if (storyPages.length !== sceneCount) {
+      log.warn(`⚠️ [UNIFIED] Requested ${sceneCount} scenes but parsed ${storyPages.length} pages`);
+    }
+
     // Filter main characters from Visual Bible (safety net)
     filterMainCharactersFromVisualBible(visualBible, inputData.characters);
 

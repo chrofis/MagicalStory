@@ -285,12 +285,21 @@ export function GenerationSettingsPanel({ settings, language }: GenerationSettin
             <div>
               <div className="text-xs font-medium text-amber-700 mb-2">{t('relationships')}</div>
               <div className="text-xs bg-white/50 p-2 rounded border border-amber-100 space-y-1">
-                {Object.entries(settings.relationshipTexts).map(([key, text]) => (
-                  <div key={key} className="flex gap-2">
-                    <span className="text-amber-600 font-mono">{key}:</span>
-                    <span className="text-gray-700">{text}</span>
-                  </div>
-                ))}
+                {Object.entries(settings.relationshipTexts).map(([key, text]) => {
+                  // Convert ID pair to names (key format: "id1-id2")
+                  const [id1, id2] = key.split('-').map(id => parseInt(id, 10));
+                  const char1 = settings.characters?.find(c => c.id === id1);
+                  const char2 = settings.characters?.find(c => c.id === id2);
+                  const displayKey = char1 && char2
+                    ? `${char1.name} → ${char2.name}`
+                    : key;
+                  return (
+                    <div key={key} className="flex gap-2">
+                      <span className="text-amber-600 font-medium whitespace-nowrap">{displayKey}:</span>
+                      <span className="text-gray-700">{text}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

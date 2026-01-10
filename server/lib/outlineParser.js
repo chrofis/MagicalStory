@@ -1281,13 +1281,27 @@ class UnifiedStoryParser {
 
     const pages = [];
 
+    // First, extract just the STORY PAGES section to avoid content after pages
+    // This prevents the regex from failing when there's AI sign-off text after the last page
+    let pagesSection = this.response;
+    const storyPagesStart = this.response.indexOf('---STORY PAGES---');
+    if (storyPagesStart !== -1) {
+      pagesSection = this.response.substring(storyPagesStart);
+      log.debug(`[UNIFIED-PARSER] Found ---STORY PAGES--- section at position ${storyPagesStart}`);
+    } else {
+      log.debug(`[UNIFIED-PARSER] No ---STORY PAGES--- marker found, searching entire response`);
+    }
+
     // Match page blocks: --- Page X --- followed by TEXT: and SCENE HINT:
+    // Using greedy match with explicit next-page lookahead, plus end-of-string fallback
     const pagePattern = /---\s*Page\s+(\d+)\s*---\s*([\s\S]*?)(?=---\s*Page\s+\d+\s*---|$)/gi;
 
     let match;
-    while ((match = pagePattern.exec(this.response)) !== null) {
+    let lastPageNumber = 0;
+    while ((match = pagePattern.exec(pagesSection)) !== null) {
       const pageNumber = parseInt(match[1], 10);
       const content = match[2];
+      lastPageNumber = Math.max(lastPageNumber, pageNumber);
 
       // Extract TEXT section
       const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
@@ -1310,13 +1324,21 @@ class UnifiedStoryParser {
         characterClothing,
         characters
       });
+
+      log.debug(`[UNIFIED-PARSER] Page ${pageNumber}: text=${text.length} chars, hint=${sceneHint.length} chars, clothing=${Object.keys(characterClothing).join(',') || 'none'}`);
     }
 
     // Sort by page number
     pages.sort((a, b) => a.pageNumber - b.pageNumber);
 
     this._cache.pages = pages;
-    log.debug(`[UNIFIED-PARSER] Extracted ${pages.length} pages`);
+    log.debug(`[UNIFIED-PARSER] Extracted ${pages.length} pages (highest page number: ${lastPageNumber})`);
+
+    // Warn if there's a mismatch between page count and highest page number
+    if (pages.length > 0 && pages.length !== lastPageNumber) {
+      log.warn(`[UNIFIED-PARSER] Page count mismatch: found ${pages.length} pages but highest page number is ${lastPageNumber}`);
+    }
+
     return pages;
   }
 

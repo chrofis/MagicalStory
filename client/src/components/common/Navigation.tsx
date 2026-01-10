@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, Code, Sparkles, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -15,6 +15,7 @@ interface NavigationProps {
   developerMode?: boolean;
   onDeveloperModeChange?: (enabled: boolean) => void;
   hideSteps?: boolean;  // Hide step navigation (e.g., when viewing a saved story)
+  onShowGenerationProgress?: () => void;  // Called to show generation progress when already on /create
 }
 
 // Step labels for desktop view
@@ -24,8 +25,9 @@ const stepLabels: Record<string, Record<number, string>> = {
   fr: { 1: 'Personnages', 2: 'Livre', 3: 'Histoire', 4: 'Style', 5: 'Résumé' },
 };
 
-export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange, hideSteps = false }: NavigationProps) {
+export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange, hideSteps = false, onShowGenerationProgress }: NavigationProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, language } = useLanguage();
   const { isAuthenticated, user, isImpersonating } = useAuth();
   const generation = useGenerationOptional();
@@ -33,6 +35,9 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Check if we're already on the /create page
+  const isOnCreatePage = location.pathname === '/create';
 
   // Handle viewing completed story
   const handleViewCompletedStory = () => {
@@ -44,7 +49,12 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
 
   // Handle clicking on generation progress indicator
   const handleViewProgress = () => {
-    navigate('/create');
+    // If already on /create page and callback is provided, use it to show progress
+    if (isOnCreatePage && onShowGenerationProgress) {
+      onShowGenerationProgress();
+    } else {
+      navigate('/create');
+    }
   };
 
   // Check if generation is in progress (has active job and not complete)
