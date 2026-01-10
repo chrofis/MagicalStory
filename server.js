@@ -7426,6 +7426,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Filter main characters from Visual Bible (safety net)
     filterMainCharactersFromVisualBible(visualBible, inputData.characters);
 
+    // Link pre-discovered landmarks (if available) to skip fetching later
+    if (inputData.availableLandmarks?.length > 0) {
+      linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
+    }
+
+    // Start background fetch for landmark reference photos (runs in parallel with avatar generation)
+    let landmarkFetchPromise = null;
+    const landmarkCount = (visualBible.locations || []).filter(l => l.isRealLandmark).length;
+    if (landmarkCount > 0 && !skipImages) {
+      log.info(`🌍 [UNIFIED] Starting background fetch for ${landmarkCount} landmark photo(s)`);
+      landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
+    }
+
     // Save checkpoint
     await saveCheckpoint(jobId, 'unified_story', {
       title,
@@ -7665,6 +7678,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`📖 [UNIFIED] No cover images to generate (skipCovers=${skipCovers})`);
     }
 
+    // Wait for landmark photos before generating page images
+    if (landmarkFetchPromise) {
+      await landmarkFetchPromise;
+      const successCount = (visualBible.locations || []).filter(l => l.photoFetchStatus === 'success').length;
+      log.info(`🌍 [UNIFIED] Landmark photos ready: ${successCount}/${landmarkCount} fetched successfully`);
+    }
+
     // PHASE 5: Generate page images (parallel with rate limiting)
     genLog.setStage('images');
     await dbPool.query(
@@ -7739,6 +7759,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
+        // Get landmark photos for this page and merge with character photos
+        const pageLandmarkPhotos = getLandmarkPhotosForPage(visualBible, pageNum);
+        if (pageLandmarkPhotos.length > 0) {
+          log.debug(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+        }
+        const allReferencePhotos = [...pagePhotos, ...pageLandmarkPhotos];
+
         const imagePrompt = buildImagePrompt(
           scene.sceneDescription,
           inputData,
@@ -7747,7 +7774,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBible,
           pageNum,
           true,
-          pagePhotos
+          allReferencePhotos
         );
 
         const pageModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
@@ -7766,7 +7793,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         const imageResult = await generateImageWithQualityRetry(
           imagePrompt,
-          pagePhotos,
+          allReferencePhotos,
           null,
           'scene',
           null,
@@ -7806,8 +7833,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           wasRegenerated: imageResult?.wasRegenerated,
           totalAttempts: imageResult?.totalAttempts,
           retryHistory: imageResult?.retryHistory,
-          // Dev mode: which reference photos/avatars were used
-          referencePhotos: pagePhotos
+          // Dev mode: which reference photos/avatars were used (includes landmark photos)
+          referencePhotos: allReferencePhotos
         };
       }))
     );
