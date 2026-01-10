@@ -111,6 +111,60 @@ avatars: {
 }
 ```
 
+### Per-Character Clothing (Different Characters, Different Outfits)
+
+Each character in a scene can have a **different clothing category**. This is fully supported.
+
+**Scene Hint Format:**
+```
+Characters:
+- Roger: summer
+- Sophie: costumed:pirate
+```
+
+**How Per-Character Clothing Works:**
+
+1. **Scene parsing** extracts per-character clothing map:
+   ```javascript
+   scene.characterClothing = { "Roger": "summer", "Sophie": "costumed:pirate" }
+   ```
+
+2. **`sceneClothingRequirements`** is built with `_currentClothing` per character (server.js:7429-7440):
+   ```javascript
+   sceneClothingRequirements["Roger"]._currentClothing = "summer";
+   sceneClothingRequirements["Sophie"]._currentClothing = "costumed:pirate";
+   ```
+
+3. **`getCharacterPhotoDetails`** checks `_currentClothing` for each character (storyHelpers.js:720-731):
+   ```javascript
+   if (clothingRequirements[char.name]?._currentClothing) {
+     const charCurrentClothing = clothingRequirements[char.name]._currentClothing;
+     if (charCurrentClothing.startsWith('costumed:')) {
+       effectiveClothingCategory = 'costumed';
+       effectiveCostumeType = charCurrentClothing.split(':')[1];
+     } else {
+       effectiveClothingCategory = charCurrentClothing;
+     }
+   }
+   ```
+
+4. **Result:** Each character gets their own avatar and clothing description:
+   - Roger: summer avatar + "yellow t-shirt, khaki shorts"
+   - Sophie: pirate costume avatar + "striped shirt, brown pants, red bandana"
+
+**Example Mixed Clothing Output:**
+```
+**CHARACTER REFERENCE PHOTOS (in order):**
+1. Roger, Looks: adult, 45 years old, man, Build: athletic. Eyes: brown.
+   Hair: dark blonde, ponytail, shoulder-length. Facial hair: clean-shaven.
+   Wearing: yellow t-shirt, khaki shorts, sandals
+2. Sophie, Looks: young-school-age, 7 years old, girl, Build: slim.
+   Eyes: blue. Hair: blonde, wavy, long.
+   Wearing: striped blue/white pirate shirt, brown pants, red bandana, black boots
+
+HEIGHT ORDER: Sophie (shortest) -> Roger (much taller)
+```
+
 ---
 
 ## Cover Images vs Normal Pages

@@ -304,8 +304,15 @@ export default function StoryWizard() {
   }, [isAuthenticated, isAuthLoading, navigate]);
 
   // Fetch user's location from IP for story personalization
+  // Also trigger early landmark discovery so landmarks are ready when needed
   useEffect(() => {
-    storyService.getUserLocation().then(setUserLocation);
+    storyService.getUserLocation().then(location => {
+      setUserLocation(location);
+      // Trigger landmark discovery in background as soon as we have location
+      if (location?.city) {
+        storyService.triggerLandmarkDiscovery(location.city, location.country);
+      }
+    });
   }, []);
 
   // Check if user has existing stories (for minimize dialog options)

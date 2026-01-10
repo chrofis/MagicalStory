@@ -1277,6 +1277,20 @@ async function initializeDatabase() {
       console.log('✓ Default pricing tiers seeded');
     }
 
+    // Discovered landmarks cache table - persists landmark discovery across restarts
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS discovered_landmarks (
+        id SERIAL PRIMARY KEY,
+        location_key VARCHAR(200) NOT NULL UNIQUE,
+        city VARCHAR(100) NOT NULL,
+        country VARCHAR(100),
+        landmarks JSONB NOT NULL DEFAULT '[]',
+        landmark_count INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('✓ Database tables initialized');
 
   } catch (err) {
@@ -1409,6 +1423,78 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
 // - POST /api/claude
 // - POST /api/gemini
 
+// Trigger landmark discovery early (called when user enters wizard or gets location)
+// This runs in background so landmarks are ready when story generation starts
+app.post('/api/landmarks/discover', async (req, res) => {
+  try {
+    const { city, country } = req.body;
+
+    if (!city) {
+      return res.json({ status: 'skipped', reason: 'no city provided' });
+    }
+
+    const cacheKey = `${city}_${country || ''}`.toLowerCase().replace(/\s+/g, '_');
+
+    // Check if we already have fresh landmarks in database
+    try {
+      const dbResult = await dbPool.query(
+        'SELECT landmark_count, updated_at FROM discovered_landmarks WHERE location_key = $1',
+        [cacheKey]
+      );
+      if (dbResult.rows.length > 0) {
+        const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
+        if (age < LANDMARK_CACHE_TTL) {
+          log.debug(`[LANDMARK] Already have ${dbResult.rows[0].landmark_count} fresh landmarks for ${city}`);
+          return res.json({
+            status: 'cached',
+            landmarkCount: dbResult.rows[0].landmark_count,
+            ageMinutes: Math.round(age / 60000)
+          });
+        }
+      }
+    } catch (dbErr) {
+      log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
+    }
+
+    // Trigger discovery in background (don't await)
+    log.info(`[LANDMARK] 🔍 Early discovery triggered for ${city}, ${country || ''}`);
+
+    discoverLandmarksForLocation(city, country || '', 10)
+      .then(async landmarks => {
+        try {
+          await dbPool.query(`
+            INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (location_key) DO UPDATE SET
+              landmarks = $4,
+              landmark_count = $5,
+              updated_at = NOW()
+          `, [cacheKey, city, country || '', JSON.stringify(landmarks), landmarks.length]);
+          log.info(`[LANDMARK] ✅ Early discovery: saved ${landmarks.length} landmarks for ${city}`);
+        } catch (dbErr) {
+          log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
+        }
+        // Also update in-memory cache
+        userLandmarkCache.set(cacheKey, {
+          landmarks,
+          city,
+          country: country || '',
+          timestamp: Date.now()
+        });
+      })
+      .catch(err => {
+        log.error(`[LANDMARK] Early discovery failed for ${city}: ${err.message}`);
+      });
+
+    // Return immediately - discovery runs in background
+    res.json({ status: 'discovering', city, country: country || '' });
+
+  } catch (err) {
+    log.error('Landmark discovery trigger error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Generate story ideas endpoint - FREE, no credits
 app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
   try {
@@ -1418,29 +1504,58 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
     if (userLocation?.city) {
       log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
 
-      // Trigger landmark discovery if not already cached for this location
+      // Trigger landmark discovery if not already in database
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
-      const cached = userLandmarkCache.get(cacheKey);
 
-      if (!cached || Date.now() - cached.timestamp > LANDMARK_CACHE_TTL) {
+      // Check database first (persists across restarts)
+      let needsDiscovery = true;
+      try {
+        const dbResult = await dbPool.query(
+          'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
+          [cacheKey]
+        );
+        if (dbResult.rows.length > 0) {
+          const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
+          if (age < LANDMARK_CACHE_TTL) {
+            needsDiscovery = false;
+            log.debug(`[LANDMARK] Using DB-cached ${dbResult.rows[0].landmarks?.length || 0} landmarks for ${userLocation.city}`);
+          }
+        }
+      } catch (dbErr) {
+        log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
+      }
+
+      if (needsDiscovery) {
         log.info(`[LANDMARK] 🔍 Starting background discovery for ${userLocation.city}, ${userLocation.country || ''}`);
 
-        // Fire and forget - discovery runs in background
+        // Fire and forget - discovery runs in background, saves to database
         discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10)
-          .then(landmarks => {
+          .then(async landmarks => {
+            // Save to database (upsert)
+            try {
+              await dbPool.query(`
+                INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
+                VALUES ($1, $2, $3, $4, $5, NOW())
+                ON CONFLICT (location_key) DO UPDATE SET
+                  landmarks = $4,
+                  landmark_count = $5,
+                  updated_at = NOW()
+              `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(landmarks), landmarks.length]);
+              log.info(`[LANDMARK] ✅ Saved ${landmarks.length} landmarks to DB for ${userLocation.city}`);
+            } catch (dbErr) {
+              log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
+            }
+            // Also update in-memory cache for immediate use
             userLandmarkCache.set(cacheKey, {
               landmarks,
               city: userLocation.city,
               country: userLocation.country || '',
               timestamp: Date.now()
             });
-            log.info(`[LANDMARK] ✅ Cached ${landmarks.length} landmarks for ${userLocation.city}`);
           })
           .catch(err => {
             log.error(`[LANDMARK] Discovery failed for ${userLocation.city}: ${err.message}`);
           });
-      } else {
-        log.debug(`[LANDMARK] Using cached ${cached.landmarks.length} landmarks for ${userLocation.city}`);
       }
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
@@ -1600,29 +1715,58 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
     if (userLocation?.city) {
       log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
 
-      // Trigger landmark discovery if not already cached for this location
+      // Trigger landmark discovery if not already in database
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
-      const cached = userLandmarkCache.get(cacheKey);
 
-      if (!cached || Date.now() - cached.timestamp > LANDMARK_CACHE_TTL) {
+      // Check database first (persists across restarts)
+      let needsDiscovery = true;
+      try {
+        const dbResult = await dbPool.query(
+          'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
+          [cacheKey]
+        );
+        if (dbResult.rows.length > 0) {
+          const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
+          if (age < LANDMARK_CACHE_TTL) {
+            needsDiscovery = false;
+            log.debug(`[LANDMARK] Using DB-cached ${dbResult.rows[0].landmarks?.length || 0} landmarks for ${userLocation.city}`);
+          }
+        }
+      } catch (dbErr) {
+        log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
+      }
+
+      if (needsDiscovery) {
         log.info(`[LANDMARK] 🔍 Starting background discovery for ${userLocation.city}, ${userLocation.country || ''}`);
 
-        // Fire and forget - discovery runs in background
+        // Fire and forget - discovery runs in background, saves to database
         discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10)
-          .then(landmarks => {
+          .then(async landmarks => {
+            // Save to database (upsert)
+            try {
+              await dbPool.query(`
+                INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
+                VALUES ($1, $2, $3, $4, $5, NOW())
+                ON CONFLICT (location_key) DO UPDATE SET
+                  landmarks = $4,
+                  landmark_count = $5,
+                  updated_at = NOW()
+              `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(landmarks), landmarks.length]);
+              log.info(`[LANDMARK] ✅ Saved ${landmarks.length} landmarks to DB for ${userLocation.city}`);
+            } catch (dbErr) {
+              log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
+            }
+            // Also update in-memory cache for immediate use
             userLandmarkCache.set(cacheKey, {
               landmarks,
               city: userLocation.city,
               country: userLocation.country || '',
               timestamp: Date.now()
             });
-            log.info(`[LANDMARK] ✅ Cached ${landmarks.length} landmarks for ${userLocation.city}`);
           })
           .catch(err => {
             log.error(`[LANDMARK] Discovery failed for ${userLocation.city}: ${err.message}`);
           });
-      } else {
-        log.debug(`[LANDMARK] Using cached ${cached.landmarks.length} landmarks for ${userLocation.city}`);
       }
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
@@ -7962,13 +8106,39 @@ async function processStoryJob(jobId) {
     log.debug(`📝 [JOB PROCESS] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
 
     // Inject pre-discovered landmarks if available for this user's location
+    // Check database first (persists across restarts), then fall back to in-memory cache
     if (inputData.userLocation?.city) {
       const cacheKey = `${inputData.userLocation.city}_${inputData.userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
-      const cachedLandmarks = userLandmarkCache.get(cacheKey);
+      let landmarks = null;
 
-      if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
-        inputData.availableLandmarks = cachedLandmarks.landmarks;
-        log.info(`[LANDMARK] 📍 Injecting ${cachedLandmarks.landmarks.length} pre-discovered landmarks for ${inputData.userLocation.city}`);
+      // Try database first (persistent)
+      try {
+        const dbResult = await dbPool.query(
+          'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
+          [cacheKey]
+        );
+        if (dbResult.rows.length > 0) {
+          const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
+          if (age < LANDMARK_CACHE_TTL) {
+            landmarks = dbResult.rows[0].landmarks;
+            log.info(`[LANDMARK] 📍 Injecting ${landmarks?.length || 0} DB-cached landmarks for ${inputData.userLocation.city}`);
+          }
+        }
+      } catch (dbErr) {
+        log.debug(`[LANDMARK] DB lookup failed: ${dbErr.message}`);
+      }
+
+      // Fall back to in-memory cache if database didn't have it
+      if (!landmarks) {
+        const cachedLandmarks = userLandmarkCache.get(cacheKey);
+        if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
+          landmarks = cachedLandmarks.landmarks;
+          log.info(`[LANDMARK] 📍 Injecting ${landmarks.length} in-memory cached landmarks for ${inputData.userLocation.city}`);
+        }
+      }
+
+      if (landmarks && landmarks.length > 0) {
+        inputData.availableLandmarks = landmarks;
       } else {
         log.debug(`[LANDMARK] No cached landmarks available for ${inputData.userLocation.city}`);
       }
