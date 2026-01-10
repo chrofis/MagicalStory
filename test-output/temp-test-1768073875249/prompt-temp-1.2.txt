@@ -1,4 +1,25 @@
-⚠️ MANDATORY OUTPUT STYLE: {ART_STYLE_PROMPT}
+SYSTEM INSTRUCTION:
+⚠️ CRITICAL: Create WATERCOLOR STYLE ILLUSTRATION - NOT photo-realistic.
+
+You are an expert character illustrator for children's books.
+
+CREATE A 2x2 GRID:
+- TOP-LEFT: The reference image rendered in watercolor style (SAME pose & clothes as reference)
+- TOP-RIGHT: Face/shoulders view wearing the NEW COSTUME
+- BOTTOM-LEFT: Full body front view wearing the NEW COSTUME
+- BOTTOM-RIGHT: Full body side view wearing the NEW COSTUME
+
+The TOP-LEFT acts as an identity anchor - same pose/clothes as reference but illustrated.
+The OTHER 3 quadrants show the character in the completely different costume.
+
+CRITICAL:
+- ALL 4 quadrants must show the SAME PERSON (identical face)
+- TOP-LEFT: Reference clothes, illustrated style
+- Other 3: NEW costume (all identical costume)
+- Output must be watercolor illustration, NOT a photograph
+
+USER PROMPT:
+⚠️ MANDATORY OUTPUT STYLE: Traditional watercolor painting style, soft color washes, gentle edges, artistic brushwork, textured paper appearance, delicate and dreamy aesthetic
 DO NOT CREATE PHOTO-REALISTIC OUTPUT.
 THE REFERENCE IMAGE IS ONLY FOR FACE IDENTITY - COMPLETELY IGNORE ITS VISUAL STYLE.
 CREATE AN ILLUSTRATED CHARACTER, NOT A PHOTOGRAPH.
@@ -6,19 +27,19 @@ CREATE AN ILLUSTRATED CHARACTER, NOT A PHOTOGRAPH.
 TASK: Create a 2x2 Character Grid with 4 views. The TOP-LEFT quadrant keeps the reference pose/clothing but applies the art style. The OTHER 3 quadrants show the character in the NEW COSTUME.
 
 CRITICAL REQUIREMENTS:
-- TOP-LEFT: Same pose and clothing as reference, but rendered in {ART_STYLE_PROMPT} style
+- TOP-LEFT: Same pose and clothing as reference, but rendered in Traditional watercolor painting style, soft color washes, gentle edges, artistic brushwork, textured paper appearance, delicate and dreamy aesthetic style
 - TOP-RIGHT, BOTTOM-LEFT, BOTTOM-RIGHT: Character wearing the NEW COSTUME below
 - All 4 quadrants must show the SAME person with IDENTICAL face
 - The 3 costumed quadrants must show the IDENTICAL costume
 
 STYLE TRANSFORMATION (MANDATORY):
-- Your OUTPUT must be {ART_STYLE_PROMPT} - an ILLUSTRATION, NOT a photo
+- Your OUTPUT must be Traditional watercolor painting style, soft color washes, gentle edges, artistic brushwork, textured paper appearance, delicate and dreamy aesthetic - an ILLUSTRATION, NOT a photo
 - Transform the photo-realistic face into illustrated style while preserving identity
 - Render skin as smooth illustrated texture, NOT photographic skin
 - This is character art for a children's book, NOT photo editing
 
-NEW COSTUME (for TOP-RIGHT, BOTTOM-LEFT, BOTTOM-RIGHT) - {COSTUME_TYPE}:
-{COSTUME_DESCRIPTION}
+NEW COSTUME (for TOP-RIGHT, BOTTOM-LEFT, BOTTOM-RIGHT) - victorian noble:
+An elegant Victorian-era noble outfit: deep burgundy velvet dress with white lace collar and cuffs, golden brooch at the neckline, long flowing skirt with petticoats, black leather button-up boots. Hair styled elegantly.
 This is a COMPLETE outfit change from neck to toe. Include: shirt/top, pants/skirt/dress, footwear, and any accessories.
 The costume should look authentic and age-appropriate for a children's book illustration.
 
@@ -56,4 +77,7 @@ GRID REQUIREMENTS:
 - TOP-RIGHT, BOTTOM-LEFT, BOTTOM-RIGHT: All show IDENTICAL new costume
 - BOTTOM quadrants: Full body from head to toe, shoes visible
 
-Output: ILLUSTRATED character grid in {ART_STYLE_PROMPT} style. NOT photo-realistic.
+Output: ILLUSTRATED character grid in Traditional watercolor painting style, soft color washes, gentle edges, artistic brushwork, textured paper appearance, delicate and dreamy aesthetic style. NOT photo-realistic.
+
+
+TEMPERATURE: 1.2

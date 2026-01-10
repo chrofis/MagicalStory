@@ -40,9 +40,9 @@ function saveImage(base64Data, outputDir, filename) {
 const TEMPERATURES = [0.4, 0.8, 1.2, 1.8];
 
 const TEST_COSTUME = {
-  name: 'medieval-peasant',
-  costume: 'medieval peasant',
-  description: 'A medieval peasant outfit: rough brown linen tunic with rope belt, simple cream-colored undershirt with loose sleeves, brown wool pants, and worn leather boots. No hat or head covering.'
+  name: 'victorian-noble',
+  costume: 'victorian noble',
+  description: 'An elegant Victorian-era noble outfit: deep burgundy velvet dress with white lace collar and cuffs, golden brooch at the neckline, long flowing skirt with petticoats, black leather button-up boots. Hair styled elegantly.'
 };
 
 async function generateWithTemperature(character, costume, temperature, outputDir) {
@@ -53,8 +53,8 @@ async function generateWithTemperature(character, costume, temperature, outputDi
     return { success: false, error: 'No standard avatar' };
   }
 
-  const artStyle = 'pixar';
-  const artStylePrompt = '3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading';
+  const artStyle = 'watercolor';
+  const artStylePrompt = 'Traditional watercolor painting style, soft color washes, gentle edges, artistic brushwork, textured paper appearance, delicate and dreamy aesthetic';
 
   // Build prompt from template
   const template = PROMPT_TEMPLATES.styledCostumedAvatar || '';
@@ -69,18 +69,25 @@ async function generateWithTemperature(character, costume, temperature, outputDi
   const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
   const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
-  // MODIFIED system instruction with anti-photorealism emphasis
-  const systemText = `You are an expert character artist creating stylized avatar illustrations for children's books.
-You are given a reference avatar for FACIAL IDENTITY ONLY.
-Your task is to TRANSFORM the avatar into: ${artStyle} style wearing a completely different costume.
-- The OUTPUT must be ${artStyle} STYLE illustration - NOT photo-realistic
-- The reference image is ONLY for facial identity extraction
-- Do NOT copy the visual style of the reference image
-- Render the character as a ${artStyle} illustration, not a photograph
-- Preserves the EXACT facial identity from the reference avatar
-- IGNORES the reference clothing completely - apply the new costume instead
-- IGNORES the reference body shape - generate a new body fitting the costume
-- Creates all 4 grid quadrants with the SAME costume - IDENTICAL outfit in all 4 views`;
+  // ANCHOR approach: top-left keeps reference clothes, other 3 get costume
+  const systemText = `⚠️ CRITICAL: Create ${artStyle.toUpperCase()} STYLE ILLUSTRATION - NOT photo-realistic.
+
+You are an expert character illustrator for children's books.
+
+CREATE A 2x2 GRID:
+- TOP-LEFT: The reference image rendered in ${artStyle} style (SAME pose & clothes as reference)
+- TOP-RIGHT: Face/shoulders view wearing the NEW COSTUME
+- BOTTOM-LEFT: Full body front view wearing the NEW COSTUME
+- BOTTOM-RIGHT: Full body side view wearing the NEW COSTUME
+
+The TOP-LEFT acts as an identity anchor - same pose/clothes as reference but illustrated.
+The OTHER 3 quadrants show the character in the completely different costume.
+
+CRITICAL:
+- ALL 4 quadrants must show the SAME PERSON (identical face)
+- TOP-LEFT: Reference clothes, illustrated style
+- Other 3: NEW costume (all identical costume)
+- Output must be ${artStyle} illustration, NOT a photograph`;
 
   const requestBody = {
     systemInstruction: {
@@ -162,7 +169,7 @@ async function runArcFaceComparison(standardAvatar, costumedAvatar) {
         image1: standardAvatar,
         image2: costumedAvatar,
         quadrant1: 'top-left',
-        quadrant2: 'top-left'
+        quadrant2: 'top-right'  // Compare costumed quadrant, not the anchor
       })
     });
 

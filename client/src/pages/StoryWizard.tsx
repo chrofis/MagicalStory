@@ -66,7 +66,7 @@ export default function StoryWizard() {
   const { t, language } = useLanguage();
   const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
-  const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId } = useGeneration();
+  const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId, markCompletionViewed, hasUnviewedCompletion } = useGeneration();
 
   // Wizard state - start at step 6 with loading if we have a storyId in URL
   // Start at step 1 if ?new=true (creating new story)
@@ -689,6 +689,15 @@ export default function StoryWizard() {
 
     loadSavedStory();
   }, [searchParams, isAuthenticated]);
+
+  // Clear "Fertig!" notification when viewing story (step 6)
+  // This stops the blinking badge in navigation when user is already viewing the story
+  useEffect(() => {
+    if (step === 6 && hasUnviewedCompletion) {
+      log.info('Clearing unviewed completion - user is viewing story');
+      markCompletionViewed();
+    }
+  }, [step, hasUnviewedCompletion, markCompletionViewed]);
 
   // Check for Stripe payment callback on page load
   useEffect(() => {
