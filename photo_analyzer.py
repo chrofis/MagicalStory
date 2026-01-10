@@ -1241,16 +1241,17 @@ def extract_face():
 # DeepFace for ArcFace embeddings (lazy loaded)
 _deepface_loaded = False
 
-def get_arcface_embedding(image_path_or_array):
+def get_arcface_embedding(image_path_or_array, assume_face_crop=False):
     """
     Extract 512-D ArcFace embedding using DeepFace.
     ArcFace is style-invariant - can match photo to cartoon.
 
     Args:
         image_path_or_array: Either a file path or numpy array (BGR)
+        assume_face_crop: If True, skip face detection (input is already a face)
 
     Returns:
-        512-dimensional normalized embedding or None on error
+        tuple: (512-dimensional normalized embedding, face_detected boolean)
     """
     global _deepface_loaded
 
@@ -1261,31 +1262,63 @@ def get_arcface_embedding(image_path_or_array):
             print("[ARCFACE] Loading ArcFace model via DeepFace...")
             _deepface_loaded = True
 
-        # DeepFace.represent returns list of dicts with 'embedding' key
-        result = DeepFace.represent(
-            img_path=image_path_or_array,
-            model_name='ArcFace',
-            enforce_detection=False,  # Don't fail if no face detected
-            detector_backend='opencv'  # Fast detection
-        )
+        face_detected = False
+
+        # Strategy:
+        # 1. If assume_face_crop=True, skip detection entirely
+        # 2. Otherwise, try detection with opencv first
+        # 3. If that fails, try with skip (assume input is face)
+
+        if assume_face_crop:
+            # Input is already a face crop - skip detection
+            result = DeepFace.represent(
+                img_path=image_path_or_array,
+                model_name='ArcFace',
+                enforce_detection=False,
+                detector_backend='skip'  # No detection, assume input is face
+            )
+            face_detected = True  # We trust caller that this is a face
+        else:
+            # Try to detect face first
+            try:
+                result = DeepFace.represent(
+                    img_path=image_path_or_array,
+                    model_name='ArcFace',
+                    enforce_detection=True,  # Require face detection
+                    detector_backend='opencv'
+                )
+                face_detected = True
+            except ValueError as e:
+                # Face not detected - try with skip (assume input is already face)
+                if "Face could not be detected" in str(e):
+                    print("[ARCFACE] No face detected by opencv, assuming input is face crop")
+                    result = DeepFace.represent(
+                        img_path=image_path_or_array,
+                        model_name='ArcFace',
+                        enforce_detection=False,
+                        detector_backend='skip'
+                    )
+                    face_detected = False  # Mark as not detected for transparency
+                else:
+                    raise
 
         if result and len(result) > 0:
             embedding = np.array(result[0]['embedding'])
             # Normalize for cosine similarity
             embedding = embedding / np.linalg.norm(embedding)
-            return embedding
+            return embedding, face_detected
 
-        return None
+        return None, False
 
     except Exception as e:
         print(f"[ARCFACE] Error: {e}")
-        return None
+        return None, False
 
 
-def extract_embedding_from_image(image_data):
+def extract_embedding_from_image(image_data, assume_face_crop=False):
     """
     Extract face embedding from image data (base64, PIL Image, or numpy array).
-    Returns 512-dimensional normalized ArcFace embedding.
+    Returns tuple: (512-dimensional normalized ArcFace embedding, face_detected boolean)
     """
     # Handle base64 input
     if isinstance(image_data, str):
@@ -1305,7 +1338,7 @@ def extract_embedding_from_image(image_data):
         # Assume numpy array (BGR)
         img_np = image_data
 
-    return get_arcface_embedding(img_np)
+    return get_arcface_embedding(img_np, assume_face_crop=assume_face_crop)
 
 
 @app.route('/face-embedding', methods=['POST'])
@@ -1402,9 +1435,12 @@ def get_face_embedding():
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             img_pil = Image.fromarray(image_rgb)
 
-            embedding = extract_embedding_from_image(img_pil)
+            # If we extracted a face, tell ArcFace to skip detection
+            embedding, arcface_detected = extract_embedding_from_image(img_pil, assume_face_crop=face_detected)
+            face_detected = face_detected or arcface_detected
         else:
-            embedding = extract_embedding_from_image(image_data)
+            embedding, arcface_detected = extract_embedding_from_image(image_data)
+            face_detected = arcface_detected
 
         if embedding is None:
             return jsonify({
@@ -1507,7 +1543,9 @@ def compare_identity():
 
             # Detect face in image1
             face_box1 = detect_face_mediapipe(image1)
+            face1_detected = False
             if face_box1:
+                face1_detected = True
                 h, w = image1.shape[:2]
                 padding = 0.15
                 x, y = face_box1['x'] / 100, face_box1['y'] / 100
@@ -1520,7 +1558,7 @@ def compare_identity():
 
             img1_rgb = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
             img1_pil = Image.fromarray(img1_rgb)
-            emb1 = extract_embedding_from_image(img1_pil)
+            emb1, _ = extract_embedding_from_image(img1_pil, assume_face_crop=face1_detected)
 
             # Process image2 similarly
             img2_data = data['image2']
@@ -1549,7 +1587,9 @@ def compare_identity():
                     image2 = image2[y1:y2, x1:x2]
 
             face_box2 = detect_face_mediapipe(image2)
+            face2_detected = False
             if face_box2:
+                face2_detected = True
                 h, w = image2.shape[:2]
                 padding = 0.15
                 x, y = face_box2['x'] / 100, face_box2['y'] / 100
@@ -1562,7 +1602,7 @@ def compare_identity():
 
             img2_rgb = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
             img2_pil = Image.fromarray(img2_rgb)
-            emb2 = extract_embedding_from_image(img2_pil)
+            emb2, _ = extract_embedding_from_image(img2_pil, assume_face_crop=face2_detected)
 
             if emb1 is None or emb2 is None:
                 return jsonify({
