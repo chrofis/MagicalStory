@@ -289,6 +289,8 @@ export const storyService = {
       relationshipTexts: s.relationshipTexts,
       outline: s.outline,
       outlinePrompt: s.outlinePrompt,
+      outlineModelId: s.outlineModelId,
+      outlineUsage: s.outlineUsage,
       story: storyContent,
       storyTextPrompts: s.storyTextPrompts,
       visualBible: s.visualBible,
