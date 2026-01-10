@@ -2351,6 +2351,25 @@ export default function StoryWizard() {
     setIsGenerating(true);
     setIsProgressMinimized(false); // Reset minimized state for new generation
     setStep(6);
+
+    // Save generation settings for dev mode display IMMEDIATELY (before generation starts)
+    setSavedGenerationSettings({
+      storyCategory: storyCategory || undefined,
+      storyTopic: storyTopic || undefined,
+      storyTheme: storyTheme || undefined,
+      storyTypeName: getStoryTypeName(),
+      storyDetails: storyDetails || undefined,
+      artStyle: artStyle || undefined,
+      language: storyLanguage || undefined,
+      languageLevel: languageLevel || undefined,
+      pages: pages || undefined,
+      dedication: dedication || undefined,
+      characters: characters.filter(c => !excludedCharacters.includes(c.id)).map(c => ({ id: c.id, name: c.name })),
+      mainCharacters: mainCharacters,
+      relationships: relationships,
+      relationshipTexts: relationshipTexts,
+    });
+
     // Reset ALL story state for new generation - must clear old story to show popup
     setGeneratedStory('');
     setStoryTitle('');
@@ -2647,6 +2666,24 @@ export default function StoryWizard() {
           setStep(6);
 
           log.success('Story generation completed!');
+
+          // Save generation settings for dev mode display (use current wizard state)
+          setSavedGenerationSettings({
+            storyCategory: storyCategory || undefined,
+            storyTopic: storyTopic || undefined,
+            storyTheme: storyTheme || undefined,
+            storyTypeName: getStoryTypeName(),
+            storyDetails: storyDetails || undefined,
+            artStyle: artStyle || undefined,
+            language: storyLanguage || undefined,
+            languageLevel: languageLevel || undefined,
+            pages: pages || undefined,
+            dedication: dedication || undefined,
+            characters: characters.map(c => ({ id: c.id, name: c.name })),
+            mainCharacters: mainCharacters,
+            relationships: relationships,
+            relationshipTexts: relationshipTexts,
+          });
 
           // Stop tracking in global context
           stopTracking();
