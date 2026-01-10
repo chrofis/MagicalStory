@@ -12,6 +12,12 @@ const { compressImageToJPEG } = require('./images');
 const photoCache = new Map();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+// Wikipedia/Wikimedia API headers - REQUIRED or they return HTML error pages
+const WIKI_HEADERS = {
+  'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch; contact@magicalstory.ch) Node.js',
+  'Accept': 'application/json'
+};
+
 // ============================================================================
 // WIKIPEDIA CATEGORY PARSING
 // ============================================================================
@@ -113,7 +119,7 @@ async function fetchWikipediaCategories(lang, pageIds) {
 
     try {
       log.debug(`[LANDMARK-CAT] Fetching URL: ${url.substring(0, 100)}...`);
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: WIKI_HEADERS });
       const data = await res.json();
 
       let foundCount = 0;
@@ -238,7 +244,7 @@ async function fetchFromWikimedia(query) {
     const searchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query + ' landmark filetype:jpg|jpeg|png|webp')}&srnamespace=6&srlimit=10&format=json&origin=*`;
 
     log.debug(`[LANDMARK] Wikimedia search: ${query}`);
-    const searchRes = await fetch(searchUrl);
+    const searchRes = await fetch(searchUrl, { headers: WIKI_HEADERS });
     const searchData = await searchRes.json();
 
     if (!searchData.query?.search?.length) {
@@ -263,7 +269,7 @@ async function fetchFromWikimedia(query) {
 
       // Get image URL and metadata
       const infoUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(fileName)}&prop=imageinfo&iiprop=url|user|extmetadata|mime&format=json&origin=*`;
-      const infoRes = await fetch(infoUrl);
+      const infoRes = await fetch(infoUrl, { headers: WIKI_HEADERS });
       const infoData = await infoRes.json();
 
       const pages = infoData.query?.pages;
@@ -513,7 +519,7 @@ async function getCommonsPhotoCount(landmarkName) {
       `&srsearch=${encodeURIComponent('"' + landmarkName + '"')}` +
       `&srnamespace=6&srlimit=1&format=json&origin=*`;
 
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: WIKI_HEADERS });
     const data = await res.json();
     return data.query?.searchinfo?.totalhits || 0;
   } catch (err) {
@@ -649,7 +655,7 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
 
     try {
       log.debug(`[LANDMARK] Wikipedia (${lang}) geosearch at ${lat}, ${lon}`);
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: WIKI_HEADERS });
       const data = await res.json();
 
       for (const item of data.query?.geosearch || []) {
@@ -824,7 +830,7 @@ async function searchLandmarksByCoordinates(lat, lon, radiusMeters = 10000) {
 
   try {
     log.debug(`[LANDMARK] Geosearch at ${lat}, ${lon} (radius ${radiusMeters}m)`);
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: WIKI_HEADERS });
     const data = await res.json();
 
     const landmarks = new Map();
@@ -886,7 +892,7 @@ async function searchLandmarksByText(city, country, limit = 20) {
       `&format=json&origin=*`;
 
     try {
-      const res = await fetch(searchUrl);
+      const res = await fetch(searchUrl, { headers: WIKI_HEADERS });
       const data = await res.json();
 
       for (const result of data.query?.search || []) {

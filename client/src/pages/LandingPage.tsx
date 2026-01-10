@@ -136,13 +136,34 @@ export default function LandingPage() {
     // Check for redirect parameter (e.g., from email link when not logged in)
     // Ignore '/' as a redirect - we want to go to /create after login, not stay on home
     const redirectParam = searchParams.get('redirect');
-    const redirectUrl = redirectParam && redirectParam !== '/' && redirectParam !== '%2F'
+    let redirectUrl = redirectParam && redirectParam !== '/' && redirectParam !== '%2F'
       ? decodeURIComponent(redirectParam)
       : null;
 
+    // Strip any login=true from the redirect URL to avoid redirect loops
+    if (redirectUrl && redirectUrl.includes('login=true')) {
+      try {
+        const url = new URL(redirectUrl, window.location.origin);
+        url.searchParams.delete('login');
+        // If it's just the home page with no meaningful path, use the inner redirect
+        const innerRedirect = url.searchParams.get('redirect');
+        if (url.pathname === '/' && innerRedirect) {
+          redirectUrl = decodeURIComponent(innerRedirect);
+        } else {
+          redirectUrl = url.pathname + url.search;
+        }
+      } catch {
+        // If URL parsing fails, try to extract path
+        const match = redirectUrl.match(/redirect=([^&]+)/);
+        if (match) {
+          redirectUrl = decodeURIComponent(match[1]);
+        }
+      }
+    }
+
     console.log('[AUTH SUCCESS] Starting redirect logic', { redirectUrl, redirectParam });
 
-    if (redirectUrl) {
+    if (redirectUrl && redirectUrl !== '/' && !redirectUrl.includes('login=true')) {
       console.log('[AUTH SUCCESS] Redirecting to URL param:', redirectUrl);
       navigate(redirectUrl);
     } else {
