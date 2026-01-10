@@ -1424,6 +1424,47 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
 // - POST /api/claude
 // - POST /api/gemini
 
+// Admin endpoint to clear landmarks cache (forces re-discovery with new scoring)
+app.delete('/api/admin/landmarks-cache', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { city } = req.query;
+    let result;
+
+    if (city) {
+      // Clear specific city
+      const cacheKey = city.toLowerCase().replace(/\s+/g, '_');
+      result = await dbPool.query(
+        'DELETE FROM discovered_landmarks WHERE location_key LIKE $1',
+        [`%${cacheKey}%`]
+      );
+      // Also clear in-memory cache
+      for (const key of userLandmarkCache.keys()) {
+        if (key.includes(cacheKey)) {
+          userLandmarkCache.delete(key);
+        }
+      }
+      log.info(`[ADMIN] Cleared landmarks cache for "${city}" (${result.rowCount} rows)`);
+    } else {
+      // Clear all
+      result = await dbPool.query('DELETE FROM discovered_landmarks');
+      userLandmarkCache.clear();
+      log.info(`[ADMIN] Cleared all landmarks cache (${result.rowCount} rows)`);
+    }
+
+    res.json({
+      message: city ? `Cleared cache for "${city}"` : 'Cleared all landmarks cache',
+      rowsDeleted: result.rowCount
+    });
+  } catch (err) {
+    log.error('Clear landmarks cache error:', err);
+    res.status(500).json({ error: 'Failed to clear cache' });
+  }
+});
+
 // Trigger landmark discovery early (called when user enters wizard or gets location)
 // This runs in background so landmarks are ready when story generation starts
 app.post('/api/landmarks/discover', async (req, res) => {
