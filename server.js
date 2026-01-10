@@ -1567,8 +1567,9 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
 
     // Discover landmarks for user location (await to include in ideas prompt)
+    // Skip for historical stories - they use historically accurate locations, not local landmarks
     let availableLandmarks = [];
-    if (userLocation?.city) {
+    if (userLocation?.city && storyCategory !== 'historical') {
       log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
 
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
@@ -1871,8 +1872,9 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
 
     // Discover landmarks for user location (await to include in ideas prompt)
+    // Skip for historical stories - they use historically accurate locations, not local landmarks
     let availableLandmarks = [];
-    if (userLocation?.city) {
+    if (userLocation?.city && storyCategory !== 'historical') {
       log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
 
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
