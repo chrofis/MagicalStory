@@ -398,6 +398,30 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
       // Skip generic Wikipedia articles
       if (/^(List of|Category:|Template:|Wikipedia:)/i.test(name)) continue;
 
+      // Check if name contains landmark indicators (buildings, structures, natural features)
+      const hasLandmarkIndicator = /\b(castle|church|cathedral|abbey|monastery|bridge|tower|museum|park|garden|palace|fountain|monument|statue|station|theater|theatre|hall|plaza|square|market|gate|wall|ruin|bath|spa|temple|chapel|shrine|library|university|school|hospital|synagogue|mosque|tunnel|pass|stadium|arena|aquae|thermae|mill|dam|lake|river|falls|waterfall|cave|hill|mountain|peak|island|lighthouse)\b/i.test(name);
+
+      // Skip administrative divisions (not actual landmarks)
+      if (/^(Canton of|County of|District of|Municipality of|Province of|Region of|Department of)/i.test(name)) {
+        log.debug(`[LANDMARK] Skipping administrative: "${name}"`);
+        continue;
+      }
+
+      // Skip entries that are just city/municipality names (end with ", Country/Region")
+      // BUT keep them if they have landmark indicators (e.g., "Stein Castle, Aargau")
+      if (!hasLandmarkIndicator && /,\s*(Switzerland|Germany|Austria|France|Italy|Aargau|Canton|Zurich|Bern|Basel)$/i.test(name)) {
+        log.debug(`[LANDMARK] Skipping city/region article: "${name}"`);
+        continue;
+      }
+
+      // Skip pure municipality names - short names without descriptive words
+      // If it's a very short name (1-2 words) without landmark indicators, it's probably just a place name
+      const wordCount = name.split(/\s+/).length;
+      if (wordCount <= 2 && !hasLandmarkIndicator) {
+        log.debug(`[LANDMARK] Skipping probable municipality: "${name}"`);
+        continue;
+      }
+
       landmarks.push({
         name,
         query: name, // Wikipedia title is clean, use directly
@@ -644,44 +668,26 @@ async function discoverLandmarksForLocation(city, country, limit = 10) {
   const coords = await geocodeCity(city, country);
 
   if (coords) {
-    // Step 2: Use Wikipedia geosearch (primary source - has clean names)
+    // Step 2: Use Wikipedia geosearch ONLY (clean article titles = real landmarks)
+    // Don't use Wikimedia Commons geosearch - it returns messy photo filenames, not landmarks
     landmarks = await searchWikipediaLandmarks(coords.lat, coords.lon, 10000, excludePattern);
     log.debug(`[LANDMARK] Wikipedia geosearch found ${landmarks.length} landmarks`);
-
-    // Step 3: If not enough from Wikipedia, also try Wikimedia Commons geosearch
-    if (landmarks.length < limit) {
-      const commonsLandmarks = await searchLandmarksByCoordinates(coords.lat, coords.lon, 10000);
-      // Filter with exclude pattern
-      const filtered = excludePattern
-        ? commonsLandmarks.filter(l => !new RegExp(excludePattern, 'i').test(l.name))
-        : commonsLandmarks;
-      landmarks = mergeLandmarks(landmarks, filtered);
-    }
   }
 
-  // Step 4: If geosearch failed or returned too few, try text search as fallback
-  if (landmarks.length < limit) {
-    log.debug(`[LANDMARK] Geosearch found ${landmarks.length}, trying text search fallback...`);
-    let textLandmarks = await searchLandmarksByText(city, country, limit * 2);
-    // Filter with exclude pattern
-    if (excludePattern) {
-      textLandmarks = textLandmarks.filter(l => !new RegExp(excludePattern, 'i').test(l.name));
-    }
-    landmarks = mergeLandmarks(landmarks, textLandmarks);
+  // Step 3: If geosearch failed, we could try text search but it's also unreliable
+  // For now, just use what Wikipedia gave us - quality over quantity
+  if (landmarks.length === 0) {
+    log.warn(`[LANDMARK] Wikipedia geosearch found no landmarks for ${location}`);
   }
 
-  // Step 5: Sort by photo count (most photos first), then by distance (closer first)
-  landmarks.sort((a, b) => {
-    const countDiff = (b.photoCount || 0) - (a.photoCount || 0);
-    if (countDiff !== 0) return countDiff;
-    return (a.distance || 99999) - (b.distance || 99999);
-  });
+  // Step 4: Sort by distance (closer landmarks first - they're more relevant to the reader's location)
+  landmarks.sort((a, b) => (a.distance || 99999) - (b.distance || 99999));
 
-  // Step 6: Take top N candidates
+  // Step 5: Take top N candidates for photo fetching
   const topLandmarks = landmarks.slice(0, Math.min(limit * 2, landmarks.length));
   log.debug(`[LANDMARK] Selected ${topLandmarks.length} candidates for photo fetch`);
 
-  // Step 7: Pre-fetch photos for top landmarks (in parallel)
+  // Step 6: Pre-fetch photos for top landmarks (in parallel)
   await Promise.allSettled(topLandmarks.map(async (landmark) => {
     try {
       const photo = await fetchLandmarkPhoto(landmark.query);
@@ -699,7 +705,7 @@ async function discoverLandmarksForLocation(city, country, limit = 10) {
     }
   }));
 
-  // Step 8: Filter to only landmarks with successful photo fetch, take top N
+  // Step 7: Filter to only landmarks with successful photo fetch, take top N
   const validLandmarks = topLandmarks.filter(l => l.hasPhoto).slice(0, limit);
 
   const elapsed = Date.now() - startTime;

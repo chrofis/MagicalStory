@@ -52,7 +52,8 @@ const CREDIT_CONFIG = {
 
   // Story page limits
   STORY_PAGES: {
-    MIN: 10,
+    MIN: 4,      // Minimum 4 pages (2 scenes for standard, 4 for picture book) - dev mode uses this
+    MIN_PUBLIC: 10,  // Minimum for non-dev users
     MAX: 100,
     DEFAULT: 20,
   },
@@ -6872,6 +6873,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   const isPictureBookLayout = inputData.languageLevel === '1st-grade';
   const sceneCount = isPictureBookLayout ? inputData.pages : Math.floor(inputData.pages / 2);
   const lang = inputData.language || 'en';
+  log.debug(`📖 [UNIFIED] Input: ${inputData.pages} pages, level: ${inputData.languageLevel}, layout: ${isPictureBookLayout ? 'Picture Book' : 'Standard'} → ${sceneCount} scenes`);
   const { getLanguageNameEnglish } = require('./server/lib/languages');
   const langText = getLanguageNameEnglish(lang);
 
@@ -10188,6 +10190,7 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
     delete inputData.idempotencyKey;
 
     log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}${idempotencyKey ? ` (idempotency: ${idempotencyKey})` : ''}`);
+    log.debug(`📝 [JOB INPUT] pages: ${req.body.pages} → ${inputData.pages}${req.body.pages !== inputData.pages ? ' (clamped!)' : ''}, level: ${inputData.languageLevel}`);
     log.debug(`📝 [JOB INPUT] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
 
     // Check email verification (skip for admins and impersonating admins)
