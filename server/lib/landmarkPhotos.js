@@ -117,11 +117,21 @@ async function fetchWikipediaCategories(lang, pageIds) {
       const data = await res.json();
 
       let foundCount = 0;
-      for (const [pageId, page] of Object.entries(data.query?.pages || {})) {
-        const categories = (page.categories || [])
-          .map(c => c.title.replace(/^Category:|^Kategorie:|^Catégorie:/i, ''));
+      const pages = data.query?.pages || {};
+      const pageKeys = Object.keys(pages);
+      log.debug(`[LANDMARK-CAT] ${lang}: API returned ${pageKeys.length} pages, keys: ${pageKeys.slice(0, 5).join(',')}...`);
+
+      for (const [pageId, page] of Object.entries(pages)) {
+        const rawCategories = page.categories || [];
+        const categories = rawCategories.map(c => c.title.replace(/^Category:|^Kategorie:|^Catégorie:/i, ''));
         results.set(parseInt(pageId), categories);
-        if (categories.length > 0) foundCount++;
+        if (categories.length > 0) {
+          foundCount++;
+          // Log first page with categories for debugging
+          if (foundCount <= 2) {
+            log.debug(`[LANDMARK-CAT] ${lang}: pageId=${pageId} "${page.title}" has ${categories.length} cats: ${categories.slice(0, 3).join(', ')}`);
+          }
+        }
       }
       log.debug(`[LANDMARK-CAT] ${lang}: ${foundCount}/${batch.length} pages have categories`);
     } catch (err) {
@@ -180,13 +190,17 @@ async function enrichLandmarksWithCategories(landmarks) {
     byLang.get(landmark.lang).push(landmark);
   }
 
-  log.info(`[LANDMARK-CAT] Enriching ${landmarks.length} landmarks (${skippedCount} skipped, no pageId)`);
+  log.info(`[LANDMARK-CAT] Enriching ${landmarks.length} landmarks (${skippedCount} skipped, no pageId/lang)`);
   log.debug(`[LANDMARK-CAT] Languages: ${Array.from(byLang.keys()).join(', ')}`);
+
+  // Log first few landmarks with their pageIds for debugging
+  const sampleLandmarks = landmarks.filter(l => l.pageId).slice(0, 5);
+  log.debug(`[LANDMARK-CAT] Sample landmarks: ${sampleLandmarks.map(l => `${l.name}(${l.pageId})`).join(', ')}`);
 
   // Fetch categories per language in parallel
   await Promise.all(Array.from(byLang.entries()).map(async ([lang, langLandmarks]) => {
     const pageIds = langLandmarks.map(l => l.pageId);
-    log.debug(`[LANDMARK-CAT] Fetching ${pageIds.length} categories from ${lang}.wikipedia`);
+    log.debug(`[LANDMARK-CAT] Fetching ${pageIds.length} categories from ${lang}.wikipedia (pageIds: ${pageIds.slice(0, 5).join(',')})`);
     const categoryMap = await fetchWikipediaCategories(lang, pageIds);
     log.debug(`[LANDMARK-CAT] Got ${categoryMap.size} category results from ${lang}.wikipedia`);
 
@@ -197,8 +211,16 @@ async function enrichLandmarksWithCategories(landmarks) {
       landmark.type = type;
       landmark.shouldBoost = shouldBoost;
 
-      if (type) {
-        log.debug(`[LANDMARK-CAT] "${landmark.name}" → ${type}${shouldBoost ? ' 🏆' : ''}`);
+      // Log ALL landmarks with their categories to debug why types aren't being extracted
+      if (categories.length > 0) {
+        log.debug(`[LANDMARK-CAT] "${landmark.name}" (pageId=${landmark.pageId}) categories: ${categories.slice(0, 5).join(', ')}${categories.length > 5 ? '...' : ''}`);
+        if (type) {
+          log.info(`[LANDMARK-CAT] ✓ "${landmark.name}" → ${type}${shouldBoost ? ' 🏆' : ''}`);
+        } else {
+          log.debug(`[LANDMARK-CAT] ✗ "${landmark.name}" → NO TYPE MATCH`);
+        }
+      } else {
+        log.debug(`[LANDMARK-CAT] ✗ "${landmark.name}" (pageId=${landmark.pageId}) → NO CATEGORIES RETURNED`);
       }
     }
   }));

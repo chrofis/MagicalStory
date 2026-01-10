@@ -1563,14 +1563,15 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
     const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
+
+    // Discover landmarks for user location (await to include in ideas prompt)
+    let availableLandmarks = [];
     if (userLocation?.city) {
       log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
 
-      // Trigger landmark discovery if not already in database
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
       // Check database first (persists across restarts)
-      let needsDiscovery = true;
       try {
         const dbResult = await dbPool.query(
           'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
@@ -1579,21 +1580,30 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
         if (dbResult.rows.length > 0) {
           const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
           if (age < LANDMARK_CACHE_TTL) {
-            needsDiscovery = false;
-            log.debug(`[LANDMARK] Using DB-cached ${dbResult.rows[0].landmarks?.length || 0} landmarks for ${userLocation.city}`);
+            const rawLandmarks = dbResult.rows[0].landmarks;
+            availableLandmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
+            log.info(`[LANDMARK] 📍 Using DB-cached ${availableLandmarks?.length || 0} landmarks for ${userLocation.city}`);
           }
         }
       } catch (dbErr) {
         log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
       }
 
-      if (needsDiscovery) {
-        log.info(`[LANDMARK] 🔍 Starting background discovery for ${userLocation.city}, ${userLocation.country || ''}`);
+      // If not cached, discover now (await with timeout)
+      if (!availableLandmarks || availableLandmarks.length === 0) {
+        log.info(`[LANDMARK] 🔍 Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
 
-        // Fire and forget - discovery runs in background, saves to database
-        discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10)
-          .then(async landmarks => {
-            // Save to database (upsert)
+        try {
+          // Use Promise.race to timeout after 15 seconds
+          const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
+          );
+
+          availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
+
+          // Save to database (upsert) for future requests
+          if (availableLandmarks && availableLandmarks.length > 0) {
             try {
               await dbPool.query(`
                 INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
@@ -1602,22 +1612,23 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
                   landmarks = $4,
                   landmark_count = $5,
                   updated_at = NOW()
-              `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(landmarks), landmarks.length]);
-              log.info(`[LANDMARK] ✅ Saved ${landmarks.length} landmarks to DB for ${userLocation.city}`);
+              `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(availableLandmarks), availableLandmarks.length]);
+              log.info(`[LANDMARK] ✅ Discovered and saved ${availableLandmarks.length} landmarks for ${userLocation.city}`);
             } catch (dbErr) {
               log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
             }
-            // Also update in-memory cache for immediate use
+            // Also update in-memory cache
             userLandmarkCache.set(cacheKey, {
-              landmarks,
+              landmarks: availableLandmarks,
               city: userLocation.city,
               country: userLocation.country || '',
               timestamp: Date.now()
             });
-          })
-          .catch(err => {
-            log.error(`[LANDMARK] Discovery failed for ${userLocation.city}: ${err.message}`);
-          });
+          }
+        } catch (err) {
+          log.warn(`[LANDMARK] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
+          availableLandmarks = [];
+        }
       }
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
@@ -1699,6 +1710,18 @@ ${adventureGuideContent}`
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
 
+    // Build available landmarks section for the prompt
+    let availableLandmarksSection = '';
+    if (availableLandmarks && availableLandmarks.length > 0) {
+      const landmarkNames = availableLandmarks
+        .slice(0, 10) // Limit to top 10 landmarks
+        .map(l => `- ${l.name}${l.type ? ` (${l.type})` : ''}`)
+        .join('\n');
+      availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
+${landmarkNames}`;
+      log.debug(`[LANDMARK] Including ${availableLandmarks.length} landmarks in ideas prompt`);
+    }
+
     // Calculate story length category for output length limits
     const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 4 sentences max per idea' :
                                 pages <= 20 ? 'MEDIUM (11-20 pages) - 6 sentences max per idea' :
@@ -1718,6 +1741,7 @@ ${adventureGuideContent}`
       .replace('{TOPIC_GUIDE}', topicGuideText)
       .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
       .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
+      .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
       .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
@@ -1774,14 +1798,15 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
     const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation } = req.body;
 
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
+
+    // Discover landmarks for user location (await to include in ideas prompt)
+    let availableLandmarks = [];
     if (userLocation?.city) {
       log.debug(`  📍 User location: ${userLocation.city}, ${userLocation.region || ''}, ${userLocation.country || ''}`);
 
-      // Trigger landmark discovery if not already in database
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
       // Check database first (persists across restarts)
-      let needsDiscovery = true;
       try {
         const dbResult = await dbPool.query(
           'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
@@ -1790,21 +1815,33 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
         if (dbResult.rows.length > 0) {
           const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
           if (age < LANDMARK_CACHE_TTL) {
-            needsDiscovery = false;
-            log.debug(`[LANDMARK] Using DB-cached ${dbResult.rows[0].landmarks?.length || 0} landmarks for ${userLocation.city}`);
+            const rawLandmarks = dbResult.rows[0].landmarks;
+            availableLandmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
+            log.info(`[LANDMARK] 📍 [STREAM] Using DB-cached ${availableLandmarks?.length || 0} landmarks for ${userLocation.city}`);
           }
         }
       } catch (dbErr) {
         log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
       }
 
-      if (needsDiscovery) {
-        log.info(`[LANDMARK] 🔍 Starting background discovery for ${userLocation.city}, ${userLocation.country || ''}`);
+      // If not cached, discover now (await with timeout)
+      if (!availableLandmarks || availableLandmarks.length === 0) {
+        log.info(`[LANDMARK] 🔍 [STREAM] Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
 
-        // Fire and forget - discovery runs in background, saves to database
-        discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10)
-          .then(async landmarks => {
-            // Save to database (upsert)
+        // Send SSE event to inform user about landmark discovery
+        res.write(`data: ${JSON.stringify({ type: 'status', message: 'Discovering local landmarks...' })}\n\n`);
+
+        try {
+          // Use Promise.race to timeout after 15 seconds
+          const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
+          );
+
+          availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
+
+          // Save to database (upsert) for future requests
+          if (availableLandmarks && availableLandmarks.length > 0) {
             try {
               await dbPool.query(`
                 INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
@@ -1813,22 +1850,23 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
                   landmarks = $4,
                   landmark_count = $5,
                   updated_at = NOW()
-              `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(landmarks), landmarks.length]);
-              log.info(`[LANDMARK] ✅ Saved ${landmarks.length} landmarks to DB for ${userLocation.city}`);
+              `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(availableLandmarks), availableLandmarks.length]);
+              log.info(`[LANDMARK] ✅ [STREAM] Discovered and saved ${availableLandmarks.length} landmarks for ${userLocation.city}`);
             } catch (dbErr) {
               log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
             }
-            // Also update in-memory cache for immediate use
+            // Also update in-memory cache
             userLandmarkCache.set(cacheKey, {
-              landmarks,
+              landmarks: availableLandmarks,
               city: userLocation.city,
               country: userLocation.country || '',
               timestamp: Date.now()
             });
-          })
-          .catch(err => {
-            log.error(`[LANDMARK] Discovery failed for ${userLocation.city}: ${err.message}`);
-          });
+          }
+        } catch (err) {
+          log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
+          availableLandmarks = [];
+        }
       }
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
@@ -1911,6 +1949,18 @@ ${adventureGuideContent}`
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
 
+    // Build available landmarks section for the prompt
+    let availableLandmarksSection = '';
+    if (availableLandmarks && availableLandmarks.length > 0) {
+      const landmarkNames = availableLandmarks
+        .slice(0, 10) // Limit to top 10 landmarks
+        .map(l => `- ${l.name}${l.type ? ` (${l.type})` : ''}`)
+        .join('\n');
+      availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
+${landmarkNames}`;
+      log.debug(`[LANDMARK] [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt`);
+    }
+
     // Calculate story length category for output length limits
     const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 4 sentences max per idea' :
                                 pages <= 20 ? 'MEDIUM (11-20 pages) - 6 sentences max per idea' :
@@ -1930,6 +1980,7 @@ ${adventureGuideContent}`
       .replace('{TOPIC_GUIDE}', topicGuideText)
       .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
       .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
+      .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
       .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
