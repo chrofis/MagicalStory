@@ -1218,6 +1218,56 @@ router.get('/avatar-prompt', authenticateToken, async (req, res) => {
 });
 
 /**
+ * POST /api/generate-avatar-options
+ * Generate 3 avatar options for user to choose from
+ */
+router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
+  try {
+    const { facePhoto, gender, category = 'standard' } = req.body;
+
+    if (!facePhoto) {
+      return res.status(400).json({ error: 'Missing facePhoto' });
+    }
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      return res.status(503).json({ error: 'Avatar generation service unavailable' });
+    }
+
+    log.debug(`🎭 [AVATAR OPTIONS] Generating 3 options...`);
+
+    const character = {
+      photoUrl: facePhoto,
+      gender: gender,
+      name: 'temp'
+    };
+    const config = {};
+
+    // Generate 3 attempts in parallel
+    const attempts = await Promise.all([
+      generateDynamicAvatar(character, category, config),
+      generateDynamicAvatar(character, category, config),
+      generateDynamicAvatar(character, category, config)
+    ]);
+
+    const options = attempts
+      .map((a, i) => a.success ? { id: i, imageData: a.imageData } : null)
+      .filter(Boolean);
+
+    log.debug(`✅ [AVATAR OPTIONS] Generated ${options.length}/3 options`);
+
+    return res.json({
+      success: true,
+      options: options
+    });
+
+  } catch (err) {
+    log.error('❌ [AVATAR OPTIONS] Error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/generate-clothing-avatars
  * Generate clothing avatars for a character (winter, standard, summer, formal)
  */
@@ -1240,7 +1290,11 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
     const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
 
+    // Log image size to debug which photo is being used
+    const imageSize = Math.round(facePhoto.length / 1024);
+    const isPNG = facePhoto.startsWith('data:image/png');
     log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId}), model: ${selectedModel}, backend: ${useRunware ? 'runware' : 'gemini'}`);
+    log.debug(`👔 [CLOTHING AVATARS] Input photo: ${imageSize}KB, format: ${isPNG ? 'PNG (likely bodyNoBg)' : 'JPEG (likely original)'}`);
 
     const isFemale = gender === 'female';
 

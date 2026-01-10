@@ -17,15 +17,15 @@ GRID LAYOUT (with clear black dividing lines between quadrants):
 
 CRITICAL GRID REQUIREMENTS:
 - Clean 2x2 collage layout with a thin neutral divider.
-- Both profile views (top right and bottom right) the face looks towards the RIGHT
+- Both profile views (top right and bottom right) the face looks towards the RIGHT (nose pointing towards right edge of image)
 - Each quadrant has solid light grey (off-white) studio background
 - All 4 quadrants show the SAME outfit. If the outfit has pattern/ logos the must be identical in size, color, and placement in all four views.
 
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.
-- Expression: Natural, friendly SMILE. The person should look happy and approachable.
+- Expression: Natural, friendly expression. The person should look approachable.
 - Body: Generate age-appropriate body proportions based on the apparent age visible in the reference photo.
-- Setting: Pure clean white background (#FFFFFF) in each quadrant.
+- Setting: Solid light grey studio background in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
 - Top quadrants: Head and shoulders, face clearly visible
 - Bottom quadrants: Full body, head to toe. Shoes visible.

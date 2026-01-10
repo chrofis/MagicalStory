@@ -17,7 +17,7 @@ GRID LAYOUT (with clear black dividing lines between quadrants):
 
 CRITICAL GRID REQUIREMENTS:
 - Clean 2x2 collage layout with a thin neutral divider.
-- Both profile views (top right and bottom right) the face looks towards the RIGHT
+- Both profile views (top right and bottom right) the face looks towards the RIGHT (nose pointing towards right edge of image)
 - Each quadrant has solid light grey (off-white) studio background
 - All 4 quadrants show the SAME outfit. If the outfit has pattern/ logos the must be identical in size, color, and placement in all four views.
 
@@ -35,6 +35,9 @@ BODY TRANSFORMATION (CRITICAL):
 - Do NOT preserve overweight or heavy body proportions from the reference photo
 - Keep the EXACT same face and identity, but transform the body to be slim and athletic
 - For children: fit and healthy, age-appropriate athletic proportions
+
+EXPRESSION:
+- The person should look happy and approachable.
 
 IDENTITY PERSISTENCE:
 - Hair and face must be fully visible. Avoid hats and hoods.

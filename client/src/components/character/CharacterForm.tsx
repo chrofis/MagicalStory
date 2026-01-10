@@ -7,7 +7,7 @@ import TraitSelector from './TraitSelector';
 import CharacterRelationships from './CharacterRelationships';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
 import { useAvatarCooldown } from '@/hooks/useAvatarCooldown';
-import { getAgeCategory } from '@/services/characterService';
+import { getAgeCategory, characterService } from '@/services/characterService';
 import type { Character, PhysicalTraits, PhysicalTraitsSource, AgeCategory, ChangedTraits, RelationshipMap, RelationshipTextMap } from '@/types/character';
 import type { CustomRelationshipPair } from '@/constants/relationships';
 
@@ -470,6 +470,10 @@ export function CharacterForm({
   // Clothing choice modal state
   const [showClothingChoiceModal, setShowClothingChoiceModal] = useState(false);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  // Avatar options selection state
+  const [avatarOptions, setAvatarOptions] = useState<Array<{ id: number; imageData: string }> | null>(null);
+  const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
+  const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -568,6 +572,49 @@ export function CharacterForm({
     if (!canRegenerate) return;
     recordRegeneration();
     onRegenerateAvatarsWithTraits?.();
+  };
+
+  // Generate 3 avatar options for user to choose from
+  const handleGenerateAvatarOptions = async () => {
+    const facePhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
+    if (!facePhoto) return;
+
+    setIsGeneratingOptions(true);
+    setAvatarOptions(null);
+    setSelectedOptionId(null);
+
+    try {
+      const result = await characterService.generateAvatarOptions(facePhoto, character.gender || 'child');
+      if (result.success && result.options.length > 0) {
+        setAvatarOptions(result.options);
+        setSelectedOptionId(result.options[0].id); // Pre-select first option
+      }
+    } catch (error) {
+      console.error('Failed to generate avatar options:', error);
+    } finally {
+      setIsGeneratingOptions(false);
+    }
+  };
+
+  // Save the selected avatar option
+  const handleSaveSelectedAvatar = () => {
+    if (avatarOptions && selectedOptionId !== null) {
+      const selected = avatarOptions.find(o => o.id === selectedOptionId);
+      if (selected) {
+        // Update character with selected avatar
+        onChange({
+          ...character,
+          avatars: {
+            ...character.avatars,
+            standard: selected.imageData,
+            status: 'complete',
+            generatedAt: new Date().toISOString(),
+          },
+        });
+        setAvatarOptions(null);
+        setSelectedOptionId(null);
+      }
+    }
   };
 
   const canSaveName = character.name && character.name.trim().length >= 2;
@@ -1235,6 +1282,23 @@ export function CharacterForm({
                     language === 'de' ? 'Generiere...' : 'Generating...'
                   ) : (
                     language === 'de' ? 'Neu generieren' : 'Regenerate'
+                  )}
+                </button>
+              )}
+              {/* Generate 3 Options button */}
+              {(developerMode || isImpersonating) && (
+                <button
+                  onClick={handleGenerateAvatarOptions}
+                  disabled={isGeneratingOptions || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || !character.photos?.original}
+                  className="w-full px-2 py-1 text-[10px] font-medium bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  {isGeneratingOptions ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                      {language === 'de' ? 'Generiere 3...' : 'Generating 3...'}
+                    </>
+                  ) : (
+                    language === 'de' ? '3 Optionen generieren' : 'Generate 3 Options'
                   )}
                 </button>
               )}
@@ -2304,6 +2368,66 @@ export function CharacterForm({
                 className="w-full px-4 py-2 text-gray-500 hover:text-gray-700 text-sm transition-colors"
               >
                 {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Avatar Options Selection Modal */}
+      {avatarOptions && avatarOptions.length > 0 && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">
+              {language === 'de' ? 'Wähle deinen Avatar' : 'Choose Your Avatar'}
+            </h3>
+            <p className="text-gray-600 mb-4 text-sm">
+              {language === 'de'
+                ? 'Klicke auf das Bild, das dir am besten gefällt'
+                : 'Click on the image you like best'}
+            </p>
+
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {avatarOptions.map((option) => (
+                <div
+                  key={option.id}
+                  onClick={() => setSelectedOptionId(option.id)}
+                  className={`cursor-pointer rounded-xl overflow-hidden border-4 transition-all ${
+                    selectedOptionId === option.id
+                      ? 'border-indigo-500 shadow-lg scale-[1.02]'
+                      : 'border-transparent hover:border-gray-300'
+                  }`}
+                >
+                  <img
+                    src={option.imageData}
+                    alt={`Option ${option.id + 1}`}
+                    className="w-full aspect-[9/16] object-cover"
+                  />
+                  <div className={`text-center py-2 text-sm font-medium ${
+                    selectedOptionId === option.id ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    Option {option.id + 1}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveSelectedAvatar}
+                disabled={selectedOptionId === null}
+                className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {language === 'de' ? 'Auswahl verwenden' : 'Use Selected'}
+              </button>
+              <button
+                onClick={() => {
+                  setAvatarOptions(null);
+                  setSelectedOptionId(null);
+                }}
+                className="px-4 py-3 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                {language === 'de' ? 'Abbrechen' : 'Cancel'}
               </button>
             </div>
           </div>

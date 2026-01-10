@@ -1362,41 +1362,52 @@ export default function StoryWizard() {
 
           // Photo analysis now only returns face/body crops
           // Physical traits and clothing are extracted during avatar evaluation
+
+          // Build the updated photos object ONCE so we can use it for both state and avatar generation
+          const updatedPhotos = {
+            original: analysis.photos?.face || originalPhotoUrl,
+            face: analysis.photos?.face,
+            body: analysis.photos?.body || originalPhotoUrl,
+            bodyNoBg: analysis.photos?.bodyNoBg,
+            faceBox: analysis.photos?.faceBox,
+            bodyBox: analysis.photos?.bodyBox,
+          };
+
+          // Build clothing updates
+          let updatedClothing: Character['clothing'] = undefined;
+          let updatedClothingSource: Character['clothingSource'] = undefined;
+
+          if (clothingToKeep) {
+            // User chose to keep old clothing - mark as user-edited so it gets sent to API
+            updatedClothing = { structured: clothingToKeep };
+            updatedClothingSource = {
+              upperBody: clothingToKeep.upperBody ? 'user' : undefined,
+              lowerBody: clothingToKeep.lowerBody ? 'user' : undefined,
+              shoes: clothingToKeep.shoes ? 'user' : undefined,
+              fullBody: clothingToKeep.fullBody ? 'user' : undefined,
+            };
+            log.info(`👕 Keeping old clothing (marked as user-edited): ${JSON.stringify(clothingToKeep)}`);
+          } else {
+            // User chose new photo's clothing - clear existing so it gets extracted from new photo
+            log.info(`👕 Using new photo's clothing (cleared existing)`);
+          }
+
+          // Build character for avatar generation BEFORE state update
+          // (React state updates are async, so we build the object we need now)
+          const charForGeneration: Character | null = currentCharacter ? {
+            ...currentCharacter,
+            photos: updatedPhotos,
+            avatars: { status: 'generating' as const },
+            clothing: updatedClothing,
+            clothingSource: updatedClothingSource,
+          } : null;
+
           setCurrentCharacter(prev => {
             if (!prev) return null;
-
-            // Handle clothing based on user's choice
-            let updatedClothing = prev.clothing;
-            let updatedClothingSource = prev.clothingSource;
-
-            if (clothingToKeep) {
-              // User chose to keep old clothing - mark as user-edited so it gets sent to API
-              updatedClothing = { structured: clothingToKeep };
-              updatedClothingSource = {
-                upperBody: clothingToKeep.upperBody ? 'user' : undefined,
-                lowerBody: clothingToKeep.lowerBody ? 'user' : undefined,
-                shoes: clothingToKeep.shoes ? 'user' : undefined,
-                fullBody: clothingToKeep.fullBody ? 'user' : undefined,
-              };
-              log.info(`👕 Keeping old clothing (marked as user-edited): ${JSON.stringify(clothingToKeep)}`);
-            } else {
-              // User chose new photo's clothing - clear existing so it gets extracted from new photo
-              updatedClothing = undefined;
-              updatedClothingSource = undefined;
-              log.info(`👕 Using new photo's clothing (cleared existing)`);
-            }
-
             return {
               ...prev,
               // Photos from face/body detection
-              photos: {
-                original: analysis.photos?.face || originalPhotoUrl,
-                face: analysis.photos?.face,
-                body: analysis.photos?.body || originalPhotoUrl,
-                bodyNoBg: analysis.photos?.bodyNoBg,
-                faceBox: analysis.photos?.faceBox,
-                bodyBox: analysis.photos?.bodyBox,
-              },
+              photos: updatedPhotos,
               // Clear avatars - will regenerate with new face
               avatars: { status: 'generating' as const },
               // Update clothing based on user's choice
@@ -1408,15 +1419,8 @@ export default function StoryWizard() {
           // Auto-start avatar generation in BACKGROUND after face detection
           // Don't await - let user continue while avatar generates
           log.info(`🎨 Auto-starting avatar generation in background...`);
+          log.info(`📸 Photo for avatar: bodyNoBg=${!!updatedPhotos.bodyNoBg}, body=${!!updatedPhotos.body}, face=${!!updatedPhotos.face}`);
           setIsGeneratingAvatar(true);
-
-          // Get the updated character for avatar generation
-          const charForGeneration = await new Promise<Character | null>(resolve => {
-            setCurrentCharacter(prev => {
-              resolve(prev);
-              return prev;
-            });
-          });
 
           // Only auto-start avatar generation if character has a name
           // If no name yet (user uploads photo first), generation will run when character is saved
@@ -1441,7 +1445,7 @@ export default function StoryWizard() {
                   setCharacters(prev => prev.map(c =>
                     c.id === result.character!.id ? result.character! : c
                   ));
-                  log.success(`✅ Avatar generated and traits extracted for ${charForGeneration.name}`);
+                  log.success(`✅ Avatar generated and traits extracted for ${charForGeneration!.name}`);
                 } else {
                   log.error(`❌ Avatar generation failed: ${result.error}`);
                   setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
@@ -1522,38 +1526,47 @@ export default function StoryWizard() {
         // Handle clothing based on user's choice
         const clothingToKeep = pendingClothingToKeep?.structured;
 
+        // Build the updated photos object ONCE so we can use it for both state and avatar generation
+        const updatedPhotos = {
+          original: analysis.photos?.face || pendingPhotoData,
+          face: analysis.photos?.face,
+          body: analysis.photos?.body || pendingPhotoData,
+          bodyNoBg: analysis.photos?.bodyNoBg,
+          faceBox: analysis.photos?.faceBox,
+          bodyBox: analysis.photos?.bodyBox,
+        };
+
+        // Build clothing updates
+        let updatedClothing: Character['clothing'] = undefined;
+        let updatedClothingSource: Character['clothingSource'] = undefined;
+
+        if (clothingToKeep) {
+          // User chose to keep old clothing
+          updatedClothing = { structured: clothingToKeep };
+          updatedClothingSource = {
+            upperBody: clothingToKeep.upperBody ? 'user' : undefined,
+            lowerBody: clothingToKeep.lowerBody ? 'user' : undefined,
+            shoes: clothingToKeep.shoes ? 'user' : undefined,
+            fullBody: clothingToKeep.fullBody ? 'user' : undefined,
+          };
+        }
+
+        // Build character for avatar generation BEFORE state update
+        // (React state updates are async, so we build the object we need now)
+        const charForGeneration: Character | null = currentCharacter ? {
+          ...currentCharacter,
+          photos: updatedPhotos,
+          avatars: { status: 'generating' as const },
+          clothing: updatedClothing,
+          clothingSource: updatedClothingSource,
+        } : null;
+
         // Update character with analysis results
         setCurrentCharacter(prev => {
           if (!prev) return null;
-
-          let updatedClothing = prev.clothing;
-          let updatedClothingSource = prev.clothingSource;
-
-          if (clothingToKeep) {
-            // User chose to keep old clothing
-            updatedClothing = { structured: clothingToKeep };
-            updatedClothingSource = {
-              upperBody: clothingToKeep.upperBody ? 'user' : undefined,
-              lowerBody: clothingToKeep.lowerBody ? 'user' : undefined,
-              shoes: clothingToKeep.shoes ? 'user' : undefined,
-              fullBody: clothingToKeep.fullBody ? 'user' : undefined,
-            };
-          } else {
-            // Clear existing so it gets extracted from new photo
-            updatedClothing = undefined;
-            updatedClothingSource = undefined;
-          }
-
           return {
             ...prev,
-            photos: {
-              original: analysis.photos?.face || pendingPhotoData,
-              face: analysis.photos?.face,
-              body: analysis.photos?.body || pendingPhotoData,
-              bodyNoBg: analysis.photos?.bodyNoBg,
-              faceBox: analysis.photos?.faceBox,
-              bodyBox: analysis.photos?.bodyBox,
-            },
+            photos: updatedPhotos,
             avatars: { status: 'generating' as const },
             clothing: updatedClothing,
             clothingSource: updatedClothingSource,
@@ -1562,15 +1575,8 @@ export default function StoryWizard() {
 
         // Auto-start avatar generation in background
         log.info(`🎨 Auto-starting avatar generation in background after face selection...`);
+        log.info(`📸 Photo for avatar: bodyNoBg=${!!updatedPhotos.bodyNoBg}, body=${!!updatedPhotos.body}, face=${!!updatedPhotos.face}`);
         setIsGeneratingAvatar(true);
-
-        // Get the updated character for avatar generation
-        const charForGeneration = await new Promise<Character | null>(resolve => {
-          setCurrentCharacter(prev => {
-            resolve(prev);
-            return prev;
-          });
-        });
 
         if (charForGeneration && charForGeneration.name && charForGeneration.name.trim()) {
           characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
@@ -1588,7 +1594,7 @@ export default function StoryWizard() {
                 setCharacters(prev => prev.map(c =>
                   c.id === result.character!.id ? result.character! : c
                 ));
-                log.success(`✅ Avatar generated for ${charForGeneration.name} (face selection)`);
+                log.success(`✅ Avatar generated for ${charForGeneration!.name} (face selection)`);
               } else {
                 log.error(`❌ Avatar generation failed: ${result.error}`);
                 setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);

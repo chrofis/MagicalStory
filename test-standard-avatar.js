@@ -12,7 +12,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 // Configuration - can override with command line args
 const CONFIG = {
   imagePath: process.argv[2] || null,  // Optional: path to image file
-  smiling: false  // No forced smiling - match production
+  smiling: true  // Add natural smile
 };
 
 // Load prompt templates
@@ -60,11 +60,11 @@ async function generateStandardAvatar(facePhoto, category, temperature, isFemale
 
   // Use production prompt as-is (don't remove ASCII grid)
 
-  // Add smiling requirement if configured
+  // Add expression requirement if configured
   if (CONFIG.smiling) {
     avatarPrompt = avatarPrompt.replace(
       'IDENTITY PERSISTENCE:',
-      'EXPRESSION:\n- The person must be SMILING with TEETH SHOWING in all 4 quadrants.\n- Natural, warm, genuine smile.\n\nIDENTITY PERSISTENCE:'
+      'EXPRESSION:\n- The person should look happy and approachable.\n\nIDENTITY PERSISTENCE:'
     );
   }
 

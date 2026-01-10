@@ -354,6 +354,31 @@ export const characterService = {
     await api.post('/api/characters', apiData);
   },
 
+  /**
+   * Generate 3 avatar options for user to choose from
+   */
+  async generateAvatarOptions(facePhoto: string, gender: string): Promise<{
+    success: boolean;
+    options: Array<{ id: number; imageData: string }>;
+    error?: string;
+  }> {
+    try {
+      const response = await api.post<{
+        success: boolean;
+        options: Array<{ id: number; imageData: string }>;
+        error?: string;
+      }>('/api/generate-avatar-options', {
+        facePhoto,
+        gender,
+        category: 'standard'
+      });
+      return response;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, options: [], error: message };
+    }
+  },
+
   async generateClothingAvatars(character: Character, options?: { avatarModel?: string }): Promise<{
     success: boolean;
     avatars?: CharacterAvatars;
