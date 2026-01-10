@@ -144,6 +144,8 @@ export interface CharacterAvatars {
   styledAvatars?: Record<string, StyledAvatarSet>;
   // Dynamic costumed avatars (from visual bible costumes, e.g., "Cowboy", "Pirate")
   costumed?: Record<string, CostumedAvatarData>;
+  // Cross-avatar LPIPS similarity scores (dev mode only)
+  crossLpips?: Record<string, number>;
 }
 
 // Structured clothing details
