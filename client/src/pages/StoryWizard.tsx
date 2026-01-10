@@ -271,6 +271,8 @@ export default function StoryWizard() {
 
   // Saved generation settings (for dev mode - shows what settings were used to generate the story)
   const [savedGenerationSettings, setSavedGenerationSettings] = useState<GenerationSettings | null>(null);
+  // Flag to skip server reload when we just finished generating (data is already in state)
+  const justFinishedGenerating = useRef(false);
 
   // Progressive story display state (show story while images are generating)
   const [progressiveStoryData, setProgressiveStoryData] = useState<{
@@ -468,6 +470,13 @@ export default function StoryWizard() {
 
     const loadSavedStory = async () => {
       if (!urlStoryId || !isAuthenticated) return;
+
+      // Skip server reload if we just finished generating - data is already in state
+      if (justFinishedGenerating.current) {
+        justFinishedGenerating.current = false;
+        log.info('Skipping story reload - just finished generating');
+        return;
+      }
 
       log.info('Loading saved story progressively:', urlStoryId);
       setIsLoading(true);
@@ -2690,6 +2699,9 @@ export default function StoryWizard() {
             relationships: relationships,
             relationshipTexts: relationshipTexts,
           });
+
+          // Mark that we just finished generating (skip server reload since data is in state)
+          justFinishedGenerating.current = true;
 
           // Stop tracking in global context
           stopTracking();
