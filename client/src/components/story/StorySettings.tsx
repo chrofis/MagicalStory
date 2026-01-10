@@ -41,12 +41,12 @@ interface StorySettingsProps {
   generatedIdeas?: string[];
   onSelectIdea?: (idea: string) => void;
   // Story type settings (from step 4)
-  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
   storyTopic?: string;
   storyTheme?: string;
   customThemeText?: string;
   artStyle?: string;
-  onCategoryChange?: (category: 'adventure' | 'life-challenge' | 'educational') => void;
+  onCategoryChange?: (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => void;
   onTopicChange?: (topic: string) => void;
   onThemeChange?: (theme: string) => void;
   onCustomThemeTextChange?: (text: string) => void;

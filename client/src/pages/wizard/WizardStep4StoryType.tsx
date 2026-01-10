@@ -1,11 +1,11 @@
 import { StoryCategorySelector } from '@/components/story/StoryCategorySelector';
 
 interface WizardStep4Props {
-  storyCategory: 'adventure' | 'life-challenge' | 'educational' | '';
+  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
   storyTopic: string;
   storyTheme: string;
   customThemeText: string;
-  onCategoryChange: (cat: 'adventure' | 'life-challenge' | 'educational' | '') => void;
+  onCategoryChange: (cat: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
   onCustomThemeTextChange: (text: string) => void;

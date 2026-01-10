@@ -12,6 +12,7 @@ const router = express.Router();
 const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, hasStorySeparateImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
+const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
 
 /**
  * Build metadata object from story data for fast list queries.
@@ -41,6 +42,42 @@ function buildStoryMetadata(story) {
     characters: (story.characters || []).map(c => ({ id: c.id, name: c.name })),
   };
 }
+
+// ============================================
+// HISTORICAL EVENTS API
+// ============================================
+
+// GET /api/stories/historical-events - List all historical events
+router.get('/historical-events', async (req, res) => {
+  try {
+    const events = getAllEvents();
+    res.json({
+      events,
+      categories: EVENT_CATEGORIES
+    });
+  } catch (error) {
+    log.error('Error fetching historical events:', error);
+    res.status(500).json({ error: 'Failed to fetch historical events' });
+  }
+});
+
+// GET /api/stories/historical-events/:id - Get historical event context for story generation
+router.get('/historical-events/:id', async (req, res) => {
+  try {
+    const eventContext = getEventForStory(req.params.id);
+    if (!eventContext) {
+      return res.status(404).json({ error: 'Historical event not found' });
+    }
+    res.json(eventContext);
+  } catch (error) {
+    log.error('Error fetching historical event:', error);
+    res.status(500).json({ error: 'Failed to fetch historical event' });
+  }
+});
+
+// ============================================
+// STORY CRUD
+// ============================================
 
 // GET /api/stories - List user's stories (paginated, metadata only)
 router.get('/', authenticateToken, async (req, res) => {

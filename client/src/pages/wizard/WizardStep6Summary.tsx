@@ -20,7 +20,7 @@ interface WizardStep6Props {
   characters: Character[];
   mainCharacters: number[];
   excludedCharacters: number[];
-  storyCategory: 'adventure' | 'life-challenge' | 'educational' | '';
+  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
   storyTopic: string;
   storyTheme: string;
   artStyle: string;

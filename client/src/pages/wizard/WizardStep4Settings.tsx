@@ -21,12 +21,12 @@ interface WizardStep4Props {
   isGeneratingIdeas: boolean;
   ideaPrompt: { prompt: string; model: string } | null;
   // Story type settings (step 4)
-  storyCategory: 'adventure' | 'life-challenge' | 'educational' | '';
+  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
   storyTopic: string;
   storyTheme: string;
   customThemeText: string;
   artStyle: string;
-  onCategoryChange: (cat: 'adventure' | 'life-challenge' | 'educational' | '') => void;
+  onCategoryChange: (cat: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
   onCustomThemeTextChange: (text: string) => void;

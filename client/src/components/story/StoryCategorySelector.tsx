@@ -10,20 +10,23 @@ import {
   educationalTopics,
   educationalGroups,
   adventureThemeGroups,
+  historicalEvents,
+  historicalEventGroups,
   getStoryTypesByGroup,
   getLifeChallengesByGroup,
   getEducationalTopicsByGroup,
+  getHistoricalEventsByGroup,
 } from '@/constants/storyTypes';
 import type { Language } from '@/types/story';
 
 interface StoryCategorySelectorProps {
   // Current values
-  storyCategory: 'adventure' | 'life-challenge' | 'educational' | '';
-  storyTopic: string;  // Life challenge or educational topic ID
+  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
+  storyTopic: string;  // Life challenge, educational topic, or historical event ID
   storyTheme: string;  // Adventure theme (or 'realistic')
   customThemeText?: string;  // Custom theme description when theme is 'custom'
   // Callbacks
-  onCategoryChange: (category: 'adventure' | 'life-challenge' | 'educational') => void;
+  onCategoryChange: (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
   onCustomThemeTextChange?: (text: string) => void;
@@ -49,6 +52,7 @@ export function StoryCategorySelector({
   const [expandedAdventureGroups, setExpandedAdventureGroups] = useState<string[]>([]);
   const [expandedLifeGroups, setExpandedLifeGroups] = useState<string[]>([]);
   const [expandedEduGroups, setExpandedEduGroups] = useState<string[]>([]);
+  const [expandedHistoricalGroups, setExpandedHistoricalGroups] = useState<string[]>([]);
 
   // Translations
   const translations = {
@@ -119,6 +123,12 @@ export function StoryCategorySelector({
     );
   };
 
+  const toggleHistoricalGroup = (groupId: string) => {
+    setExpandedHistoricalGroups(prev =>
+      prev.includes(groupId) ? prev.filter(g => g !== groupId) : [...prev, groupId]
+    );
+  };
+
   // Expand all groups by default when category changes
   useEffect(() => {
     if (storyCategory === 'adventure') {
@@ -127,18 +137,20 @@ export function StoryCategorySelector({
       setExpandedLifeGroups(lifeChallengeGroups.map(g => g.id));
     } else if (storyCategory === 'educational') {
       setExpandedEduGroups(educationalGroups.map(g => g.id));
+    } else if (storyCategory === 'historical') {
+      setExpandedHistoricalGroups(historicalEventGroups.map(g => g.id));
     }
   }, [storyCategory]);
 
   // Handle category selection
-  const handleCategorySelect = (categoryId: 'adventure' | 'life-challenge' | 'educational') => {
+  const handleCategorySelect = (categoryId: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => {
     onCategoryChange(categoryId);
     // Reset topic and theme when changing category
     onTopicChange('');
     if (categoryId === 'adventure') {
       onThemeChange('');
     } else {
-      onThemeChange('realistic');  // Default to realistic for non-adventure
+      onThemeChange('realistic');  // Default to realistic for non-adventure (including historical)
     }
   };
 
@@ -187,6 +199,8 @@ export function StoryCategorySelector({
     if (challenge) return challenge.name[lang] || challenge.name.en;
     const topic = educationalTopics.find(t => t.id === id);
     if (topic) return topic.name[lang] || topic.name.en;
+    const event = historicalEvents.find(e => e.id === id);
+    if (event) return event.name[lang] || event.name.en;
     return id;
   };
 
@@ -230,7 +244,7 @@ export function StoryCategorySelector({
             {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
           </span>
           <button
-            onClick={() => onCategoryChange('' as 'adventure' | 'life-challenge' | 'educational')}
+            onClick={() => onCategoryChange('')}
             className="text-indigo-600 hover:underline"
           >
             {t.change}
@@ -291,7 +305,7 @@ export function StoryCategorySelector({
             {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
           </span>
           <button
-            onClick={() => onCategoryChange('' as any)}
+            onClick={() => onCategoryChange('')}
             className="text-indigo-600 hover:underline"
           >
             {t.change}
@@ -354,7 +368,7 @@ export function StoryCategorySelector({
             {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
           </span>
           <button
-            onClick={() => onCategoryChange('' as any)}
+            onClick={() => onCategoryChange('')}
             className="text-indigo-600 hover:underline"
           >
             {t.change}
@@ -395,6 +409,79 @@ export function StoryCategorySelector({
                         <span className="text-sm font-medium">
                           {topic.name[lang] || topic.name.en}
                         </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Render step 2d: Historical event selection
+  if (storyCategory === 'historical' && !storyTopic) {
+    return (
+      <div className="space-y-4">
+        {/* Selected category indicator */}
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
+            {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
+          </span>
+          <button
+            onClick={() => onCategoryChange('')}
+            className="text-indigo-600 hover:underline"
+          >
+            {t.change}
+          </button>
+        </div>
+
+        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+          <Sparkles className="text-indigo-600" size={24} />
+          {lang === 'de' ? 'Historisches Ereignis' : lang === 'fr' ? 'Événement Historique' : 'Historical Event'}
+        </h2>
+
+        <div className="space-y-3">
+          {historicalEventGroups.map((group) => {
+            const events = getHistoricalEventsByGroup(group.id);
+            const isExpanded = expandedHistoricalGroups.includes(group.id);
+
+            return (
+              <div key={group.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => toggleHistoricalGroup(group.id)}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <span className="font-semibold text-gray-700 flex items-center gap-2">
+                    <span>{group.icon}</span>
+                    {group.name[lang] || group.name.en}
+                  </span>
+                  {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </button>
+
+                {isExpanded && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 p-3">
+                    {events.map((event) => (
+                      <button
+                        key={event.id}
+                        onClick={() => handleTopicSelect(event.id)}
+                        className="p-3 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-xl">{event.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">
+                              {event.shortName[lang] || event.shortName.en}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {typeof event.year === 'string' && event.year.startsWith('-')
+                                ? `${event.year.slice(1)} BC`
+                                : event.year}
+                            </div>
+                          </div>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -488,20 +575,21 @@ export function StoryCategorySelector({
             </div>
           </div>
           <button
-            onClick={() => onCategoryChange('' as any)}
+            onClick={() => onCategoryChange('')}
             className="text-indigo-600 hover:underline text-sm"
           >
             {t.change}
           </button>
         </div>
 
-        {/* Topic (for life-challenge and educational) */}
+        {/* Topic (for life-challenge, educational, and historical) */}
         {storyTopic && (
           <div className="flex items-center justify-between border-t border-indigo-100 pt-3">
             <div className="flex items-center gap-2">
               <span className="text-2xl">
                 {lifeChallenges.find(c => c.id === storyTopic)?.emoji ||
-                 educationalTopics.find(t => t.id === storyTopic)?.emoji}
+                 educationalTopics.find(t => t.id === storyTopic)?.emoji ||
+                 historicalEvents.find(e => e.id === storyTopic)?.emoji}
               </span>
               <div>
                 <div className="text-xs text-gray-500">{t.selectedTopic}</div>

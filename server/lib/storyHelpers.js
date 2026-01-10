@@ -13,6 +13,7 @@ const { hashImageData } = require('./images');
 const { buildVisualBiblePrompt } = require('./visualBible');
 const { OutlineParser, UnifiedStoryParser, extractCharacterNamesFromScene } = require('./outlineParser');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
+const { getEventForStory } = require('./historicalEvents');
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -1396,6 +1397,55 @@ ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${stor
 
 ${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
 ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
+  } else if (storyCategory === 'historical') {
+    // Get historical event context
+    const historicalEvent = getEventForStory(storyTopic);
+    if (historicalEvent) {
+      categoryGuidelines = `This is a HISTORICAL story about the real event: "${historicalEvent.name}" (${historicalEvent.year}).
+
+**CRITICAL: HISTORICAL ACCURACY REQUIRED**
+This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
+
+**HISTORICAL CONTEXT:**
+${historicalEvent.historicalContext}
+
+**KEY FIGURES (use these names and roles accurately):**
+${historicalEvent.keyFigures.map(f => `- ${f.name}: ${f.role} (${f.nationality})`).join('\n')}
+
+**KEY LOCATIONS:**
+${historicalEvent.locations.join(', ')}
+
+**PERIOD-ACCURATE COSTUMES (CRITICAL for illustrations):**
+${Object.entries(historicalEvent.costumes).map(([role, desc]) => `- ${role}: ${desc}`).join('\n')}
+
+**HISTORICAL DETAILS:**
+${Object.entries(historicalEvent.details).map(([key, val]) => `- ${key}: ${val}`).join('\n')}
+
+**STORY ANGLE SUGGESTIONS:**
+${historicalEvent.storyAngles.map((a, i) => `${i + 1}. ${a}`).join('\n')}
+
+**THEMES TO WEAVE IN:**
+${historicalEvent.themes.join(', ')}
+
+**GUIDELINES:**
+- The main character(s) should witness or participate in this historical event
+- Include historically accurate details about the time period
+- Characters should wear period-appropriate clothing as described above
+- Use the suggested story angles or create a similar child-appropriate perspective
+- Make the history come alive through the eyes of a child character
+- Balance historical education with an engaging adventure narrative
+- The story should help children understand what life was like during this event`;
+    } else {
+      // Fallback if event not found
+      categoryGuidelines = `This is a HISTORICAL story about "${storyTopic}".
+
+**IMPORTANT GUIDELINES for Historical Stories:**
+- Create a story set during this historical event or period
+- Include historically accurate details about the time
+- Characters should wear period-appropriate clothing
+- Make history accessible and engaging for children
+- Balance education with entertainment`;
+    }
   } else {
     categoryGuidelines = `This is an ADVENTURE story with a ${storyTheme || inputData.storyType || 'adventure'} theme.
 
@@ -2138,6 +2188,55 @@ ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${stor
 
 ${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
 ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
+  } else if (storyCategory === 'historical') {
+    // Get historical event context
+    const historicalEvent = getEventForStory(storyTopic);
+    if (historicalEvent) {
+      categoryGuidelines = `This is a HISTORICAL story about the real event: "${historicalEvent.name}" (${historicalEvent.year}).
+
+**CRITICAL: HISTORICAL ACCURACY REQUIRED**
+This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
+
+**HISTORICAL CONTEXT:**
+${historicalEvent.historicalContext}
+
+**KEY FIGURES (use these names and roles accurately):**
+${historicalEvent.keyFigures.map(f => `- ${f.name}: ${f.role} (${f.nationality})`).join('\n')}
+
+**KEY LOCATIONS:**
+${historicalEvent.locations.join(', ')}
+
+**PERIOD-ACCURATE COSTUMES (CRITICAL for illustrations):**
+${Object.entries(historicalEvent.costumes).map(([role, desc]) => `- ${role}: ${desc}`).join('\n')}
+
+**HISTORICAL DETAILS:**
+${Object.entries(historicalEvent.details).map(([key, val]) => `- ${key}: ${val}`).join('\n')}
+
+**STORY ANGLE SUGGESTIONS:**
+${historicalEvent.storyAngles.map((a, i) => `${i + 1}. ${a}`).join('\n')}
+
+**THEMES TO WEAVE IN:**
+${historicalEvent.themes.join(', ')}
+
+**GUIDELINES:**
+- The main character(s) should witness or participate in this historical event
+- Include historically accurate details about the time period
+- Characters should wear period-appropriate clothing as described above
+- Use the suggested story angles or create a similar child-appropriate perspective
+- Make the history come alive through the eyes of a child character
+- Balance historical education with an engaging adventure narrative
+- The story should help children understand what life was like during this event`;
+    } else {
+      // Fallback if event not found
+      categoryGuidelines = `This is a HISTORICAL story about "${storyTopic}".
+
+**IMPORTANT GUIDELINES for Historical Stories:**
+- Create a story set during this historical event or period
+- Include historically accurate details about the time
+- Characters should wear period-appropriate clothing
+- Make history accessible and engaging for children
+- Balance education with entertainment`;
+    }
   } else {
     // Adventure category - get theme-specific guide
     const adventureGuide = getTeachingGuide('adventure', storyTheme);

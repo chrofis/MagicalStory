@@ -1117,7 +1117,7 @@ export default function StoryWizard() {
   }, [step]);
 
   // Handler for story category change - doesn't auto-advance, user must select theme/topic
-  const handleCategoryChange = (category: 'adventure' | 'life-challenge' | 'educational' | '') => {
+  const handleCategoryChange = (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => {
     setStoryCategory(category);
     // Don't auto-advance - user needs to select theme/topic next
   };

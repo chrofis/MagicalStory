@@ -718,7 +718,7 @@ export const storyService = {
   async generateStoryIdeas(data: {
     storyType: string;
     storyTypeName: string;
-    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
+    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
     storyTopic?: string;
     storyTheme?: string;
     customThemeText?: string;
@@ -750,7 +750,7 @@ export const storyService = {
     data: {
       storyType: string;
       storyTypeName: string;
-      storyCategory?: 'adventure' | 'life-challenge' | 'educational' | '';
+      storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
       storyTopic?: string;
       storyTheme?: string;
       customThemeText?: string;
@@ -864,7 +864,7 @@ export const storyService = {
   async createStoryJob(data: {
     storyType: string;
     storyTypeName: string;
-    storyCategory?: 'adventure' | 'life-challenge' | 'educational';
+    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
     storyTopic?: string;
     storyTheme?: string;
     customThemeText?: string;

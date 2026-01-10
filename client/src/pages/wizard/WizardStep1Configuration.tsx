@@ -1,12 +1,12 @@
 import { StoryCategorySelector, ArtStyleSelector } from '@/components/story';
 
 interface WizardStep1Props {
-  storyCategory: 'adventure' | 'life-challenge' | 'educational' | '';
+  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
   storyTopic: string;
   storyTheme: string;
   customThemeText: string;
   artStyle: string;
-  onCategoryChange: (cat: 'adventure' | 'life-challenge' | 'educational' | '') => void;
+  onCategoryChange: (cat: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
   onCustomThemeTextChange: (text: string) => void;
