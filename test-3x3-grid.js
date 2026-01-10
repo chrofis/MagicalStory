@@ -38,40 +38,40 @@ function saveImage(base64Data, outputDir, filename) {
 }
 
 const TEST_COSTUME = {
-  name: 'pirate-captain',
-  costume: 'pirate captain',
-  description: 'A dashing pirate captain outfit: long navy blue coat with gold trim and brass buttons, white ruffled shirt underneath, brown leather belt with gold buckle, black boots. No hat - hair flowing freely.'
+  name: 'wizard',
+  costume: 'wizard',
+  description: 'A magical wizard outfit: long purple robe with silver stars and moons pattern, leather belt with pouch, brown boots, wooden magic wand in hand. NO HAT - hair visible and flowing freely.'
 };
 
 async function generate3x3Grid(character, costume, temperature, outputDir) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const standardAvatar = character.avatars?.standard;
 
-  const artStyle = 'pixar';
-  const artStylePrompt = '3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading';
+  const artStyle = 'cartoon';
+  const artStylePrompt = 'Colorful cartoon style, expressive features, clean bold lines, cel-shaded coloring, vibrant saturated colors, smooth gradients, Disney-inspired';
 
-  // 2x2 grid: top = face only, bottom = full body with costume
-  const gridPrompt = `Create a 2x2 character sheet (2 rows, 2 columns = 4 images) in ${artStyle} animation style.
+  // 2x2 grid: top = exact copy of reference face, bottom = new style with costume
+  const gridPrompt = `Create a 2x2 character sheet.
 
-GRID LAYOUT:
+TOP ROW - EXACT COPIES OF REFERENCE (same style as reference):
+- TOP-LEFT: EXACT COPY of the reference face. Same style, same colors, same everything. Just zoomed in to show only face (forehead to chin). No shoulders, no clothing visible.
+- TOP-RIGHT: EXACT COPY of reference face, but head turned right (nose pointing right). Keep the SAME STYLE as reference image.
 
-TOP ROW - FACE ONLY (EXTREME CLOSE-UP):
-- TOP-LEFT: ONLY THE FACE. Crop at hairline, chin, and ears. NOTHING BELOW THE CHIN. No neck. No shoulders. No clothing. No hair below ears. Just forehead, eyes, nose, mouth, chin. Front view.
-- TOP-RIGHT: ONLY THE FACE. Same extreme crop. 3/4 angle. FACE FILLS THE ENTIRE FRAME.
+⚠️ TOP ROW MUST KEEP THE ORIGINAL REFERENCE STYLE - DO NOT CHANGE THE ART STYLE FOR TOP ROW.
 
-BOTTOM ROW - FULL BODY WITH COSTUME:
-- BOTTOM-LEFT: Full body front view wearing: ${costume.description}
-- BOTTOM-RIGHT: Full body side view (facing right) wearing the same costume.
+BOTTOM ROW - NEW STYLE WITH COSTUME (${artStyle}):
+- BOTTOM-LEFT: Full body front view in ${artStyle} style: ${artStylePrompt}. Wearing: ${costume.description}
+- BOTTOM-RIGHT: Full body side view facing RIGHT in ${artStyle} style. Same costume.
 
-CRITICAL REQUIREMENTS:
-- ALL 4 images show the EXACT SAME PERSON from the reference
-- TOP ROW: FACE ONLY. Imagine a passport photo cropped even tighter. ZERO clothing visible. ZERO shoulders. ZERO neck. The frame edge cuts at the chin.
-- BOTTOM ROW: Full body showing the complete costume from head to toe
-- Expression: Happy, gentle smile, lips closed
-- Style: ${artStylePrompt}
-- Background: Light grey studio in all 4 cells
+⚠️ ONLY THE BOTTOM ROW gets the new ${artStyle} style. Top row stays in reference style.
 
-TOP = identity reference (face only), BOTTOM = costume showcase (full body).`;
+REQUIREMENTS:
+- SAME person in all 4 images
+- TOP ROW: Original reference style (exact copy)
+- BOTTOM ROW: New ${artStyle} style with costume
+- NO HATS or HEAD COVERINGS
+- FACE MUST BE VISIBLE in all quadrants
+- Background: Light grey studio`;
 
   const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
   const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
@@ -188,8 +188,8 @@ async function main() {
   // Save reference
   saveImage(sophie.avatars.standard, baseOutputDir, '0-reference.png');
 
-  // Test just one temperature for this approach
-  const temperatures = [1.0];
+  // Test temp 0.5
+  const temperatures = [0.5];
 
   console.log('2. Generating 3x3 grids...\n');
 

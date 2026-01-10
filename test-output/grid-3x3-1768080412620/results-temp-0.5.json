@@ -1,0 +1,62 @@
+{
+  "temperature": 0.5,
+  "faces": [
+    {
+      "box": {
+        "height": 233,
+        "width": 233,
+        "x": 143,
+        "y": 101
+      },
+      "confidence": 0.91,
+      "index": 1,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.0298
+    },
+    {
+      "box": {
+        "height": 68,
+        "width": 68,
+        "x": 224,
+        "y": 516
+      },
+      "confidence": 0.91,
+      "index": 0,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": -0.0405
+    }
+  ],
+  "top3": [
+    {
+      "box": {
+        "height": 233,
+        "width": 233,
+        "x": 143,
+        "y": 101
+      },
+      "confidence": 0.91,
+      "index": 1,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.0298
+    },
+    {
+      "box": {
+        "height": 68,
+        "width": 68,
+        "x": 224,
+        "y": 516
+      },
+      "confidence": 0.91,
+      "index": 0,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": -0.0405
+    }
+  ],
+  "avg": -0.005350000000000001,
+  "total": 2,
+  "passing": 0
+}

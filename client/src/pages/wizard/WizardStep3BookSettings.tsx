@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, MapPin, Sun, Snowflake, Leaf, Flower2 } from 'lucide-react';
+import { BookOpen, MapPin } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
@@ -12,12 +12,7 @@ const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[]
 ];
 
 // Season options
-const SEASONS = [
-  { value: 'spring', icon: Flower2, color: 'text-pink-500' },
-  { value: 'summer', icon: Sun, color: 'text-yellow-500' },
-  { value: 'autumn', icon: Leaf, color: 'text-orange-500' },
-  { value: 'winter', icon: Snowflake, color: 'text-blue-500' },
-];
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 
 // Calculate current season based on date (Northern Hemisphere)
 function getCurrentSeason(): string {
@@ -245,27 +240,23 @@ export function WizardStep3BookSettings({
           </span>
           <div className="flex gap-1">
             {SEASONS.map((s) => {
-              const Icon = s.icon;
-              const isSelected = season === s.value;
+              const isSelected = season === s;
+              const label = seasonLabels[s][language] || seasonLabels[s].en;
               return (
                 <button
-                  key={s.value}
-                  onClick={() => onSeasonChange(s.value)}
-                  title={seasonLabels[s.value][language] || seasonLabels[s.value].en}
-                  className={`p-2 rounded-lg transition-all ${
+                  key={s}
+                  onClick={() => onSeasonChange(s)}
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
                     isSelected
-                      ? `bg-white shadow-md ring-2 ring-indigo-400 ${s.color}`
-                      : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  <Icon size={20} />
+                  {label}
                 </button>
               );
             })}
           </div>
-          <span className="text-sm font-medium text-gray-700 ml-1">
-            {seasonLabels[season]?.[language] || seasonLabels[season]?.en || season}
-          </span>
         </div>
       </div>
 
