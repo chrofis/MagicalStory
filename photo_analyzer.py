@@ -1084,6 +1084,160 @@ def split_grid():
         }), 500
 
 
+@app.route('/extract-face', methods=['POST'])
+def extract_face():
+    """
+    Extract just the face from an image, optionally from a specific quadrant.
+    This is useful for LPIPS comparison where we want to compare face-to-face only.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",
+        "quadrant": "top-left" | "top-right" | "bottom-left" | "bottom-right" | null,
+        "size": 256  # Output size (default 256x256)
+    }
+
+    If quadrant is specified, the image is assumed to be a 2x2 grid and will be
+    cropped to that quadrant first before face extraction.
+
+    Returns:
+    {
+        "success": true,
+        "face": "data:image/jpeg;base64,...",  # Extracted face image
+        "faceBbox": [ymin, xmin, ymax, xmax],  # Face location (normalized 0-1)
+        "faceDetected": true                    # Whether a face was found
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'image' in request body"
+            }), 400
+
+        # Decode base64 image
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return jsonify({
+                "success": False,
+                "error": "Failed to decode image"
+            }), 400
+
+        height, width = image.shape[:2]
+        quadrant = data.get('quadrant')
+        output_size = data.get('size', 256)
+
+        print(f"[EXTRACT-FACE] Input: {width}x{height}, quadrant: {quadrant}")
+
+        # Crop to quadrant if specified
+        if quadrant:
+            mid_h = height // 2
+            mid_w = width // 2
+            quadrant_map = {
+                'top-left': (0, mid_h, 0, mid_w),
+                'top-right': (0, mid_h, mid_w, width),
+                'bottom-left': (mid_h, height, 0, mid_w),
+                'bottom-right': (mid_h, height, mid_w, width)
+            }
+            if quadrant in quadrant_map:
+                y1, y2, x1, x2 = quadrant_map[quadrant]
+                image = image[y1:y2, x1:x2]
+                height, width = image.shape[:2]
+                print(f"[EXTRACT-FACE] Cropped to {quadrant}: {width}x{height}")
+
+        # Detect face
+        face_box = detect_face_mediapipe(image)
+
+        if face_box:
+            print(f"[EXTRACT-FACE] Face detected: x={face_box['x']:.1f}%, y={face_box['y']:.1f}%, w={face_box['width']:.1f}%, h={face_box['height']:.1f}%")
+
+            # Convert face_box (percentage 0-100) to normalized (0-1) bbox
+            face_bbox = [
+                face_box['y'] / 100,          # ymin
+                face_box['x'] / 100,          # xmin
+                (face_box['y'] + face_box['height']) / 100,  # ymax
+                (face_box['x'] + face_box['width']) / 100    # xmax
+            ]
+
+            # Add 10% padding around face for context (but minimal to exclude shoulders)
+            padding = 0.10
+            face_bbox_padded = [
+                max(0, face_bbox[0] - (face_bbox[2] - face_bbox[0]) * padding),  # ymin
+                max(0, face_bbox[1] - (face_bbox[3] - face_bbox[1]) * padding),  # xmin
+                min(1, face_bbox[2] + (face_bbox[2] - face_bbox[0]) * padding),  # ymax
+                min(1, face_bbox[3] + (face_bbox[3] - face_bbox[1]) * padding)   # xmax
+            ]
+
+            # Crop to face
+            y1 = int(face_bbox_padded[0] * height)
+            x1 = int(face_bbox_padded[1] * width)
+            y2 = int(face_bbox_padded[2] * height)
+            x2 = int(face_bbox_padded[3] * width)
+
+            face_img = image[y1:y2, x1:x2]
+
+            # Make square and resize
+            h, w = face_img.shape[:2]
+            max_dim = max(h, w)
+            square = np.full((max_dim, max_dim, 3), [230, 240, 255], dtype=np.uint8)  # Peach background
+            y_off = (max_dim - h) // 2
+            x_off = (max_dim - w) // 2
+            square[y_off:y_off+h, x_off:x_off+w] = face_img
+
+            face_resized = cv2.resize(square, (output_size, output_size), interpolation=cv2.INTER_LANCZOS4)
+
+            # Encode as JPEG
+            _, buffer = cv2.imencode('.jpg', face_resized, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            face_base64 = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+            print(f"[EXTRACT-FACE] Face extracted: {output_size}x{output_size}")
+
+            return jsonify({
+                "success": True,
+                "face": face_base64,
+                "faceBbox": face_bbox,
+                "faceDetected": True
+            }), 200
+
+        else:
+            # No face detected - return center crop as fallback
+            print("[EXTRACT-FACE] No face detected, using center crop")
+
+            # Center crop to square
+            min_dim = min(height, width)
+            y1 = (height - min_dim) // 2
+            x1 = (width - min_dim) // 2
+            center_crop = image[y1:y1+min_dim, x1:x1+min_dim]
+
+            face_resized = cv2.resize(center_crop, (output_size, output_size), interpolation=cv2.INTER_LANCZOS4)
+
+            _, buffer = cv2.imencode('.jpg', face_resized, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            face_base64 = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+            return jsonify({
+                "success": True,
+                "face": face_base64,
+                "faceBbox": None,
+                "faceDetected": False
+            }), 200
+
+    except Exception as e:
+        print(f"[EXTRACT-FACE] Error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PHOTO_ANALYZER_PORT', 5000))
     print(f"[START] Photo Analyzer API starting on port {port}")

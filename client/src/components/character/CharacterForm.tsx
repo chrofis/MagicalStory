@@ -1535,6 +1535,23 @@ export function CharacterForm({
                 Generated: {new Date(character.avatars.generatedAt).toLocaleString()}
               </div>
             )}
+            {/* Cross-avatar LPIPS scores in developer mode */}
+            {(developerMode || isImpersonating) && character.avatars?.crossLpips && (
+              <div className="text-[10px] text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">
+                <div className="font-medium mb-1">Cross-Avatar LPIPS:</div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(character.avatars.crossLpips as Record<string, number>).map(([pair, score]) => {
+                    const [cat1, cat2] = pair.split('_vs_');
+                    const color = score < 0.3 ? 'text-green-600' : score < 0.5 ? 'text-yellow-600' : 'text-red-600';
+                    return (
+                      <span key={pair} className={color}>
+                        {cat1} ↔ {cat2}: {score.toFixed(2)}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               {onRegenerateAvatarsWithTraits && (
                 <button

@@ -103,6 +103,57 @@ function clearCostumedAvatarGenerationLog() {
 // ============================================================================
 
 /**
+ * Extract face from an image using the Python service
+ * Can optionally extract from a specific quadrant of a 2x2 grid
+ * @param {string} imageData - Base64 image
+ * @param {string} quadrant - Optional: 'top-left', 'top-right', 'bottom-left', 'bottom-right'
+ * @param {number} size - Output size (default 256x256)
+ * Returns { success, face, faceBbox, faceDetected } or null on error
+ */
+async function extractFace(imageData, quadrant = null, size = 256) {
+  try {
+    const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+
+    const requestBody = {
+      image: imageData,
+      size
+    };
+    if (quadrant) {
+      requestBody.quadrant = quadrant;
+    }
+
+    const response = await fetch(`${photoAnalyzerUrl}/extract-face`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!response.ok) {
+      log.warn('[EXTRACT-FACE] Service returned error:', response.status);
+      return null;
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      log.debug(`[EXTRACT-FACE] Face extracted (detected: ${result.faceDetected})`);
+      return result;
+    } else {
+      log.warn('[EXTRACT-FACE] Extraction failed:', result.error);
+      return null;
+    }
+  } catch (err) {
+    if (err.cause?.code === 'ECONNREFUSED') {
+      log.debug('[EXTRACT-FACE] Service not available (offline)');
+    } else {
+      log.warn('[EXTRACT-FACE] Error:', err.message);
+    }
+    return null;
+  }
+}
+
+/**
  * Compare two images using LPIPS perceptual similarity (via Python service)
  * LPIPS score: 0 = identical, 1 = very different
  * @param {string} image1 - First image (base64)
@@ -162,6 +213,56 @@ async function compareLPIPS(image1, image2, bbox = null, bboxBoth = null) {
     } else {
       log.warn('[LPIPS] Error:', err.message);
     }
+    return null;
+  }
+}
+
+/**
+ * Compare faces using LPIPS after extracting faces from both images
+ * This provides more accurate face-to-face comparison by removing clothing/background
+ * @param {string} originalPhoto - Original face photo (base64)
+ * @param {string} avatarImage - Generated avatar (2x2 grid, base64)
+ * @param {string} avatarQuadrant - Quadrant to extract from avatar (default 'top-left' for front face)
+ * Returns { success, lpipsScore, interpretation, region, facesExtracted } or null on error
+ */
+async function compareFacesLPIPS(originalPhoto, avatarImage, avatarQuadrant = 'top-left') {
+  try {
+    // Extract faces from both images in parallel
+    const [originalFaceResult, avatarFaceResult] = await Promise.all([
+      extractFace(originalPhoto, null, 256),  // Original photo - no quadrant
+      extractFace(avatarImage, avatarQuadrant, 256)  // Avatar - extract from quadrant
+    ]);
+
+    // Check if face extraction succeeded
+    const originalFace = originalFaceResult?.face;
+    const avatarFace = avatarFaceResult?.face;
+
+    if (!originalFace || !avatarFace) {
+      log.warn('[LPIPS FACES] Face extraction failed - falling back to bbox comparison');
+      // Fallback to bbox comparison
+      const faceOnlyBbox = [0, 0, 0.3, 0.5];
+      return await compareLPIPS(originalPhoto, avatarImage, faceOnlyBbox);
+    }
+
+    log.debug(`[LPIPS FACES] Faces extracted - original: ${originalFaceResult.faceDetected}, avatar: ${avatarFaceResult.faceDetected}`);
+
+    // Compare the extracted faces (no bbox needed - they're already face-only)
+    const lpipsResult = await compareLPIPS(originalFace, avatarFace);
+
+    if (lpipsResult) {
+      return {
+        ...lpipsResult,
+        region: 'extracted_faces',
+        facesExtracted: {
+          original: originalFaceResult.faceDetected,
+          avatar: avatarFaceResult.faceDetected
+        }
+      };
+    }
+
+    return null;
+  } catch (err) {
+    log.warn('[LPIPS FACES] Error:', err.message);
     return null;
   }
 }
@@ -294,10 +395,8 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       ]
     };
 
-    // Run Gemini evaluation and LPIPS comparison in parallel
-    // For LPIPS: compare original face with top-left quadrant of 2x2 grid (face front view)
-    // bbox format: [ymin, xmin, ymax, xmax] normalized 0-1
-    const topLeftQuadrant = [0, 0, 0.5, 0.5];  // Top-left = face front view
+    // Run Gemini evaluation and LPIPS face-to-face comparison in parallel
+    // LPIPS: extract faces from both images, then compare faces only (no clothing/background)
     const [geminiResponse, lpipsResult] = await Promise.all([
       fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -308,8 +407,8 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
           signal: AbortSignal.timeout(30000)
         }
       ),
-      // LPIPS comparison - compare faces only (top-left quadrant of generated 2x2 grid)
-      compareLPIPS(originalPhoto, generatedAvatar, topLeftQuadrant)
+      // LPIPS comparison - extract faces from both images, then compare
+      compareFacesLPIPS(originalPhoto, generatedAvatar, 'top-left')
     ]);
 
     if (!geminiResponse.ok) {
@@ -1531,6 +1630,7 @@ These corrections OVERRIDE what is visible in the reference photo.
 
       // PHASE 3: Cross-avatar LPIPS comparison (compare avatars against each other)
       // This helps verify consistency - avatars of same person should be similar
+      // Extract faces from top-left quadrant of each avatar, then compare face-to-face
       const avatarImages = {};
       for (const { category, imageData } of avatarsToEvaluate) {
         if (imageData) avatarImages[category] = imageData;
@@ -1542,19 +1642,29 @@ These corrections OVERRIDE what is visible in the reference photo.
         ['standard', 'summer']
       ];
 
-      // bbox for top-left quadrant of 2x2 grid (face front view)
-      const faceQuadrantBbox = [0, 0, 0.5, 0.5];
+      // First, extract faces from all avatars in parallel
+      const faceExtractionPromises = Object.entries(avatarImages).map(async ([category, imageData]) => {
+        const result = await extractFace(imageData, 'top-left', 256);
+        return { category, face: result?.face || null, detected: result?.faceDetected || false };
+      });
+      const extractedFaces = await Promise.all(faceExtractionPromises);
+      const avatarFaces = {};
+      for (const { category, face, detected } of extractedFaces) {
+        if (face) {
+          avatarFaces[category] = face;
+          log.debug(`[LPIPS CROSS] Extracted face from ${category} (detected: ${detected})`);
+        }
+      }
 
       results.crossLpips = {};
       for (const [cat1, cat2] of crossPairs) {
-        if (avatarImages[cat1] && avatarImages[cat2]) {
-          // Compare top-left quadrants (face front view) of both avatars
-          // Use bboxBoth to crop BOTH images to the face quadrant
-          const crossResult = await compareLPIPS(avatarImages[cat1], avatarImages[cat2], null, faceQuadrantBbox);
+        if (avatarFaces[cat1] && avatarFaces[cat2]) {
+          // Compare extracted faces (no bbox needed - already face-only)
+          const crossResult = await compareLPIPS(avatarFaces[cat1], avatarFaces[cat2]);
           if (crossResult?.success) {
             const pairKey = `${cat1}_vs_${cat2}`;
             results.crossLpips[pairKey] = crossResult.lpipsScore;
-            console.log(`📊 [LPIPS CROSS] ${cat1} vs ${cat2}: ${crossResult.lpipsScore?.toFixed(4)} (${crossResult.interpretation})`);
+            console.log(`📊 [LPIPS CROSS] ${cat1} vs ${cat2}: ${crossResult.lpipsScore?.toFixed(4)} (${crossResult.interpretation}) [face-to-face]`);
           }
         }
       }
