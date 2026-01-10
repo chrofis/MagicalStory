@@ -1485,15 +1485,19 @@ function extractStoryTextFromOutput(text) {
  */
 function linkPreDiscoveredLandmarks(visualBible, availableLandmarks) {
   if (!visualBible?.locations || !availableLandmarks?.length) {
+    log.debug(`[LANDMARK-LINK] Skip: locs=${visualBible?.locations?.length || 0}, avail=${availableLandmarks?.length || 0}`);
     return;
   }
 
+  log.info(`[LANDMARK-LINK] Linking ${visualBible.locations.length} locs with ${availableLandmarks.length} landmarks`);
   let linkedCount = 0;
 
   for (const location of visualBible.locations) {
     if (!location.isRealLandmark || !location.landmarkQuery) {
       continue;
     }
+
+    log.debug(`[LANDMARK-LINK] Try: "${location.name}" query="${location.landmarkQuery}"`);
 
     // Try to find a matching pre-discovered landmark
     // Match by exact name or by landmarkQuery containing the landmark name
@@ -1514,12 +1518,19 @@ function linkPreDiscoveredLandmarks(visualBible, availableLandmarks) {
       location.landmarkQuery = preDiscovered.name; // Use exact name for consistency
       linkedCount++;
 
-      log.debug(`[VISUAL BIBLE] 🔗 Linked pre-discovered landmark: "${location.name}" → "${preDiscovered.name}"`);
+      log.info(`[LANDMARK-LINK] ✅ Linked "${location.name}" → "${preDiscovered.name}" (${Math.round(preDiscovered.photoData.length/1024)}KB)`);
+    } else if (preDiscovered) {
+      log.warn(`[LANDMARK-LINK] ⚠️ Found "${preDiscovered.name}" but no photoData`);
+    } else {
+      log.warn(`[LANDMARK-LINK] ❌ No match for "${location.landmarkQuery}"`);
+      log.debug(`[LANDMARK-LINK] Available: ${availableLandmarks.slice(0, 5).map(l => l.name).join(', ')}...`);
     }
   }
 
   if (linkedCount > 0) {
     log.info(`[VISUAL BIBLE] 📍 Linked ${linkedCount} pre-discovered landmark(s) with photos`);
+  } else {
+    log.warn(`[LANDMARK-LINK] No landmarks were linked!`);
   }
 }
 
