@@ -1126,6 +1126,21 @@ export function StoryDisplay({
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
                             </div>
                           )}
+                          {/* Landmark reference photo */}
+                          {entry.referencePhotoData && (
+                            <div className="mt-2 border border-amber-200 rounded overflow-hidden">
+                              <img
+                                src={entry.referencePhotoData}
+                                alt={`${entry.name} reference`}
+                                className="w-full max-h-32 object-contain bg-gray-50"
+                              />
+                              {entry.photoAttribution && (
+                                <div className="text-[9px] text-gray-500 bg-gray-100 px-1 py-0.5 truncate">
+                                  📷 {entry.photoAttribution}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

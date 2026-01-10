@@ -13,7 +13,7 @@ const { hashImageData } = require('./images');
 const { buildVisualBiblePrompt } = require('./visualBible');
 const { OutlineParser, UnifiedStoryParser, extractCharacterNamesFromScene } = require('./outlineParser');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
-const { getEventForStory } = require('./historicalEvents');
+const { getEventById } = require('./historicalEvents');
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -282,11 +282,12 @@ const PROMPTS_DIR = path.join(__dirname, '../../prompts');
 const EDUCATIONAL_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'educational-guides.txt'));
 const LIFE_CHALLENGE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
 const ADVENTURE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'adventure-guides.txt'));
+const HISTORICAL_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'historical-guides.txt'));
 
 /**
  * Get teaching guide for a specific topic
- * @param {string} category - 'educational', 'life-challenge', or 'adventure'
- * @param {string} topicId - The topic ID (e.g., 'months-year', 'potty-training', 'pirate')
+ * @param {string} category - 'educational', 'life-challenge', 'adventure', or 'historical'
+ * @param {string} topicId - The topic ID (e.g., 'months-year', 'potty-training', 'pirate', 'moon-landing')
  * @returns {string|null} The teaching guide content or null if not found
  */
 function getTeachingGuide(category, topicId) {
@@ -301,6 +302,8 @@ function getTeachingGuide(category, topicId) {
     return LIFE_CHALLENGE_GUIDES.get(normalizedId) || null;
   } else if (category === 'adventure') {
     return ADVENTURE_GUIDES.get(normalizedId) || null;
+  } else if (category === 'historical') {
+    return HISTORICAL_GUIDES.get(normalizedId) || null;
   }
   return null;
 }
@@ -1398,34 +1401,18 @@ ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${stor
 ${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
 ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
   } else if (storyCategory === 'historical') {
-    // Get historical event context
-    const historicalEvent = getEventForStory(storyTopic);
-    if (historicalEvent) {
-      categoryGuidelines = `This is a HISTORICAL story about the real event: "${historicalEvent.name}" (${historicalEvent.year}).
+    // Get historical event context from txt guide
+    const historicalGuide = getTeachingGuide('historical', storyTopic);
+    const historicalEvent = getEventById(storyTopic);
+    if (historicalGuide) {
+      const eventName = historicalEvent?.name || storyTopic;
+      const eventYear = historicalEvent?.year || '';
+      categoryGuidelines = `This is a HISTORICAL story about the real event: "${eventName}"${eventYear ? ` (${eventYear})` : ''}.
 
 **CRITICAL: HISTORICAL ACCURACY REQUIRED**
 This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
 
-**HISTORICAL CONTEXT:**
-${historicalEvent.historicalContext}
-
-**KEY FIGURES (use these names and roles accurately):**
-${historicalEvent.keyFigures.map(f => `- ${f.name}: ${f.role} (${f.nationality})`).join('\n')}
-
-**KEY LOCATIONS:**
-${historicalEvent.locations.join(', ')}
-
-**PERIOD-ACCURATE COSTUMES (CRITICAL for illustrations):**
-${Object.entries(historicalEvent.costumes).map(([role, desc]) => `- ${role}: ${desc}`).join('\n')}
-
-**HISTORICAL DETAILS:**
-${Object.entries(historicalEvent.details).map(([key, val]) => `- ${key}: ${val}`).join('\n')}
-
-**STORY ANGLE SUGGESTIONS:**
-${historicalEvent.storyAngles.map((a, i) => `${i + 1}. ${a}`).join('\n')}
-
-**THEMES TO WEAVE IN:**
-${historicalEvent.themes.join(', ')}
+${historicalGuide}
 
 **GUIDELINES:**
 - The main character(s) should witness or participate in this historical event
@@ -2189,34 +2176,18 @@ ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${stor
 ${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
 ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
   } else if (storyCategory === 'historical') {
-    // Get historical event context
-    const historicalEvent = getEventForStory(storyTopic);
-    if (historicalEvent) {
-      categoryGuidelines = `This is a HISTORICAL story about the real event: "${historicalEvent.name}" (${historicalEvent.year}).
+    // Get historical event context from txt guide
+    const historicalGuide = getTeachingGuide('historical', storyTopic);
+    const historicalEvent = getEventById(storyTopic);
+    if (historicalGuide) {
+      const eventName = historicalEvent?.name || storyTopic;
+      const eventYear = historicalEvent?.year || '';
+      categoryGuidelines = `This is a HISTORICAL story about the real event: "${eventName}"${eventYear ? ` (${eventYear})` : ''}.
 
 **CRITICAL: HISTORICAL ACCURACY REQUIRED**
 This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
 
-**HISTORICAL CONTEXT:**
-${historicalEvent.historicalContext}
-
-**KEY FIGURES (use these names and roles accurately):**
-${historicalEvent.keyFigures.map(f => `- ${f.name}: ${f.role} (${f.nationality})`).join('\n')}
-
-**KEY LOCATIONS:**
-${historicalEvent.locations.join(', ')}
-
-**PERIOD-ACCURATE COSTUMES (CRITICAL for illustrations):**
-${Object.entries(historicalEvent.costumes).map(([role, desc]) => `- ${role}: ${desc}`).join('\n')}
-
-**HISTORICAL DETAILS:**
-${Object.entries(historicalEvent.details).map(([key, val]) => `- ${key}: ${val}`).join('\n')}
-
-**STORY ANGLE SUGGESTIONS:**
-${historicalEvent.storyAngles.map((a, i) => `${i + 1}. ${a}`).join('\n')}
-
-**THEMES TO WEAVE IN:**
-${historicalEvent.themes.join(', ')}
+${historicalGuide}
 
 **GUIDELINES:**
 - The main character(s) should witness or participate in this historical event
