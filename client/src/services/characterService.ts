@@ -409,7 +409,12 @@ export const characterService = {
 
       // Prefer body with no background for best avatar generation results
       const inputPhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
-      log.info(`Generating clothing avatars for ${character.name} (id: ${character.id}), using: ${character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : 'original'}`);
+      const photoSource = character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : 'original';
+      const photoSize = inputPhoto ? Math.round(inputPhoto.length / 1024) : 0;
+      const isPNG = inputPhoto?.startsWith('data:image/png');
+      log.info(`🎨 Generating clothing avatars for ${character.name} (id: ${character.id})`);
+      log.info(`📸 Photo source: ${photoSource}, size: ${photoSize}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
+      log.info(`📸 Available photos: bodyNoBg=${!!character.photos?.bodyNoBg}, body=${!!character.photos?.body}, face=${!!character.photos?.face}, original=${!!character.photos?.original}`);
 
       const response = await api.post<{
         success: boolean;
@@ -499,7 +504,12 @@ export const characterService = {
 
       // Prefer body with no background for best avatar generation results
       const inputPhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
-      log.info(`Generating clothing avatars WITH TRAITS for ${character.name} (id: ${character.id}), using: ${character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : 'original'}`);
+      const photoSource = character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : 'original';
+      const photoSize = inputPhoto ? Math.round(inputPhoto.length / 1024) : 0;
+      const isPNG = inputPhoto?.startsWith('data:image/png');
+      log.info(`🎨 Generating clothing avatars WITH TRAITS for ${character.name} (id: ${character.id})`);
+      log.info(`📸 Photo source: ${photoSource}, size: ${photoSize}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
+      log.info(`📸 Available photos: bodyNoBg=${!!character.photos?.bodyNoBg}, body=${!!character.photos?.body}, face=${!!character.photos?.face}, original=${!!character.photos?.original}`);
       log.info(`Physical traits: ${JSON.stringify(character.physical)}`);
 
       // Filter traits to only include those with 'user' source
