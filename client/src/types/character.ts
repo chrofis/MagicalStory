@@ -103,11 +103,19 @@ export interface LpipsResult {
   region?: string;          // 'full' or 'cropped'
 }
 
+// ArcFace identity comparison result (style-invariant face recognition)
+export interface ArcFaceResult {
+  similarity: number;       // Cosine similarity 0-1 (>0.6 = high confidence same person)
+  samePerson: boolean;      // Whether faces match (above threshold)
+  confidence: string;       // 'high' | 'medium' | 'low'
+}
+
 // Face match evaluation result
 export interface FaceMatchResult {
   score: number;    // 1-10 score from Gemini
   details: string;  // Full evaluation text with feature breakdown
   lpips?: LpipsResult | null;  // LPIPS perceptual similarity (optional, from Python service)
+  arcface?: ArcFaceResult | null;  // ArcFace identity comparison (style-invariant, optional)
 }
 
 // Styled avatar set for a specific art style (includes standard clothing + costumed)
