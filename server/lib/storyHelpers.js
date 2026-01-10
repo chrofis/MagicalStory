@@ -2339,8 +2339,9 @@ function buildAvailableLandmarksSection(landmarks) {
     return '';
   }
 
+  // Format: "- Kurpark (Baden) [Park]" or "- Ruine Stein [Ruins]"
   const landmarkList = landmarks
-    .map(l => `- ${l.name}`)
+    .map(l => l.type ? `- ${l.name} [${l.type}]` : `- ${l.name}`)
     .join('\n');
 
   return `**REAL LANDMARKS - You must use at least 2 landmarks from below list:**
@@ -2349,16 +2350,16 @@ ${landmarkList}
 
 When you use a landmark from the list (even if you rename it in your story):
 - Set "isRealLandmark": true
-- Set "landmarkQuery": copy-paste the EXACT name from the list above
+- Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
 
-EXAMPLE - Using "Ruine Stein" as "The Enchanted Castle" in your story:
+EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 {
   "name": "The Enchanted Castle",
   "isRealLandmark": true,
   "landmarkQuery": "Ruine Stein"
 }
 
-Your "name" can be creative, but "landmarkQuery" MUST match the list exactly!
+Your "name" can be creative, but "landmarkQuery" MUST match the original name exactly (without the [type] suffix)!
 `;
 }
 

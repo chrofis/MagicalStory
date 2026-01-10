@@ -12,6 +12,185 @@ const { compressImageToJPEG } = require('./images');
 const photoCache = new Map();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+// ============================================================================
+// WIKIPEDIA CATEGORY PARSING
+// ============================================================================
+
+/**
+ * Categories that indicate tourist-worthy landmarks (get +40% score boost)
+ * Patterns match against category names (case-insensitive)
+ */
+const BOOST_CATEGORY_PATTERNS = [
+  // Tourist attractions
+  /tourist.?attract/i, /visitor.?attract/i, /sehenswürdigkeit/i, /attraction.?touristique/i,
+  // Castles & palaces
+  /\bcastles?\b/i, /\bpalaces?\b/i, /\bschloss\b/i, /\bschlösser\b/i, /\bburg(en)?\b/i, /château/i,
+  // Religious buildings
+  /\bchurches?\b/i, /\bcathedrals?\b/i, /\babbeys?\b/i, /\bmonaster/i, /\bkirchen?\b/i, /\bdom\b/i, /église/i,
+  // Bridges
+  /\bbridges?\b/i, /\bbrücken?\b/i, /\bpont\b/i,
+  // Museums & cultural
+  /\bmuseums?\b/i, /\bmuseen\b/i, /\bmusée/i, /cultural.?heritage/i, /kulturerbe/i,
+  // Parks & gardens
+  /\bparks?\b/i, /\bgardens?\b/i, /\bgärten\b/i, /\bjardin/i,
+  // Monuments & memorials
+  /\bmonuments?\b/i, /\bmemorials?\b/i, /\bdenkmal/i, /\bdenkmäler/i,
+  // Historic sites
+  /historic.?(site|place|building|monument)/i, /historisch/i, /patrimoine/i,
+  // UNESCO
+  /unesco/i, /world.?heritage/i, /welterbe/i, /weltkulturerbe/i,
+  // Towers & landmarks
+  /\btowers?\b/i, /\bturm\b/i, /\btürme\b/i, /\btour\b/i, /landmark/i, /wahrzeichen/i,
+  // Railway stations (historic)
+  /railway.?station/i, /\bbahnhof\b/i, /\bgare\b/i,
+  // Roman/ancient
+  /roman.?(site|ruin|bath|remain)/i, /römisch/i, /romain/i, /ancient/i, /antik/i,
+  // Ruins
+  /\bruins?\b/i, /\bruine/i,
+  // Squares & plazas
+  /\bsquares?\b/i, /\bplazas?\b/i, /\bplatz\b/i, /\bplätze\b/i, /\bplace\b/i
+];
+
+/**
+ * Map category keywords to human-readable landmark types
+ * Order matters - first match wins
+ */
+const CATEGORY_TO_TYPE = [
+  // Specific types first
+  { pattern: /castle|schloss|burg|château/i, type: 'Castle' },
+  { pattern: /palace|palast|palais/i, type: 'Palace' },
+  { pattern: /cathedral|dom|kathedrale|cathédrale/i, type: 'Cathedral' },
+  { pattern: /church|kirche|église/i, type: 'Church' },
+  { pattern: /abbey|abtei|abbaye/i, type: 'Abbey' },
+  { pattern: /monastery|kloster|monastère/i, type: 'Monastery' },
+  { pattern: /chapel|kapelle|chapelle/i, type: 'Chapel' },
+  { pattern: /bridge|brücke|pont/i, type: 'Bridge' },
+  { pattern: /tower|turm|tour/i, type: 'Tower' },
+  { pattern: /museum|musée/i, type: 'Museum' },
+  { pattern: /park(?!ing)/i, type: 'Park' },
+  { pattern: /garden|garten|jardin/i, type: 'Garden' },
+  { pattern: /fountain|brunnen|fontaine/i, type: 'Fountain' },
+  { pattern: /monument|denkmal/i, type: 'Monument' },
+  { pattern: /statue|skulptur|sculpture/i, type: 'Statue' },
+  { pattern: /square|platz|place(?!s?\s+in)/i, type: 'Square' },
+  { pattern: /market|markt|marché/i, type: 'Market' },
+  { pattern: /station|bahnhof|gare/i, type: 'Station' },
+  { pattern: /theater|theatre|théâtre/i, type: 'Theatre' },
+  { pattern: /library|bibliothek|bibliothèque/i, type: 'Library' },
+  { pattern: /ruin|ruine/i, type: 'Ruins' },
+  { pattern: /roman|römisch|romain/i, type: 'Roman site' },
+  { pattern: /bath|bad|therme|bain/i, type: 'Baths' },
+  { pattern: /lake|see|lac/i, type: 'Lake' },
+  { pattern: /river|fluss|rivière/i, type: 'River' },
+  { pattern: /mountain|berg|montagne/i, type: 'Mountain' },
+  { pattern: /cave|höhle|grotte/i, type: 'Cave' },
+  { pattern: /waterfall|wasserfall|cascade/i, type: 'Waterfall' },
+  // Generic fallbacks
+  { pattern: /historic|historisch|historique/i, type: 'Historic site' },
+  { pattern: /landmark|sehenswürdigkeit|monument/i, type: 'Landmark' },
+  { pattern: /building|gebäude|bâtiment/i, type: 'Building' }
+];
+
+/**
+ * Fetch Wikipedia categories for a batch of page IDs
+ * @param {string} lang - Wikipedia language code (e.g., 'de', 'en')
+ * @param {number[]} pageIds - Array of page IDs to fetch categories for
+ * @returns {Promise<Map<number, string[]>>} - Map of pageId -> category names
+ */
+async function fetchWikipediaCategories(lang, pageIds) {
+  if (!pageIds || pageIds.length === 0) return new Map();
+
+  const results = new Map();
+
+  // Wikipedia API allows up to 50 page IDs per request
+  const batchSize = 50;
+  for (let i = 0; i < pageIds.length; i += batchSize) {
+    const batch = pageIds.slice(i, i + batchSize);
+    const url = `https://${lang}.wikipedia.org/w/api.php?` +
+      `action=query&pageids=${batch.join('|')}` +
+      `&prop=categories&cllimit=10&clshow=!hidden` +
+      `&format=json&origin=*`;
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+
+      for (const [pageId, page] of Object.entries(data.query?.pages || {})) {
+        const categories = (page.categories || [])
+          .map(c => c.title.replace(/^Category:|^Kategorie:|^Catégorie:/i, ''));
+        results.set(parseInt(pageId), categories);
+      }
+    } catch (err) {
+      log.debug(`[LANDMARK] Failed to fetch categories for ${lang}: ${err.message}`);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Parse categories to extract landmark type and check for boost eligibility
+ * @param {string[]} categories - Array of category names
+ * @returns {{ type: string|null, shouldBoost: boolean }}
+ */
+function parseLandmarkCategories(categories) {
+  if (!categories || categories.length === 0) {
+    return { type: null, shouldBoost: false };
+  }
+
+  // Check if any category matches boost patterns
+  const shouldBoost = categories.some(cat =>
+    BOOST_CATEGORY_PATTERNS.some(pattern => pattern.test(cat))
+  );
+
+  // Find landmark type from categories
+  let type = null;
+  for (const cat of categories) {
+    for (const { pattern, type: matchType } of CATEGORY_TO_TYPE) {
+      if (pattern.test(cat)) {
+        type = matchType;
+        break;
+      }
+    }
+    if (type) break;
+  }
+
+  return { type, shouldBoost };
+}
+
+/**
+ * Enrich landmarks with Wikipedia categories (type + boost flag)
+ * @param {Array} landmarks - Landmarks with pageId and lang fields
+ * @returns {Promise<void>} - Modifies landmarks in place
+ */
+async function enrichLandmarksWithCategories(landmarks) {
+  // Group landmarks by language
+  const byLang = new Map();
+  for (const landmark of landmarks) {
+    if (!landmark.pageId || !landmark.lang) continue;
+    if (!byLang.has(landmark.lang)) byLang.set(landmark.lang, []);
+    byLang.get(landmark.lang).push(landmark);
+  }
+
+  // Fetch categories per language in parallel
+  await Promise.all(Array.from(byLang.entries()).map(async ([lang, langLandmarks]) => {
+    const pageIds = langLandmarks.map(l => l.pageId);
+    const categoryMap = await fetchWikipediaCategories(lang, pageIds);
+
+    for (const landmark of langLandmarks) {
+      const categories = categoryMap.get(landmark.pageId) || [];
+      landmark.categories = categories;
+      const { type, shouldBoost } = parseLandmarkCategories(categories);
+      landmark.type = type;
+      landmark.shouldBoost = shouldBoost;
+
+      if (shouldBoost) {
+        log.debug(`[LANDMARK] 🏆 Boost: "${landmark.name}" (${type || 'unknown'}) - categories: ${categories.slice(0, 3).join(', ')}`);
+      }
+    }
+  }));
+}
+
 /**
  * Fetch photo from Wikimedia Commons API
  * @param {string} query - Search query (e.g., "Eiffel Tower Paris")
@@ -496,7 +675,9 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
             name,
             query: name,
             source: `wikipedia-${lang}`,
-            distance: item.dist
+            distance: item.dist,
+            pageId: item.pageid,  // Store for category lookup
+            lang                   // Store which Wikipedia to query
           });
         }
       }
@@ -509,6 +690,16 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
 
   const landmarks = Array.from(allLandmarks.values());
   log.debug(`[LANDMARK] Wikipedia found ${landmarks.length} landmarks across ${languages.length} languages`);
+
+  // Enrich with categories (type + boost flag) - one API call per language
+  if (landmarks.length > 0) {
+    log.debug(`[LANDMARK] Fetching Wikipedia categories for ${landmarks.length} landmarks...`);
+    await enrichLandmarksWithCategories(landmarks);
+    const boostedCount = landmarks.filter(l => l.shouldBoost).length;
+    const typedCount = landmarks.filter(l => l.type).length;
+    log.debug(`[LANDMARK] Categories: ${typedCount}/${landmarks.length} typed, ${boostedCount} boosted`);
+  }
+
   return landmarks;
 }
 
@@ -717,15 +908,16 @@ function buildExcludePattern(city, country) {
  * Strategy:
  * 1. Geocode the city to get coordinates (ensures correct location)
  * 2. Use Wikipedia geosearch to get actual landmark names (clean titles)
- * 3. Search Wikimedia Commons for photos of those landmarks
- * 4. Fall back to text search if geosearch fails
+ * 3. Fetch Wikipedia categories for type extraction + tourist boost
+ * 4. Search Wikimedia Commons for photos of those landmarks
+ * 5. Score by: (photos + photoSize) / distancePenalty * categoryBoost (+40%)
  *
  * @param {string} city - City name
  * @param {string} country - Country name
- * @param {number} limit - Max landmarks to return (default 10)
- * @returns {Promise<Array<{name, query, photoCount, photoData, photoUrl, attribution, hasPhoto}>>}
+ * @param {number} limit - Max landmarks to return (default 30)
+ * @returns {Promise<Array<{name, query, type, photoData, photoUrl, attribution, hasPhoto, score}>>}
  */
-async function discoverLandmarksForLocation(city, country, limit = 10) {
+async function discoverLandmarksForLocation(city, country, limit = 30) {
   const location = [city, country].filter(Boolean).join(', ');
   log.info(`[LANDMARK] 🔍 Discovering landmarks near: ${location}`);
   const startTime = Date.now();
@@ -754,10 +946,11 @@ async function discoverLandmarksForLocation(city, country, limit = 10) {
     log.warn(`[LANDMARK] Wikipedia geosearch found no landmarks for ${location}`);
   }
 
-  // Step 4: Take candidates within reasonable distance (10km already filtered by Wikipedia)
-  // Don't sort by distance - we'll sort by photo popularity instead
-  const candidates = landmarks.slice(0, Math.min(limit * 3, landmarks.length));
-  log.debug(`[LANDMARK] Selected ${candidates.length} candidates for scoring`);
+  // Step 4: Process all landmarks (Wikipedia already limits to ~50 per language)
+  // We'll fetch photos for all and let the scoring decide
+  const MAX_CANDIDATES = 60;  // Safety limit to avoid API abuse
+  const candidates = landmarks.slice(0, Math.min(MAX_CANDIDATES, landmarks.length));
+  log.debug(`[LANDMARK] Selected ${candidates.length} candidates for photo fetching`);
 
   // Step 5: Get Commons photo counts + fetch photos in parallel
   // This tells us how photogenic/popular each landmark is
@@ -787,29 +980,33 @@ async function discoverLandmarksForLocation(city, country, limit = 10) {
     }
   }));
 
-  // Step 6: Score and sort by photogenic popularity with distance penalty
-  // Score = (commonsPhotoCount + photoSizeKB) / (1 + distance/1000)
-  // This penalizes far-away landmarks (e.g., 6km away = score divided by 7)
+  // Step 6: Score and sort by photogenic popularity with distance penalty + category boost
+  // Base score = (commonsPhotoCount + photoSizeKB) / (1 + distance/1000)
+  // +40% boost for tourist attractions, castles, churches, bridges, museums, etc.
+  const CATEGORY_BOOST = 1.4;  // +40%
+
   const scoredLandmarks = candidates
     .filter(l => l.hasPhoto)
     .map(l => {
       const rawScore = (l.commonsPhotoCount || 0) + (l.photoSizeKB || 0);
       const distancePenalty = 1 + (l.distance || 0) / 1000;
+      const baseScore = rawScore / distancePenalty;
+      const boostedScore = l.shouldBoost ? baseScore * CATEGORY_BOOST : baseScore;
       return {
         ...l,
         rawScore,
-        score: Math.round(rawScore / distancePenalty)
+        score: Math.round(boostedScore)
       };
     })
     .sort((a, b) => b.score - a.score);
 
-  // Step 7: Take top N by score
+  // Step 7: Return top N landmarks by score (default 30 - enough variety without overwhelming)
   const validLandmarks = scoredLandmarks.slice(0, limit);
 
-  // Log scoring results
+  // Log scoring results with type info
   if (validLandmarks.length > 0) {
     log.debug(`[LANDMARK] Top landmarks by score: ${validLandmarks.slice(0, 5).map(l =>
-      l.name + '(' + l.commonsPhotoCount + ' photos, ' + l.photoSizeKB + 'KB)'
+      `${l.name} [${l.type || '?'}]${l.shouldBoost ? '🏆' : ''} (${l.score})`
     ).join(', ')}`);
   }
 

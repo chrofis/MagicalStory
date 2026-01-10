@@ -1519,7 +1519,7 @@ app.post('/api/landmarks/discover', async (req, res) => {
     // Trigger discovery in background (don't await)
     log.info(`[LANDMARK] 🔍 Early discovery triggered for ${city}, ${country || ''}`);
 
-    discoverLandmarksForLocation(city, country || '', 10)
+    discoverLandmarksForLocation(city, country || '')
       .then(async landmarks => {
         try {
           await dbPool.query(`
