@@ -102,8 +102,8 @@ export default function StoryWizard() {
     return localStorage.getItem('story_type') || '';
   });
   // New story category system
-  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | ''>(() => {
-    return (localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | '';
+  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | 'historical' | ''>(() => {
+    return (localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
   });
   const [storyTopic, setStoryTopic] = useState(() => {
     return localStorage.getItem('story_topic') || '';
@@ -417,7 +417,7 @@ export default function StoryWizard() {
 
       // Reset story settings state
       setStoryType('');
-      setStoryCategory('' as 'adventure' | 'life-challenge' | 'educational' | '');
+      setStoryCategory('' as 'adventure' | 'life-challenge' | 'educational' | 'historical' | '');
       setStoryTopic('');
       setStoryTheme('');
       setCustomThemeText('');
@@ -493,8 +493,12 @@ export default function StoryWizard() {
             setStoryTextPrompts(story.storyTextPrompts || []);
             setStyledAvatarGeneration(story.styledAvatarGeneration || []);
             setCostumedAvatarGeneration(story.costumedAvatarGeneration || []);
-            console.log('[StoryWizard] Loading story metadata, generationLog:', story.generationLog?.length || 0, 'entries');
-            setGenerationLog(story.generationLog || []);
+            // Note: generationLog is loaded from devMetadata, not from story metadata
+            // Don't overwrite here - it would clear entries set from job result
+            if (story.generationLog?.length) {
+              console.log('[StoryWizard] Loading story metadata, generationLog:', story.generationLog.length, 'entries');
+              setGenerationLog(story.generationLog);
+            }
 
             // Visual Bible
             if (story.visualBible) {
