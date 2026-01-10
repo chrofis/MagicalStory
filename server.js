@@ -355,7 +355,9 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:8000',
       'http://localhost:3000',
+      'http://localhost:5173',  // Vite dev server
       'http://127.0.0.1:8000',
+      'http://127.0.0.1:5173',
       'https://www.magicalstory.ch',
       'https://magicalstory.ch'
     ];
@@ -8202,7 +8204,9 @@ async function processStoryJob(jobId) {
         if (dbResult.rows.length > 0) {
           const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
           if (age < LANDMARK_CACHE_TTL) {
-            landmarks = dbResult.rows[0].landmarks;
+            // Parse JSON if stored as string (TEXT column) vs JSONB
+            const rawLandmarks = dbResult.rows[0].landmarks;
+            landmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
             log.info(`[LANDMARK] 📍 Injecting ${landmarks?.length || 0} DB-cached landmarks for ${inputData.userLocation.city}`);
           }
         }
