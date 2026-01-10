@@ -1,0 +1,361 @@
+{
+  "temperature": 1,
+  "faces": [
+    {
+      "box": {
+        "height": 69,
+        "width": 69,
+        "x": 1030,
+        "y": 460
+      },
+      "confidence": 0.9,
+      "index": 16,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2822
+    },
+    {
+      "box": {
+        "height": 69,
+        "width": 69,
+        "x": 834,
+        "y": 28
+      },
+      "confidence": 0.9,
+      "index": 3,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2815
+    },
+    {
+      "box": {
+        "height": 74,
+        "width": 74,
+        "x": 1028,
+        "y": 239
+      },
+      "confidence": 0.91,
+      "index": 19,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2561
+    },
+    {
+      "box": {
+        "height": 71,
+        "width": 71,
+        "x": 1029,
+        "y": 26
+      },
+      "confidence": 0.9,
+      "index": 4,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.256
+    },
+    {
+      "box": {
+        "height": 73,
+        "width": 73,
+        "x": 834,
+        "y": 458
+      },
+      "confidence": 0.91,
+      "index": 15,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2287
+    },
+    {
+      "box": {
+        "height": 72,
+        "width": 72,
+        "x": 638,
+        "y": 27
+      },
+      "confidence": 0.9,
+      "index": 2,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2227
+    },
+    {
+      "box": {
+        "height": 69,
+        "width": 69,
+        "x": 641,
+        "y": 680
+      },
+      "confidence": 0.9,
+      "index": 8,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2114
+    },
+    {
+      "box": {
+        "height": 68,
+        "width": 68,
+        "x": 57,
+        "y": 461
+      },
+      "confidence": 0.9,
+      "index": 17,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2107
+    },
+    {
+      "box": {
+        "height": 72,
+        "width": 72,
+        "x": 639,
+        "y": 458
+      },
+      "confidence": 0.91,
+      "index": 14,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2036
+    },
+    {
+      "box": {
+        "height": 70,
+        "width": 70,
+        "x": 834,
+        "y": 241
+      },
+      "confidence": 0.9,
+      "index": 20,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.191
+    },
+    {
+      "box": {
+        "height": 70,
+        "width": 70,
+        "x": 447,
+        "y": 457
+      },
+      "confidence": 0.9,
+      "index": 13,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1892
+    },
+    {
+      "box": {
+        "height": 73,
+        "width": 73,
+        "x": 250,
+        "y": 26
+      },
+      "confidence": 0.9,
+      "index": 11,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1837
+    },
+    {
+      "box": {
+        "height": 69,
+        "width": 69,
+        "x": 836,
+        "y": 680
+      },
+      "confidence": 0.88,
+      "index": 10,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1817
+    },
+    {
+      "box": {
+        "height": 72,
+        "width": 72,
+        "x": 445,
+        "y": 241
+      },
+      "confidence": 0.9,
+      "index": 22,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1554
+    },
+    {
+      "box": {
+        "height": 73,
+        "width": 73,
+        "x": 443,
+        "y": 26
+      },
+      "confidence": 0.9,
+      "index": 1,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1546
+    },
+    {
+      "box": {
+        "height": 72,
+        "width": 72,
+        "x": 1030,
+        "y": 678
+      },
+      "confidence": 0.91,
+      "index": 9,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1508
+    },
+    {
+      "box": {
+        "height": 69,
+        "width": 69,
+        "x": 58,
+        "y": 681
+      },
+      "confidence": 0.89,
+      "index": 5,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1487
+    },
+    {
+      "box": {
+        "height": 72,
+        "width": 72,
+        "x": 639,
+        "y": 242
+      },
+      "confidence": 0.9,
+      "index": 23,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1482
+    },
+    {
+      "box": {
+        "height": 70,
+        "width": 70,
+        "x": 251,
+        "y": 460
+      },
+      "confidence": 0.89,
+      "index": 12,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1458
+    },
+    {
+      "box": {
+        "height": 73,
+        "width": 73,
+        "x": 252,
+        "y": 242
+      },
+      "confidence": 0.91,
+      "index": 21,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1316
+    },
+    {
+      "box": {
+        "height": 71,
+        "width": 71,
+        "x": 55,
+        "y": 28
+      },
+      "confidence": 0.91,
+      "index": 0,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.122
+    },
+    {
+      "box": {
+        "height": 73,
+        "width": 73,
+        "x": 54,
+        "y": 242
+      },
+      "confidence": 0.89,
+      "index": 18,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1192
+    },
+    {
+      "box": {
+        "height": 70,
+        "width": 70,
+        "x": 446,
+        "y": 679
+      },
+      "confidence": 0.89,
+      "index": 7,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1166
+    },
+    {
+      "box": {
+        "height": 71,
+        "width": 71,
+        "x": 251,
+        "y": 679
+      },
+      "confidence": 0.88,
+      "index": 6,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1111
+    }
+  ],
+  "top3": [
+    {
+      "box": {
+        "height": 69,
+        "width": 69,
+        "x": 1030,
+        "y": 460
+      },
+      "confidence": 0.9,
+      "index": 16,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2822
+    },
+    {
+      "box": {
+        "height": 69,
+        "width": 69,
+        "x": 834,
+        "y": 28
+      },
+      "confidence": 0.9,
+      "index": 3,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2815
+    },
+    {
+      "box": {
+        "height": 74,
+        "width": 74,
+        "x": 1028,
+        "y": 239
+      },
+      "confidence": 0.91,
+      "index": 19,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.2561
+    }
+  ],
+  "avg": 0.18343750000000003,
+  "total": 24,
+  "passing": 0
+}

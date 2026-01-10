@@ -1,0 +1,21 @@
+Create a 2x2 character sheet (2 rows, 2 columns = 4 images) in pixar animation style.
+
+GRID LAYOUT:
+
+TOP ROW - FACE ONLY (no clothing visible):
+- TOP-LEFT: Close-up of face ONLY. Crop tight - show forehead to chin, ear to ear. NO neck, NO shoulders, NO clothing. Just the face. Front view.
+- TOP-RIGHT: Close-up of face ONLY. Same tight crop. 3/4 angle (slightly turned right).
+
+BOTTOM ROW - FULL BODY WITH COSTUME:
+- BOTTOM-LEFT: Full body front view wearing: A dashing pirate captain outfit: long navy blue coat with gold trim and brass buttons, white ruffled shirt underneath, brown leather belt with gold buckle, black boots. No hat - hair flowing freely.
+- BOTTOM-RIGHT: Full body side view (facing right) wearing the same costume.
+
+CRITICAL REQUIREMENTS:
+- ALL 4 images show the EXACT SAME PERSON from the reference
+- TOP ROW: Face fills the entire frame. NO clothing, NO shoulders, NO neck visible. Just face.
+- BOTTOM ROW: Full body showing the complete costume from head to toe
+- Expression: Happy, gentle smile, lips closed
+- Style: 3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading
+- Background: Light grey studio in all 4 cells
+
+The TOP faces are identity anchors - they must match the reference face exactly.

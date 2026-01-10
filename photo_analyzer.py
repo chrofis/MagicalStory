@@ -1697,6 +1697,160 @@ def compare_identity():
         }), 500
 
 
+@app.route('/detect-all-faces', methods=['POST'])
+def detect_all_faces():
+    """
+    Detect ALL faces in an image and optionally compare each to a reference.
+    Uses DeepFace to find multiple faces.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",
+        "reference_image": "data:image/jpeg;base64,..."  # Optional: compare each face to this
+    }
+
+    Returns:
+    {
+        "success": true,
+        "faces": [
+            {
+                "index": 0,
+                "box": {"x": 100, "y": 50, "width": 80, "height": 100},
+                "similarity": 0.72,  # Only if reference_image provided
+                "same_person": true
+            },
+            ...
+        ],
+        "total_faces": 12
+    }
+    """
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+        reference_data = data.get('reference_image')
+
+        if not image_data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+
+        # Decode main image
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+
+        height, width = image.shape[:2]
+        print(f"[DETECT-ALL] Image size: {width}x{height}")
+
+        # Get reference embedding if provided
+        ref_embedding = None
+        if reference_data:
+            if ',' in reference_data:
+                reference_data = reference_data.split(',')[1]
+            ref_bytes = base64.b64decode(reference_data)
+            ref_arr = np.frombuffer(ref_bytes, np.uint8)
+            ref_image = cv2.imdecode(ref_arr, cv2.IMREAD_COLOR)
+            if ref_image is not None:
+                ref_rgb = cv2.cvtColor(ref_image, cv2.COLOR_BGR2RGB)
+                ref_pil = Image.fromarray(ref_rgb)
+                ref_embedding, _ = extract_embedding_from_image(ref_pil, assume_face_crop=False)
+                if ref_embedding is not None:
+                    ref_embedding = ref_embedding / np.linalg.norm(ref_embedding)
+                    print(f"[DETECT-ALL] Reference embedding extracted")
+
+        # Use DeepFace to detect all faces
+        from deepface import DeepFace
+
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # Try multiple detectors - retinaface works on photos, opencv/mtcnn better on illustrations
+        face_objs = []
+        detectors = ['opencv', 'mtcnn', 'retinaface']
+
+        for detector in detectors:
+            try:
+                print(f"[DETECT-ALL] Trying detector: {detector}")
+                face_objs = DeepFace.extract_faces(
+                    img_path=image_rgb,
+                    detector_backend=detector,
+                    enforce_detection=False,
+                    align=True
+                )
+                if face_objs:
+                    print(f"[DETECT-ALL] {detector} found {len(face_objs)} faces")
+                    break
+            except Exception as e:
+                print(f"[DETECT-ALL] {detector} error: {e}")
+                continue
+
+        print(f"[DETECT-ALL] Found {len(face_objs)} faces")
+
+        faces = []
+        for i, face_obj in enumerate(face_objs):
+            facial_area = face_obj.get('facial_area', {})
+            face_img = face_obj.get('face')
+            confidence = face_obj.get('confidence', 0)
+
+            # Skip low confidence detections
+            if confidence < 0.5:
+                continue
+
+            face_info = {
+                "index": i,
+                "box": {
+                    "x": facial_area.get('x', 0),
+                    "y": facial_area.get('y', 0),
+                    "width": facial_area.get('w', 0),
+                    "height": facial_area.get('h', 0)
+                },
+                "confidence": round(confidence, 3)
+            }
+
+            # If reference provided, compute similarity
+            if ref_embedding is not None and face_img is not None:
+                try:
+                    # face_img is already a numpy array (RGB, float 0-1)
+                    face_uint8 = (face_img * 255).astype(np.uint8)
+                    face_pil = Image.fromarray(face_uint8)
+                    face_emb, _ = extract_embedding_from_image(face_pil, assume_face_crop=True)
+
+                    if face_emb is not None:
+                        face_emb = face_emb / np.linalg.norm(face_emb)
+                        similarity = float(np.dot(ref_embedding, face_emb))
+                        face_info["similarity"] = round(similarity, 4)
+                        face_info["same_person"] = similarity > 0.45
+                        face_info["match_confidence"] = "high" if similarity > 0.6 else "medium" if similarity > 0.45 else "low"
+                except Exception as e:
+                    print(f"[DETECT-ALL] Error computing similarity for face {i}: {e}")
+
+            faces.append(face_info)
+
+        # Sort by similarity if available (highest first)
+        if faces and 'similarity' in faces[0]:
+            faces.sort(key=lambda f: f.get('similarity', 0), reverse=True)
+
+        print(f"[DETECT-ALL] Returning {len(faces)} valid faces")
+
+        return jsonify({
+            "success": True,
+            "faces": faces,
+            "total_faces": len(faces),
+            "image_size": {"width": width, "height": height}
+        }), 200
+
+    except Exception as e:
+        print(f"[DETECT-ALL] Error: {e}")
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PHOTO_ANALYZER_PORT', 5000))
     print(f"[START] Photo Analyzer API starting on port {port}")

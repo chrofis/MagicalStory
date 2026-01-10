@@ -1,0 +1,231 @@
+{
+  "temperature": 1.5,
+  "faces": [
+    {
+      "box": {
+        "height": 115,
+        "width": 115,
+        "x": 389,
+        "y": 49
+      },
+      "confidence": 0.9,
+      "index": 11,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1351
+    },
+    {
+      "box": {
+        "height": 115,
+        "width": 115,
+        "x": 686,
+        "y": 344
+      },
+      "confidence": 0.89,
+      "index": 3,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1336
+    },
+    {
+      "box": {
+        "height": 114,
+        "width": 114,
+        "x": 684,
+        "y": 49
+      },
+      "confidence": 0.89,
+      "index": 9,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1203
+    },
+    {
+      "box": {
+        "height": 115,
+        "width": 115,
+        "x": 688,
+        "y": 632
+      },
+      "confidence": 0.9,
+      "index": 7,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.111
+    },
+    {
+      "box": {
+        "height": 115,
+        "width": 115,
+        "x": 91,
+        "y": 633
+      },
+      "confidence": 0.91,
+      "index": 6,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1062
+    },
+    {
+      "box": {
+        "height": 111,
+        "width": 111,
+        "x": 987,
+        "y": 636
+      },
+      "confidence": 0.88,
+      "index": 8,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1042
+    },
+    {
+      "box": {
+        "height": 115,
+        "width": 115,
+        "x": 390,
+        "y": 344
+      },
+      "confidence": 0.89,
+      "index": 1,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1035
+    },
+    {
+      "box": {
+        "height": 114,
+        "width": 114,
+        "x": 90,
+        "y": 345
+      },
+      "confidence": 0.9,
+      "index": 0,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.102
+    },
+    {
+      "box": {
+        "height": 116,
+        "width": 116,
+        "x": 983,
+        "y": 51
+      },
+      "confidence": 0.89,
+      "index": 12,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.0954
+    },
+    {
+      "box": {
+        "height": 115,
+        "width": 115,
+        "x": 392,
+        "y": 632
+      },
+      "confidence": 0.9,
+      "index": 13,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.0953
+    },
+    {
+      "box": {
+        "height": 114,
+        "width": 114,
+        "x": 985,
+        "y": 344
+      },
+      "confidence": 0.89,
+      "index": 4,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.0898
+    },
+    {
+      "box": {
+        "height": 118,
+        "width": 118,
+        "x": 88,
+        "y": 47
+      },
+      "confidence": 0.9,
+      "index": 10,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.0851
+    },
+    {
+      "box": {
+        "height": 59,
+        "width": 59,
+        "x": 707,
+        "y": 467
+      },
+      "confidence": 0.97,
+      "index": 5,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.0156
+    },
+    {
+      "box": {
+        "height": 60,
+        "width": 60,
+        "x": 112,
+        "y": 466
+      },
+      "confidence": 0.98,
+      "index": 2,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.0133
+    }
+  ],
+  "top3": [
+    {
+      "box": {
+        "height": 115,
+        "width": 115,
+        "x": 389,
+        "y": 49
+      },
+      "confidence": 0.9,
+      "index": 11,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1351
+    },
+    {
+      "box": {
+        "height": 115,
+        "width": 115,
+        "x": 686,
+        "y": 344
+      },
+      "confidence": 0.89,
+      "index": 3,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1336
+    },
+    {
+      "box": {
+        "height": 114,
+        "width": 114,
+        "x": 684,
+        "y": 49
+      },
+      "confidence": 0.89,
+      "index": 9,
+      "match_confidence": "low",
+      "same_person": false,
+      "similarity": 0.1203
+    }
+  ],
+  "avg": 0.0936,
+  "total": 14,
+  "passing": 0
+}

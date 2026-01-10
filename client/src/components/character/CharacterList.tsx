@@ -107,13 +107,13 @@ export function CharacterList({
                 }`}
               >
                 {/* Top row: Photo/Name on left, Edit/Delete on right */}
-                <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     {(char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original) && (
                       <img
                         src={char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original}
                         alt={char.name}
-                        className={`w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0 ${isOut ? 'grayscale' : ''}`}
+                        className={`w-12 h-12 md:w-14 md:h-14 rounded-full object-cover object-top border-2 border-indigo-200 flex-shrink-0 ${isOut ? 'grayscale' : ''}`}
                       />
                     )}
                     <div className="flex-1 min-w-0">
@@ -145,14 +145,14 @@ export function CharacterList({
                   </div>
                 </div>
 
-                {/* Role selector */}
+                {/* Role selector - compact */}
                 {onCharacterRoleChange && (
-                  <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                  <div className="flex rounded overflow-hidden border border-gray-300 text-[10px] md:text-xs">
                     <button
                       onClick={() => onCharacterRoleChange(char.id, 'out')}
                       disabled={isLastInStory}
                       title={isLastInStory ? (language === 'de' ? 'Mindestens ein Charakter muss in der Geschichte sein' : language === 'fr' ? 'Au moins un personnage doit être dans l\'histoire' : 'At least one character must be in the story') : undefined}
-                      className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
+                      className={`flex-1 px-1.5 py-1 font-medium transition-colors ${
                         isOut
                           ? 'bg-gray-500 text-white'
                           : isLastInStory
@@ -164,7 +164,7 @@ export function CharacterList({
                     </button>
                     <button
                       onClick={() => onCharacterRoleChange(char.id, 'in')}
-                      className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-l border-r border-gray-300 ${
+                      className={`flex-1 px-1.5 py-1 font-medium transition-colors border-l border-r border-gray-300 ${
                         isIn
                           ? 'bg-indigo-600 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
@@ -174,13 +174,13 @@ export function CharacterList({
                     </button>
                     <button
                       onClick={() => onCharacterRoleChange(char.id, 'main')}
-                      className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                      className={`flex-1 px-1.5 py-1 font-medium transition-colors flex items-center justify-center gap-0.5 ${
                         isMain
                           ? 'bg-indigo-600 text-white'
                           : 'bg-white text-gray-600 hover:bg-gray-100'
                       }`}
                     >
-                      <Star size={12} className={isMain ? 'fill-white' : ''} />
+                      <Star size={10} className={isMain ? 'fill-white' : ''} />
                       {roleLabels.main}
                     </button>
                   </div>

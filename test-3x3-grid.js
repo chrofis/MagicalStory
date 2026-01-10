@@ -50,33 +50,34 @@ async function generate3x3Grid(character, costume, temperature, outputDir) {
   const artStyle = 'pixar';
   const artStylePrompt = '3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading';
 
-  // 3x4 grid (12 images) - all same costume, slight face variations
-  const gridPrompt = `Create a 3x4 character sheet (3 rows, 4 columns = 12 images) in ${artStyle} animation style.
+  // 2x2 grid: top = face only, bottom = full body with costume
+  const gridPrompt = `Create a 2x2 character sheet (2 rows, 2 columns = 4 images) in ${artStyle} animation style.
 
-Show the SAME young person from the reference in 12 views, ALL wearing: ${costume.description}
+GRID LAYOUT:
 
-GRID LAYOUT (3 rows x 4 columns):
-Row 1: 4 face close-ups, ALL facing STRAIGHT forward at camera
-Row 2: 4 face close-ups, ALL facing SLIGHTLY RIGHT (3/4 profile)
-Row 3: 2 full body facing straight | 2 full body facing right
+TOP ROW - FACE ONLY (EXTREME CLOSE-UP):
+- TOP-LEFT: ONLY THE FACE. Crop at hairline, chin, and ears. NOTHING BELOW THE CHIN. No neck. No shoulders. No clothing. No hair below ears. Just forehead, eyes, nose, mouth, chin. Front view.
+- TOP-RIGHT: ONLY THE FACE. Same extreme crop. 3/4 angle. FACE FILLS THE ENTIRE FRAME.
 
-EXPRESSION: ALL 12 images show HAPPY expression with LIPS CLOSED (gentle smile, no teeth)
+BOTTOM ROW - FULL BODY WITH COSTUME:
+- BOTTOM-LEFT: Full body front view wearing: ${costume.description}
+- BOTTOM-RIGHT: Full body side view (facing right) wearing the same costume.
 
-IMPORTANT - FACE VARIATIONS:
-- Keep the SAME face identity but add SLIGHT STRUCTURAL variations
-- Vary: face width, eye spacing, nose size, chin shape slightly
-- This helps find which variation best matches the reference
-- All variations should still be recognizable as the same person
+CRITICAL REQUIREMENTS:
+- ALL 4 images show the EXACT SAME PERSON from the reference
+- TOP ROW: FACE ONLY. Imagine a passport photo cropped even tighter. ZERO clothing visible. ZERO shoulders. ZERO neck. The frame edge cuts at the chin.
+- BOTTOM ROW: Full body showing the complete costume from head to toe
+- Expression: Happy, gentle smile, lips closed
+- Style: ${artStylePrompt}
+- Background: Light grey studio in all 4 cells
 
-Style: ${artStylePrompt}
-Background: Light grey studio in each cell
-Same costume in ALL 12 images.`;
+TOP = identity reference (face only), BOTTOM = costume showcase (full body).`;
 
   const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
   const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
   const systemText = `You create character illustration sheets for children's books.
-Create a 3x4 grid (12 images) of the same character in ${artStyle} style with slight face variations.`;
+Create a 2x2 grid: top row shows face-only close-ups (no clothing), bottom row shows full body with costume. All in ${artStyle} style.`;
 
   const requestBody = {
     systemInstruction: { parts: [{ text: systemText }] },
@@ -89,7 +90,7 @@ Create a 3x4 grid (12 images) of the same character in ${artStyle} style with sl
     generationConfig: {
       temperature: temperature,
       responseModalities: ["TEXT", "IMAGE"],
-      imageConfig: { aspectRatio: "4:3" }  // Wide for 3x4 grid
+      imageConfig: { aspectRatio: "1:1" }  // Square for 2x2 grid
     },
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
@@ -143,61 +144,36 @@ Create a 3x4 grid (12 images) of the same character in ${artStyle} style with sl
   }
 }
 
-async function compareAllQuadrants(standardAvatar, gridImage, rows = 3, cols = 4) {
+async function detectAndCompareAllFaces(referenceAvatar, gridImage) {
   const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-  const quadrants = [];
 
-  // Generate positions for any grid size
-  const rowNames = ['top', 'middle', 'bottom'];
-  const colNames = cols === 4 ? ['col1', 'col2', 'col3', 'col4'] : ['left', 'center', 'right'];
+  try {
+    console.log(`   Calling /detect-all-faces...`);
+    const response = await fetch(`${photoAnalyzerUrl}/detect-all-faces`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: gridImage,
+        reference_image: referenceAvatar
+      })
+    });
 
-  // Determine grid_size parameter for photo_analyzer
-  const gridSizeParam = cols === 4 ? '3x4' : (cols === 3 ? 3 : 2);
-
-  const positions = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      positions.push(`${rowNames[r]}-${colNames[c]}`);
+    const result = await response.json();
+    if (result.success) {
+      console.log(`   Found ${result.total_faces} faces in grid`);
+      return result.faces;
+    } else {
+      console.log(`   Error: ${result.error}`);
+      return [];
     }
+  } catch (err) {
+    console.log(`   Error: ${err.message}`);
+    return [];
   }
-
-  console.log(`   Comparing ${positions.length} positions: ${positions.join(', ')}`);
-
-  for (const pos of positions) {
-    try {
-      const response = await fetch(`${photoAnalyzerUrl}/compare-identity`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image1: standardAvatar,
-          image2: gridImage,
-          quadrant1: 'top-left',
-          quadrant2: pos,
-          grid_size: gridSizeParam
-        })
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        quadrants.push({
-          position: pos,
-          similarity: result.similarity,
-          samePerson: result.same_person,
-          confidence: result.confidence
-        });
-      } else {
-        quadrants.push({ position: pos, error: result.error });
-      }
-    } catch (err) {
-      quadrants.push({ position: pos, error: err.message });
-    }
-  }
-
-  return quadrants;
 }
 
 async function main() {
-  console.log('🎭 3x4 Grid Test - Generate 12 variations\n');
+  console.log('🎭 2x2 Grid Test - Face anchors + Full body costume\n');
 
   const baseOutputDir = path.join(__dirname, 'test-output', `grid-3x3-${Date.now()}`);
   console.log(`Output: ${baseOutputDir}\n`);
@@ -212,8 +188,8 @@ async function main() {
   // Save reference
   saveImage(sophie.avatars.standard, baseOutputDir, '0-reference.png');
 
-  // Test temperatures including 2.0
-  const temperatures = [1.0, 1.5, 2.0];
+  // Test just one temperature for this approach
+  const temperatures = [1.0];
 
   console.log('2. Generating 3x3 grids...\n');
 
@@ -226,27 +202,32 @@ async function main() {
       saveImage(genResult.imageData, baseOutputDir, `grid-temp-${temp}.png`);
       console.log(`   ✅ Saved grid`);
 
-      // Compare all 12 quadrants (3x4 grid)
-      console.log(`   📊 Comparing all 12 cells...`);
-      const comparisons = await compareAllQuadrants(sophie.avatars.standard, genResult.imageData, 3, 4);
+      // Detect all faces and compare to reference
+      console.log(`   📊 Detecting all faces in grid...`);
+      const faces = await detectAndCompareAllFaces(sophie.avatars.standard, genResult.imageData);
 
-      // Find best
-      const valid = comparisons.filter(c => c.similarity !== undefined);
-      if (valid.length > 0) {
-        const best = valid.reduce((a, b) => a.similarity > b.similarity ? a : b);
-        const worst = valid.reduce((a, b) => a.similarity < b.similarity ? a : b);
-        const avg = valid.reduce((sum, c) => sum + c.similarity, 0) / valid.length;
+      if (faces.length > 0) {
+        // Already sorted by similarity (highest first)
+        const top3 = faces.slice(0, 3);
+        const avg = faces.reduce((sum, f) => sum + (f.similarity || 0), 0) / faces.length;
+        const passing = faces.filter(f => f.same_person).length;
 
-        console.log(`   Best:  ${best.position} = ${(best.similarity * 100).toFixed(1)}%`);
-        console.log(`   Worst: ${worst.position} = ${(worst.similarity * 100).toFixed(1)}%`);
-        console.log(`   Avg:   ${(avg * 100).toFixed(1)}%`);
-        console.log(`   Pass:  ${valid.filter(c => c.samePerson).length}/${valid.length}\n`);
+        console.log(`\n   🏆 TOP 3 MATCHES:`);
+        top3.forEach((face, i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+          const pos = `(${face.box.x}, ${face.box.y})`;
+          console.log(`   ${medal} #${i+1}: ${(face.similarity * 100).toFixed(1)}% at ${pos} [${face.match_confidence}]`);
+        });
+
+        console.log(`\n   Stats: ${faces.length} faces, avg ${(avg * 100).toFixed(1)}%, ${passing}/${faces.length} pass\n`);
 
         // Save detailed results
         fs.writeFileSync(
           path.join(baseOutputDir, `results-temp-${temp}.json`),
-          JSON.stringify({ temperature: temp, comparisons, best, worst, avg }, null, 2)
+          JSON.stringify({ temperature: temp, faces, top3, avg, total: faces.length, passing }, null, 2)
         );
+      } else {
+        console.log(`   ⚠️ No faces detected in grid\n`);
       }
     } else {
       console.log(`   ❌ Failed: ${genResult.error}\n`);
