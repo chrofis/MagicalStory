@@ -1803,10 +1803,25 @@ ${landmarkEntries}`;
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
     const result = await callTextModel(prompt, 6000, modelToUse);
 
-    // Parse the response to extract 2 ideas from FINAL markers (ignoring DRAFT and REVIEW)
+    // Parse the response to extract 2 ideas
+    // Support multiple formats: [FINAL_1], ## STORY 1, STORY 1:, etc.
     const responseText = result.text.trim();
-    const idea1Match = responseText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\]|$)/);
-    const idea2Match = responseText.match(/\[FINAL_2\]\s*([\s\S]*?)$/);
+
+    // Try [FINAL_1]/[FINAL_2] format first (expected from prompt)
+    let idea1Match = responseText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\]|##\s*STORY\s*2|$)/i);
+    let idea2Match = responseText.match(/\[FINAL_2\]\s*([\s\S]*?)$/);
+
+    // Try ## STORY 1 / ## STORY 2 format
+    if (!idea1Match || !idea2Match) {
+      idea1Match = responseText.match(/##\s*STORY\s*1[:\s]*([^\n]*(?:\n(?!##\s*STORY\s*2)[\s\S])*?)(?=##\s*STORY\s*2|$)/i);
+      idea2Match = responseText.match(/##\s*STORY\s*2[:\s]*([\s\S]*?)$/i);
+    }
+
+    // Try STORY 1: / STORY 2: format (without ##)
+    if (!idea1Match || !idea2Match) {
+      idea1Match = responseText.match(/STORY\s*1[:\s]+([^\n]*(?:\n(?!STORY\s*2)[\s\S])*?)(?=STORY\s*2|$)/i);
+      idea2Match = responseText.match(/STORY\s*2[:\s]+([\s\S]*?)$/i);
+    }
 
     const idea1 = idea1Match ? idea1Match[1].trim() : '';
     const idea2 = idea2Match ? idea2Match[1].trim() : '';
@@ -2093,36 +2108,54 @@ ${landmarkEntries}`;
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', prompt, model: modelToUse })}\n\n`);
 
+    // Helper function to parse story markers (supports multiple formats)
+    const parseStory1 = (text) => {
+      // Try [FINAL_1] format first
+      let match = text.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\]|##\s*STORY\s*2)/i);
+      if (match) return match[1].trim();
+      // Try ## STORY 1 format
+      match = text.match(/##\s*STORY\s*1[:\s]*([^\n]*(?:\n(?!##\s*STORY\s*2)[\s\S])*?)(?=##\s*STORY\s*2)/i);
+      if (match) return match[1].trim();
+      return null;
+    };
+
+    const parseStory2 = (text) => {
+      // Try [FINAL_2] format first
+      let match = text.match(/\[FINAL_2\]\s*([\s\S]*?)$/);
+      if (match) return match[1].trim();
+      // Try ## STORY 2 format
+      match = text.match(/##\s*STORY\s*2[:\s]*([\s\S]*?)$/i);
+      if (match) return match[1].trim();
+      return null;
+    };
+
     // Stream from LLM and parse for story markers
     await callTextModelStreaming(prompt, 6000, (delta, fullText) => {
       accumulatedText = fullText;
 
-      // Check if we have a complete FINAL_1 (ignoring DRAFT_1 and REVIEW_1)
+      // Check if we have a complete story 1
       if (!story1Sent) {
-        const story1Match = accumulatedText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\])/);
-        if (story1Match) {
-          const story1 = story1Match[1].trim();
+        const story1 = parseStory1(accumulatedText);
+        if (story1 && story1.length > 50) {
           res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
           story1Sent = true;
           log.debug('  Story 1 sent to client');
         }
       }
 
-      // Check if we have a complete FINAL_2 (after the marker and some content)
+      // Check if we have a complete story 2 (streaming check)
       if (!story2Sent && story1Sent) {
-        const story2Match = accumulatedText.match(/\[FINAL_2\]\s*([\s\S]+?)$/);
-        if (story2Match && story2Match[1].trim().length > 50) {
-          // Wait a bit more to ensure we have the full story
-          // We'll send it at the end
+        const story2 = parseStory2(accumulatedText);
+        if (story2 && story2.length > 50) {
+          // Wait until end to send story 2 to ensure completeness
         }
       }
     }, modelToUse);
 
     // Parse final result and send story 2 if not already sent
     if (!story2Sent) {
-      const story2Match = accumulatedText.match(/\[FINAL_2\]\s*([\s\S]+?)$/);
-      if (story2Match) {
-        const story2 = story2Match[1].trim();
+      const story2 = parseStory2(accumulatedText);
+      if (story2) {
         res.write(`data: ${JSON.stringify({ story2 })}\n\n`);
         log.debug('  Story 2 sent to client');
       }
@@ -2130,9 +2163,8 @@ ${landmarkEntries}`;
 
     // If story1 wasn't parsed correctly, try to extract it now
     if (!story1Sent) {
-      const story1Match = accumulatedText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\]|$)/);
-      if (story1Match) {
-        const story1 = story1Match[1].trim();
+      const story1 = parseStory1(accumulatedText);
+      if (story1) {
         res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
       } else {
         // Fallback: use the whole response as story1
