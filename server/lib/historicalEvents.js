@@ -450,6 +450,164 @@ const HISTORICAL_EVENTS = {
     themes: ['sharing', 'generosity', 'connection', 'changing the world']
   },
 
+  // ============================================
+  // SWISS HISTORY
+  // ============================================
+
+  'swiss-founding': {
+    id: 'swiss-founding',
+    name: 'Founding of Switzerland (Rütlischwur)',
+    shortName: 'Rütlischwur',
+    year: 1291,
+    date: 'August 1, 1291',
+    location: 'Rütli Meadow, Lake Lucerne, Switzerland',
+    category: 'swiss',
+    themes: ['unity', 'freedom', 'friendship', 'standing together', 'promise']
+  },
+
+  'wilhelm-tell': {
+    id: 'wilhelm-tell',
+    name: 'Wilhelm Tell and the Apple',
+    shortName: 'Wilhelm Tell',
+    year: 1307,
+    date: 'November 18, 1307 (legend)',
+    location: 'Altdorf, Uri, Switzerland',
+    category: 'swiss',
+    themes: ['courage', 'standing up to bullies', 'father\'s love', 'freedom', 'skill']
+  },
+
+  'battle-morgarten': {
+    id: 'battle-morgarten',
+    name: 'Battle of Morgarten',
+    shortName: 'Morgarten',
+    year: 1315,
+    date: 'November 15, 1315',
+    location: 'Morgarten, Zug, Switzerland',
+    category: 'swiss',
+    themes: ['teamwork', 'clever thinking', 'defending home', 'small vs large']
+  },
+
+  'battle-sempach': {
+    id: 'battle-sempach',
+    name: 'Battle of Sempach and Arnold von Winkelried',
+    shortName: 'Sempach',
+    year: 1386,
+    date: 'July 9, 1386',
+    location: 'Sempach, Lucerne, Switzerland',
+    category: 'swiss',
+    themes: ['sacrifice', 'bravery', 'protecting others', 'unity']
+  },
+
+  'swiss-reformation': {
+    id: 'swiss-reformation',
+    name: 'Zwingli and the Swiss Reformation',
+    shortName: 'Swiss Reformation',
+    year: 1523,
+    date: '1519-1531',
+    location: 'Zurich, Switzerland',
+    category: 'swiss',
+    themes: ['thinking differently', 'standing up for beliefs', 'education', 'change']
+  },
+
+  'red-cross-founding': {
+    id: 'red-cross-founding',
+    name: 'Henry Dunant Founds the Red Cross',
+    shortName: 'Red Cross',
+    year: 1863,
+    date: 'October 29, 1863',
+    location: 'Geneva, Switzerland',
+    category: 'swiss',
+    themes: ['helping others', 'compassion', 'humanity', 'making a difference']
+  },
+
+  'general-dufour': {
+    id: 'general-dufour',
+    name: 'General Dufour and Swiss Unity',
+    shortName: 'General Dufour',
+    year: 1847,
+    date: 'November 1847',
+    location: 'Switzerland',
+    category: 'swiss',
+    themes: ['mercy', 'reconciliation', 'leadership', 'keeping families together']
+  },
+
+  'sonderbund-war': {
+    id: 'sonderbund-war',
+    name: 'The Sonderbund War',
+    shortName: 'Sonderbundskrieg',
+    year: 1847,
+    date: 'November 3-29, 1847',
+    location: 'Central Switzerland',
+    category: 'swiss',
+    themes: ['unity', 'resolving conflicts', 'compromise', 'nation building']
+  },
+
+  'swiss-constitution': {
+    id: 'swiss-constitution',
+    name: 'Swiss Federal Constitution',
+    shortName: 'Bundesverfassung',
+    year: 1848,
+    date: 'September 12, 1848',
+    location: 'Bern, Switzerland',
+    category: 'swiss',
+    themes: ['democracy', 'unity in diversity', 'fairness', 'new beginnings']
+  },
+
+  'gotthard-tunnel': {
+    id: 'gotthard-tunnel',
+    name: 'Building the Gotthard Railway Tunnel',
+    shortName: 'Gotthard Tunnel',
+    year: 1882,
+    date: 'May 22, 1882',
+    location: 'Swiss Alps (Göschenen to Airolo)',
+    category: 'swiss',
+    themes: ['engineering', 'perseverance', 'international cooperation', 'connecting people']
+  },
+
+  'swiss-ww1-neutrality': {
+    id: 'swiss-ww1-neutrality',
+    name: 'Switzerland Stays Neutral in WWI',
+    shortName: 'Swiss Neutrality WWI',
+    year: 1914,
+    date: '1914-1918',
+    location: 'Switzerland',
+    category: 'swiss',
+    themes: ['peace', 'helping refugees', 'staying united', 'humanitarian aid']
+  },
+
+  'general-guisan': {
+    id: 'general-guisan',
+    name: 'General Guisan and the Rütli Report',
+    shortName: 'General Guisan',
+    year: 1940,
+    date: 'July 25, 1940',
+    location: 'Rütli Meadow, Switzerland',
+    category: 'swiss',
+    themes: ['leadership', 'courage', 'unity', 'defending freedom', 'determination']
+  },
+
+  'swiss-ww2-neutrality': {
+    id: 'swiss-ww2-neutrality',
+    name: 'Switzerland in World War II',
+    shortName: 'Swiss WWII',
+    year: 1939,
+    date: '1939-1945',
+    location: 'Switzerland',
+    category: 'swiss',
+    themes: ['protecting borders', 'helping refugees', 'staying neutral', 'difficult choices']
+  },
+
+  'swiss-womens-vote': {
+    id: 'swiss-womens-vote',
+    name: 'Swiss Women Win the Right to Vote',
+    shortName: 'Swiss Women Vote',
+    year: 1971,
+    date: 'February 7, 1971',
+    location: 'Switzerland',
+    category: 'swiss',
+    themes: ['equality', 'perseverance', 'democracy', 'never giving up', 'fairness']
+  },
+
   'human-genome': {
     id: 'human-genome',
     name: 'Human Genome Decoded',
@@ -497,6 +655,7 @@ function getRandomEvents(count = 5) {
 
 // Categories for UI
 const EVENT_CATEGORIES = [
+  { id: 'swiss', name: 'Swiss History', icon: '🇨🇭' },
   { id: 'exploration', name: 'Exploration & Discovery', icon: '🧭' },
   { id: 'science', name: 'Science & Medicine', icon: '🔬' },
   { id: 'invention', name: 'Inventions', icon: '💡' },
