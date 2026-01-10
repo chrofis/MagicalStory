@@ -112,16 +112,20 @@ async function fetchWikipediaCategories(lang, pageIds) {
       `&format=json&origin=*`;
 
     try {
+      log.debug(`[LANDMARK-CAT] Fetching URL: ${url.substring(0, 100)}...`);
       const res = await fetch(url);
       const data = await res.json();
 
+      let foundCount = 0;
       for (const [pageId, page] of Object.entries(data.query?.pages || {})) {
         const categories = (page.categories || [])
           .map(c => c.title.replace(/^Category:|^Kategorie:|^Catégorie:/i, ''));
         results.set(parseInt(pageId), categories);
+        if (categories.length > 0) foundCount++;
       }
+      log.debug(`[LANDMARK-CAT] ${lang}: ${foundCount}/${batch.length} pages have categories`);
     } catch (err) {
-      log.debug(`[LANDMARK] Failed to fetch categories for ${lang}: ${err.message}`);
+      log.warn(`[LANDMARK-CAT] Failed to fetch categories for ${lang}: ${err.message}`);
     }
   }
 
@@ -166,16 +170,25 @@ function parseLandmarkCategories(categories) {
 async function enrichLandmarksWithCategories(landmarks) {
   // Group landmarks by language
   const byLang = new Map();
+  let skippedCount = 0;
   for (const landmark of landmarks) {
-    if (!landmark.pageId || !landmark.lang) continue;
+    if (!landmark.pageId || !landmark.lang) {
+      skippedCount++;
+      continue;
+    }
     if (!byLang.has(landmark.lang)) byLang.set(landmark.lang, []);
     byLang.get(landmark.lang).push(landmark);
   }
 
+  log.info(`[LANDMARK-CAT] Enriching ${landmarks.length} landmarks (${skippedCount} skipped, no pageId)`);
+  log.debug(`[LANDMARK-CAT] Languages: ${Array.from(byLang.keys()).join(', ')}`);
+
   // Fetch categories per language in parallel
   await Promise.all(Array.from(byLang.entries()).map(async ([lang, langLandmarks]) => {
     const pageIds = langLandmarks.map(l => l.pageId);
+    log.debug(`[LANDMARK-CAT] Fetching ${pageIds.length} categories from ${lang}.wikipedia`);
     const categoryMap = await fetchWikipediaCategories(lang, pageIds);
+    log.debug(`[LANDMARK-CAT] Got ${categoryMap.size} category results from ${lang}.wikipedia`);
 
     for (const landmark of langLandmarks) {
       const categories = categoryMap.get(landmark.pageId) || [];
@@ -184,8 +197,8 @@ async function enrichLandmarksWithCategories(landmarks) {
       landmark.type = type;
       landmark.shouldBoost = shouldBoost;
 
-      if (shouldBoost) {
-        log.debug(`[LANDMARK] 🏆 Boost: "${landmark.name}" (${type || 'unknown'}) - categories: ${categories.slice(0, 3).join(', ')}`);
+      if (type) {
+        log.debug(`[LANDMARK-CAT] "${landmark.name}" → ${type}${shouldBoost ? ' 🏆' : ''}`);
       }
     }
   }));
