@@ -58,8 +58,8 @@ Return a JSON object with this EXACT structure:
   "detailedHairAnalysis": {
     "texture": "<MUST be one of: fine | medium | thick | coarse>",
     "type": "<MUST be one of: straight | wavy | curly | coily>",
-    "lengthTop": "<length of hair on top, e.g. '5cm', '15cm', '30cm'>",
-    "lengthSides": "<length of hair on sides, e.g. '2cm', '10cm', '25cm' - same as top if uniform length>",
+    "lengthTop": "<MUST be one of: bald | buzz cut | short | ear-length | chin-length | neck-length | shoulder-length | mid-back | waist-length>",
+    "lengthSides": "<MUST be one of: shaved | buzz cut | short | ear-length | same as top> - for fades/undercuts, otherwise 'same as top'>",
     "bangsEndAt": "<MUST be one of: above eyebrows | at eyebrows | below eyebrows | no bangs>",
     "styling": "<MUST be one of: messy | slicked | natural | styled | tousled>",
     "direction": "<MUST be one of: left | right | back | forward | center part | side part left | side part right>",

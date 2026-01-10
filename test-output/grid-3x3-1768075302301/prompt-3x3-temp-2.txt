@@ -1,0 +1,12 @@
+Create a 3x3 character sheet in pixar animation style.
+
+Show the same young person from the reference in 9 different views, all wearing: A dashing pirate captain outfit: long navy blue coat with gold trim and brass buttons, white ruffled shirt underneath, brown leather belt with gold buckle, black boots. No hat - hair flowing freely.
+
+GRID LAYOUT:
+Row 1: Face front view | Face front view | Face front view
+Row 2: Face looking right | Face front (original clothes) | Face looking right
+Row 3: Full body front | Full body front | Full body side
+
+Style: 3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading
+Background: Light grey studio
+Add subtle expression variations between each cell.

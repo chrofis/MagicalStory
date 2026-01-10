@@ -1,0 +1,72 @@
+{
+  "temperature": 1.5,
+  "comparisons": [
+    {
+      "position": "top-left",
+      "similarity": 0.5287,
+      "samePerson": true,
+      "confidence": "medium"
+    },
+    {
+      "position": "top-center",
+      "similarity": 0.2729,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "top-right",
+      "similarity": 0.492,
+      "samePerson": true,
+      "confidence": "medium"
+    },
+    {
+      "position": "middle-left",
+      "similarity": 0.2729,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "middle-center",
+      "similarity": 0.2729,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "middle-right",
+      "similarity": 0.2729,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "bottom-left",
+      "similarity": 0.0933,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "bottom-center",
+      "similarity": 0.2729,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "bottom-right",
+      "similarity": 0.0227,
+      "samePerson": false,
+      "confidence": "high"
+    }
+  ],
+  "best": {
+    "position": "top-left",
+    "similarity": 0.5287,
+    "samePerson": true,
+    "confidence": "medium"
+  },
+  "worst": {
+    "position": "bottom-right",
+    "similarity": 0.0227,
+    "samePerson": false,
+    "confidence": "high"
+  },
+  "avg": 0.2779111111111111
+}

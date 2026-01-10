@@ -50,54 +50,25 @@ async function generate3x3Grid(character, costume, temperature, outputDir) {
   const artStyle = 'pixar';
   const artStylePrompt = '3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading';
 
-  // Special prompt for 3x3 grid with anchor and variations
-  const gridPrompt = `⚠️ MANDATORY OUTPUT STYLE: ${artStylePrompt}
-DO NOT CREATE PHOTO-REALISTIC OUTPUT. CREATE AN ILLUSTRATION.
+  // Simplified prompt for 3x3 grid
+  const gridPrompt = `Create a 3x3 character sheet in ${artStyle} animation style.
 
-TASK: Create a 3x3 grid (9 images) of the SAME character. 8 images show the NEW COSTUME, 1 image (middle-center) shows the ORIGINAL clothing styled.
+Show the same young person from the reference in 9 different views, all wearing: ${costume.description}
 
-NEW COSTUME - ${costume.costume}:
-${costume.description}
+GRID LAYOUT:
+Row 1: Face front view | Face front view | Face front view
+Row 2: Face looking right | Face front (original clothes) | Face looking right
+Row 3: Full body front | Full body front | Full body side
 
-GRID LAYOUT (3 rows x 3 columns):
-
-TOP ROW - All 3 faces looking FORWARD at camera, wearing NEW COSTUME:
-| Top-Left: Face front, costumed | Top-Center: Face front, costumed | Top-Right: Face front, costumed |
-
-MIDDLE ROW - Faces looking RIGHT, except middle-center ANCHOR looks FORWARD:
-| Middle-Left: Face right, costumed | Middle-Center: ANCHOR - Face FRONT, Original clothes, styled (NO costume) | Middle-Right: Face right, costumed |
-
-BOTTOM ROW - Full body views, wearing NEW COSTUME:
-| Bottom-Left: Full body front | Bottom-Center: Full body front | Bottom-Right: Full body facing right |
-
-IMPORTANT - SLIGHT FACE VARIATIONS:
-- Add SLIGHT natural variations between faces (subtle expression changes, minor angle shifts)
-- This helps test which variation best preserves identity
-- Variations should be subtle - still clearly the same person
-- The ANCHOR (middle-center) should match reference most closely
-
-CRITICAL:
-- ALL 9 images show the SAME PERSON (same identity from reference)
-- 8 images wear the NEW COSTUME
-- 1 image (middle-center) wears ORIGINAL CLOTHES from reference - this is the styled ANCHOR
-- ${artStyle} illustrated style throughout (NOT photo-realistic)
-- Light grey studio background in each cell
-
-REFERENCE IMAGE: Extract facial identity. Middle-center copies the pose/clothes but in illustration style.`;
+Style: ${artStylePrompt}
+Background: Light grey studio
+Add subtle expression variations between each cell.`;
 
   const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
   const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
-  const systemText = `You create character illustration grids for children's books.
-
-Generate a 3x3 grid showing the same character with SLIGHT VARIATIONS in each cell.
-- TOP ROW: 3 faces looking forward, all in costume
-- MIDDLE ROW: 3 faces looking right, but MIDDLE-CENTER shows original clothes (anchor)
-- BOTTOM ROW: 3 full body views in costume
-
-Add subtle natural variations to help identify which face best matches the reference.
-The middle-center cell is the ANCHOR - same pose/clothes as reference, just styled.
-Output must be ${artStyle} illustration style, NOT photo-realistic.`;
+  const systemText = `You create character illustration sheets for children's books.
+Create a 3x3 grid of the same character in ${artStyle} style.`;
 
   const requestBody = {
     systemInstruction: { parts: [{ text: systemText }] },
@@ -139,6 +110,17 @@ Output must be ${artStyle} illustration style, NOT photo-realistic.`;
     }
 
     const data = await response.json();
+
+    // Debug: log full response structure
+    console.log(`   API Response: candidates=${data.candidates?.length}, finishReason=${data.candidates?.[0]?.finishReason}`);
+    if (data.candidates?.[0]?.content?.parts) {
+      const partTypes = data.candidates[0].content.parts.map(p => p.text ? 'text' : p.inlineData ? 'image' : 'unknown');
+      console.log(`   Parts: ${partTypes.join(', ')}`);
+    }
+    if (data.promptFeedback) {
+      console.log(`   Feedback: ${JSON.stringify(data.promptFeedback)}`);
+    }
+
     const parts = data.candidates?.[0]?.content?.parts || [];
     const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
 

@@ -131,7 +131,11 @@ export function WizardStep6Summary({
     const topic = educationalTopics.find(t => t.id === storyTopic);
     if (topic) return topic.name[lang] || topic.name.en;
     const event = historicalEvents.find(e => e.id === storyTopic);
-    if (event) return event.name[lang] || event.name.en;
+    if (event) {
+      const eventName = event.shortName[lang] || event.shortName.en;
+      // Show mainPerson if available (e.g., "Mondlandung Neil Armstrong")
+      return event.mainPerson ? `${eventName} ${event.mainPerson}` : eventName;
+    }
     return '';
   };
 
