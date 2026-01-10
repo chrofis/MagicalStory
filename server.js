@@ -1562,7 +1562,7 @@ app.post('/api/landmarks/discover', async (req, res) => {
 // Generate story ideas endpoint - FREE, no credits
 app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
 
@@ -1742,11 +1742,18 @@ ${adventureGuideContent}`
       : '';
 
     // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
+    // Season labels for prompt
+    const seasonLabels = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
+    const seasonLabel = season ? seasonLabels[season] || season : null;
+
     let userLocationInstruction = '';
     if (userLocation?.city && effectiveCategory !== 'historical') {
       const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
-      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
+      const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
+      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
+    } else if (seasonLabel) {
+      userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
     }
 
     // Build available landmarks section for the prompt (include photo descriptions if available)
@@ -1858,7 +1865,7 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
   res.flushHeaders();
 
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
 
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
 
@@ -2042,11 +2049,18 @@ ${adventureGuideContent}`
       : '';
 
     // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
+    // Season labels for prompt
+    const seasonLabels = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
+    const seasonLabel = season ? seasonLabels[season] || season : null;
+
     let userLocationInstruction = '';
     if (userLocation?.city && effectiveCategory !== 'historical') {
       const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
-      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
+      const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
+      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
+    } else if (seasonLabel) {
+      userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
     }
 
     // Build available landmarks section for the prompt (include photo descriptions if available)

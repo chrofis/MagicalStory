@@ -2302,6 +2302,7 @@ export default function StoryWizard() {
         }).filter(r => r.character1 && r.character2),
         ideaModel: (user?.role === 'admin' || isImpersonating) ? modelSelections.ideaModel : undefined,
         userLocation: userLocation || undefined,
+        season,
       },
       {
         onStatus: (_status, prompt, model) => {

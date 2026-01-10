@@ -50,25 +50,33 @@ async function generate3x3Grid(character, costume, temperature, outputDir) {
   const artStyle = 'pixar';
   const artStylePrompt = '3D render, Pixar animation style, natural proportions, highly detailed textures, soft studio lighting, vibrant colors, smooth shading';
 
-  // Simplified prompt for 3x3 grid
-  const gridPrompt = `Create a 3x3 character sheet in ${artStyle} animation style.
+  // 3x4 grid (12 images) - all same costume, slight face variations
+  const gridPrompt = `Create a 3x4 character sheet (3 rows, 4 columns = 12 images) in ${artStyle} animation style.
 
-Show the same young person from the reference in 9 different views, all wearing: ${costume.description}
+Show the SAME young person from the reference in 12 views, ALL wearing: ${costume.description}
 
-GRID LAYOUT:
-Row 1: Face front view | Face front view | Face front view
-Row 2: Face looking right | Face front (original clothes) | Face looking right
-Row 3: Full body front | Full body front | Full body side
+GRID LAYOUT (3 rows x 4 columns):
+Row 1: 4 face close-ups, ALL facing STRAIGHT forward at camera
+Row 2: 4 face close-ups, ALL facing SLIGHTLY RIGHT (3/4 profile)
+Row 3: 2 full body facing straight | 2 full body facing right
+
+EXPRESSION: ALL 12 images show HAPPY expression with LIPS CLOSED (gentle smile, no teeth)
+
+IMPORTANT - FACE VARIATIONS:
+- Keep the SAME face identity but add SLIGHT STRUCTURAL variations
+- Vary: face width, eye spacing, nose size, chin shape slightly
+- This helps find which variation best matches the reference
+- All variations should still be recognizable as the same person
 
 Style: ${artStylePrompt}
-Background: Light grey studio
-Add subtle expression variations between each cell.`;
+Background: Light grey studio in each cell
+Same costume in ALL 12 images.`;
 
   const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
   const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
 
   const systemText = `You create character illustration sheets for children's books.
-Create a 3x3 grid of the same character in ${artStyle} style.`;
+Create a 3x4 grid (12 images) of the same character in ${artStyle} style with slight face variations.`;
 
   const requestBody = {
     systemInstruction: { parts: [{ text: systemText }] },
@@ -81,7 +89,7 @@ Create a 3x3 grid of the same character in ${artStyle} style.`;
     generationConfig: {
       temperature: temperature,
       responseModalities: ["TEXT", "IMAGE"],
-      imageConfig: { aspectRatio: "1:1" }  // Square for 3x3 grid
+      imageConfig: { aspectRatio: "4:3" }  // Wide for 3x4 grid
     },
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
@@ -135,16 +143,25 @@ Create a 3x3 grid of the same character in ${artStyle} style.`;
   }
 }
 
-async function compareAllQuadrants(standardAvatar, gridImage, gridSize = 3) {
+async function compareAllQuadrants(standardAvatar, gridImage, rows = 3, cols = 4) {
   const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
   const quadrants = [];
 
-  // For 3x3: positions are like top-left, top-center, top-right, middle-left, etc.
-  const positions = [
-    'top-left', 'top-center', 'top-right',
-    'middle-left', 'middle-center', 'middle-right',
-    'bottom-left', 'bottom-center', 'bottom-right'
-  ];
+  // Generate positions for any grid size
+  const rowNames = ['top', 'middle', 'bottom'];
+  const colNames = cols === 4 ? ['col1', 'col2', 'col3', 'col4'] : ['left', 'center', 'right'];
+
+  // Determine grid_size parameter for photo_analyzer
+  const gridSizeParam = cols === 4 ? '3x4' : (cols === 3 ? 3 : 2);
+
+  const positions = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      positions.push(`${rowNames[r]}-${colNames[c]}`);
+    }
+  }
+
+  console.log(`   Comparing ${positions.length} positions: ${positions.join(', ')}`);
 
   for (const pos of positions) {
     try {
@@ -156,7 +173,7 @@ async function compareAllQuadrants(standardAvatar, gridImage, gridSize = 3) {
           image2: gridImage,
           quadrant1: 'top-left',
           quadrant2: pos,
-          grid_size: gridSize
+          grid_size: gridSizeParam
         })
       });
 
@@ -180,7 +197,7 @@ async function compareAllQuadrants(standardAvatar, gridImage, gridSize = 3) {
 }
 
 async function main() {
-  console.log('🎭 3x3 Grid Test - Generate 9 variations\n');
+  console.log('🎭 3x4 Grid Test - Generate 12 variations\n');
 
   const baseOutputDir = path.join(__dirname, 'test-output', `grid-3x3-${Date.now()}`);
   console.log(`Output: ${baseOutputDir}\n`);
@@ -209,9 +226,9 @@ async function main() {
       saveImage(genResult.imageData, baseOutputDir, `grid-temp-${temp}.png`);
       console.log(`   ✅ Saved grid`);
 
-      // Compare all 9 quadrants
-      console.log(`   📊 Comparing all 9 cells...`);
-      const comparisons = await compareAllQuadrants(sophie.avatars.standard, genResult.imageData, 3);
+      // Compare all 12 quadrants (3x4 grid)
+      console.log(`   📊 Comparing all 12 cells...`);
+      const comparisons = await compareAllQuadrants(sophie.avatars.standard, genResult.imageData, 3, 4);
 
       // Find best
       const valid = comparisons.filter(c => c.similarity !== undefined);
@@ -223,7 +240,7 @@ async function main() {
         console.log(`   Best:  ${best.position} = ${(best.similarity * 100).toFixed(1)}%`);
         console.log(`   Worst: ${worst.position} = ${(worst.similarity * 100).toFixed(1)}%`);
         console.log(`   Avg:   ${(avg * 100).toFixed(1)}%`);
-        console.log(`   Pass:  ${valid.filter(c => c.samePerson).length}/9\n`);
+        console.log(`   Pass:  ${valid.filter(c => c.samePerson).length}/${valid.length}\n`);
 
         // Save detailed results
         fs.writeFileSync(

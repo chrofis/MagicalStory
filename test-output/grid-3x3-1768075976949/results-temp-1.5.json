@@ -1,0 +1,90 @@
+{
+  "temperature": 1.5,
+  "comparisons": [
+    {
+      "position": "top-col1",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "top-col2",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "top-col3",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "top-col4",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "middle-col1",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "middle-col2",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "middle-col3",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "middle-col4",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "bottom-col1",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "bottom-col2",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "bottom-col3",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    },
+    {
+      "position": "bottom-col4",
+      "similarity": 0.0791,
+      "samePerson": false,
+      "confidence": "high"
+    }
+  ],
+  "best": {
+    "position": "bottom-col4",
+    "similarity": 0.0791,
+    "samePerson": false,
+    "confidence": "high"
+  },
+  "worst": {
+    "position": "bottom-col4",
+    "similarity": 0.0791,
+    "samePerson": false,
+    "confidence": "high"
+  },
+  "avg": 0.07909999999999999
+}

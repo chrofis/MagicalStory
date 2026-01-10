@@ -752,6 +752,8 @@ export const storyService = {
     ideaModel?: string | null;
     // User's location for personalized story settings
     userLocation?: { city: string | null; region: string | null; country: string | null };
+    // Season for story setting
+    season?: string;
   }): Promise<{ storyIdeas: string[]; storyIdea: string; prompt?: string; model?: string }> {
     const response = await api.post<{ storyIdeas: string[]; storyIdea: string; prompt?: string; model?: string }>('/api/generate-story-ideas', data);
     return response;
@@ -784,6 +786,8 @@ export const storyService = {
       ideaModel?: string | null;
       // User's location for personalized story settings
       userLocation?: { city: string | null; region: string | null; country: string | null };
+      // Season for story setting
+      season?: string;
     },
     callbacks: {
       onStory1?: (story: string) => void;

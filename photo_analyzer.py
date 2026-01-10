@@ -1397,11 +1397,29 @@ def get_face_embedding():
 
             height, width = image.shape[:2]
 
-            # Crop to quadrant if specified (supports 2x2 and 3x3 grids)
+            # Crop to quadrant if specified (supports 2x2, 3x3, and 3x4 grids)
             if quadrant:
                 grid_size = data.get('grid_size', 2)
-                
-                if grid_size == 3:
+
+                if grid_size == '3x4' or grid_size == 34:
+                    # 3 rows, 4 columns
+                    third_h = height // 3
+                    fourth_w = width // 4
+                    quadrant_map = {
+                        'top-col1': (0, third_h, 0, fourth_w),
+                        'top-col2': (0, third_h, fourth_w, 2*fourth_w),
+                        'top-col3': (0, third_h, 2*fourth_w, 3*fourth_w),
+                        'top-col4': (0, third_h, 3*fourth_w, width),
+                        'middle-col1': (third_h, 2*third_h, 0, fourth_w),
+                        'middle-col2': (third_h, 2*third_h, fourth_w, 2*fourth_w),
+                        'middle-col3': (third_h, 2*third_h, 2*fourth_w, 3*fourth_w),
+                        'middle-col4': (third_h, 2*third_h, 3*fourth_w, width),
+                        'bottom-col1': (2*third_h, height, 0, fourth_w),
+                        'bottom-col2': (2*third_h, height, fourth_w, 2*fourth_w),
+                        'bottom-col3': (2*third_h, height, 2*fourth_w, 3*fourth_w),
+                        'bottom-col4': (2*third_h, height, 3*fourth_w, width)
+                    }
+                elif grid_size == 3:
                     third_h = height // 3
                     third_w = width // 3
                     quadrant_map = {
