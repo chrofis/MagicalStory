@@ -579,14 +579,18 @@ export function CharacterForm({
     console.log('[AVATAR OPTIONS] Button clicked!');
     console.log('[AVATAR OPTIONS] character.photos:', character.photos);
 
-    // Use face or original photo (not bodyNoBg which has transparency that may cause issues)
-    const facePhoto = character.photos?.face || character.photos?.original || character.photos?.body;
-    console.log('[AVATAR OPTIONS] facePhoto:', facePhoto ? facePhoto.substring(0, 50) + '...' : 'null');
+    // Use body photo like the working test script does (not face crop)
+    const bodyPhoto = character.photos?.body || character.photos?.original;
+    console.log('[AVATAR OPTIONS] bodyPhoto:', bodyPhoto ? bodyPhoto.substring(0, 50) + '...' : 'null');
 
-    if (!facePhoto) {
-      console.log('[AVATAR OPTIONS] No facePhoto, returning early');
+    if (!bodyPhoto) {
+      console.log('[AVATAR OPTIONS] No bodyPhoto, returning early');
       return;
     }
+
+    // Use actual gender (female/male), not "child"
+    const gender = character.gender === 'female' ? 'female' : 'male';
+    console.log('[AVATAR OPTIONS] Using gender:', gender);
 
     setIsGeneratingOptions(true);
     setAvatarOptions(null);
@@ -594,7 +598,7 @@ export function CharacterForm({
 
     try {
       console.log('[AVATAR OPTIONS] Calling characterService.generateAvatarOptions...');
-      const result = await characterService.generateAvatarOptions(facePhoto, character.gender || 'child');
+      const result = await characterService.generateAvatarOptions(bodyPhoto, gender);
       console.log('[AVATAR OPTIONS] Result:', result);
       if (result.success && result.options.length > 0) {
         setAvatarOptions(result.options);
@@ -1479,6 +1483,34 @@ export function CharacterForm({
               style={{ background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 20px 20px' }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Developer Mode: Show which photo will be used for avatar generation */}
+      {(developerMode || isImpersonating) && (
+        <div className="bg-orange-50 border border-orange-300 rounded-lg p-3">
+          <h4 className="text-xs font-semibold text-orange-700 mb-2">
+            Avatar Generation Input Photo
+          </h4>
+          <div className="text-xs text-orange-600 mb-2">
+            <div>bodyNoBg: {character.photos?.bodyNoBg ? `✅ ${Math.round(character.photos.bodyNoBg.length / 1024)}KB` : '❌ missing'}</div>
+            <div>body: {character.photos?.body ? `✅ ${Math.round(character.photos.body.length / 1024)}KB` : '❌ missing'}</div>
+            <div>face: {character.photos?.face ? `✅ ${Math.round(character.photos.face.length / 1024)}KB` : '❌ missing'}</div>
+            <div>original: {character.photos?.original ? `✅ ${Math.round(character.photos.original.length / 1024)}KB` : '❌ missing'}</div>
+            <div className="mt-1 font-bold">
+              Will use: {character.photos?.bodyNoBg ? 'bodyNoBg ✅' : character.photos?.body ? 'body ⚠️' : character.photos?.face ? 'face ⚠️' : 'original ❌'}
+            </div>
+          </div>
+          {(character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original) && (
+            <div className="flex justify-center">
+              <img
+                src={character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original}
+                alt="Avatar generation input"
+                className="max-h-32 object-contain rounded border border-orange-300"
+                style={{ background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 20px 20px' }}
+              />
+            </div>
+          )}
         </div>
       )}
 
