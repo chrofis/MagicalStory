@@ -9,6 +9,13 @@ Nur sichere, familienfreundliche Inhalte.
 - ALLE Charaktere im GLEICHEN konsistenten Stil
 - KLEIDUNG der Charaktere: Verwende die in der Szene beschriebene Kleidung. Falls nicht angegeben, EXAKT wie in den Referenzbildern
 
+**KOMPOSITION (KRITISCH):**
+- EXAKTE räumliche Positionen aus der Szene einhalten (linker Rand, rechter Rand, Mitte, etc.)
+- Bei Totalen: Charaktere KLEIN im Bild mit deutlichem Abstand dazwischen
+- Wenn Distanz zwischen Charakteren beschrieben wird: WEIT AUSEINANDER zeigen, nicht nah beieinander
+- Leerer Raum ist Kompositionselement - wie beschrieben beibehalten
+- "Linker/rechter Bildrand" bedeutet AM RAND des Bildes, nicht zur Mitte hin
+
 **VISUELLE KONTINUITÄT:**
 Vom vorherigen Szenenbild KOPIEREN: Requisiten, Möbel, Hintergrundelemente, Kunststil, Farbpalette, KLEIDUNG DER CHARAKTERE
 NICHT KOPIEREN: Posen, Positionen, Gesichtsausdrücke - diese müssen NEU sein für die aktuelle Szene

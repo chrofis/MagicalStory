@@ -9,6 +9,13 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 - ALL characters in the SAME consistent style
 - Character CLOTHING: Use EXACTLY what is shown in the reference images (the correct outfit has been pre-selected)
 
+**COMPOSITION (CRITICAL):**
+- RESPECT exact spatial positions described in the scene (left edge, right edge, center, etc.)
+- For wide shots: characters should appear SMALL in frame with significant empty space between them
+- If scene describes distance between characters: show them FAR APART, not close together
+- Empty space is a compositional element - preserve it as described
+- "Left/right edge" means AT THE EDGE of the frame, not near center
+
 ---
 
 {CHARACTER_REFERENCE_LIST}

@@ -9,6 +9,13 @@ ILLUSTRATION DE LIVRE POUR ENFANTS - Contenu sûr et familial.
 - TOUS les personnages dans le MÊME style cohérent
 - VÊTEMENTS des personnages: Utiliser les vêtements décrits dans la scène. Si non spécifié, EXACTEMENT comme sur les images de référence
 
+**COMPOSITION (CRITIQUE):**
+- RESPECTER les positions spatiales exactes décrites dans la scène (bord gauche, bord droit, centre, etc.)
+- Pour les plans larges: les personnages doivent apparaître PETITS dans le cadre avec un espace vide significatif entre eux
+- Si la scène décrit une distance entre les personnages: les montrer TRÈS ÉLOIGNÉS, pas proches
+- L'espace vide est un élément de composition - le préserver comme décrit
+- "Bord gauche/droit" signifie AU BORD du cadre, pas vers le centre
+
 ---
 
 {CHARACTER_REFERENCE_LIST}
