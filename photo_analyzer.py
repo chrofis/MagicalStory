@@ -325,20 +325,24 @@ def remove_faces_except(image, keep_face_id, all_faces):
         face_x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * face_padding)) * w)
         face_x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * face_padding) * w)
 
-        # 1. Remove the face region (above doesn't matter for body)
+        # 1. Remove the face region - set to WHITE and transparent
+        # (White RGB ensures AI models don't "see through" transparency to original data)
         if face_x2 > face_x1 and face_bottom > face_top:
-            result[face_top:face_bottom, face_x1:face_x2, 3] = 0
+            result[face_top:face_bottom, face_x1:face_x2, 0:3] = 255  # BGR = white
+            result[face_top:face_bottom, face_x1:face_x2, 3] = 0      # Alpha = transparent
             print(f"   Removed face {face['id']} at ({face_x1},{face_top})-({face_x2},{face_bottom})")
 
         # 2. Remove body region: from face bottom to image bottom, on "their side" of midpoint
         body_top = face_bottom  # Start from where face ends
         if remove_left:
             # Other person is to the left - remove from left edge to midpoint
-            result[body_top:h, 0:midpoint_x, 3] = 0
+            result[body_top:h, 0:midpoint_x, 0:3] = 255  # BGR = white
+            result[body_top:h, 0:midpoint_x, 3] = 0       # Alpha = transparent
             print(f"   Removed body {face['id']}: left side (0 to {midpoint_x}) below y={body_top}")
         else:
             # Other person is to the right - remove from midpoint to right edge
-            result[body_top:h, midpoint_x:w, 3] = 0
+            result[body_top:h, midpoint_x:w, 0:3] = 255  # BGR = white
+            result[body_top:h, midpoint_x:w, 3] = 0       # Alpha = transparent
             print(f"   Removed body {face['id']}: right side ({midpoint_x} to {w}) below y={body_top}")
 
     return result
@@ -371,6 +375,11 @@ def remove_background(image):
 
         # Apply mask to alpha channel
         bgra[:, :, 3] = binary_mask
+
+        # Set RGB to white where background is removed (alpha < 128)
+        # This ensures AI models don't "see through" transparency to original data
+        bg_mask = binary_mask < 128
+        bgra[bg_mask, 0:3] = 255  # BGR = white
 
         return bgra, binary_mask
 
