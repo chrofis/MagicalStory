@@ -90,6 +90,15 @@ When multiple characters wear costumes, each character MUST have a **different p
 - Example: If 3 pirates → one has RED shirt, one has BLUE shirt, one has GREEN shirt
 - This is essential for visual storytelling - readers identify characters by color
 
+**CRITICAL - Distinct Costume STYLES:**
+Beyond color differences, each character must have a **structurally different outfit** - not just color variations of the same costume:
+- Give characters different ROLES within the setting (princess vs scribe, captain vs sailor, knight vs squire)
+- Vary OUTFIT TYPES: One has dress, another has tunic; one has long robes, another has short practical clothes
+- Vary ACCESSORIES: Different items per character (one has jewelry, another has tools, another has rope/belt)
+- Match costumes to PERSONALITY: Adventurous child = practical outfit; studious child = scholar robes
+- Example WRONG: Both have "white Egyptian dress with gold collar and bracelets"
+- Example RIGHT: One has "flowing priestess robes with ceremonial sash" while other has "short explorer tunic with leather sandal straps and rope belt"
+
 **NO HATS OR FACE COVERINGS:** Never include hats, helmets, headwear, face masks, ninja masks, superhero masks, bandanas, or anything that covers/obstructs the face in costume descriptions - faces must stay fully visible for character recognition.
 
 **Output as JSON:**
