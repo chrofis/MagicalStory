@@ -2976,9 +2976,38 @@ export default function StoryWizard() {
             onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
             onSaveAndRegenerateWithTraits={handleSaveAndRegenerateWithTraits}
             onSaveAndTryNewPhoto={async () => {
-              // Save the character first, then go back to name step for new photo
-              await saveCharacter();
-              setCharacterStep('name');
+              // Save the character but keep it selected, then go to photo step
+              if (!currentCharacter) return;
+
+              setIsLoading(true);
+              try {
+                // Check if this is an edit (existing character) or new character
+                const isEdit = currentCharacter.id && characters.find(c => c.id === currentCharacter.id);
+                const updatedCharacters = isEdit
+                  ? characters.map(c => c.id === currentCharacter.id ? currentCharacter : c)
+                  : [...characters, currentCharacter];
+
+                // Save characters along with relationships
+                await characterService.saveCharacterData({
+                  characters: updatedCharacters,
+                  relationships,
+                  relationshipTexts,
+                  customRelationships,
+                  customStrengths: [],
+                  customWeaknesses: [],
+                  customFears: [],
+                });
+
+                setCharacters(updatedCharacters);
+                autoSelectMainCharacters(updatedCharacters);
+
+                // Keep current character selected and go to photo step
+                setCharacterStep('photo');
+              } catch (error) {
+                log.error('Error saving character:', error);
+              } finally {
+                setIsLoading(false);
+              }
             }}
             relationships={relationships}
             relationshipTexts={relationshipTexts}
