@@ -43,6 +43,16 @@ export const storyCategories: StoryCategory[] = [
       fr: 'Vivez de vrais événements historiques'
     },
     emoji: '🏛️'
+  },
+  {
+    id: 'custom',
+    name: { en: 'Create Your Own', de: 'Eigenes Thema', fr: 'Créer le vôtre' },
+    description: {
+      en: 'Describe your own unique story idea',
+      de: 'Beschreibe deine eigene Geschichte',
+      fr: 'Décris ta propre idée d\'histoire'
+    },
+    emoji: '✨'
   }
 ];
 

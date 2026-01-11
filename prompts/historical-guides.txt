@@ -17,7 +17,8 @@ LOCATION: Moon (Sea of Tranquility)
 KEY FIGURES:
 - Neil Armstrong: Commander, first person on the Moon (American)
 - Buzz Aldrin: Lunar Module Pilot, second person on the Moon (American)
-- Michael Collins: Command Module Pilot, orbited the Moon (American)
+- Michael Collins: Command Module Pilot, orbited the Moon alone while others walked (American)
+- Gene Kranz: Flight Director in Houston, known for his white vest (American)
 
 HISTORICAL CONTEXT:
 The Apollo 11 mission was the culmination of the Space Race between the USA and Soviet Union.
@@ -28,6 +29,10 @@ The astronauts launched from Kennedy Space Center in Florida aboard a Saturn V r
 powerful rocket ever built. The journey to the Moon took about 3 days. Neil Armstrong and Buzz Aldrin
 descended to the surface in the Lunar Module "Eagle" while Michael Collins orbited above in the
 Command Module "Columbia."
+
+Just before landing, the computer flashed a "1202 Alarm" (overload warning), creating tension in
+Mission Control. Armstrong had to take manual control and search for a safe landing spot while fuel
+ran critically low. He landed with less than 30 seconds of fuel remaining.
 
 Armstrong's first words on the Moon were: "That's one small step for man, one giant leap for mankind."
 The astronauts spent about 2.5 hours outside, collecting lunar samples and planting an American flag.
@@ -46,12 +51,15 @@ STORY ANGLES:
 - The son/daughter of a NASA engineer during the mission
 - Dreaming of becoming an astronaut after watching the landing
 - The journey from Earth to Moon from astronaut perspective
+- Michael Collins: "The Loneliest Man" - orbiting the dark side of the Moon alone, cut off from radio
+- The tension of the 1202 Alarm and running out of fuel just before landing
 
 HISTORICAL DETAILS:
 - Technology: Saturn V rocket, Lunar Module Eagle, Command Module Columbia, 1960s computers less powerful than a modern calculator
 - Food: Freeze-dried food in pouches, Tang orange drink
 - Communication: Radio communication with 1.3 second delay between Earth and Moon
 - Duration: 8 days total mission, 21 hours on lunar surface
+- Flag: Held open by a horizontal wire (making it look like it was waving in the airless Moon)
 
 THEMES: courage, teamwork, human achievement, exploration, dreams coming true
 
@@ -70,10 +78,11 @@ After being rejected by Portugal, he convinced Queen Isabella and King Ferdinand
 fund his expedition. He set sail on August 3, 1492, with three ships: the Nina, the Pinta, and
 the Santa Maria, and a crew of about 90 men.
 
-The voyage was difficult - many sailors feared falling off the edge of the Earth or being lost
-at sea forever. After 36 days of sailing, a lookout on the Pinta spotted land. Columbus landed
-on an island he named San Salvador, believing he had reached the Indies (Asia). He called the
-native Taino people "Indians."
+The voyage was difficult - sailors grew increasingly desperate as days passed with no sign of land.
+By October, the crew was starving and thirsty. Mutiny was imminent - the crew threatened to throw
+Columbus overboard if land wasn't sighted soon. After 36 days of sailing, a lookout on the Pinta
+spotted land just in time. Columbus landed on an island he named San Salvador, believing he had
+reached the Indies (Asia). He called the native Taino people "Indians."
 
 Though Columbus never realized he had found a "New World," his voyages opened the way for
 European exploration and the Columbian Exchange of plants, animals, and ideas between continents.
@@ -222,6 +231,7 @@ STORY ANGLES:
 - The final push to the summit
 - Sherpa culture and mountain traditions
 - Overcoming the "impossible" mountain
+- Tenzing's oxygen mask clogging with ice during the climb
 
 HISTORICAL DETAILS:
 - Equipment: Primitive oxygen systems, hemp ropes, leather boots, wool clothing

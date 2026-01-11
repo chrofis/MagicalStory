@@ -41,12 +41,12 @@ interface StorySettingsProps {
   generatedIdeas?: string[];
   onSelectIdea?: (idea: string) => void;
   // Story type settings (from step 4)
-  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
   storyTopic?: string;
   storyTheme?: string;
   customThemeText?: string;
   artStyle?: string;
-  onCategoryChange?: (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => void;
+  onCategoryChange?: (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '') => void;
   onTopicChange?: (topic: string) => void;
   onThemeChange?: (theme: string) => void;
   onCustomThemeTextChange?: (text: string) => void;
@@ -185,7 +185,7 @@ export function StorySettings({
       {/* Story Type Selection - Show inline when not complete */}
       {!isStoryTypeComplete && onCategoryChange && onTopicChange && onThemeChange && onLegacyStoryTypeChange && (
         <StoryCategorySelector
-          storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | 'historical' | ''}
+          storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | ''}
           storyTopic={storyTopic}
           storyTheme={storyTheme}
           customThemeText={customThemeText}
@@ -547,7 +547,7 @@ export function StorySettings({
           <div className="space-y-6 max-h-[70vh] overflow-y-auto">
             {/* Story Category Selector */}
             <StoryCategorySelector
-              storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | 'historical' | ''}
+              storyCategory={storyCategory as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | ''}
               storyTopic={storyTopic}
               storyTheme={storyTheme}
               onCategoryChange={onCategoryChange}

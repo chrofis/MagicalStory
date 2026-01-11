@@ -66,7 +66,7 @@ interface StoryDetailsServer {
   title: string;
   storyType: string;
   storyTypeName?: string;  // Display name for story type
-  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical';  // Story category
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom';  // Story category
   storyTopic?: string;  // Life challenge or educational topic
   storyTheme?: string;  // Adventure theme
   storyDetails?: string;  // User's custom story idea
@@ -730,7 +730,7 @@ export const storyService = {
   async generateStoryIdeas(data: {
     storyType: string;
     storyTypeName: string;
-    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
+    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
     storyTopic?: string;
     storyTheme?: string;
     customThemeText?: string;
@@ -764,7 +764,7 @@ export const storyService = {
     data: {
       storyType: string;
       storyTypeName: string;
-      storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
+      storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
       storyTopic?: string;
       storyTheme?: string;
       customThemeText?: string;
@@ -880,7 +880,7 @@ export const storyService = {
   async createStoryJob(data: {
     storyType: string;
     storyTypeName: string;
-    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
+    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
     storyTopic?: string;
     storyTheme?: string;
     customThemeText?: string;

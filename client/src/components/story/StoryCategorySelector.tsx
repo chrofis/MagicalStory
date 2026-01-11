@@ -21,18 +21,17 @@ import type { Language } from '@/types/story';
 
 interface StoryCategorySelectorProps {
   // Current values
-  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
+  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
   storyTopic: string;  // Life challenge, educational topic, or historical event ID
   storyTheme: string;  // Adventure theme (or 'realistic')
   customThemeText?: string;  // Custom theme description when theme is 'custom'
   // Callbacks
-  onCategoryChange: (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => void;
+  onCategoryChange: (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '') => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
   onCustomThemeTextChange?: (text: string) => void;
   // For backwards compatibility - sets the legacy storyType
   onLegacyStoryTypeChange: (storyType: string) => void;
-  // Dev mode - enables historical category (hidden for normal users until tested)
   developerMode?: boolean;
 }
 
@@ -146,12 +145,15 @@ export function StoryCategorySelector({
   }, [storyCategory]);
 
   // Handle category selection
-  const handleCategorySelect = (categoryId: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => {
+  const handleCategorySelect = (categoryId: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '') => {
     onCategoryChange(categoryId);
     // Reset topic and theme when changing category
     onTopicChange('');
     if (categoryId === 'adventure') {
       onThemeChange('');
+    } else if (categoryId === 'custom') {
+      onThemeChange('custom');  // Set theme to 'custom' to show custom theme input
+      onLegacyStoryTypeChange('custom');
     } else {
       onThemeChange('realistic');  // Default to realistic for non-adventure (including historical)
     }
@@ -217,16 +219,18 @@ export function StoryCategorySelector({
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {storyCategories
-            .filter(category => category.id !== 'historical' || developerMode)
-            .map((category) => (
+          {storyCategories.map((category) => (
             <button
               key={category.id}
-              onClick={() => handleCategorySelect(category.id)}
-              className="p-6 rounded-xl border-2 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+              onClick={() => handleCategorySelect(category.id as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom')}
+              className={`p-6 rounded-xl border-2 transition-all text-left ${
+                category.id === 'custom'
+                  ? 'border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50'
+                  : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
+              }`}
             >
               <div className="text-4xl mb-3">{category.emoji}</div>
-              <div className="font-bold text-lg text-gray-800">
+              <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-purple-700' : 'text-gray-800'}`}>
                 {category.name[lang] || category.name.en}
               </div>
               <div className="text-sm text-gray-600 mt-1">
@@ -260,22 +264,6 @@ export function StoryCategorySelector({
           <Sparkles className="text-indigo-600" size={24} />
           {t.theme}
         </h2>
-
-        {/* Custom theme option at top level */}
-        <button
-          onClick={() => handleAdventureThemeSelect('custom')}
-          className="w-full p-4 rounded-xl border-2 border-dashed border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50 transition-all flex items-center gap-3"
-        >
-          <span className="text-3xl">✨</span>
-          <div className="text-left">
-            <div className="font-bold text-indigo-700">
-              {lang === 'de' ? 'Eigenes Thema' : lang === 'fr' ? 'Créer le vôtre' : 'Create Your Own'}
-            </div>
-            <div className="text-sm text-gray-600">
-              {lang === 'de' ? 'Beschreibe dein eigenes Abenteuer-Thema' : lang === 'fr' ? 'Décris ton propre thème d\'aventure' : 'Describe your own adventure theme'}
-            </div>
-          </div>
-        </button>
 
         <div className="space-y-3">
           {adventureThemeGroups.filter(g => g.id !== 'custom').map((group) => {
