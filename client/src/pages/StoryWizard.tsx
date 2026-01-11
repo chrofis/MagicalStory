@@ -899,13 +899,12 @@ export default function StoryWizard() {
     const loadCharacterData = async () => {
       try {
         setIsLoading(true);
-        // Pass developerMode or isImpersonating to load all avatar variants for admin users
-        const loadAllAvatars = developerMode || isImpersonating;
-        const data = await characterService.getCharacterData(loadAllAvatars);
+        // Always load lightweight data initially (only standard avatar)
+        // Full avatar variants are loaded on-demand when needed
+        const data = await characterService.getCharacterData(false);
         log.info('Loaded character data from API:', {
           characters: data.characters.length,
           relationships: Object.keys(data.relationships).length,
-          includeAllAvatars: loadAllAvatars,
         });
 
         setCharacters(data.characters);
@@ -948,59 +947,9 @@ export default function StoryWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isAuthLoading]);
 
-  // Reload characters with full avatar data when developer mode is enabled
-  // This ensures devs can see all avatar variants (winter, summer, formal)
-  useEffect(() => {
-    const reloadWithFullAvatars = async () => {
-      if (!developerMode || !isAuthenticated || characters.length === 0) return;
-
-      // Check if any character is missing winter/summer avatars (stripped for non-devs)
-      const needsReload = characters.some(c =>
-        c.avatars?.standard && (!c.avatars?.winter || !c.avatars?.summer)
-      );
-
-      if (!needsReload) return;
-
-      log.info('Developer mode enabled, reloading characters with full avatar data...');
-      try {
-        const data = await characterService.getCharacterData(true);
-        setCharacters(data.characters);
-        log.info('Reloaded characters with full avatar data:', {
-          characters: data.characters.length,
-          withWinterAvatars: data.characters.filter(c => c.avatars?.winter).length,
-        });
-      } catch (error) {
-        log.error('Failed to reload character data with avatars:', error);
-      }
-    };
-
-    reloadWithFullAvatars();
-    // Only react to developerMode changes after initial load
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [developerMode, isAuthenticated]);
-
-  // Reload characters with full avatar data when impersonating becomes true
-  // This handles the case where auth context restores isImpersonating after initial load
-  useEffect(() => {
-    const reloadForImpersonation = async () => {
-      if (!isImpersonating || !isAuthenticated || characters.length === 0) return;
-
-      const needsReload = characters.some(c =>
-        c.avatars?.standard && (!c.avatars?.winter || !c.avatars?.summer)
-      );
-      if (!needsReload) return;
-
-      log.info('Impersonation detected, reloading characters with full avatar data...');
-      try {
-        const data = await characterService.getCharacterData(true);
-        setCharacters(data.characters);
-      } catch (error) {
-        log.error('Failed to reload character data for impersonation:', error);
-      }
-    };
-    reloadForImpersonation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isImpersonating, isAuthenticated, characters.length]);
+  // NOTE: Removed auto-reload of full avatar data for dev mode and impersonation
+  // Full avatar variants (winter, summer, formal, styledAvatars) are now loaded on-demand
+  // to avoid 30+ MB payload on initial page load. Standard avatar is always available.
 
   // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh
@@ -1384,12 +1333,16 @@ export default function StoryWizard() {
 
       // Start analyzing - don't show photo yet
       setIsAnalyzingPhoto(true);
-      // Only go to name step if character doesn't have a name yet
-      // If character already has a name, stay on current step (photo re-upload case)
+      // Navigation after photo analysis depends on whether this is first photo or re-upload:
+      // - First photo (no name): go to 'name' step
+      // - Re-upload (has name): go to 'traits' step so user sees avatar regenerating
       if (!currentCharacter?.name || currentCharacter.name.trim().length < 2) {
         setCharacterStep('name');
+      } else {
+        // Character already has a name - this is a re-upload, go to traits to show avatar
+        setCharacterStep('traits');
+        log.info(`📸 Character has name, going to traits step to show avatar regeneration`);
       }
-      // Otherwise stay on current step, avatar regenerates in background
 
       // Run photo analysis
       try {
@@ -1678,6 +1631,16 @@ export default function StoryWizard() {
             clothingSource: updatedClothingSource,
           };
         });
+
+        // Navigate based on whether character has a name:
+        // - Has name: go to traits step to see avatar regenerating
+        // - No name: go to name step
+        if (currentCharacter?.name && currentCharacter.name.trim().length >= 2) {
+          setCharacterStep('traits');
+          log.info(`📸 Face selected, character has name, going to traits step`);
+        } else {
+          setCharacterStep('name');
+        }
 
         // Auto-start avatar generation in background
         log.info(`🎨 Auto-starting avatar generation in background after face selection...`);
