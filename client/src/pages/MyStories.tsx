@@ -642,14 +642,16 @@ export default function MyStories() {
       <Navigation currentStep={0} />
 
       <div className="px-4 md:px-8 py-4 md:py-8 max-w-6xl mx-auto">
-        {/* Header - compact on mobile */}
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <h1 className="text-xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
+        {/* Header - stacked on mobile, side-by-side on desktop */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          {/* Title - centered on mobile */}
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center justify-center md:justify-start gap-2">
             <Book size={24} className="md:w-7 md:h-7" />
-            <span className="hidden sm:inline">{t.myStories}</span>
+            {t.myStories}
           </h1>
 
-          <div className="flex items-center gap-2">
+          {/* Buttons - centered on mobile */}
+          <div className="flex items-center justify-center md:justify-end gap-2">
             {/* See Pricing button - icon only on mobile */}
             <button
               onClick={() => navigate('/pricing')}
@@ -660,16 +662,16 @@ export default function MyStories() {
               <span className="hidden md:inline">{t.seePricing}</span>
             </button>
 
-            {/* Create Book button - icon only on mobile when not selected */}
+            {/* Create Book button */}
             {canSelectForBook && (
               <button
                 onClick={goToBookBuilder}
                 disabled={selectedStories.length === 0 || isOverLimit}
-                className="flex items-center gap-1 px-2 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1 px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={t.createBook}
               >
                 <BookOpen size={18} />
-                <span className="hidden md:inline">{t.createBook}</span>
+                <span className="text-sm md:text-base">{t.createBook}</span>
                 {selectedStories.length > 0 && (
                   <span className="bg-white text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">
                     {selectedStories.length}
@@ -678,14 +680,13 @@ export default function MyStories() {
               </button>
             )}
 
-            {/* Create Story button - compact on mobile */}
+            {/* Create Story button */}
             <button
               onClick={() => navigate('/create?new=true')}
-              className="flex items-center gap-1 px-2 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
+              className="flex items-center gap-1 px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
               title={t.createStory}
             >
-              <span className="md:hidden">+</span>
-              <span className="hidden md:inline">{t.createStory}</span>
+              <span className="text-sm md:text-base">{t.createStory}</span>
             </button>
           </div>
         </div>
