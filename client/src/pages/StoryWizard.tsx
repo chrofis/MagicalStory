@@ -103,8 +103,8 @@ export default function StoryWizard() {
     return localStorage.getItem('story_type') || '';
   });
   // New story category system
-  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | 'historical' | ''>(() => {
-    return (localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
+  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | ''>(() => {
+    return (localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
   });
   const [storyTopic, setStoryTopic] = useState(() => {
     return localStorage.getItem('story_topic') || '';
@@ -423,7 +423,7 @@ export default function StoryWizard() {
 
       // Reset story settings state
       setStoryType('');
-      setStoryCategory('' as 'adventure' | 'life-challenge' | 'educational' | 'historical' | '');
+      setStoryCategory('' as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '');
       setStoryTopic('');
       setStoryTheme('');
       setCustomThemeText('');
@@ -2912,6 +2912,7 @@ export default function StoryWizard() {
             onLocationChange={setUserLocation}
             season={season}
             onSeasonChange={setSeason}
+            userCredits={user?.credits ?? 0}
           />
         );
 

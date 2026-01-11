@@ -41,6 +41,7 @@ interface WizardStep3Props {
   onLocationChange: (location: UserLocation) => void;
   season: string;
   onSeasonChange: (season: string) => void;
+  userCredits: number; // User's available credits (-1 = unlimited)
 }
 
 /**
@@ -62,6 +63,7 @@ export function WizardStep3BookSettings({
   onLocationChange,
   season,
   onSeasonChange,
+  userCredits,
 }: WizardStep3Props) {
   const { t, language } = useLanguage();
   const [isEditingLocation, setIsEditingLocation] = useState(false);
@@ -95,8 +97,20 @@ export function WizardStep3BookSettings({
 
   // Page slider configuration
   const minPages = developerMode ? 4 : 10;
-  const maxPages = 50;
+  const absoluteMaxPages = 50;
   const pageStep = 2; // Only even values
+  const creditsPerPage = 10;
+
+  // Calculate max pages based on user credits (-1 = unlimited)
+  const hasUnlimitedCredits = userCredits === -1;
+  const affordablePages = hasUnlimitedCredits
+    ? absoluteMaxPages
+    : Math.floor(userCredits / creditsPerPage);
+  // Round down to nearest even number
+  const maxAffordablePages = Math.floor(affordablePages / 2) * 2;
+  // Effective max is the lower of absolute max and what user can afford
+  const effectiveMaxPages = Math.min(absoluteMaxPages, Math.max(minPages, maxAffordablePages));
+  const isLimitedByCredits = !hasUnlimitedCredits && maxAffordablePages < absoluteMaxPages;
 
   // Ensure pages value is even and within range
   useEffect(() => {
@@ -106,13 +120,13 @@ export function WizardStep3BookSettings({
     if (validPages % 2 !== 0) {
       validPages = Math.round(validPages / 2) * 2;
     }
-    // Ensure in range
-    validPages = Math.max(minPages, Math.min(maxPages, validPages));
+    // Ensure in range (use effectiveMaxPages to respect credit limit)
+    validPages = Math.max(minPages, Math.min(effectiveMaxPages, validPages));
 
     if (validPages !== pages) {
       onPagesChange(validPages);
     }
-  }, [pages, minPages, maxPages, onPagesChange]);
+  }, [pages, minPages, effectiveMaxPages, onPagesChange]);
 
   const readingLevels = [
     {
@@ -307,9 +321,9 @@ export function WizardStep3BookSettings({
             <input
               type="range"
               min={minPages}
-              max={maxPages}
+              max={effectiveMaxPages}
               step={pageStep}
-              value={pages}
+              value={Math.min(pages, effectiveMaxPages)}
               onChange={(e) => onPagesChange(parseInt(e.target.value))}
               className="w-full h-3 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-600
                          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6
@@ -325,8 +339,22 @@ export function WizardStep3BookSettings({
               <span className="text-xl font-bold text-indigo-600">
                 {pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}
               </span>
-              <span className="text-sm text-gray-400">{maxPages}</span>
+              <span className={`text-sm ${isLimitedByCredits ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                {effectiveMaxPages}
+                {isLimitedByCredits && ' ⚠️'}
+              </span>
             </div>
+
+            {/* Credit limit warning */}
+            {isLimitedByCredits && (
+              <div className="text-center text-sm text-orange-600 bg-orange-50 rounded-lg py-2 px-3">
+                {language === 'de'
+                  ? `Max. ${effectiveMaxPages} Seiten mit ${userCredits} Credits möglich`
+                  : language === 'fr'
+                  ? `Max. ${effectiveMaxPages} pages possibles avec ${userCredits} crédits`
+                  : `Max. ${effectiveMaxPages} pages possible with ${userCredits} credits`}
+              </div>
+            )}
 
             {/* Credits and description */}
             <div className="text-center">
