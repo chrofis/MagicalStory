@@ -371,6 +371,63 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/characters/avatars/all - Clear all avatar data (admin only)
+// Useful for cleaning up large avatar data that slows down loading
+// NOTE: Must be defined BEFORE /:characterId to avoid route conflict
+router.delete('/avatars/all', authenticateToken, async (req, res) => {
+  try {
+    // Admin only
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    console.log(`[Characters] DELETE /avatars/all - Admin ${req.user.id} clearing all avatars`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Fetch current character data
+    const rowId = `characters_${req.user.id}`;
+    const rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [rowId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'No character data found' });
+    }
+
+    const data = JSON.parse(rows[0].data);
+    const characters = data.characters || [];
+
+    let clearedCount = 0;
+    let totalSizeCleared = 0;
+
+    for (const char of characters) {
+      if (char.avatars) {
+        const avatarJson = JSON.stringify(char.avatars);
+        totalSizeCleared += avatarJson.length;
+        console.log(`  Clearing avatars for ${char.name}: ${Object.keys(char.avatars).join(', ')}`);
+        delete char.avatars;
+        clearedCount++;
+      }
+    }
+
+    // Save updated data
+    await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
+
+    const sizeMB = (totalSizeCleared / 1024 / 1024).toFixed(2);
+    console.log(`[Characters] DELETE /avatars/all - Cleared ${clearedCount} characters, ${sizeMB}MB of avatar data`);
+
+    res.json({
+      success: true,
+      message: `Cleared avatars for ${clearedCount} characters`,
+      clearedSizeMB: parseFloat(sizeMB)
+    });
+  } catch (err) {
+    console.error('Error clearing avatars:', err);
+    res.status(500).json({ error: 'Failed to clear avatars' });
+  }
+});
+
 // DELETE /api/characters/:characterId - Delete a single character
 // Much faster than re-uploading all characters via POST
 router.delete('/:characterId', authenticateToken, async (req, res) => {
