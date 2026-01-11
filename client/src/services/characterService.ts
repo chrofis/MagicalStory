@@ -412,8 +412,12 @@ export const characterService = {
       const photoSource = character.photos?.bodyNoBg ? 'bodyNoBg' : character.photos?.body ? 'body' : character.photos?.face ? 'face' : 'original';
       const photoSize = inputPhoto ? Math.round(inputPhoto.length / 1024) : 0;
       const isPNG = inputPhoto?.startsWith('data:image/png');
+      // Extract fingerprint to verify same image on server
+      const base64Start = inputPhoto ? inputPhoto.indexOf('base64,') + 7 : 0;
+      const fingerprint = inputPhoto ? inputPhoto.substring(base64Start, base64Start + 20) : 'none';
       log.info(`🎨 Generating clothing avatars for ${character.name} (id: ${character.id})`);
       log.info(`📸 Photo source: ${photoSource}, size: ${photoSize}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
+      log.info(`📸 Image fingerprint: ${fingerprint}...`);
       log.info(`📸 Available photos: bodyNoBg=${!!character.photos?.bodyNoBg}, body=${!!character.photos?.body}, face=${!!character.photos?.face}, original=${!!character.photos?.original}`);
 
       const response = await api.post<{
