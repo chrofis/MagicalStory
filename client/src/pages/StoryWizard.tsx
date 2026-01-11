@@ -2058,11 +2058,19 @@ export default function StoryWizard() {
     // Move to traits step immediately so user can continue editing
     setCharacterStep('traits');
 
+    // Skip avatar generation if already generating or complete
+    const avatarStatus = currentCharacter.avatars?.status;
+    const hasAvatar = !!(currentCharacter.avatars?.standard || currentCharacter.avatars?.winter || currentCharacter.avatars?.summer);
+    if (avatarStatus === 'generating' || (avatarStatus === 'complete' && hasAvatar)) {
+      log.info(`⏭️ Skipping avatar generation - already ${avatarStatus}${hasAvatar ? ' with avatars' : ''}`);
+      return;
+    }
+
     // Start background avatar generation
     setIsGeneratingAvatar(true);
     setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'generating' } } : prev);
 
-    log.info(`🎨 Starting avatar generation for ${currentCharacter.name}...`);
+    log.info(`🎨 Starting avatar generation for ${currentCharacter.name || 'unnamed'}...`);
 
     try {
       // Generate avatars with physical traits
