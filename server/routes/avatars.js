@@ -1245,7 +1245,14 @@ router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
       return res.status(503).json({ error: 'Avatar generation service unavailable' });
     }
 
-    log.debug(`🎭 [AVATAR OPTIONS] Generating 3 options...`);
+    // Debug: log received photo info
+    console.log(`🎭 [AVATAR OPTIONS] Received photo:`);
+    console.log(`   Type: ${typeof facePhoto}`);
+    console.log(`   Length: ${facePhoto.length}`);
+    console.log(`   Prefix: ${facePhoto.substring(0, 50)}...`);
+    console.log(`   Gender: ${gender}, Category: ${category}`);
+
+    log.debug(`🎭 [AVATAR OPTIONS] Generating 3 options sequentially...`);
 
     const character = {
       photoUrl: facePhoto,
@@ -1254,16 +1261,19 @@ router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
     };
     const config = {};
 
-    // Generate 3 attempts in parallel
-    const attempts = await Promise.all([
-      generateDynamicAvatar(character, category, config),
-      generateDynamicAvatar(character, category, config),
-      generateDynamicAvatar(character, category, config)
-    ]);
-
-    const options = attempts
-      .map((a, i) => a.success ? { id: i, imageData: a.imageData } : null)
-      .filter(Boolean);
+    // Generate 3 attempts sequentially with delay to avoid rate limiting
+    const options = [];
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) {
+        // Wait 2 seconds between requests to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      log.debug(`🎭 [AVATAR OPTIONS] Generating option ${i + 1}/3...`);
+      const result = await generateDynamicAvatar(character, category, config);
+      if (result.success) {
+        options.push({ id: i, imageData: result.imageData });
+      }
+    }
 
     log.debug(`✅ [AVATAR OPTIONS] Generated ${options.length}/3 options`);
 

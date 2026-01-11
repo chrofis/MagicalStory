@@ -215,6 +215,7 @@ export default function StoryWizard() {
   const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
   const [isProgressMinimized, setIsProgressMinimized] = useState(false); // Track if progress modal is minimized
   const [showMinimizeDialog, setShowMinimizeDialog] = useState(false); // Show dialog when user clicks minimize
+  const [showSingleCharacterDialog, setShowSingleCharacterDialog] = useState(false); // Show dialog when only 1 character
   const [userHasStories, setUserHasStories] = useState(false); // Track if user has existing stories
   const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
@@ -2243,6 +2244,11 @@ export default function StoryWizard() {
 
   const goNext = async () => {
     if (step < 5 && canGoNext()) {
+      // Show dialog if user has only 1 character and is moving from step 1 to step 2
+      if (step === 1 && characters.length === 1) {
+        setShowSingleCharacterDialog(true);
+        return;
+      }
       await safeSetStep(step + 1);
     }
   };
@@ -3756,6 +3762,45 @@ export default function StoryWizard() {
                   {language === 'de' ? 'Meine Geschichten lesen' : language === 'fr' ? 'Lire mes histoires' : 'Read my stories'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Character Dialog - shown when user has only 1 character */}
+      {showSingleCharacterDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">
+              {language === 'de' ? 'Nur ein Charakter' : language === 'fr' ? 'Un seul personnage' : 'Only One Character'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {language === 'de'
+                ? 'Geschichten werden interessanter mit mehreren Charakteren. Du hast nur einen Charakter erstellt.'
+                : language === 'fr'
+                ? 'Les histoires sont plus intéressantes avec plusieurs personnages. Vous n\'avez créé qu\'un seul personnage.'
+                : 'Stories are more interesting with multiple characters. You have only created one character.'}
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setShowSingleCharacterDialog(false);
+                  startNewCharacter();
+                }}
+                className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-medium"
+              >
+                {language === 'de' ? 'Weiteren Charakter erstellen' : language === 'fr' ? 'Créer un autre personnage' : 'Create another character'}
+              </button>
+
+              <button
+                onClick={async () => {
+                  setShowSingleCharacterDialog(false);
+                  await safeSetStep(step + 1);
+                }}
+                className="w-full py-3 px-4 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+              >
+                {language === 'de' ? 'Trotzdem weiter' : language === 'fr' ? 'Continuer quand même' : 'Continue anyway'}
+              </button>
             </div>
           </div>
         </div>

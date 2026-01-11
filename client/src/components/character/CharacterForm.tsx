@@ -579,7 +579,8 @@ export function CharacterForm({
     console.log('[AVATAR OPTIONS] Button clicked!');
     console.log('[AVATAR OPTIONS] character.photos:', character.photos);
 
-    const facePhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
+    // Use face or original photo (not bodyNoBg which has transparency that may cause issues)
+    const facePhoto = character.photos?.face || character.photos?.original || character.photos?.body;
     console.log('[AVATAR OPTIONS] facePhoto:', facePhoto ? facePhoto.substring(0, 50) + '...' : 'null');
 
     if (!facePhoto) {
