@@ -579,34 +579,18 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
                 full_img_rgba = remove_faces_except(full_img_rgba, selected_face_id, all_faces)
 
         # 7. GET BODY BOUNDS
-        # If multiple people and one selected, base body_box on selected face position
+        # If multiple people and one selected, use alpha channel from full_img_rgba
+        # (after remove_faces_except made non-selected people transparent)
         # Otherwise use the full mask bounds
         body_box = None
-        if len(all_faces) > 1 and selected_face_id is not None and face_box is not None:
-            # Calculate body box from selected face - expand face to full body
-            # Face is roughly top 1/7 of body (head:body ratio ~1:7 for adults)
-            # So body height = face_height * 7, body starts at face top
-            face_height = face_box['height']
-            face_width = face_box['width']
-            face_x = face_box['x']
-            face_y = face_box['y']
-
-            # Estimate body dimensions based on face
-            body_height = min(100 - face_y, face_height * 8)  # Full body from face to bottom, or 8x face
-            body_width = face_width * 2.5  # Body is about 2.5x face width
-            body_x = face_x + (face_width / 2) - (body_width / 2)  # Center body on face
-
-            # Clamp to image bounds
-            body_x = max(0, body_x)
-            body_width = min(100 - body_x, body_width)
-
-            body_box = {
-                'x': body_x,
-                'y': face_y,
-                'width': body_width,
-                'height': body_height
-            }
-            print(f"   Body box from selected face: x={body_x:.1f}%, y={face_y:.1f}%, w={body_width:.1f}%, h={body_height:.1f}%")
+        if len(all_faces) > 1 and selected_face_id is not None and full_img_rgba is not None:
+            # Use alpha channel as mask - only selected person is visible (non-zero alpha)
+            alpha_mask = full_img_rgba[:, :, 3]
+            body_box = get_body_bounds_from_mask(alpha_mask, padding_percent=0.05)
+            if body_box:
+                print(f"   Body box from alpha mask: x={body_box['x']:.1f}%, y={body_box['y']:.1f}%, w={body_box['width']:.1f}%, h={body_box['height']:.1f}%")
+            else:
+                print("   Warning: Could not calculate body box from alpha mask")
         elif body_mask is not None:
             # Single person or no selection - use mask bounds
             body_box = get_body_bounds_from_mask(body_mask, padding_percent=0.05)

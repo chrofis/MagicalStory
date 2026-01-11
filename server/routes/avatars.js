@@ -758,7 +758,18 @@ async function generateDynamicAvatar(character, category, config) {
     }
 
     if (!imageData) {
+      // Debug: Log what Gemini actually returned
       log.error(`❌ [DYNAMIC AVATAR] No image in response for ${logCategory}`);
+      log.error(`   candidates: ${data.candidates ? data.candidates.length : 'none'}`);
+      if (data.candidates?.[0]) {
+        log.error(`   finishReason: ${data.candidates[0].finishReason || 'unknown'}`);
+        log.error(`   parts: ${data.candidates[0].content?.parts?.length || 0}`);
+        if (data.candidates[0].content?.parts) {
+          data.candidates[0].content.parts.forEach((p, i) => {
+            log.error(`   part[${i}]: ${p.text ? 'text' : p.inlineData ? 'inlineData:' + p.inlineData.mimeType : 'unknown'}`);
+          });
+        }
+      }
       return { success: false, error: 'No image generated' };
     }
 
