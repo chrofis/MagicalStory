@@ -176,112 +176,110 @@ export function WizardStep3BookSettings({
 
   return (
     <div className="space-y-6">
-      {/* Header with Story Language Selection on the right */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
+      {/* Header with Language, Location, Season on one line */}
+      <div className="flex flex-col gap-4">
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           <BookOpen size={24} />
           {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : 'Book Format'}
         </h2>
 
-        {/* Story Language Selection - Dropdown on the right */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">
-            {language === 'de' ? 'Sprachvariante:' : language === 'fr' ? 'Variante:' : 'Language:'}
-          </span>
-          <div className="relative">
-            <select
-              value={storyLanguage}
-              onChange={(e) => onStoryLanguageChange(e.target.value as StoryLanguageCode)}
-              className="px-4 py-2 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base font-medium appearance-none bg-white cursor-pointer pr-10"
-            >
-              {STORY_LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.name}
-                </option>
-              ))}
-            </select>
-            {/* Custom dropdown arrow */}
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+        {/* Language, Location, Season Row */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Language Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : 'Language:'}
+            </span>
+            <div className="relative">
+              <select
+                value={storyLanguage}
+                onChange={(e) => onStoryLanguageChange(e.target.value as StoryLanguageCode)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
+              >
+                {STORY_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.flag} {lang.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Location and Season Row */}
-      <div className="flex flex-wrap gap-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
-        {/* Location */}
-        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-          <MapPin className="text-indigo-500" size={20} />
-          <span className="text-sm text-gray-600">
-            {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu:' : 'Location:'}
-          </span>
-          {isEditingLocation ? (
-            <div className="flex items-center gap-2 flex-1">
-              <input
-                type="text"
-                value={editCity}
-                onChange={(e) => setEditCity(e.target.value)}
-                placeholder={language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : 'City'}
-                className="px-2 py-1 border border-indigo-300 rounded text-sm w-24 focus:outline-none focus:border-indigo-500"
-              />
-              <input
-                type="text"
-                value={editCountry}
-                onChange={(e) => setEditCountry(e.target.value)}
-                placeholder={language === 'de' ? 'Land' : language === 'fr' ? 'Pays' : 'Country'}
-                className="px-2 py-1 border border-indigo-300 rounded text-sm w-24 focus:outline-none focus:border-indigo-500"
-              />
-              <button
-                onClick={handleSaveLocation}
-                className="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
-              >
-                OK
-              </button>
-              <button
-                onClick={() => setIsEditingLocation(false)}
-                className="px-2 py-1 text-gray-600 text-sm hover:text-gray-800"
-              >
-                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsEditingLocation(true)}
-              className="font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
-            >
-              {userLocation?.city
-                ? `${userLocation.city}${userLocation.country ? `, ${userLocation.country}` : ''}`
-                : (language === 'de' ? 'Nicht festgelegt' : language === 'fr' ? 'Non défini' : 'Not set')}
-            </button>
-          )}
-        </div>
-
-        {/* Season */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">
-            {language === 'de' ? 'Jahreszeit:' : language === 'fr' ? 'Saison:' : 'Season:'}
-          </span>
-          <div className="flex gap-1">
-            {SEASONS.map((s) => {
-              const isSelected = season === s;
-              const label = seasonLabels[s][language] || seasonLabels[s].en;
-              return (
+          {/* Location */}
+          <div className="flex items-center gap-2">
+            <MapPin className="text-gray-500" size={16} />
+            <span className="text-sm text-gray-600">
+              {language === 'de' ? 'Ort:' : language === 'fr' ? 'Lieu:' : 'Location:'}
+            </span>
+            {isEditingLocation ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={editCity}
+                  onChange={(e) => setEditCity(e.target.value)}
+                  placeholder={language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : 'City'}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm w-20 focus:outline-none focus:border-indigo-500"
+                />
+                <input
+                  type="text"
+                  value={editCountry}
+                  onChange={(e) => setEditCountry(e.target.value)}
+                  placeholder={language === 'de' ? 'Land' : language === 'fr' ? 'Pays' : 'Country'}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm w-20 focus:outline-none focus:border-indigo-500"
+                />
                 <button
-                  key={s}
-                  onClick={() => onSeasonChange(s)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
-                    isSelected
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                  onClick={handleSaveLocation}
+                  className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700"
                 >
-                  {label}
+                  OK
                 </button>
-              );
-            })}
+                <button
+                  onClick={() => setIsEditingLocation(false)}
+                  className="px-1 text-gray-500 text-xs hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsEditingLocation(true)}
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+              >
+                {userLocation?.city
+                  ? `${userLocation.city}${userLocation.country ? `, ${userLocation.country}` : ''}`
+                  : (language === 'de' ? 'Festlegen' : language === 'fr' ? 'Définir' : 'Set')}
+              </button>
+            )}
+          </div>
+
+          {/* Season Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              {language === 'de' ? 'Jahreszeit:' : language === 'fr' ? 'Saison:' : 'Season:'}
+            </span>
+            <div className="relative">
+              <select
+                value={season}
+                onChange={(e) => onSeasonChange(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
+              >
+                {SEASONS.map((s) => (
+                  <option key={s} value={s}>
+                    {seasonLabels[s][language] || seasonLabels[s].en}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -294,22 +292,22 @@ export function WizardStep3BookSettings({
             <button
               key={level.value}
               onClick={() => onLanguageLevelChange(level.value)}
-              className={`flex-shrink-0 w-40 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
+              className={`flex-shrink-0 w-32 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
                 languageLevel === level.value
                   ? 'border-indigo-600 ring-2 ring-indigo-200'
                   : 'border-gray-200 hover:border-indigo-300'
               }`}
             >
-              <div className="w-full bg-gray-100 p-2 h-28 md:h-auto">
+              <div className="w-full bg-gray-100 p-1.5 h-20 md:h-24">
                 <img
                   src={level.image}
                   alt={level.label}
                   className="w-full h-full object-contain"
                 />
               </div>
-              <div className="p-2 md:p-3">
-                <div className="font-semibold text-sm md:text-base mb-1">{level.label}</div>
-                <div className="text-xs md:text-sm text-gray-500 whitespace-pre-line">{level.desc}</div>
+              <div className="p-1.5 md:p-2">
+                <div className="font-semibold text-xs md:text-sm mb-0.5">{level.label}</div>
+                <div className="text-[10px] md:text-xs text-gray-500 whitespace-pre-line">{level.desc}</div>
               </div>
             </button>
           ))}

@@ -274,8 +274,10 @@ KEY LOCATIONS: Base camp (Framheim for Norwegians), Ross Ice Shelf, Polar platea
 
 STORY ANGLES:
 - The preparation and planning for the expedition
-- Life with the sled dogs
+- Amundsen's bond with his sled dogs (and the hard reality of eating the weak ones for survival)
 - The moment of reaching the pole
+- Scott arriving to find Amundsen's flag already there
+- Scott's final diary entries in the tent while a blizzard raged outside
 - Learning from different approaches to exploration
 
 HISTORICAL DETAILS:
@@ -347,8 +349,9 @@ The bathyscaphe Trieste, designed by Auguste Piccard (Jacques's father), was bui
 withstand this crushing pressure. It had a small steel sphere for the crew attached to a
 large float filled with gasoline for buoyancy.
 
-On January 23, 1960, Piccard and Walsh began their descent. It took nearly 5 hours to reach
-the bottom. At the deepest point, they observed fish and shrimp - proving life exists even
+On January 23, 1960, Piccard and Walsh began their descent. Halfway down, a window pane cracked
+with a sound like a gunshot. They decided to keep going despite the danger. It took nearly 5 hours
+to reach the bottom. At the deepest point, they observed a flatfish - proving life exists even
 in the most extreme conditions. They spent 20 minutes on the bottom before ascending.
 
 The dive was not repeated until 2012 when filmmaker James Cameron made a solo dive.
@@ -361,6 +364,7 @@ KEY LOCATIONS: USS Lewis support ship, Inside Trieste bathyscaphe, Challenger De
 
 STORY ANGLES:
 - Descending into total darkness
+- The terrifying crack of the window halfway down - and deciding to keep going
 - The strange creatures of the deep
 - The bravery of exploring the unknown
 - Comparing deep sea to outer space
@@ -474,7 +478,7 @@ Thomas Edison was known as "The Wizard of Menlo Park" for his incredible inventi
 While he didn't invent the first electric light, he created the first PRACTICAL light bulb
 that would last long enough for everyday use.
 
-Edison and his team tested over 3,000 different materials for the filament (the part that
+Edison and his team tested over 6,000 different materials for the filament (the part that
 glows). After cotton thread, fishing line, and even hair from his workers' beards, he
 discovered that carbonized bamboo could glow for over 1,200 hours.
 
@@ -498,7 +502,7 @@ STORY ANGLES:
 - Lighting up New York City for the first time
 
 HISTORICAL DETAILS:
-- Failures: Over 3,000 materials tested
+- Failures: Over 6,000 materials tested
 - Success: Carbonized bamboo filament
 - Duration: First successful bulb burned 13.5 hours
 - Quote: "I have not failed. I've just found 10,000 ways that won't work."
@@ -876,6 +880,7 @@ LOCATION: Berlin, Germany
 
 KEY FIGURES:
 - Mikhail Gorbachev: Soviet leader who allowed change (Russian)
+- Gunther Schabowski: The official who accidentally announced the border was open (German)
 - The People of Berlin: Citizens who tore down the wall (German)
 
 HISTORICAL CONTEXT:
@@ -888,10 +893,11 @@ German guards had orders to shoot anyone trying to cross. At least 140 people di
 to escape.
 
 By 1989, communist governments across Eastern Europe were falling. Peaceful protests grew in
-East Germany. On November 9, a confused announcement led East Germans to believe the border
-was open. Thousands rushed to the wall.
+East Germany. On November 9, an official accidentally announced that restrictions were lifted
+"immediately." Thousands rushed to the wall.
 
-Guards, overwhelmed, opened the gates. People climbed the wall, danced on it, and began
+The guards had no orders. They called their superiors but got no answer. To avoid a massacre,
+they opened the gates. People climbed the wall, danced on it, and began
 tearing it apart with hammers and bare hands. Families separated for decades were reunited.
 Germany officially reunified in 1990.
 
@@ -956,8 +962,9 @@ STORY ANGLES:
 - Voting for the first time
 
 HISTORICAL DETAILS:
-- Imprisonment: 27 years in prison
-- Walk: Held Winnie's hand walking out of prison
+- Imprisonment: 27 years in prison (Prisoner Number 46664)
+- Walk: Held Winnie's hand walking out of prison, fist raised
+- Celebration: Toyi-toyi chanting and dancing in the streets
 - Election: First democratically elected President of South Africa
 - Reconciliation: Created Truth and Reconciliation Commission
 
@@ -985,8 +992,9 @@ with remarkable accuracy. The base is level to within 2 inches across 750 feet. 
 align almost perfectly with the compass directions.
 
 Contrary to myths, the pyramids were not built by slaves but by paid workers - farmers who
-worked during the Nile flood season when they couldn't farm. Archaeological evidence shows
-workers' villages with bakeries, breweries, and medical care.
+worked during the Nile flood season when they couldn't farm. Workers were paid in beer, bread,
+and onions. Archaeological evidence shows workers' villages with bakeries, breweries, and
+medical care.
 
 Ramps, levers, and careful organization allowed tens of thousands of workers to complete the
 Great Pyramid in about 20 years. It remains one of the Seven Wonders of the Ancient World
@@ -1023,8 +1031,8 @@ KEY FIGURES:
 
 HISTORICAL CONTEXT:
 The Eiffel Tower was built for the 1889 World's Fair, celebrating 100 years since the French
-Revolution. Many Parisians hated the design, calling it an "eyesore" and a "metal monster."
-Famous artists and writers signed a petition against it.
+Revolution. Many Parisians hated the design, calling it the "Iron Asparagus," an "eyesore,"
+and a "useless and monstrous" tower. Famous artists and writers signed a petition against it.
 
 Gustave Eiffel's company built the tower in just 2 years, 2 months, and 5 days using
 innovative techniques. The 18,038 iron pieces were manufactured precisely in a factory and
@@ -1102,6 +1110,7 @@ HISTORICAL DETAILS:
 - Locks: Three sets of locks lift ships 85 feet
 - Excavation: 240 million cubic yards of earth removed
 - Time: 10 years of American construction
+- Lives Lost: About 5,600 during US construction, over 20,000 during French attempt
 
 THEMES: engineering, problem-solving, perseverance, international cooperation
 
@@ -1310,9 +1319,9 @@ Many people thought he was crazy. Banks refused to loan him money. He mortgaged 
 and borrowed against his life insurance. He bought 160 acres of orange groves in Anaheim
 and began building his vision.
 
-Opening day, July 17, 1955, was chaotic - nicknamed "Black Sunday." Rides broke down, there
-wasn't enough drinking water, ladies' high heels sank into fresh asphalt, and counterfeit
-tickets caused overcrowding.
+Opening day, July 17, 1955, was chaotic - nicknamed "Black Sunday." Rides broke down, Walt
+had to choose between working toilets or working water fountains (he chose toilets), ladies'
+high heels sank into fresh asphalt, and counterfeit tickets doubled the crowd.
 
 But Walt's dream proved magical. Disneyland revolutionized themed entertainment with
 different "lands" (Adventureland, Tomorrowland, etc.) and attention to detail. Within its
@@ -1674,9 +1683,10 @@ Earth's atmosphere blurs the view of stars and galaxies. Astronomer Lyman Spitze
 in 1946 putting a telescope in space, above the atmosphere. Decades later, the Hubble Space
 Telescope was built.
 
-Launched in 1990, Hubble seemed like a disaster. Its main mirror was flawed, producing blurry
-images. NASA became a laughingstock. But in 1993, astronauts performed a daring repair mission,
-installing corrective optics - like giving Hubble glasses.
+Launched in 1990, Hubble seemed like a disaster. Its main mirror had a flaw just 1/50th the
+width of a human hair, but that tiny error made images blurry. It was a national embarrassment.
+But in 1993, astronauts performed a daring repair mission, installing corrective optics -
+like giving Hubble glasses.
 
 The repair worked spectacularly. Hubble has since made over 1.5 million observations, showing
 us galaxies billions of light-years away, the birth of stars, and helped determine the age of
