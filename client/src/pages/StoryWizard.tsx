@@ -345,6 +345,11 @@ export default function StoryWizard() {
       return;
     }
 
+    // Reset restored job ref when viewing a specific story (allows re-restoration when clicking spinner)
+    if (urlStoryId) {
+      restoredJobIdRef.current = null;
+    }
+
     // If there's an active job and we haven't restored it yet, restore progressive view
     if (activeJob && !urlStoryId && restoredJobIdRef.current !== activeJob.jobId) {
       log.info('Returning during active generation, restoring progress for job:', activeJob.jobId);
