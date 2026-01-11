@@ -1015,17 +1015,38 @@ export function CharacterForm({
 
     return (
       <div className="space-y-6">
+        {/* Info banner explaining what's happening */}
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
+          <p className="text-indigo-800 font-medium">
+            {language === 'de'
+              ? `🎨 So wird ${character.name} in deiner Geschichte aussehen.`
+              : language === 'fr'
+              ? `🎨 Voici à quoi ressemblera ${character.name} dans ton histoire.`
+              : `🎨 This is how ${character.name} will look in your story.`
+            }
+          </p>
+          {isStillGenerating && (
+            <p className="text-indigo-600 text-sm mt-2">
+              {language === 'de'
+                ? 'Du kannst warten oder direkt weiterfahren – das Bild wird im Hintergrund fertig und du kannst es jederzeit bei den Charakteren anpassen.'
+                : language === 'fr'
+                ? 'Tu peux attendre ou continuer – l\'image sera terminée en arrière-plan et tu pourras la modifier à tout moment.'
+                : 'You can wait or continue – the image will finish in the background and you can adjust it anytime in your characters.'
+              }
+            </p>
+          )}
+        </div>
+
         {/* Header */}
         <div className="text-center">
           <h3 className="text-2xl font-bold text-gray-800">
             {isStillGenerating
-              ? (language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création de l\'avatar...' : 'Creating your avatar...')
+              ? (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Creating...')
               : hasFailed
-              ? (language === 'de' ? 'Avatar konnte nicht erstellt werden' : language === 'fr' ? 'Échec de la création' : 'Avatar creation failed')
-              : (language === 'de' ? 'Dein Avatar ist fertig!' : language === 'fr' ? 'Votre avatar est prêt!' : 'Your Avatar is Ready!')
+              ? (language === 'de' ? 'Erstellung fehlgeschlagen' : language === 'fr' ? 'Échec de la création' : 'Creation failed')
+              : (language === 'de' ? `${character.name} ist fertig!` : language === 'fr' ? `${character.name} est prêt!` : `${character.name} is ready!`)
             }
           </h3>
-          <p className="text-gray-600 mt-2">{character.name}</p>
         </div>
 
         {/* Avatar Display - centered, prominent, clickable for lightbox */}
@@ -1049,7 +1070,7 @@ export function CharacterForm({
             <div className="w-64 h-80 rounded-lg border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col items-center justify-center">
               <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
               <span className="text-indigo-600 font-medium">
-                {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création de l\'avatar...' : 'Creating avatar...'}
+                {language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Creating...'}
               </span>
               <span className="text-indigo-400 text-sm mt-1">
                 {language === 'de' ? 'Dies kann einen Moment dauern' : language === 'fr' ? 'Cela peut prendre un moment' : 'This may take a moment'}
@@ -1059,8 +1080,8 @@ export function CharacterForm({
             <div className="w-64 h-80 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
               <span className="text-gray-400">
                 {hasFailed
-                  ? (language === 'de' ? 'Generierung fehlgeschlagen' : language === 'fr' ? 'Échec de génération' : 'Generation failed')
-                  : (language === 'de' ? 'Kein Avatar' : language === 'fr' ? 'Pas d\'avatar' : 'No avatar')
+                  ? (language === 'de' ? 'Erstellung fehlgeschlagen' : language === 'fr' ? 'Échec de génération' : 'Creation failed')
+                  : (language === 'de' ? 'Kein Bild' : language === 'fr' ? 'Pas d\'image' : 'No image')
                 }
               </span>
             </div>
@@ -1083,16 +1104,16 @@ export function CharacterForm({
                 ) : (
                   <Check size={24} />
                 )}
-                {language === 'de' ? 'Perfekt - Avatar verwenden' : language === 'fr' ? 'Parfait - Utiliser l\'avatar' : 'Perfect - Use Avatar'}
+                {language === 'de' ? 'Perfekt – weiter' : language === 'fr' ? 'Parfait – continuer' : 'Perfect – continue'}
               </button>
 
               {/* Hint about modifying later */}
               <p className="text-xs text-gray-500 text-center">
                 {language === 'de'
-                  ? 'Du kannst den Avatar später jederzeit anpassen'
+                  ? 'Du kannst das Aussehen später jederzeit anpassen'
                   : language === 'fr'
-                  ? 'Vous pouvez modifier l\'avatar plus tard'
-                  : 'You can modify the avatar later anytime'}
+                  ? 'Tu peux modifier l\'apparence plus tard'
+                  : 'You can modify the look later anytime'}
               </p>
 
               {/* Try with new photo */}
@@ -1285,12 +1306,12 @@ export function CharacterForm({
                   <div className="flex flex-col items-center gap-2">
                     <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                     <span className="text-xs text-indigo-600 font-medium px-2 text-center">
-                      {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? 'Création...' : 'Creating...'}
+                      {language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création...' : 'Creating...'}
                     </span>
                   </div>
                 ) : (
                   <span className="text-[10px] text-gray-400 text-center px-2">
-                    {language === 'de' ? 'Kein Avatar' : 'No avatar'}
+                    {language === 'de' ? 'Kein Bild' : 'No image'}
                   </span>
                 )}
               </div>
@@ -1323,7 +1344,7 @@ export function CharacterForm({
                 className="w-full px-2 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex items-center justify-center gap-1 border border-indigo-200"
               >
                 <Pencil size={10} />
-                {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+                {language === 'de' ? 'Aussehen anpassen' : language === 'fr' ? 'Modifier l\'apparence' : 'Modify Look'}
               </button>
               {/* Regenerate button - developer mode only */}
               {(developerMode || isImpersonating) && (
@@ -2166,7 +2187,7 @@ export function CharacterForm({
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="text-lg font-semibold text-gray-800">
-              {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+              {language === 'de' ? 'Aussehen anpassen' : language === 'fr' ? 'Modifier l\'apparence' : 'Modify Look'}
             </h2>
             <button
               onClick={() => setIsModifyingAvatar(false)}
@@ -2191,7 +2212,7 @@ export function CharacterForm({
                   ) : (
                     <div className="w-48 h-64 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex items-center justify-center">
                       <span className="text-gray-400 text-sm">
-                        {language === 'de' ? 'Kein Avatar' : 'No avatar'}
+                        {language === 'de' ? 'Kein Bild' : 'No image'}
                       </span>
                     </div>
                   )}
