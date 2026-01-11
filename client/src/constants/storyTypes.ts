@@ -240,6 +240,7 @@ export const educationalGroups: EducationalGroup[] = [
 // HISTORICAL EVENTS (for historically accurate story generation)
 // =============================================================================
 export const historicalEventGroups: HistoricalEventGroup[] = [
+  { id: 'swiss', name: { en: 'Swiss History', de: 'Schweizer Geschichte', fr: 'Histoire Suisse' }, icon: '🇨🇭' },
   { id: 'exploration', name: { en: 'Exploration & Discovery', de: 'Entdeckungen', fr: 'Exploration & Découverte' }, icon: '🧭' },
   { id: 'science', name: { en: 'Science & Medicine', de: 'Wissenschaft & Medizin', fr: 'Science & Médecine' }, icon: '🔬' },
   { id: 'invention', name: { en: 'Inventions', de: 'Erfindungen', fr: 'Inventions' }, icon: '💡' },
@@ -250,6 +251,22 @@ export const historicalEventGroups: HistoricalEventGroup[] = [
 ];
 
 export const historicalEvents: HistoricalEvent[] = [
+  // Swiss History
+  { id: 'swiss-founding', name: { en: 'Founding of Switzerland (Rütlischwur)', de: 'Gründung der Schweiz (Rütlischwur)', fr: 'Fondation de la Suisse (Serment du Grütli)' }, shortName: { en: 'Rütlischwur', de: 'Rütlischwur', fr: 'Serment du Grütli' }, emoji: '🤝', year: 1291, category: 'swiss' },
+  { id: 'wilhelm-tell', name: { en: 'Wilhelm Tell and the Apple', de: 'Wilhelm Tell und der Apfel', fr: 'Guillaume Tell et la pomme' }, shortName: { en: 'Wilhelm Tell', de: 'Wilhelm Tell', fr: 'Guillaume Tell' }, emoji: '🏹', year: 1307, category: 'swiss', mainPerson: 'Wilhelm Tell' },
+  { id: 'battle-morgarten', name: { en: 'Battle of Morgarten', de: 'Schlacht am Morgarten', fr: 'Bataille de Morgarten' }, shortName: { en: 'Morgarten', de: 'Morgarten', fr: 'Morgarten' }, emoji: '⚔️', year: 1315, category: 'swiss' },
+  { id: 'battle-sempach', name: { en: 'Battle of Sempach (Winkelried)', de: 'Schlacht bei Sempach (Winkelried)', fr: 'Bataille de Sempach (Winkelried)' }, shortName: { en: 'Sempach', de: 'Sempach', fr: 'Sempach' }, emoji: '🛡️', year: 1386, category: 'swiss', mainPerson: 'Arnold von Winkelried' },
+  { id: 'swiss-reformation', name: { en: 'Swiss Reformation (Zwingli)', de: 'Schweizer Reformation (Zwingli)', fr: 'Réforme Suisse (Zwingli)' }, shortName: { en: 'Reformation', de: 'Reformation', fr: 'Réforme' }, emoji: '📜', year: 1523, category: 'swiss', mainPerson: 'Huldrych Zwingli' },
+  { id: 'red-cross-founding', name: { en: 'Henry Dunant Founds the Red Cross', de: 'Henry Dunant gründet das Rote Kreuz', fr: 'Henry Dunant fonde la Croix-Rouge' }, shortName: { en: 'Red Cross', de: 'Rotes Kreuz', fr: 'Croix-Rouge' }, emoji: '❤️', year: 1863, category: 'swiss', mainPerson: 'Henry Dunant' },
+  { id: 'general-dufour', name: { en: 'General Dufour and Swiss Unity', de: 'General Dufour und die Schweizer Einheit', fr: 'Général Dufour et l\'unité suisse' }, shortName: { en: 'General Dufour', de: 'General Dufour', fr: 'Général Dufour' }, emoji: '🎖️', year: 1847, category: 'swiss', mainPerson: 'Guillaume-Henri Dufour' },
+  { id: 'sonderbund-war', name: { en: 'The Sonderbund War', de: 'Der Sonderbundskrieg', fr: 'La Guerre du Sonderbund' }, shortName: { en: 'Sonderbund', de: 'Sonderbund', fr: 'Sonderbund' }, emoji: '🏔️', year: 1847, category: 'swiss' },
+  { id: 'swiss-constitution', name: { en: 'Swiss Federal Constitution', de: 'Schweizerische Bundesverfassung', fr: 'Constitution fédérale suisse' }, shortName: { en: 'Constitution', de: 'Bundesverfassung', fr: 'Constitution' }, emoji: '📋', year: 1848, category: 'swiss' },
+  { id: 'gotthard-tunnel', name: { en: 'Gotthard Railway Tunnel', de: 'Gotthard-Eisenbahntunnel', fr: 'Tunnel ferroviaire du Gothard' }, shortName: { en: 'Gotthard Tunnel', de: 'Gotthardtunnel', fr: 'Tunnel du Gothard' }, emoji: '🚂', year: 1882, category: 'swiss' },
+  { id: 'swiss-ww1-neutrality', name: { en: 'Swiss Neutrality in WWI', de: 'Schweizer Neutralität im 1. Weltkrieg', fr: 'Neutralité suisse pendant la Première Guerre' }, shortName: { en: 'WWI Neutrality', de: 'Neutralität 1. WK', fr: 'Neutralité 1GM' }, emoji: '🕊️', year: 1914, category: 'swiss' },
+  { id: 'general-guisan', name: { en: 'General Guisan and the Rütli Report', de: 'General Guisan und der Rütlirapport', fr: 'Général Guisan et le Rapport du Grütli' }, shortName: { en: 'General Guisan', de: 'General Guisan', fr: 'Général Guisan' }, emoji: '🎖️', year: 1940, category: 'swiss', mainPerson: 'Henri Guisan' },
+  { id: 'swiss-ww2-neutrality', name: { en: 'Switzerland in World War II', de: 'Die Schweiz im 2. Weltkrieg', fr: 'La Suisse pendant la Seconde Guerre' }, shortName: { en: 'WWII', de: '2. Weltkrieg', fr: '2ème GM' }, emoji: '🏔️', year: 1939, category: 'swiss' },
+  { id: 'swiss-womens-vote', name: { en: 'Swiss Women Win the Vote', de: 'Schweizer Frauenstimmrecht', fr: 'Droit de vote des femmes suisses' }, shortName: { en: 'Women\'s Vote', de: 'Frauenstimmrecht', fr: 'Vote des femmes' }, emoji: '🗳️', year: 1971, category: 'swiss' },
+
   // Exploration & Discovery
   { id: 'moon-landing', name: { en: 'First Moon Landing', de: 'Erste Mondlandung', fr: 'Premier pas sur la Lune' }, shortName: { en: 'Moon Landing', de: 'Mondlandung', fr: 'Alunissage' }, emoji: '🌙', year: 1969, category: 'exploration', mainPerson: 'Neil Armstrong' },
   { id: 'columbus-voyage', name: { en: 'Columbus Reaches the Americas', de: 'Kolumbus erreicht Amerika', fr: 'Colomb atteint les Amériques' }, shortName: { en: 'Discovery of America', de: 'Entdeckung Amerikas', fr: 'Découverte de l\'Amérique' }, emoji: '⛵', year: 1492, category: 'exploration', mainPerson: 'Christopher Columbus' },

@@ -38,7 +38,7 @@ export interface HistoricalEvent {
   shortName: LocalizedString;
   emoji: string;
   year: number | string;
-  category: 'exploration' | 'science' | 'invention' | 'rights' | 'construction' | 'culture' | 'archaeology';
+  category: 'swiss' | 'exploration' | 'science' | 'invention' | 'rights' | 'construction' | 'culture' | 'archaeology';
   mainPerson?: string;  // Main historical figure (e.g., "Neil Armstrong")
 }
 
