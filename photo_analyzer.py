@@ -455,16 +455,15 @@ def create_face_thumbnail(image, face_box, size=200):
 
 def remove_faces_except(image, keep_face_id, all_faces):
     """
-    Remove all faces AND bodies EXCEPT the selected one by making them transparent.
-    Uses midpoint approach: calculates midpoint between selected face and each other face,
-    removes everything on "their side" of the midpoint (below their face level).
+    Blank out non-selected faces by making them white/transparent.
+    Only removes the face rectangles, not body regions.
 
     Args:
         image: BGRA numpy array (must have alpha channel)
         keep_face_id: ID of face to keep (0-indexed)
         all_faces: list of face dicts with x, y, width, height (percentages 0-100)
 
-    Returns: image with non-selected faces and bodies made transparent
+    Returns: image with non-selected faces blanked out
     """
     if not all_faces or len(all_faces) <= 1:
         return image
@@ -477,61 +476,22 @@ def remove_faces_except(image, keep_face_id, all_faces):
         # Convert BGR to BGRA
         result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)
 
-    # Find the selected face
-    selected_face = None
-    for face in all_faces:
-        if face['id'] == keep_face_id:
-            selected_face = face
-            break
-
-    if selected_face is None:
-        print(f"[REMOVE] WARNING: Selected face ID {keep_face_id} not found")
-        return result
-
-    # Calculate selected face center (in pixels)
-    selected_center_x = int((selected_face['x'] + selected_face['width'] / 2) / 100 * w)
-
     for face in all_faces:
         if face['id'] == keep_face_id:
             continue  # Skip the selected face
 
-        # Calculate other face center (in pixels)
-        other_center_x = int((face['x'] + face['width'] / 2) / 100 * w)
-
-        # Calculate midpoint X between selected and other face
-        midpoint_x = (selected_center_x + other_center_x) // 2
-
-        # Determine which side to remove (left or right of midpoint)
-        remove_left = other_center_x < midpoint_x  # Other is to the left
-
-        # Calculate face top position (for face removal - with padding above)
-        face_padding = 0.3
+        # Calculate face boundaries with padding (50% extra to cover full head)
+        face_padding = 0.5
         face_top = int(max(0, (face['y'] / 100 - face['height'] / 100 * face_padding)) * h)
         face_bottom = int(min(1.0, (face['y'] + face['height']) / 100 + face['height'] / 100 * face_padding) * h)
-
-        # Face X boundaries (with padding)
         face_x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * face_padding)) * w)
         face_x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * face_padding) * w)
 
-        # 1. Remove the face region - set to WHITE and transparent
-        # (White RGB ensures AI models don't "see through" transparency to original data)
+        # Blank out the face region - set to WHITE and transparent
         if face_x2 > face_x1 and face_bottom > face_top:
             result[face_top:face_bottom, face_x1:face_x2, 0:3] = 255  # BGR = white
             result[face_top:face_bottom, face_x1:face_x2, 3] = 0      # Alpha = transparent
-            print(f"   Removed face {face['id']} at ({face_x1},{face_top})-({face_x2},{face_bottom})")
-
-        # 2. Remove body region: from face bottom to image bottom, on "their side" of midpoint
-        body_top = face_bottom  # Start from where face ends
-        if remove_left:
-            # Other person is to the left - remove from left edge to midpoint
-            result[body_top:h, 0:midpoint_x, 0:3] = 255  # BGR = white
-            result[body_top:h, 0:midpoint_x, 3] = 0       # Alpha = transparent
-            print(f"   Removed body {face['id']}: left side (0 to {midpoint_x}) below y={body_top}")
-        else:
-            # Other person is to the right - remove from midpoint to right edge
-            result[body_top:h, midpoint_x:w, 0:3] = 255  # BGR = white
-            result[body_top:h, midpoint_x:w, 3] = 0       # Alpha = transparent
-            print(f"   Removed body {face['id']}: right side ({midpoint_x} to {w}) below y={body_top}")
+            print(f"   Blanked face {face['id']} at ({face_x1},{face_top})-({face_x2},{face_bottom})")
 
     return result
 
