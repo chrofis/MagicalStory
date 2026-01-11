@@ -10,41 +10,6 @@ const router = express.Router();
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 
-// GET /api/characters/cleanup-styled-x7k9m - One-time cleanup endpoint (remove after use)
-router.get('/cleanup-styled-x7k9m', async (req, res) => {
-  try {
-    const email = 'rogerfischer@hotmail.com';
-    const userResult = await dbQuery("SELECT id FROM users WHERE email = $1", [email]);
-    if (userResult.length === 0) return res.json({ error: 'User not found' });
-
-    const userId = userResult[0].id;
-    const rowId = `characters_${userId}`;
-    const charResult = await dbQuery('SELECT data FROM characters WHERE id = $1', [rowId]);
-    if (charResult.length === 0) return res.json({ error: 'No character data' });
-
-    const data = JSON.parse(charResult[0].data);
-    let cleared = 0, styledCount = 0, costumedCount = 0;
-
-    for (const char of data.characters || []) {
-      if (char.avatars?.styledAvatars) {
-        styledCount += Object.keys(char.avatars.styledAvatars).length;
-        cleared += JSON.stringify(char.avatars.styledAvatars).length;
-        delete char.avatars.styledAvatars;
-      }
-      if (char.avatars?.costumed) {
-        costumedCount += Object.keys(char.avatars.costumed).length;
-        cleared += JSON.stringify(char.avatars.costumed).length;
-        delete char.avatars.costumed;
-      }
-    }
-
-    await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
-    res.json({ success: true, styledCount, costumedCount, clearedMB: (cleared/1024/1024).toFixed(2) });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // GET /api/characters - Get user's characters
 // Query params:
 //   - includeAllAvatars=true: Include all avatar variants (dev mode only)
@@ -100,7 +65,7 @@ router.get('/', authenticateToken, async (req, res) => {
         console.log(`[Characters] GET - Final characters count: ${characterData.characters.length}`);
 
         // Strip heavy avatar data for non-dev users to reduce payload
-        // Normal users only see 'standard' avatar in the UI
+        // Only return face thumbnails for list view - full avatars loaded on-demand
         if (!includeAllAvatars) {
           let strippedSize = 0;
           characterData.characters = characterData.characters.map(char => {
@@ -109,13 +74,16 @@ router.get('/', authenticateToken, async (req, res) => {
             // Calculate stripped size for logging
             const fullAvatarsJson = JSON.stringify(char.avatars);
 
-            // Keep only essential avatar data
+            // Only keep face thumbnail and status - no full avatar images
+            // Full 'standard' avatar is loaded on-demand via /api/characters/:id/avatar
             const lightAvatars = {
-              standard: char.avatars.standard,
               status: char.avatars.status,
               stale: char.avatars.stale,
               generatedAt: char.avatars.generatedAt,
-              faceThumbnails: char.avatars.faceThumbnails  // Keep face thumbnails for display
+              // Use faceThumbnail.standard for display (small ~50KB vs 1.5MB for full)
+              faceThumbnail: char.avatars.faceThumbnails?.standard || null,
+              // Flag to indicate full avatars need to be loaded separately
+              hasFullAvatars: !!(char.avatars.standard || char.avatars.winter || char.avatars.summer)
             };
 
             const lightAvatarsJson = JSON.stringify(lightAvatars);
