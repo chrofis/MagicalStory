@@ -520,26 +520,46 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
         img_h, img_w = img.shape[:2]
         print(f"[PHOTO] Processing image: {img_w}x{img_h}")
 
-        # 2. DETECT FACES - use best strategy based on aspect ratio
-        # MediaPipe struggles with tall portrait photos - 640x480 normalized works best
+        # 2. DETECT FACES - scale while maintaining aspect ratio
+        # IMPORTANT: Never distort the image - faces become undetectable when squished
         print("[FACE] Detecting faces...")
 
         aspect_ratio = img_h / img_w
         detection_img = img
 
-        # For portrait images (aspect > 1.3), ALWAYS use 640x480 normalized
-        # This consistently detects more faces than the original tall format
-        if aspect_ratio > 1.3:
-            print(f"[FACE] Portrait image (aspect: {aspect_ratio:.2f}) - using 640x480 normalized")
-            detection_img = cv2.resize(img, (640, 480), interpolation=cv2.INTER_AREA)
-        elif img_w > 1600 or img_h > 1600:
-            # For large landscape images, just scale down
-            max_dim = max(img_w, img_h)
+        # Scale to max dimension 1200px while maintaining aspect ratio
+        max_dim = max(img_w, img_h)
+        if max_dim > 1200:
             scale = 1200 / max_dim
-            detection_img = cv2.resize(img, (int(img_w * scale), int(img_h * scale)), interpolation=cv2.INTER_AREA)
-            print(f"[FACE] Large image - scaled to {detection_img.shape[1]}x{detection_img.shape[0]}")
+            new_w = int(img_w * scale)
+            new_h = int(img_h * scale)
+            detection_img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            print(f"[FACE] Scaled {img_w}x{img_h} -> {new_w}x{new_h} (aspect preserved: {aspect_ratio:.2f})")
+        else:
+            print(f"[FACE] Using original size {img_w}x{img_h} (aspect: {aspect_ratio:.2f})")
+
+        # DEBUG: Save detection image to see what MediaPipe analyzes
+        debug_path = os.path.join(TEMP_DIR, 'debug_detection_input.jpg')
+        cv2.imwrite(debug_path, detection_img)
+        print(f"[DEBUG] Saved detection input to: {debug_path}")
 
         all_faces = detect_all_faces_mediapipe(detection_img, min_confidence=0.15)
+
+        # DEBUG: Draw detected faces on image and save
+        if len(all_faces) > 0:
+            debug_img = detection_img.copy()
+            det_h, det_w = debug_img.shape[:2]
+            for f in all_faces:
+                x1 = int(f['x'] * det_w / 100)
+                y1 = int(f['y'] * det_h / 100)
+                x2 = int((f['x'] + f['width']) * det_w / 100)
+                y2 = int((f['y'] + f['height']) * det_h / 100)
+                cv2.rectangle(debug_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(debug_img, f"{f['confidence']*100:.0f}%", (x1, y1-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            debug_result_path = os.path.join(TEMP_DIR, 'debug_detection_result.jpg')
+            cv2.imwrite(debug_result_path, debug_img)
+            print(f"[DEBUG] Saved detection result to: {debug_result_path}")
+
         # Note: coordinates are percentages, so they map correctly to original image
         # Log each face with confidence AND position
         if len(all_faces) > 0:

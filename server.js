@@ -1771,6 +1771,13 @@ ${landmarkEntries}`;
 
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
+
+    // Load category-specific story requirements
+    const storyRequirementsFile = effectiveCategory === 'historical'
+      ? 'story-idea-requirements-historical.txt'
+      : 'story-idea-requirements-adventure.txt';
+    const storyRequirements = await fs.readFile(path.join(__dirname, 'prompts', storyRequirementsFile), 'utf-8');
+
     const prompt = promptTemplate
       .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
       .replace('{STORY_TYPE_NAME}', effectiveTheme)
@@ -1785,6 +1792,7 @@ ${landmarkEntries}`;
       .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
       .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
       .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
+      .replace('{STORY_REQUIREMENTS}', storyRequirements)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Call the text model (using the imported function)
@@ -2061,6 +2069,13 @@ ${landmarkEntries}`;
 
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
+
+    // Load category-specific story requirements
+    const storyRequirementsFile = effectiveCategory === 'historical'
+      ? 'story-idea-requirements-historical.txt'
+      : 'story-idea-requirements-adventure.txt';
+    const storyRequirements = await fs.readFile(path.join(__dirname, 'prompts', storyRequirementsFile), 'utf-8');
+
     const prompt = promptTemplate
       .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
       .replace('{STORY_TYPE_NAME}', effectiveTheme)
@@ -2075,6 +2090,7 @@ ${landmarkEntries}`;
       .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
       .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
       .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
+      .replace('{STORY_REQUIREMENTS}', storyRequirements)
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Get model to use

@@ -1,0 +1,39 @@
+--- STORY REQUIREMENTS FOR HISTORICAL STORIES ---
+
+STORY 1 REQUIREMENTS (PARTICIPANT - characters ARE the achievers):
+The main characters ARE the historical achievers - they perform the famous deeds themselves.
+
+**OUTPUT FORMAT - MUST START WITH ROLE ASSIGNMENTS:**
+Before writing the story outline, list each character's historical role:
+```
+ROLES:
+[Child Name]: [Historical Figure] ([their role in the event])
+[Child Name]: [Historical Figure] ([their role in the event])
+```
+
+Example outputs:
+- Moon landing: "ROLES:\nEmma: Neil Armstrong (first human to walk on the moon)\nMax: Mission Control Director (guides the mission from Houston)"
+- Wright Brothers: "ROLES:\nSophie: Orville Wright (pilot of the first flight)\nMax: Wilbur Wright (runs alongside the plane)"
+- Light bulb: "ROLES:\nEmma: Thomas Edison (inventor testing thousands of materials)"
+- Pyramids: "ROLES:\nEmma: Imhotep (chief architect)\nMax: Foreman (organizes the workers)\nSophie: Engineer (solves construction puzzles)"
+
+IMPORTANT:
+- List ALL main characters with their assigned historical roles FIRST
+- Then write the story outline
+- Each main character needs a meaningful role in the achievement
+- Supporting characters can take secondary roles (assistants, family, witnesses)
+
+STORY 2 REQUIREMENTS (OBSERVER - characters WITNESS the event):
+The main characters witness the historical event unfold - they are observers, not the famous figures.
+They experience history from the sidelines as a child, neighbor, friend, helper, or curious onlooker.
+
+Examples of observer roles:
+- Moon landing: "Emma and Max watch the Moon landing on TV with their family, dreaming of becoming astronauts."
+- Wright Brothers: "Sophie is a local child who watches two strange men testing flying machines on the beach."
+- Light bulb: "Max is Edison's young assistant who fetches materials and witnesses the breakthrough."
+- Pyramids: "Emma is a worker's daughter who sneaks onto the construction site and befriends the architect's son."
+
+IMPORTANT:
+- Characters observe, help, or are inspired by the historical figures
+- They can interact with the event but don't replace the famous people
+- Focus on the child's perspective and what they learn/experience
