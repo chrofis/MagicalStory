@@ -121,6 +121,8 @@ export default function StoryWizard() {
 
   // Characters state (step 1)
   const [characters, setCharacters] = useState<Character[]>([]);
+  // Characters saved with the story (for regeneration when viewing saved stories)
+  const [storyCharacters, setStoryCharacters] = useState<Array<{ id: number; name: string; photoData?: string }> | null>(null);
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
   const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits' | 'characteristics' | 'relationships' | 'avatar'>('photo');
@@ -439,6 +441,7 @@ export default function StoryWizard() {
       setStoryDetails('');
       setMainCharacters([]);
       setExcludedCharacters([]);
+      setStoryCharacters(null);
 
       // Clear localStorage for story settings
       localStorage.removeItem('story_type');
@@ -576,6 +579,15 @@ export default function StoryWizard() {
               relationships: story.relationships,
               relationshipTexts: story.relationshipTexts,
             });
+
+            // Store story's characters for regeneration (these are the characters used when the story was created)
+            if (story.characters?.length) {
+              setStoryCharacters(story.characters.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                photoData: c.photoData || c.photos?.face || c.photos?.original
+              })));
+            }
 
             // Show the story view immediately - images will load progressively
             setStep(6);
@@ -2217,8 +2229,9 @@ export default function StoryWizard() {
   const canGoNext = (): boolean => {
     // NEW ORDER: 1=Characters, 2=BookSettings, 3=StoryType, 4=ArtStyle, 5=Summary
     if (step === 1) {
-      // Step 1: Characters - must have at least one character, one main character, AND all relationships defined
-      return characters.length > 0 && mainCharacters.length > 0 && areAllRelationshipsDefined();
+      // Step 1: Characters - must have at least one character and one main character
+      // Relationships default to "not known to" which is acceptable (warning shown)
+      return characters.length > 0 && mainCharacters.length > 0;
     }
     if (step === 2) {
       // Step 2: Book Settings - always can proceed (languageLevel has default)
@@ -2893,6 +2906,11 @@ export default function StoryWizard() {
             onRegenerateAvatars={handleRegenerateAvatars}
             onRegenerateAvatarsWithTraits={handleRegenerateAvatarsWithTraits}
             onSaveAndRegenerateWithTraits={handleSaveAndRegenerateWithTraits}
+            onSaveAndTryNewPhoto={async () => {
+              // Save the character first, then go back to name step for new photo
+              await saveCharacter();
+              setCharacterStep('name');
+            }}
             relationships={relationships}
             relationshipTexts={relationshipTexts}
             onRelationshipChange={updateRelationship}
@@ -3048,7 +3066,7 @@ export default function StoryWizard() {
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}
               sceneDescriptions={progressiveStoryData?.sceneDescriptions || sceneDescriptions}
-              characters={characters.filter(c => !excludedCharacters.includes(c.id))}
+              characters={storyCharacters || characters.filter(c => !excludedCharacters.includes(c.id))}
               // Progressive mode props - active when generating (even before story text arrives)
               progressiveMode={isGenerating}
               progressiveData={progressiveStoryData || undefined}
@@ -3264,6 +3282,7 @@ export default function StoryWizard() {
                 // Clear story ID and URL parameter
                 setStoryId(null);
                 setJobId(null);
+                setStoryCharacters(null);
                 const newParams = new URLSearchParams(searchParams);
                 newParams.delete('storyId');
                 setSearchParams(newParams, { replace: true });
