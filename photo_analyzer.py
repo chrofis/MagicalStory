@@ -88,6 +88,18 @@ except ImportError:
     except ImportError:
         print("[INFO] MTCNN not available - will use MediaPipe fallback")
 
+# Try to initialize rembg (better background removal than MediaPipe)
+REMBG_AVAILABLE = False
+rembg_session = None
+try:
+    from rembg import remove as rembg_remove, new_session
+    # Use u2net model (good balance of speed and quality)
+    rembg_session = new_session("u2net")
+    REMBG_AVAILABLE = True
+    print("[OK] rembg background removal available (U2-Net)")
+except ImportError:
+    print("[INFO] rembg not available - will use MediaPipe fallback")
+
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
 os.makedirs(TEMP_DIR, exist_ok=True)
@@ -498,9 +510,37 @@ def remove_faces_except(image, keep_face_id, all_faces):
 
 def remove_background(image):
     """
-    Remove background from image using MediaPipe Selfie Segmentation.
+    Remove background from image using rembg (U2-Net) or MediaPipe fallback.
     Returns tuple: (image with transparent background (RGBA), binary mask)
     """
+    # Try rembg first (better quality, includes heads properly)
+    if REMBG_AVAILABLE:
+        try:
+            # Convert BGR to RGB for PIL
+            rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(rgb_image)
+
+            # Remove background using rembg
+            result_pil = rembg_remove(pil_image, session=rembg_session)
+
+            # Convert back to numpy RGBA
+            result_rgba = np.array(result_pil)
+
+            # Convert RGBA to BGRA for OpenCV
+            bgra = cv2.cvtColor(result_rgba, cv2.COLOR_RGBA2BGRA)
+
+            # Extract binary mask from alpha channel
+            binary_mask = bgra[:, :, 3]
+
+            # Set RGB to white where background is removed (alpha < 128)
+            bg_mask = binary_mask < 128
+            bgra[bg_mask, 0:3] = 255  # BGR = white
+
+            return bgra, binary_mask
+        except Exception as e:
+            print(f"[WARN] rembg failed: {e}, falling back to MediaPipe")
+
+    # Fallback to MediaPipe
     if not MEDIAPIPE_AVAILABLE:
         return None, None
 
@@ -815,6 +855,18 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
             body_box = get_body_bounds_from_mask(alpha_mask, padding_percent=0.05)
             if body_box:
                 print(f"   Body box from alpha mask: x={body_box['x']:.1f}%, y={body_box['y']:.1f}%, w={body_box['width']:.1f}%, h={body_box['height']:.1f}%")
+
+                # Extend body box upward to include the kept face (MediaPipe often misses heads)
+                kept_face = next((f for f in all_faces if f['id'] == selected_face_id), None)
+                if kept_face:
+                    # Face top with padding for top of head (50% above face)
+                    face_top = max(0, kept_face['y'] - kept_face['height'] * 0.5)
+                    if face_top < body_box['y']:
+                        # Extend body box upward to include head
+                        height_to_add = body_box['y'] - face_top
+                        body_box['y'] = face_top
+                        body_box['height'] += height_to_add
+                        print(f"   Extended body box to include head: y={body_box['y']:.1f}%, h={body_box['height']:.1f}%")
         elif len(all_faces) == 1 and body_mask is not None:
             # Single person - use segmentation mask bounds
             body_box = get_body_bounds_from_mask(body_mask, padding_percent=0.05)

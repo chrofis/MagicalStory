@@ -5,4 +5,4 @@ pillow==10.1.0
 numpy==1.24.3
 mediapipe==0.10.9
 mtcnn-opencv>=1.0.0
-# Force rebuild 1768174369
+rembg>=2.0.50

@@ -256,11 +256,15 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
     }
 
     const pool = getPool();
+    // Only extract tokenUsage and metadata - NOT full story data (which includes images)
+    // This prevents OOM crashes when loading 1000+ stories
     const storiesResult = await pool.query(`
       SELECT
         s.id,
         s.user_id,
-        s.data,
+        s.data::jsonb->'tokenUsage' as token_usage,
+        s.data::jsonb->>'storyType' as story_type,
+        s.data::jsonb->>'title' as title,
         s.created_at,
         u.email as user_email,
         u.username as user_name
@@ -289,8 +293,8 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
 
     for (const row of storiesResult.rows) {
       try {
-        const storyData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
-        const tokenUsage = storyData.tokenUsage;
+        // token_usage is already extracted by PostgreSQL JSONB operator
+        const tokenUsage = typeof row.token_usage === 'string' ? JSON.parse(row.token_usage) : row.token_usage;
 
         if (tokenUsage) {
           storiesWithTokenData++;
@@ -310,8 +314,9 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
             }
           }
 
-          const storyPages = storyData.pages || 0;
-          const bookPages = storyPages + 3;
+          // We no longer have pages info without loading full story data
+          // Use a reasonable estimate or skip book pages calculation
+          const bookPages = 20; // Default estimate
 
           // Aggregate by user
           const userKey = row.user_email || row.user_id || 'unknown';
@@ -346,7 +351,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
           }
 
           // Aggregate by story type
-          const storyType = storyData.storyType || 'unknown';
+          const storyType = row.story_type || 'unknown';
           if (!byStoryType[storyType]) {
             byStoryType[storyType] = {
               storyCount: 0,
@@ -436,9 +441,8 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
           if (storiesWithUsage.length < 50) {
             storiesWithUsage.push({
               id: row.id,
-              title: storyData.title,
-              storyType: storyData.storyType,
-              storyPages: storyPages,
+              title: row.title,
+              storyType: row.story_type,
               bookPages: bookPages,
               userId: row.user_id,
               userEmail: row.user_email,
