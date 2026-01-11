@@ -1960,9 +1960,9 @@ export function StoryDisplay({
                             <div className="flex gap-2 items-center">
                               <button
                                 onClick={() => openSceneEditModal(pageNumber)}
-                                disabled={isGenerating || isRegenerating || !hasEnoughCredits}
+                                disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
                                 className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating || isRegenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                 }`}
                                 title={!hasEnoughCredits
                                   ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
@@ -2304,9 +2304,9 @@ export function StoryDisplay({
                             <div className="flex gap-2 items-center">
                               <button
                                 onClick={() => openSceneEditModal(pageNumber)}
-                                disabled={isGenerating || isRegenerating || !hasEnoughCredits}
+                                disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
                                 className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating || isRegenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                 }`}
                                 title={!hasEnoughCredits
                                   ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
