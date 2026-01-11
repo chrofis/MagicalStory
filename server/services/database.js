@@ -149,6 +149,29 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id)`);
 
+    // Migration: Convert characters.data from TEXT to JSONB for faster operations
+    // Check if column is still TEXT and convert if needed
+    const charColType = await dbPool.query(`
+      SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'characters' AND column_name = 'data'
+    `);
+    if (charColType.rows[0]?.data_type === 'text') {
+      console.log('[DB] Converting characters.data from TEXT to JSONB...');
+      try {
+        // Add temporary JSONB column, copy data, swap columns
+        await dbPool.query('ALTER TABLE characters ADD COLUMN IF NOT EXISTS data_jsonb JSONB');
+        await dbPool.query('UPDATE characters SET data_jsonb = data::jsonb WHERE data_jsonb IS NULL AND data IS NOT NULL');
+        await dbPool.query('ALTER TABLE characters DROP COLUMN data');
+        await dbPool.query('ALTER TABLE characters RENAME COLUMN data_jsonb TO data');
+        await dbPool.query('ALTER TABLE characters ALTER COLUMN data SET NOT NULL');
+        console.log('[DB] ✅ Characters data column converted to JSONB');
+      } catch (err) {
+        console.error('[DB] Failed to convert characters.data to JSONB:', err.message);
+      }
+    }
+    // Create GIN index for faster JSONB queries
+    await dbPool.query('CREATE INDEX IF NOT EXISTS idx_characters_data_gin ON characters USING GIN (data)');
+
     // Stories table
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS stories (
