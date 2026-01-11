@@ -280,6 +280,12 @@ export interface SavedStory {
   languageLevel: LanguageLevel;
   pages: number;
   dedication?: string;
+  season?: string;  // Season when story takes place
+  userLocation?: {
+    city: string | null;
+    region: string | null;
+    country: string | null;
+  } | null;
   characters: Character[];
   mainCharacters: number[];
   relationships: RelationshipMap;

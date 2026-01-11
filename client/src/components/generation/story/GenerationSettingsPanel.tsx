@@ -18,6 +18,8 @@ export interface GenerationSettings {
   mainCharacters?: number[];
   relationships?: RelationshipMap;
   relationshipTexts?: RelationshipTextMap;
+  season?: string;
+  userLocation?: { city: string | null; region: string | null; country: string | null } | null;
 }
 
 interface GenerationSettingsPanelProps {
@@ -30,16 +32,19 @@ const categoryLabels: Record<string, Record<string, string>> = {
     adventure: 'Adventure',
     'life-challenge': 'Life Challenge',
     educational: 'Educational',
+    historical: 'Historical',
   },
   de: {
     adventure: 'Abenteuer',
     'life-challenge': 'Lebensherausforderung',
     educational: 'Bildung',
+    historical: 'Historisch',
   },
   fr: {
     adventure: 'Aventure',
     'life-challenge': 'Défi de vie',
     educational: 'Éducatif',
+    historical: 'Historique',
   },
 };
 
@@ -74,55 +79,73 @@ export function GenerationSettingsPanel({ settings, language }: GenerationSettin
   const t = (key: string) => {
     const labels: Record<string, Record<string, string>> = {
       en: {
-        title: 'Generation Settings',
+        title: 'Story Info',
         category: 'Category',
         topic: 'Topic',
         theme: 'Theme',
         storyType: 'Story Type',
-        storyDetails: 'Story Details',
+        storyDetails: 'Story Idea',
         artStyle: 'Art Style',
         language: 'Language',
         readingLevel: 'Reading Level',
-        pages: 'Pages',
+        pages: 'Length',
         dedication: 'Dedication',
-        characters: 'Characters',
-        mainCharacter: 'Main',
+        mainCharacters: 'Main Characters',
+        otherCharacters: 'Other Characters',
         relationships: 'Relationships',
+        season: 'Season',
+        location: 'Location',
         noData: 'Not specified',
+        spring: 'Spring',
+        summer: 'Summer',
+        autumn: 'Autumn',
+        winter: 'Winter',
       },
       de: {
-        title: 'Generierungseinstellungen',
+        title: 'Story-Info',
         category: 'Kategorie',
         topic: 'Thema',
         theme: 'Thema',
         storyType: 'Story-Typ',
-        storyDetails: 'Story-Details',
+        storyDetails: 'Story-Idee',
         artStyle: 'Kunststil',
         language: 'Sprache',
-        readingLevel: 'Leseniveau',
-        pages: 'Seiten',
+        readingLevel: 'Lesestufe',
+        pages: 'Länge',
         dedication: 'Widmung',
-        characters: 'Charaktere',
-        mainCharacter: 'Haupt',
+        mainCharacters: 'Hauptfiguren',
+        otherCharacters: 'Andere Figuren',
         relationships: 'Beziehungen',
+        season: 'Jahreszeit',
+        location: 'Ort',
         noData: 'Nicht angegeben',
+        spring: 'Frühling',
+        summer: 'Sommer',
+        autumn: 'Herbst',
+        winter: 'Winter',
       },
       fr: {
-        title: 'Paramètres de génération',
+        title: 'Info histoire',
         category: 'Catégorie',
         topic: 'Sujet',
         theme: 'Thème',
         storyType: 'Type d\'histoire',
-        storyDetails: 'Détails de l\'histoire',
+        storyDetails: 'Idée d\'histoire',
         artStyle: 'Style artistique',
         language: 'Langue',
         readingLevel: 'Niveau de lecture',
-        pages: 'Pages',
+        pages: 'Longueur',
         dedication: 'Dédicace',
-        characters: 'Personnages',
-        mainCharacter: 'Principal',
+        mainCharacters: 'Personnages principaux',
+        otherCharacters: 'Autres personnages',
         relationships: 'Relations',
+        season: 'Saison',
+        location: 'Lieu',
         noData: 'Non spécifié',
+        spring: 'Printemps',
+        summer: 'Été',
+        autumn: 'Automne',
+        winter: 'Hiver',
       },
     };
     return (labels[language] || labels.en)[key] || key;
@@ -144,6 +167,24 @@ export function GenerationSettingsPanel({ settings, language }: GenerationSettin
   };
 
   const mainCharacterIds = settings.mainCharacters || [];
+  const mainChars = settings.characters?.filter(c => mainCharacterIds.includes(c.id)) || [];
+  const otherChars = settings.characters?.filter(c => !mainCharacterIds.includes(c.id)) || [];
+
+  // Get season label
+  const getSeasonLabel = (season: string) => {
+    return t(season) || season;
+  };
+
+  // Format location string
+  const getLocationString = () => {
+    if (!settings.userLocation) return null;
+    const parts = [
+      settings.userLocation.city,
+      settings.userLocation.region,
+      settings.userLocation.country
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : null;
+  };
 
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
@@ -167,55 +208,73 @@ export function GenerationSettingsPanel({ settings, language }: GenerationSettin
       {/* Expandable content */}
       {isExpanded && (
         <div className="px-4 pb-4 space-y-4">
-          {/* Story Category & Topic/Theme */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* 1. Main Characters */}
+          {mainChars.length > 0 && (
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1">
-                <Book size={12} />
-                {t('category')}
+              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-2">
+                <User size={12} />
+                {t('mainCharacters')}
               </div>
-              <div className="text-sm">
-                {settings.storyCategory ? getCategoryLabel(settings.storyCategory) : renderValue(undefined)}
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1">
-                <FileText size={12} />
-                {settings.storyCategory === 'adventure' ? t('theme') : t('topic')}
-              </div>
-              <div className="text-sm">
-                {renderValue(settings.storyCategory === 'adventure' ? settings.storyTheme : settings.storyTopic)}
-              </div>
-            </div>
-          </div>
-
-          {/* Story Type Name (legacy) */}
-          {settings.storyTypeName && (
-            <div>
-              <div className="text-xs font-medium text-amber-700 mb-1">{t('storyType')}</div>
-              <div className="text-sm">{renderValue(settings.storyTypeName)}</div>
-            </div>
-          )}
-
-          {/* Story Details */}
-          {settings.storyDetails && (
-            <div>
-              <div className="text-xs font-medium text-amber-700 mb-1">{t('storyDetails')}</div>
-              <div className="text-sm bg-white/50 p-2 rounded border border-amber-100 whitespace-pre-wrap">
-                {settings.storyDetails}
+              <div className="flex flex-wrap gap-2">
+                {mainChars.map((char) => (
+                  <div
+                    key={char.id}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 border border-indigo-200"
+                  >
+                    <User size={10} />
+                    <span>{char.name}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Art Style & Language */}
+          {/* 2. Other Characters */}
+          {otherChars.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-2">
+                <Users size={12} />
+                {t('otherCharacters')}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {otherChars.map((char) => (
+                  <div
+                    key={char.id}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border border-gray-200"
+                  >
+                    <User size={10} />
+                    <span>{char.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 3. Relationships - show relationship types with names */}
+          {settings.relationships && Object.keys(settings.relationships).length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-amber-700 mb-2">{t('relationships')}</div>
+              <div className="text-xs bg-white/50 p-2 rounded border border-amber-100 space-y-1">
+                {Object.entries(settings.relationships).map(([key, relationshipType]) => {
+                  const [id1, id2] = key.split('-').map(id => parseInt(id, 10));
+                  const char1 = settings.characters?.find(c => c.id === id1);
+                  const char2 = settings.characters?.find(c => c.id === id2);
+                  if (!char1 || !char2) return null;
+                  return (
+                    <div key={key} className="flex gap-2">
+                      <span className="text-amber-600 font-medium whitespace-nowrap">
+                        {char1.name} → {char2.name}:
+                      </span>
+                      <span className="text-gray-700">{relationshipType}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 4-6. Language, Reading Level, Length */}
           <div className="grid grid-cols-3 gap-4">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1">
-                <Palette size={12} />
-                {t('artStyle')}
-              </div>
-              <div className="text-sm capitalize">{renderValue(settings.artStyle)}</div>
-            </div>
             <div>
               <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1">
                 <Globe size={12} />
@@ -231,76 +290,72 @@ export function GenerationSettingsPanel({ settings, language }: GenerationSettin
                 {settings.languageLevel ? getLevelLabel(settings.languageLevel) : renderValue(undefined)}
               </div>
             </div>
-          </div>
-
-          {/* Pages & Dedication */}
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-xs font-medium text-amber-700 mb-1">{t('pages')}</div>
-              <div className="text-sm">{renderValue(settings.pages)}</div>
-            </div>
-            {settings.dedication && (
-              <div>
-                <div className="text-xs font-medium text-amber-700 mb-1">{t('dedication')}</div>
-                <div className="text-sm italic">"{settings.dedication}"</div>
+              <div className="text-sm">
+                {settings.pages ? `${settings.pages} ${language === 'de' ? 'Seiten' : 'pages'}` : renderValue(undefined)}
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Characters */}
-          {settings.characters && settings.characters.length > 0 && (
+          {/* 7-9. Season, Location, Art Style */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-2">
-                <Users size={12} />
-                {t('characters')}
+              <div className="text-xs font-medium text-amber-700 mb-1">{t('season')}</div>
+              <div className="text-sm">
+                {settings.season ? getSeasonLabel(settings.season) : renderValue(undefined)}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {settings.characters.map((char) => {
-                  const isMain = mainCharacterIds.includes(char.id);
-                  return (
-                    <div
-                      key={char.id}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs ${
-                        isMain
-                          ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                          : 'bg-gray-100 text-gray-700 border border-gray-200'
-                      }`}
-                    >
-                      <User size={10} />
-                      <span>{char.name}</span>
-                      {isMain && (
-                        <span className="text-[10px] font-medium text-indigo-600">
-                          ({t('mainCharacter')})
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+            </div>
+            <div>
+              <div className="text-xs font-medium text-amber-700 mb-1">{t('location')}</div>
+              <div className="text-sm">
+                {getLocationString() || renderValue(undefined)}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1">
+                <Palette size={12} />
+                {t('artStyle')}
+              </div>
+              <div className="text-sm capitalize">{renderValue(settings.artStyle)}</div>
+            </div>
+          </div>
+
+          {/* 10. Story Idea/Details */}
+          {settings.storyDetails && (
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1">
+                <FileText size={12} />
+                {t('storyDetails')}
+              </div>
+              <div className="text-sm bg-white/50 p-2 rounded border border-amber-100 whitespace-pre-wrap">
+                {settings.storyDetails}
               </div>
             </div>
           )}
 
-          {/* Relationships */}
-          {settings.relationshipTexts && Object.keys(settings.relationshipTexts).length > 0 && (
-            <div>
-              <div className="text-xs font-medium text-amber-700 mb-2">{t('relationships')}</div>
-              <div className="text-xs bg-white/50 p-2 rounded border border-amber-100 space-y-1">
-                {Object.entries(settings.relationshipTexts).map(([key, text]) => {
-                  // Convert ID pair to names (key format: "id1-id2")
-                  const [id1, id2] = key.split('-').map(id => parseInt(id, 10));
-                  const char1 = settings.characters?.find(c => c.id === id1);
-                  const char2 = settings.characters?.find(c => c.id === id2);
-                  const displayKey = char1 && char2
-                    ? `${char1.name} → ${char2.name}`
-                    : key;
-                  return (
-                    <div key={key} className="flex gap-2">
-                      <span className="text-amber-600 font-medium whitespace-nowrap">{displayKey}:</span>
-                      <span className="text-gray-700">{text}</span>
-                    </div>
-                  );
-                })}
-              </div>
+          {/* Category & Theme (optional - for context) */}
+          {(settings.storyCategory || settings.storyTheme || settings.storyTopic) && (
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-amber-100">
+              {settings.storyCategory && (
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1">
+                    <Book size={12} />
+                    {t('category')}
+                  </div>
+                  <div className="text-sm">{getCategoryLabel(settings.storyCategory)}</div>
+                </div>
+              )}
+              {(settings.storyTheme || settings.storyTopic) && (
+                <div>
+                  <div className="text-xs font-medium text-amber-700 mb-1">
+                    {settings.storyCategory === 'adventure' ? t('theme') : t('topic')}
+                  </div>
+                  <div className="text-sm">
+                    {settings.storyCategory === 'adventure' ? settings.storyTheme : settings.storyTopic}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

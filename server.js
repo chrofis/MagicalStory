@@ -6788,6 +6788,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       languageLevel: '1st-grade',
       pages: sceneCount,
       dedication: dedication,
+      season: inputData.season || '', // Season when story takes place
+      userLocation: inputData.userLocation || null, // User's location for personalization
       characters: inputData.characters || [],
       mainCharacters: inputData.mainCharacters || [],
       relationships: inputData.relationships || {},
@@ -8118,6 +8120,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       languageLevel: inputData.languageLevel || '1st-grade',
       pages: inputData.pages || sceneCount,
       dedication: inputData.dedication || '',
+      season: inputData.season || '', // Season when story takes place
+      userLocation: inputData.userLocation || null, // User's location for personalization
       characters: inputData.characters || [],
       mainCharacters: inputData.mainCharacters || [],
       relationships: inputData.relationships || {},

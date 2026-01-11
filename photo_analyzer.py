@@ -38,6 +38,8 @@ CORS(app)
 mp_face_detection = None
 mp_selfie_segmentation = None
 MEDIAPIPE_AVAILABLE = False
+MEDIAPIPE_TASKS_AVAILABLE = False
+mp_tasks_face_detector = None
 
 try:
     import mediapipe as mp
@@ -47,8 +49,24 @@ try:
         mp_selfie_segmentation = mp.solutions.selfie_segmentation
         MEDIAPIPE_AVAILABLE = True
         print("[OK] MediaPipe legacy API available")
+    elif hasattr(mp, 'tasks'):
+        # Try new Tasks API (Python 3.14+)
+        from mediapipe.tasks import python as mp_python
+        from mediapipe.tasks.python import vision as mp_vision
+
+        # Download model if needed
+        model_path = os.path.join(os.path.dirname(__file__), 'blaze_face_short_range.tflite')
+        if not os.path.exists(model_path):
+            print("[INFO] Downloading MediaPipe face detection model...")
+            import urllib.request
+            model_url = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
+            urllib.request.urlretrieve(model_url, model_path)
+            print(f"[OK] Downloaded model to {model_path}")
+
+        MEDIAPIPE_TASKS_AVAILABLE = True
+        print("[OK] MediaPipe Tasks API available (Python 3.14+)")
     else:
-        print("[WARN] MediaPipe installed but legacy solutions API not available (Python 3.14+)")
+        print("[WARN] MediaPipe installed but no usable API found")
 except ImportError:
     print("[WARN] MediaPipe not installed - face detection disabled")
 
@@ -164,6 +182,59 @@ def detect_all_faces_opencv(image):
     return faces
 
 
+def detect_all_faces_mediapipe_tasks(image, min_confidence=0.15):
+    """
+    Detect ALL faces using MediaPipe Tasks API (Python 3.14+).
+    Returns list of faces sorted by confidence (highest first).
+    """
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision as mp_vision
+
+    model_path = os.path.join(os.path.dirname(__file__), 'blaze_face_short_range.tflite')
+
+    # Create face detector
+    base_options = mp_python.BaseOptions(model_asset_path=model_path)
+    options = mp_vision.FaceDetectorOptions(
+        base_options=base_options,
+        min_detection_confidence=min_confidence
+    )
+
+    faces = []
+    with mp_vision.FaceDetector.create_from_options(options) as detector:
+        # Convert BGR to RGB
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # Create MediaPipe Image
+        import mediapipe as mp
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
+
+        # Detect faces
+        detection_result = detector.detect(mp_image)
+
+        img_h, img_w = image.shape[:2]
+
+        for idx, detection in enumerate(detection_result.detections):
+            bbox = detection.bounding_box
+            confidence = detection.categories[0].score if detection.categories else 0.5
+
+            face = {
+                'id': idx,
+                'x': (bbox.origin_x / img_w) * 100,
+                'y': (bbox.origin_y / img_h) * 100,
+                'width': (bbox.width / img_w) * 100,
+                'height': (bbox.height / img_h) * 100,
+                'confidence': confidence
+            }
+            faces.append(face)
+
+    # Sort by confidence
+    faces.sort(key=lambda f: f['confidence'], reverse=True)
+    for i, face in enumerate(faces):
+        face['id'] = i
+
+    return faces
+
+
 def detect_all_faces_mediapipe(image, min_confidence=0.15):
     """
     Detect ALL faces using MediaPipe Face Detection.
@@ -173,6 +244,10 @@ def detect_all_faces_mediapipe(image, min_confidence=0.15):
 
     Returns: list of {id, x, y, width, height, confidence}
     """
+    # Try MediaPipe Tasks API first (Python 3.14+)
+    if MEDIAPIPE_TASKS_AVAILABLE:
+        return detect_all_faces_mediapipe_tasks(image, min_confidence)
+
     if not MEDIAPIPE_AVAILABLE:
         # Fallback to OpenCV when MediaPipe is not available
         return detect_all_faces_opencv(image)
@@ -544,6 +619,10 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
         print(f"[DEBUG] Saved detection input to: {debug_path}")
 
         all_faces = detect_all_faces_mediapipe(detection_img, min_confidence=0.15)
+
+        # Filter out tiny faces (likely false positives - hair tips, noise)
+        # Real faces should be at least 3% of image width/height
+        all_faces = [f for f in all_faces if f['width'] >= 3.0 and f['height'] >= 3.0]
 
         # DEBUG: Draw detected faces on image and save
         if len(all_faces) > 0:

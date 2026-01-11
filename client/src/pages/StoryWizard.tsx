@@ -578,6 +578,8 @@ export default function StoryWizard() {
               mainCharacters: story.mainCharacters,
               relationships: story.relationships,
               relationshipTexts: story.relationshipTexts,
+              season: story.season,
+              userLocation: story.userLocation,
             });
 
             // Store story's characters for regeneration (these are the characters used when the story was created)
@@ -2502,6 +2504,8 @@ export default function StoryWizard() {
       mainCharacters: mainCharacters,
       relationships: relationships,
       relationshipTexts: relationshipTexts,
+      season: season || undefined,
+      userLocation: userLocation || undefined,
     });
 
     // Reset ALL story state for new generation - must clear old story to show popup
@@ -2817,6 +2821,8 @@ export default function StoryWizard() {
             mainCharacters: mainCharacters,
             relationships: relationships,
             relationshipTexts: relationshipTexts,
+            season: season || undefined,
+            userLocation: userLocation || undefined,
           });
 
           // Mark that we just finished generating (skip server reload since data is in state)
@@ -3642,10 +3648,10 @@ export default function StoryWizard() {
                 const charWithUndefined = getCharacterWithMostUndefinedRelationships();
                 if (!charWithUndefined) return null;
                 const warningText = language === 'de'
-                  ? `${charWithUndefined.name} hat Beziehungen, die nicht definiert sind (Standard: "nicht bekannt")`
+                  ? `${charWithUndefined.name} hat Beziehungen, die nicht definiert sind ("nicht bekannt")`
                   : language === 'fr'
-                  ? `${charWithUndefined.name} a des relations non définies (par défaut : "ne connaît pas")`
-                  : `${charWithUndefined.name} has relationships that are not defined (default: "not known to")`;
+                  ? `${charWithUndefined.name} a des relations non définies ("ne connaît pas")`
+                  : `${charWithUndefined.name} has undefined relationships ("not known to")`;
                 return (
                   <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
                     <span className="text-amber-600 text-lg">⚠️</span>
