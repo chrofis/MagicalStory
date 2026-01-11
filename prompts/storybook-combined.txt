@@ -41,6 +41,9 @@ Create a simple story arc:
 - The entire page text should be a single flowing paragraph
 - Engaging sentences that tell the story and complement the illustration
 
+## Jokes and Humor
+If the story includes a joke or punchline, write 5 DIFFERENT VERSIONS in a `---JOKE VARIATIONS---` section at the start of your response. Number them 1-5 with different approaches. Use `[JOKE joke_id]` as placeholder in the story. If no jokes, skip this section.
+
 **GOOD EXAMPLE (Page text):**
 "Leo loved exploring the outdoors. Today, he discovered a secret trail deep in the woods. The trees were giant and full of green leaves. Birds called out from the branches high above. He walked steadily, looking for his next adventure. His brown backpack held all the important supplies for his trip."
 

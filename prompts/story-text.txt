@@ -52,6 +52,31 @@ Your characters must feel like real people, not cardboard cutouts.
 - Generic dialogue that any character could say
 - Characters who all react the same way
 
+## Jokes and Humor
+
+If the story includes a joke, pun, or humorous punchline:
+- Write 5 DIFFERENT VERSIONS of the joke in a `---JOKE VARIATIONS---` section before the story text
+- Each variation should have a different approach (wordplay, timing, setup, punchline)
+- Number them 1-5
+- The final story text should use `[JOKE #X]` as a placeholder where the joke appears
+- The system will select the best version for the final story
+
+**Format:**
+```
+---JOKE VARIATIONS---
+JOKE_ID: joke_page3
+1. "Why did the dragon sneeze? Because he caught a cold... fire!"
+2. "Why did the dragon sneeze? His cave was too dusty from all the gold!"
+3. "The dragon sneezed so hard, the whole mountain shook. 'Excuse me,' he said, 'I'm allergic to knights.'"
+4. "ACHOO! The dragon looked embarrassed. 'Sorry, I think I'm coming down with something... probably a knight-mare!'"
+5. "'Bless you!' said the princess. The dragon blushed. 'Thanks. I think I swallowed a butterfly.'"
+---END JOKE VARIATIONS---
+```
+
+Then in the story text: `[JOKE joke_page3]`
+
+If no jokes in the story, skip this section entirely.
+
 ## Language
 
 {LANGUAGE_INSTRUCTION}

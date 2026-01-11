@@ -76,6 +76,28 @@ You MUST follow these text length guidelines strictly. Each page's story text mu
 - Generic dialogue that any character could say
 - Characters who all react the same way
 
+# Jokes and Humor
+
+If the story includes a joke, pun, or humorous punchline:
+- Write 5 DIFFERENT VERSIONS of the joke in a `---JOKE VARIATIONS---` section (before the story pages)
+- Each variation should have a different approach (wordplay, timing, setup, punchline)
+- Number them 1-5 with a unique JOKE_ID
+- In the story text, use `[JOKE joke_id]` as a placeholder where the joke appears
+- The system will select the best version for the final story
+
+**Format example:**
+```
+---JOKE VARIATIONS---
+JOKE_ID: dragon_sneeze
+1. "Why did the dragon sneeze? Because he caught a cold... fire!"
+2. "Why did the dragon sneeze? His cave was too dusty from all the gold!"
+3. "'Bless you!' said the princess. The dragon blushed. 'Thanks. I think I swallowed a butterfly.'"
+4. "ACHOO! 'Excuse me,' the dragon said, 'I'm allergic to knights.'"
+5. "The dragon sneezed so hard, smoke came out of his ears. 'Oops,' he giggled."
+---END JOKE VARIATIONS---
+```
+
+If no jokes in the story, skip this section entirely.
 
 ---
 
