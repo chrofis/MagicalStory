@@ -1151,11 +1151,11 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
       if (analyzerData.multiple_faces_detected && analyzerData.faces) {
         log.info(`📸 [PHOTO] Multiple faces detected (${analyzerData.face_count}), returning for selection`);
 
-        // Convert faces to camelCase
+        // Convert faces to camelCase (handle both old snake_case and new camelCase from Python)
         const faces = analyzerData.faces.map(face => ({
           id: face.id,
           confidence: face.confidence,
-          faceBox: face.face_box,
+          faceBox: face.faceBox || face.face_box,
           thumbnail: face.thumbnail
         }));
 
