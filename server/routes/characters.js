@@ -218,6 +218,29 @@ router.post('/', authenticateToken, async (req, res) => {
           hasChanges = true;
         }
 
+        // Preserve photo data if not sent (reduces payload by 10-15MB)
+        // Photos are large base64 data URLs that don't need to be re-uploaded every save
+        if (existingChar.photo_url && !newChar.photo_url) {
+          mergedChar.photo_url = existingChar.photo_url;
+          preservedFields.push('photo_url');
+          hasChanges = true;
+        }
+        if (existingChar.thumbnail_url && !newChar.thumbnail_url) {
+          mergedChar.thumbnail_url = existingChar.thumbnail_url;
+          preservedFields.push('thumbnail_url');
+          hasChanges = true;
+        }
+        if (existingChar.body_photo_url && !newChar.body_photo_url) {
+          mergedChar.body_photo_url = existingChar.body_photo_url;
+          preservedFields.push('body_photo_url');
+          hasChanges = true;
+        }
+        if (existingChar.body_no_bg_url && !newChar.body_no_bg_url) {
+          mergedChar.body_no_bg_url = existingChar.body_no_bg_url;
+          preservedFields.push('body_no_bg_url');
+          hasChanges = true;
+        }
+
         if (preservedFields.length > 0) {
           console.log(`[Characters] POST - Preserving fields for ${newChar.name}: ${preservedFields.join(', ')}`);
         }
@@ -472,11 +495,11 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
     const rowId = `characters_${req.user.id}`;
 
     // First, get ONLY the character name (not the full data blob)
-    // Column is now JSONB, no need for ::jsonb cast
+    // Use ::jsonb cast to support both TEXT and JSONB column types
     const nameResult = await dbQuery(`
       SELECT c.elem->>'name' as name
       FROM characters,
-           jsonb_array_elements(data->'characters') WITH ORDINALITY AS c(elem, idx)
+           jsonb_array_elements(data::jsonb->'characters') WITH ORDINALITY AS c(elem, idx)
       WHERE id = $1
         AND (c.elem->>'id')::bigint = $2
     `, [rowId, characterIdToDelete]);
@@ -488,37 +511,37 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
     const deletedCharName = nameResult[0].name;
 
     // Use PostgreSQL to filter out the character and clean relationships IN-PLACE
-    // Column is JSONB so operations are fast (no TEXT parsing needed)
+    // Use ::jsonb cast to support both TEXT and JSONB column types
     const updateResult = await dbQuery(`
       UPDATE characters
       SET data = jsonb_build_object(
         'characters', COALESCE(
           (SELECT jsonb_agg(c)
-           FROM jsonb_array_elements(data->'characters') c
+           FROM jsonb_array_elements(data::jsonb->'characters') c
            WHERE (c->>'id')::bigint != $2),
           '[]'::jsonb
         ),
         'relationships', COALESCE(
           (SELECT jsonb_object_agg(key, value)
-           FROM jsonb_each(data->'relationships')
+           FROM jsonb_each(data::jsonb->'relationships')
            WHERE key NOT LIKE '%' || $2::text || '-%'
              AND key NOT LIKE '%-' || $2::text),
           '{}'::jsonb
         ),
         'relationshipTexts', COALESCE(
           (SELECT jsonb_object_agg(key, value)
-           FROM jsonb_each(data->'relationshipTexts')
+           FROM jsonb_each(data::jsonb->'relationshipTexts')
            WHERE key NOT LIKE '%' || $2::text || '-%'
              AND key NOT LIKE '%-' || $2::text),
           '{}'::jsonb
         ),
-        'customRelationships', COALESCE(data->'customRelationships', '[]'::jsonb),
-        'customStrengths', COALESCE(data->'customStrengths', '[]'::jsonb),
-        'customWeaknesses', COALESCE(data->'customWeaknesses', '[]'::jsonb),
-        'customFears', COALESCE(data->'customFears', '[]'::jsonb)
+        'customRelationships', COALESCE(data::jsonb->'customRelationships', '[]'::jsonb),
+        'customStrengths', COALESCE(data::jsonb->'customStrengths', '[]'::jsonb),
+        'customWeaknesses', COALESCE(data::jsonb->'customWeaknesses', '[]'::jsonb),
+        'customFears', COALESCE(data::jsonb->'customFears', '[]'::jsonb)
       )
       WHERE id = $1
-      RETURNING jsonb_array_length(data->'characters') as remaining_count
+      RETURNING jsonb_array_length(data::jsonb->'characters') as remaining_count
     `, [rowId, characterIdToDelete]);
 
     const remainingCount = updateResult[0]?.remaining_count || 0;

@@ -152,33 +152,49 @@ def detect_all_faces_opencv(image):
     """
     Fallback to detect all faces using OpenCV's Haar cascade.
     Returns list of faces sorted by size (largest first).
+    More strict settings to reduce false positives.
     """
     cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
     face_cascade = cv2.CascadeClassifier(cascade_path)
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    img_h, img_w = image.shape[:2]
+
+    # Minimum face size: at least 4% of smaller image dimension (not too strict)
+    min_face_size = int(min(img_w, img_h) * 0.04)
+    min_face_size = max(min_face_size, 30)  # At least 30px (original OpenCV default)
+
     faces_detected = face_cascade.detectMultiScale(
         gray,
         scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(30, 30)
+        minNeighbors=5,  # Keep original to catch more faces
+        minSize=(min_face_size, min_face_size)
     )
 
-    img_h, img_w = image.shape[:2]
     faces = []
 
     for idx, (x, y, w, h) in enumerate(faces_detected):
+        # Additional filter: face should be roughly square-ish (not too elongated)
+        aspect_ratio = w / h if h > 0 else 0
+        if aspect_ratio < 0.5 or aspect_ratio > 2.0:
+            continue  # Skip non-face-shaped detections
+
         faces.append({
             'id': idx,
             'x': (x / img_w) * 100,
             'y': (y / img_h) * 100,
             'width': (w / img_w) * 100,
             'height': (h / img_h) * 100,
-            'confidence': 0.8
+            'confidence': 0.5  # Lower confidence - OpenCV is less reliable than MediaPipe
         })
 
-    # Sort by size (area) descending
+    # Sort by size (area) descending - larger faces first
     faces.sort(key=lambda f: f['width'] * f['height'], reverse=True)
+
+    # Re-number IDs after filtering
+    for i, face in enumerate(faces):
+        face['id'] = i
+
     return faces
 
 

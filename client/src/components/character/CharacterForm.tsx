@@ -1006,10 +1006,12 @@ export function CharacterForm({
   // Step 5: Avatar Review for NEW characters
   if (isNewCharacter && step === 'avatar') {
     const avatarStatus = character.avatars?.status;
-    const displayAvatar = character.avatars?.standard ||
+    // Use faceThumbnail for display (lightweight), fall back to full avatars if available
+    const displayAvatar = character.avatars?.faceThumbnail ||
+                          character.avatars?.standard ||
                           character.avatars?.winter ||
                           character.avatars?.summer;
-    const hasAvatar = !!displayAvatar;
+    const hasAvatar = !!displayAvatar || character.avatars?.hasFullAvatars;
     const isStillGenerating = isGeneratingAvatar || isRegeneratingAvatarsWithTraits || avatarStatus === 'generating';
     const hasFailed = avatarStatus === 'failed';
 
@@ -1057,7 +1059,7 @@ export function CharacterForm({
                 src={displayAvatar}
                 alt={`${character.name} avatar`}
                 className="w-64 h-80 object-contain rounded-lg bg-white shadow-lg border-2 border-indigo-200 cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => setLightboxImage(displayAvatar)}
+                onClick={() => setLightboxImage(displayAvatar || null)}
                 title={language === 'de' ? 'Klicken zum Vergrössern' : language === 'fr' ? 'Cliquer pour agrandir' : 'Click to enlarge'}
               />
               {isStillGenerating && (
@@ -1285,45 +1287,54 @@ export function CharacterForm({
 
           {/* Avatar section - full width of left column */}
           <div>
-            {character.avatars?.standard ? (
-              <div className="relative">
-                <img
-                  src={character.avatars?.standard}
-                  alt={`${character.name} avatar`}
-                  className={`w-full object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
-                  onClick={() => setEnlargedAvatar(true)}
-                  title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
-                />
-                {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
-                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            {(() => {
+              // Use faceThumbnail for display, fall back to full avatar
+              const avatarToShow = character.avatars?.faceThumbnail || character.avatars?.standard;
+
+              if (avatarToShow) {
+                return (
+                  <div className="relative">
+                    <img
+                      src={avatarToShow}
+                      alt={`${character.name} avatar`}
+                      className={`w-full object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
+                      onClick={() => setEnlargedAvatar(true)}
+                      title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
+                    />
+                    {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
-                {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs text-indigo-600 font-medium px-2 text-center">
-                      {language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création...' : 'Creating...'}
+                );
+              }
+
+              return (
+                <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
+                  {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs text-indigo-600 font-medium px-2 text-center">
+                        {language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création...' : 'Creating...'}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-gray-400 text-center px-2">
+                      {language === 'de' ? 'Kein Bild' : 'No image'}
                     </span>
-                  </div>
-                ) : (
-                  <span className="text-[10px] text-gray-400 text-center px-2">
-                    {language === 'de' ? 'Kein Bild' : 'No image'}
-                  </span>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })()}
             {/* Enlarged avatar modal */}
-            {enlargedAvatar && character.avatars?.standard && (
+            {enlargedAvatar && (character.avatars?.faceThumbnail || character.avatars?.standard) && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                 onClick={() => setEnlargedAvatar(false)}
               >
                 <img
-                  src={character.avatars?.standard}
+                  src={character.avatars?.faceThumbnail || character.avatars?.standard}
                   alt={`${character.name} avatar`}
                   className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
@@ -2203,9 +2214,9 @@ export function CharacterForm({
               <div className="flex flex-col md:flex-row gap-6">
                 {/* Left side (or top on mobile): Avatar preview */}
                 <div className="flex-shrink-0 flex justify-center md:justify-start">
-                  {character.avatars?.standard ? (
+                  {(character.avatars?.faceThumbnail || character.avatars?.standard) ? (
                     <img
-                      src={character.avatars?.standard}
+                      src={character.avatars?.faceThumbnail || character.avatars?.standard}
                       alt={`${character.name} avatar`}
                       className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
                     />

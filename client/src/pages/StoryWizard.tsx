@@ -1294,7 +1294,7 @@ export default function StoryWizard() {
 
     // Check cooldown for existing characters with avatars (developers exempt)
     if (currentCharacter && !developerMode) {
-      const hasAvatars = !!(currentCharacter.avatars?.winter || currentCharacter.avatars?.standard || currentCharacter.avatars?.summer);
+      const hasAvatars = !!(currentCharacter.avatars?.winter || currentCharacter.avatars?.standard || currentCharacter.avatars?.summer || currentCharacter.avatars?.hasFullAvatars);
       log.info(`📸 hasAvatars=${hasAvatars}`);
       if (hasAvatars) {
         const cooldown = getAvatarCooldown(currentCharacter.id);
@@ -2023,7 +2023,7 @@ export default function StoryWizard() {
 
     // Skip avatar generation if already generating or complete
     const avatarStatus = currentCharacter.avatars?.status;
-    const hasAvatar = !!(currentCharacter.avatars?.standard || currentCharacter.avatars?.winter || currentCharacter.avatars?.summer);
+    const hasAvatar = !!(currentCharacter.avatars?.standard || currentCharacter.avatars?.winter || currentCharacter.avatars?.summer || currentCharacter.avatars?.hasFullAvatars);
     if (avatarStatus === 'generating' || (avatarStatus === 'complete' && hasAvatar)) {
       log.info(`⏭️ Skipping avatar generation - already ${avatarStatus}${hasAvatar ? ' with avatars' : ''}`);
       return;

@@ -105,15 +105,20 @@ export function GenerationProgress({
   const charactersWithAvatars = useMemo(() => {
     return characters.filter(char => {
       const avatars = char.avatars;
-      return avatars && (avatars.standard || avatars.summer || avatars.winter || avatars.formal);
+      // Use faceThumbnail for display (lightweight), or full avatars if available
+      return avatars && (avatars.faceThumbnail || avatars.standard || avatars.summer || avatars.winter || avatars.formal || avatars.hasFullAvatars);
     });
   }, [characters]);
 
-  // Get a random avatar for a character
+  // Get the best available avatar for a character (prefer lightweight faceThumbnail)
   const getRandomAvatar = (char: Character): string => {
     const avatars = char.avatars;
     if (!avatars) return '';
 
+    // Prefer faceThumbnail for display (lightweight ~50KB vs 1.5MB full avatar)
+    if (avatars.faceThumbnail) return avatars.faceThumbnail;
+
+    // Fall back to full avatars if faceThumbnail not available
     const available: string[] = [];
     if (avatars.standard) available.push(avatars.standard);
     if (avatars.summer) available.push(avatars.summer);

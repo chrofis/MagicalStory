@@ -188,15 +188,6 @@ function stripAvatarImages(avatars: Character['avatars']): Character['avatars'] 
   };
 }
 
-// Version that preserves avatar images (used when saving freshly generated avatars)
-function mapCharacterToApiWithAvatars(char: Partial<Character>): Record<string, unknown> {
-  const result = mapCharacterToApi(char);
-  // Override with full avatars (don't strip)
-  result.clothing_avatars = char.avatars;
-  result.avatars = char.avatars;
-  return result;
-}
-
 // Convert frontend Character to API format
 function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
   // Auto-compute ageCategory if not set but age is available
@@ -227,11 +218,9 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     other: char.physical?.other,  // Glasses, birthmarks, always-present accessories
     detailed_hair_analysis: char.physical?.detailedHairAnalysis,
     physical_traits_source: char.physicalTraitsSource,
-    // Photos
-    photo_url: char.photos?.original,
-    thumbnail_url: char.photos?.face,
-    body_photo_url: char.photos?.body,
-    body_no_bg_url: char.photos?.bodyNoBg,
+    // Photos - NOT sent on regular saves (server preserves existing)
+    // This reduces payload from 10-15MB to <1MB
+    // Photos are sent via mapCharacterToApiWithPhotos when uploading new photos
     face_box: char.photos?.faceBox,
     body_box: char.photos?.bodyBox,
     // Psychological traits
@@ -368,11 +357,27 @@ export const characterService = {
     });
   },
 
-  async saveCharacterData(data: CharacterData, options?: { preserveAvatars?: boolean }): Promise<void> {
-    // Use full avatar data if preserveAvatars is true (e.g., when saving freshly generated avatars)
-    const mapFn = options?.preserveAvatars ? mapCharacterToApiWithAvatars : mapCharacterToApi;
+  async saveCharacterData(data: CharacterData, options?: { preserveAvatars?: boolean; includePhotos?: boolean }): Promise<void> {
+    // Map each character with optional avatar/photo inclusion
+    // - preserveAvatars: include full avatar images (after avatar generation)
+    // - includePhotos: include photo data (after photo upload)
+    // - default: strip both (server preserves existing data)
+    const mapCharacter = (char: Character) => {
+      let result = mapCharacterToApi(char);
+      if (options?.preserveAvatars) {
+        result.clothing_avatars = char.avatars;
+        result.avatars = char.avatars;
+      }
+      if (options?.includePhotos) {
+        result.photo_url = char.photos?.original;
+        result.thumbnail_url = char.photos?.face;
+        result.body_photo_url = char.photos?.body;
+        result.body_no_bg_url = char.photos?.bodyNoBg;
+      }
+      return result;
+    };
     const apiData = {
-      characters: data.characters.map(mapFn),
+      characters: data.characters.map(mapCharacter),
       relationships: data.relationships,
       relationshipTexts: data.relationshipTexts,
       customRelationships: data.customRelationships,
@@ -882,8 +887,8 @@ export const characterService = {
     if (avatars.status === 'generating' || avatars.status === 'pending') return false; // Already in progress
     if (avatars.status === 'failed') return true; // Retry failed ones
 
-    // Check if at least one avatar exists
-    const hasAnyAvatar = !!(avatars.winter || avatars.standard || avatars.summer || avatars.formal);
+    // Check if at least one avatar exists (or hasFullAvatars flag is set)
+    const hasAnyAvatar = !!(avatars.winter || avatars.standard || avatars.summer || avatars.formal || avatars.hasFullAvatars);
     return !hasAnyAvatar;
   },
 
@@ -994,10 +999,11 @@ export const characterService = {
       }
 
       // Save back - preserve avatars since we just generated them
+      // Also include photos since this is typically called right after photo upload
       await characterService.saveCharacterData({
         ...currentData,
         characters: updatedCharacters,
-      }, { preserveAvatars: true });
+      }, { preserveAvatars: true, includePhotos: true });
 
       result.success = true;
       result.character = updatedCharacter;  // Return the updated character with avatars and extracted data
