@@ -31,82 +31,70 @@ router.get('/', authenticateToken, async (req, res) => {
     };
 
     if (isDatabaseMode()) {
-      // First try to get by exact ID (fast path - no sorting needed)
-      // Current format: characters_{user_id}
       const characterId = `characters_${req.user.id}`;
-      let rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+      let rows;
 
-      // Fallback: query by user_id if exact ID not found (handles legacy data)
-      // Legacy format: characters_{user_id}_{timestamp}
-      if (rows.length === 0) {
-        const fallbackQuery = `
-          SELECT data FROM characters
-          WHERE user_id = $1
-          ORDER BY created_at DESC
-          LIMIT 1
+      if (includeAllAvatars) {
+        // Admin mode: return full data (no stripping)
+        rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+        if (rows.length === 0) {
+          rows = await dbQuery('SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
+        }
+      } else {
+        // Normal mode: strip heavy avatar data in PostgreSQL (not Node.js)
+        // This avoids loading 30MB+ blob into memory just to strip it
+        const lightQuery = `
+          SELECT jsonb_build_object(
+            'characters', COALESCE((
+              SELECT jsonb_agg(
+                (SELECT jsonb_object_agg(key, value) FROM jsonb_each(c) WHERE key != 'avatars')
+                ||
+                CASE WHEN c->'avatars' IS NOT NULL THEN
+                  jsonb_build_object('avatars', jsonb_build_object(
+                    'status', c->'avatars'->'status',
+                    'stale', c->'avatars'->'stale',
+                    'generatedAt', c->'avatars'->'generatedAt',
+                    'faceThumbnail', c->'avatars'->'faceThumbnails'->'standard',
+                    'hasFullAvatars', (
+                      c->'avatars'->'standard' IS NOT NULL OR
+                      c->'avatars'->'winter' IS NOT NULL OR
+                      c->'avatars'->'summer' IS NOT NULL
+                    )
+                  ))
+                ELSE '{}'::jsonb
+                END
+              )
+              FROM jsonb_array_elements(data->'characters') c
+            ), '[]'::jsonb),
+            'relationships', COALESCE(data->'relationships', '{}'::jsonb),
+            'relationshipTexts', COALESCE(data->'relationshipTexts', '{}'::jsonb),
+            'customRelationships', COALESCE(data->'customRelationships', '[]'::jsonb),
+            'customStrengths', COALESCE(data->'customStrengths', '[]'::jsonb),
+            'customWeaknesses', COALESCE(data->'customWeaknesses', '[]'::jsonb),
+            'customFears', COALESCE(data->'customFears', '[]'::jsonb)
+          ) as data
+          FROM characters
+          WHERE id = $1
         `;
-        rows = await dbQuery(fallbackQuery, [req.user.id]);
+        rows = await dbQuery(lightQuery, [characterId]);
+
+        // Fallback for legacy data
+        if (rows.length === 0) {
+          const fallbackQuery = lightQuery.replace('WHERE id = $1', 'WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1');
+          rows = await dbQuery(fallbackQuery, [req.user.id]);
+        }
       }
+
       console.log(`[Characters] GET - Found ${rows.length} rows for user_id: ${req.user.id}, includeAllAvatars: ${includeAllAvatars}`);
 
       if (rows.length > 0) {
-        // JSONB columns return objects directly, TEXT returns strings
         const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-        console.log(`[Characters] GET - Parsed data keys: ${Object.keys(data).join(', ')}`);
-        console.log(`[Characters] GET - Characters count in data: ${Array.isArray(data) ? data.length : (data.characters?.length || 0)}`);
-        // Handle both old format (array) and new format (object)
         if (Array.isArray(data)) {
           characterData.characters = data;
         } else {
-          characterData = {
-            ...characterData,
-            ...data
-          };
+          characterData = { ...characterData, ...data };
         }
-        console.log(`[Characters] GET - Final characters count: ${characterData.characters.length}`);
-
-        // Strip heavy avatar data for non-dev users to reduce payload
-        // Only return face thumbnails for list view - full avatars loaded on-demand
-        if (!includeAllAvatars) {
-          let strippedSize = 0;
-          characterData.characters = characterData.characters.map(char => {
-            if (!char.avatars) return char;
-
-            // Calculate stripped size for logging
-            const fullAvatarsJson = JSON.stringify(char.avatars);
-
-            // Only keep face thumbnail and status - no full avatar images
-            // Full 'standard' avatar is loaded on-demand via /api/characters/:id/avatar
-            const lightAvatars = {
-              status: char.avatars.status,
-              stale: char.avatars.stale,
-              generatedAt: char.avatars.generatedAt,
-              // Use faceThumbnail.standard for display (small ~50KB vs 1.5MB for full)
-              faceThumbnail: char.avatars.faceThumbnails?.standard || null,
-              // Flag to indicate full avatars need to be loaded separately
-              hasFullAvatars: !!(char.avatars.standard || char.avatars.winter || char.avatars.summer)
-            };
-
-            const lightAvatarsJson = JSON.stringify(lightAvatars);
-            strippedSize += fullAvatarsJson.length - lightAvatarsJson.length;
-
-            return {
-              ...char,
-              avatars: lightAvatars
-            };
-          });
-          if (strippedSize > 0) {
-            console.log(`[Characters] GET - Stripped ${(strippedSize / 1024 / 1024).toFixed(2)} MB of avatar data for normal user`);
-          }
-        } else {
-          // Debug: Check for styled avatars (dev mode)
-          for (const char of characterData.characters) {
-            if (char.avatars?.styledAvatars) {
-              const styles = Object.keys(char.avatars.styledAvatars);
-              console.log(`[Characters] GET - ${char.name} has styledAvatars for: ${styles.join(', ')}`);
-            }
-          }
-        }
+        console.log(`[Characters] GET - Characters count: ${characterData.characters.length}`);
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
