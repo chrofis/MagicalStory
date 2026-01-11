@@ -6747,7 +6747,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             const characterId = `characters_${userId}`;
             const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
             if (charResult.rows.length > 0) {
-              const charData = JSON.parse(charResult.rows[0].data);
+              // Handle both TEXT and JSONB column types
+              const rawData = charResult.rows[0].data;
+              const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
               const chars = charData.characters || [];
               let updatedCount = 0;
 
@@ -8168,7 +8170,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const characterId = `characters_${userId}`;
           const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
           if (charResult.rows.length > 0) {
-            const charData = JSON.parse(charResult.rows[0].data);
+            // Handle both TEXT and JSONB column types
+            const rawData = charResult.rows[0].data;
+            const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
             const chars = charData.characters || [];
             let updatedCount = 0;
             for (const dbChar of chars) {
@@ -9902,7 +9906,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             log.debug(`💾 [PIPELINE] Looking up characters table with id: ${characterId}`);
             const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
             if (charResult.rows.length > 0) {
-              const charData = JSON.parse(charResult.rows[0].data);
+              // Handle both TEXT and JSONB column types
+              const rawData = charResult.rows[0].data;
+              const charData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
               const chars = charData.characters || [];
               log.debug(`💾 [PIPELINE] Found ${chars.length} characters in DB: ${chars.map(c => `"${c.name}"`).join(', ')}`);
               let updatedCount = 0;
