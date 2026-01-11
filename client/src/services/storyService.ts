@@ -800,7 +800,23 @@ export const storyService = {
     const controller = new AbortController();
     const token = localStorage.getItem('auth_token');
 
+    // Timeout after 2 minutes of no response
+    const STREAM_TIMEOUT_MS = 120000;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let lastActivityTime = Date.now();
+
+    const resetTimeout = () => {
+      lastActivityTime = Date.now();
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.warn('[generateStoryIdeasStream] Stream timeout - no activity for 2 minutes');
+        controller.abort();
+        callbacks.onError?.('Connection timeout. Please try again.');
+      }, STREAM_TIMEOUT_MS);
+    };
+
     const fetchStream = async () => {
+      resetTimeout(); // Start initial timeout
       try {
         const response = await fetch('/api/generate-story-ideas-stream', {
           method: 'POST',
@@ -831,6 +847,8 @@ export const storyService = {
           const { done, value } = await reader.read();
           if (done) break;
 
+          // Reset timeout on any activity
+          resetTimeout();
           buffer += decoder.decode(value, { stream: true });
 
           // Parse SSE events
@@ -863,16 +881,22 @@ export const storyService = {
           }
         }
       } catch (err) {
+        if (timeoutId) clearTimeout(timeoutId);
         if ((err as Error).name !== 'AbortError') {
           callbacks.onError?.((err as Error).message || 'Stream error');
         }
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
       }
     };
 
     fetchStream();
 
     return {
-      abort: () => controller.abort(),
+      abort: () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        controller.abort();
+      },
     };
   },
 

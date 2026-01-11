@@ -1147,6 +1147,26 @@ export default function StoryWizard() {
     }
   }, [step, storyCategory, storyTheme, storyTopic, characters.length, isGeneratingIdeas, generatedIdeas.length]);
 
+  // Safety timeout: reset isGeneratingIdeas if stuck for too long (e.g., server deploy)
+  useEffect(() => {
+    if (!isGeneratingIdeas) return;
+
+    const SAFETY_TIMEOUT_MS = 150000; // 2.5 minutes (slightly longer than stream timeout)
+    const timeoutId = setTimeout(() => {
+      log.warn('[StoryWizard] Safety timeout - resetting isGeneratingIdeas after 2.5 minutes');
+      setIsGeneratingIdeas(false);
+      setIsGeneratingIdea1(false);
+      setIsGeneratingIdea2(false);
+      showError(language === 'de'
+        ? 'Zeitüberschreitung bei der Ideengenerierung. Bitte versuchen Sie es erneut.'
+        : language === 'fr'
+        ? 'Délai d\'attente de génération d\'idées. Veuillez réessayer.'
+        : 'Idea generation timed out. Please try again.');
+    }, SAFETY_TIMEOUT_MS);
+
+    return () => clearTimeout(timeoutId);
+  }, [isGeneratingIdeas, language]);
+
   // Persist wizard step to localStorage (so navigating away and back preserves position)
   useEffect(() => {
     // Only persist steps 1-5, not step 6 (which is story viewing/generation)
@@ -3617,6 +3637,22 @@ export default function StoryWizard() {
           {/* Navigation buttons - inside the container */}
           {step < 6 && !currentCharacter && (
             <div className="mt-6 pt-6 border-t border-gray-200">
+              {/* Warning for undefined relationships in step 1 */}
+              {step === 1 && characters.length >= 2 && !areAllRelationshipsDefined() && (() => {
+                const charWithUndefined = getCharacterWithMostUndefinedRelationships();
+                if (!charWithUndefined) return null;
+                const warningText = language === 'de'
+                  ? `${charWithUndefined.name} hat Beziehungen, die nicht definiert sind (Standard: "nicht bekannt")`
+                  : language === 'fr'
+                  ? `${charWithUndefined.name} a des relations non définies (par défaut : "ne connaît pas")`
+                  : `${charWithUndefined.name} has relationships that are not defined (default: "not known to")`;
+                return (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                    <span className="text-amber-600 text-lg">⚠️</span>
+                    <p className="text-amber-700 text-sm">{warningText}</p>
+                  </div>
+                );
+              })()}
               {/* Steps 1-4: Back and Next buttons side by side */}
               {step !== 5 && (
                 <div className={`flex ${step === 1 ? 'justify-end' : 'justify-between'}`}>
