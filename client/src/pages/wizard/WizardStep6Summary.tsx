@@ -29,6 +29,8 @@ interface WizardStep6Props {
   storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '';
   storyTopic: string;
   storyTheme: string;
+  customThemeText?: string;
+  onCustomThemeTextChange?: (text: string) => void;
   artStyle: string;
   storyLanguage: StoryLanguageCode;
   languageLevel: string;
@@ -70,6 +72,8 @@ export function WizardStep6Summary({
   storyCategory,
   storyTopic,
   storyTheme,
+  customThemeText = '',
+  onCustomThemeTextChange,
   artStyle,
   storyLanguage,
   languageLevel,
@@ -225,6 +229,9 @@ export function WizardStep6Summary({
     option1: language === 'de' ? 'Option 1' : language === 'fr' ? 'Option 1' : 'Option 1',
     option2: language === 'de' ? 'Option 2' : language === 'fr' ? 'Option 2' : 'Option 2',
     selected: language === 'de' ? 'Ausgewählt' : language === 'fr' ? 'Sélectionné' : 'Selected',
+    customTheme: language === 'de' ? 'Eigenes Thema' : language === 'fr' ? 'Thème personnalisé' : 'Custom Theme',
+    customThemePlaceholder: language === 'de' ? 'Beschreibe dein Abenteuer-Thema...' : language === 'fr' ? 'Décris ton thème...' : 'Describe your adventure theme...',
+    useMyTheme: language === 'de' ? 'Mein Thema direkt verwenden' : language === 'fr' ? 'Utiliser mon thème directement' : 'Use my theme directly',
   };
 
   return (
@@ -298,6 +305,43 @@ export function WizardStep6Summary({
           <button onClick={() => onEditStep(4)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
       </div>
+
+      {/* Custom Theme - shown when storyTheme is 'custom' */}
+      {storyTheme === 'custom' && (
+        <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-lg font-semibold text-purple-800 flex items-center gap-2">
+              ✨ {t.customTheme}
+            </label>
+            <button
+              onClick={() => {
+                if (customThemeText.trim()) {
+                  onSelectIdea(customThemeText);
+                }
+              }}
+              disabled={!customThemeText.trim()}
+              className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              <Check size={14} />
+              {t.useMyTheme}
+            </button>
+          </div>
+          <textarea
+            value={customThemeText}
+            onChange={(e) => onCustomThemeTextChange?.(e.target.value)}
+            placeholder={t.customThemePlaceholder}
+            className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none text-base bg-white"
+            rows={3}
+          />
+          <p className="text-xs text-purple-600 mt-1">
+            {language === 'de'
+              ? 'Dieses Thema wird für die Ideengenerierung verwendet. Du kannst es auch direkt als Handlung verwenden.'
+              : language === 'fr'
+              ? 'Ce thème sera utilisé pour la génération d\'idées. Tu peux aussi l\'utiliser directement comme intrigue.'
+              : 'This theme will be used for idea generation. You can also use it directly as your plot.'}
+          </p>
+        </div>
+      )}
 
       {/* Story Details - Required */}
       <div>
