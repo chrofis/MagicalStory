@@ -50,7 +50,8 @@ router.get('/', authenticateToken, async (req, res) => {
       console.log(`[Characters] GET - Found ${rows.length} rows for user_id: ${req.user.id}, includeAllAvatars: ${includeAllAvatars}`);
 
       if (rows.length > 0) {
-        const data = JSON.parse(rows[0].data);
+        // JSONB columns return objects directly, TEXT returns strings
+        const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
         console.log(`[Characters] GET - Parsed data keys: ${Object.keys(data).join(', ')}`);
         console.log(`[Characters] GET - Characters count in data: ${Array.isArray(data) ? data.length : (data.characters?.length || 0)}`);
         // Handle both old format (array) and new format (object)
@@ -136,7 +137,7 @@ router.post('/', authenticateToken, async (req, res) => {
       const existingRows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
       let existingCharacters = [];
       if (existingRows.length > 0) {
-        const existingData = JSON.parse(existingRows[0].data);
+        const existingData = typeof existingRows[0].data === 'string' ? JSON.parse(existingRows[0].data) : existingRows[0].data;
         existingCharacters = existingData.characters || [];
       }
 
@@ -422,7 +423,7 @@ router.delete('/avatars/styled', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'No character data found' });
     }
 
-    const data = JSON.parse(rows[0].data);
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     const characters = data.characters || [];
 
     let clearedCount = 0;
