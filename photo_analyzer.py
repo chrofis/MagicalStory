@@ -633,6 +633,9 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
                 face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
                 print("   Face thumbnail created (768x768)")
 
+        # Max dimensions for body images (efficient for avatar generation)
+        max_w, max_h = 512, 768
+
         # Body with transparent background
         if full_img_rgba is not None:
             # Crop to body_box (calculated from alpha mask for multi-face, or segmentation mask for single-face)
@@ -644,25 +647,26 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
                 print(f"   Using full image for body_no_bg (no body_box)")
 
             if body_img_rgba.size > 0:
-                # Resize if too large
                 bh, bw = body_img_rgba.shape[:2]
-                if bw > 600 or bh > 800:
-                    scale = min(600/bw, 800/bh)
-                    body_img_rgba = cv2.resize(body_img_rgba, (int(bw*scale), int(bh*scale)))
+                if bw > max_w or bh > max_h:
+                    scale = min(max_w/bw, max_h/bh)
+                    new_w, new_h = int(bw*scale), int(bh*scale)
+                    body_img_rgba = cv2.resize(body_img_rgba, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                    print(f"   Resized body_no_bg from {bw}x{bh} to {new_w}x{new_h}")
 
-                # Encode as PNG to preserve transparency
-                _, buffer_png = cv2.imencode('.png', body_img_rgba)
+                # Encode as PNG with max compression (level 9) to preserve transparency
+                _, buffer_png = cv2.imencode('.png', body_img_rgba, [cv2.IMWRITE_PNG_COMPRESSION, 9])
                 body_no_bg = f"data:image/png;base64,{base64.b64encode(buffer_png).decode('utf-8')}"
-                print("   Body no-bg created")
+                print(f"   Body no-bg created: {len(buffer_png)//1024}KB")
 
         # Also create body with background (for display)
         if body_box and img is not None:
             body_img = crop_to_box(img, body_box)
             if body_img.size > 0:
                 bh, bw = body_img.shape[:2]
-                if bw > 600 or bh > 800:
-                    scale = min(600/bw, 800/bh)
-                    body_img = cv2.resize(body_img, (int(bw*scale), int(bh*scale)))
+                if bw > max_w or bh > max_h:
+                    scale = min(max_w/bw, max_h/bh)
+                    body_img = cv2.resize(body_img, (int(bw*scale), int(bh*scale)), interpolation=cv2.INTER_AREA)
                 _, buffer = cv2.imencode('.jpg', body_img, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 body_crop = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
