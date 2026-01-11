@@ -1802,18 +1802,19 @@ ${landmarkEntries}`;
     const responseText = result.text.trim();
 
     // Try [FINAL_1]/[FINAL_2] format first (expected from prompt)
-    let idea1Match = responseText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\]|##\s*STORY\s*2|$)/i);
+    // Include \n--- as terminator for markdown horizontal rule separator between stories
+    let idea1Match = responseText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\n---|\[DRAFT_2\]|\[FINAL_2\]|##\s*STORY\s*2|$)/i);
     let idea2Match = responseText.match(/\[FINAL_2\]\s*([\s\S]*?)$/);
 
     // Try ## STORY 1 / ## STORY 2 format
     if (!idea1Match || !idea2Match) {
-      idea1Match = responseText.match(/##\s*STORY\s*1[:\s]*([^\n]*(?:\n(?!##\s*STORY\s*2)[\s\S])*?)(?=##\s*STORY\s*2|$)/i);
+      idea1Match = responseText.match(/##\s*STORY\s*1[:\s]*([^\n]*(?:\n(?!\n---|##\s*STORY\s*2)[\s\S])*?)(?=\n---|##\s*STORY\s*2|$)/i);
       idea2Match = responseText.match(/##\s*STORY\s*2[:\s]*([\s\S]*?)$/i);
     }
 
     // Try STORY 1: / STORY 2: format (without ##)
     if (!idea1Match || !idea2Match) {
-      idea1Match = responseText.match(/STORY\s*1[:\s]+([^\n]*(?:\n(?!STORY\s*2)[\s\S])*?)(?=STORY\s*2|$)/i);
+      idea1Match = responseText.match(/STORY\s*1[:\s]+([^\n]*(?:\n(?!\n---|STORY\s*2)[\s\S])*?)(?=\n---|STORY\s*2|$)/i);
       idea2Match = responseText.match(/STORY\s*2[:\s]+([\s\S]*?)$/i);
     }
 
@@ -2093,14 +2094,14 @@ ${landmarkEntries}`;
 
     // Helper function to parse story markers (supports multiple formats)
     const parseStory1 = (text) => {
-      // Try [FINAL_1] format first
-      let match = text.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[FINAL_2\]|##\s*STORY\s*2|\*\*\s*Story\s*2)/i);
+      // Try [FINAL_1] format first - includes --- separator and $ fallback
+      let match = text.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\n---|\[DRAFT_2\]|\[FINAL_2\]|##\s*STORY\s*2|\*\*\s*Story\s*2|$)/i);
       if (match) return match[1].trim();
       // Try ## STORY 1 format
-      match = text.match(/##\s*STORY\s*1[:\s]*([^\n]*(?:\n(?!##\s*STORY\s*2|\*\*\s*Story\s*2)[\s\S])*?)(?=##\s*STORY\s*2|\*\*\s*Story\s*2)/i);
+      match = text.match(/##\s*STORY\s*1[:\s]*([^\n]*(?:\n(?!\n---|##\s*STORY\s*2|\*\*\s*Story\s*2)[\s\S])*?)(?=\n---|##\s*STORY\s*2|\*\*\s*Story\s*2|$)/i);
       if (match) return match[1].trim();
       // Try **Story 1: Title** format (bold markdown)
-      match = text.match(/\*\*\s*Story\s*1[:\s]*[^*]*\*\*\s*([\s\S]*?)(?=\*\*\s*Story\s*2)/i);
+      match = text.match(/\*\*\s*Story\s*1[:\s]*[^*]*\*\*\s*([\s\S]*?)(?=\n---|\*\*\s*Story\s*2|$)/i);
       if (match) return match[1].trim();
       return null;
     };
