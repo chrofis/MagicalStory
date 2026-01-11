@@ -261,8 +261,24 @@ export function StoryCategorySelector({
           {t.theme}
         </h2>
 
+        {/* Custom theme option at top level */}
+        <button
+          onClick={() => handleAdventureThemeSelect('custom')}
+          className="w-full p-4 rounded-xl border-2 border-dashed border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50 transition-all flex items-center gap-3"
+        >
+          <span className="text-3xl">✨</span>
+          <div className="text-left">
+            <div className="font-bold text-indigo-700">
+              {lang === 'de' ? 'Eigenes Thema' : lang === 'fr' ? 'Créer le vôtre' : 'Create Your Own'}
+            </div>
+            <div className="text-sm text-gray-600">
+              {lang === 'de' ? 'Beschreibe dein eigenes Abenteuer-Thema' : lang === 'fr' ? 'Décris ton propre thème d\'aventure' : 'Describe your own adventure theme'}
+            </div>
+          </div>
+        </button>
+
         <div className="space-y-3">
-          {adventureThemeGroups.map((group) => {
+          {adventureThemeGroups.filter(g => g.id !== 'custom').map((group) => {
             const themes = getStoryTypesByGroup(group.id);
             const isExpanded = expandedAdventureGroups.includes(group.id);
 
