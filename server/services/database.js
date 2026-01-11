@@ -151,12 +151,14 @@ async function initializeDatabase() {
 
     // Migration: Convert characters.data from TEXT to JSONB for faster operations
     // Check if column is still TEXT and convert if needed
+    console.log('[DB] Checking characters.data column type...');
     const charColType = await dbPool.query(`
       SELECT data_type FROM information_schema.columns
       WHERE table_name = 'characters' AND column_name = 'data'
     `);
-    const currentType = charColType.rows[0]?.data_type;
-    console.log(`[DB] Characters data column type: ${currentType}`);
+    const currentType = charColType.rows[0]?.data_type?.toLowerCase();
+    console.log(`[DB] Characters data column type: "${currentType}" (rows: ${charColType.rows.length})`);
+    console.log(`[DB] Full result: ${JSON.stringify(charColType.rows)}`);
     if (currentType === 'text') {
       console.log('[DB] Converting characters.data from TEXT to JSONB...');
       try {
