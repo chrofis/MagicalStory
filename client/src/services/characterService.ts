@@ -188,6 +188,15 @@ function stripAvatarImages(avatars: Character['avatars']): Character['avatars'] 
   };
 }
 
+// Version that preserves avatar images (used when saving freshly generated avatars)
+function mapCharacterToApiWithAvatars(char: Partial<Character>): Record<string, unknown> {
+  const result = mapCharacterToApi(char);
+  // Override with full avatars (don't strip)
+  result.clothing_avatars = char.avatars;
+  result.avatars = char.avatars;
+  return result;
+}
+
 // Convert frontend Character to API format
 function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
   // Auto-compute ageCategory if not set but age is available
@@ -359,9 +368,11 @@ export const characterService = {
     });
   },
 
-  async saveCharacterData(data: CharacterData): Promise<void> {
+  async saveCharacterData(data: CharacterData, options?: { preserveAvatars?: boolean }): Promise<void> {
+    // Use full avatar data if preserveAvatars is true (e.g., when saving freshly generated avatars)
+    const mapFn = options?.preserveAvatars ? mapCharacterToApiWithAvatars : mapCharacterToApi;
     const apiData = {
-      characters: data.characters.map(mapCharacterToApi),
+      characters: data.characters.map(mapFn),
       relationships: data.relationships,
       relationshipTexts: data.relationshipTexts,
       customRelationships: data.customRelationships,
@@ -982,11 +993,11 @@ export const characterService = {
         log.info(`📝 Character ${character.name} (id: ${character.id}) not found in server data - adding it`);
       }
 
-      // Save back
+      // Save back - preserve avatars since we just generated them
       await characterService.saveCharacterData({
         ...currentData,
         characters: updatedCharacters,
-      });
+      }, { preserveAvatars: true });
 
       result.success = true;
       result.character = updatedCharacter;  // Return the updated character with avatars and extracted data
@@ -1132,7 +1143,7 @@ export const characterService = {
       await characterService.saveCharacterData({
         ...freshData,
         characters: updatedCharacters,
-      });
+      }, { preserveAvatars: true });
 
       log.success(`💾 Saved avatar updates for ${updatedCharactersMap.size} characters`);
     }

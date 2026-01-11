@@ -10,6 +10,41 @@ const router = express.Router();
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 
+// GET /api/characters/cleanup-styled-x7k9m - One-time cleanup endpoint (remove after use)
+router.get('/cleanup-styled-x7k9m', async (req, res) => {
+  try {
+    const email = 'rogerfischer@hotmail.com';
+    const userResult = await dbQuery("SELECT id FROM users WHERE email = $1", [email]);
+    if (userResult.length === 0) return res.json({ error: 'User not found' });
+
+    const userId = userResult[0].id;
+    const rowId = `characters_${userId}`;
+    const charResult = await dbQuery('SELECT data FROM characters WHERE id = $1', [rowId]);
+    if (charResult.length === 0) return res.json({ error: 'No character data' });
+
+    const data = JSON.parse(charResult[0].data);
+    let cleared = 0, styledCount = 0, costumedCount = 0;
+
+    for (const char of data.characters || []) {
+      if (char.avatars?.styledAvatars) {
+        styledCount += Object.keys(char.avatars.styledAvatars).length;
+        cleared += JSON.stringify(char.avatars.styledAvatars).length;
+        delete char.avatars.styledAvatars;
+      }
+      if (char.avatars?.costumed) {
+        costumedCount += Object.keys(char.avatars.costumed).length;
+        cleared += JSON.stringify(char.avatars.costumed).length;
+        delete char.avatars.costumed;
+      }
+    }
+
+    await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
+    res.json({ success: true, styledCount, costumedCount, clearedMB: (cleared/1024/1024).toFixed(2) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/characters - Get user's characters
 // Query params:
 //   - includeAllAvatars=true: Include all avatar variants (dev mode only)
@@ -227,9 +262,9 @@ router.post('/', authenticateToken, async (req, res) => {
 
         const mergedAvatars = { ...newChar.avatars };
 
-        // Preserve basic avatar variants (winter, summer, formal) from database
+        // Preserve basic avatar variants (standard, winter, summer, formal) from database
         // These get stripped for non-dev users on GET, so we must preserve them on save
-        const basicVariants = ['winter', 'summer', 'formal'];
+        const basicVariants = ['standard', 'winter', 'summer', 'formal'];
         for (const variant of basicVariants) {
           if (existingChar.avatars[variant] && !newChar.avatars?.[variant]) {
             mergedAvatars[variant] = existingChar.avatars[variant];
