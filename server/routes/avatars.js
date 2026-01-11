@@ -1386,23 +1386,45 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           avatarPrompt += userTraitsSection;
         }
 
+        // Build request body matching the sync CLOTHING AVATARS path
+        const requestBody = {
+          systemInstruction: {
+            parts: [{
+              text: PROMPT_TEMPLATES.avatarSystemInstruction
+            }]
+          },
+          contents: [{
+            parts: [
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Data
+                }
+              },
+              { text: avatarPrompt }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            responseModalities: ["TEXT", "IMAGE"],
+            imageConfig: {
+              aspectRatio: "9:16"
+            }
+          },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+          ]
+        };
+
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: avatarPrompt },
-                  { inlineData: { mimeType, data: base64Data } }
-                ]
-              }],
-              generationConfig: {
-                responseModalities: ['IMAGE', 'TEXT'],
-                responseMimeType: 'image/png'
-              }
-            })
+            body: JSON.stringify(requestBody)
           }
         );
 
@@ -1418,8 +1440,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
         if (data.candidates && data.candidates[0]?.content?.parts) {
           for (const part of data.candidates[0].content.parts) {
-            if (part.inlineData) {
-              imageData = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            // Handle both camelCase (inlineData) and snake_case (inline_data) - Gemini API varies
+            const inlineData = part.inlineData || part.inline_data;
+            if (inlineData && inlineData.data) {
+              const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+              imageData = `data:${respMimeType};base64,${inlineData.data}`;
               break;
             }
           }
